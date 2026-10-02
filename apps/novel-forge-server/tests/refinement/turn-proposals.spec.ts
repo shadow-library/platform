@@ -250,6 +250,7 @@ describe('splitTurnChangeSet', () => {
       query: {
         projects: { findFirst: async () => ({ id: 7n, brief: null, themes: null, instructions: null, ...project }) },
         entities: { findMany: async () => [mira] },
+        milestones: { findMany: async () => [] },
         canonFacts: { findMany: async () => [] },
       },
     };
@@ -294,26 +295,29 @@ describe('splitTurnChangeSet', () => {
     expect(turnHold(['echo', PLANNER_ONLY_WARNING])).toBe('turn');
   });
 
-  it('should hold only the ops the chapter writer reads when the turn drew on planner-only material', async () => {
+  it('should hold every op the chapter writer or a reader can see when the turn drew on planner-only material', async () => {
     const db = fakeDb({ premise: '' });
+    const milestone: ChangeOp = { op: 'milestone.upsert', milestoneKey: 'heist', label: 'The heist' };
 
-    const split = await splitTurnChangeSet(db as never, 7n, ops, { authorMessage: MESSAGE, mode: 'auto', justDiscussing: false, warnings: [PLANNER_ONLY_WARNING] });
+    const split = await splitTurnChangeSet(db as never, 7n, [milestone, ...ops], { authorMessage: MESSAGE, mode: 'auto', justDiscussing: false, warnings: [PLANNER_ONLY_WARNING] });
 
     expect(split.held).toBe('writer_read');
-    expect(split.direct).toEqual([ops[0] as ChangeOp]);
+    expect(split.direct).toEqual([milestone]);
     expect(split.dispositions).toEqual([
-      { index: 0, side: 'direct', source: 'quoted' },
+      { index: 0, side: 'direct', source: 'idea' },
       { index: 1, side: 'card', reason: 'held_for_review' },
-      { index: 2, side: 'card', reason: 'no_quote' },
+      { index: 2, side: 'card', reason: 'held_for_review' },
+      { index: 3, side: 'card', reason: 'no_quote' },
     ]);
   });
 
   it('should stop reporting a writer-read hold once the only op it held was a turned-down idea', async () => {
     const db = fakeDb({ premise: '' });
     const kael = ops[2] as ChangeOp;
+    const milestone: ChangeOp = { op: 'milestone.upsert', milestoneKey: 'heist', label: 'The heist' };
     const rejectedIdeas = async () => new Set([ideaIdOf(kael)]);
 
-    const split = await splitTurnChangeSet(db as never, 7n, [ops[0] as ChangeOp, kael], {
+    const split = await splitTurnChangeSet(db as never, 7n, [milestone, kael], {
       authorMessage: MESSAGE,
       mode: 'auto',
       justDiscussing: false,
@@ -322,7 +326,7 @@ describe('splitTurnChangeSet', () => {
     });
 
     expect(split.droppedIdeas).toEqual([ideaIdOf(kael)]);
-    expect(split.direct).toEqual([ops[0] as ChangeOp]);
+    expect(split.direct).toEqual([milestone]);
     expect(split.held).toBe('none');
   });
 

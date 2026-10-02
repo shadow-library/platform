@@ -58,7 +58,7 @@ export class BibleDocListItem {
 
   @Field({
     description:
-      'Only planners read this page: it says what happens later in the book, and a chat turn that looks it up holds for review every change the chapter writer would read.',
+      'Only planners read this page: it says what happens later in the book, and a chat turn that looks it up holds for review every change the chapter writer or a reader could see.',
   })
   plannerOnly: boolean;
 
@@ -97,7 +97,7 @@ export class BibleDocResponse {
 
   @Field({
     description:
-      'Only planners read this page: it says what happens later in the book, and a chat turn that looks it up holds for review every change the chapter writer would read.',
+      'Only planners read this page: it says what happens later in the book, and a chat turn that looks it up holds for review every change the chapter writer or a reader could see.',
   })
   plannerOnly: boolean;
 

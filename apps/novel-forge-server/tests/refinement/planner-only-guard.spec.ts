@@ -18,8 +18,8 @@ describe('planner-only guard', () => {
     expect(PLANNER_ONLY_WARNING).toContain('your notes');
   });
 
-  it('should say the warning holds only what the chapter writer reads, since what only planning reads applies', () => {
-    expect(PLANNER_ONLY_WARNING).toContain('its changes to what the chapter writer reads wait for you');
+  it('should say the warning holds what the chapter writer or readers could see, since only planner-side records apply', () => {
+    expect(PLANNER_ONLY_WARNING).toContain('its changes to what the chapter writer or your readers could see wait for you');
   });
 
   it('should warn once on a turn that read one, and leave any other turn’s warnings as they are', () => {

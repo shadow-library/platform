@@ -67,11 +67,7 @@ export function traceArgs(tool: string, args: Record<string, unknown>): Refineme
 
 const elapsed = (ms: number): number => Math.max(0, Math.round(ms));
 
-/**
- * One turn's trace, kept on the turn's own call stack rather than in `EmitterRelay`, which the synchronous route never builds. Its clock
- * replays the web's turn reducer: waiting time is thinking until the first write, a lookup pauses it and drops the wait before it, and a
- * replaced reply forgets when the reply and its first change began.
- */
+/** Lives on the turn's call stack because the sync route never builds `EmitterRelay`; replays the web turn reducer's clock. */
 export class TurnTraceCollector {
   private readonly sources = new Map<string, Refinement.ChatTraceSource>();
   private readonly startedAt: number;

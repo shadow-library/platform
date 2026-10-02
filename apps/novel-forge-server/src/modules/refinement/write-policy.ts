@@ -3,15 +3,14 @@ import { type Refinement } from '@server/database';
 import { isWriterExcludedBibleDoc } from '../ai/context/bible-docs';
 import { requiredEntityTypesForSlug } from '../bible/bible-manifest';
 import { type RecordFields } from './artifact-state';
-import { ACTION_TYPES, type ActionType, type ChangeOp, changeSetRefs, declaredOpFields, type EntityUpsertOp, isActionOp, type OpType, type PremiseUpdateOp } from './change-set';
+import { ACTION_TYPES, type ActionType, type ChangeOp, changeSetRefs, declaredOpFields, type EntityUpsertOp, isActionOp, type OpType } from './change-set';
 
 export type OpSide = 'direct' | 'card';
 /**
- * What a turn's warnings hold for review: `turn` every op, `writer_read` only the ops whose records the chapter writer reads, so a turn that
- * drew on planner-only material still lands what only planning reads.
+ * What a turn's warnings hold for review: `turn` every op, `writer_read` every op whose records the chapter writer or a reader can see, so a
+ * turn that drew on planner-only material still lands what only planning reads.
  */
 export type WriteHold = 'none' | 'turn' | 'writer_read';
-export type WriterExposure = 'planner_side' | 'writer_read';
 export type CardReason =
   | 'just_discussing'
   | 'manual_mode'
@@ -142,40 +141,8 @@ export const IDEA_POLICY: Readonly<Record<OpType, 'idea' | AlwaysCardRule>> = {
   ...(Object.fromEntries(ACTION_TYPES.map(action => [action, 'action'])) as Record<ActionType, AlwaysCardRule>),
 };
 
-const PREMISE_FIELD_EXPOSURE: Readonly<Record<Exclude<keyof PremiseUpdateOp, 'op'>, WriterExposure>> = {
-  premise: 'planner_side',
-  brief: 'planner_side',
-  themes: 'planner_side',
-  instructions: 'writer_read',
-};
-
-/**
- * Whether the chapter writer reads what an op writes, so a `writer_read` hold knows which ops to keep for review. Keyed by every kind, so a
- * new kind does not compile until it is classified here; a premise update is judged by the fields it writes.
- */
-export const WRITER_EXPOSURE: Readonly<Record<OpType, WriterExposure | Readonly<Record<string, WriterExposure>>>> = {
-  'premise.update': PREMISE_FIELD_EXPOSURE,
-  'bible_document.upsert': 'writer_read',
-  'bible_document.remove': 'writer_read',
-  'volume.upsert': 'writer_read',
-  'volume.remove': 'writer_read',
-  'brief.update': 'writer_read',
-  'brief.remove': 'writer_read',
-  'draft.update': 'writer_read',
-  'draft.remove': 'writer_read',
-  'entity.upsert': 'writer_read',
-  'entity.remove': 'writer_read',
-  'fact.upsert': 'writer_read',
-  'fact.remove': 'writer_read',
-  'milestone.upsert': 'planner_side',
-  'milestone.remove': 'writer_read',
-  'promise.create': 'writer_read',
-  'promise.update': 'writer_read',
-  'promise.set_payoff': 'writer_read',
-  'promise.drop': 'writer_read',
-  'organise.rule': 'writer_read',
-  ...(Object.fromEntries(ACTION_TYPES.map(action => [action, 'writer_read'])) as Record<ActionType, WriterExposure>),
-};
+/** The kinds only planning reads; every other kind, a new one included, is held when a turn drew on planner-only material. */
+const PLANNER_SIDE_OPS: ReadonlySet<OpType> = new Set(['milestone.upsert']);
 
 const MIN_QUOTE_WORDS = 3;
 const NOVELTY_FLOOR = 4;
@@ -399,12 +366,8 @@ export function alwaysCardRule(op: ChangeOp, state: WritePolicyState): AlwaysCar
   return gates || (current && op.terms !== undefined) ? 'secret_gating' : undefined;
 }
 
-/** An op is planner-side only when every field it writes is: one writer-read field, or one not yet classified, puts the whole op in front of the writer. */
-export function writerExposure(op: ChangeOp): WriterExposure {
-  const exposure = WRITER_EXPOSURE[op.op];
-  if (typeof exposure === 'string') return exposure;
-  const fields = op as unknown as Record<string, unknown>;
-  return declaredOpFields(op.op).every(field => fields[field] === undefined || exposure[field] === 'planner_side') ? 'planner_side' : 'writer_read';
+export function isPlannerSide(op: ChangeOp): boolean {
+  return PLANNER_SIDE_OPS.has(op.op);
 }
 
 /** Plans cite Story Bible pages as `bible_doc:`, change-sets name them `doc:`. */
@@ -528,7 +491,7 @@ function moveDependentsToCards(ops: readonly ChangeOp[], judged: Judged[], curre
  */
 function judge(ops: readonly ChangeOp[], input: WritePolicyInput, appliesIdeas: boolean, hold: WriteHold): Judged[] {
   const judged = ops.map((op, index): Judged => {
-    const held = hold === 'turn' || (hold === 'writer_read' && writerExposure(op) === 'writer_read');
+    const held = hold === 'turn' || (hold === 'writer_read' && !isPlannerSide(op));
     const intrinsic = intrinsicDisposition(op, index, input, appliesIdeas && !held);
     return held && intrinsic.disposition.side === 'direct' ? { disposition: { index, side: 'card', reason: 'held_for_review' } } : intrinsic;
   });

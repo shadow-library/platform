@@ -4990,7 +4990,7 @@ export interface components {
       applied?: components['schemas']['TurnAppliedResult'];
       /** @description why ops that rest on the author’s words were NOT applied (a warning to review, a conflict, a refused write) */
       applyNote?: string;
-      /** @description present when a hold kept changes that would have applied among the suggestions. warnings: a warning on the turn held every change. planner_sources: the turn drew on the author’s notes or a planner-only page, so only the changes the chapter writer reads were held. */
+      /** @description present when a hold kept changes that would have applied among the suggestions. warnings: a warning on the turn held every change. planner_sources: the turn drew on the author’s notes or a planner-only page, so every change the chapter writer or a reader could see was held; only milestones still applied. */
       held?: components['schemas']['TurnHoldReason'];
       runId: string;
     };
@@ -5990,7 +5990,7 @@ export interface components {
       excerpt?: string;
       /** @description The chapter writer never reads this page: a ref to it resolves to nothing in a writer pack. True of every planner-only page. */
       writerExcluded: boolean;
-      /** @description Only planners read this page: it says what happens later in the book, and a chat turn that looks it up holds for review every change the chapter writer would read. */
+      /** @description Only planners read this page: it says what happens later in the book, and a chat turn that looks it up holds for review every change the chapter writer or a reader could see. */
       plannerOnly: boolean;
       /** Format: date-time */
       updatedAt: string;
@@ -6007,7 +6007,7 @@ export interface components {
       body?: string | null;
       /** @description The chapter writer never reads this page: a ref to it resolves to nothing in a writer pack. True of every planner-only page. */
       writerExcluded: boolean;
-      /** @description Only planners read this page: it says what happens later in the book, and a chat turn that looks it up holds for review every change the chapter writer would read. */
+      /** @description Only planners read this page: it says what happens later in the book, and a chat turn that looks it up holds for review every change the chapter writer or a reader could see. */
       plannerOnly: boolean;
       /** Format: date-time */
       createdAt: string;

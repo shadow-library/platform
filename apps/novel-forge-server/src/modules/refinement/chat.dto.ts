@@ -478,7 +478,7 @@ export class ChatTurnResponse {
   @Field(() => TurnHoldReasonEnum, {
     optional: true,
     description:
-      'present when a hold kept changes that would have applied among the suggestions. warnings: a warning on the turn held every change. planner_sources: the turn drew on the author’s notes or a planner-only page, so only the changes the chapter writer reads were held.',
+      'present when a hold kept changes that would have applied among the suggestions. warnings: a warning on the turn held every change. planner_sources: the turn drew on the author’s notes or a planner-only page, so every change the chapter writer or a reader could see was held; only milestones still applied.',
   })
   held?: TurnHoldReason;
 

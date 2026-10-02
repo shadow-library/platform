@@ -9,6 +9,7 @@ import {
   type DirectDisposition,
   exceedsNoveltyBudget,
   exceedsRemovalBudget,
+  isPlannerSide,
   opReferences,
   type OpSide,
   quoteFoundIn,
@@ -16,7 +17,6 @@ import {
   splitChangeSet,
   type WriteHold,
   type WritePolicyInput,
-  writerExposure,
 } from '@modules/refinement/write-policy';
 
 const AUTHOR_MESSAGE = [
@@ -424,31 +424,33 @@ describe('splitChangeSet — the hold flag', () => {
   });
 });
 
-describe('writerExposure', () => {
+describe('isPlannerSide', () => {
   const premise = (fields: Omit<Extract<ChangeOp, { op: 'premise.update' }>, 'op'>): ChangeOp => ({ op: 'premise.update', ...fields });
-  const cases: [string, ChangeOp, 'planner_side' | 'writer_read'][] = [
-    ['a milestone', { op: 'milestone.upsert', milestoneKey: 'heist', label: 'The heist' }, 'planner_side'],
-    ['the premise', premise({ premise: 'A thief.' }), 'planner_side'],
-    ['the story brief and themes', premise({ brief: 'A heist.', themes: ['debt'] }), 'planner_side'],
-    ['the style guide', premise({ instructions: 'Short sentences.' }), 'writer_read'],
-    ['the premise beside the style guide', premise({ premise: 'A thief.', instructions: 'Short sentences.' }), 'writer_read'],
-    ['an entity', mira(), 'writer_read'],
-    ['a fact', fact({ body: 'The crown eats memories.' }), 'writer_read'],
-    ['a volume', { op: 'volume.upsert', volumeKey: 'v2', title: 'The Drowned Court' }, 'writer_read'],
-    ['a Story Bible page', { op: 'bible_document.upsert', section: 'world', slug: 'saltgate', body: 'Docks.' }, 'writer_read'],
-    ['a new promise', { op: 'promise.create', kind: 'thread', key: 'ledger', label: 'Who took the ledger' }, 'writer_read'],
-    ['a promise update', { op: 'promise.update', kind: 'thread', key: 'ledger', label: 'The ledger' }, 'writer_read'],
+  const cases: [string, ChangeOp, boolean][] = [
+    ['a milestone', { op: 'milestone.upsert', milestoneKey: 'heist', label: 'The heist' }, true],
+    ['the premise', premise({ premise: 'A thief.' }), false],
+    ['the story brief and themes', premise({ brief: 'A heist.', themes: ['debt'] }), false],
+    ['the style guide', premise({ instructions: 'Short sentences.' }), false],
+    ['a milestone removal', { op: 'milestone.remove', milestoneKey: 'heist' }, false],
+    ['an entity', mira(), false],
+    ['a fact', fact({ body: 'The crown eats memories.' }), false],
+    ['a volume', { op: 'volume.upsert', volumeKey: 'v2', title: 'The Drowned Court' }, false],
+    ['a Story Bible page', { op: 'bible_document.upsert', section: 'world', slug: 'saltgate', body: 'Docks.' }, false],
+    ['a new promise', { op: 'promise.create', kind: 'thread', key: 'ledger', label: 'Who took the ledger' }, false],
+    ['a promise update', { op: 'promise.update', kind: 'thread', key: 'ledger', label: 'The ledger' }, false],
   ];
 
   for (const [name, op, expected] of cases) {
-    it(`should classify ${name} as ${expected}`, () => {
-      expect(writerExposure(op)).toBe(expected);
+    it(`should ${expected ? 'classify' : 'not classify'} ${name} as planner-side`, () => {
+      expect(isPlannerSide(op)).toBe(expected);
     });
   }
 });
 
 describe('splitChangeSet — a writer-read hold', () => {
   const premise: ChangeOp = { op: 'premise.update', premise: 'Mira is a thief who works the Saltgate docks.', quote: QUOTE };
+  const brief: ChangeOp = { op: 'premise.update', brief: 'Mira is a thief who works the Saltgate docks.', quote: QUOTE };
+  const themes: ChangeOp = { op: 'premise.update', themes: ['thief', 'docks'], quote: QUOTE };
   const style: ChangeOp = { op: 'premise.update', instructions: 'Mira is a thief who works the Saltgate docks.', quote: QUOTE };
   const heist = (fields: Partial<Extract<ChangeOp, { op: 'milestone.upsert' }>> = {}): ChangeOp => ({
     op: 'milestone.upsert',
@@ -458,24 +460,47 @@ describe('splitChangeSet — a writer-read hold', () => {
   });
 
   it('should apply what only planning reads as usual', () => {
-    const split = policy([premise, heist()], { ideas: 'apply', hold: 'writer_read' });
+    const split = policy([heist()], { ideas: 'apply', hold: 'writer_read' });
 
-    expect(split.dispositions).toEqual([
-      { index: 0, side: 'direct', source: 'quoted' },
-      { index: 1, side: 'direct', source: 'idea' },
-    ]);
+    expect(split.dispositions).toEqual([{ index: 0, side: 'direct', source: 'idea' }]);
     expect(split.held).toBe('none');
   });
 
-  it('should hold a writer-read op that would have applied, keeping an idea’s quote-rule reason so a turned-down one is still filtered', () => {
-    const ops = [mira({ quote: QUOTE }), mira({ entityKey: 'kael', name: 'Kael', body: INVENTED }), style, premise];
+  it('should hold every story field a reader or the chapter writer can see, quoted or an idea', () => {
+    const ops: ChangeOp[] = [
+      premise,
+      brief,
+      themes,
+      style,
+      { op: 'premise.update', premise: INVENTED },
+      { op: 'premise.update', brief: INVENTED },
+      { op: 'premise.update', themes: ['debt', 'betrayal'] },
+    ];
+    const split = policy(ops, { ideas: 'apply', hold: 'writer_read' });
+
+    expect(split.direct).toEqual([]);
+    expect(split.dispositions).toEqual([
+      { index: 0, side: 'card', reason: 'held_for_review' },
+      { index: 1, side: 'card', reason: 'held_for_review' },
+      { index: 2, side: 'card', reason: 'held_for_review' },
+      { index: 3, side: 'card', reason: 'held_for_review' },
+      { index: 4, side: 'card', reason: 'no_quote' },
+      { index: 5, side: 'card', reason: 'no_quote' },
+      { index: 6, side: 'card', reason: 'no_quote' },
+    ]);
+    expect(split.held).toBe('writer_read');
+  });
+
+  it('should hold an op that would have applied, keeping an idea’s quote-rule reason so a turned-down one is still filtered', () => {
+    const ops = [mira({ quote: QUOTE }), mira({ entityKey: 'kael', name: 'Kael', body: INVENTED }), style, premise, heist()];
     const split = policy(ops, { ideas: 'apply', hold: 'writer_read', existing: ['premise'] });
 
     expect(split.dispositions).toEqual([
       { index: 0, side: 'card', reason: 'held_for_review' },
       { index: 1, side: 'card', reason: 'no_quote' },
       { index: 2, side: 'card', reason: 'held_for_review' },
-      { index: 3, side: 'direct', source: 'quoted' },
+      { index: 3, side: 'card', reason: 'held_for_review' },
+      { index: 4, side: 'direct', source: 'idea' },
     ]);
     expect(split.held).toBe('writer_read');
   });
@@ -492,11 +517,15 @@ describe('splitChangeSet — a writer-read hold', () => {
     expect(existing.dispositions[1]).toEqual({ index: 1, side: 'direct', source: 'idea' });
   });
 
-  it('should apply a quoted planner-side op when ideas do not apply', () => {
-    const split = policy([premise, mira({ quote: QUOTE })], { ideas: 'card', hold: 'writer_read' });
+  it('should apply nothing when ideas do not apply, since only an idea is planner-side', () => {
+    const split = policy([heist(), premise, mira({ quote: QUOTE })], { ideas: 'card', hold: 'writer_read' });
 
-    expect(split.direct).toEqual([premise]);
-    expect(split.dispositions[1]).toEqual({ index: 1, side: 'card', reason: 'held_for_review' });
+    expect(split.direct).toEqual([]);
+    expect(split.dispositions).toEqual([
+      { index: 0, side: 'card', reason: 'not_allowlisted' },
+      { index: 1, side: 'card', reason: 'held_for_review' },
+      { index: 2, side: 'card', reason: 'held_for_review' },
+    ]);
   });
 
   it('should leave the turn to manual mode or just discussing, which outrank it', () => {

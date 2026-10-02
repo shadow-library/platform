@@ -10,7 +10,7 @@ import { type ApplyResult, type OpResult } from './proposal-apply.service';
 import { type ChangeSetSplit, type OpSource, splitChangeSet, type WriteHold } from './write-policy';
 
 export const HELD_FOR_REVIEW_NOTE = 'Not applied automatically: review the warnings on these suggestions first.';
-export const WRITER_READ_HELD_NOTE = 'Changes the chapter writer reads wait for your review, because this turn drew on your notes.';
+export const WRITER_READ_HELD_NOTE = 'Changes the chapter writer or your readers could see wait for your review, because this turn drew on your notes.';
 export const APPLY_FAILED_NOTE = 'Your words could not be applied as they stand, so every change is offered as a suggestion instead.';
 export const UNLINKED_NOTE = 'Your words were applied, but this reply could not be linked to them — find the change in Change history to undo it.';
 export const CARDS_UNSAVED_NOTE = 'Your words were applied, but the suggestions that came with them could not be saved — ask again to see them.';
@@ -72,7 +72,7 @@ export interface TurnSplit extends ChangeSetSplit {
   droppedIdeas: string[];
 }
 
-/** Reading the notes or a planner-only page holds only what the chapter writer reads; any other warning holds the whole turn. */
+/** Reading the notes or a planner-only page holds every op the chapter writer or a reader can see; any other warning holds the whole turn. */
 export function turnHold(warnings: readonly string[]): WriteHold {
   if (warnings.length === 0) return 'none';
   return warnings.every(warning => warning === PLANNER_ONLY_WARNING) ? 'writer_read' : 'turn';

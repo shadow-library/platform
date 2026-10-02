@@ -365,7 +365,7 @@ function byText(left: string, right: string): number {
 }
 
 const PLANNER_ONLY_PAGE_NOTE =
-  '(planner-only: says what happens later in the book — look it up to read it; a change drawn from it to anything the chapter writer reads waits for the author’s review)';
+  '(planner-only: says what happens later in the book — look it up to read it; a change drawn from it to anything the chapter writer or readers can see waits for the author’s review)';
 
 export function renderInventory(inventory: NovelChatInventory): string {
   const entities = [...inventory.entities]
