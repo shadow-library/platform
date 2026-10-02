@@ -5,11 +5,13 @@ import { Paginated, PaginationQuery } from '@shadow-library/modules/http-core';
 import { ChatMode, ChatScope, ChatSessionStatus, ChatTurnOutcome, ContentMode, CostTier, SortByTime } from '@server/common';
 import { type Project, type Refinement } from '@server/database';
 
+import { CHAT_TRACE_STATUSES, type ChatTraceStatus } from './chat-turn-trace';
 import { AppliedArtifactItem, AppliedOpSource, OpResultItem, ProposalResponse } from './refinement.dto';
 import { TURN_HOLD_REASONS, type TurnHoldReason } from './turn-proposals';
 import { type OpSource } from './write-policy';
 
 const TurnHoldReasonEnum = EnumType.create('TurnHoldReason', [...TURN_HOLD_REASONS]);
+const ChatTraceStatusEnum = EnumType.create('ChatTraceStatus', [...CHAT_TRACE_STATUSES]);
 
 @Schema()
 export class ChatProjectParams {
@@ -169,6 +171,81 @@ export class ChatQuestionResponse {
   progressKey?: string | null;
 }
 
+@Schema({ description: 'The arguments a lookup was asked with, reduced to the ones that name what it read; text is trimmed and a long query is cut.' })
+export class ChatTraceArgsResponse {
+  @Field({ optional: true })
+  slug?: string;
+
+  @Field({ optional: true })
+  section?: string;
+
+  @Field({ optional: true })
+  chapter?: number;
+
+  @Field({ optional: true })
+  from?: number;
+
+  @Field({ optional: true })
+  to?: number;
+
+  @Field({ optional: true })
+  part?: number;
+
+  @Field({ optional: true })
+  status?: string;
+
+  @Field({ optional: true })
+  entityKey?: string;
+
+  @Field({ optional: true })
+  volumeKey?: string;
+
+  @Field({ optional: true })
+  category?: string;
+
+  @Field({ optional: true })
+  query?: string;
+}
+
+@Schema({ description: 'One source a turn read: a lookup asked again with the same arguments is listed once, with its latest outcome.' })
+export class ChatTraceSourceResponse {
+  @Field()
+  tool: string;
+
+  @Field(() => ChatTraceArgsResponse)
+  args: ChatTraceArgsResponse;
+
+  @Field(() => ChatTraceStatusEnum, { description: '`error` when the lookup could not be read: an unknown tool, bad arguments, an exhausted budget or a failed read.' })
+  status: ChatTraceStatus;
+}
+
+@Schema({ description: "Milliseconds spent on each step of the turn, as the turn's own progress view counts them." })
+export class ChatTraceTimingResponse {
+  @Field(() => Integer, { description: 'From the turn starting to its first written word or change, less the time spent thinking.' })
+  readMs: number;
+
+  @Field(() => Integer, { description: 'Time spent waiting on the model before it wrote, outside any lookup.' })
+  thinkMs: number;
+
+  @Field(() => Integer, { optional: true, description: 'From the first word of the reply to its first change, or to the end; absent when the turn streamed no reply.' })
+  writeMs?: number;
+
+  @Field(() => Integer, { optional: true, description: 'From the first change to the turn settling; absent when the turn streamed no change.' })
+  saveMs?: number;
+
+  @Field(() => Integer)
+  workedMs: number;
+}
+
+@Schema({ description: 'What a settled turn read and how long it took. Never carries what a lookup returned.' })
+export class ChatTurnTraceResponse {
+  @Field(() => [ChatTraceSourceResponse])
+  sources: ChatTraceSourceResponse[];
+
+  @Field(() => ChatTraceTimingResponse)
+  timing: ChatTraceTimingResponse;
+}
+
 @Schema()
 export class ChatMessageResponse {
   @Field(() => String)
@@ -239,6 +316,13 @@ export class ChatMessageResponse {
 
   @Field(() => ChatQuestionResponse, { optional: true, nullable: true, description: "This turn's question card, when Forge raised one; null on every other message." })
   question?: ChatQuestionResponse | null;
+
+  @Field(() => ChatTurnTraceResponse, {
+    optional: true,
+    nullable: true,
+    description: "What this reply's turn read and how long each step took; null on user messages and on replies older than the trace.",
+  })
+  trace?: ChatTurnTraceResponse | null;
 
   @Field(() => String, { format: 'date-time' })
   createdAt: Date;

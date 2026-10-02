@@ -85,6 +85,9 @@
 - **A running turn is a chronological timeline** (reading, thinking, the reply, changes as they are written) whose live status is always its last line. The settled turn result is
   the authority: nothing claims "saved", applied or carded before it arrives, and a replaced or failed reply leaves no streamed change standing. Thinking time is measured, not
   shown: the gateway does not forward the model's reasoning, so there is no reasoning summary.
+- **A settled reply keeps its turn's trace**: the sources it read, named by only the arguments their labels use (never what a lookup returned), and each step's time, so a
+  reload shows the turn as its watcher saw it. A reply that streamed nothing has no write timings, and a reply older than the trace has none at all. The trace never enters a
+  model prompt.
 - **The mode is the author's choice in the composer**, and its label always names what the next turn will do: Edit freely (session `auto`, the default), Ask first (session
   `manual`) or Just discuss (this turn only; every op is a card, and the session's mode is untouched). Edit prose is a separate per-turn permission, never implied by a mode, and
   prose always arrives as a card. The chat model is told the session's mode, but it never decides what applies.

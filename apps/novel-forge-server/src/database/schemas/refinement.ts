@@ -59,6 +59,41 @@ export namespace Refinement {
     | { kind: 'pov'; message: string; data: PovData }
     | { kind: 'density'; message: string }
     | { kind: 'other'; message: string };
+
+  /** Only the argument keys a lookup's label reads; never the lookup's result. */
+  export interface ChatTraceArgs {
+    slug?: string;
+    section?: string;
+    chapter?: number;
+    from?: number;
+    to?: number;
+    part?: number;
+    status?: string;
+    entityKey?: string;
+    volumeKey?: string;
+    category?: string;
+    query?: string;
+  }
+
+  export interface ChatTraceSource {
+    tool: string;
+    args: ChatTraceArgs;
+    status: 'ok' | 'error';
+  }
+
+  /** `writeMs` and `saveMs` are absent on a turn that streamed nothing: the synchronous route never sees the reply being written. */
+  export interface ChatTraceTiming {
+    readMs: number;
+    thinkMs: number;
+    writeMs?: number;
+    saveMs?: number;
+    workedMs: number;
+  }
+
+  export interface ChatTurnTrace {
+    sources: ChatTraceSource[];
+    timing: ChatTraceTiming;
+  }
 }
 
 export const chatScope = pgEnum('chat_scope', ['project', 'novel', 'bible_document', 'volume', 'brief']);
@@ -127,6 +162,9 @@ export const chatMessages = pgTable(
     // A hub turn's structured question card (an identity decision the author hasn't made): question, why, 2-4 answers, optional progressKey.
     // Null on every message but a chat-refine reply that raised one; the server drops a malformed shape before it ever reaches this column.
     question: jsonb('question').$type<Record<string, unknown>>(),
+    // What a settled reply read and how long each step took, so a reload shows the turn as its watcher saw it. Null on user messages and on
+    // replies older than the column.
+    trace: jsonb('trace').$type<Refinement.ChatTurnTrace>(),
     createdAt: timestamp('created_at').notNull().defaultNow(),
   },
   t => [unique('chat_messages_session_id_ordinal_unique').on(t.sessionId, t.ordinal), index('chat_messages_applied_proposal_id_idx').on(t.appliedProposalId)],

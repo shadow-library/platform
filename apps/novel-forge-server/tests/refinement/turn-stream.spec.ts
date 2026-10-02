@@ -49,6 +49,33 @@ describe('TurnStreamService', () => {
     ]);
   });
 
+  it('should carry the reply’s trace on the done frame', async () => {
+    const trace = { sources: [{ tool: 'get_notes', args: { query: 'ledger' }, status: 'ok' as const }], timing: { readMs: 400, thinkMs: 900, writeMs: 1200, workedMs: 2500 } };
+    const message = (id: bigint, role: string, extra: object = {}) => ({
+      id,
+      sessionId: 'session-1',
+      ordinal: Number(id),
+      role,
+      content: 'Text.',
+      createdAt: new Date(0),
+      ...extra,
+    });
+    const chatService = {
+      turn: async (_projectId: bigint, _sessionId: string, _content: string, emitter: ChatTurnEmitter) => {
+        emitter.onRunId(RUN_ID);
+        return { runId: RUN_ID, userMessage: message(1n, 'user'), assistantMessage: message(2n, 'assistant', { trace }), proposal: null };
+      },
+    };
+    const service = new TurnStreamService(chatService as never, { forMessages: async () => new Map() } as never);
+    await service.start(PROJECT_ID, 'session-1', 'Where is the ledger?');
+    await Bun.sleep(0);
+
+    const frames: TurnStreamFrame[] = [];
+    collect(service, frames);
+    const done = frames.find(frame => frame.event === 'done');
+    expect(JSON.parse(done?.data ?? '{}')).toMatchObject({ assistantMessage: { trace }, userMessage: { trace: null } });
+  });
+
   it('should give a reconnecting subscriber the same replay once, then only live change events', async () => {
     const { service, emitter } = await startedTurn();
     emitter.onChange({ index: 0, op: 'premise.update', label: 'Premise', group: 'premise' });

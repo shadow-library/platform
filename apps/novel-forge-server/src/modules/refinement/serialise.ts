@@ -33,6 +33,7 @@ interface ChatMessageRow {
   contentMode?: Project.ContentMode | null;
   costTier?: Project.CostTier | null;
   question?: unknown;
+  trace?: Refinement.ChatTurnTrace | null;
   createdAt: Date;
 }
 
@@ -55,6 +56,7 @@ export function serialiseMessage(message: ChatMessageRow, offersNotes: NotesOffe
     costTier: message.costTier ?? null,
     offersNotes: offersNotes(message),
     question: (message.question as ChatMessageResponse['question']) ?? null,
+    trace: message.trace ?? null,
     createdAt: message.createdAt,
   };
 }

@@ -28,6 +28,7 @@ import { type ForgeCallPolicy, PluginPolicyService } from '../plugins/plugin-pol
 import { type ChangeOp } from './change-set';
 import { ChatCompactionService } from './chat-compaction.service';
 import { type ChatTurnEmitter, EmitterRelay } from './chat-turn-emitter';
+import { TurnTraceCollector } from './chat-turn-trace';
 import { CHAT_TURN_GRAPH, chatRoutedProject, type ChatSelection, chatSelection, type ChatSelectionOverride, loadTurnSelections, withChatModel } from './chat-selection';
 import { sanitizeChatQuestion } from './chat-question';
 import { loadRejectedIdeas } from './idea-rejections';
@@ -61,6 +62,13 @@ export interface SessionModelUpdate {
 
 /** The selection is absent on user messages and on turns older than selections. */
 export type ChatMessageView = Refinement.ChatMessage & Partial<ChatSelection>;
+
+interface LookupObservers {
+  round: number;
+  relay: EmitterRelay | null;
+  trace: TurnTraceCollector;
+  planner: { read: boolean };
+}
 
 interface ChatReplyRoute {
   policy: ForgeCallPolicy;
@@ -381,6 +389,7 @@ export class ChatService {
    * without one the turn is byte-for-byte what it was, down to going through `modelRouter.structured`.
    */
   async turn(projectId: bigint, sessionId: string, content: string, emitter?: ChatTurnEmitter, options: ChatTurnOptions = {}): Promise<ChatTurnResult> {
+    const trace = new TurnTraceCollector();
     const session = await this.getSession(projectId, sessionId);
     if (session.status !== 'active') throw AppErrorCode.CHT_002.create();
     await this.validateScopeRef(projectId, session.scopeType, session.scopeRef);
@@ -414,7 +423,11 @@ export class ChatService {
     const effectiveProject = withChatModel(routed, resolvedModel);
     const selection: ChatSelection = { contentMode: route.contentMode, costTier: route.costTier };
     const relay = emitter ? new EmitterRelay(emitter, err => this.logger.warn('chat turn emitter failed — running the turn unobserved', { projectId, sessionId, err })) : null;
-    const streamHandlers = relay?.streamHandlers;
+    const streamHandlers = relay ? trace.observe(relay.streamHandlers) : undefined;
+    const supersede = (): void => {
+      relay?.supersedeOnNextDelta();
+      trace.supersedeOnNextWrite();
+    };
     const { runId, result } = await this.workflowRunService.runChain(projectId, CHAT_TURN_GRAPH, `session:${sessionId}`, { content, ...selection }, async runId => {
       relay?.runId(runId);
       await this.workflowRunService.linkContextPack(runId, pack.id);
@@ -453,10 +466,10 @@ export class ChatService {
       const planner = { read: false };
       for (let round = 0; round < MAX_LOOKUP_ROUNDS && (output.lookups?.length ?? 0) > 0; round++) {
         this.logger.debug('chat turn: executing declared lookups', { runId, round, lookups: output.lookups?.map(l => l.tool) });
-        const results = await this.executeLookups(projectId, runId, output.lookups ?? [], lookupCallCounts, round, relay, planner);
+        const results = await this.executeLookups(projectId, runId, output.lookups ?? [], lookupCallCounts, { round, relay, trace, planner });
         const exhausted = round === MAX_LOOKUP_ROUNDS - 1 ? '\n\nLookup budget exhausted — answer with what you have; do not request more lookups.' : '';
         turnHistory.push(new AIMessage(JSON.stringify({ reply: output.reply, lookups: output.lookups })), new HumanMessage(`Lookup results:\n${results}${exhausted}`));
-        relay?.supersedeOnNextDelta();
+        supersede();
         output = await invoke();
       }
       // A model that still asks for lookups after the budget note answers with its reply alone, dropping any changeSet or question sent alongside it.
@@ -468,7 +481,7 @@ export class ChatService {
       let warnings = await this.negationWarnings(projectId, output, exempt);
       if (warnings.length > 0) {
         turnHistory.push(new AIMessage(JSON.stringify({ reply: output.reply, changeSet: output.changeSet })), new HumanMessage(negationFixRequest(warnings)));
-        relay?.supersedeOnNextDelta();
+        supersede();
         const revised = await invoke().catch((err: unknown) => {
           this.logger.warn('chat turn: negation fix round failed — keeping the flagged change-set', { projectId, sessionId, runId, err });
           return null;
@@ -480,7 +493,7 @@ export class ChatService {
       }
 
       const turnWarnings = chatTurnWarnings(warnings, planner.read);
-      const persisted = await this.persistAssistantTurn(projectId, session, userMessage, output, runId, resolvedModel, turnWarnings, justDiscussing);
+      const persisted = await this.persistAssistantTurn(projectId, session, userMessage, output, runId, resolvedModel, turnWarnings, justDiscussing, trace);
       return { ...persisted, assistantMessage: { ...persisted.assistantMessage, ...selection } };
     });
 
@@ -533,9 +546,7 @@ export class ChatService {
     runId: string,
     lookups: { tool: string; args?: Record<string, unknown> }[],
     callCounts: Map<string, number>,
-    round: number,
-    relay: EmitterRelay | null,
-    planner: { read: boolean },
+    { round, relay, trace, planner }: LookupObservers,
   ): Promise<string> {
     const rawTools = this.toolRegistry.getRaw(CHAT_HUB_NODE);
     const ctx: ToolContext = { chapter: null, db: this.db, node: CHAT_HUB_NODE, projectId, retrieval: this.retrievalService, runId };
@@ -544,6 +555,7 @@ export class ChatService {
     for (const lookup of lookups) {
       const args = lookup.args ?? {};
       relay?.lookup({ round, tool: lookup.tool, args: { ...args }, status: 'running' });
+      trace.lookupStarted();
       const rawTool = rawTools.find(t => t.name === lookup.tool);
       const callCount = (callCounts.get(lookup.tool) ?? 0) + 1;
       callCounts.set(lookup.tool, callCount);
@@ -579,7 +591,9 @@ export class ChatService {
 
       // Copied, not shared: `args` is the object the audit row below stores, and a subscriber that
       // redacts what it is handed in place would rewrite that row.
-      relay?.lookup({ round, tool: lookup.tool, args: { ...args }, status: auditStatus === 'ok' ? 'ok' : 'error' });
+      const status = auditStatus === 'ok' ? 'ok' : 'error';
+      relay?.lookup({ round, tool: lookup.tool, args: { ...args }, status });
+      trace.lookupSettled(lookup.tool, args, status);
 
       const digest = createHash('sha256').update(resultStr).digest('hex').slice(0, 16);
       await this.db
@@ -627,6 +641,7 @@ export class ChatService {
     model: { provider: string; model: string },
     warnings: string[],
     justDiscussing: boolean,
+    trace: TurnTraceCollector,
   ): Promise<Omit<ChatTurnResult, 'runId'>> {
     const question = sanitizeChatQuestion(output.question, PROGRESS_ITEM_KEYS);
     const [assistantMessage] = await this.db
@@ -649,6 +664,7 @@ export class ChatService {
 
     const staging = await this.stageChangeSet(projectId, session, assistantMessage, userMessage.content, output, runId, warnings, justDiscussing);
     if (staging.cardProposal) await this.linkMessage(assistantMessage, { proposalId: staging.cardProposal.id });
+    await this.saveTrace(projectId, assistantMessage, trace.finish());
 
     await this.db.update(schema.chatSessions).set({ lastTurnAt: new Date(), updatedAt: new Date() }).where(eq(schema.chatSessions.id, session.id));
     const { cardProposal: proposal, appliedProposal, applied, applyNote, held } = staging;
@@ -717,6 +733,16 @@ export class ChatService {
   private async linkMessage(message: Refinement.ChatMessage, link: Pick<Refinement.ChatMessage, 'proposalId'> | Pick<Refinement.ChatMessage, 'appliedProposalId'>): Promise<void> {
     await this.db.update(schema.chatMessages).set(link).where(eq(schema.chatMessages.id, message.id));
     Object.assign(message, link);
+  }
+
+  /** A turn whose reply and changes are already saved is never failed by its trace; the reply then reads as one from before traces. */
+  private async saveTrace(projectId: bigint, message: Refinement.ChatMessage, trace: Refinement.ChatTurnTrace): Promise<void> {
+    try {
+      await this.db.update(schema.chatMessages).set({ trace }).where(eq(schema.chatMessages.id, message.id));
+      Object.assign(message, { trace });
+    } catch (err) {
+      this.logger.warn('chat turn: saving the turn trace failed — the reply keeps no trace', { projectId, messageId: message.id, runId: message.runId, err });
+    }
   }
 
   private async negationWarnings(projectId: bigint, output: ChatRefineOutput, exempt: ReadonlySet<string>): Promise<string[]> {

@@ -43,6 +43,13 @@
       "when": 1790704497425,
       "tag": "0005_proposal_op_undo",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790959716582,
+      "tag": "0006_chat_message_trace",
+      "breakpoints": true
     }
   ]
 }

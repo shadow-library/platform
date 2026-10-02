@@ -4872,6 +4872,8 @@ export interface components {
       offersNotes?: boolean;
       /** @description This turn's question card, when Forge raised one; null on every other message. */
       question?: components['schemas']['ChatQuestionResponse'] | null;
+      /** @description What this reply's turn read and how long each step took; null on user messages and on replies older than the trace. */
+      trace?: components['schemas']['ChatTurnTraceResponse'] | null;
       /** Format: date-time */
       createdAt: string;
     };
@@ -4890,6 +4892,46 @@ export interface components {
       tradeOff?: string | null;
       /** @description true on the one answer Forge recommends */
       recommended?: boolean;
+    };
+    /** @description What a settled turn read and how long it took. Never carries what a lookup returned. */
+    ChatTurnTraceResponse: {
+      sources: components['schemas']['ChatTraceSourceResponse'][];
+      timing: components['schemas']['ChatTraceTimingResponse'];
+    };
+    /** @description One source a turn read: a lookup asked again with the same arguments is listed once, with its latest outcome. */
+    ChatTraceSourceResponse: {
+      tool: string;
+      args: components['schemas']['ChatTraceArgsResponse'];
+      /** @description `error` when the lookup could not be read: an unknown tool, bad arguments, an exhausted budget or a failed read. */
+      status: components['schemas']['ChatTraceStatus'];
+    };
+    /** @description The arguments a lookup was asked with, reduced to the ones that name what it read; text is trimmed and a long query is cut. */
+    ChatTraceArgsResponse: {
+      slug?: string;
+      section?: string;
+      chapter?: number;
+      from?: number;
+      to?: number;
+      part?: number;
+      status?: string;
+      entityKey?: string;
+      volumeKey?: string;
+      category?: string;
+      query?: string;
+    };
+    /** @enum {string} */
+    ChatTraceStatus: 'ok' | 'error';
+    /** @description Milliseconds spent on each step of the turn, as the turn's own progress view counts them. */
+    ChatTraceTimingResponse: {
+      /** @description From the turn starting to its first written word or change, less the time spent thinking. */
+      readMs: number;
+      /** @description Time spent waiting on the model before it wrote, outside any lookup. */
+      thinkMs: number;
+      /** @description From the first word of the reply to its first change, or to the end; absent when the turn streamed no reply. */
+      writeMs?: number;
+      /** @description From the first change to the turn settling; absent when the turn streamed no change. */
+      saveMs?: number;
+      workedMs: number;
     };
     /** @description The turn running right now, so a client can name the phase and count the wait instead of showing a bare spinner. */
     PendingTurnResponse: {
@@ -4948,6 +4990,8 @@ export interface components {
       applied?: components['schemas']['TurnAppliedResult'];
       /** @description why ops that rest on the author’s words were NOT applied (a warning to review, a conflict, a refused write) */
       applyNote?: string;
+      /** @description present when a hold kept changes that would have applied among the suggestions. warnings: a warning on the turn held every change. planner_sources: the turn drew on the author’s notes or a planner-only page, so only the changes the chapter writer reads were held. */
+      held?: components['schemas']['TurnHoldReason'];
       runId: string;
     };
     /** @description Proposal application outcome returned as part of an automatic-mode turn. */
@@ -4973,6 +5017,8 @@ export interface components {
     } & {
       [key: string]: unknown;
     };
+    /** @enum {string} */
+    TurnHoldReason: 'warnings' | 'planner_sources';
     UpdateChatSessionBody: {
       mode?: components['schemas']['ChatMode'];
       title?: string;
@@ -5944,7 +5990,7 @@ export interface components {
       excerpt?: string;
       /** @description The chapter writer never reads this page: a ref to it resolves to nothing in a writer pack. True of every planner-only page. */
       writerExcluded: boolean;
-      /** @description Only planners read this page: it says what happens later in the book, and a chat turn that looks it up is held for review. */
+      /** @description Only planners read this page: it says what happens later in the book, and a chat turn that looks it up holds for review every change the chapter writer would read. */
       plannerOnly: boolean;
       /** Format: date-time */
       updatedAt: string;
@@ -5961,7 +6007,7 @@ export interface components {
       body?: string | null;
       /** @description The chapter writer never reads this page: a ref to it resolves to nothing in a writer pack. True of every planner-only page. */
       writerExcluded: boolean;
-      /** @description Only planners read this page: it says what happens later in the book, and a chat turn that looks it up is held for review. */
+      /** @description Only planners read this page: it says what happens later in the book, and a chat turn that looks it up holds for review every change the chapter writer would read. */
       plannerOnly: boolean;
       /** Format: date-time */
       createdAt: string;
@@ -16323,6 +16369,11 @@ export type ListChatMessagesResponse = components['schemas']['ListChatMessagesRe
 export type ChatMessageResponse = components['schemas']['ChatMessageResponse'];
 export type ChatQuestionResponse = components['schemas']['ChatQuestionResponse'];
 export type ChatQuestionAnswerResponse = components['schemas']['ChatQuestionAnswerResponse'];
+export type ChatTurnTraceResponse = components['schemas']['ChatTurnTraceResponse'];
+export type ChatTraceSourceResponse = components['schemas']['ChatTraceSourceResponse'];
+export type ChatTraceArgsResponse = components['schemas']['ChatTraceArgsResponse'];
+export type ChatTraceStatus = components['schemas']['ChatTraceStatus'];
+export type ChatTraceTimingResponse = components['schemas']['ChatTraceTimingResponse'];
 export type PendingTurnResponse = components['schemas']['PendingTurnResponse'];
 export type FailedTurnResponse = components['schemas']['FailedTurnResponse'];
 export type ChatTurnOutcome = components['schemas']['ChatTurnOutcome'];
@@ -16331,6 +16382,7 @@ export type ChatTurnBody = components['schemas']['ChatTurnBody'];
 export type ChatTurnResponse = components['schemas']['ChatTurnResponse'];
 export type TurnAppliedResult = components['schemas']['TurnAppliedResult'];
 export type TurnOpResultItem = components['schemas']['TurnOpResultItem'];
+export type TurnHoldReason = components['schemas']['TurnHoldReason'];
 export type UpdateChatSessionBody = components['schemas']['UpdateChatSessionBody'];
 export type UpdateSessionModelBody = components['schemas']['UpdateSessionModelBody'];
 export type ChatTurnStreamResponse = components['schemas']['ChatTurnStreamResponse'];
