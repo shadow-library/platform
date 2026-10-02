@@ -587,11 +587,13 @@ button.turnRow:hover {
 }
 
 .badgeAccent {
+  flex: none;
   padding: 1px 6px;
   border-radius: var(--sh-radius-full);
   background: var(--sh-accent-soft);
   font-size: 11px;
   font-weight: 600;
+  white-space: nowrap;
   color: var(--sh-accent-text);
 }
 
@@ -762,7 +764,7 @@ button.turnRow:hover {
 
 .questionOptions {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -790,13 +792,24 @@ button.turnRow:hover {
   cursor: default;
 }
 
+.option[aria-pressed='true'],
+.option[aria-pressed='true']:hover:not(:disabled) {
+  border-color: var(--sh-accent);
+  background: var(--sh-accent-soft);
+}
+
 .question[data-settled] .option {
   opacity: 0.7;
+}
+
+.questionEyebrow {
+  color: var(--sh-accent-text);
 }
 
 .optionHead {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 6px;
 }
 
@@ -805,8 +818,33 @@ button.turnRow:hover {
 }
 
 .optionWhy {
+  flex: 1;
   font-size: var(--sh-text-body-sm);
   color: var(--sh-text-secondary);
+}
+
+.optionTradeOff {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--sh-border-default);
+}
+
+.questionFoot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.questionConfirm {
+  max-width: 100%;
+}
+
+.questionConfirmLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .job {

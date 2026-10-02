@@ -66,6 +66,7 @@ import {
   organiseReceiptView,
   type PromptChip,
   promptChips,
+  questionEyebrow,
   questionOf,
   type QuestionOption,
   type SessionMode,
@@ -122,6 +123,7 @@ interface TranscriptActions {
   cancelJob: (jobId: string) => void;
   answer: (option: QuestionOption) => void;
   leaveUndecided: (key: ProgressItemKey | undefined) => void;
+  focusComposer: () => void;
   addParagraph: (paragraph: UnusedParagraph) => void;
   reviewInPanel: (messageId: string) => void;
 }
@@ -570,6 +572,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
       cancelJob,
       answer: option => sendTurn(option.title),
       leaveUndecided,
+      focusComposer: () => inputRef.current?.focus(),
       addParagraph: paragraph => sendTurn(unusedParagraphPrompt(paragraph)),
       reviewInPanel,
     };
@@ -582,6 +585,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
       cancelJob: jobId => latest.current?.cancelJob(jobId),
       answer: option => latest.current?.answer(option),
       leaveUndecided: key => latest.current?.leaveUndecided(key),
+      focusComposer: () => latest.current?.focusComposer(),
       addParagraph: paragraph => latest.current?.addParagraph(paragraph),
       reviewInPanel: messageId => latest.current?.reviewInPanel(messageId),
     }),
@@ -677,6 +681,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
                     novelId={novelId}
                     message={m}
                     settledQuestions={answeredUpTo > m.ordinal}
+                    eyebrow={questionEyebrow(m.question?.progressKey, checklist, answeredUpTo > m.ordinal)}
                     held={m.id === finishedId ? finishedHeld : undefined}
                     busy={busy}
                     jobs={jobsByMessage.get(m.id) ?? NO_JOBS}
@@ -915,6 +920,7 @@ interface AssistantMessageProps {
   novelId: string;
   message: ChatMessageResponse;
   settledQuestions: boolean;
+  eyebrow: string;
   /** Why the turn's cards were held, for the turn this tab ran. */
   held?: TurnHoldReason;
   busy: boolean;
@@ -931,6 +937,7 @@ const AssistantMessage = memo(function AssistantMessage({
   novelId,
   message,
   settledQuestions,
+  eyebrow,
   held,
   busy,
   jobs,
@@ -972,10 +979,12 @@ const AssistantMessage = memo(function AssistantMessage({
           <QuestionCard
             key={`${message.id}:question`}
             question={question}
+            eyebrow={eyebrow}
             settled={settledQuestions}
             disabled={busy}
             onPick={actions.answer}
             onUndecided={() => actions.leaveUndecided(question.progressKey)}
+            onOwnWords={actions.focusComposer}
           />
         )}
         {jobs.map(job => (

@@ -9,7 +9,7 @@ import { checklistView, type OrganiseReceiptView } from '../src/features/chat/ch
 import { ComposerModeMenu } from '../src/features/chat/ComposerModeMenu';
 import { JobProgress } from '../src/features/chat/JobProgress';
 import { OrganiseReceipt, type OrganiseReceiptProps } from '../src/features/chat/OrganiseReceipt';
-import { QuestionCard } from '../src/features/chat/QuestionCard';
+import { QuestionCard, QuestionCardView, type QuestionCardViewProps } from '../src/features/chat/QuestionCard';
 import { ReadyChecklist, type ReadyChecklistProps } from '../src/features/chat/ReadyChecklist';
 import { StreamedTurn } from '../src/features/chat/StreamedTurn';
 import { CommitBar, SuggestionCard, type SuggestionCardProps } from '../src/features/chat/SuggestionCard';
@@ -237,19 +237,89 @@ describe('QuestionCard', () => {
     ],
   };
 
-  it('should show examples with trade-offs, a recommendation and “Undecided for now”', () => {
-    const card = html(createElement(QuestionCard, { question, settled: false, disabled: false, onPick: noop, onUndecided: noop }));
-    expect(card).toContain('aria-labelledby=');
-    expect(card).toContain('My pick');
+  const view = (overrides: Partial<QuestionCardViewProps> = {}): string =>
+    html(
+      createElement(QuestionCardView, {
+        question,
+        eyebrow: 'Question 2 of 8 · Who opposes her',
+        settled: false,
+        disabled: false,
+        onSelect: noop,
+        onConfirm: noop,
+        onUndecided: noop,
+        onOwnWords: noop,
+        ...overrides,
+      }),
+    );
+  const buttons = (card: string): string[] => card.match(/<button[^>]*>/g) ?? [];
+
+  it('should lead with the eyebrow, label the card by it and the question, and show trade-offs and the recommendation', () => {
+    const card = view();
+    expect(card).toContain('Question 2 of 8 · Who opposes her');
+    expect(card).toMatch(/aria-labelledby="[^"]+ [^"]+"/);
+    expect(card).toContain('Claude’s pick');
+    expect(card).not.toContain('My pick');
     expect(card).toContain('Trade-off: waits for volume 2');
-    expect(card).toContain('Undecided for now');
-    expect(card.match(/<button type="button"/g)).toHaveLength(3);
+    expect(card.match(/Trade-off:/g)).toHaveLength(2);
   });
 
-  it('should lock the options once answered', () => {
-    const card = html(createElement(QuestionCard, { question, settled: true, disabled: false, onPick: noop, onUndecided: noop }));
+  it('should offer every option as an unpressed toggle with no answer chosen yet', () => {
+    const card = view();
+    expect(card.match(/aria-pressed="false"/g)).toHaveLength(2);
+    expect(card).not.toContain('aria-pressed="true"');
+    expect(card).toContain('Choose an option');
+    expect(buttons(card).at(-1)).toContain('disabled=""');
+  });
+
+  it('should press the chosen option and name it on the enabled confirm button', () => {
+    const card = view({ selected: 1 });
+    expect(card.match(/aria-pressed="true"/g)).toHaveLength(1);
+    expect(card.match(/aria-pressed="false"/g)).toHaveLength(1);
+    expect(card).toContain('Answer: Whether Low Harrow survives');
+    expect(card).not.toContain('Choose an option');
+    expect(buttons(card).at(-1)).not.toContain('disabled=""');
+  });
+
+  it('should offer own words and undecided on the left, with the confirm button last', () => {
+    const card = view();
+    expect(card.indexOf('Answer in my own words')).toBeLessThan(card.indexOf('Undecided for now'));
+    expect(card.indexOf('Undecided for now')).toBeLessThan(card.indexOf('Choose an option'));
+    expect(buttons(card)).toHaveLength(5);
+  });
+
+  it('should keep own words available but lock the options, undecided and confirm while a turn runs', () => {
+    const card = view({ selected: 0, disabled: true });
+    const [first, second, ownWords, undecided, confirm] = buttons(card);
+    expect(first).toContain('disabled=""');
+    expect(second).toContain('disabled=""');
+    expect(ownWords).not.toContain('disabled=""');
+    expect(undecided).toContain('disabled=""');
+    expect(confirm).toContain('disabled=""');
+  });
+
+  it('should render a three-option and a four-option question as plain toggles', () => {
+    const options = [{ title: 'A' }, { title: 'B' }, { title: 'C' }, { title: 'D' }];
+    expect(view({ question: { question: 'Which?', options: options.slice(0, 3) } }).match(/aria-pressed=/g)).toHaveLength(3);
+    const four = view({ question: { question: 'Which?', options }, selected: 3 });
+    expect(four.match(/aria-pressed=/g)).toHaveLength(4);
+    expect(four).toContain('Answer: D');
+    expect(four).not.toContain('Claude’s pick');
+    expect(four).not.toContain('Trade-off');
+  });
+
+  it('should lock the options once answered and drop the footer', () => {
+    const card = view({ settled: true, eyebrow: 'Question · Who opposes her' });
+    expect(card).toContain('data-settled="true"');
+    expect(card).toContain('Question · Who opposes her');
     expect(card).not.toContain('Undecided for now');
+    expect(card).not.toContain('Answer in my own words');
+    expect(card).not.toContain('Choose an option');
     expect(card.match(/disabled=""/g)).toHaveLength(2);
+  });
+
+  it('should show no pressed option on a settled card even if one was picked', () => {
+    const card = html(createElement(QuestionCard, { question, eyebrow: 'Question', settled: true, disabled: false, onPick: noop, onUndecided: noop, onOwnWords: noop }));
+    expect(card).not.toContain('aria-pressed="true"');
   });
 });
 

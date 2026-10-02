@@ -37,6 +37,7 @@ import {
   picksSentence,
   promptChips,
   proposalPresentation,
+  questionEyebrow,
   questionOf,
   rationaleOf,
   rejectionScopeNote,
@@ -337,6 +338,39 @@ describe('checklistView', () => {
 
   it('should name the next chapter after the drafts written', () => {
     expect(checklistView(items, 3).title).toBe('Ready for chapter 4');
+  });
+});
+
+describe('questionEyebrow', () => {
+  const items = [
+    { key: 'premise', label: 'Premise', why: 'Everything hangs on it', status: 'answered' as const },
+    { key: 'ending', label: 'How it ends', why: 'Aim the volumes', status: 'undecided' as const },
+    { key: 'opposition', label: 'Who opposes her', why: 'Conflict', status: 'open' as const },
+    { key: 'theme', label: 'Theme', why: 'Depth', status: 'dismissed' as const },
+    { key: 'protagonist', label: 'Protagonist', why: 'Lead', status: 'open' as const },
+  ];
+  const checklist = checklistView(items, 0);
+
+  it('should count the next unanswered position out of the visible checklist items and name the topic', () => {
+    expect(questionEyebrow('opposition', checklist, false)).toBe('Question 3 of 4 · Who opposes her');
+  });
+
+  it('should be just “Question” without a progress key, a checklist, or a matching item', () => {
+    expect(questionEyebrow(undefined, checklist, false)).toBe('Question');
+    expect(questionEyebrow(null, checklist, false)).toBe('Question');
+    expect(questionEyebrow('opposition', undefined, false)).toBe('Question');
+    expect(questionEyebrow('first_volume_goal', checklist, false)).toBe('Question');
+    expect(questionEyebrow('theme', checklist, false)).toBe('Question');
+  });
+
+  it('should drop the counter on a settled question and keep its topic', () => {
+    expect(questionEyebrow('opposition', checklist, true)).toBe('Question · Who opposes her');
+    expect(questionEyebrow('opposition', undefined, true)).toBe('Question');
+  });
+
+  it('should drop the counter when the checklist already counts the question’s own item as answered', () => {
+    expect(questionEyebrow('premise', checklist, false)).toBe('Question · Premise');
+    expect(questionEyebrow('ending', checklist, false)).toBe('Question · How it ends');
   });
 });
 

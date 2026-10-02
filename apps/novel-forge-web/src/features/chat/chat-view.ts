@@ -336,6 +336,14 @@ export function checklistView(items: readonly ProgressItemResponse[], draftsTota
   };
 }
 
+export function questionEyebrow(progressKey: string | null | undefined, checklist: ChecklistView | undefined, settled: boolean): string {
+  if (!progressKey || !checklist) return 'Question';
+  const item = checklist.items.find(entry => entry.key === progressKey);
+  if (!item) return 'Question';
+  if (settled || item.state !== 'open') return `Question · ${item.label}`;
+  return `Question ${checklist.answered + 1} of ${checklist.items.length} · ${item.label}`;
+}
+
 export interface QuestionOption {
   title: string;
   why?: string;

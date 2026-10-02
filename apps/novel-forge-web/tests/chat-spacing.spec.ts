@@ -122,7 +122,7 @@ const CHAT: Expected[] = [
   { selector: '.cardHead', values: { gap: '8px', padding: '10px 12px' }, baseline: '.turnCardHead', source: 'Main l.114 head; chat.module.css .turnCardHead' },
   { selector: '.cardHeadNote', values: { 'margin-left': 'auto' }, source: 'Main l.117' },
   { selector: '.badgeSuccess', values: { padding: '2px 8px', 'border-radius': 'var(--sh-radius-full)' }, source: 'Main l.116 "Your own words" badge 2px 8px pill' },
-  { selector: '.badgeAccent', values: { padding: '1px 6px', 'border-radius': 'var(--sh-radius-full)' }, source: 'Main l.174 "My pick" badge 1px 6px pill' },
+  { selector: '.badgeAccent', values: { padding: '1px 6px', 'border-radius': 'var(--sh-radius-full)' }, source: 'Main l.174 "Claude’s pick" badge 1px 6px pill' },
   { selector: '.appliedRows', values: { margin: '0', padding: '8px 12px', gap: '8px' }, source: 'Main l.119 list padding 8px 12px, gap 8' },
   { selector: '.appliedRow', values: { gap: '10px' }, source: 'Main l.120 row gap 10' },
   { selector: '.appliedTopic', values: { width: '96px', 'padding-top': '2px' }, source: 'Main l.120 topic width 96, padding-top 2' },
@@ -139,9 +139,16 @@ const CHAT: Expected[] = [
   { selector: '.suggestions, .waiting', values: { gap: '8px' }, source: 'chat.module.css .turnCard margin-top 8 between cards' },
   { selector: '.suggestion', values: { gap: '8px', padding: '12px 14px', 'border-radius': 'var(--sh-radius-lg)' }, source: 'Main l.154 suggestion card; Phone suggestion' },
   { selector: '.question', values: { gap: '10px' }, source: 'Main l.168 question gap 10' },
-  { selector: '.questionOptions', values: { 'grid-template-columns': 'repeat(3, minmax(0, 1fr))', gap: '8px' }, source: 'Main l.172 three columns gap 8' },
+  {
+    selector: '.questionOptions',
+    values: { 'grid-template-columns': 'repeat(2, minmax(0, 1fr))', gap: '8px' },
+    source: 'chat redesign .opts two columns; gap kept at 8 (Main l.172)',
+  },
   { selector: '.option', values: { gap: '2px', padding: '10px 12px', 'border-radius': 'var(--sh-radius-lg)' }, source: 'Main l.28 .opt' },
   { selector: '.optionHead', values: { gap: '6px' }, source: 'Main l.174 title row gap 6' },
+  { selector: '.optionTradeOff', values: { 'margin-top': '6px', 'padding-top': '6px' }, source: 'chat redesign .trade padding-top 6, dashed rule' },
+  { selector: '.questionFoot', values: { gap: '8px' }, source: 'rule 6: 8 between controls' },
+  { selector: '.questionConfirm', values: { 'max-width': '100%' }, source: 'a long answer title ellipsises inside the button instead of overflowing the phone' },
   { selector: '.job', values: { gap: '10px', padding: '12px 14px', 'border-radius': 'var(--sh-radius-lg)' }, source: 'NextChapter l.195 progress box' },
   { selector: '.jobHead', values: { gap: '8px' }, source: 'rule 6: 8' },
   { selector: '.jobDone', values: { gap: '12px' }, source: 'Main l.110 receipt → applied block gap 12' },
@@ -357,7 +364,7 @@ describe('Chat width arithmetic', () => {
     const list = Math.min(thread - 2 * sidePad, listMax);
     const isPhone = viewport <= PHONE;
     const reply = list;
-    const columns = isPhone ? 1 : 3;
+    const columns = isPhone ? 1 : 2;
     const option = (reply - optionGap * (columns - 1)) / columns;
     const checklistCell = isPhone ? list - 2 * 14 : (list - 2 * 14 - 20) / 2;
     const appliedText = isPhone ? reply - 2 * cardPad : reply - 2 * cardPad - px(base.get('.appliedTopic')?.width) - px(base.get('.appliedRow')?.gap);
@@ -376,9 +383,9 @@ describe('Chat width arithmetic', () => {
   });
 
   it('should keep every block readable at 768, 1024 and 1280, with the rail and with the sidebar expanded by hand', () => {
-    expect(layout(768)).toEqual({ list: 672, reply: 672, option: 218.66666666666666, checklistCell: 312, appliedText: 542 });
-    expect(layout(768, SIDEBAR_WIDTH)).toEqual({ list: 474, reply: 474, option: 152.66666666666666, checklistCell: 213, appliedText: 344 });
-    expect(layout(1024)).toEqual({ list: 720, reply: 720, option: 234.66666666666666, checklistCell: 336, appliedText: 590 });
+    expect(layout(768)).toEqual({ list: 672, reply: 672, option: 332, checklistCell: 312, appliedText: 542 });
+    expect(layout(768, SIDEBAR_WIDTH)).toEqual({ list: 474, reply: 474, option: 233, checklistCell: 213, appliedText: 344 });
+    expect(layout(1024)).toEqual({ list: 720, reply: 720, option: 356, checklistCell: 336, appliedText: 590 });
     expect(layout(1024, SIDEBAR_WIDTH)).toEqual(layout(1024));
     expect(layout(1280)).toEqual(layout(1024));
     expect(layout(1280, SIDEBAR_WIDTH)).toEqual(layout(1024));
