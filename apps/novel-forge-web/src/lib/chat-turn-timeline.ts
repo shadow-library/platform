@@ -13,19 +13,25 @@ export interface TurnSource {
   status: ChatTurnLookup['status'];
 }
 
-/** A row with sources is a disclosure over them; one without is a plain line. */
+/** A step already taken; the step in progress is the tail. A row with sources is a disclosure over them; one without is a plain line. */
 export interface TurnRow {
-  key: 'read' | 'think' | 'save';
+  key: 'read' | 'save';
   label: string;
-  running: boolean;
   sources: TurnSource[];
 }
 
-export type TurnTail = { kind: 'starting'; slow: boolean } | { kind: 'working'; elapsed: string; slow: boolean };
+/** The one live line, always last: what the turn is doing now and how long it has run. */
+export interface TurnTail {
+  label: string;
+  elapsed: string | null;
+  /** Nothing has come back yet. */
+  starting: boolean;
+  slow: boolean;
+}
 
 export interface TurnTimeline {
   live: boolean;
-  /** What happened before the reply: reading, then thinking. */
+  /** What was read before the reply. Time spent thinking is shown only while it happens, on the tail. */
   trace: TurnRow[];
   /** What happens after it: the changes being written. */
   saving: TurnRow | null;
@@ -60,9 +66,6 @@ export const SLOW_TURN_NOTE = 'This one’s taking longer than usual. The model 
 
 const OTHER_SOURCE: Noun = ['other source', 'other sources'];
 const MAX_NAMED_GROUPS = 3;
-const MIN_THOUGHT_MS = 1000;
-
-const SAVING: Record<TurnMode, string> = { auto: 'Saving to your Story Bible', manual: 'Preparing suggestions' };
 
 function plural(count: number, one: string, many: string): string {
   return `${count} ${count === 1 ? one : many}`;
@@ -70,6 +73,10 @@ function plural(count: number, one: string, many: string): string {
 
 function listed(parts: string[]): string {
   return parts.length < 2 ? (parts[0] ?? '') : `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}`;
+}
+
+function savingLabel(mode: TurnMode, count: number): string {
+  return mode === 'auto' ? `Saving ${plural(count, 'change', 'changes')} to your Story Bible` : `Preparing ${plural(count, 'suggestion', 'suggestions')}`;
 }
 
 function lowerFirst(value: string): string {
@@ -91,9 +98,9 @@ export function turnSources(lookups: readonly SourceEntry[]): TurnSource[] {
 // A Bible page's label is its own title, so its case is the author's; every other label opens on a fixed phrase.
 export function readingLabel(lookup: Pick<ChatTurnLookup, 'tool' | 'args'>): string {
   const label = lookupLabel(lookup.tool, lookup.args);
-  if (label === GENERIC_LOOKUP_LABEL) return 'Looking something up…';
-  if (label.startsWith('Searched ')) return `Searching ${label.slice('Searched '.length)}…`;
-  return `Reading ${lookup.tool === 'get_bible_document' ? label : lowerFirst(label)}…`;
+  if (label === GENERIC_LOOKUP_LABEL) return 'Looking something up';
+  if (label.startsWith('Searched ')) return `Searching ${label.slice('Searched '.length)}`;
+  return `Reading ${lookup.tool === 'get_bible_document' ? label : lowerFirst(label)}`;
 }
 
 export function readSummary(lookups: readonly SourceEntry[]): string {
@@ -111,22 +118,26 @@ export function readSummary(lookups: readonly SourceEntry[]): string {
   return failed > 0 ? `${summary} · ${failed} couldn’t be read` : summary;
 }
 
-function readRow(lookups: readonly SourceEntry[], live: boolean): TurnRow {
-  const current = live ? lookups.filter(lookup => lookup.status === 'running').at(-1) : undefined;
-  return { key: 'read', label: current ? readingLabel(current) : readSummary(lookups), running: Boolean(current), sources: turnSources(lookups) };
-}
-
-function thinkRow(phase: ChatTurnPhase, thoughtMs: number): TurnRow | null {
-  if (phase.kind === 'thinking') return { key: 'think', label: 'Thinking', running: true, sources: [] };
-  if (phase.kind === 'starting' || thoughtMs < MIN_THOUGHT_MS) return null;
-  return { key: 'think', label: `Thought for ${formatElapsed(thoughtMs)}`, running: false, sources: [] };
+// While the turn runs, a source still being read belongs to the tail; the row sums up only what has come back.
+function readRow(lookups: readonly SourceEntry[], live: boolean): TurnRow | null {
+  const read = live ? lookups.filter(lookup => lookup.status !== 'running') : lookups;
+  if (read.length === 0) return null;
+  return { key: 'read', label: readSummary(read), sources: turnSources(read) };
 }
 
 // Streamed changes are provisional — a reset voids them and only the settled turn says what was applied or carded — so the row never
 // claims them in the past tense, and is gone once the turn ends.
 function savingRow(state: ChatTurnStreamState, phase: ChatTurnPhase, mode: TurnMode, live: boolean): TurnRow | null {
-  if (!live || state.changes.length === 0) return null;
-  return { key: 'save', label: `${SAVING[mode]} · ${state.changes.length}`, running: phase.kind === 'saving', sources: [] };
+  if (!live || state.changes.length === 0 || phase.kind === 'saving') return null;
+  return { key: 'save', label: savingLabel(mode, state.changes.length), sources: [] };
+}
+
+function tailLabel(phase: ChatTurnPhase, state: ChatTurnStreamState, mode: TurnMode): string {
+  const current = state.lookups.filter(lookup => lookup.status === 'running').at(-1);
+  if (phase.kind === 'reading' && current) return readingLabel(current);
+  if (phase.kind === 'writing') return 'Writing';
+  if (phase.kind === 'saving') return savingLabel(mode, phase.count);
+  return 'Thinking';
 }
 
 function workedLabel(ending: 'done' | 'stopped', workedMs: number, lookups: readonly SourceEntry[]): string {
@@ -135,14 +146,14 @@ function workedLabel(ending: 'done' | 'stopped', workedMs: number, lookups: read
   return read > 0 ? `${lead} · read ${plural(read, 'source', 'sources')}` : lead;
 }
 
-function traceRows(lookups: readonly SourceEntry[], live: boolean, think: TurnRow | null): TurnRow[] {
-  return [...(lookups.length > 0 ? [readRow(lookups, live)] : []), ...(think ? [think] : [])];
+function traceRows(lookups: readonly SourceEntry[], live: boolean): TurnRow[] {
+  const read = readRow(lookups, live);
+  return read ? [read] : [];
 }
 
 export function timelineOfTrace(trace: ChatTurnTraceResponse): TurnTimeline {
   const { timing, sources } = trace;
-  const rows = traceRows(sources, false, thinkRow({ kind: 'settled' }, timing.thinkMs));
-  return { live: false, trace: rows, saving: null, tail: null, worked: workedLabel('done', timing.workedMs, sources) };
+  return { live: false, trace: traceRows(sources, false), saving: null, tail: null, worked: workedLabel('done', timing.workedMs, sources) };
 }
 
 // Drawn from the saved trace so the transcript refetch that swaps in the saved reply changes nothing.
@@ -150,10 +161,11 @@ export function turnTimeline(state: ChatTurnStreamState, now: number, mode: Turn
   if (state.status === 'done' && state.turn.assistantMessage.trace) return timelineOfTrace(state.turn.assistantMessage.trace);
   const live = state.status === 'idle' || state.status === 'streaming';
   const phase = turnPhase(state, now);
-  const { thoughtMs, workedMs } = turnSummary(state, now);
-  const trace = traceRows(state.lookups, live, thinkRow(phase, thoughtMs));
-  const slow = workedMs >= SLOW_TURN_MS;
-  const tail: TurnTail | null = !live ? null : phase.kind === 'starting' ? { kind: 'starting', slow } : { kind: 'working', elapsed: formatElapsed(workedMs), slow };
+  const { workedMs } = turnSummary(state, now);
+  const trace = traceRows(state.lookups, live);
+  const tail: TurnTail | null = live
+    ? { label: tailLabel(phase, state, mode), elapsed: workedMs < 1000 ? null : formatElapsed(workedMs), starting: phase.kind === 'starting', slow: workedMs >= SLOW_TURN_MS }
+    : null;
   const worked = state.status === 'done' || state.status === 'stopped' ? workedLabel(state.status, workedMs, state.lookups) : null;
   return { live, trace, saving: savingRow(state, phase, mode, live), tail, worked };
 }

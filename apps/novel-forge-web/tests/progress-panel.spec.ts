@@ -789,7 +789,7 @@ describe('TurnReceiptView for a mixed or held turn', () => {
 
 describe('TurnLiveTail progress link', () => {
   it('should offer the progress sheet from the running turn only when asked to', () => {
-    expect(html(createElement(TurnLiveTail, { tail: { kind: 'working', elapsed: '3s', slow: false }, onProgress: noop }))).toContain('>Progress</button>');
-    expect(html(createElement(TurnLiveTail, { tail: { kind: 'working', elapsed: '3s', slow: false } }))).not.toContain('Progress');
+    expect(html(createElement(TurnLiveTail, { tail: { label: 'Thinking', elapsed: '3s', starting: false, slow: false }, onProgress: noop }))).toContain('>Progress</button>');
+    expect(html(createElement(TurnLiveTail, { tail: { label: 'Thinking', elapsed: '3s', starting: false, slow: false } }))).not.toContain('Progress');
   });
 });

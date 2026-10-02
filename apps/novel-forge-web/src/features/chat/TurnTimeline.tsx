@@ -39,13 +39,11 @@ interface TurnTraceRowProps {
 function TurnTraceRow({ row }: TurnTraceRowProps): React.JSX.Element {
   const [open, setOpen] = useState(false);
   const detailId = useId();
-  const label = <span className={row.running ? styles.shimmer : undefined}>{row.label}</span>;
-
   if (row.sources.length === 0) {
     return (
       <div className={styles.turnRow}>
-        <span className={styles.turnIcon}>{row.running && <TurnSpark />}</span>
-        {label}
+        <span className={styles.turnIcon} />
+        {row.label}
       </div>
     );
   }
@@ -53,8 +51,10 @@ function TurnTraceRow({ row }: TurnTraceRowProps): React.JSX.Element {
   return (
     <>
       <button type="button" className={styles.turnRow} aria-expanded={open} aria-controls={open ? detailId : undefined} onClick={() => setOpen(current => !current)}>
-        <span className={styles.turnIcon}>{row.running ? <TurnSpark /> : <ChevronRightIcon size={12} className={styles.turnChevron} />}</span>
-        {label}
+        <span className={styles.turnIcon}>
+          <ChevronRightIcon size={12} className={styles.turnChevron} />
+        </span>
+        {row.label}
       </button>
       {open && (
         <ul id={detailId} className={styles.turnDetail}>
@@ -100,12 +100,11 @@ export function TurnLiveTail({ tail, onProgress }: TurnLiveTailProps): React.JSX
   return (
     <>
       <div className={styles.turnTail}>
-        <TurnSpark breathe={tail.kind === 'starting'} />
-        {tail.kind === 'starting' ? (
-          <span className={styles.shimmer}>Thinking</span>
-        ) : (
+        <TurnSpark breathe={tail.starting} />
+        <span className={styles.shimmer}>{tail.label}</span>
+        {tail.elapsed && (
           <span className={styles.turnElapsed} aria-hidden="true">
-            {tail.elapsed}
+            · {tail.elapsed}
           </span>
         )}
         <span className={styles.srOnly} role="status">

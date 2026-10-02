@@ -33,33 +33,51 @@ const READ: [ChatTurnStreamEvent, number][] = [
 ];
 
 describe('turnTimeline', () => {
-  it('should show only the starting tail right after send', () => {
-    expect(turnTimeline(startChatTurnStream(0), 500, 'auto')).toEqual({ live: true, trace: [], saving: null, tail: { kind: 'starting', slow: false }, worked: null });
+  it('should show only a thinking tail, without a clock, right after send', () => {
+    expect(turnTimeline(startChatTurnStream(0), 500, 'auto')).toEqual({
+      live: true,
+      trace: [],
+      saving: null,
+      tail: { label: 'Thinking', elapsed: null, starting: true, slow: false },
+      worked: null,
+    });
   });
 
-  it('should name the source being read and list every source so far', () => {
+  it('should name the source being read in the tail and sum up only what has come back', () => {
     const view = turnTimeline(play([...READ, [lookup('get_notes', 'running', { from: 20 }), 2500]]), 3000, 'auto');
 
-    expect(view.trace).toHaveLength(1);
-    expect(view.trace[0]).toMatchObject({ key: 'read', label: 'Reading notes from ¶20…', running: true });
-    expect(view.trace[0]?.sources.map(source => source.status)).toEqual(['ok', 'ok', 'ok', 'running']);
-    expect(view.tail).toEqual({ kind: 'working', elapsed: '3s', slow: false });
+    expect(view.trace).toEqual([expect.objectContaining({ key: 'read', label: 'Read your notes and 2 Bible pages' })]);
+    expect(view.trace[0]?.sources.map(source => source.status)).toEqual(['ok', 'ok', 'ok']);
+    expect(view.tail).toEqual({ label: 'Reading notes from ¶20', elapsed: '3s', starting: false, slow: false });
   });
 
-  it('should settle reading into a plain-words summary and think below it', () => {
+  it('should leave the read row out until a first source comes back', () => {
+    const view = turnTimeline(play([[lookup('get_notes', 'running'), 500]]), 1500, 'auto');
+
+    expect(view.trace).toEqual([]);
+    expect(view.tail?.label).toBe('Reading your notes');
+  });
+
+  it('should settle reading into a plain-words summary and keep thinking on the tail’s one line', () => {
     const view = turnTimeline(play(READ), 4000, 'auto');
 
-    expect(view.trace.map(row => [row.label, row.running])).toEqual([
-      ['Read your notes and 2 Bible pages', false],
-      ['Thinking', true],
-    ]);
+    expect(view.trace.map(row => row.label)).toEqual(['Read your notes and 2 Bible pages']);
+    expect(view.tail).toEqual({ label: 'Thinking', elapsed: '4s', starting: false, slow: false });
   });
 
-  it('should collapse thinking into a plain row once the reply starts, with no reasoning to open', () => {
+  it('should leave no trace of thinking once the reply starts', () => {
     const view = turnTimeline(play([...READ, [delta(), 10_000]]), 11_000, 'auto');
 
-    expect(view.trace[1]).toEqual({ key: 'think', label: 'Thought for 10s', running: false, sources: [] });
-    expect(view.tail).toEqual({ kind: 'working', elapsed: '11s', slow: false });
+    expect(view.trace.map(row => row.key)).toEqual(['read']);
+    expect(view.tail).toEqual({ label: 'Writing', elapsed: '11s', starting: false, slow: false });
+  });
+
+  it('should show thinking again on the tail when the model goes back to it', () => {
+    const rethinking = play([...READ, [delta(), 10_000], [lookup('get_entity', 'ok', { entityKey: 'vex' }), 12_000]]);
+    const view = turnTimeline(rethinking, 20_000, 'auto');
+
+    expect(view.trace.map(row => row.label)).toEqual(['Read your notes, 2 Bible pages and 1 profile']);
+    expect(view.tail?.label).toBe('Thinking');
   });
 
   it('should leave out a think shorter than a second', () => {
@@ -73,8 +91,8 @@ describe('turnTimeline', () => {
       [change(1), 1200],
     ]);
 
-    expect(turnTimeline(state, 1300, 'auto').saving).toMatchObject({ label: 'Saving to your Story Bible · 2', running: true });
-    expect(turnTimeline(state, 1300, 'manual').saving).toMatchObject({ label: 'Preparing suggestions · 2', running: true });
+    expect(turnTimeline(state, 1300, 'auto')).toMatchObject({ saving: null, tail: { label: 'Saving 2 changes to your Story Bible' } });
+    expect(turnTimeline(state, 1300, 'manual')).toMatchObject({ saving: null, tail: { label: 'Preparing 2 suggestions' } });
   });
 
   it('should settle saving while the reply goes on, and claim nothing once the turn ends', () => {
@@ -84,8 +102,8 @@ describe('turnTimeline', () => {
       [delta(' More.'), 1200],
     ]);
 
-    expect(turnTimeline(writing, 1300, 'auto').saving).toMatchObject({ label: 'Saving to your Story Bible · 1', running: false });
-    expect(turnTimeline(writing, 1300, 'manual').saving?.label).toBe('Preparing suggestions · 1');
+    expect(turnTimeline(writing, 1300, 'auto')).toMatchObject({ saving: { label: 'Saving 1 change to your Story Bible' }, tail: { label: 'Writing' } });
+    expect(turnTimeline(writing, 1300, 'manual').saving?.label).toBe('Preparing 1 suggestion');
     expect(turnTimeline(stopChatTurnStream(writing, 1400), 1500, 'auto').saving).toBeNull();
   });
 
@@ -96,18 +114,18 @@ describe('turnTimeline', () => {
       [{ type: 'reset' }, 1200],
     ]);
 
-    expect(turnTimeline(voided, 1300, 'auto').saving).toBeNull();
+    expect(turnTimeline(voided, 1300, 'auto')).toMatchObject({ saving: null, tail: { label: 'Thinking' } });
   });
 
   it('should turn slow past the threshold', () => {
     expect(turnTimeline(startChatTurnStream(0), 44_999, 'auto').tail?.slow).toBe(false);
-    expect(turnTimeline(play([[delta(), 1000]]), 45_000, 'auto').tail).toEqual({ kind: 'working', elapsed: '45s', slow: true });
+    expect(turnTimeline(play([[delta(), 1000]]), 45_000, 'auto').tail).toEqual({ label: 'Writing', elapsed: '45s', starting: false, slow: true });
   });
 
   it('should not read on once a turn stopped mid-lookup', () => {
     const stopped = stopChatTurnStream(play([[lookup('get_notes', 'running'), 100]]), 200);
 
-    expect(turnTimeline(stopped, 300, 'auto').trace[0]).toMatchObject({ key: 'read', running: false });
+    expect(turnTimeline(stopped, 300, 'auto')).toMatchObject({ trace: [{ key: 'read', label: 'Read your notes' }], tail: null });
   });
 
   it('should settle a finished turn with no tail and a worked line', () => {
@@ -116,7 +134,6 @@ describe('turnTimeline', () => {
 
     expect(view.live).toBe(false);
     expect(view.tail).toBeNull();
-    expect(view.trace.every(row => !row.running)).toBe(true);
     expect(view.worked).toBe('Worked 48s · read 3 sources');
   });
 
@@ -145,7 +162,7 @@ describe('timelineOfTrace', () => {
     const watched = turnTimeline(play([...READ, [delta(), 10_000], [{ type: 'done', turn }, 48_000]]), 99_000, 'auto');
 
     expect(timelineOfTrace(READ_TRACE)).toEqual(watched);
-    expect(watched.trace.map(row => row.label)).toEqual(['Read your notes and 2 Bible pages', 'Thought for 10s']);
+    expect(watched.trace.map(row => row.label)).toEqual(['Read your notes and 2 Bible pages']);
   });
 
   it('should label a query the server clipped as the live turn labelled it unclipped', () => {
@@ -158,11 +175,14 @@ describe('timelineOfTrace', () => {
     expect(view.trace[0]?.sources[0]?.label).toBe(lookupLabel('search_lore', { query }));
   });
 
-  it('should keep a reply that streamed nothing to its think row and worked line', () => {
-    const view = timelineOfTrace({ sources: [], timing: { readMs: 0, thinkMs: 3200, workedMs: 4100 } });
-
-    expect(view).toEqual({ live: false, trace: [{ key: 'think', label: 'Thought for 3s', running: false, sources: [] }], saving: null, tail: null, worked: 'Worked 4s' });
-    expect(timelineOfTrace({ sources: [], timing: { readMs: 0, thinkMs: 400, workedMs: 900 } }).trace).toEqual([]);
+  it('should keep a reply that read nothing to its worked line alone', () => {
+    expect(timelineOfTrace({ sources: [], timing: { readMs: 0, thinkMs: 3200, workedMs: 4100 } })).toEqual({
+      live: false,
+      trace: [],
+      saving: null,
+      tail: null,
+      worked: 'Worked 4s',
+    });
   });
 
   it('should name what could not be read and count only what was', () => {
@@ -175,7 +195,7 @@ describe('timelineOfTrace', () => {
     });
     const none = timelineOfTrace({ sources: [{ tool: 'get_draft', args: { chapter: 1 }, status: 'error' }], timing: { readMs: 500, thinkMs: 0, workedMs: 2000 } });
 
-    expect(partly.trace[0]).toMatchObject({ label: 'Read your notes · 1 couldn’t be read', running: false });
+    expect(partly.trace[0]).toMatchObject({ label: 'Read your notes · 1 couldn’t be read' });
     expect(partly.trace[0]?.sources.map(source => [source.label, source.status])).toEqual([
       ['Your notes', 'ok'],
       ['Chapter 1 draft', 'error'],
@@ -223,13 +243,13 @@ describe('readSummary', () => {
 
 describe('readingLabel', () => {
   it('should turn a source into the act of reading it', () => {
-    expect(readingLabel({ tool: 'get_draft', args: { chapter: 2 } })).toBe('Reading chapter 2 draft…');
-    expect(readingLabel({ tool: 'search_lore', args: { query: 'ley' } })).toBe('Searching the lore for “ley”…');
-    expect(readingLabel({ tool: 'get_mystery', args: {} })).toBe('Looking something up…');
+    expect(readingLabel({ tool: 'get_draft', args: { chapter: 2 } })).toBe('Reading chapter 2 draft');
+    expect(readingLabel({ tool: 'search_lore', args: { query: 'ley' } })).toBe('Searching the lore for “ley”');
+    expect(readingLabel({ tool: 'get_mystery', args: {} })).toBe('Looking something up');
   });
 
   it('should keep the case of a Bible page’s own title', () => {
-    expect(readingLabel({ tool: 'get_bible_document', args: { slug: 'vex' } })).toBe('Reading Vex…');
+    expect(readingLabel({ tool: 'get_bible_document', args: { slug: 'vex' } })).toBe('Reading Vex');
   });
 });
 
@@ -238,11 +258,11 @@ const html = (element: React.ReactElement): string => renderToStaticMarkup(eleme
 describe('TurnTrace', () => {
   it('should make a row with sources a collapsed disclosure and a row without one plain text', () => {
     const view = turnTimeline(play([...READ, [delta(), 10_000]]), 11_000, 'auto');
-    const out = html(createElement(TurnTrace, { rows: view.trace }));
+    const out = html(createElement(TurnTrace, { rows: [...view.trace, { key: 'save', label: 'Saving 1 change to your Story Bible', sources: [] }] }));
 
     expect(out).toContain('aria-expanded="false"');
     expect(out).toContain('Read your notes and 2 Bible pages');
-    expect(out).toContain('Thought for 10s');
+    expect(out).toContain('Saving 1 change to your Story Bible');
     expect(out.match(/<button/g)).toHaveLength(1);
     expect(out).not.toContain('Notes from ¶11');
   });
@@ -255,7 +275,7 @@ describe('TurnTrace', () => {
     );
 
     expect(out).toContain('Read your notes');
-    expect(out).toContain('Thought for 4s');
+    expect(out).not.toContain('Thought');
     expect(out.match(/<button/g)).toHaveLength(1);
   });
 
@@ -265,14 +285,21 @@ describe('TurnTrace', () => {
 });
 
 describe('TurnLiveTail', () => {
-  it('should think while starting and show the elapsed time once working', () => {
-    expect(html(createElement(TurnLiveTail, { tail: { kind: 'starting', slow: false } }))).toContain('Thinking');
-    expect(html(createElement(TurnLiveTail, { tail: { kind: 'working', elapsed: '12s', slow: false } }))).toContain('12s');
+  const tail = (elapsed: string | null, slow = false) => ({ label: 'Thinking', elapsed, starting: elapsed === null, slow });
+
+  it('should put what the turn is doing and how long it has run on one line', () => {
+    const out = html(createElement(TurnLiveTail, { tail: tail('24s') }));
+
+    const line = out.slice(0, out.indexOf('</div>'));
+
+    expect(line.indexOf('Thinking')).toBeLessThan(line.indexOf('· 24s'));
+    expect(line.indexOf('Thinking')).toBeGreaterThan(-1);
+    expect(html(createElement(TurnLiveTail, { tail: tail(null) }))).not.toContain('·');
   });
 
   it('should announce the turn once in a status line, and name a slow one visibly', () => {
-    const working = html(createElement(TurnLiveTail, { tail: { kind: 'working', elapsed: '12s', slow: false } }));
-    const slow = html(createElement(TurnLiveTail, { tail: { kind: 'working', elapsed: '46s', slow: true } }));
+    const working = html(createElement(TurnLiveTail, { tail: tail('12s') }));
+    const slow = html(createElement(TurnLiveTail, { tail: tail('46s', true) }));
 
     expect(working.match(/role="status"/g)).toHaveLength(1);
     expect(working).toContain('Forge is working on your message');
@@ -288,14 +315,26 @@ describe('StreamedTurn', () => {
         stream: play([
           [delta(), 1000],
           [change(0), 1100],
+          [delta(' More.'), 1200],
         ]),
         mode: 'auto',
         now: 5000,
       }),
     );
 
-    expect(out.indexOf('Here is the plan.')).toBeLessThan(out.indexOf('Saving to your Story Bible · 1'));
-    expect(out.indexOf('Saving to your Story Bible · 1')).toBeLessThan(out.indexOf('5s'));
+    expect(out.indexOf('More.')).toBeLessThan(out.indexOf('Saving 1 change to your Story Bible'));
+    expect(out.indexOf('Saving 1 change to your Story Bible')).toBeLessThan(out.indexOf('Writing'));
+    expect(out.indexOf('Writing')).toBeLessThan(out.indexOf('· 5s'));
+  });
+
+  it('should show a thinking turn as one line after the reply so far, not a row above it', () => {
+    const out = html(
+      createElement(StreamedTurn, { stream: play([...READ, [delta('Reading the rest first.'), 3000], [lookup('get_notes', 'ok', { from: 8 }), 4000]]), mode: 'auto', now: 24_000 }),
+    );
+
+    expect(out.match(/Thinking/g)).toHaveLength(1);
+    expect(out.indexOf('Reading the rest first.')).toBeLessThan(out.indexOf('Thinking'));
+    expect(out.indexOf('Thinking')).toBeLessThan(out.indexOf('· 24s'));
   });
 
   it('should put the receipt under the model line and let a footer replace the worked line', () => {
