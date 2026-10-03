@@ -1,7 +1,7 @@
 import { useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Button, toast } from '@shadow-library/ui';
+import { Alert, Button, toast, useMediaQuery } from '@shadow-library/ui';
 
 import { ChevronDownIcon, ClockIcon, CloseIcon, EditIcon, PlusIcon, ProposalsIcon } from '@/components/icons';
 import { PaneError, PaneLoader, StatusChip, TurnStatus } from '@/components/nf';
@@ -44,6 +44,7 @@ import {
   useUpdateChatSessionMutation,
   useUpdateSessionModelMutation,
 } from '@/lib/apis';
+import { CHAPTER_SHEET_QUERY, type ChapterOpenMode, draftCardShape } from '@/lib/chapter-panel';
 import { chatChoiceUpdate, sameChoice, type TurnChoice, turnChoiceDefaults, turnOverride } from '@/lib/chat-model';
 import { chatColumnView, chatTitle } from '@/lib/chat-sessions';
 import { timelineOfTrace, turnTimeline } from '@/lib/chat-turn-timeline';
@@ -54,6 +55,7 @@ import { type PendingItem, pendingKey } from '@/lib/pending-items';
 import { useGenerationActivity } from '@/lib/use-generation-activity';
 
 import { ChapterDraftCard } from './ChapterDraftCard';
+import { ChapterPanel } from './ChapterPanel';
 import { editQueued, inputCaption, type QueuedTurn, queuedView, queueStep, releaseSettings, restoreFailed, type TurnSettings } from './chat-queue';
 import { ChatComposer } from './ChatComposer';
 import { NotesChip, SaveAsNotesOffer } from './ChatExtras';
@@ -94,7 +96,7 @@ import styles from './Chat.module.css';
 import { ComposerModeMenu } from './ComposerModeMenu';
 import { JobProgress } from './JobProgress';
 import { findPending, revealPending } from './pending-reveal';
-import { ProgressDock } from './ProgressPanel';
+import { ProgressDock, ProgressDockStrip } from './ProgressPanel';
 import { type DockState, dockState, jobProposals, organiseIdeas, type PanelProposals, panelTurnOf, turnRefs } from './progress-panel-view';
 import { QuestionCard } from './QuestionCard';
 import { ReadyChecklist } from './ReadyChecklist';
@@ -131,6 +133,12 @@ export interface ChatColumnProps {
   /** A pending card another screen sent the author here to answer. */
   revealCard?: string;
   onCardRevealed?: () => void;
+  /** The chapter open in the panel beside the chat. */
+  chapter?: number;
+  /** How the author's click asked for that chapter; absent when the URL alone opened it. */
+  chapterRequest?: ChapterOpenMode;
+  onOpenChapter: (chapter: number, mode: ChapterOpenMode) => void;
+  onCloseChapter: () => void;
 }
 
 /** Everything a transcript row can ask the column to do; one stable object, so memoised rows do not re-render on every keystroke. */
@@ -164,7 +172,7 @@ function isPlanJob(job: ChatJobState): boolean {
  * once there is — one tree either way, so the draft, the focus and the model picker survive the move.
  */
 export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
-  const { novelId, session, starting, initialTurn, onInitialTurnSent } = props;
+  const { novelId, session, starting, initialTurn, onInitialTurnSent, chapter } = props;
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const projectQuery = useProjectQuery(novelId);
@@ -185,6 +193,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
   const startNextDraft = useStartNextDraftMutation(novelId);
   const adoptProposal = useAdoptProposalMutation(novelId);
   const unanswered = useUnansweredCount();
+  const narrow = useMediaQuery(CHAPTER_SHEET_QUERY);
 
   const [input, setInput] = useState('');
   const [proseEdits, setProseEdits] = useState(false);
@@ -612,14 +621,30 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
     setPanelReveal(0);
   };
 
-  // The panel docks only where the thread keeps its full column beside it; narrower, the receipt opens it as a sheet.
-  const reviewInPanel = (key: string): void => {
-    setPanelFocus(key);
-    setPanelReveal(count => count + 1);
-    if ((frameRef.current?.offsetWidth ?? 0) >= PANEL_DOCK_MIN) return setDock({ kind: 'open' });
+  const openChangesSheet = (): void => {
     setSheetReveals(true);
     setSheetOpen(true);
   };
+
+  // The panel docks only where the thread keeps its full column beside it and no chapter holds the right side; otherwise the receipt opens it as a sheet.
+  const reviewInPanel = (key: string): void => {
+    setPanelFocus(key);
+    setPanelReveal(count => count + 1);
+    if (chapter === undefined && (frameRef.current?.offsetWidth ?? 0) >= PANEL_DOCK_MIN) return setDock({ kind: 'open' });
+    openChangesSheet();
+  };
+
+  // Closing the panel hands focus back to the card it was opened from, or to the composer, rather than leaving it on the page.
+  useEffect(() => {
+    if (chapter === undefined) return;
+    const composer = inputRef.current;
+    return () => {
+      requestAnimationFrame(() => {
+        if (document.activeElement && document.activeElement !== document.body) return;
+        (document.querySelector<HTMLElement>(`[data-open-chapter="${chapter}"]`) ?? composer)?.focus({ preventScroll: true });
+      });
+    };
+  }, [chapter]);
 
   // The tray's click has long returned by the time a card brought into the chat renders, so the card it asked for is looked for after every render.
   const revealing = useRef<{ key: string; until: number } | undefined>(undefined);
@@ -744,7 +769,8 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
 
   return (
     <div ref={frameRef} className={styles.frame}>
-      <div className={styles.column}>
+      {/* The chapter sheet covers the chat at this width, so the chat under it is out of reach of Tab and screen readers too. */}
+      <div className={styles.column} inert={narrow && chapter !== undefined}>
         <div className={styles.head}>
           <div className={styles.headInner}>
             {session && renamingHeader ? (
@@ -892,7 +918,13 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
               )}
               {draftsForYou.map(draft => (
                 <PendingAnchor key={draft.chapter} id={pendingKey('draft', draft.chapter)}>
-                  <ChapterDraftCard novelId={novelId} draft={draft} onAskForChanges={askForChanges} />
+                  <ChapterDraftCard
+                    novelId={novelId}
+                    draft={draft}
+                    beside={draftCardShape(draft.chapter, chapter) === 'pointer'}
+                    onOpen={props.onOpenChapter}
+                    onAskForChanges={askForChanges}
+                  />
                 </PendingAnchor>
               ))}
               {continuityForYou.map(proposal => (
@@ -992,6 +1024,18 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
           />
         </div>
       </div>
+      {chapter !== undefined && (
+        <ChapterPanel
+          key={chapter}
+          novelId={novelId}
+          chapter={chapter}
+          request={props.chapterRequest}
+          onClose={props.onCloseChapter}
+          strip={
+            conversation && dock.kind === 'open' && <ProgressDockStrip waiting={reviewCardsId !== undefined} onReview={openChangesSheet} onClose={() => closeDock(reviewCardsId)} />
+          }
+        />
+      )}
       {conversation && (
         <ProgressDock
           novelId={novelId}
@@ -1000,7 +1044,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
           onApplied={onApplied}
           reveal={panelReveal}
           onBackToCurrent={panelFocus && pending ? () => setPanelFocus(undefined) : undefined}
-          docked={dock.kind === 'open'}
+          docked={dock.kind === 'open' && chapter === undefined}
           onClose={() => closeDock(reviewCardsId)}
           sheetOpen={sheetOpen}
           onSheetOpenChange={setSheetOpen}

@@ -526,3 +526,23 @@ export function ProgressDock({ docked, onClose, sheetOpen, onSheetOpenChange, sh
     </>
   );
 }
+
+export interface ProgressDockStripProps {
+  /** The changes still wait on the author's OK, rather than having been opened to look back at. */
+  waiting: boolean;
+  onReview: () => void;
+  onClose: () => void;
+}
+
+/** The panel folded to one line while a chapter holds the right side; its changes open as the sheet, leaving the chapter where it is. */
+export function ProgressDockStrip({ waiting, onReview, onClose }: ProgressDockStripProps): React.JSX.Element {
+  return (
+    <div className={styles.strip} role="region" aria-label="Story Bible changes">
+      <span className={styles.stripText}>{waiting ? 'Story Bible changes are waiting on you' : 'Story Bible changes'}</span>
+      <Button size="sm" variant="secondary" onClick={onReview}>
+        Review
+      </Button>
+      <IconButton variant="ghost" size="sm" aria-label="Close the Story Bible changes" icon={<CloseIcon />} onClick={onClose} />
+    </div>
+  );
+}

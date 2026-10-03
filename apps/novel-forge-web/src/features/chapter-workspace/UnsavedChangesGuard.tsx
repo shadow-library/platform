@@ -8,10 +8,17 @@ export interface UnsavedChangesGuardProps {
   description: string;
   /** Absent when the text cannot be saved from here, which drops "Save and leave". */
   onSave?: () => Promise<boolean>;
+  /** Narrows the guard to the navigations that take the text off screen; every navigation counts when absent. */
+  leaves?: (current: GuardedLocation, next: GuardedLocation) => boolean;
 }
 
-export function UnsavedChangesGuard({ when, description, onSave }: UnsavedChangesGuardProps): React.JSX.Element | null {
-  const blocker = useBlocker({ shouldBlockFn: () => when, enableBeforeUnload: () => when, withResolver: true });
+export interface GuardedLocation {
+  pathname: string;
+  search: unknown;
+}
+
+export function UnsavedChangesGuard({ when, description, onSave, leaves }: UnsavedChangesGuardProps): React.JSX.Element | null {
+  const blocker = useBlocker({ shouldBlockFn: ({ current, next }) => when && (leaves?.(current, next) ?? true), enableBeforeUnload: () => when, withResolver: true });
   const [saving, setSaving] = useState(false);
   if (blocker.status !== 'blocked') return null;
 

@@ -1,6 +1,7 @@
 /* The chat and its progress panel side by side; the panel's container queries measure this row, not the viewport, since the app sidebar
    takes a share of it. */
 .frame {
+  position: relative;
   flex: 1;
   min-width: 0;
   min-height: 0;
@@ -525,7 +526,7 @@ button.turnRow:hover {
   border-color: var(--sh-danger-border);
 }
 
-/* Collapsed to an opening that fades out; reading opens the whole chapter in the thread rather than in a nested scroller. */
+/* Collapsed to an opening that fades out; the whole chapter is read in the panel beside the chat. */
 .draftBody {
   position: relative;
   max-height: 220px;
@@ -544,20 +545,21 @@ button.turnRow:hover {
   background: linear-gradient(to bottom, transparent, var(--sh-surface-card));
 }
 
-.draftBody[data-reading] {
-  max-height: none;
-}
-
-.draftBody[data-reading]::after {
-  content: none;
-}
-
 .draftFoot {
   display: flex;
   flex-direction: column;
   gap: 8px;
   padding: 10px 12px;
   border-top: 1px solid var(--sh-border-subtle);
+}
+
+/* The card while its chapter is open in the panel: one line pointing there, so the draft is on screen once. */
+.draftPointer {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 12px;
 }
 
 .cardHead {

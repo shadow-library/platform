@@ -1,7 +1,3 @@
-.spacer {
-  flex: 1;
-}
-
 .scrollFill {
   position: absolute;
   inset: 0;
@@ -347,37 +343,6 @@
   height: 6px;
   border-radius: 50%;
   background: var(--nf-dot);
-}
-
-.toolbar {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 6px 8px;
-  border: 1px solid var(--sh-border-subtle);
-  border-radius: var(--sh-radius-md);
-  background: var(--sh-surface-card);
-  margin-bottom: 10px;
-  position: sticky;
-  top: 0;
-  z-index: 1;
-}
-
-.toolbarBtn {
-  min-width: 30px;
-  height: 28px;
-  padding: 0 8px;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  cursor: pointer;
-  font-size: 13px;
-  color: var(--sh-text-secondary);
-}
-
-.toolbarNote {
-  font-size: 10px;
-  color: var(--sh-text-tertiary);
 }
 
 .editorScreen {

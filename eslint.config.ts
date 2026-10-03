@@ -264,6 +264,18 @@ export default defineConfig([
     },
   },
 
+  /**
+   * novel-forge-web chapter panel: its resize divider is WAI-ARIA's window splitter, a focusable `role="separator"` with a value that the
+   * keyboard and the pointer move. jsx-a11y counts separator as non-interactive, and its handler overrides key on the element, not the role.
+   */
+  {
+    files: ['apps/novel-forge-web/src/features/chat/ChapterPanel.tsx'],
+    rules: {
+      'jsx-a11y/no-noninteractive-tabindex': ['error', { roles: ['separator'] }],
+      'jsx-a11y/no-noninteractive-element-interactions': 'off',
+    },
+  },
+
   /** packages/fastify: route specs declare unused fixture classes and stubs purely to exercise the decorators. */
   {
     files: ['packages/fastify/tests/**/*.spec.ts'],

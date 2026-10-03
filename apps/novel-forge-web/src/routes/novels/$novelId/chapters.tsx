@@ -42,18 +42,24 @@ import { ChapterToolbar, ChapterToolbarStatus, GoalMetDialog, VolumeList, Volume
 import {
   ChapterDetailsPanel,
   ChecksDrawer,
+  editorRecovery,
   EditorStrip,
   FinalizeButton,
   HeldActions,
   PassageAskCard,
   PassageReader,
   PassageSuggestionCard,
+  type ProseTool,
+  ProseToolbar,
+  ProseToolbarNote,
   StoryBibleUpdatesButton,
   UnsavedChangesGuard,
   useChapterEditor,
   useOverrideConfirm,
   usePassageAsk,
+  useProseFormatting,
   useReviewJobs,
+  useSaveShortcut,
   WorkspaceStrip,
 } from '@/features/chapter-workspace';
 import {
@@ -142,6 +148,8 @@ import styles from './chapters.module.css';
 function toneOf(intent: ChipIntent): 'success' | 'danger' | 'warning' {
   return intent === 'success' ? 'success' : intent === 'danger' ? 'danger' : 'warning';
 }
+
+const CHAPTER_TOOLS: readonly ProseTool[] = ['bold', 'italic', 'bulleted', 'numbered', 'table'];
 
 // The list's whole-novel figures (counts, every chapter number, the next chapter) come with any page, so the smallest one is asked for.
 const SUMMARY_ROWS: ListChapterRowsQueryParams = { filter: 'all', limit: 1, offset: 0 };
@@ -1111,65 +1119,6 @@ function ChapterSwitchDrawer({ open, onOpenChange, novelId, current, onPick }: C
   );
 }
 
-interface ProseToolbarProps {
-  onBold: () => void;
-  onItalic: () => void;
-  onBulleted: () => void;
-  onNumbered: () => void;
-  onTable: () => void;
-  /** Absent where the chapter can't take a passage rewrite. */
-  onAsk?: () => void;
-  /** Why Ask for changes is unavailable right now; shown beside it, and the button is disabled while set. */
-  askBlockedReason?: string;
-}
-
-interface ToolbarButton {
-  label: React.ReactNode;
-  title: string;
-  action: () => void;
-}
-
-function ProseToolbar({ onBold, onItalic, onBulleted, onNumbered, onTable, onAsk, askBlockedReason }: ProseToolbarProps): React.JSX.Element {
-  const askReasonId = useId();
-  const buttons: ToolbarButton[] = [
-    { label: <strong>B</strong>, title: 'Bold (⌘B)', action: onBold },
-    { label: <em>I</em>, title: 'Italic (⌘I)', action: onItalic },
-    { label: '•', title: 'Bulleted list', action: onBulleted },
-    { label: '1.', title: 'Numbered list', action: onNumbered },
-    { label: '▦', title: 'Table', action: onTable },
-  ];
-  return (
-    <div className={styles.toolbar}>
-      {buttons.map((b, i) => (
-        <Tooltip key={i} content={b.title}>
-          <button onMouseDown={e => e.preventDefault()} onClick={b.action} aria-label={b.title} className={styles.toolbarBtn}>
-            {b.label}
-          </button>
-        </Tooltip>
-      ))}
-      <div className={styles.spacer} />
-      {onAsk && askBlockedReason && (
-        <span id={askReasonId} className={styles.toolbarNote}>
-          {askBlockedReason}
-        </span>
-      )}
-      {onAsk && (
-        <Button
-          variant="ghost"
-          size="sm"
-          disabled={Boolean(askBlockedReason)}
-          aria-describedby={askBlockedReason ? askReasonId : undefined}
-          onMouseDown={e => e.preventDefault()}
-          onClick={onAsk}
-        >
-          Ask for changes
-        </Button>
-      )}
-      <span className={styles.toolbarNote}>Markdown supported</span>
-    </div>
-  );
-}
-
 interface SummarizeDialogProps {
   novelId: string;
   draft: DraftResponse;
@@ -1455,17 +1404,7 @@ function ChapterWorkspace({ novelId, draft, deleted, onBack, onPick }: ChapterWo
     if (deleted && !unsaved) onBack();
   }, [deleted, unsaved, onBack]);
 
-  const { save } = editor;
-  useEffect(() => {
-    if (!inEditor) return;
-    const saveOnShortcut = (event: KeyboardEvent): void => {
-      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 's') return;
-      event.preventDefault();
-      void save();
-    };
-    window.addEventListener('keydown', saveOnShortcut);
-    return () => window.removeEventListener('keydown', saveOnShortcut);
-  }, [inEditor, save]);
+  useSaveShortcut(inEditor, editor.save);
 
   const meta = statusMeta(draft);
   const held = draft.status === 'final' ? 0 : blockingHold(reviews.data);
@@ -1477,57 +1416,10 @@ function ChapterWorkspace({ novelId, draft, deleted, onBack, onPick }: ChapterWo
   const runBlockedReason = generation ? 'The chapter is being written — review it once it’s done.' : !draft.body?.trim() ? 'There’s no text to review yet.' : undefined;
   const displayTitle = draft.title?.trim() || 'Untitled chapter';
   const askable = actions.askForge && !generation && draft.reviewStatus !== 'generating';
+  const askBlockedReason = saveBlocked ? 'Resolve the save problem first' : proseSelection.start === proseSelection.end ? 'Select a passage to ask for changes' : undefined;
 
-  const surround = (before: string, after: string): void => {
-    const el = editorRef.current;
-    if (!el) return;
-    const s = el.selectionStart;
-    const e = el.selectionEnd;
-    editor.setBody(body.slice(0, s) + before + body.slice(s, e) + after + body.slice(e));
-    requestAnimationFrame(() => {
-      el.focus();
-      el.setSelectionRange(s + before.length, e + before.length);
-    });
-  };
-
-  const prefixLines = (prefix: (i: number) => string): void => {
-    const el = editorRef.current;
-    if (!el) return;
-    const from = body.lastIndexOf('\n', el.selectionStart - 1) + 1;
-    const nl = body.indexOf('\n', el.selectionEnd);
-    const to = nl === -1 ? body.length : nl;
-    const out = body
-      .slice(from, to)
-      .split('\n')
-      .map((line, i) => prefix(i) + line)
-      .join('\n');
-    editor.setBody(body.slice(0, from) + out + body.slice(to));
-    requestAnimationFrame(() => {
-      el.focus();
-      el.setSelectionRange(from, from + out.length);
-    });
-  };
-
-  const insertTable = (): void => {
-    const el = editorRef.current;
-    if (!el) return;
-    const at = el.selectionStart;
-    const tpl = '\n| Column A | Column B |\n| --- | --- |\n| Cell 1 | Cell 2 |\n| Cell 3 | Cell 4 |\n';
-    editor.setBody(body.slice(0, at) + tpl + body.slice(at));
-    requestAnimationFrame(() => {
-      el.focus();
-      el.setSelectionRange(at + tpl.length, at + tpl.length);
-    });
-  };
-
-  const onEditorKeyDown = (e: React.KeyboardEvent): void => {
-    if (!(e.metaKey || e.ctrlKey)) return;
-    const key = e.key.toLowerCase();
-    if (key === 'b') surround('**', '**');
-    else if (key === 'i') surround('*', '*');
-    else return;
-    e.preventDefault();
-  };
+  const format = useProseFormatting(editorRef, body, editor.setBody);
+  const askReasonId = useId();
 
   const finishEditing = async (): Promise<void> => {
     if (await editor.save()) setEditing(false);
@@ -1591,31 +1483,7 @@ function ChapterWorkspace({ novelId, draft, deleted, onBack, onPick }: ChapterWo
     );
   };
 
-  const copyMine = (): void => {
-    navigator.clipboard.writeText(title.trim() ? `${title.trim()}\n\n${body}` : body).then(
-      () => toast.success('Your text is copied'),
-      () => toast.danger('Copying failed — select the text and copy it yourself'),
-    );
-  };
-
-  const takeTheirs = (): void => {
-    const replaced = editor.takeTheirs();
-    toast.neutral('Your edits were replaced with the newer version', { action: { label: 'Undo', onClick: () => editor.restore(replaced) } });
-  };
-
-  const discardMine = (): void => {
-    const replaced = editor.takeTheirs();
-    setEditing(false);
-    toast.neutral('Your edits were discarded', {
-      action: {
-        label: 'Undo',
-        onClick: () => {
-          editor.restore(replaced);
-          setEditing(true);
-        },
-      },
-    });
-  };
+  const recovery = editorRecovery(editor, setEditing);
 
   const refuseApproval = (error: ApiError): void => {
     if (approvalMoved(error)) toast.warning('The text changed since you read it — the new version is on screen now. Read it, then approve again.');
@@ -1682,9 +1550,9 @@ function ChapterWorkspace({ novelId, draft, deleted, onBack, onPick }: ChapterWo
       state={editor.state}
       chapter={chapter}
       onKeepMine={editor.keepMine}
-      onTakeTheirs={takeTheirs}
-      onCopyMine={copyMine}
-      onDiscard={discardMine}
+      onTakeTheirs={recovery.takeTheirs}
+      onCopyMine={recovery.copyMine}
+      onDiscard={recovery.discardMine}
       onRetry={() => void editor.retry()}
     />
   );
@@ -1849,17 +1717,22 @@ function ChapterWorkspace({ novelId, draft, deleted, onBack, onPick }: ChapterWo
                 </div>
                 {tab === 'write' ? (
                   <>
-                    <ProseToolbar
-                      onBold={() => surround('**', '**')}
-                      onItalic={() => surround('*', '*')}
-                      onBulleted={() => prefixLines(() => '- ')}
-                      onNumbered={() => prefixLines(i => `${i + 1}. `)}
-                      onTable={insertTable}
-                      onAsk={askable ? () => void askFromEditor() : undefined}
-                      askBlockedReason={
-                        saveBlocked ? 'Resolve the save problem first' : proseSelection.start === proseSelection.end ? 'Select a passage to ask for changes' : undefined
-                      }
-                    />
+                    <ProseToolbar tools={CHAPTER_TOOLS} onTool={format.apply}>
+                      {askable && askBlockedReason && <ProseToolbarNote id={askReasonId}>{askBlockedReason}</ProseToolbarNote>}
+                      {askable && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={Boolean(askBlockedReason)}
+                          aria-describedby={askBlockedReason ? askReasonId : undefined}
+                          onMouseDown={e => e.preventDefault()}
+                          onClick={() => void askFromEditor()}
+                        >
+                          Ask for changes
+                        </Button>
+                      )}
+                      <ProseToolbarNote>Markdown supported</ProseToolbarNote>
+                    </ProseToolbar>
                     <textarea
                       ref={editorRef}
                       value={body}
@@ -1868,7 +1741,7 @@ function ChapterWorkspace({ novelId, draft, deleted, onBack, onPick }: ChapterWo
                         setProseSelection({ start: e.currentTarget.selectionStart, end: e.currentTarget.selectionEnd });
                       }}
                       onSelect={e => setProseSelection({ start: e.currentTarget.selectionStart, end: e.currentTarget.selectionEnd })}
-                      onKeyDown={onEditorKeyDown}
+                      onKeyDown={format.onKeyDown}
                       readOnly={textLocked}
                       spellCheck
                       aria-label="Chapter prose (Markdown)"

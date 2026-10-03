@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button, Dialog, Input, SegmentedControl, Spinner, toast } from '@shadow-library/ui';
 
 import { ArchiveIcon, ChatIcon, EditIcon, SearchIcon, TrashIcon } from '@/components/icons';
@@ -18,6 +18,7 @@ import {
   useSetSessionStatusMutation,
   useUpdateChatSessionMutation,
 } from '@/lib/apis';
+import { type ChapterOpenMode, chapterParam } from '@/lib/chapter-panel';
 import { chatHistoryView, chatTitle, matchesChatQuery } from '@/lib/chat-sessions';
 import { groupByRecency, relativeTime } from '@/lib/format';
 
@@ -27,6 +28,8 @@ interface ChatSearch {
   session?: string;
   /** A pending card another screen sent the author here to answer: shown in the open chat, or brought into it first. */
   card?: string;
+  /** The chapter open beside the chat, kept for this chat across a reload or a shared link; switching chats closes it. */
+  chapter?: number;
 }
 
 // `?session=new` is the chat that does not exist yet: the row is written on the first message, so until
@@ -49,6 +52,7 @@ export const Route = createFileRoute('/novels/$novelId/chat')({
   validateSearch: (search: Record<string, unknown>): ChatSearch => ({
     session: typeof search.session === 'string' && search.session ? search.session : undefined,
     card: cardParam(search.card),
+    chapter: chapterParam(search.chapter),
   }),
   component: ChatScreen,
 });
@@ -356,7 +360,7 @@ function ChatHistoryDialog({ novelId, open, onOpenChange, openSessionId, onDelet
 
 function ChatScreen(): React.JSX.Element {
   const { novelId } = Route.useParams();
-  const { session: sessionParam, card } = Route.useSearch();
+  const { session: sessionParam, card, chapter } = Route.useSearch();
   const navigate = Route.useNavigate();
   // Unfiltered on purpose: the status filter belongs to the history modal, and resolving the open chat
   // against a filtered list would answer an archived link with whichever active chat happened to sort first.
@@ -367,7 +371,7 @@ function ChatScreen(): React.JSX.Element {
   const [draftSession, setDraftSession] = useState<ChatSessionResponse>();
   // The opening message, queued for the one `ChatColumn` render that owns sending it.
   const [pendingFirstTurn, setPendingFirstTurn] = useState<{ sessionId: string; content: string }>();
-  // A synchronous latch against a second create, held until `selectSession` actually resolves: `isPending`
+  // A synchronous latch against a second create, held until the navigation to the new chat actually resolves: `isPending`
   // goes false the instant `onSuccess` runs, before the navigation away from the draft has landed.
   const startingRef = useRef(false);
   // Which `startDraft` call is still current: `newChat` bumps it so an abandoned create's `onSuccess` skips navigating.
@@ -378,6 +382,19 @@ function ChatScreen(): React.JSX.Element {
   const [grownFromDraft, setGrownFromDraft] = useState<string>();
   const [historyOpen, setHistoryOpen] = useState(false);
   const [changeHistoryOpen, setChangeHistoryOpen] = useState(false);
+  const [chapterRequest, setChapterRequest] = useState<{ chapter: number; mode: ChapterOpenMode }>();
+
+  const openChapter = useCallback(
+    (opened: number, mode: ChapterOpenMode): void => {
+      setChapterRequest({ chapter: opened, mode });
+      void navigate({ search: previous => ({ ...previous, chapter: opened }) });
+    },
+    [navigate],
+  );
+  const closeChapter = useCallback((): void => {
+    setChapterRequest(undefined);
+    void navigate({ search: previous => ({ ...previous, chapter: undefined }) });
+  }, [navigate]);
 
   const sessions = sessionsQuery.data?.items ?? [];
 
@@ -420,7 +437,8 @@ function ChatScreen(): React.JSX.Element {
           setDraftSession(session);
           setGrownFromDraft(session.id);
           setPendingFirstTurn({ sessionId: session.id, content });
-          await selectSession(session.id);
+          // The chat grows out of the draft it was typed in, so a chapter open beside it stays open.
+          await navigate({ search: previous => ({ session: session.id, chapter: previous.chapter }) });
           startingRef.current = false;
         },
         onError: err => {
@@ -456,6 +474,10 @@ function ChatScreen(): React.JSX.Element {
         onInitialTurnSent={() => setPendingFirstTurn(undefined)}
         revealCard={card}
         onCardRevealed={() => void navigate({ search: previous => ({ ...previous, card: undefined }), replace: true })}
+        chapter={chapter}
+        chapterRequest={chapterRequest && chapterRequest.chapter === chapter ? chapterRequest.mode : undefined}
+        onOpenChapter={openChapter}
+        onCloseChapter={closeChapter}
       />
 
       <ChatHistoryDialog novelId={novelId} open={historyOpen} onOpenChange={setHistoryOpen} openSessionId={selected?.id} onDeleted={onChatDeleted} />

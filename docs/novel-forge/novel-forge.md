@@ -118,6 +118,12 @@
 - **A written chapter is decided in the chat**: every draft awaiting review (`needs_review` or `contradiction`) shows at the end of the thread to be read in full, approved
   under the approval rules (a contradiction needs the AI review first; blocking findings are overridden only on confirmation), or revised by asking — which turns
   on Edit prose, since a revision is `action.revise_draft`. Chapter writing started anywhere is followed in the thread until the draft lands.
+- **A chapter opens beside the chat**, only on the author's click, in a panel on the right that stays open for that chat (`?chapter=N`) until closed, across a
+  reload; switching chats closes it. The draft is on screen once: while the panel holds a chapter, that chapter's card in the thread is a one-line pointer.
+  Approve in the panel and on the card is the same approval of the same draft, and waits for the author's unsaved edits to be saved. Hand edits go through the
+  Chapters page's editor (autosave, the conflict choice, the hand-save path), and leaving the chapter with text unsaved asks first. A final chapter opens
+  read-only and one being written shows its progress, never an editor. Only one panel holds the right side: the changes panel folds to a strip and reviews
+  in its sheet while a chapter is open. Below 1024px the chapter is a full sheet over the chat.
 - **Passage comments ride the message**: an author's message may carry up to ten comments on passages of chapter drafts (`contexts`), each sent with its draft, revision,
   UTF-16 offsets and a hash of its quote. The server re-anchors each to the draft as it stands — in place; else, when the revision the author read survives, only the copy
   still between the words that surrounded it there; else the quote's one occurrence — and stores it on the message at that draft's current offsets; a passage it cannot

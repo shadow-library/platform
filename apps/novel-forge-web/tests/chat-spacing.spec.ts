@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { readFileSync } from 'node:fs';
 
+import { CHAPTER_PANEL_MIN, CHAPTER_PANEL_WIDTH, CHAPTER_SHEET_QUERY, CHAT_BESIDE_PANEL_MIN, clampPanelWidth } from '../src/lib/chapter-panel';
 import {
   CHAT_THREAD_PADDING,
   CHAT_THREAD_WIDTH,
@@ -149,6 +150,11 @@ const CHAT: Expected[] = [
   { selector: '.draftBody', values: { padding: '12px 12px 0' }, source: 'the card head’s 12px inline padding; the foot’s border closes the bottom' },
   { selector: '.draftBody::after', values: { height: '64px' }, source: 'fade over the last three body lines (22px each)' },
   { selector: '.draftFoot', values: { gap: '8px', padding: '10px 12px' }, source: 'as .cardActions' },
+  {
+    selector: '.draftPointer',
+    values: { gap: '8px', padding: '10px 12px' },
+    source: 'the card’s own head (.cardHead gap 8, padding 10px 12px) standing alone while its chapter is open beside the chat',
+  },
   { selector: '.indented', values: { gap: '8px' }, source: 'gap 8 as .assistantCol; no avatar, so no indent' },
   { selector: '.composerNotice', values: { gap: '8px', padding: '8px 10px', 'border-radius': 'var(--sh-radius-md)' }, source: 'Main l.214 strip padding 8px 10px radius 6' },
   { selector: '.impact', values: { gap: '12px' }, source: 'rule 6: 12 inside cards' },
@@ -303,8 +309,81 @@ const PANEL: Expected[] = [
   { selector: '.showMore', values: { padding: '0' }, source: 'chat.module.css .textLink padding 0' },
   { selector: '.backBar', values: { padding: '14px 16px 0' }, source: 'redesign l.160 .psec padding 14px 16px, closing onto the section below' },
   { selector: '.panelBar', values: { padding: '8px 8px 0' }, source: 'the close button tucked into the corner, closing onto the first section' },
+  {
+    selector: '.strip',
+    values: { gap: '8px', padding: '6px 8px 6px 16px' },
+    source: 'the panel folded under the chapter’s header: the header’s 16 at the left and 8 at the right (ChapterPanel .head), 6 above and below its 28px buttons',
+  },
   { selector: '.srOnly', values: { width: '1px', height: '1px' }, source: 'Main l.30 .sr' },
 ];
+
+// Every at-rule block read apart from the base rules, keyed by its prelude, so a sheet or phone override never masks the value it overrides.
+function atRulesOf(path: string): { base: Rules; at: Map<string, Rules> } {
+  const css = readFileSync(new URL(path, import.meta.url), 'utf-8').replace(/\/\*[\s\S]*?\*\//g, '');
+  const at = new Map<string, Rules>();
+  let base = '';
+  let index = 0;
+  for (let start = css.indexOf('@', index); start >= 0; start = css.indexOf('@', index)) {
+    const open = css.indexOf('{', start);
+    let depth = 1;
+    let end = open + 1;
+    while (depth > 0 && end < css.length) {
+      if (css[end] === '{') depth++;
+      if (css[end] === '}') depth--;
+      end++;
+    }
+    base += css.slice(index, start);
+    at.set(css.slice(start, open).trim(), rulesOf(css.slice(open + 1, end - 1)));
+    index = end;
+  }
+  return { base: rulesOf(base + css.slice(index)), at };
+}
+
+// "mockup" is the owner-approved chat-first review mockup (https://claude.ai/artifact/35KytWnhv6NJGDqcNNEhBk), screens 2–4.
+const CHAPTER_PANEL: Expected[] = [
+  {
+    selector: '.panel',
+    values: { width: 'var(--chapter-panel-width, 640px)', 'max-width': 'calc(100% - 420px)', 'min-height': '0' },
+    source: 'mockup: a 640 reading width by default, the chat keeping at least 420 beside it',
+  },
+  { selector: '.separator', values: { width: '6px' }, source: 'a 6px grab area centred on the 1px border' },
+  {
+    selector: '.head',
+    values: { height: '48px', gap: '8px', padding: '0 8px 0 16px' },
+    source: 'mockup panel header 48 high; ProgressPanel .section 16 at the left, .panelBar 8 at the right',
+  },
+  { selector: '.title', values: { margin: '0' }, source: 'heading reset' },
+  { selector: '.headActions', values: { gap: '8px', 'margin-left': 'auto' }, source: 'chat .headActions gap 8, margin-left auto' },
+  { selector: '.scroll', values: { 'min-height': '0' }, source: 'as chat .scroll' },
+  { selector: '.reader', values: { padding: '28px 56px 28px 64px' }, source: 'mockup reading view padding 28px 56px 28px 64px' },
+  { selector: '.reader :global(.nf-md) > *::before', values: { width: '32px' }, source: 'mockup paragraph-number gutter: 32 wide, 16 short of the prose' },
+  { selector: '.note', values: { margin: '0 0 16px' }, source: 'the judge’s note above the prose; ProgressPanel .section 16' },
+  { selector: '.empty', values: { margin: '0' }, source: 'paragraph reset' },
+  { selector: '.state', values: { gap: '12px', padding: '28px 56px 0 64px' }, source: 'the reading view’s padding (.reader), 12 between a status and its line as chat .receipt' },
+  { selector: '.editorBody', values: { 'min-height': '0' }, source: 'as chat .column' },
+  {
+    selector: '.textarea',
+    values: { 'min-height': '0', width: '100%', padding: '28px 56px 28px 64px' },
+    source: 'mockup edit view: the textarea fills the panel, its text where the reading view’s prose sits',
+  },
+  { selector: '.statusBar', values: { gap: '4px 8px', padding: '6px 16px' }, source: 'mockup status bar; ProgressPanel .section 16 at the sides' },
+];
+
+const CHAPTER_PANEL_AT: Record<string, Expected[]> = {
+  '@media (max-width: 1023px)': [
+    { selector: '.panel', values: { width: 'auto', 'max-width': 'none' }, source: 'below 1024 the chapter is a full sheet over the chat' },
+    { selector: '.backBar', values: { padding: '8px 8px 0' }, source: 'ProgressPanel .panelBar padding 8px 8px 0' },
+  ],
+  '@media (max-width: 760px)': [
+    {
+      selector: '.reader, .textarea',
+      values: { padding: '20px 16px 20px 44px' },
+      source: 'the phone gutter (16, --nf-page-pad-inline) at the right, 44 at the left for the numbers',
+    },
+    { selector: '.reader :global(.nf-md) > *::before', values: { width: '24px' }, source: 'the gutter narrowed with its padding' },
+    { selector: '.state', values: { padding: '20px 16px 0' }, source: 'the phone gutter' },
+  ],
+};
 
 function check(rules: Rules, table: Expected[], baseline?: Rules): void {
   for (const expected of table) {
@@ -365,6 +444,13 @@ describe('Chat spacing', () => {
 
   it('should keep the progress panel’s values cited', () => {
     check(spacingOf('../src/features/chat/ProgressPanel.module.css').base, PANEL);
+  });
+
+  it('should keep the chapter panel’s values cited, its sheet and phone overrides apart', () => {
+    const { base, at } = atRulesOf('../src/features/chat/ChapterPanel.module.css');
+    check(base, CHAPTER_PANEL);
+    for (const [prelude, rules] of at) check(rules, CHAPTER_PANEL_AT[prelude] ?? []);
+    expect([...Object.keys(CHAPTER_PANEL_AT)].filter(prelude => !at.has(prelude))).toEqual([]);
   });
 
   it('should keep the model menu’s values cited', () => {
@@ -459,6 +545,27 @@ describe('Chat width arithmetic', () => {
     const panelWidth = px(spacingOf('../src/features/chat/ProgressPanel.module.css').base.get('.panel')?.width);
     expect(docksFrom).toBe(CHAT_THREAD_WIDTH + 2 * sidePad + panelWidth);
     expect(docksFrom).toBe(PANEL_DOCK_MIN);
+  });
+
+  it('should hold the chapter panel to the same bounds in its stylesheet as in the divider it is dragged by', () => {
+    const css = readFileSync(new URL('../src/features/chat/ChapterPanel.module.css', import.meta.url), 'utf-8');
+    const panel = /\n\.panel \{([^}]*)\}/.exec(css)?.[1] ?? '';
+    expect(panel).toContain(`width: var(--chapter-panel-width, ${CHAPTER_PANEL_WIDTH}px)`);
+    expect(panel).toContain(`min-width: ${CHAPTER_PANEL_MIN}px`);
+    expect(panel).toContain(`max-width: calc(100% - ${CHAT_BESIDE_PANEL_MIN}px)`);
+    expect(css).toContain(`@media ${CHAPTER_SHEET_QUERY} {`);
+  });
+
+  it('should leave the chat at least 420 beside a chapter from 1024 up, and a reading column no narrower than the panel minimum', () => {
+    for (const viewport of [1024, 1280, 1440]) {
+      for (const sidebar of [SIDEBAR_RAIL_WIDTH, SIDEBAR_WIDTH]) {
+        const frame = viewport - sidebar;
+        const panel = clampPanelWidth(CHAPTER_PANEL_WIDTH, frame);
+        expect({ viewport, sidebar, chat: frame - panel >= CHAT_BESIDE_PANEL_MIN }).toEqual({ viewport, sidebar, chat: true });
+        expect(panel).toBeGreaterThanOrEqual(CHAPTER_PANEL_MIN);
+      }
+    }
+    expect(clampPanelWidth(CHAPTER_PANEL_WIDTH, 1440 - SIDEBAR_RAIL_WIDTH)).toBe(CHAPTER_PANEL_WIDTH);
   });
 
   it('should dock the progress panel from 1192 beside the rail and from 1390 beside the sidebar', () => {

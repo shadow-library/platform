@@ -173,6 +173,26 @@
   padding: 14px 16px 0;
 }
 
+.strip {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 6px 16px;
+  border-bottom: 1px solid var(--sh-border-subtle);
+  background: var(--sh-surface-well);
+}
+
+.stripText {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--sh-text-body-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--sh-text-secondary);
+}
+
 .panelBar {
   display: flex;
   justify-content: flex-end;
