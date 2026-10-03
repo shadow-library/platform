@@ -171,7 +171,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
   const [queued, setQueued] = useState<QueuedTurn>();
   const [turnChoice, setTurnChoice] = useState<TurnChoice>();
   const [renamingHeader, setRenamingHeader] = useState(false);
-  const [checklistOpen, setChecklistOpen] = useState(true);
+  const [checklistOpen, setChecklistOpen] = useState(false);
   const [planStartOpen, setPlanStartOpen] = useState(false);
   const [announcement, setAnnouncement] = useState('');
   const [cancellingJob, setCancellingJob] = useState<string>();
@@ -195,7 +195,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
   const name = project ? projectTitle(project) : 'this novel';
   const notes = notesQuery.data?.notes;
   const nextChapter = (statusQuery.data?.draftsTotal ?? 0) + 1;
-  const checklist = progressQuery.data ? checklistView(progressQuery.data.items, nextChapter - 1) : undefined;
+  const checklist = progressQuery.data ? checklistView(progressQuery.data.items) : undefined;
   const state = transcriptTurnState(messagesQuery);
   const stream = turn.stream;
   // Once this tab has stopped its own turn, the server's pending view lags behind; the stream already knows better.
@@ -242,7 +242,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
   const waitingCards = waiting.filter(proposal => proposal.kind !== PLAN_KIND);
 
   const opener = openerChip(project?.kind, messages.length, notes);
-  const chips: PromptChip[] = composerChips([...(opener ? [opener] : []), ...promptChips(checklist?.items ?? [], nextChapter)], {
+  const chips: PromptChip[] = composerChips([...(opener ? [opener] : []), ...promptChips(nextChapter)], {
     running: pending,
     awaitingAnswer: awaitingAnswer(messages),
   });
@@ -698,7 +698,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
                     novelId={novelId}
                     message={m}
                     settledQuestions={answeredUpTo > m.ordinal}
-                    eyebrow={questionEyebrow(m.question?.progressKey, checklist, answeredUpTo > m.ordinal)}
+                    eyebrow={questionEyebrow(m.question?.progressKey, checklist)}
                     held={m.id === finishedId ? finishedHeld : undefined}
                     busy={busy}
                     jobs={jobsByMessage.get(m.id) ?? NO_JOBS}

@@ -350,16 +350,16 @@ export interface ChecklistView {
   complete: boolean;
 }
 
-const ITEM_STATE_LABEL: Record<ChecklistItemView['state'], string> = { open: 'Open', answered: 'Answered', undecided: 'Undecided for now' };
+const ITEM_STATE_LABEL: Record<ChecklistItemView['state'], string> = { open: 'Open', answered: 'Settled', undecided: 'Undecided for now' };
 
-export function checklistView(items: readonly ProgressItemResponse[], draftsTotal: number): ChecklistView {
+export function checklistView(items: readonly ProgressItemResponse[]): ChecklistView {
   const visible = items
     .filter(item => item.status !== 'dismissed')
     .map(item => ({ key: item.key as ProgressItemKey, label: item.label, why: item.why, state: item.status as ChecklistItemView['state'] }))
     .map(item => ({ ...item, stateLabel: ITEM_STATE_LABEL[item.state] }));
   const answered = visible.filter(item => item.state !== 'open').length;
   return {
-    title: `Ready for chapter ${draftsTotal + 1}`,
+    title: 'Story so far',
     items: visible,
     answered,
     percent: visible.length === 0 ? 100 : Math.round((answered / visible.length) * 100),
@@ -368,12 +368,9 @@ export function checklistView(items: readonly ProgressItemResponse[], draftsTota
   };
 }
 
-export function questionEyebrow(progressKey: string | null | undefined, checklist: ChecklistView | undefined, settled: boolean): string {
+export function questionEyebrow(progressKey: string | null | undefined, checklist: ChecklistView | undefined): string {
   if (!progressKey || !checklist) return 'Question';
-  const item = checklist.items.find(entry => entry.key === progressKey);
-  if (!item) return 'Question';
-  if (settled || item.state !== 'open') return `Question · ${item.label}`;
-  return `Question ${checklist.answered + 1} of ${checklist.items.length} · ${item.label}`;
+  return checklist.items.find(entry => entry.key === progressKey)?.label ?? 'Question';
 }
 
 export interface QuestionOption {
@@ -495,15 +492,10 @@ export interface PromptChip {
   prompt: string;
 }
 
-export function promptChips(openItems: readonly Pick<ChecklistItemView, 'label' | 'state'>[], nextChapter: number): PromptChip[] {
-  const open = openItems
-    .filter(item => item.state === 'open')
-    .slice(0, 2)
-    .map(item => ({ label: item.label, prompt: `Let’s settle this: ${item.label}.` }));
+export function promptChips(nextChapter: number): PromptChip[] {
   return [
+    { label: `Ideas for chapter ${nextChapter}`, prompt: `Give me a few ideas for chapter ${nextChapter}, from where the story stands.` },
     { label: `Plan chapter ${nextChapter}`, prompt: `Let’s plan chapter ${nextChapter}.` },
-    ...open,
-    { label: 'What’s missing?', prompt: 'What’s still missing before the next chapter?' },
   ];
 }
 
@@ -519,7 +511,7 @@ export function jobKindForOp(op: ChangeOp | undefined): JobKind {
   return (op && ACTION_JOB_KIND[String(op.op)]) ?? 'generate';
 }
 
-export const OPENER_PROMPT = 'Organise my notes and ask me about the rest';
+export const OPENER_PROMPT = 'Organise my notes';
 
 /** A new novel's chat that nothing was queued for still gets its opening move one click away. */
 export function openerChip(kind: string | undefined, messageCount: number, notes: string | undefined): PromptChip | undefined {

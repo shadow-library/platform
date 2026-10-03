@@ -55,7 +55,7 @@ interface ChapterReview {
  * the model's wording. Opt-in (`E2E_LIVE_AI=1`) and tagged `@model`.
  */
 
-const OPENER = 'Organise my notes and ask me about the rest';
+const OPENER = 'Organise my notes';
 const CHAPTER_ONE_INTENT = 'Tamsin measures the street at dawn and sees a wall move while she watches.';
 const PLAN_KIND = 'chapter_plan';
 

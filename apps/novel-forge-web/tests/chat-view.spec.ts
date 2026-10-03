@@ -329,17 +329,13 @@ describe('checklistView', () => {
   ];
 
   it('should count undecided as answered and leave dismissed items out', () => {
-    const view = checklistView(items, 0);
-    expect(view.title).toBe('Ready for chapter 1');
+    const view = checklistView(items);
+    expect(view.title).toBe('Story so far');
     expect(view.items.map(item => item.key)).toEqual(['premise', 'ending', 'opposition']);
     expect(view.answered).toBe(2);
     expect(view.percent).toBe(67);
     expect(view.dismissed).toBe(1);
     expect(view.complete).toBe(false);
-  });
-
-  it('should name the next chapter after the drafts written', () => {
-    expect(checklistView(items, 3).title).toBe('Ready for chapter 4');
   });
 });
 
@@ -351,28 +347,20 @@ describe('questionEyebrow', () => {
     { key: 'theme', label: 'Theme', why: 'Depth', status: 'dismissed' as const },
     { key: 'protagonist', label: 'Protagonist', why: 'Lead', status: 'open' as const },
   ];
-  const checklist = checklistView(items, 0);
+  const checklist = checklistView(items);
 
-  it('should count the next unanswered position out of the visible checklist items and name the topic', () => {
-    expect(questionEyebrow('opposition', checklist, false)).toBe('Question 3 of 4 · Who opposes her');
+  it('should name the topic without counting questions, whatever the item’s state', () => {
+    expect(questionEyebrow('opposition', checklist)).toBe('Who opposes her');
+    expect(questionEyebrow('premise', checklist)).toBe('Premise');
+    expect(questionEyebrow('ending', checklist)).toBe('How it ends');
   });
 
   it('should be just “Question” without a progress key, a checklist, or a matching item', () => {
-    expect(questionEyebrow(undefined, checklist, false)).toBe('Question');
-    expect(questionEyebrow(null, checklist, false)).toBe('Question');
-    expect(questionEyebrow('opposition', undefined, false)).toBe('Question');
-    expect(questionEyebrow('first_volume_goal', checklist, false)).toBe('Question');
-    expect(questionEyebrow('theme', checklist, false)).toBe('Question');
-  });
-
-  it('should drop the counter on a settled question and keep its topic', () => {
-    expect(questionEyebrow('opposition', checklist, true)).toBe('Question · Who opposes her');
-    expect(questionEyebrow('opposition', undefined, true)).toBe('Question');
-  });
-
-  it('should drop the counter when the checklist already counts the question’s own item as answered', () => {
-    expect(questionEyebrow('premise', checklist, false)).toBe('Question · Premise');
-    expect(questionEyebrow('ending', checklist, false)).toBe('Question · How it ends');
+    expect(questionEyebrow(undefined, checklist)).toBe('Question');
+    expect(questionEyebrow(null, checklist)).toBe('Question');
+    expect(questionEyebrow('opposition', undefined)).toBe('Question');
+    expect(questionEyebrow('first_volume_goal', checklist)).toBe('Question');
+    expect(questionEyebrow('theme', checklist)).toBe('Question');
   });
 });
 
@@ -473,21 +461,15 @@ describe('turnAnnouncement', () => {
 });
 
 describe('promptChips + openerChip', () => {
-  it('should offer the next chapter, two open questions and what is missing', () => {
-    const chips = promptChips(
-      [
-        { label: 'Who opposes her', state: 'open' },
-        { label: 'Premise', state: 'answered' },
-        { label: 'Theme', state: 'open' },
-        { label: 'Ending', state: 'open' },
-      ],
-      1,
-    );
-    expect(chips.map(chip => chip.label)).toEqual(['Plan chapter 1', 'Who opposes her', 'Theme', 'What’s missing?']);
+  it('should lead with ideas for the next chapter, then planning it, and never press for checklist answers', () => {
+    expect(promptChips(3)).toEqual([
+      { label: 'Ideas for chapter 3', prompt: 'Give me a few ideas for chapter 3, from where the story stands.' },
+      { label: 'Plan chapter 3', prompt: 'Let’s plan chapter 3.' },
+    ]);
   });
 
   it('should offer the opener only on an empty new-novel chat with notes', () => {
-    expect(openerChip('new_novel', 0, 'notes')?.label).toBe('Organise my notes and ask me about the rest');
+    expect(openerChip('new_novel', 0, 'notes')?.label).toBe('Organise my notes');
     expect(openerChip('new_novel', 2, 'notes')).toBeUndefined();
     expect(openerChip('new_novel', 0, '  ')).toBeUndefined();
     expect(openerChip('source', 0, 'notes')).toBeUndefined();

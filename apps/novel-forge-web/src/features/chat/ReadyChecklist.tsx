@@ -42,13 +42,10 @@ export function ReadyChecklist({ view, loading, error, onRetry, expanded, onTogg
     <section className={styles.checklist} aria-label={view.title}>
       <button type="button" className={styles.checklistHead} aria-expanded={expanded} aria-controls={expanded ? listId : undefined} onClick={onToggle}>
         <span className={styles.checklistTitle}>{view.title}</span>
-        <span className={styles.caption}>advice, not a gate</span>
         <span className={styles.checklistBar} aria-hidden="true">
           <span className={styles.checklistFill} style={{ width: `${view.percent}%` }} />
         </span>
-        <span className={styles.checklistCount}>
-          {view.answered} of {view.items.length} answered
-        </span>
+        <span className={styles.checklistCount}>{view.answered} settled</span>
         <span className={styles.checklistToggle}>{expanded ? 'Hide' : 'Show'}</span>
       </button>
       {expanded && (
@@ -83,10 +80,7 @@ export function ReadyChecklist({ view, loading, error, onRetry, expanded, onTogg
               </li>
             ))}
           </ul>
-          <p className={styles.checklistNote}>
-            None of this blocks you — plan the next chapter whenever you like. “Undecided for now” counts as answered.
-            {view.dismissed > 0 && ` ${view.dismissed} dismissed.`}
-          </p>
+          {view.dismissed > 0 && <p className={styles.checklistNote}>{view.dismissed} dismissed.</p>}
         </div>
       )}
     </section>

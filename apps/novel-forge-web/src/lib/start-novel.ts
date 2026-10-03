@@ -5,7 +5,8 @@ export const NOTES_MAX_CHARS = 100_000;
 export const TITLE_MAX_CHARS = 255;
 export const UNTITLED_NOVEL = 'Untitled novel';
 
-export const NOTES_OPENER = 'Here are my notes for the story. Organise them into my Story Bible, then ask me about the rest.';
+export const NOTES_OPENER =
+  'Here are my notes for the story. Organise them into my Story Bible as the world stands when the story opens, and keep anything that happens later as my plans.';
 export const BLANK_OPENER = 'I’m starting a new novel. Help me design it — ask me one question at a time.';
 
 export const NOTES_OVER_WORDS = `That’s over the ${NOTES_MAX_WORDS.toLocaleString('en')}-word limit. Trim your notes; you can add the rest in the chat.`;

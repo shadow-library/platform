@@ -20,13 +20,10 @@ const noop = (): void => undefined;
 const html = (element: ReactElement): string => renderToStaticMarkup(element);
 const FAILURE = new ApiError(500, { code: 'X', type: 'SERVER_ERROR', message: 'Backend down' });
 
-const PROGRESS = checklistView(
-  [
-    { key: 'premise', label: 'Premise', why: 'Everything hangs on it', status: 'answered' },
-    { key: 'opposition', label: 'Who opposes her', why: 'Chapter one needs a pressure', status: 'open' },
-  ],
-  0,
-);
+const PROGRESS = checklistView([
+  { key: 'premise', label: 'Premise', why: 'Everything hangs on it', status: 'answered' },
+  { key: 'opposition', label: 'Who opposes her', why: 'Chapter one needs a pressure', status: 'open' },
+]);
 
 function checklist(overrides: Partial<ReadyChecklistProps> = {}): string {
   return html(createElement(ReadyChecklist, { view: PROGRESS, loading: false, onRetry: noop, expanded: true, onToggle: noop, onMark: noop, ...overrides }));
@@ -41,21 +38,33 @@ describe('ReadyChecklist', () => {
   });
 
   it('should render nothing when there is nothing to advise', () => {
-    expect(checklist({ view: checklistView([], 0) })).toBe('');
-    expect(checklist({ view: checklistView([{ key: 'premise', label: 'Premise', why: 'x', status: 'answered' }], 0) })).toBe('');
+    expect(checklist({ view: checklistView([]) })).toBe('');
+    expect(checklist({ view: checklistView([{ key: 'premise', label: 'Premise', why: 'x', status: 'answered' }]) })).toBe('');
   });
 
-  it('should be a keyboard disclosure that explains each open item and never blocks', () => {
+  it('should be a quiet keyboard disclosure that explains each open item without pressing for answers', () => {
     const open = checklist();
     expect(open).toContain('aria-expanded="true"');
-    expect(open).toContain('1 of 2 answered');
+    expect(open).toContain('Story so far');
+    expect(open).toContain('1 settled');
+    expect(open).toContain('>Settled<');
+    expect(open).not.toContain('of 2');
+    expect(open).not.toContain('advice, not a gate');
     expect(open).toContain('Chapter one needs a pressure');
     expect(open).toContain('aria-label="Mark “Who opposes her” undecided for now"');
     expect(open).toContain('aria-label="Dismiss “Who opposes her”"');
-    expect(open).toContain('None of this blocks you');
+    expect(open).not.toContain('dismissed.');
     const closed = checklist({ expanded: false });
     expect(closed).toContain('aria-expanded="false"');
     expect(closed).not.toContain('Who opposes her');
+  });
+
+  it('should note how many items were dismissed only when there are some', () => {
+    const view = checklistView([
+      { key: 'opposition', label: 'Who opposes her', why: 'x', status: 'open' },
+      { key: 'theme', label: 'Theme', why: 'x', status: 'dismissed' },
+    ]);
+    expect(checklist({ view })).toContain('1 dismissed.');
   });
 });
 

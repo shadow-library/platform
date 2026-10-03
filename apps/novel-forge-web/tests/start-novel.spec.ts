@@ -139,8 +139,11 @@ describe('startErrorsFrom', () => {
 });
 
 describe('firstTurnFor', () => {
-  it('should hand notes to the chat to organise', () => {
+  it('should hand notes to the chat to organise as the story opens, keeping later events as plans rather than asking', () => {
     expect(firstTurnFor('Tamsin keeps the lamp.')).toBe(NOTES_OPENER);
+    expect(NOTES_OPENER).toContain('as the world stands when the story opens');
+    expect(NOTES_OPENER).toContain('keep anything that happens later as my plans');
+    expect(NOTES_OPENER).not.toContain('ask me');
   });
 
   it('should open a blank start with a question-led design', () => {
