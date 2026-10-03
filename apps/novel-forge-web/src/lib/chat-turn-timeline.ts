@@ -57,6 +57,8 @@ const SOURCE_NOUNS: Record<string, Noun> = {
   get_usage: 'usage figures',
   search_lore: ['lore search', 'lore searches'],
   search_prose: ['prose search', 'prose searches'],
+  search_web: ['web search', 'web searches'],
+  fetch_page: ['web page', 'web pages'],
 };
 
 // Past this the wait is worth naming: the median turn lands well inside it, so the copy switching is

@@ -62,6 +62,19 @@ function searched(where: string, query: unknown): string {
   return value ? `Searched ${where} for ${quoted(value)}` : `Searched ${where}`;
 }
 
+// The site and path, without the scheme or "www.", cut like a query: enough to tell two pages of one site apart.
+function pageLabel(args: Args): string {
+  const raw = text(args.url);
+  if (!raw) return 'A web page';
+  try {
+    const url = new URL(raw);
+    const place = `${url.hostname.replace(/^www\./, '')}${url.pathname.replace(/\/$/, '')}`;
+    return `Web page: ${place.length > QUERY_LIMIT ? `${place.slice(0, QUERY_LIMIT)}…` : place}`;
+  } catch {
+    return 'A web page';
+  }
+}
+
 const LABELS: Record<string, (args: Args) => string> = {
   get_bible_document: bibleLabel,
   get_brief: args => chapterLabel(args, 'plan'),
@@ -78,6 +91,8 @@ const LABELS: Record<string, (args: Args) => string> = {
   get_world_facts: args => named('World facts:', args.category, 'World facts'),
   search_lore: args => searched('the lore', args.query),
   search_prose: args => searched('the prose', args.query),
+  search_web: args => searched('the web', args.query),
+  fetch_page: pageLabel,
 };
 
 export function lookupLabel(tool: string, args: Args): string {

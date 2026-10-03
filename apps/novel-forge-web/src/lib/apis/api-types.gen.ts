@@ -4918,6 +4918,7 @@ export interface components {
       volumeKey?: string;
       category?: string;
       query?: string;
+      url?: string;
     };
     /** @enum {string} */
     ChatTraceStatus: 'ok' | 'error';

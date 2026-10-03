@@ -236,6 +236,16 @@ describe('readSummary', () => {
     expect(readSummary([settled('get_draft', { chapter: 1 }, 'error')])).toBe('Couldn’t read 1 source');
   });
 
+  it('should count web searches and pages under their own names', () => {
+    expect(
+      readSummary([
+        settled('search_web', { query: 'winter survival' }),
+        settled('fetch_page', { url: 'https://example.com/a' }),
+        settled('fetch_page', { url: 'https://example.com/b' }),
+      ]),
+    ).toBe('Read 1 web search and 2 web pages');
+  });
+
   it('should word an unknown tool as another source', () => {
     expect(readSummary([settled('get_mystery')])).toBe('Read 1 other source');
   });
@@ -246,6 +256,13 @@ describe('readingLabel', () => {
     expect(readingLabel({ tool: 'get_draft', args: { chapter: 2 } })).toBe('Reading chapter 2 draft');
     expect(readingLabel({ tool: 'search_lore', args: { query: 'ley' } })).toBe('Searching the lore for “ley”');
     expect(readingLabel({ tool: 'get_mystery', args: {} })).toBe('Looking something up');
+  });
+
+  it('should name a web search by its query and a page by its site and path', () => {
+    expect(readingLabel({ tool: 'search_web', args: { query: 'how fortresses ration water' } })).toBe('Searching the web for “how fortresses ration water”');
+    expect(lookupLabel('fetch_page', { url: 'https://www.example.com/survival/water/' })).toBe('Web page: example.com/survival/water');
+    expect(lookupLabel('fetch_page', { url: `https://example.com/${'a'.repeat(60)}` })).toBe(`Web page: example.com/${'a'.repeat(28)}…`);
+    expect(lookupLabel('fetch_page', { url: 'not a url' })).toBe('A web page');
   });
 
   it('should keep the case of a Bible page’s own title', () => {
