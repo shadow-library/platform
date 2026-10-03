@@ -19,10 +19,10 @@ const docs = [
 ] as BibleDocRow[];
 
 describe('organisedTimelineState', () => {
-  it('should read the timeline as current only while it was organised from the notes as they stand', () => {
+  it('should read the timeline as current only while it was organised from the notes as they stand, and as kept without an organise lock', () => {
     expect(organisedTimelineState([brief, organised(textDigest(NOTES))])).toBe('current');
     expect(organisedTimelineState([brief, organised('00000000')])).toBe('stale');
-    expect(organisedTimelineState([brief])).toBeNull();
+    expect(organisedTimelineState([brief])).toBe('kept');
   });
 });
 
@@ -40,7 +40,16 @@ describe('organisedTimelineText', () => {
     expect(organisedTimelineText(docs, [brief, organised('00000000')])).toContain("Where it disagrees with the author's own words, those win");
   });
 
-  it('should be null until the author has organised their notes', () => {
-    expect(organisedTimelineText(docs, [brief])).toBeNull();
+  it('should bind a timeline the author kept without organising their notes, under its own rule', () => {
+    const text = organisedTimelineText(docs, [brief]);
+
+    expect(text?.startsWith("The author's own timeline, kept by them in the Story Bible.")).toBe(true);
+    expect(text).toContain('happens where it is placed and never in the opening');
+    expect(text).not.toContain('notes');
+  });
+
+  it('should be null when there is no timeline page or it is empty', () => {
+    expect(organisedTimelineText(docs.slice(1), [brief])).toBeNull();
+    expect(organisedTimelineText([{ section: 'project', slug: 'timeline', body: ' \n ' }], [brief])).toBeNull();
   });
 });

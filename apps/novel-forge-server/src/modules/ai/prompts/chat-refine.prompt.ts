@@ -11,6 +11,7 @@ import { countTokens } from '../context/token-budget';
 import { type RegisteredTool } from '../tools/types';
 import { type WebMode } from '../web/web-research.service';
 import { type ChatRefineOutput, ChatRefineSchema } from '../schemas/chat-refine.schema';
+import { laterPlanIssues } from '../../refinement/later-plans-guard';
 import { proseEditIssues } from '../../refinement/prose-intent';
 import { AUTHORING_STYLE_PLANNING, EDIT_BY_DELETION } from './authoring-preamble';
 import { HUB_ALLOWED_OPS, HUB_INSTRUCTIONS } from './scope-playbooks';
@@ -57,7 +58,7 @@ export function chatPromptTokens(scopeInstructions: string): number {
 
 export const chatRefinePrompt: PromptModule<ChatRefineOutput> = {
   key: 'chat-refine',
-  version: '2.17.0',
+  version: '2.18.0',
   kind: 'authoring',
   role: 'chat',
   cacheStrategy: { stableVars: ['scopeInstructions', 'stableContext'] },
@@ -78,6 +79,8 @@ export interface ChatTurnPermissions {
   proseEdits: boolean;
   /** Whether the author marked the turn as just discussing. */
   justDiscussing?: boolean;
+  /** Whether the author's message asks to organise their stored notes, which only the organise action does. */
+  organiseNotes?: boolean;
   mode: Refinement.ChatMode;
 }
 
@@ -99,15 +102,22 @@ export function renderTurnRules(permissions: ChatTurnPermissions): string {
 
 /**
  * Per-turn variant: the repair ladder forces the model back inside the playbook's op allowlist, and `scope` decides only
- * whether lookups are on. A prose op the author did not ask for is advisory rather than blocking, so a model that insists
- * costs one repair and then loses the op, never the turn.
+ * whether lookups are on. A prose op the author did not ask for, a page of later plans the chapter writer would read and a notes
+ * organise done inline are advisory rather than blocking, so a model that insists costs one repair and then loses the op, never the turn.
  */
-export function buildChatRefinePrompt(scope: Refinement.ChatScope, permissions: Pick<ChatTurnPermissions, 'proseEdits'> = { proseEdits: false }): PromptModule<ChatRefineOutput> {
+export function buildChatRefinePrompt(
+  scope: Refinement.ChatScope,
+  permissions: Pick<ChatTurnPermissions, 'proseEdits' | 'organiseNotes'> = { proseEdits: false },
+): PromptModule<ChatRefineOutput> {
   return {
     ...chatRefinePrompt,
     template: buildTemplate(),
     postValidate: data => validateTurnOutput(data, HUB_ALLOWED_OPS, scope === 'project'),
-    advise: data => (permissions.proseEdits || (data.lookups?.length ?? 0) > 0 ? [] : proseEditIssues(data.changeSet)),
+    advise: data => {
+      if ((data.lookups?.length ?? 0) > 0) return [];
+      const prose = permissions.proseEdits ? [] : proseEditIssues(data.changeSet);
+      return [...prose, ...laterPlanIssues(data.changeSet, permissions.organiseNotes === true)];
+    },
   };
 }
 

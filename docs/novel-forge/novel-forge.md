@@ -91,6 +91,14 @@
   one line whether they have something in mind or want suggestions. An open item alone is never a reason to ask. An answer the author picks is written to the story field its
   question settles, which closes the item.
   Opposition is whatever pushes back — a person or faction, or the situation itself — and a story with no antagonist is a shape the chat supports, not a gap it fills.
+- **What happens later lives only on the planner-only timeline.** Story Bible pages say how things stand when the story opens; the author's plans for later go on
+  `project/timeline` under its band headings, always as a card. A message that asks to organise the notes (the notes opener or the opener chip) stages the organise action
+  alone once the notes reach organise's minimum, whatever the model proposed; shorter notes the chat organises itself. A page titled as plans for later, written where the
+  chapter writer reads, costs the turn one repair and is then withheld. The title check is lexical: plans written under another title are kept off only by the prompt.
+- **Chapter ideas start from where the story stands**: chapter 1 from the opening state (the pages on how things stand when the story opens and the timeline's opening),
+  every later chapter from the previous chapter's ending, read before suggesting. The author's plans play out over chapters in their order and at their pace — at most the
+  next planned beat per idea, never several in one chapter unless the author asks. The author's structure outranks genre habits: a craft concern such as a slow opening is
+  one sentence of advice, never the premise of every option.
 - A turn streams its reply and, as each proposed change is written, that change's name and Story Bible group (never its body). Both are provisional and belong to the reply
   being written: a replaced reply (a retry, repair or lookup round) voids them, and only the settled turn says what was applied or carded.
 - **A running turn is a chronological timeline** (reading, thinking, the reply, changes as they are written) whose live status is always its last line. The settled turn result is
@@ -212,9 +220,10 @@
   author to fill; an empty plan is refused over an existing one. The recap surfaces two or three obligations: the previous chapter's hook, the most pressing promise, and what the
   volume goal needs.
 - The planner reads, beside the catalog and the last three summaries: the previous chapter's closing prose and continuation state, built as the writer's but unscrubbed, the
-  active Notebook (decisions, directions, backlog, do-not-propose), and the organised timeline as the author's private plans for later, once an organise lock has written it.
-  It continues from that ending, lets later plans shape setup and foreshadowing but never states one before its place, and the author's intent for the chapter still wins. The
-  catalog gives way to these under budget pressure; the timeline is capped.
+  active Notebook (decisions, directions, backlog, do-not-propose), and the timeline as the author's private plans for later — organised from the notes as they stand or
+  from older ones once an organise lock has written it, and kept by the author when a card they accepted or their own edit wrote it without one. It continues from that
+  ending (chapter 1 from the opening state), lets later plans shape setup and foreshadowing but never states one before its place, takes at most the next planned beat and
+  never pulls one earlier for a genre habit, and the author's intent for the chapter still wins. The catalog gives way to these under budget pressure; the timeline is capped.
 - The planner (the `outline` role) proposes milestone claims; the reveal rule cuts every claim the plan may not make and every reveal whose unlock does not hold, from the
   contract and from every text field, so a card never proposes what the author could not apply. A scene's point of view must be a character of the novel. The writer's knowledge
   is pooled over the scenes' points of view for the whole chapter, and the card warns when they differ in what they know.

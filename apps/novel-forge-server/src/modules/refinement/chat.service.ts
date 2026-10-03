@@ -23,8 +23,10 @@ import { type ChatRefineOutput, type ChatTitleOutput } from '../ai/schemas';
 import { type ToolContext, ToolRegistryService } from '../ai/tools';
 import { resolveUnrestrictedRoute } from '../ai/unrestricted-route';
 import { type WebLookups, type WebMode, WebResearchService } from '../ai/web';
+import { countWords } from '../eval/deterministic-metrics';
 import { ProjectEventService } from '../events/project-event.service';
 import { NotesStoreService } from '../notes/notes-store.service';
+import { ORGANISE_MIN_WORDS } from '../notes/organise-plan';
 import { type ForgeCallPolicy, PluginPolicyService } from '../plugins/plugin-policy.service';
 import { type ChangeOp } from './change-set';
 import { ChatCompactionService } from './chat-compaction.service';
@@ -34,6 +36,7 @@ import { CHAT_TURN_GRAPH, chatRoutedProject, type ChatSelection, chatSelection, 
 import { sanitizeChatQuestion } from './chat-question';
 import { loadRejectedIdeas } from './idea-rejections';
 import { requestedNegations } from './negation-echo';
+import { isNotesOrganiseRequest, withLaterPlansRouted } from './later-plans-guard';
 import { chatTurnWarnings, readsPlannerOnlyPage } from './planner-only-guard';
 import { ProposalApplyService } from './proposal-apply.service';
 import { ProposalService } from './proposal.service';
@@ -423,7 +426,9 @@ export class ChatService {
     const history = await this.compaction.buildHistory(session, project, route.contentMode);
     const proseEdits = options.proseEdits === true;
     const justDiscussing = options.justDiscussing === true;
-    const prompt = buildChatRefinePrompt(session.scopeType, { proseEdits });
+    const organiseNotes = isNotesOrganiseRequest(content) && countWords(await this.authorNotes(projectId)) >= ORGANISE_MIN_WORDS;
+    const prompt = buildChatRefinePrompt(session.scopeType, { proseEdits, organiseNotes });
+    const guarded = (output: ChatRefineOutput): ChatRefineOutput => withLaterPlansRouted(withheldProse(output, proseEdits), organiseNotes);
     const turnRules = renderTurnRules({ proseEdits, justDiscussing, mode: session.mode });
     const webMode = await this.webResearch.modeFor(route.resolved.model);
     const scopeInstructions = chatScopeInstructions(this.toolRegistry.getRaw(CHAT_HUB_NODE, webMode), webMode);
@@ -492,7 +497,7 @@ export class ChatService {
 
       // A removal written as "no X" gets one chance to be rewritten as a deletion; whatever survives is kept and flagged for review.
       const exempt = requestedNegations(content);
-      output = withheldProse(output, proseEdits);
+      output = guarded(output);
       let warnings = await this.negationWarnings(projectId, output, exempt);
       if (warnings.length > 0) {
         turnHistory.push(new AIMessage(JSON.stringify({ reply: output.reply, changeSet: output.changeSet })), new HumanMessage(negationFixRequest(warnings)));
@@ -502,7 +507,7 @@ export class ChatService {
           return null;
         });
         if (revised && (revised.lookups?.length ?? 0) === 0) {
-          output = withheldProse(revised, proseEdits);
+          output = guarded(revised);
           warnings = await this.negationWarnings(projectId, output, exempt);
         }
       }

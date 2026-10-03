@@ -254,7 +254,7 @@ describe('Prompt modules', () => {
 
     it('should guide AI-assisted writing, a hand-writer’s review or audit, and plain discussion', () => {
       const hub = HUB_INSTRUCTIONS;
-      expect(PROMPT_REGISTRY['chat-refine'].version).toBe('2.17.0');
+      expect(PROMPT_REGISTRY['chat-refine'].version).toBe('2.18.0');
       expect(hub).toContain('Writing with you:');
       expect(hub).toContain('Writing by hand:');
       expect(hub).toContain('fetch before you critique');
@@ -265,6 +265,23 @@ describe('Prompt modules', () => {
       expect(hub).toContain('outrank every summary');
       expect(hub).toContain("follow the author's lead");
       expect(hub).toContain('Raise a `question` card only when they ask for options or say they are unsure');
+    });
+
+    it('should route notes organising to its action and keep later plans on the planner-only timeline', () => {
+      const hub = HUB_INSTRUCTIONS;
+      expect(hub).toContain("Organising the author's notes is action.organise_notes, never pages you write yourself");
+      expect(hub).toContain('Story Bible pages say how things stand when the story opens.');
+      expect(hub).toContain('goes only on the planner-only timeline page project/timeline');
+      expect(hub).toContain('"## Early on", "## Later", "## The ending", "## Not yet placed"');
+    });
+
+    it('should start chapter ideas from where the story stands and keep to the author’s order and pacing', () => {
+      const hub = HUB_INSTRUCTIONS;
+      expect(hub).toContain('chapter 1 from the opening state');
+      expect(hub).toContain("every later chapter from the previous chapter's ending");
+      expect(hub).toContain('Read that material first');
+      expect(hub).toContain('never packs several planned beats into one chapter unless the author asks');
+      expect(hub).toContain('a craft concern such as a slow opening is one sentence of advice in the reply, never the premise of every option');
     });
 
     it("should follow the author's lead and raise a question card only when asked or when the chapter needs it", () => {

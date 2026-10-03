@@ -788,11 +788,19 @@ describe('ContextAssembler.forOutline — planner inputs', () => {
     expect(pack.sections.filter(section => ['ledger', 'later_plans'].includes(section.key)).every(section => section.required)).toBe(true);
   });
 
-  it('should leave the timeline out until the author has organised their notes', async () => {
+  it('should give the planner a timeline the author kept without organising, under its own rule', async () => {
     const pack = await makeAssembler(outlineDb([notes, direction])).forOutline(1n, 5, { budgetTokens: 100_000, dryRun: true } as never);
 
+    expect(sectionOf(pack, 'later_plans')).toContain("The author's own timeline, kept by them in the Story Bible.");
+    expect(sectionOf(pack, 'later_plans')).toContain('- The lamp goes dark for a night.');
+  });
+
+  it('should leave the timeline out when the page is empty', async () => {
+    const db = outlineDb([notes, organised]);
+    db.query.bibleDocuments.findMany = mock(async () => [{ ...timeline, body: '  ' }]);
+    const pack = await makeAssembler(db).forOutline(1n, 5, { budgetTokens: 100_000, dryRun: true } as never);
+
     expect(keys(pack)).not.toContain('later_plans');
-    expect(pack.rendered).not.toContain('The lamp goes dark');
   });
 
   it('should cap the timeline so a long page cannot crowd out the catalog', async () => {

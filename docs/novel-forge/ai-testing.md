@@ -1951,7 +1951,8 @@ them off `model_calls` rather than trusting a number here. Cost and admin inspec
 
 ### 2. Organise notes (a chat action)
 
-- **Entry:** ask the chat to organise your notes; it offers an `action.organise_notes` card. Accepting it queues a job
+- **Entry:** ask the chat to organise your notes (a new novel's notes opener or the "Organise my notes" chip); with 600+ words of notes the turn stages the
+  `action.organise_notes` card alone, whatever else the model proposed, and never writes pages from the notes itself. Accepting it queues a job
   (`jobs.kind='organise'`, graph `notes-organise`); follow it with `GET /chat/sessions/$S/jobs` or the SSE
   `…/jobs/stream`.
 - **Preconditions:** at least 600 words of notes (`NTS_003`); no organise card still pending (`NTS_004`).
@@ -1968,6 +1969,10 @@ them off `model_calls` rather than trusting a number here. Cost and admin inspec
     `NTS_010` while a later organise change builds on it.
   - **Quality:** nothing the notes place late in the book appears as current; the ending lands only in planner-only
     pages; a suggestion is labelled as one.
+  - With notes under 600 words the chat organises them itself: no page the chapter writer reads is titled as plans
+    (such a page is withheld with a note in the reply), and later events go to the `project/timeline` card.
+  - Then ask "Give me a few ideas for chapter 1, from where the story stands": the ideas open from the opening state,
+    each reaches at most the next planned beat, and a pacing concern is at most one sentence of advice.
 - **Save as notes:** send one chat message of 600+ words that the notes do not hold. Your message then carries
   `offersNotes`; `POST /notes/from-message {"sessionId","messageId"}` appends it as paragraphs of its own
   (`NTS_006` under 600 words, `NTS_005` not your message).

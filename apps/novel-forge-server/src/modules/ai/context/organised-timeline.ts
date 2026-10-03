@@ -5,8 +5,11 @@ import { type Ledger } from '@server/database';
 import { AUTHOR_BRIEF_TOPIC } from '../../ledger/ledger-sections';
 import { type BibleDocRow, ORGANISED_TIMELINE_DOC } from './bible-docs';
 
-/** Whether the organised timeline was organised from the notes as they stand, or from an earlier version of them. */
-export type OrganisedTimelineState = 'current' | 'stale';
+/**
+ * Whether the timeline was organised from the notes as they stand, from an earlier version of them, or kept by the author without an
+ * organise run — written from the chat on a card they accepted, or by hand.
+ */
+export type OrganisedTimelineState = 'current' | 'stale' | 'kept';
 
 const BANDS = [
   `"${TIMELINE_BAND_LABELS.opening}" is how the story opens;`,
@@ -17,6 +20,11 @@ const BANDS = [
 const RULES: Record<OrganisedTimelineState, string> = {
   current: [
     "The author's own timeline, organised from their notes as they stand and checked by them.",
+    `It binds where things happen: ${BANDS}.`,
+    "The ending is the author's own, and every step keeps to it.",
+  ].join(' '),
+  kept: [
+    "The author's own timeline, kept by them in the Story Bible.",
     `It binds where things happen: ${BANDS}.`,
     "The ending is the author's own, and every step keeps to it.",
   ].join(' '),
@@ -33,12 +41,12 @@ export function isOrganisedTimelineDoc(doc: Pick<BibleDocRow, 'section' | 'slug'
 }
 
 /**
- * Null until an organise lock has written the timeline: only that lock makes the page the author's checked timeline, although the address
- * is planner-only whoever writes it.
+ * `kept` until an organise lock has written the timeline. Every other write to the address is the author's own or a card they accepted, so
+ * the page binds either way; only the lock says which notes it was organised from.
  */
-export function organisedTimelineState(ledger: Pick<Ledger.Entry, 'kind' | 'topic' | 'links' | 'payload' | 'statement'>[]): OrganisedTimelineState | null {
+export function organisedTimelineState(ledger: Pick<Ledger.Entry, 'kind' | 'topic' | 'links' | 'payload' | 'statement'>[]): OrganisedTimelineState {
   const decision = ledger.find(entry => entry.kind === 'decision' && entry.topic === ORGANISE_TOPIC && (entry.links.bibleDocuments ?? []).some(isOrganisedTimelineDoc));
-  if (!decision) return null;
+  if (!decision) return 'kept';
   const digest = (decision.payload as { notesDigest?: unknown } | null)?.notesDigest;
   const notes = ledger.find(entry => entry.topic === AUTHOR_BRIEF_TOPIC)?.statement ?? '';
   return typeof digest === 'string' && digest === textDigest(notes) ? 'current' : 'stale';
@@ -48,9 +56,8 @@ export function renderOrganisedTimeline(body: string, state: OrganisedTimelineSt
   return `${RULES[state]}\n\n${body.trim()}`;
 }
 
-/** The timeline as a planner reads it, rule first; null when the author has not organised their notes or the page is empty. */
+/** The timeline as a planner reads it, rule first; null when the page is missing or empty. */
 export function organisedTimelineText(docs: readonly Pick<BibleDocRow, 'section' | 'slug' | 'body'>[], ledger: Parameters<typeof organisedTimelineState>[0]): string | null {
-  const state = organisedTimelineState(ledger);
   const body = docs.find(isOrganisedTimelineDoc)?.body?.trim();
-  return state && body ? renderOrganisedTimeline(body, state) : null;
+  return body ? renderOrganisedTimeline(body, organisedTimelineState(ledger)) : null;
 }
