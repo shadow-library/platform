@@ -1,6 +1,7 @@
 import { textDigest } from '@shadow-library/sdk';
 
 import { type ChatJobState, type OrganiseReceipt } from '@/lib/apis/chat.api';
+import { type GenerationActivity } from '@/lib/generation-activity';
 import { isRecord } from '@/lib/is-record';
 import {
   type ChatMessageResponse,
@@ -381,6 +382,12 @@ export function jobView(job: ChatJobState): JobView {
   const phase = job.progress.phase ? PHASE_LABEL[job.progress.phase] : undefined;
   const detail = job.retrying ? 'It timed out; trying once more.' : job.status === 'pending' ? 'Queued — starts in a moment.' : phase;
   return { title: `${titles.running}${suffix}…`, detail, tone: 'running', cancellable: true };
+}
+
+/** Writing started outside this chat's own jobs, e.g. from a plan card's Write: the chat follows it from the project's job list. */
+export function writingView({ chapters, current }: GenerationActivity): JobView {
+  const position = chapters.length > 1 ? ` (${chapters.indexOf(current) + 1} of ${chapters.length})` : '';
+  return { title: `Writing chapter ${current}${position}…`, detail: 'The draft opens in Chapters once it is written.', tone: 'running', cancellable: true };
 }
 
 /** After a turn, focus goes back to the composer unless the author has already moved it somewhere else on purpose. */

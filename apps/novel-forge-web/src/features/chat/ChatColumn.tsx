@@ -46,6 +46,7 @@ import { messageTime, projectTitle } from '@/lib/format';
 import { PANEL_DOCK_MIN } from '@/lib/sidebar-rail';
 import { takePendingFirstTurn } from '@/lib/pending-first-turn';
 
+import { useGenerationActivity } from '@/lib/use-generation-activity';
 import { editQueued, inputCaption, type QueuedTurn, queuedView, queueStep, releaseSettings, restoreFailed, type TurnSettings } from './chat-queue';
 import { ChatComposer } from './ChatComposer';
 import { NotesChip, SaveAsNotesOffer } from './ChatExtras';
@@ -78,6 +79,7 @@ import {
   unansweredWarning,
   unusedParagraphPrompt,
 } from './chat-view';
+  writingView,
 import styles from './Chat.module.css';
 import { ComposerModeMenu } from './ComposerModeMenu';
 import { JobProgress } from './JobProgress';
@@ -160,6 +162,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
   const turn = useChatTurnStream(novelId, session?.id ?? '');
   const updateSession = useUpdateChatSessionMutation(novelId);
   const startNextDraft = useStartNextDraftMutation(novelId);
+  const generation = useGenerationActivity(novelId);
   const unanswered = useUnansweredCount();
 
   const [input, setInput] = useState('');
@@ -253,6 +256,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
   const step = queueStep({ queued, running: pending, locked, stream: stream.status, finishedId, inTranscript: finishedId !== undefined && messageIds.has(finishedId) });
   const queueNow = useRef(queued);
   useLayoutEffect(() => {
+  const writing = generation.activity && !jobStream.jobs.some(job => job.id === generation.activity?.jobId) ? generation.activity : undefined;
     queueNow.current = queued;
   });
   const switching = updateSession.isPending && updateSession.variables?.mode !== undefined;
@@ -516,8 +520,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
   };
 
   const onWriting = (job: JobEnqueueResponse): void => {
-    if (job.kind === 'plan' || job.kind === 'organise') return jobStream.track([{ id: job.jobId, kind: job.kind }]);
-    toast.success('Writing started — follow it in the generation activity at the top of the page.');
+    if (job.kind === 'plan' || job.kind === 'organise') jobStream.track([{ id: job.jobId, kind: job.kind }]);
   };
 
   const cancelJob = (jobId: string): void => {
@@ -800,6 +803,11 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
                 </Button>
               </div>
             )}
+              {writing && (
+                <div className={styles.indented}>
+                  <JobProgress view={writingView(writing)} stream="live" cancelling={generation.stopping} onCancel={generation.stop} />
+                </div>
+              )}
           </div>
 
           {view.kind === 'centred' && (
