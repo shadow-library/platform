@@ -26,6 +26,7 @@ import {
   type ProposalResponse,
   transcriptTurnState,
   type TurnHoldReason,
+  useAdoptProposalMutation,
   useAuthorNotesQuery,
   useCancelChatJobMutation,
   useChatJobStream,
@@ -39,7 +40,6 @@ import {
   useProjectQuery,
   useProjectStatusQuery,
   useProposalQuery,
-  useReviewQueueQuery,
   useStartNextDraftMutation,
   useUpdateChatSessionMutation,
   useUpdateSessionModelMutation,
@@ -50,6 +50,7 @@ import { timelineOfTrace, turnTimeline } from '@/lib/chat-turn-timeline';
 import { messageTime, projectTitle } from '@/lib/format';
 import { PANEL_DOCK_MIN } from '@/lib/sidebar-rail';
 import { takePendingFirstTurn } from '@/lib/pending-first-turn';
+import { type PendingItem, pendingKey } from '@/lib/pending-items';
 import { useGenerationActivity } from '@/lib/use-generation-activity';
 
 import { ChapterDraftCard } from './ChapterDraftCard';
@@ -92,6 +93,7 @@ import {
 import styles from './Chat.module.css';
 import { ComposerModeMenu } from './ComposerModeMenu';
 import { JobProgress } from './JobProgress';
+import { findPending, revealPending } from './pending-reveal';
 import { ProgressDock } from './ProgressPanel';
 import { type DockState, dockState, jobProposals, organiseIdeas, type PanelProposals, panelTurnOf, turnRefs } from './progress-panel-view';
 import { QuestionCard } from './QuestionCard';
@@ -103,11 +105,13 @@ import { useUnansweredCount } from './suggestion-store';
 import { TurnProposalCard } from './TurnProposalCard';
 import { TurnReceipt } from './TurnReceipt';
 import { TurnTrace } from './TurnTimeline';
+import { PENDING_PROPOSAL_LIMIT, usePendingItems } from './use-pending-items';
+import { PendingAnchor, WaitingTray } from './WaitingTray';
 
-// Matches the shell's own pending-proposal query, so the transcript reads that cache rather than issuing a second request for the same rows.
-const PENDING_PROPOSAL_LIMIT = 50;
 const PLAN_KIND = 'chapter_plan';
 const NO_JOBS: readonly ChatJobState[] = [];
+// A card brought into the chat appears once the card list refetches; past this the reveal gives up rather than jumping later.
+const REVEAL_WAIT_MS = 10_000;
 
 export interface ChatColumnProps {
   novelId: string;
@@ -124,6 +128,9 @@ export interface ChatColumnProps {
   // without the author touching this column's own composer.
   initialTurn?: string;
   onInitialTurnSent?: () => void;
+  /** A pending card another screen sent the author here to answer. */
+  revealCard?: string;
+  onCardRevealed?: () => void;
 }
 
 /** Everything a transcript row can ask the column to do; one stable object, so memoised rows do not re-render on every keystroke. */
@@ -173,10 +180,10 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
   const updateSession = useUpdateChatSessionMutation(novelId);
   const saveChatChoice = useUpdateSessionModelMutation(novelId);
   const generation = useGenerationActivity(novelId);
-  const reviewQueue = useReviewQueueQuery(novelId);
   const continuityQuery = useContinuityProposalsQuery(novelId);
   const finalizeReviewsQuery = useFinalizeReviewsQuery(novelId);
   const startNextDraft = useStartNextDraftMutation(novelId);
+  const adoptProposal = useAdoptProposalMutation(novelId);
   const unanswered = useUnansweredCount();
 
   const [input, setInput] = useState('');
@@ -269,21 +276,25 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
   }, [jobStream.jobs, messageIds]);
   const looseJobs = jobsByMessage.get('') ?? NO_JOBS;
   const writing = generation.activity && !jobStream.jobs.some(job => job.id === generation.activity?.jobId) ? generation.activity : undefined;
-  const draftsForYou = (reviewQueue.data?.drafts ?? []).filter(draft => draft.reviewStatus === 'needs_review' || draft.reviewStatus === 'contradiction');
   const continuityForYou = continuityQuery.data?.items ?? [];
   const bibleReceipts = (finalizeReviewsQuery.data?.applied ?? []).filter(review => !hiddenBibleReceipts.has(review.id));
   const bibleDecisions = finalizeReviewsQuery.data?.waiting ?? [];
   const hideBibleReceipt = (reviewId: string): void => setHiddenBibleReceipts(hideReceipt(reviewId));
 
-  const shownProposals = new Set<string>();
-  for (const message of messages) {
-    if (message.proposalId) shownProposals.add(message.proposalId);
-    if (message.appliedProposalId) shownProposals.add(message.appliedProposalId);
-  }
-  for (const job of jobStream.jobs) {
-    if (job.progress.proposalId) shownProposals.add(job.progress.proposalId);
-    if (job.progress.appliedProposalId) shownProposals.add(job.progress.appliedProposalId);
-  }
+  const shownProposals = useMemo(() => {
+    const shown = new Set<string>();
+    for (const message of messages) {
+      if (message.proposalId) shown.add(message.proposalId);
+      if (message.appliedProposalId) shown.add(message.appliedProposalId);
+    }
+    for (const job of jobStream.jobs) {
+      if (job.progress.proposalId) shown.add(job.progress.proposalId);
+      if (job.progress.appliedProposalId) shown.add(job.progress.appliedProposalId);
+    }
+    return shown;
+  }, [messages, jobStream.jobs]);
+  const pendingWork = usePendingItems(novelId, session?.id, shownProposals);
+  const draftsForYou = pendingWork.drafts;
   const waiting = (proposalsQuery.data?.items ?? []).filter(proposal => session && proposal.sessionId === session.id && !shownProposals.has(proposal.id));
   const waitingPlans = waiting.filter(proposal => proposal.kind === PLAN_KIND);
   const waitingCards = waiting.filter(proposal => proposal.kind !== PLAN_KIND);
@@ -610,6 +621,53 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
     setSheetOpen(true);
   };
 
+  // The tray's click has long returned by the time a card brought into the chat renders, so the card it asked for is looked for after every render.
+  const revealing = useRef<{ key: string; until: number } | undefined>(undefined);
+  useEffect(() => {
+    const wanted = revealing.current;
+    if (!wanted) return;
+    if (Date.now() > wanted.until) {
+      revealing.current = undefined;
+      return;
+    }
+    const target = findPending(scrollRef.current, wanted.key);
+    if (!target) return;
+    revealing.current = undefined;
+    revealPending(target);
+  });
+
+  const showPending = (key: string): void => {
+    const target = findPending(scrollRef.current, key);
+    if (target) return revealPending(target);
+    revealing.current = { key, until: Date.now() + REVEAL_WAIT_MS };
+  };
+
+  const adoptPending = (item: PendingItem & { proposalId: string }): void => {
+    if (!session) return;
+    adoptProposal.mutate(
+      { proposalId: item.proposalId, sessionId: session.id },
+      {
+        onSuccess: () => {
+          revealing.current = { key: item.key, until: Date.now() + REVEAL_WAIT_MS };
+        },
+        onError: err => toast.danger(err.message),
+      },
+    );
+  };
+
+  // Handled once per card: shown where the thread holds it, otherwise brought into this chat first.
+  const cardHandled = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    const { revealCard, onCardRevealed } = props;
+    if (!revealCard || !session || !pendingWork.ready || cardHandled.current === revealCard) return;
+    cardHandled.current = revealCard;
+    onCardRevealed?.();
+    const item = pendingWork.items.find(entry => entry.key === pendingKey('proposal', revealCard));
+    if (!item) return void toast.warning('That card is no longer waiting on you.');
+    if (item.proposalId) return adoptPending({ ...item, proposalId: item.proposalId });
+    showPending(item.key);
+  });
+
   // A turn starting anywhere — this composer, a chip, a queued first message, another tab — takes the panel back to it.
   const [panelSawPending, setPanelSawPending] = useState(pending);
   if (pending !== panelSawPending) {
@@ -813,20 +871,15 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
               ))}
               {waitingCards.length > 0 && (
                 <section className={styles.indented} aria-label="Waiting on you">
-                  {waitingCards.map(proposal =>
-                    answeredInPanel(proposal) ? (
-                      <TurnReceipt
-                        key={proposal.id}
-                        novelId={novelId}
-                        proposalId={proposal.id}
-                        cards={proposal}
-                        onReview={() => reviewInPanel(proposal.id)}
-                        onApplied={onApplied}
-                      />
-                    ) : (
-                      <TurnProposalCard key={proposal.id} novelId={novelId} proposal={proposal} onApplied={onApplied} />
-                    ),
-                  )}
+                  {waitingCards.map(proposal => (
+                    <PendingAnchor key={proposal.id} id={pendingKey('proposal', proposal.id)}>
+                      {answeredInPanel(proposal) ? (
+                        <TurnReceipt novelId={novelId} proposalId={proposal.id} cards={proposal} onReview={() => reviewInPanel(proposal.id)} onApplied={onApplied} />
+                      ) : (
+                        <TurnProposalCard novelId={novelId} proposal={proposal} onApplied={onApplied} />
+                      )}
+                    </PendingAnchor>
+                  ))}
                 </section>
               )}
               {waitingPlans.map(proposal => (
@@ -838,10 +891,14 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
                 </div>
               )}
               {draftsForYou.map(draft => (
-                <ChapterDraftCard key={draft.chapter} novelId={novelId} draft={draft} onAskForChanges={askForChanges} />
+                <PendingAnchor key={draft.chapter} id={pendingKey('draft', draft.chapter)}>
+                  <ChapterDraftCard novelId={novelId} draft={draft} onAskForChanges={askForChanges} />
+                </PendingAnchor>
               ))}
               {continuityForYou.map(proposal => (
-                <ContinuityProposalCard key={proposal.id} novelId={novelId} proposal={proposal} />
+                <PendingAnchor key={proposal.id} id={pendingKey('continuity', proposal.id)}>
+                  <ContinuityProposalCard novelId={novelId} proposal={proposal} />
+                </PendingAnchor>
               ))}
               {bibleReceipts.map(review => (
                 <StoryBibleReceiptCard
@@ -853,13 +910,14 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
                 />
               ))}
               {bibleDecisions.map(review => (
-                <FinalizeDecisionsCard
-                  key={review.id}
-                  novelId={novelId}
-                  review={review}
-                  settling={finalizeReviewsQuery.data?.settling.includes(review.id) ?? false}
-                  onFixChapter={askForChanges}
-                />
+                <PendingAnchor key={review.id} id={pendingKey('decisions', review.id)}>
+                  <FinalizeDecisionsCard
+                    novelId={novelId}
+                    review={review}
+                    settling={finalizeReviewsQuery.data?.settling.includes(review.id) ?? false}
+                    onFixChapter={askForChanges}
+                  />
+                </PendingAnchor>
               ))}
               {planStartOpen && (
                 <div ref={planStartBar} className={`${styles.indented} ${styles.planStartBar}`}>
@@ -918,6 +976,18 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
             onSendQueued={() => releaseQueued('now')}
             caption={inputCaption({ input, running: pending, queued: Boolean(queued), switching })}
             notices={notices}
+            tray={
+              session && (
+                <WaitingTray
+                  items={pendingWork.items}
+                  tray={pendingWork.tray}
+                  canAdopt={!locked}
+                  adopting={adoptProposal.isPending ? adoptProposal.variables?.proposalId : undefined}
+                  onShow={showPending}
+                  onAdopt={adoptPending}
+                />
+              )
+            }
             announcement={announcement}
           />
         </div>
@@ -953,13 +1023,15 @@ interface TranscriptPlanCardProps {
 
 function TranscriptPlanCard({ novelId, proposalId, nextChapter, actions }: TranscriptPlanCardProps): React.JSX.Element {
   return (
-    <ChatPlanCard
-      projectId={novelId}
-      proposalId={proposalId}
-      onAskForChanges={() => actions.sendTurn(`Let’s change the plan for chapter ${nextChapter}.`)}
-      onPlanAgain={() => actions.sendTurn(`Plan chapter ${nextChapter} again from scratch.`)}
-      onWriting={actions.onWriting}
-    />
+    <PendingAnchor id={pendingKey('proposal', proposalId)}>
+      <ChatPlanCard
+        projectId={novelId}
+        proposalId={proposalId}
+        onAskForChanges={() => actions.sendTurn(`Let’s change the plan for chapter ${nextChapter}.`)}
+        onPlanAgain={() => actions.sendTurn(`Plan chapter ${nextChapter} again from scratch.`)}
+        onWriting={actions.onWriting}
+      />
+    </PendingAnchor>
   );
 }
 
@@ -986,32 +1058,22 @@ interface JobOutcomeProps {
   actions: TranscriptActions;
 }
 
-/** What a finished job left: one receipt whose changes are reviewed in the panel. A plan is mounted beside the reply, and a canon refresh card is answered in Review. */
+/** What a finished job left: one receipt whose changes are reviewed in the panel. A plan is mounted beside the reply. */
 function JobOutcome({ novelId, job, actions }: JobOutcomeProps): React.JSX.Element | null {
   const { progress } = job;
-  if (job.kind === 'canon_refresh') {
-    if (!progress.proposalId) return null;
-    return (
-      <div className={styles.row}>
-        <Button asChild size="sm" variant="secondary">
-          <Link to="/novels/$novelId/review" params={{ novelId }} search={{ view: 'proposals', proposal: progress.proposalId }}>
-            Review the Story Bible updates
-          </Link>
-        </Button>
-      </div>
-    );
-  }
   if (!jobProposals(job, undefined)) return null;
   return (
-    <TurnReceipt
-      novelId={novelId}
-      appliedProposalId={progress.appliedProposalId}
-      proposalId={progress.proposalId}
-      ideas={organiseIdeas(progress.organised)}
-      note={progress.applyNote}
-      onReview={() => actions.reviewInPanel(job.id)}
-      onApplied={actions.onApplied}
-    />
+    <PendingAnchor id={progress.proposalId ? pendingKey('proposal', progress.proposalId) : undefined}>
+      <TurnReceipt
+        novelId={novelId}
+        appliedProposalId={progress.appliedProposalId}
+        proposalId={progress.proposalId}
+        ideas={organiseIdeas(progress.organised)}
+        note={progress.applyNote}
+        onReview={() => actions.reviewInPanel(job.id)}
+        onApplied={actions.onApplied}
+      />
+    </PendingAnchor>
   );
 }
 
@@ -1080,14 +1142,16 @@ const AssistantMessage = memo(function AssistantMessage({
         )}
         {!content && timeline?.worked && <MessageModelTag message={message} worked={timeline.worked} />}
         {(message.appliedProposalId || (message.proposalId && !isPlan)) && (
-          <TurnReceipt
-            novelId={novelId}
-            appliedProposalId={message.appliedProposalId ?? undefined}
-            proposalId={isPlan ? undefined : (message.proposalId ?? undefined)}
-            held={held}
-            onReview={() => actions.reviewInPanel(message.id)}
-            onApplied={actions.onApplied}
-          />
+          <PendingAnchor id={message.proposalId && !isPlan ? pendingKey('proposal', message.proposalId) : undefined}>
+            <TurnReceipt
+              novelId={novelId}
+              appliedProposalId={message.appliedProposalId ?? undefined}
+              proposalId={isPlan ? undefined : (message.proposalId ?? undefined)}
+              held={held}
+              onReview={() => actions.reviewInPanel(message.id)}
+              onApplied={actions.onApplied}
+            />
+          </PendingAnchor>
         )}
         {ownCard && <OwnCard novelId={novelId} query={staged} onApplied={actions.onApplied} />}
         {question && (

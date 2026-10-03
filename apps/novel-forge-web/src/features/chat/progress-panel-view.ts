@@ -45,10 +45,10 @@ function hasChanges(message: ChatMessageResponse): boolean {
   return Boolean(message.appliedProposalId || message.proposalId);
 }
 
-/** A job's changes, once it has finished with any. A plan has its own card in the thread, and a canon refresh card is answered in Review. */
+/** A job's changes, once it has finished with any. A plan has its own card in the thread. */
 export function jobProposals(job: ChatJobState, after: number | undefined): PanelProposals | undefined {
   const { appliedProposalId, proposalId, organised } = job.progress;
-  if (job.status !== 'done' || job.kind === 'plan' || job.kind === 'canon_refresh' || !(appliedProposalId || proposalId)) return undefined;
+  if (job.status !== 'done' || job.kind === 'plan' || !(appliedProposalId || proposalId)) return undefined;
   return { key: job.id, appliedProposalId, proposalId, organised, after };
 }
 

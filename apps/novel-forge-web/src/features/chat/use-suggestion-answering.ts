@@ -1,10 +1,19 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { toast } from '@shadow-library/ui';
 
-import { type ApplyProposalResponse, cachedProposal, type ProposalResponse, useApplyProposalMutation, useDiscardProposalMutation, useRejectProposalOpMutation } from '@/lib/apis';
+import {
+  type ApplyProposalResponse,
+  cachedProposal,
+  type ProposalResponse,
+  useApplyProposalMutation,
+  useDiscardProposalMutation,
+  useListAuditsQuery,
+  useRejectProposalOpMutation,
+} from '@/lib/apis';
+import { auditApplyIndexes, auditSkippedOps, findAuditReportByProposal } from '@/lib/bible-audit';
 
-import { answeredInPanel, type RejectionScope, rejectionWhy, type SuggestionCommit, suggestionCommit, type SuggestionDecision } from './chat-view';
+import { answeredInPanel, type RejectionScope, rejectionWhy, type SuggestionCommit, suggestionCommit, type SuggestionDecision, withAuditSkips } from './chat-view';
 import { answersSettled, currentAnswers, type SuggestionAnswers, updateAnswers, useSuggestionAnswers, writeAnswers } from './suggestion-store';
 
 export interface SuggestionAnswering {
@@ -60,6 +69,16 @@ export function addAllDecisions(
   return next;
 }
 
+const NO_SKIPS: ReadonlySet<number> = new Set();
+
+/** The ops of an audit card the author skipped in the audit's own answers; none for any other card. */
+export function useAuditSkippedOps(novelId: string, proposal: Pick<ProposalResponse, 'id' | 'kind' | 'changeSet'>): ReadonlySet<number> {
+  const audit = proposal.kind === 'bible_audit';
+  const audits = useListAuditsQuery(novelId, audit);
+  const total = proposal.changeSet.length;
+  return useMemo(() => (audit ? auditSkippedOps(findAuditReportByProposal(audits.data, proposal.id), total) : NO_SKIPS), [audit, audits.data, proposal.id, total]);
+}
+
 export interface SuggestionAnsweringOptions {
   onApplied?: (result: ApplyProposalResponse) => void;
   onCommitted?: () => void;
@@ -74,17 +93,20 @@ export function useSuggestionAnswering(novelId: string, proposal: ProposalRespon
   const apply = useApplyProposalMutation(novelId);
   const discard = useDiscardProposalMutation(novelId);
   const reject = useRejectProposalOpMutation(novelId);
-  const answers = useSuggestionAnswers(proposal.id);
+  const stored = useSuggestionAnswers(proposal.id);
+  const skipped = useAuditSkippedOps(novelId, proposal);
+  const answers = useMemo(() => ({ ...stored, decisions: withAuditSkips(stored.decisions, skipped) }), [stored, skipped]);
   const total = proposal.changeSet.length;
-  const finished = answersSettled(proposal.status, proposal.changeSet, answers.decisions, answers.scopes);
+  const finished = answersSettled(proposal.status, proposal.changeSet, stored.decisions, stored.scopes);
 
   useEffect(() => {
-    writeAnswers(proposal.id, finished ? { decisions: [], scopes: [] } : { decisions: [...answers.decisions.entries()], scopes: [...answers.scopes.entries()] });
-  }, [answers.decisions, answers.scopes, finished, proposal.id]);
+    writeAnswers(proposal.id, finished ? { decisions: [], scopes: [] } : { decisions: [...stored.decisions.entries()], scopes: [...stored.scopes.entries()] });
+  }, [stored.decisions, stored.scopes, finished, proposal.id]);
 
   const settle = (error?: string): void => updateAnswers(proposal.id, current => ({ ...current, committing: false, error }));
 
-  const commitWith = async (decisions: ReadonlyMap<number, SuggestionDecision>, force: boolean): Promise<void> => {
+  const commitWith = async (answered: ReadonlyMap<number, SuggestionDecision>, force: boolean): Promise<void> => {
+    const decisions = withAuditSkips(answered, skipped);
     const status = (cachedProposal(queryClient, novelId, proposal.id) ?? proposal).status;
     const plan = plannedCommit({ status, committing: currentAnswers(proposal.id).committing, total, decisions, force });
     if (plan.kind === 'wait') return;
@@ -93,7 +115,7 @@ export function useSuggestionAnswering(novelId: string, proposal: ProposalRespon
       if (plan.kind === 'discard') {
         await discard.mutateAsync(proposal.id);
       } else {
-        const result = await apply.mutateAsync({ proposalId: proposal.id, opIndexes: plan.opIndexes });
+        const result = await apply.mutateAsync({ proposalId: proposal.id, opIndexes: auditApplyIndexes(proposal, plan.opIndexes, skipped) });
         options.onApplied?.(result);
         const failed = result.opResults.filter(op => op.status === 'failed');
         if (failed.length > 0) toast.danger(`${failed.length} couldn’t be added: ${failed[0]?.error ?? 'the Story Bible refused it'}`);
@@ -114,7 +136,7 @@ export function useSuggestionAnswering(novelId: string, proposal: ProposalRespon
   };
 
   const addAll = (): void => {
-    const next = addAllDecisions(proposal, currentAnswers(proposal.id).decisions);
+    const next = addAllDecisions(proposal, withAuditSkips(currentAnswers(proposal.id).decisions, skipped));
     if (!next) return;
     updateAnswers(proposal.id, current => ({ ...current, decisions: next }));
     void commitWith(next, true);

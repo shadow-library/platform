@@ -10,6 +10,7 @@ import {
   NOVEL_CHAT_PACK_FLOOR,
   NOVEL_CHAT_REQUEST_BUDGET,
   NOVEL_CHAT_SECTION_CAPS,
+  renderAwaitingAuthor,
   renderHandoff,
   renderNotebook,
   renderNovelStory,
@@ -20,6 +21,7 @@ import {
 import { type AssembledPack } from '@modules/ai/context/sections';
 import { countTokens } from '@modules/ai/context/token-budget';
 import { AUTHOR_BRIEF_TOPIC } from '@modules/ledger/ledger-sections';
+import { hashReviewedBody } from '@modules/review/review-findings';
 import { type ProgressItem } from '@server/common';
 
 type Rows = Record<string, Record<string, unknown>[]>;
@@ -459,6 +461,59 @@ describe('ContextAssembler.forNovelChat', () => {
 
     expect(pack.sections.map(candidate => candidate.key)).not.toContain('prev_ending');
     expect(pack.sections.map(candidate => candidate.key)).not.toContain('continuation_state');
+  });
+});
+
+describe('renderAwaitingAuthor', () => {
+  it('should say nothing when no Story Bible work waits on the author', () => {
+    expect(renderAwaitingAuthor({ continuity: [], asking: [], answered: [] })).toBeNull();
+  });
+
+  it('should name each chapter in order with the action that settles it, on one line', () => {
+    const line = renderAwaitingAuthor({ continuity: [5, 2], asking: [{ chapter: 4, open: 1 }], answered: [7, 6] });
+
+    expect(line).toBe(
+      "Waiting on the author: Story Bible additions for chapters 2, 5 (action.apply_continuity); chapter 4's finalize review, 1 answer open on its Story Bible card; " +
+        "chapter 6's finalize review, answered (action.finalize); chapter 7's finalize review, answered (action.finalize)",
+    );
+    expect(line).not.toContain('\n');
+  });
+});
+
+describe('ContextAssembler.forNovelChat and the Story Bible work waiting on the author', () => {
+  const draft = (chapter: number, revision: number, status: 'draft' | 'final' = 'draft'): Record<string, unknown> => ({
+    chapter,
+    title: `Chapter ${chapter}`,
+    reviewStatus: status === 'final' ? 'final' : 'approved',
+    status,
+    revision,
+    body: `the prose of chapter ${chapter}`,
+    summary: null,
+    isolated: false,
+    staleReason: null,
+  });
+  const review = (chapter: number, draftRevision: number, decisions: (string | null)[]): Record<string, unknown> => ({
+    chapter,
+    draftRevision,
+    sourceHash: hashReviewedBody(`the prose of chapter ${chapter}`),
+    items: decisions.map(decision => ({ decision })),
+  });
+
+  it('should tell the model which chapters wait on continuity additions or on a finalize review, leaving out a review the prose moved past', async () => {
+    const pack = await assembler({
+      drafts: [draft(3, 2), draft(4, 1), draft(5, 3), draft(6, 1, 'final')],
+      continuityProposals: [{ chapter: 2 }],
+      finalizeReviews: [review(3, 2, [null, null, 'kept']), review(4, 1, ['kept', 'skipped']), review(5, 2, [null]), review(6, 1, [null])],
+    }).forNovelChat(1n, new Date(0), { promptTokens: PROMPT_TOKENS, requestTokens: 0 });
+
+    const status = section(pack, 'pipeline_status');
+    expect(status).toContain(
+      "Waiting on the author: Story Bible additions for chapter 2 (action.apply_continuity); chapter 3's finalize review, 2 answers open on its Story Bible card; " +
+        "chapter 4's finalize review, answered (action.finalize)",
+    );
+    expect(status).not.toContain("chapter 5's");
+    expect(status).not.toContain("chapter 6's");
+    expect(pack.sections.find(candidate => candidate.key === 'pipeline_status')?.segment).toBe('volatile');
   });
 });
 

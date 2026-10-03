@@ -65,7 +65,10 @@ function databaseOver(stored: Stored) {
       drafts: { findMany: async () => stored.drafts ?? [] },
       briefs: { findFirst: async () => stored.briefs?.[0] },
       jobs: { findFirst: async () => stored.runningPlans?.[0] },
-      chatMessages: { findMany: async () => (stored.authorMessages ?? []).map(content => ({ content })) },
+      chatMessages: {
+        findFirst: async () => ({ sessionId: 'session-1' }),
+        findMany: async () => (stored.authorMessages ?? []).map(content => ({ content })),
+      },
       refinementProposals: { findFirst: async () => undefined },
     },
     select: () => ({

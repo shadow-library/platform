@@ -40,8 +40,12 @@ const PLAN_ACTION = JSON.stringify([{ op: 'action.plan_chapter' }]);
  * three, nor past the previous plan card or plan action there, which an earlier chapter's intent belongs to.
  */
 export async function authorMessagesFor(db: Pick<DbExecutor, 'query'>, context: Pick<ActionContext, 'sessionId' | 'messageId' | 'proposalId'>): Promise<string[]> {
-  const { sessionId, messageId } = context;
-  if (!sessionId || messageId === null) return [];
+  const { messageId } = context;
+  if (!context.sessionId || messageId === null) return [];
+  // A card brought in from another chat keeps the message it answered, so the author's words are read in the chat that message is in.
+  const answered = await db.query.chatMessages.findFirst({ columns: { sessionId: true }, where: eq(schema.chatMessages.id, messageId) });
+  if (!answered) return [];
+  const { sessionId } = answered;
   const proposals = schema.refinementProposals;
   const previousPlan = await db.query.refinementProposals.findFirst({
     columns: { messageId: true },

@@ -41,6 +41,7 @@ import {
   unansweredWarning,
   undoImpactView,
   unusedParagraphPrompt,
+  withAuditSkips,
 } from '../src/features/chat/chat-view';
 import { type ChatMessageResponse, type ChatTurnResponse, type ProposalResponse } from '../src/lib/apis/api-types.gen';
 import { type ChatJobState, type OrganiseReceipt } from '../src/lib/apis/chat.api';
@@ -610,5 +611,30 @@ describe('commitBarView', () => {
       text: 'Couldn’t finish: The Story Bible moved on. Your answers are kept.',
       failed: true,
     });
+  });
+});
+
+describe('withAuditSkips', () => {
+  it('should keep a finding skipped in the audit declined, whatever the chat answered', () => {
+    const decisions = withAuditSkips(
+      new Map([
+        [0, 'add'],
+        [1, 'add'],
+      ]),
+      new Set([1, 2]),
+    );
+
+    expect([...decisions.entries()]).toEqual([
+      [0, 'add'],
+      [1, 'decline'],
+      [2, 'decline'],
+    ]);
+    expect(suggestionCommit(3, decisions)).toEqual({ kind: 'apply', opIndexes: [0] });
+  });
+
+  it('should hand back the same answers for a card with nothing skipped', () => {
+    const decisions = new Map<number, 'add' | 'decline'>([[0, 'add']]);
+
+    expect(withAuditSkips(decisions, new Set())).toBe(decisions);
   });
 });

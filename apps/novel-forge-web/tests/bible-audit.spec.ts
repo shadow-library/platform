@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 
 import { type BibleAuditFindingResponse, type BibleAuditReportResponse, type GenerationJobItem, type ListBibleAuditsResponse } from '../src/lib/apis/api-types.gen';
 import {
+  auditApplyIndexes,
   auditDecisionLabel,
   auditGroupLabel,
   auditKeptFindingsCount,
@@ -12,6 +13,7 @@ import {
   auditProposalLabel,
   auditReadOnly,
   auditRestageable,
+  auditSkippedOps,
   auditStageLabel,
   clearKey,
   findAdoptableAuditJob,
@@ -323,5 +325,32 @@ describe('auditPollState', () => {
 
   it('should give a fallback message for a failed job with no recorded error', () => {
     expect(auditPollState([job({ id: 'j1', status: 'failed' })], undefined, { jobId: 'j1', runId: 'run-1' }).failure).toBe('The bible audit stopped before it finished.');
+  });
+});
+
+describe('auditSkippedOps', () => {
+  it('should leave out every op no kept finding carries', () => {
+    expect([...auditSkippedOps({ selection: [0, 2] }, 4)]).toEqual([1, 3]);
+  });
+
+  it('should leave out nothing while the report is unknown', () => {
+    expect(auditSkippedOps(undefined, 3).size).toBe(0);
+  });
+});
+
+describe('auditApplyIndexes', () => {
+  const audit = { kind: 'bible_audit', changeSet: [{}, {}, {}, {}] };
+
+  it('should let the server apply an audit card’s own kept selection when every kept op is added', () => {
+    expect(auditApplyIndexes(audit, [0, 2], new Set([1, 3]))).toBeUndefined();
+    expect(auditApplyIndexes(audit, [0, 1, 2, 3], new Set())).toBeUndefined();
+  });
+
+  it('should name the ops when the author declined some of the kept ones', () => {
+    expect(auditApplyIndexes(audit, [0], new Set([1, 3]))).toEqual([0]);
+  });
+
+  it('should always name the ops of any other card', () => {
+    expect(auditApplyIndexes({ kind: 'chat', changeSet: [{}, {}] }, [0, 1], new Set())).toEqual([0, 1]);
   });
 });

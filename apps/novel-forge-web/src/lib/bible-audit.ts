@@ -56,7 +56,7 @@ export function auditKeptFindingsCount(report: Pick<BibleAuditReportResponse, 'f
   return report.findings.filter(finding => findingDecidable(finding) && findingDecisionValue(finding) === 'kept').length;
 }
 
-/** The card is a pending proposal already; this opens the Review Queue on it rather than applying anything here. */
+/** The card is a pending proposal already; this opens it in the chat rather than applying anything here. */
 export function auditStageLabel(keptFindingsCount: number): string {
   return `Review ${keptFindingsCount} kept finding${keptFindingsCount === 1 ? '' : 's'}`;
 }
@@ -64,6 +64,22 @@ export function auditStageLabel(keptFindingsCount: number): string {
 /** Whether one change-set op index is on an audit card's kept selection — undecided (no report loaded yet) reads as kept. */
 export function auditOpKept(report: Pick<BibleAuditReportResponse, 'selection'> | undefined, index: number): boolean {
   return !report || report.selection.includes(index);
+}
+
+/** The ops of an audit card its Keep and Skip answers leave out — a skipped finding's, and any no finding carries; none while the report is unknown. */
+export function auditSkippedOps(report: Pick<BibleAuditReportResponse, 'selection'> | undefined, total: number): ReadonlySet<number> {
+  if (!report) return new Set();
+  const kept = new Set(report.selection);
+  return new Set(Array.from({ length: total }, (_, index) => index).filter(index => !kept.has(index)));
+}
+
+/**
+ * The op indexes an apply of a card sends. An audit card applying everything its answers keep sends none, so the server applies its own kept
+ * selection; that holds even when the report was not loaded, where naming a skipped finding's op would be refused (AUD_006).
+ */
+export function auditApplyIndexes(proposal: { kind: string; changeSet: readonly unknown[] }, opIndexes: number[], skipped: ReadonlySet<number>): number[] | undefined {
+  if (proposal.kind !== 'bible_audit') return opIndexes;
+  return opIndexes.length === proposal.changeSet.length - skipped.size ? undefined : opIndexes;
 }
 
 /** Removes one key from a record immutably — shared by the optimistic-decision and draft-reason maps a mutation clears on settle. */

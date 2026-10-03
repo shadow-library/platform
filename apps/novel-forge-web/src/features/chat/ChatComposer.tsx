@@ -38,6 +38,8 @@ export interface ChatComposerProps {
   caption?: string;
   /** Warnings the author should see before sending, such as a half-answered card. */
   notices?: ReactNode;
+  /** What waits on the author across the novel, above everything else in the stack. */
+  tray?: ReactNode;
   /** A finished turn or job, read once by assistive tech. */
   announcement: string;
 }
@@ -72,11 +74,13 @@ export function ChatComposer({
   onSendQueued,
   caption,
   notices,
+  tray,
   announcement,
 }: ChatComposerProps): React.JSX.Element {
   return (
     <div className={styles.composer}>
       <div ref={composerRef} className={styles.composerStack}>
+        {tray}
         {queued && (
           <div className={styles.queued}>
             <span className={styles.queuedLabel}>Queued</span>

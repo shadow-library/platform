@@ -951,6 +951,24 @@ export function useDiscardProposalMutation(projectId: string): UseMutationResult
   });
 }
 
+export interface AdoptProposalVariables {
+  proposalId: string;
+  sessionId: string;
+}
+
+/** Brings a pending card into a chat; only the card lists move, so nothing else about the project is refetched. */
+export function useAdoptProposalMutation(projectId: string): UseMutationResult<ProposalResponse, ApiError, AdoptProposalVariables> {
+  const queryClient = useQueryClient();
+  return useMutation<ProposalResponse, ApiError, AdoptProposalVariables>({
+    mutationFn: ({ proposalId, sessionId }) => APIRequest.post(`/projects/${projectId}/proposals/${proposalId}/adopt`).body({ sessionId }).execute(),
+    onSuccess: proposal => {
+      queryClient.setQueryData(refinementKeys.proposal(projectId, proposal.id), proposal);
+      queryClient.invalidateQueries({ queryKey: [...refinementKeys.proposals(projectId), 'list'] });
+    },
+    onError: () => queryClient.invalidateQueries({ queryKey: [...refinementKeys.proposals(projectId), 'list'] }),
+  });
+}
+
 export function useAuditBibleMutation(projectId: string): UseMutationResult<BibleAuditJobResponse, ApiError, undefined> {
   const queryClient = useQueryClient();
   return useMutation<BibleAuditJobResponse, ApiError, undefined>({

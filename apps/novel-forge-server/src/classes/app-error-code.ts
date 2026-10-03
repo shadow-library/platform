@@ -257,6 +257,7 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly RFN_017 = AppErrorCode.badRequest('RFN_017', 'This turn’s changes were undone as a whole — a change can be redone only while the rest of its turn is applied');
   // A user-facing 500: the author must learn the undo did not happen, and why
   static readonly RFN_018 = new AppErrorCode('RFN_018', 'Change {opIndex} could not be put back exactly as it was before, so nothing was undone', 500);
+  static readonly RFN_019 = AppErrorCode.conflict('RFN_019', 'Only a change still waiting on you can be brought into a chat — this one was answered or replaced meanwhile');
 
   /*!
    * Context Errors

@@ -88,7 +88,7 @@ export function AuditDialog({ novelId, reportId, names, docTitles, onOpenChange 
   const stage = (): void => {
     if (!data?.proposalId) return;
     flushReasons();
-    void navigate({ to: '/novels/$novelId/review', params: { novelId }, search: { view: 'proposals', proposal: data.proposalId } });
+    void navigate({ to: '/novels/$novelId/chat', params: { novelId }, search: { card: data.proposalId } });
     onOpenChange(false);
   };
 

@@ -1487,6 +1487,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/projects/{projectId}/proposals/{proposalId}/adopt': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Adopt Proposal */
+    post: operations['post_api_v1_projects_projectId_proposals_proposalId_adopt'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/projects/{projectId}/proposals/{proposalId}/discard': {
     parameters: {
       query?: never;
@@ -4803,6 +4820,10 @@ export interface components {
       scope: components['schemas']['LedgerRejectionScope'];
       /** @description The author's reason, kept on the Notebook entry. */
       why?: string;
+    };
+    AdoptProposalBody: {
+      /** @description The chat that takes the card: it shows there and is answered there. */
+      sessionId: string;
     };
     ListChangesResponse: {
       total: number;
@@ -11051,6 +11072,51 @@ export interface operations {
       };
     };
   };
+  post_api_v1_projects_projectId_proposals_proposalId_adopt: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        proposalId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['AdoptProposalBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProposalResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   post_api_v1_projects_projectId_proposals_proposalId_discard: {
     parameters: {
       query?: never;
@@ -16479,6 +16545,7 @@ export type ProposalOpDependencyErrorResponse = components['schemas']['ProposalO
 export type ProposalOpDependencyDetails = components['schemas']['ProposalOpDependencyDetails'];
 export type RedoProposalOpResponse = components['schemas']['RedoProposalOpResponse'];
 export type RejectProposalOpBody = components['schemas']['RejectProposalOpBody'];
+export type AdoptProposalBody = components['schemas']['AdoptProposalBody'];
 export type ListChangesResponse = components['schemas']['ListChangesResponse'];
 export type ChangeItemResponse = components['schemas']['ChangeItemResponse'];
 export type RollbackBody = components['schemas']['RollbackBody'];

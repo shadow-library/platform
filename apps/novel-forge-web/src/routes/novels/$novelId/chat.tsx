@@ -25,6 +25,8 @@ import styles from './chat.module.css';
 
 interface ChatSearch {
   session?: string;
+  /** A pending card another screen sent the author here to answer: shown in the open chat, or brought into it first. */
+  card?: string;
 }
 
 // `?session=new` is the chat that does not exist yet: the row is written on the first message, so until
@@ -33,6 +35,12 @@ const DRAFT_SESSION = 'new';
 
 const HISTORY_PAGE_SIZE = 25;
 
+// A hand-typed `?card=41` arrives as a number, a navigated one as a string.
+function cardParam(value: unknown): string | undefined {
+  const card = typeof value === 'number' || typeof value === 'string' ? String(value) : '';
+  return /^[0-9]+$/.test(card) ? card : undefined;
+}
+
 // The open chat lives in the URL so a refresh or shared link reopens the same conversation.
 // No loader by design: the refinement chat is a live, streaming conversation whose data is
 // session-selection driven — the session list, transcript, and pending-turn polling aren't needed for the
@@ -40,6 +48,7 @@ const HISTORY_PAGE_SIZE = 25;
 export const Route = createFileRoute('/novels/$novelId/chat')({
   validateSearch: (search: Record<string, unknown>): ChatSearch => ({
     session: typeof search.session === 'string' && search.session ? search.session : undefined,
+    card: cardParam(search.card),
   }),
   component: ChatScreen,
 });
@@ -347,7 +356,7 @@ function ChatHistoryDialog({ novelId, open, onOpenChange, openSessionId, onDelet
 
 function ChatScreen(): React.JSX.Element {
   const { novelId } = Route.useParams();
-  const { session: sessionParam } = Route.useSearch();
+  const { session: sessionParam, card } = Route.useSearch();
   const navigate = Route.useNavigate();
   // Unfiltered on purpose: the status filter belongs to the history modal, and resolving the open chat
   // against a filtered list would answer an archived link with whichever active chat happened to sort first.
@@ -445,6 +454,8 @@ function ChatScreen(): React.JSX.Element {
         starting={createSession.isPending}
         initialTurn={pendingFirstTurn?.sessionId === selected?.id ? pendingFirstTurn?.content : undefined}
         onInitialTurnSent={() => setPendingFirstTurn(undefined)}
+        revealCard={card}
+        onCardRevealed={() => void navigate({ search: previous => ({ ...previous, card: undefined }), replace: true })}
       />
 
       <ChatHistoryDialog novelId={novelId} open={historyOpen} onOpenChange={setHistoryOpen} openSessionId={selected?.id} onDeleted={onChatDeleted} />

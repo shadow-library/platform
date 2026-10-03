@@ -22,6 +22,7 @@ import {
   withWriterNotes,
 } from '../../bible/fact/knowledge-view';
 import { loadWriterDisclosurePolicy, WriterDisclosurePolicy, type WriterField } from '../../bible/fact/writer-disclosure-policy';
+import { isReviewCurrent } from '../../finalize-review/finalize-review-gate';
 import { bridgedSummary, type BridgeLoader, bridgeLoader, type BridgeSubject, type IsolationBridge, loadIsolationBridges } from '../../finalize-review/isolation-bridge';
 import { loadActiveLedger } from '../../ledger/ledger-entries';
 import { AUTHOR_BRIEF_TOPIC, ledgerSection, writerLinesSection } from '../../ledger/ledger-sections';
@@ -42,6 +43,7 @@ import {
   NOVEL_CHAT_PACK_MARGIN,
   NOVEL_CHAT_REQUEST_BUDGET,
   NOVEL_CHAT_SECTION_CAPS,
+  renderAwaitingAuthor,
   renderChapterIndex,
   renderHandoff,
   renderInventory,
@@ -1473,13 +1475,22 @@ export class ContextAssembler {
     return this.finalize(projectId, 'chat_hub', null, [...pinned, ...volatile, ...plugins], [], Math.max(sumTokens(kept.fitting), packRoom), { ...opts, omitted: kept.omitted });
   }
 
-  /** The live production picture the hub reasons over: cursor, draft states, stale plans, open work. */
+  /** The live production picture the hub reasons over: cursor, draft states, stale plans, open work, and the Story Bible work waiting on the author. */
   private async renderPipelineStatus(projectId: bigint, storyCurrentChapter: number): Promise<string> {
-    const [drafts, staleBriefs, pendingProposals, openJobs] = await Promise.all([
+    const [drafts, staleBriefs, pendingProposals, openJobs, continuity, reviews] = await Promise.all([
       this.db.query.drafts.findMany({ where: eq(schema.drafts.projectId, projectId), orderBy: schema.drafts.chapter }),
       this.db.query.briefs.findMany({ where: and(eq(schema.briefs.projectId, projectId), isNotNull(schema.briefs.staleReason)) }),
       this.db.$count(schema.refinementProposals, and(eq(schema.refinementProposals.projectId, projectId), eq(schema.refinementProposals.status, 'pending'))),
       this.db.$count(schema.jobs, and(eq(schema.jobs.projectId, projectId), inArray(schema.jobs.status, ['pending', 'in_progress']))),
+      this.db.query.continuityProposals.findMany({
+        columns: { chapter: true },
+        where: and(eq(schema.continuityProposals.projectId, projectId), eq(schema.continuityProposals.status, 'pending')),
+      }),
+      this.db.query.finalizeReviews.findMany({
+        columns: { chapter: true, draftRevision: true, sourceHash: true },
+        where: and(eq(schema.finalizeReviews.projectId, projectId), eq(schema.finalizeReviews.status, 'ready'), eq(schema.finalizeReviews.bridgeOnly, false)),
+        with: { items: { columns: { decision: true } } },
+      }),
     ]);
 
     const byReview = new Map<string, number[]>();
@@ -1494,6 +1505,18 @@ export class ContextAssembler {
     if (staleBriefs.length > 0) lines.push(`Stale briefs: chapters ${staleBriefs.map(b => b.chapter).join(', ')}`);
     if (pendingProposals > 0) lines.push(`Pending proposals awaiting review: ${pendingProposals}`);
     if (openJobs > 0) lines.push(`Jobs running or queued: ${openJobs}`);
+    const draftOf = new Map(drafts.map(draft => [draft.chapter, draft]));
+    const current = reviews.filter(review => {
+      const draft = draftOf.get(review.chapter);
+      return draft !== undefined && draft.status !== 'final' && isReviewCurrent(review, draft);
+    });
+    const openOf = (review: (typeof current)[number]): number => review.items.filter(item => item.decision === null).length;
+    const awaiting = renderAwaitingAuthor({
+      continuity: continuity.map(proposal => proposal.chapter),
+      asking: current.filter(review => openOf(review) > 0).map(review => ({ chapter: review.chapter, open: openOf(review) })),
+      answered: current.filter(review => openOf(review) === 0).map(review => review.chapter),
+    });
+    if (awaiting) lines.push(awaiting);
     return lines.join('\n');
   }
 

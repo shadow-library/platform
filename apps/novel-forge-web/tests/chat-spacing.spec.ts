@@ -216,6 +216,23 @@ const CHAT: Expected[] = [
     source: 'chat redesign .round: 34px circle, margin-left auto',
   },
   { selector: '.queued', values: { gap: '8px', padding: '6px 10px', 'border-radius': 'var(--sh-radius-md)' }, source: 'chat redesign .queued gap 8, padding 6px 10px' },
+  { selector: '.tray', values: { 'border-radius': 'var(--sh-radius-lg)' }, source: 'chat-first review mockup screen 1 .tray, a bordered box with .turnCard’s radius' },
+  {
+    selector: '.trayHead',
+    values: { gap: '8px', padding: '4px 8px 4px 12px' },
+    source: 'mockup .trayHead gap 8, 12 at the left; 4 above and below and 8 at the right so its 28px Hide button keeps the mockup’s 36px head',
+  },
+  { selector: '.trayRows', values: { margin: '0', padding: '0' }, source: 'a list reset: the rows carry their own padding' },
+  {
+    selector: '.trayRow',
+    values: { gap: '8px', padding: '4px 8px 4px 12px' },
+    source: 'mockup .trayRow 12 at the left on .chips’ gap 8; the row’s 28px button stands in for the mockup’s 8 above and below, as in .trayHead',
+  },
+  {
+    selector: '.trayLine',
+    values: { gap: '8px', width: 'fit-content', 'max-width': '100%', padding: '6px 10px', 'border-radius': 'var(--sh-radius-full)' },
+    source: 'mockup screen 5 .trayLine, a fit-content pill; the .queued strip’s gap 8 and padding 6px 10px, since both hold a 28px button',
+  },
 ];
 
 const CHAT_PHONE: Expected[] = [

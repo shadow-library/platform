@@ -525,3 +525,25 @@ export function renderHandoff(chapters: readonly NovelChatChapter[], drafts: rea
   const nextBrief = briefFor(next);
   return [...latestLines, nextStatus(next, nextBrief), nextBrief ? renderPlan(nextBrief) : null].filter((line): line is string => Boolean(line)).join('\n');
 }
+
+export interface AwaitingAuthor {
+  /** Chapters whose Story Bible additions wait outside a finalize review. */
+  continuity: readonly number[];
+  /** Approved chapters whose finalize review still asks the author, with how many answers it waits on. */
+  asking: readonly { chapter: number; open: number }[];
+  /** Approved chapters whose finalize review is answered and waits only for the author's finalize. */
+  answered: readonly number[];
+}
+
+/** The Story Bible work waiting on the author, as one line naming the action each part takes, so "add those to the bible" has something to point at. */
+export function renderAwaitingAuthor({ continuity, asking, answered }: AwaitingAuthor): string | null {
+  const byChapter = (left: number, right: number): number => left - right;
+  const parts = [
+    continuity.length > 0 ? `Story Bible additions for chapter${continuity.length === 1 ? '' : 's'} ${[...continuity].sort(byChapter).join(', ')} (action.apply_continuity)` : null,
+    ...[...asking]
+      .sort((left, right) => left.chapter - right.chapter)
+      .map(({ chapter, open }) => `chapter ${chapter}'s finalize review, ${open} answer${open === 1 ? '' : 's'} open on its Story Bible card`),
+    ...[...answered].sort(byChapter).map(chapter => `chapter ${chapter}'s finalize review, answered (action.finalize)`),
+  ].filter((part): part is string => part !== null);
+  return parts.length > 0 ? `Waiting on the author: ${parts.join('; ')}` : null;
+}

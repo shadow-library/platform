@@ -110,12 +110,14 @@ export function useDraftSummaryQuery(projectId: string, enabled = true): UseQuer
   });
 }
 
-export function useDraftQuery(projectId: string, n: number | undefined, enabled = true): UseQueryResult<DraftResponse, ApiError> {
-  return useQuery<DraftResponse, ApiError>({
-    queryKey: draftKeys.detail(projectId, n ?? -1),
+export const draftQueryOptions = (projectId: string, n: number): UseQueryOptions<DraftResponse, ApiError> =>
+  queryOptions<DraftResponse, ApiError>({
+    queryKey: draftKeys.detail(projectId, n),
     queryFn: () => APIRequest.get(`/projects/${projectId}/drafts/${n}`).execute(),
-    enabled: enabled && Boolean(projectId) && n !== undefined,
   });
+
+export function useDraftQuery(projectId: string, n: number | undefined, enabled = true): UseQueryResult<DraftResponse, ApiError> {
+  return useQuery({ ...draftQueryOptions(projectId, n ?? -1), enabled: enabled && Boolean(projectId) && n !== undefined });
 }
 
 export const reviewQueueQueryOptions = (projectId: string): UseQueryOptions<ReviewQueueResponse, ApiError> =>

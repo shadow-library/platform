@@ -54,6 +54,13 @@ export class ApplyProposalBody {
   opIndexes?: number[];
 }
 
+@Schema()
+export class AdoptProposalBody {
+  // A pattern, not `format: 'uuid'` — fastify's route schema compiler has no uuid format registered.
+  @Field({ pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', description: 'The chat that takes the card: it shows there and is answered there.' })
+  sessionId: string;
+}
+
 @Schema({ minProperties: 1 })
 export class UpdateProposalBody {
   @Field(() => [ChangeOpItem], { description: 'Replacement change-set operations, each discriminated by its op field.' })

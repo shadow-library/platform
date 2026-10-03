@@ -758,12 +758,15 @@ describe('a job’s changes in the panel', () => {
   const idle = startChatTurnStream(0);
   const changes = (after?: number): PanelProposals => ({ key: 'j1', appliedProposalId: 'oa', proposalId: 'oc', organised: ORGANISED, after });
 
-  it('should map a finished organise job to its applied changes and card, and leave plans, canon refreshes and unfinished jobs out', () => {
+  it('should map a finished organise job to its applied changes and card, and leave plans and unfinished jobs out', () => {
     expect(jobProposals(job(), 2)).toEqual(changes(2));
     expect(jobProposals(job({ status: 'in_progress' }), 2)).toBeUndefined();
     expect(jobProposals(job({ kind: 'plan', progress: { proposalId: 'plan' } }), 2)).toBeUndefined();
-    expect(jobProposals(job({ kind: 'canon_refresh', progress: { proposalId: 'audit' } }), 2)).toBeUndefined();
     expect(jobProposals(job({ kind: 'generate', progress: {} }), 2)).toBeUndefined();
+  });
+
+  it('should review a Story Bible refresh’s card in the panel, as any other job’s, rather than send the author elsewhere', () => {
+    expect(jobProposals(job({ kind: 'canon_refresh', progress: { proposalId: 'audit' } }), 2)).toEqual({ key: 'j1', proposalId: 'audit', after: 2 });
   });
 
   it('should follow a job that finished after the latest turn with changes, and the turn when it came later', () => {

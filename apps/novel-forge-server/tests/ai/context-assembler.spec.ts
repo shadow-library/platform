@@ -146,6 +146,8 @@ function makeDbStub(overrides: Record<string, unknown> = {}) {
     userFeedback: { findMany: mock(async () => []) },
     decisionLedgerEntries: { findMany: mock(async () => []) },
     bibleDocuments: { findMany: mock(async () => []) },
+    continuityProposals: { findMany: mock(async () => []) },
+    finalizeReviews: { findMany: mock(async () => []) },
   };
 
   const insert = mock(() => ({

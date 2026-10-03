@@ -1039,6 +1039,119 @@ button.turnRow:hover {
   color: var(--sh-warning-text-on-subtle);
 }
 
+/* "Waiting on you": a list above the composer while something is not in the thread yet, otherwise one line. */
+.tray {
+  border: 1px solid var(--sh-border-default);
+  border-radius: var(--sh-radius-lg);
+  background: var(--sh-surface-card);
+  overflow: hidden;
+}
+
+.trayHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px 4px 12px;
+  border-bottom: 1px solid var(--sh-border-subtle);
+  background: var(--sh-surface-well);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sh-text-secondary);
+}
+
+.trayRows {
+  max-height: 30vh;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.trayRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px 4px 12px;
+  font-size: var(--sh-text-body-sm);
+}
+
+.trayRow:not(:first-child) {
+  border-top: 1px solid var(--sh-border-subtle);
+}
+
+.trayTitle {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--sh-text-primary);
+}
+
+.traySource {
+  flex: none;
+  font-size: 11px;
+  white-space: nowrap;
+  color: var(--sh-text-tertiary);
+}
+
+.trayLine {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  max-width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--sh-border-default);
+  border-radius: var(--sh-radius-full);
+  background: var(--sh-surface-card);
+  font-size: 12px;
+  color: var(--sh-text-secondary);
+}
+
+.trayLineText {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The card the tray points at: outlined briefly when shown, and for as long as it holds keyboard focus. */
+.pendingAnchor {
+  min-width: 0;
+}
+
+.pendingAnchor:empty {
+  display: none;
+}
+
+.pendingAnchor:focus {
+  outline: none;
+}
+
+.pendingAnchor[data-flash] > *,
+.pendingAnchor:focus-visible > * {
+  outline: 2px solid var(--sh-border-focus);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .pendingAnchor[data-flash]:not(:focus-visible) > * {
+    animation: pending-flash 1.6s ease-out forwards;
+  }
+}
+
+@keyframes pending-flash {
+  60% {
+    outline-color: var(--sh-border-focus);
+  }
+
+  100% {
+    outline-color: transparent;
+  }
+}
+
 @media (max-width: 760px) {
   .phoneOnly {
     display: inline-flex;
@@ -1062,6 +1175,10 @@ button.turnRow:hover {
     flex-wrap: nowrap;
     overflow-x: auto;
     padding-bottom: 2px;
+  }
+
+  .traySource {
+    display: none;
   }
 
   /* 16px keeps iOS from zooming into the field; [data-size] outranks the textarea's own size rule. */

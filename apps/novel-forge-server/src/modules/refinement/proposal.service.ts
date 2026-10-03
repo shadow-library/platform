@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, ne, type SQL, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, ne, type SQL, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger, OffsetPaginationResult, utils } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
@@ -66,12 +66,15 @@ function pickBaseline(states: Readonly<Record<string, ArtifactState>>, refs: rea
 
 type ApproveDraftOp = Extract<ChangeOp, { op: 'action.approve_draft' }>;
 
+/** What a chat stages itself. A card brought into the chat from elsewhere (an audit, a plugin, a premise review) is not the chat's own work to replace. */
+const CHAT_STAGED_KINDS: readonly Refinement.Kind[] = ['chat', 'hub', 'chapter_plan', 'organise'];
+
 /**
  * Who a new proposal supersedes its own stale pending work for: a chat session, or — for a plugin, which
  * has no session and restages the same decision on every run — the plugin's own scope.
  */
 function supersessionOwner(input: CreateProposalInput): SQL | undefined {
-  if (input.sessionId) return eq(schema.refinementProposals.sessionId, input.sessionId);
+  if (input.sessionId) return and(eq(schema.refinementProposals.sessionId, input.sessionId), inArray(schema.refinementProposals.kind, CHAT_STAGED_KINDS));
   if (input.kind !== 'plugin' || !input.scopeRef) return undefined;
   return and(eq(schema.refinementProposals.kind, 'plugin'), eq(schema.refinementProposals.scopeType, input.scopeType), eq(schema.refinementProposals.scopeRef, input.scopeRef));
 }
@@ -333,6 +336,35 @@ export class ProposalService {
     if (!record || !op || result?.status !== 'applied') throw AppErrorCode.RFN_014.create({ opIndex: String(opIndex) });
     const refs = changeSetRefs([op]);
     return undoImpact(undoneChange(refs, [record.inverse]), await loadImpactRows(this.db, proposal.projectId, proposal.id, refs));
+  }
+
+  /**
+   * Moves a pending card into a chat so it is answered there, and an action it starts reports to that chat. It keeps the message it answered,
+   * so a plan it starts still reads the author's words where they were written. A card the chat already holds comes back as it is.
+   */
+  async adopt(projectId: bigint, proposalId: bigint, sessionId: string): Promise<Refinement.Proposal> {
+    const session = await this.db.query.chatSessions.findFirst({
+      columns: { status: true },
+      where: and(eq(schema.chatSessions.id, sessionId), eq(schema.chatSessions.projectId, projectId)),
+    });
+    if (!session) throw AppErrorCode.CHT_001.create();
+    if (session.status !== 'active') throw AppErrorCode.CHT_002.create();
+
+    const existing = await this.get(projectId, proposalId);
+    if (existing.status !== 'pending') throw AppErrorCode.RFN_019.create();
+    if (existing.sessionId === sessionId) return existing;
+
+    const owner = existing.sessionId === null ? isNull(schema.refinementProposals.sessionId) : eq(schema.refinementProposals.sessionId, existing.sessionId);
+    const [adopted] = await this.db
+      .update(schema.refinementProposals)
+      .set({ sessionId, updatedAt: new Date() })
+      .where(and(eq(schema.refinementProposals.id, existing.id), eq(schema.refinementProposals.status, 'pending'), owner))
+      .returning();
+    if (adopted) return adopted;
+    // Another tab may have brought it into this same chat meanwhile; anything else settled or moved it.
+    const raced = await this.get(projectId, proposalId);
+    if (raced.status === 'pending' && raced.sessionId === sessionId) return raced;
+    throw AppErrorCode.RFN_019.create();
   }
 
   async discard(projectId: bigint, proposalId: bigint): Promise<Refinement.Proposal> {

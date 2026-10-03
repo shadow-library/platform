@@ -11,6 +11,7 @@ import { type OpToggleResult, ProposalApplyService } from './proposal-apply.serv
 import { ProposalOpUndoService } from './proposal-op-undo.service';
 import { ProposalService } from './proposal.service';
 import {
+  AdoptProposalBody,
   ApplyProposalBody,
   ApplyProposalResponse,
   ListProposalResponse,
@@ -120,6 +121,13 @@ export class ProposalController {
   async rejectOp(@Params() params: ProposalOpParams, @Body() body: RejectProposalOpBody): Promise<LedgerEntryResponse> {
     const entry = await this.ideaRejectionService.reject(params.projectId, params.proposalId, params.opIndex, body);
     return { ...entry, status: ledgerEntryStatus(entry) };
+  }
+
+  @BotPermission(PROJECTS_WRITE_PERMISSION)
+  @Post('/:proposalId/adopt')
+  @RespondFor(200, ProposalResponse)
+  adoptProposal(@Params() params: ProposalIdParams, @Body() body: AdoptProposalBody): Promise<ProposalResponse> {
+    return this.proposalService.adopt(params.projectId, params.proposalId, body.sessionId).then(serialiseProposal);
   }
 
   @BotPermission(PROJECTS_WRITE_PERMISSION)

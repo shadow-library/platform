@@ -137,6 +137,14 @@ export function suggestionCommit(total: number, decisions: ReadonlyMap<number, S
   return { kind: 'apply', opIndexes: opIndexes.sort((a, b) => a - b) };
 }
 
+/** A finding the author skipped in the audit stays declined wherever the card is answered: the server refuses its op (AUD_006). */
+export function withAuditSkips(decisions: ReadonlyMap<number, SuggestionDecision>, skipped: ReadonlySet<number>): ReadonlyMap<number, SuggestionDecision> {
+  if (skipped.size === 0) return decisions;
+  const next = new Map(decisions);
+  for (const index of skipped) next.set(index, 'decline');
+  return next;
+}
+
 export type ProposalPresentation = 'plan' | 'suggestions' | 'applied' | 'reverted' | 'passed' | 'legacy';
 
 const ONE_WAY_DOORS = new Set(['action.finalize', 'action.approve_draft', 'action.apply_continuity', 'action.generate_chapter', 'action.advance_volume']);

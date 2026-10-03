@@ -6,11 +6,13 @@ import { ProposalsIcon } from '@/components/icons';
 import { type ChipIntent, RegenerateAppliedBriefs, StatusChip } from '@/components/nf';
 import { ChangeOpBody, PluginSourceChip } from '@/features/proposals';
 import { type ApplyProposalResponse, type ProposalResponse, useApplyProposalMutation, useDiscardProposalMutation, useRevertProposalMutation } from '@/lib/apis';
+import { auditApplyIndexes } from '@/lib/bible-audit';
 import { appliedBriefChapters } from '@/lib/chapter-brief';
 import { defaultDeclined, isGuardedOp, NEVER_AUTO_NOTE } from '@/lib/proposals';
 
 import { finalizeReviewBlocked, finalizeReviewChapter, opSubject } from './chat-view';
 import styles from './Chat.module.css';
+import { useAuditSkippedOps } from './use-suggestion-answering';
 
 const OP_RESULT_INTENT: Record<string, ChipIntent> = {
   applied: 'success',
@@ -38,6 +40,9 @@ export function TurnProposalCard({ novelId, proposal, onApplied }: TurnProposalC
   const [declined, setDeclined] = useState<Set<number>>(() => defaultDeclined(proposal.changeSet));
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [finalizeRefusal, setFinalizeRefusal] = useState<FinalizeRefusal>();
+  const skipped = useAuditSkippedOps(novelId, proposal);
+  const isDeclined = (index: number): boolean => declined.has(index) || skipped.has(index);
+  const declinedCount = proposal.changeSet.filter((_, index) => isDeclined(index)).length;
 
   // The selection is keyed to one proposal's op indexes, so a different proposal in the same slot resets
   // it during render rather than in an effect — an effect would paint one frame of the old selection.
@@ -60,13 +65,13 @@ export function TurnProposalCard({ novelId, proposal, onApplied }: TurnProposalC
   };
 
   const doApply = (): void => {
-    const selected = proposal.changeSet.map((_, i) => i).filter(i => !declined.has(i));
+    const selected = proposal.changeSet.map((_, i) => i).filter(i => !isDeclined(i));
     if (selected.length === 0) return void toast.danger('Select at least one operation to apply');
     setFinalizeRefusal(undefined);
-    // Always explicit: a blanket apply (no `opIndexes`) is refused outright when the change-set holds a
-    // one-way door, so naming the indexes is what makes finalize reachable at all.
+    // Explicit but for an audit card: a blanket apply (no `opIndexes`) is refused outright when the change-set holds a
+    // one-way door, so naming the indexes is what makes finalize reachable at all; an audit card holds none.
     apply.mutate(
-      { proposalId: proposal.id, opIndexes: selected },
+      { proposalId: proposal.id, opIndexes: auditApplyIndexes(proposal, selected, skipped) },
       {
         onSuccess: r => {
           onApplied?.(r);
@@ -102,9 +107,11 @@ export function TurnProposalCard({ novelId, proposal, onApplied }: TurnProposalC
           const result = opResults.find(r => r.index === i);
           const isAction = String(op.op).startsWith('action.');
           return (
-            <div key={i} className={styles.turnOp} data-declined={declined.has(i)}>
+            <div key={i} className={styles.turnOp} data-declined={isDeclined(i)}>
               <div className={styles.turnOpRow}>
-                {isPending && <Checkbox checked={!declined.has(i)} onCheckedChange={() => toggle(declined, i, setDeclined)} aria-label={`include ${opSubject(op)}`} />}
+                {isPending && (
+                  <Checkbox checked={!isDeclined(i)} disabled={skipped.has(i)} onCheckedChange={() => toggle(declined, i, setDeclined)} aria-label={`include ${opSubject(op)}`} />
+                )}
                 <button type="button" className={styles.turnOpLabel} aria-expanded={expanded.has(i)} onClick={() => toggle(expanded, i, setExpanded)}>
                   {opSubject(op)}
                 </button>
@@ -152,7 +159,7 @@ export function TurnProposalCard({ novelId, proposal, onApplied }: TurnProposalC
           {isPending && (
             <>
               <Button size="sm" variant="primary" loading={apply.isPending} onClick={doApply}>
-                {declined.size > 0 ? `Apply ${proposal.changeSet.length - declined.size} selected` : 'Apply'}
+                {declinedCount > 0 ? `Apply ${proposal.changeSet.length - declinedCount} selected` : 'Apply'}
               </Button>
               <Button
                 size="sm"

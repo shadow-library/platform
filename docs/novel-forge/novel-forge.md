@@ -75,7 +75,8 @@
 
 - **One conversation over the whole novel.** Its context is the novel's durable state, not its text: the story (planner-only parts labelled), the progress map, the Notebook,
   inventories of Story Bible pages and entities by name and key, the chapter list, open promises, the last chapter's planned ending, its closing prose and continuation state
-  (an isolated chapter only as its bridge), the next chapter's plan, a compaction summary and recent messages. The stable sections get a fixed reservation so the cached prefix stays byte-identical across a session; the handoff is always kept, so a request near the
+  (an isolated chapter only as its bridge), the next chapter's plan, what waits on the author (a count of pending cards, and by chapter the Story Bible additions and
+  finalize reviews, each with the action that settles it), a compaction summary and recent messages. The stable sections get a fixed reservation so the cached prefix stays byte-identical across a session; the handoff is always kept, so a request near the
   history ceiling can run past the budget. The author's own words render before, and outrank, any AI summary.
 - Detail comes through declared lookups (never native tool binding): Story Bible pages, entities, canon facts, threads and promises, chapter summaries, a plan, a draft, a
   character timeline, a volume, lore and prose search, the author's notes, usage and a chapter's reviews. A turn that reads the notes or a planner-only page holds for review
@@ -125,8 +126,15 @@
   expanded app sidebar would leave it too little room, the sidebar folds to its icon rail on every screen, and the author's own toggle holds only until the window crosses
   that width again. Its undo refuses rather than cascades, as the write policy below requires. Every chat-produced proposal — a turn's, an organise round's, or a card no
   reply carries — is reviewed there from its one receipt, never as inline cards in the thread: the receipt carries Undo all for what was saved, Add all for what waits and
-  why a hold kept it. An action, prose or a plan edit keeps its own card in the thread and is never added in bulk; a plan keeps its plan card, and a canon refresh card is
-  answered in Review.
+  why a hold kept it. An action, prose or a plan edit keeps its own card in the thread and is never added in bulk; a plan keeps its plan card, and a Story Bible refresh's
+  card is reviewed from its job's receipt like any other job's.
+- **Waiting on you**: one tray above the composer lists everything pending across the novel — drafts to read, Story Bible decisions, continuity additions, then every pending
+  card oldest first, whichever chat, job or pipeline staged it — and is absent when nothing is. Nothing shows twice in a thread: what the thread already holds the tray only
+  points at, and a card from elsewhere (an audit, a refresh, a plugin, another chat) is brought into this chat: it shows here, and an action it starts reports here. A
+  card brought from another chat still shows on the reply that staged it there and may be answered from either; it keeps that reply, so a plan it starts reads the author's
+  words where they were written. Only a pending card moves (`RFN_019`), only into an active chat of the same novel, and only a chat's own kinds (chat, plan, organise) are
+  ever superseded by its later cards — never an audit, refresh or plugin card brought in. An audit card keeps the Keep and Skip answered in the audit. The tray is open while
+  anything is outside the thread and one line otherwise.
 - **One message may be queued while a turn runs**, and it is sent only after this tab's own turn settles cleanly. A failed or stopped reply, a turn started in another tab or a
   locked chat holds it for the author, who can edit it or send it now. A message released on its own keeps the settings it was queued with.
 - A chat turn MUST NEVER propose a whole-record overwrite for a record it did not fetch in the same turn; every turn is a fresh run, and state lives in chat tables.
