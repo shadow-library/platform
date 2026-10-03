@@ -41,6 +41,7 @@ function fitToContent(el: HTMLTextAreaElement, minRows: number, maxRows: number)
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function Textarea(
   {
     size = 'md',
+    variant = 'field',
     minRows = 3,
     maxRows = 12,
     autoGrow = true,
@@ -92,6 +93,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function 
         ref={mergeRefs(ref, fieldRef)}
         className={styles.field}
         data-size={size}
+        data-variant={variant}
         data-autogrow={autoGrow ? 'true' : 'false'}
         data-invalid={invalid || undefined}
         rows={minRows}

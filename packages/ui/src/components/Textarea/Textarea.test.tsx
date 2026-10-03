@@ -30,6 +30,13 @@ describe('Textarea', () => {
     expect(field).toHaveAttribute('aria-invalid', 'true');
   });
 
+  it('draws the field surface by default and drops it when bare', () => {
+    const { rerender } = render(<Textarea aria-label="Notes" />);
+    expect(screen.getByRole('textbox')).toHaveAttribute('data-variant', 'field');
+    rerender(<Textarea aria-label="Notes" variant="bare" />);
+    expect(screen.getByRole('textbox')).toHaveAttribute('data-variant', 'bare');
+  });
+
   it('fires onValueChange with the string value', async () => {
     const onValueChange = vi.fn();
     const user = userEvent.setup();

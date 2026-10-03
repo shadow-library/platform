@@ -74,6 +74,17 @@
   cursor: not-allowed;
 }
 
+/* ── Bare: the container draws the surface; listed last so it outranks every state above at equal specificity */
+.field[data-variant='bare'],
+.field[data-variant='bare']:not(:disabled):not(:read-only):hover,
+.field[data-variant='bare']:focus {
+  padding: 0;
+  border-color: transparent;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
 /* ── Character counter (below-right, quiet until the last 20%) */
 .counter {
   margin-top: 4px;

@@ -12,9 +12,13 @@ import { type TextareaHTMLAttributes } from 'react';
  */
 export type TextareaSize = 'sm' | 'md' | 'lg';
 
+export type TextareaVariant = 'field' | 'bare';
+
 export interface TextareaProps extends Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'rows'> {
   /** Font/radius scale — matches the Input field. @default 'md' */
   size?: TextareaSize;
+  /** `bare` drops the field surface — border, fill, focus ring and padding — for a textarea whose container is the visible surface, as in a chat composer. @default 'field' */
+  variant?: TextareaVariant;
   /** Minimum visible rows; also the starting height. @default 3 */
   minRows?: number;
   /** Auto-grow cap; content past this scrolls internally. @default 12 */
