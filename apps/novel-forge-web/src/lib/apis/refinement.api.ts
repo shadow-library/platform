@@ -104,8 +104,10 @@ interface SessionStatusVariables {
 
 interface SessionModelVariables {
   sessionId: string;
-  provider: string | null;
-  model: string | null;
+  provider?: string | null;
+  model?: string | null;
+  contentMode?: ContentMode | null;
+  costTier?: CostTier | null;
 }
 
 interface SessionUpdateVariables {
@@ -775,7 +777,7 @@ export function useDeleteChatSessionMutation(projectId: string): UseMutationResu
 export function useUpdateSessionModelMutation(projectId: string): UseMutationResult<ChatSessionResponse, ApiError, SessionModelVariables> {
   const queryClient = useQueryClient();
   return useMutation<ChatSessionResponse, ApiError, SessionModelVariables>({
-    mutationFn: ({ sessionId, provider, model }) => APIRequest.patch(`/projects/${projectId}/chat/sessions/${sessionId}/model`).body({ provider, model }).execute(),
+    mutationFn: ({ sessionId, ...body }) => APIRequest.patch(`/projects/${projectId}/chat/sessions/${sessionId}/model`).body(body).execute(),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: refinementKeys.sessions(projectId) }),
   });
 }

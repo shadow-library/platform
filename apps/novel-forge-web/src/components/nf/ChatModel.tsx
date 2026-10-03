@@ -96,9 +96,10 @@ interface PinnedModelMenuProps {
 }
 
 export interface TurnModelControl {
-  /** The author's pick for the next turn; undefined follows the chat, then the project. */
+  /** A pick not yet on the chat — before the chat exists, or while it saves; undefined shows the chat's, then the project's. */
   choice?: TurnChoice;
-  onChange: (choice: TurnChoice | undefined) => void;
+  /** The chat's new setting; the project's own choice when the author goes back to the default. */
+  onChange: (choice: TurnChoice) => void;
 }
 
 export type ChatModelMenuProps = PinnedModelMenuProps & { turn?: TurnModelControl };
@@ -197,6 +198,7 @@ export interface ResolvedTurnModel {
 export interface TurnModelPanelProps {
   choice: TurnChoice;
   defaults: TurnChoiceDefaults;
+  project: TurnChoice;
   resolved?: ResolvedTurnModel;
   resolving: boolean;
   /** A model this chat was pinned to before tiers existed; it outranks the tier until cleared. */
@@ -214,10 +216,11 @@ function priceLabel({ inputPricePerMToken, outputPricePerMToken }: ResolvedTurnM
 }
 
 export function TurnModelPanel(props: TurnModelPanelProps): React.JSX.Element {
-  const { choice, defaults, resolved, resolving, pinnedModel, onChange, settingsLink } = props;
+  const { choice, defaults, project, resolved, resolving, pinnedModel, onChange, settingsLink } = props;
   const modeId = useId();
   const tierId = useId();
   const custom = !sameChoice(choice, defaults.choice);
+  const ownSetting = !sameChoice(choice, project);
   const price = resolved && priceLabel(resolved);
   return (
     <div className={styles.panel}>
@@ -264,12 +267,12 @@ export function TurnModelPanel(props: TurnModelPanelProps): React.JSX.Element {
         </span>
       )}
       <span className={styles.note}>
-        {custom ? 'Applies to your next message and anything it starts, then goes back to the default.' : defaultNote(defaults)} Default: {choiceLabel(defaults.choice)}
+        {defaultNote(defaults, custom)} Project default: {choiceLabel(project)}
         {settingsLink && <> · {settingsLink}</>}
       </span>
       <div className={styles.actions}>
-        <Button size="sm" variant="ghost" disabled={!custom} onClick={props.onReset}>
-          Use the default
+        <Button size="sm" variant="ghost" disabled={!ownSetting} onClick={props.onReset}>
+          Use the project default
         </Button>
         <Button size="sm" variant="primary" className={styles.done} onClick={props.onDone}>
           Done
@@ -292,14 +295,14 @@ function TurnModelMenu({ novelId, session, disabled, control }: TurnModelMenuPro
   const modelsQuery = useAiModelsQuery();
   const updateModel = useUpdateSessionModelMutation(novelId);
   const project = projectQuery.data;
-  const defaults = turnChoiceDefaults(session, { contentMode: project?.contentMode ?? 'standard', costTier: project?.costTier ?? 'balanced' });
+  const projectChoice: TurnChoice = { contentMode: project?.contentMode ?? 'standard', costTier: project?.costTier ?? 'balanced' };
+  const defaults = turnChoiceDefaults(session, projectChoice);
   const choice = control.choice ?? defaults.choice;
   const routes = useProjectModelsQuery(novelId, choice, open);
   const chat = routes.data?.models.find(route => route.group === 'chat');
   const pinnedModel = session?.modelId ? modelLabel(modelsQuery.data?.models ?? [], session.modelId, session.modelProvider) : undefined;
   const scope = choiceScope(control.choice, defaults);
 
-  const change = (next: TurnChoice): void => control.onChange(sameChoice(next, defaults.choice) ? undefined : next);
   const clearPin = (): void => {
     if (!session) return;
     updateModel.mutate({ sessionId: session.id, provider: null, model: null }, { onError: e => toast.danger(e.message) });
@@ -314,15 +317,16 @@ function TurnModelMenu({ novelId, session, disabled, control }: TurnModelMenuPro
           <ChevronDownIcon size={12} />
         </button>
       </Popover.Trigger>
-      <Popover.Content side="top" align="start" aria-label="Model and cost for this turn">
+      <Popover.Content side="top" align="start" aria-label="Model and cost for this chat">
         <TurnModelPanel
           choice={choice}
           defaults={defaults}
+          project={projectChoice}
           resolved={chat}
           resolving={routes.isLoading}
           pinnedModel={pinnedModel}
-          onChange={change}
-          onReset={() => control.onChange(undefined)}
+          onChange={control.onChange}
+          onReset={() => control.onChange(projectChoice)}
           onDone={() => setOpen(false)}
           onClearPin={clearPin}
           settingsLink={

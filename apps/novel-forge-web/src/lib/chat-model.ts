@@ -46,11 +46,20 @@ export function choiceLabel(choice: TurnChoice): string {
   return `${contentModeLabel(choice.contentMode)} · ${tierLabel(choice.costTier)}`;
 }
 
+/** A pick still being saved already belongs to the chat. */
 export function choiceScope(choice: TurnChoice | undefined, defaults: TurnChoiceDefaults): string {
-  if (choice && !sameChoice(choice, defaults.choice)) return 'this turn only';
+  if (choice && !sameChoice(choice, defaults.choice)) return 'this chat';
   return defaults.source === 'chat' ? 'this chat' : 'project default';
 }
 
-export function defaultNote(defaults: TurnChoiceDefaults): string {
-  return defaults.source === 'chat' ? 'This is this chat’s own setting.' : 'This is the project default.';
+/** The chat's own setting for a pick: a field that matches the project is cleared, so the chat keeps following the project there. */
+export function chatChoiceUpdate(choice: TurnChoice, project: TurnChoice): { contentMode: TurnChoice['contentMode'] | null; costTier: TurnChoice['costTier'] | null } {
+  return {
+    contentMode: choice.contentMode === project.contentMode ? null : choice.contentMode,
+    costTier: choice.costTier === project.costTier ? null : choice.costTier,
+  };
+}
+
+export function defaultNote(defaults: TurnChoiceDefaults, custom: boolean): string {
+  return defaults.source === 'chat' || custom ? 'This chat keeps this setting until you change it.' : 'This is the project default.';
 }

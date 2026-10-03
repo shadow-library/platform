@@ -1874,13 +1874,13 @@ export default function createPlugin() {
   3. Clone a Performant project.
   4. Hub turn on an Economy project (new chat), then check its `model_calls`.
   5. Project override: `PATCH /projects/$P {"config":{"models":{"chat":{"provider":"openrouter","model":"openai/gpt-5.6-luna"}}}}`, turn.
-  6. Pick Performant for one turn in the composer, then send another turn without it.
+  6. Pick Performant in the composer, send two turns, then pick "Use the project default" and send a third.
   7. Set project `contentMode:'unrestricted'` with a standard-only chat pin (e.g. `anthropic/claude-opus-5.5`), turn.
 - **Verify:**
   - Step 2: every project created without a tier is Economy; the one that named Performant is Performant. A bot-owned project starts on Balanced, and `PUT /ai/settings` as a bot is 403 `AI_016`.
   - Step 3: the clone is Performant whatever the account default.
   - Step 4: the chat call's `model` is the Economy chat model from `GET /ai/models` `tiers`, and `chat_messages.model_id` (assistant) matches.
-  - Precedence exactly: the turn's tier > project pin for the role > the tier map. Step 5 uses the pin; step 6 uses the Performant chat model for that turn only, and the next turn is back on Economy.
+  - Precedence exactly: the turn's tier > project pin for the role > the tier map. Step 5 uses the pin; step 6 uses the Performant chat model for both turns (the chat session's `costTier` is `performant`) and the third is back on Economy with the session's `costTier` null.
   - Step 7: a pin not on the unrestricted allowlist (`x-ai/grok-4.6, deepseek/deepseek-v4-pro, z-ai/glm-5.2, moonshotai/kimi-k3`, image `x-ai/grok-imagine-image-2.0`) is ignored; the project uses the unrestricted model for its tier. `GET /ai/models` `unrestrictedAllowlist` shows the list.
   - `GET /projects/:p/models` reports each group's `source` as `project` or `tier`, never anything else.
   - Group→role mapping: Illustrations compose runs on the helper group (not Planning); embedding and vision are not configurable.

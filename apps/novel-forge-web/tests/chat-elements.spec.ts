@@ -327,6 +327,7 @@ function panel(overrides: Partial<TurnModelPanelProps> = {}): string {
     createElement(TurnModelPanel, {
       choice: project,
       defaults: { choice: project, source: 'project' },
+      project,
       resolved: { label: 'Claude Sonnet 5', inputPricePerMToken: 3, outputPricePerMToken: 15 },
       resolving: false,
       onChange: noop,
@@ -364,14 +365,15 @@ describe('TurnModelPanel', () => {
     expect(body).toContain('$3 in · $15 out per million tokens');
     expect(body).toContain('This is the project default.');
     const own = panel({ defaults: { choice: { contentMode: 'standard', costTier: 'balanced' }, source: 'chat' } });
-    expect(own).toContain('This is this chat’s own setting.');
-    expect(own).not.toContain('This is the this chat');
+    expect(own).toContain('This chat keeps this setting until you change it.');
   });
 
-  it('should say a changed pick is for this turn only and allow going back', () => {
+  it('should keep a changed pick for the whole chat and offer the project default back', () => {
     const body = panel({ choice: { contentMode: 'unrestricted', costTier: 'economy' } });
-    expect(body).toContain('Applies to your next message and anything it starts');
-    expect(body).toContain('Default: Standard · Balanced');
+    expect(body).toContain('This chat keeps this setting until you change it.');
+    expect(body).toContain('Project default: Standard · Balanced');
+    expect(body).not.toMatch(/disabled=""[^>]*><span[^>]*>Use the project default/);
+    expect(panel()).toMatch(/disabled=""[^>]*><span[^>]*>Use the project default/);
   });
 
   it('should explain a legacy chat pin and offer to clear it', () => {

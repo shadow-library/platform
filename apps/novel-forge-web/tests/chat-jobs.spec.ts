@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 
 import { type ChatJobEventResponse, type ChatJobResponse } from '../src/lib/apis/api-types.gen';
 import { learnAnchors, mergeChatJobs, parseChatJobEvent, reduceChatJobs } from '../src/lib/apis/chat.api';
-import { choiceLabel, choiceScope, modelTagParts, turnChoiceDefaults, turnOverride } from '../src/lib/chat-model';
+import { chatChoiceUpdate, choiceLabel, choiceScope, modelTagParts, turnChoiceDefaults, turnOverride } from '../src/lib/chat-model';
 
 function event(seq: number, type: ChatJobEventResponse['type'], data?: Record<string, unknown>): ChatJobEventResponse {
   return { seq, jobId: 'j1', kind: 'organise', type, data, createdAt: '2026-09-26T10:00:00.000Z' };
@@ -128,10 +128,15 @@ describe('turn choice', () => {
     expect(turnOverride({ contentMode: 'unrestricted', costTier: 'economy' }, project)).toEqual({ contentMode: 'unrestricted', costTier: 'economy' });
   });
 
+  it('should save only the fields of a pick that differ from the project', () => {
+    expect(chatChoiceUpdate({ contentMode: 'standard', costTier: 'performant' }, project)).toEqual({ contentMode: null, costTier: 'performant' });
+    expect(chatChoiceUpdate(project, project)).toEqual({ contentMode: null, costTier: null });
+  });
+
   it('should label the scope of the pick', () => {
     const defaults = turnChoiceDefaults(undefined, project);
     expect(choiceScope(undefined, defaults)).toBe('project default');
-    expect(choiceScope({ contentMode: 'standard', costTier: 'economy' }, defaults)).toBe('this turn only');
+    expect(choiceScope({ contentMode: 'standard', costTier: 'economy' }, defaults)).toBe('this chat');
     expect(choiceLabel({ contentMode: 'unrestricted', costTier: 'performant' })).toBe('Unrestricted · Performant');
   });
 });

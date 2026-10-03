@@ -38,15 +38,16 @@ import {
   useProposalQuery,
   useStartNextDraftMutation,
   useUpdateChatSessionMutation,
+  useUpdateSessionModelMutation,
 } from '@/lib/apis';
-import { type TurnChoice, turnChoiceDefaults, turnOverride } from '@/lib/chat-model';
+import { chatChoiceUpdate, sameChoice, type TurnChoice, turnChoiceDefaults, turnOverride } from '@/lib/chat-model';
 import { chatColumnView, chatTitle } from '@/lib/chat-sessions';
 import { timelineOfTrace, turnTimeline } from '@/lib/chat-turn-timeline';
 import { messageTime, projectTitle } from '@/lib/format';
 import { PANEL_DOCK_MIN } from '@/lib/sidebar-rail';
 import { takePendingFirstTurn } from '@/lib/pending-first-turn';
-
 import { useGenerationActivity } from '@/lib/use-generation-activity';
+
 import { editQueued, inputCaption, type QueuedTurn, queuedView, queueStep, releaseSettings, restoreFailed, type TurnSettings } from './chat-queue';
 import { ChatComposer } from './ChatComposer';
 import { NotesChip, SaveAsNotesOffer } from './ChatExtras';
@@ -78,8 +79,8 @@ import {
   type TurnOutcome,
   unansweredWarning,
   unusedParagraphPrompt,
-} from './chat-view';
   writingView,
+} from './chat-view';
 import styles from './Chat.module.css';
 import { ComposerModeMenu } from './ComposerModeMenu';
 import { JobProgress } from './JobProgress';
@@ -161,8 +162,9 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
   const cancelJobMutation = useCancelChatJobMutation(novelId, session?.id);
   const turn = useChatTurnStream(novelId, session?.id ?? '');
   const updateSession = useUpdateChatSessionMutation(novelId);
-  const startNextDraft = useStartNextDraftMutation(novelId);
+  const saveChatChoice = useUpdateSessionModelMutation(novelId);
   const generation = useGenerationActivity(novelId);
+  const startNextDraft = useStartNextDraftMutation(novelId);
   const unanswered = useUnansweredCount();
 
   const [input, setInput] = useState('');
@@ -212,7 +214,32 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
   const busy = pending || locked;
   const notesOpener = notesOpenerId(messages);
   const answeredUpTo = lastUserOrdinal(messages);
-  const defaults = turnChoiceDefaults(session, { contentMode: project?.contentMode ?? 'standard', costTier: project?.costTier ?? 'balanced' });
+  const projectChoice: TurnChoice = { contentMode: project?.contentMode ?? 'standard', costTier: project?.costTier ?? 'balanced' };
+  const defaults = turnChoiceDefaults(session, projectChoice);
+  // A model and cost pick is the chat's own setting. It is held here only until the chat exists and the save lands, and goes on each turn meanwhile.
+  if (turnChoice && sameChoice(turnChoice, defaults.choice)) setTurnChoice(undefined);
+  const saveChoice = (sessionId: string, choice: TurnChoice): void =>
+    saveChatChoice.mutate(
+      { sessionId, ...chatChoiceUpdate(choice, projectChoice) },
+      {
+        onError: err => {
+          setTurnChoice(undefined);
+          toast.danger(err.message);
+        },
+      },
+    );
+  const savedPickFor = useRef<string | undefined>(undefined);
+  const chooseModel = (choice: TurnChoice): void => {
+    setTurnChoice(choice);
+    if (!session) return;
+    savedPickFor.current = session.id;
+    saveChoice(session.id, choice);
+  };
+  useEffect(() => {
+    if (!session || !turnChoice || savedPickFor.current === session.id) return;
+    savedPickFor.current = session.id;
+    saveChoice(session.id, turnChoice);
+  });
 
   const finishedId = stream.status === 'done' ? stream.turn.assistantMessage.id : undefined;
   const finishedHeld = stream.status === 'done' ? stream.turn.held : undefined;
@@ -228,6 +255,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
     return grouped;
   }, [jobStream.jobs, messageIds]);
   const looseJobs = jobsByMessage.get('') ?? NO_JOBS;
+  const writing = generation.activity && !jobStream.jobs.some(job => job.id === generation.activity?.jobId) ? generation.activity : undefined;
 
   const shownProposals = new Set<string>();
   for (const message of messages) {
@@ -256,7 +284,6 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
   const step = queueStep({ queued, running: pending, locked, stream: stream.status, finishedId, inTranscript: finishedId !== undefined && messageIds.has(finishedId) });
   const queueNow = useRef(queued);
   useLayoutEffect(() => {
-  const writing = generation.activity && !jobStream.jobs.some(job => job.id === generation.activity?.jobId) ? generation.activity : undefined;
     queueNow.current = queued;
   });
   const switching = updateSession.isPending && updateSession.variables?.mode !== undefined;
@@ -358,8 +385,6 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
       {
         onSuccess: result => {
           announce(turnAnnouncement(turnOutcome(result)));
-          // The model and cost pick is for this turn only; a failed send keeps it for the retry, and a newer pick for the next message stays.
-          setTurnChoice(current => (current === settings.choice ? undefined : current));
           invalidateProgress(queryClient, novelId);
           const note = applyNoteToast(result);
           if (note) toast.warning(note);
@@ -380,7 +405,6 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
   const enqueue = (content: string): void => {
     if (queued || locked) return;
     setQueued({ content, ...currentSettings(), watching: turn.isPending, after: finishedId });
-    setTurnChoice(undefined);
     setInput('');
   };
 
@@ -409,7 +433,6 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
     setInput(edited.input);
     setProseEdits(edited.settings.proseEdits);
     setJustDiscussing(edited.settings.justDiscussing);
-    setTurnChoice(edited.settings.choice);
     setQueued(undefined);
     inputRef.current?.focus();
   };
@@ -779,6 +802,11 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
               {waitingPlans.map(proposal => (
                 <TranscriptPlanCard key={proposal.id} novelId={novelId} proposalId={proposal.id} nextChapter={nextChapter} actions={actions} />
               ))}
+              {writing && (
+                <div className={styles.indented}>
+                  <JobProgress view={writingView(writing)} stream="live" cancelling={generation.stopping} onCancel={generation.stop} />
+                </div>
+              )}
               {planStartOpen && (
                 <div ref={planStartBar} className={`${styles.indented} ${styles.planStartBar}`}>
                   <Button size="sm" variant="ghost" prefix={<CloseIcon size={14} />} onClick={() => setPlanStartOpen(false)}>
@@ -803,11 +831,6 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
                 </Button>
               </div>
             )}
-              {writing && (
-                <div className={styles.indented}>
-                  <JobProgress view={writingView(writing)} stream="live" cancelling={generation.stopping} onCancel={generation.stop} />
-                </div>
-              )}
           </div>
 
           {view.kind === 'centred' && (
@@ -832,7 +855,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
             chips={chips}
             onChip={onChip}
             modeMenu={<ComposerModeMenu value={composerModeOf(shownMode, justDiscussing)} onChange={changeMode} disabled={locked || pending || switching} />}
-            modelMenu={<ChatModelMenu novelId={novelId} session={session} disabled={locked} turn={{ choice: turnChoice, onChange: setTurnChoice }} />}
+            modelMenu={<ChatModelMenu novelId={novelId} session={session} disabled={locked} turn={{ choice: turnChoice, onChange: chooseModel }} />}
             justDiscussing={justDiscussing}
             proseEdits={proseEdits}
             onProseEditsChange={setProseEdits}
