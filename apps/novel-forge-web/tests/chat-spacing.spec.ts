@@ -13,7 +13,7 @@ import {
 } from '../src/lib/sidebar-rail';
 
 const SPACING =
-  /^(padding|padding-top|padding-bottom|padding-block|padding-inline|margin|margin-top|margin-left|gap|border-radius|width|height|max-width|min-height|grid-template-columns)$/;
+  /^(padding|padding-top|padding-bottom|padding-block|padding-inline|margin|margin-inline|margin-top|margin-left|gap|border-radius|width|height|max-width|min-height|grid-template-columns)$/;
 
 type Rules = Map<string, Record<string, string>>;
 
@@ -65,9 +65,9 @@ const CHAT: Expected[] = [
   { selector: '.column', values: { 'min-height': '0' }, baseline: '.column', source: 'chat.module.css .column' },
   {
     selector: '.head',
-    values: { height: '52px', gap: '10px', 'padding-inline': 'var(--nf-page-pad-inline)' },
+    values: { height: '52px', gap: '10px' },
     source:
-      'chat.module.css .head height 52, gap 10; 2026-10-03 redesign after Claude and ChatGPT: a 768 reading column, the shell gutter (--nf-page-pad-inline) at the pane edges — the header spans the pane, title left and actions right, with no rule under it',
+      'chat.module.css .head height 52, gap 10; 2026-10-03 redesign after Claude and ChatGPT: the header carries no rule under it, and its row sits in the pages’ column (.headInner)',
   },
   {
     selector: '.headTitleButton',
@@ -77,8 +77,9 @@ const CHAT: Expected[] = [
   },
   {
     selector: '.headInner',
-    values: { gap: '10px' },
-    source: 'keeps .head’s own gap 10; uncapped, so the header spans the pane as Claude’s and ChatGPT’s do',
+    values: { 'max-width': 'var(--sh-page-max)', 'margin-inline': 'auto', 'padding-inline': 'var(--nf-page-pad-inline)', gap: '10px' },
+    source:
+      'the other pages’ column (.nf-page in styles.css: --sh-page-max, centred, the shell gutter inside), so the title and actions line up with every page; keeps .head’s gap 10',
   },
   { selector: '.headActions', values: { gap: '8px', 'margin-left': 'auto' }, source: 'Main l.76 header buttons gap 8, margin-left auto' },
   { selector: '.body', values: { 'min-height': '0' }, baseline: '.body', source: 'chat.module.css .body' },
@@ -456,12 +457,12 @@ describe('Chat width arithmetic', () => {
     expect(docks(1280, SIDEBAR_WIDTH)).toBe(false);
   });
 
-  it('should let the chat screen fill the pane, span the header across it and cap the thread, hero and composer to one column', () => {
+  it('should let the chat screen fill the pane, set the header in the pages’ column and cap the thread, hero and composer to one column', () => {
     const route = readFileSync(new URL('../src/routes/novels/$novelId/chat.module.css', import.meta.url), 'utf-8');
     const screen = /\n\.screen \{([^}]*)\}/.exec(route)?.[1] ?? '';
     expect(screen).toContain('inset: 0');
     expect(screen).not.toMatch(/max-width|margin/);
-    expect(base.get('.headInner')?.['max-width']).toBeUndefined();
+    expect(base.get('.headInner')?.['max-width']).toBe('var(--sh-page-max)');
     expect(base.get('.composerStack')?.['max-width']).toBe(base.get('.msgList')?.['max-width']);
     expect(base.get('.hero')?.['max-width']).toBe(base.get('.msgList')?.['max-width']);
   });
