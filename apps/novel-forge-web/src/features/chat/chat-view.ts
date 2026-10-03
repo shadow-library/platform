@@ -663,6 +663,14 @@ export function unusedParagraphPrompt({ number, text }: UnusedParagraph): string
   return text ? `Add this from my notes (¶${number}) to the Story Bible: ${text}` : `Add ¶${number} of my notes to the Story Bible.`;
 }
 
-export function firstUserMessageId(messages: readonly Pick<ChatMessageResponse, 'id' | 'role'>[]): string | undefined {
-  return messages.find(message => message.role === 'user')?.id;
+// Every opener that handed the notes over, current and past: the start dialog's and the chip's.
+const NOTES_OPENER_LEADS = ['Here are my notes for the story.', 'Organise my notes'];
+
+/**
+ * The message that handed the author's notes to the chat, so it can carry them: the chat's opening message, and only when it is one of the
+ * notes openers. Any other chat reaches the notes through its lookups, never with a message.
+ */
+export function notesOpenerId(messages: readonly Pick<ChatMessageResponse, 'id' | 'role' | 'content'>[]): string | undefined {
+  const opening = messages.find(message => message.role === 'user');
+  return opening && NOTES_OPENER_LEADS.some(lead => opening.content.trimStart().startsWith(lead)) ? opening.id : undefined;
 }

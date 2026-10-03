@@ -22,6 +22,7 @@ import {
   jobView,
   lastUserOrdinal,
   mergeUndoImpacts,
+  notesOpenerId,
   offersNotes,
   opCardTitle,
   openerChip,
@@ -478,6 +479,20 @@ describe('turnAnnouncement', () => {
     expect(turnAnnouncement({ applied: 2, suggested: 1, failed: false })).toBe('Forge replied. 2 changes added from your words. 1 suggestion waits for you.');
     expect(turnAnnouncement({ applied: 0, suggested: 0, failed: false })).toBe('Forge replied.');
     expect(turnAnnouncement({ applied: 0, suggested: 0, failed: true })).toBe('Forge couldn’t finish that reply.');
+  });
+});
+
+describe('notesOpenerId', () => {
+  const user = (id: string, content: string) => ({ id, role: 'user', content });
+
+  it('should carry the notes on a chat that opened by handing them over, under any opener past or present', () => {
+    expect(notesOpenerId([user('m1', 'Here are my notes for the story. Organise them into my Story Bible as the world stands when the story opens.')])).toBe('m1');
+    expect(notesOpenerId([user('m1', 'Organise my notes and ask me about the rest')])).toBe('m1');
+  });
+
+  it('should never carry them on a chat that opened with anything else, even when a later message mentions the notes', () => {
+    expect(notesOpenerId([user('m1', 'Give me a few ideas for chapter 1, from where the story stands.'), user('m3', 'Organise my notes')])).toBeUndefined();
+    expect(notesOpenerId([])).toBeUndefined();
   });
 });
 

@@ -57,11 +57,11 @@ import {
   composerModeChange,
   composerModeOf,
   entryNotes,
-  firstUserMessageId,
   heroText,
   jobKindForOp,
   jobView,
   lastUserOrdinal,
+  notesOpenerId,
   offersNotes,
   openerChip,
   organiseReceiptView,
@@ -209,7 +209,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
   const view = chatColumnView({ messageCount: messages.length, loading: messagesQuery.isLoading, active: pending || showStream || planStartOpen });
   const locked = session ? session.status !== 'active' : starting;
   const busy = pending || locked;
-  const firstUserId = firstUserMessageId(messages);
+  const notesOpener = notesOpenerId(messages);
   const answeredUpTo = lastUserOrdinal(messages);
   const defaults = turnChoiceDefaults(session, { contentMode: project?.contentMode ?? 'standard', costTier: project?.costTier ?? 'balanced' });
 
@@ -685,7 +685,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
                   <div key={m.id} className={styles.userRow}>
                     <div className={styles.userCol}>
                       <div className={styles.userBubble}>{m.content}</div>
-                      {m.id === firstUserId && notes?.trim() && <NotesChip notes={notes} />}
+                      {m.id === notesOpener && notes?.trim() && <NotesChip notes={notes} />}
                       {session && offersNotes(m) && <SaveAsNotesOffer novelId={novelId} sessionId={session.id} messageId={m.id} />}
                       <time className={styles.userTime} dateTime={m.createdAt} title={new Date(m.createdAt).toLocaleString()}>
                         {messageTime(m.createdAt)}
