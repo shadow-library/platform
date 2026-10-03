@@ -2,6 +2,8 @@ import { DynamicStructuredTool } from '@langchain/core/tools';
 import { z } from 'zod';
 import { Injectable } from '@shadow-library/app';
 
+import { type WebMode } from '../web';
+import { fetchPageTool } from './tools/fetch-page.tool';
 import { getBibleDocumentTool } from './tools/get-bible-document.tool';
 import { getBriefTool } from './tools/get-brief.tool';
 import { getCanonFactsTool } from './tools/get-canon-facts.tool';
@@ -17,6 +19,7 @@ import { getVolumeTool } from './tools/get-volume.tool';
 import { getWorldFactsTool } from './tools/get-world-facts.tool';
 import { searchLoreTool } from './tools/search-lore.tool';
 import { searchProseTool } from './tools/search-prose.tool';
+import { searchWebTool } from './tools/search-web.tool';
 import { type RegisteredTool, type ToolContext } from './types';
 
 const ALL_TOOLS: RegisteredTool[] = [
@@ -37,15 +40,19 @@ const ALL_TOOLS: RegisteredTool[] = [
   getReviewTool,
 ];
 
-export function toolsForNode(nodeName: string): RegisteredTool[] {
-  return ALL_TOOLS.filter(t => t.allowedNodes.includes(nodeName));
+// Offered only on a turn that reaches the web through Brave: a model the gateway runs with its own web search uses that instead.
+const WEB_TOOLS: RegisteredTool[] = [searchWebTool, fetchPageTool];
+
+export function toolsForNode(nodeName: string, web: WebMode = 'off'): RegisteredTool[] {
+  const tools = web === 'brave' ? [...ALL_TOOLS, ...WEB_TOOLS] : ALL_TOOLS;
+  return tools.filter(t => t.allowedNodes.includes(nodeName));
 }
 
 @Injectable()
 export class ToolRegistryService {
   // The ctx is captured in each tool's func closure.
   forNode(nodeName: string, ctx: ToolContext): DynamicStructuredTool[] {
-    return ALL_TOOLS.filter(t => t.allowedNodes.includes(nodeName)).map(
+    return toolsForNode(nodeName).map(
       rawTool =>
         new DynamicStructuredTool({
           description: rawTool.description,
@@ -63,7 +70,7 @@ export class ToolRegistryService {
     );
   }
 
-  getRaw(nodeName: string): RegisteredTool[] {
-    return toolsForNode(nodeName);
+  getRaw(nodeName: string, web: WebMode = 'off'): RegisteredTool[] {
+    return toolsForNode(nodeName, web);
   }
 }

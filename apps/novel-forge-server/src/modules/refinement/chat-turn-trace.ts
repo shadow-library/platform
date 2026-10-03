@@ -20,6 +20,7 @@ const ARG_KINDS: Record<TraceArgKey, 'text' | 'count'> = {
   volumeKey: 'text',
   category: 'text',
   query: 'text',
+  url: 'text',
 };
 
 /** Mirrors the keys the web's `lookupLabel` reads per tool, so a reloaded turn names its sources as the live one did. */
@@ -37,6 +38,8 @@ const TRACE_ARGS: Record<string, readonly TraceArgKey[]> = {
   get_world_facts: ['category'],
   search_lore: ['query'],
   search_prose: ['query'],
+  search_web: ['query'],
+  fetch_page: ['url'],
 };
 
 // The web cuts a query at the same length and appends the same ellipsis, so a clipped query labels exactly as the unclipped one did live.

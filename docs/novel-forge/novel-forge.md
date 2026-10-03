@@ -77,6 +77,13 @@
 - Detail comes through declared lookups (never native tool binding): Story Bible pages, entities, canon facts, threads and promises, chapter summaries, a plan, a draft, a
   character timeline, a volume, lore and prose search, the author's notes, usage and a chapter's reviews. A turn that reads the notes or a planner-only page holds for review
   every change the chapter writer or a reader can see; only planner-side records (milestones) still apply (see the write policy).
+- **Web research** needs no switch. Each turn asks the AI gateway whether it runs the turn's model on a CLI with its own web search; if so the chat call asks
+  for it, and otherwise the chat gets two more lookups through Brave Search (titles, URLs and snippets, and a page read as plain text), or no web at all
+  without a Brave key. It is for real-world facts and research, never the author's story. Web text reaches the model
+  marked untrusted, never justifies a change on its own and is never copied into the book; the reply names its sources. Through Brave a page may be read only if
+  this turn's search returned it or the author wrote its link, so a planted instruction cannot send the novel to an address it composed, and only from a public
+  address on a standard port, every redirect checked again — the server runs inside the cluster. A CLI's own web search carries neither guarantee; the gateway's
+  design notes (D21) record that risk.
 - **Start**: a new novel is a title (never blank; the web names an untitled one) plus notes of at most 10,000 words, created with its first chat in one transaction. The progress
   map ("Ready for chapter 1") is advice, never a gate; an item marked undecided or dismissed is recorded under a reserved Notebook topic that never reads as an author decision or
   a do-not-propose rule. An answer the author picks is written to the story field its question settles, which closes the item, and the chat moves on to the next one.
@@ -400,7 +407,7 @@
   apply MUST capture inverse ops; NEVER add an apply path that skips inverse capture.
 - Every model call MUST go through `ModelRouterService`; nodes and services NEVER build model clients, chains NEVER persist, retrieval NEVER calls a chat LLM.
 - Authoring calls (draft, revise, repair, planners, bible builder) MUST have zero tools; write tools NEVER exist. Only verification (judge, validation) and chat lookups use the
-  read-only tool registry, and `projectId` NEVER appears in a tool input schema.
+  read-only tool registry, and `projectId` NEVER appears in a tool input schema. The web lookups are chat-only, and only they reach outside the platform.
 - Nothing user-visible MAY exist only in a checkpoint; domain tables win. Node effects MUST be idempotent. Graphs MUST run to a terminal state; NEVER pause one for human review.
 - Raw model output MUST be persisted before parsing; structured calls use the repair ladder; domain-invalid output NEVER enters the database as canon.
 - Context MUST be assembled once per run, token-budgeted, tier-labelled and persisted as a pack; graph state holds the pack id, NEVER canon text. The stable segment MUST stay

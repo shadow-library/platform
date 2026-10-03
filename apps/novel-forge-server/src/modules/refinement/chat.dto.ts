@@ -205,6 +205,9 @@ export class ChatTraceArgsResponse {
 
   @Field({ optional: true })
   query?: string;
+
+  @Field({ optional: true })
+  url?: string;
 }
 
 @Schema({ description: 'One source a turn read: a lookup asked again with the same arguments is listed once, with its latest outcome.' })

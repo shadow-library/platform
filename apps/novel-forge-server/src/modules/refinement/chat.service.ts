@@ -1,9 +1,9 @@
 import { createHash } from 'node:crypto';
 
-import { AIMessage, HumanMessage } from '@langchain/core/messages';
+import { AIMessage, type BaseMessage, HumanMessage } from '@langchain/core/messages';
 import { and, asc, desc, eq, gt, inArray, isNull, lt, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
-import { Logger, OffsetPaginationResult, utils } from '@shadow-library/common';
+import { AppError, Logger, OffsetPaginationResult, utils } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
@@ -22,6 +22,7 @@ import { RetrievalService } from '../ai/retrieval';
 import { type ChatRefineOutput, type ChatTitleOutput } from '../ai/schemas';
 import { type ToolContext, ToolRegistryService } from '../ai/tools';
 import { resolveUnrestrictedRoute } from '../ai/unrestricted-route';
+import { type WebLookups, type WebMode, WebResearchService } from '../ai/web';
 import { ProjectEventService } from '../events/project-event.service';
 import { NotesStoreService } from '../notes/notes-store.service';
 import { type ForgeCallPolicy, PluginPolicyService } from '../plugins/plugin-policy.service';
@@ -68,6 +69,17 @@ interface LookupObservers {
   relay: EmitterRelay | null;
   trace: TurnTraceCollector;
   planner: { read: boolean };
+  web?: WebLookups;
+  webMode: WebMode;
+}
+
+// A web lookup's refusal says why — not configured, the engine failed, or the page is off limits — so the model can search again or answer
+// without it; every other handler failure stays the bare "lookup failed".
+const WEB_LOOKUP_REFUSALS: ReadonlySet<string> = new Set([AppErrorCode.AI_019.code, AppErrorCode.AI_020.code, AppErrorCode.AI_021.code]);
+
+function authorTexts(content: string, history: readonly BaseMessage[]): string[] {
+  const earlier = history.filter(message => message instanceof HumanMessage && typeof message.content === 'string').map(message => message.content as string);
+  return [content, ...earlier];
 }
 
 interface ChatReplyRoute {
@@ -167,6 +179,7 @@ export class ChatService {
     private readonly pluginPolicy: PluginPolicyService,
     private readonly events: ProjectEventService,
     private readonly notesStore: NotesStoreService,
+    private readonly webResearch: WebResearchService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
@@ -412,7 +425,8 @@ export class ChatService {
     const justDiscussing = options.justDiscussing === true;
     const prompt = buildChatRefinePrompt(session.scopeType, { proseEdits });
     const turnRules = renderTurnRules({ proseEdits, justDiscussing, mode: session.mode });
-    const scopeInstructions = chatScopeInstructions(this.toolRegistry.getRaw(CHAT_HUB_NODE));
+    const webMode = await this.webResearch.modeFor(route.resolved.model);
+    const scopeInstructions = chatScopeInstructions(this.toolRegistry.getRaw(CHAT_HUB_NODE, webMode), webMode);
     const promptTokens = chatPromptTokens(scopeInstructions);
     const historyTexts = history.map(message => (typeof message.content === 'string' ? message.content : JSON.stringify(message.content)));
     const requestTokens = [turnRules, content, ...historyTexts].reduce((sum, part) => sum + countTokens(part), 0);
@@ -442,7 +456,7 @@ export class ChatService {
       // Not awaited: must overlap the turn, not delay it. Its own workflow run, not this one — this
       // run may already be marked complete by the time it resolves.
       if (userMessage.ordinal === 1) this.nameSession(projectId, session, content, routed, runId);
-      const ctx = { projectId, runId, node: 'chat-turn', promptKey: prompt.key, promptVersion: prompt.version, role: 'chat' };
+      const ctx = { projectId, runId, node: 'chat-turn', promptKey: prompt.key, promptVersion: prompt.version, role: 'chat', webTools: webMode === 'native' };
       const turnHistory = [...history];
       const invoke = (): Promise<ChatRefineOutput> => {
         const input = {
@@ -464,9 +478,10 @@ export class ChatService {
       let output = await invoke();
       const lookupCallCounts = new Map<string, number>();
       const planner = { read: false };
+      const web = webMode === 'brave' ? this.webResearch.forTurn(authorTexts(content, history)) : undefined;
       for (let round = 0; round < MAX_LOOKUP_ROUNDS && (output.lookups?.length ?? 0) > 0; round++) {
         this.logger.debug('chat turn: executing declared lookups', { runId, round, lookups: output.lookups?.map(l => l.tool) });
-        const results = await this.executeLookups(projectId, runId, output.lookups ?? [], lookupCallCounts, { round, relay, trace, planner });
+        const results = await this.executeLookups(projectId, runId, output.lookups ?? [], lookupCallCounts, { round, relay, trace, planner, web, webMode });
         const exhausted = round === MAX_LOOKUP_ROUNDS - 1 ? '\n\nLookup budget exhausted — answer with what you have; do not request more lookups.' : '';
         turnHistory.push(new AIMessage(JSON.stringify({ reply: output.reply, lookups: output.lookups })), new HumanMessage(`Lookup results:\n${results}${exhausted}`));
         supersede();
@@ -546,10 +561,10 @@ export class ChatService {
     runId: string,
     lookups: { tool: string; args?: Record<string, unknown> }[],
     callCounts: Map<string, number>,
-    { round, relay, trace, planner }: LookupObservers,
+    { round, relay, trace, planner, web, webMode }: LookupObservers,
   ): Promise<string> {
-    const rawTools = this.toolRegistry.getRaw(CHAT_HUB_NODE);
-    const ctx: ToolContext = { chapter: null, db: this.db, node: CHAT_HUB_NODE, projectId, retrieval: this.retrievalService, runId };
+    const rawTools = this.toolRegistry.getRaw(CHAT_HUB_NODE, webMode);
+    const ctx: ToolContext = { chapter: null, db: this.db, node: CHAT_HUB_NODE, projectId, retrieval: this.retrievalService, runId, web };
     const blocks: string[] = [];
 
     for (const lookup of lookups) {
@@ -582,8 +597,10 @@ export class ChatService {
             auditStatus = 'ok';
             if (readsPlannerOnlyPage(lookup.tool, parsed.data)) planner.read = true;
           } catch (err) {
-            this.logger.error('lookup handler error', { err, tool: lookup.tool });
-            resultStr = 'error: lookup failed';
+            const refusal = AppError.is(err) && WEB_LOOKUP_REFUSALS.has(err.code);
+            if (refusal) this.logger.warn('web lookup refused', { tool: lookup.tool, code: err.code, reason: err.message });
+            else this.logger.error('lookup handler error', { err, tool: lookup.tool });
+            resultStr = refusal ? `error: ${err.message}` : 'error: lookup failed';
             auditStatus = 'handler_error';
           }
         }

@@ -22,6 +22,7 @@ import { IndexingService } from './retrieval/indexing.service';
 import { RetrievalService } from './retrieval/retrieval.service';
 import { TelemetryHandler } from './telemetry.handler';
 import { ToolRegistryService } from './tools/tool-registry.service';
+import { WebResearchService } from './web/web-research.service';
 import { WriterSnapshotService } from './writer-snapshot.service';
 
 @Module({
@@ -41,6 +42,7 @@ import { WriterSnapshotService } from './writer-snapshot.service';
     CatalogService,
     ContextAssembler,
     ToolRegistryService,
+    WebResearchService,
     WorkflowRunService,
     WriterSnapshotService,
   ],
@@ -57,6 +59,7 @@ import { WriterSnapshotService } from './writer-snapshot.service';
     CatalogService,
     ContextAssembler,
     ToolRegistryService,
+    WebResearchService,
     WorkflowRunService,
     WriterSnapshotService,
   ],

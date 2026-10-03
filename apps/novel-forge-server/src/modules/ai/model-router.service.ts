@@ -39,6 +39,12 @@ import { parseSchema, renderSchemaIssues, type SchemaIssue, type SchemaParseResu
 import { type TelemetryContext, TelemetryHandler } from './telemetry.handler';
 import { modelCallFailed, ModelCallTimeoutError } from './transient-model-error';
 
+/**
+ * Asks the AI gateway to give the model its own web search for this request. The gateway honours it only where it runs the model on a CLI
+ * that has one; anywhere else the call goes out exactly as without it.
+ */
+export const GATEWAY_WEB_TOOLS_HEADER = 'x-gateway-web-tools';
+
 export type ProjectConfig = OwnerFields & {
   contentMode?: string;
   costTier?: Project.CostTier | null;
@@ -362,7 +368,10 @@ export class ModelRouterService {
   // Every vendor is reached through OpenRouter's OpenAI-compatible endpoint, so one client covers them
   // all; `ai.openrouter.api.url` redirects the leg at an in-cluster gateway speaking the same wire
   // protocol. The registry's one `ollama` entry is the embedder, which never reaches a chat client.
-  buildClient(resolved: ResolvedModel, opts?: { role?: AiRole; telemetry?: TelemetryConfig; guard?: RequestGuard; responseSchema?: ResponseSchema }): BaseChatModel {
+  buildClient(
+    resolved: ResolvedModel,
+    opts?: { role?: AiRole; telemetry?: TelemetryConfig; guard?: RequestGuard; responseSchema?: ResponseSchema; webTools?: boolean },
+  ): BaseChatModel {
     // Fail-closed backstop: the sink never dispatches a model absent from the registry. An id that is
     // present but explicitly paired with a different provider is left alone — that precedence is by
     // design (see resolveProvider) and must not silently route to the platform's OpenRouter key.
@@ -393,7 +402,7 @@ export class ModelRouterService {
         model: override || resolved.model,
         apiKey,
         maxRetries: 0,
-        configuration: { baseURL: Config.get('ai.openrouter.api.url') },
+        configuration: { baseURL: Config.get('ai.openrouter.api.url'), ...(opts?.webTools ? { defaultHeaders: { [GATEWAY_WEB_TOOLS_HEADER]: 'on' } } : {}) },
         __includeRawResponse: true,
         ...(Object.keys(modelKwargs).length > 0 ? { modelKwargs } : {}),
         ...opts?.telemetry,
@@ -470,7 +479,7 @@ export class ModelRouterService {
     if (image !== undefined && !MODEL_MAP[resolved.model]?.supportsImageInput) throw AppErrorCode.AI_011.create({ model: resolved.model });
     await this.refuseHardLine(route, [...inputScreens(input), ...pluginScreens(policy)], ctx);
     const responseSchema = this.responseSchemaFor(promptModule);
-    const llm = this.buildClient(resolved, { role, guard: this.hardLineGuard(route), ...(responseSchema ? { responseSchema } : {}) });
+    const llm = this.buildClient(resolved, { role, guard: this.hardLineGuard(route), webTools: ctx.webTools === true, ...(responseSchema ? { responseSchema } : {}) });
     const messages = await this.buildMessages(promptModule, input, resolved, policy, image);
     if (ctx.onMessages) {
       try {

@@ -73,6 +73,7 @@ export namespace Refinement {
     volumeKey?: string;
     category?: string;
     query?: string;
+    url?: string;
   }
 
   export interface ChatTraceSource {

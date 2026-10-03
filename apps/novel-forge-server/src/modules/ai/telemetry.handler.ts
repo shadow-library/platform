@@ -24,6 +24,8 @@ export interface TelemetryContext {
   role: string;
   /** The chapter this call was made on behalf of, for calls scoped to exactly one. */
   chapter?: number;
+  /** Asks the AI gateway to run this call with the model's own web search, where it serves the model on a CLI that has one. */
+  webTools?: boolean;
   /**
    * Fired once, synchronously, with the exact messages `buildMessages` produced for this call and the provider/model it
    * resolved to — before the request is sent. Only a writer-attempt call site sets it, to snapshot what the router received

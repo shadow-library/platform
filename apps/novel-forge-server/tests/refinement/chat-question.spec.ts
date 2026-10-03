@@ -124,6 +124,7 @@ function chat(output: unknown) {
     { resolve: async () => ({ writerClass: 'standard', raised: false, systemMessages: [] }) } as never,
     { publish: () => undefined } as never,
     { read: async () => ({ text: '' }) } as never,
+    { modeFor: async () => 'off' } as never,
   );
   return { service, inserts, updates };
 }

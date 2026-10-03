@@ -179,6 +179,15 @@ describe('ModelRouterService.buildClient', () => {
     setConfig('ai.openrouter.api.url', 'https://openrouter.ai/api/v1');
   });
 
+  it('should ask the gateway for its own web tools only when told to', () => {
+    const headers = (webTools?: boolean) =>
+      (router.buildClient({ provider: 'openrouter', model: 'anthropic/claude-sonnet-5' }, { webTools }) as ChatOpenAI).clientConfig.defaultHeaders;
+
+    expect(headers(true)).toEqual({ 'x-gateway-web-tools': 'on' });
+    expect(headers(false)).toBeUndefined();
+    expect(headers()).toBeUndefined();
+  });
+
   it('should leave retries to the router by building the openrouter client with none of its own', () => {
     const client = router.buildClient({ provider: 'openrouter', model: 'x-ai/grok-4.6' }) as unknown as { caller: { maxRetries: number } };
     expect(client.caller.maxRetries).toBe(0);

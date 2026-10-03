@@ -59,6 +59,7 @@ function chat() {
     { resolve: async () => ({ writerClass: 'permissive', raised: false, systemMessages: [] }) } as never,
     { publish: () => undefined } as never,
     { read: async () => ({ text: '' }) } as never,
+    { modeFor: async () => 'off' } as never,
   );
   return { service, inserts, turns };
 }

@@ -154,6 +154,10 @@ export class AppErrorCode extends ServerErrorCode {
     500,
   );
   static readonly AI_018 = new AppErrorCode('AI_018', 'AI usage could not be checked against the quota, so the model call was refused — try again shortly', 503);
+  // The web lookups' refusals: the chat model reads their message as the lookup's result, so each says what to do instead.
+  static readonly AI_019 = new AppErrorCode('AI_019', 'Web search is not configured — set AI_WEB_SEARCH_BRAVE_API_KEY', 500);
+  static readonly AI_020 = new AppErrorCode('AI_020', 'Web search failed: {reason}', 502);
+  static readonly AI_021 = AppErrorCode.badRequest('AI_021', 'That page was not fetched: {reason}');
 
   /*!
    * Illustration Errors

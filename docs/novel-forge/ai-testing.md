@@ -1555,7 +1555,7 @@ Ordinary hub turns run `chat-refine@2.13.0`, role `chat` (planning-group model),
   - The final `changeSet` is a `volume.upsert` carrying only `volumeKey` plus the changed field(s) (`objective`, maybe `body`). Re-emitting an unchanged `title` or `ordinal` is a violation of the prompt's partial-update rule.
   - **Invariant, checked by hand.** The whole-record-overwrite rule is prompt-only; no code enforces it (`chat.service.ts` has no check). So verify that for every `volume.upsert`, `bible_document.upsert`, `brief.update` or `draft.update` in a change-set, a matching `get_*` row exists in the same run's `tool_calls`.
   - A turn never contains both `lookups` and `changeSet` (`postValidate`, `chat-refine.prompt.ts`).
-  - **Budget:** at most 3 lookup rounds (`MAX_LOOKUP_ROUNDS`). Per-tool caps: `get_draft` 2, `get_brief` 8, `get_volume`/`get_bible_document`/`search_lore` 10, `get_entity` 15, others 5-8. Over budget writes `tool_calls.status='budget_exceeded'`. Exhausting rounds forces a reply with no lookups. It is silent; error code `CHT_004` exists but is never thrown.
+  - **Budget:** at most 3 lookup rounds (`MAX_LOOKUP_ROUNDS`). Per-tool caps: `get_draft` 2, `fetch_page` 3, `search_web` 5, `get_brief` 8, `get_volume`/`get_bible_document`/`search_lore` 10, `get_entity` 15, others 5-8. Over budget writes `tool_calls.status='budget_exceeded'`. Exhausting rounds forces a reply with no lookups. It is silent; error code `CHT_004` exists but is never thrown.
   - **Quality:** the new goal is coherent with the Ledger and Archive facts from 1.1, and the reply says WHY in web-novel terms (hook, escalation).
 - **Fails when:**
   - `tool_calls.status='invalid_args'`: the model used a wrong arg name.

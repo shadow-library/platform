@@ -17,3 +17,4 @@ export * from './retrieval';
 export * from './telemetry.handler';
 export * from './tools';
 export * from './unrestricted-route';
+export * from './web';
