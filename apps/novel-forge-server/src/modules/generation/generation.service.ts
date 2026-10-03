@@ -116,11 +116,6 @@ export interface RunContextPackSummary {
 
 export type ApprovedDraft = Generation.Draft & { overriddenFindings: number };
 
-export interface ReviewQueueResult {
-  drafts: Generation.Draft[];
-  proposals: Generation.ContinuityProposal[];
-}
-
 function toRunUsageResponse(totals: CallUsageTotals, run: { startedAt: Date; endedAt: Date | null } | null): RunUsageResponse {
   return {
     calls: totals.calls,
@@ -975,7 +970,7 @@ export class GenerationService {
   /**
    * Folds the canon a (usually hand-authored) chapter establishes back into the story bible. Runs the
    * chapter-extract prompt to derive a change-set of entity/bible ops, then stages it as a normal
-   * refinement proposal so the author reviews it on the Proposals page alongside every other canon edit
+   * refinement proposal so the author reviews it in the chat alongside every other canon edit
    * — rather than the parallel continuity-proposal path. Throws DRF_005 when the chapter adds nothing new. An isolated chapter is read on
    * the unrestricted route and its excerpts are withheld from what is staged.
    */
@@ -1083,20 +1078,6 @@ export class GenerationService {
   async validate(projectId: bigint): Promise<WorkflowRunResult> {
     this.logger.info('validate: running full-novel validation', { projectId });
     return this.workflowRunService.runNovelValidation({ projectId });
-  }
-
-  async getReviewQueue(projectId: bigint): Promise<ReviewQueueResult> {
-    const [drafts, proposals] = await Promise.all([
-      this.db.query.drafts.findMany({
-        where: and(eq(schema.drafts.projectId, projectId), inArray(schema.drafts.reviewStatus, ['needs_review', 'contradiction'])),
-        orderBy: asc(schema.drafts.chapter),
-      }),
-      this.db.query.continuityProposals.findMany({
-        where: and(eq(schema.continuityProposals.projectId, projectId), eq(schema.continuityProposals.status, 'pending')),
-        orderBy: asc(schema.continuityProposals.chapter),
-      }),
-    ]);
-    return { drafts, proposals };
   }
 
   async listRuns(projectId: bigint, query: ListRunsQuery): Promise<ListWorkflowRunResponse> {

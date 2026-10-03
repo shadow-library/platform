@@ -284,3 +284,15 @@ export function visibleForm(form: OpenFindingForm | undefined, list: ListChapter
   const finding = review && !review.stale ? review.findings.find(item => item.id === form.findingId) : undefined;
   return finding && findingState(finding) === 'open' ? form : undefined;
 }
+
+// `[info]` lines are the measurements the author reads in the judge note, not findings for the reviser to act on.
+export function buildRepairNote(judgeNote: string | null | undefined): string {
+  const findings = (judgeNote ?? '')
+    .split('\n')
+    .filter(line => !line.trimStart().startsWith('[info]'))
+    .join('\n')
+    .trim();
+  return findings
+    ? `Resolve the following continuity findings without changing anything else:\n${findings}`
+    : 'Resolve the continuity contradiction the judge flagged for this chapter.';
+}

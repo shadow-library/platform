@@ -1428,15 +1428,6 @@ export class ChapterReviewResponse {
 }
 
 @Schema()
-export class ReviewQueueResponse {
-  @Field(() => [DraftResponse])
-  drafts: DraftResponse[];
-
-  @Field(() => [ContinuityProposalResponse])
-  proposals: ContinuityProposalResponse[];
-}
-
-@Schema()
 export class ListWorkflowRunResponse extends Paginated(WorkflowRunListItemResponse) {}
 
 @Schema()

@@ -3,8 +3,7 @@ import { Button, ConfirmDialog, toast } from '@shadow-library/ui';
 
 import { StatusChip } from '@/components/nf';
 import { type ContinuityProposalResponse, useApplyContinuityProposalMutation, useDiscardContinuityProposalMutation } from '@/lib/apis';
-import { continuityHighlights } from '@/lib/continuity-proposal';
-import { continuityCaption, continuityHasHeldEntries } from '@/lib/review-queue';
+import { continuityCaption, continuityHasHeldEntries, continuityHighlights } from '@/lib/continuity-proposal';
 
 import styles from './Chat.module.css';
 

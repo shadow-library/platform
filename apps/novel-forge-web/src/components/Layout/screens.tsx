@@ -2,7 +2,7 @@ import { type ReactNode } from 'react';
 
 import { type ProjectKind } from '@/lib/apis';
 
-import { BookIcon, ChatIcon, EditIcon, ImageIcon, OverviewIcon, ReviewIcon, RunsIcon, SendIcon, SettingsIcon, UsageIcon } from '../icons';
+import { BookIcon, ChatIcon, EditIcon, ImageIcon, OverviewIcon, RunsIcon, SendIcon, SettingsIcon, UsageIcon } from '../icons';
 import { type ProjectRoute } from './routes';
 
 export interface ProjectScreen {
@@ -29,7 +29,6 @@ export const PROJECT_SCREENS: ProjectScreen[] = [
   { segment: 'overview', to: '/novels/$novelId/overview', label: 'Overview', icon: <OverviewIcon /> },
   { segment: 'story-bible', to: '/novels/$novelId/story-bible', label: 'Story Bible', icon: <BookIcon /> },
   { segment: 'chapters', to: '/novels/$novelId/chapters', label: 'Chapters', icon: <EditIcon /> },
-  { segment: 'review', to: '/novels/$novelId/review', label: 'Review Queue', icon: <ReviewIcon /> },
   { segment: 'illustrations', to: '/novels/$novelId/illustrations', label: 'Illustrations', icon: <ImageIcon /> },
   { segment: 'runs', to: '/novels/$novelId/runs', label: 'Workflow Runs', icon: <RunsIcon />, adminOnly: true },
   { segment: 'publish', to: '/novels/$novelId/publish', label: 'Publish', icon: <SendIcon /> },
@@ -66,8 +65,8 @@ export function projectHomeRoute(kind: ProjectKind): ProjectRoute {
   return PROJECT_HOME[kind];
 }
 
-/** Screens removed with the other project kinds and the Blueprint; an old link to one opens the project's home. */
-const RETIRED_SEGMENTS = new Set(['blueprint', 'volumes', 'import-plan', 'transform', 'translation', 'rebrand', 'reforge', 'source']);
+/** Screens that no longer exist; an old link to one opens the project's home. */
+const RETIRED_SEGMENTS = new Set(['blueprint', 'volumes', 'import-plan', 'transform', 'translation', 'rebrand', 'reforge', 'source', 'review', 'proposals']);
 
 export function isRetiredScreen(splat: string | undefined): boolean {
   const segment = splat?.split('/').find(Boolean);

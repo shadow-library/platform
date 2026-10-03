@@ -368,10 +368,11 @@ project, stores the notes verbatim and opens an auto-mode chat; the response is 
 queues the opening message into that chat. The Part 6 recipes start here. Continuing an existing manuscript is the
 separate **Import novel** screen (Part 4). Screens are declared once in
 `apps/novel-forge-web/src/components/Layout/screens.tsx` (`PROJECT_SCREENS`), and the visible labels are **Chat**,
-**Overview**, **Story Bible**, **Chapters**, **Review Queue**, **Illustrations**, **Workflow Runs** (admin-only,
+**Overview**, **Story Bible**, **Chapters**, **Illustrations**, **Workflow Runs** (admin-only,
 `adminOnly: true`), **Publish**, **Usage & charges**, **Project Settings**. Old links to retired screens
-(`isRetiredScreen`) open the project's home. There is no standalone volumes screen and no standalone **Proposals**
-screen: continuity and refinement proposals are both a view inside **Review Queue** (`review.tsx`).
+(`isRetiredScreen`) open the project's home. There is no standalone volumes screen, no standalone **Proposals**
+screen and no review screen: every pending draft, finalize decision, continuity addition and proposal is a card in the chat, and the
+**Waiting on you** tray above the composer lists them all.
 
 **Content without AI:** `POST /api/v1/import` takes a hand-written `novel-import` bundle; a minimal valid one is
 built by `buildFinalBundle` at `e2e/tests/novel-forge/forge-helpers.ts:110`. Useful when you need chapters to
@@ -735,7 +736,7 @@ Everything below is read off current code in `apps/novel-forge-server` / `apps/n
 - **Preconditions:** `status='active'`. Falls back to `projects.brief` then `projects.premise` when `overview` is
   omitted; when supplied, `overview` must be 10–200,000 characters.
 - **Input:** `{"overview": "<the sample spark above>"}`
-- **Run:** 1. POST. 2. Read the `rationale` fields. 3. Open **Review Queue**'s Proposals view (`/novels/$novelId/review?view=proposals`), review, apply.
+- **Run:** 1. POST. 2. Read the `rationale` fields. 3. Open the chat (`/novels/$novelId/chat`); the proposal is a card there, listed in the **Waiting on you** tray. Review it, apply.
 - **Verify:** run `graph='premise-enhance'`, `target='premise'`, prompt `premise-enhance@1.2.0`, role `premise`;
   context pack `purpose='premise'` (project premise + a 1-line-per-doc inventory). The response's `rationale` object
   carries `enhancedPremise, hook, stakes, protagonistDrive, progressionSystem, serializationNotes, genre, themes`, and
@@ -807,7 +808,7 @@ Everything below is read off current code in `apps/novel-forge-server` / `apps/n
 - **Preconditions:** `status='active'`. Most informative right after the builder, and again after you hand-delete an
   entity to prove the auditor notices.
 - **Input:** none (empty POST).
-- **Run:** 1. POST. 2. Read `findings[]`. 3. If a proposal came back, review it in **Review Queue**'s Proposals view and apply.
+- **Run:** 1. POST. 2. Read `findings[]`. 3. If a proposal came back, open its card from the chat's **Waiting on you** tray, review it and apply.
 - **Verify:** run `graph='bible-audit'`, `target='bible'`, prompt `bible-audit@2.2.0`, role `audit`; context pack `purpose='audit'`
   (premise + first 5 lines of each doc), plus the rendered doc inventory, entity inventory and `renderManifest()`.
   Findings are keyed `doc:<section>/<slug>` or `entity:<entityKey>` with `action` ∈ `add|revise|remove|keep`.
@@ -827,7 +828,7 @@ Everything below is read off current code in `apps/novel-forge-server` / `apps/n
 #### Bible / entity / canon-fact refinement — proposal-only writes
 
 - **Entry:** applying anything from this path: `POST /api/v1/projects/{projectId}/proposals/{proposalId}/apply`
-  (revert: `/revert`, discard: `/discard`; list: **Review Queue**'s Proposals view). Conversational refinement of an individual
+  (revert: `/revert`, discard: `/discard`; list: `GET /projects/:projectId/proposals?status=pending`, shown as cards in the chat's **Waiting on you** tray). Conversational refinement of an individual
   document or entity is the **refinement chat hub** (`/novels/$novelId/chat`) — covered in
   Part 5 (chat hub and admin).
 - **Preconditions:** a pending proposal from premise-enhance, bible-audit, or a chat turn.
@@ -1091,11 +1092,11 @@ mechanicalCheck → judge → …`; a patch whose `find` anchor is not unique fa
 
 #### Revise from feedback
 
-- **Entry:** **Review Queue** → chapter → `R` (revise); `POST /projects/:projectId/drafts/:n/revise`.
+- **Entry:** chat → the chapter's draft card → **Ask for changes** (composer opens with `Revise chapter N:` and Edit prose on); `POST /projects/:projectId/drafts/:n/revise`.
 - **Preconditions:** draft exists and `status != 'final'` (else `DRF_002`).
 - **Input:** `{"note":"The withdrawal scene is summarized, not dramatized. Put Amara's hands on the ledger,
 show the clerk's tell, and cut the two paragraphs of Quay history."}`
-- **Run:** 1. **Review Queue** → pick the chapter. 2. Press `R`, paste the note, submit. 3. Toast `Chapter N revised — re-review the new draft`.
+- **Run:** 1. Chat → the chapter's draft card → **Ask for changes**. 2. Append the note to the composer text and send. 3. The turn proposes `action.revise_draft`; the revised draft reappears as a draft card.
 - **Verify:** `user_feedback` row `artifact_type='draft'`, `disposition='revision_requested'` with the note;
   `drafts.revision` +1, `review_status` back to `needs_review`, `stale_reason=NULL`; `draft_revisions` row
   `source='revised'` linked to that `feedback_id`. `model_calls`: `revision@1.5.0`.
@@ -1111,7 +1112,7 @@ show the clerk's tell, and cut the two paragraphs of Quay history."}`
 
 #### Draft approval (and the deterministic reveal gate)
 
-- **Entry:** **Chapters** → "Approve draft", or **Review Queue** → `A`;
+- **Entry:** **Chapters** → "Approve draft", or the chat's draft card → **Approve**;
   `POST /projects/:projectId/drafts/:n/approve`.
 - **Preconditions:** draft not `final` (`DRF_002`) and not stale (`DRF_007`). The UI disables the button while
   `review_status` is `contradiction` or `generating`.
@@ -1144,7 +1145,7 @@ show the clerk's tell, and cut the two paragraphs of Quay history."}`
   no `error` for this chapter (`FIN_003`); an isolated draft needs a non-blank summary **and** a non-empty
   `state` (`CHP_005`, `common/finalize-gate.ts`).
 - **Input:** `{"chapter": 1}` — or `{}` to take the lowest `approved` draft.
-- **Run:** 1. POST. 2. `GET /projects/:projectId/runs` → the `chapter-finalization` run. 3. `GET /projects/:projectId/review-queue` → `proposals[]`.
+- **Run:** 1. POST. 2. `GET /projects/:projectId/runs` → the `chapter-finalization` run. 3. `GET /projects/:projectId/continuity-proposals` → `items[]`.
 - **Verify:** `node_trace` = `guard → commitProse → extractContinuity → applyContinuity → updateIndexes →
 advanceCursor → finish`. `chapters` row: `status='done'`, `locked=true`, `word_count`, `content` sanitized;
   `drafts.status='final'`, `review_status='final'`. `continuity_proposals` row written with
@@ -1168,16 +1169,15 @@ advanceCursor → finish`. `chapters` row: `status='done'`, `locked=true`, `word
 
 #### Continuity proposal review (low-confidence hold)
 
-- **Entry:** **Review Queue**'s Proposals view (`review.tsx`) lists continuity proposals in their own "Continuity"
-  section alongside refinement proposals under "Refinement", and can apply or discard one directly
-  (`useApplyContinuityProposalMutation` / `useDiscardContinuityProposalMutation`). **PATCH is still API only** —
+- **Entry:** the chat shows a pending continuity proposal as a card (`ContinuityProposalCard`) that can apply or discard it directly
+  (`useApplyContinuityProposalMutation` / `useDiscardContinuityProposalMutation`), and the **Waiting on you** tray lists it. **PATCH is still API only** —
   there is no UI control to edit a held entry's `confidence` before applying.
   `GET|PATCH /projects/:projectId/chapters/:n/continuity-proposal`, `…/apply`, `…/discard`.
 - **Preconditions:** a `pending` continuity proposal (finalize left one held, or run
   `POST /chapters/:n/propose-continuity` to make a fresh one).
 - **Input (PATCH):** `{"proposal": {…edited delta…}}` — the whole delta, replacing the stored one.
 - **Run:** 1. `GET` the proposal. 2. `PATCH` a `confidence` from `low` to `high` on one thread. 3. `POST …/apply`.
-- **Verify:** `GET /review-queue` lists it under `proposals`. After apply: `continuity_proposals.status`
+- **Verify:** `GET /continuity-proposals` lists it under `items`. After apply: `continuity_proposals.status`
   becomes `applied` **only when no `low` entry remains**; otherwise it stays `pending` with the proposal
   narrowed to the held entries. `chapters.continuity_applied=true` either way.
   A thread already advanced past this chapter is skipped (warn `thread already advanced past this chapter`).
@@ -1192,9 +1192,8 @@ advanceCursor → finish`. `chapters` row: `status='done'`, `locked=true`, `word
 - **Preconditions:** a draft with prose. Best tested on a **hand-written or unrestricted** chapter, whose canon
   never went through the finalization extractor.
 - **Input:** no body.
-- **Run:** 1. Open the chapter. 2. "Add to bible". 3. Toast `Canon proposal drafted — review it on the
-Proposals page` (stale copy — there is no separate Proposals page any more; it means **Review Queue**'s
-  Proposals view, `chapters.tsx:1253`). 4. **Review Queue** → Proposals → open → apply.
+- **Run:** 1. Open the chapter. 2. "Add to bible". 3. Toast `Canon proposal drafted — it is waiting on you in the
+chat`. 4. Open the chat → the **Waiting on you** tray → the proposal card → apply.
 - **Verify:** `refinement.proposals` row `kind='chapter_extract'`, `scope_type='brief'`,
   `scope_ref='chapter:N'`, `allowed_ops` = `entity.upsert, entity.remove, bible_document.upsert,
 bible_document.remove`, `model` recorded. `model_calls`: `chapter-extract@1.0.0`, `role='extraction'`.
@@ -1570,7 +1569,7 @@ Ordinary hub turns run `chat-refine@2.13.0`, role `chat` (planning-group model),
 
 #### 1.4 Per-op cherry-pick apply and baseline conflict
 
-- **Entry:** UI: in the chat, the turn card "N changes" with a checkbox per op and the "Apply N selected" and "Decline all" buttons, or **Review Queue**'s Proposals view. API `POST /proposals/:id/apply {"opIndexes":[...]}`.
+- **Entry:** UI: in the chat, the turn card "N changes" with a checkbox per op and the "Apply N selected" and "Decline all" buttons, or the same card brought in from the **Waiting on you** tray. API `POST /proposals/:id/apply {"opIndexes":[...]}`.
 - **Preconditions:** the pending 1.1 proposal (call it `$X`).
 - **Run:**
   1. `PATCH /proposals/$X {"changeSet":[<the ops>]}`: hand-edit (for example delete the `volume.upsert` op for volume 2). Ops are re-validated and the baseline is re-captured for the new refs.

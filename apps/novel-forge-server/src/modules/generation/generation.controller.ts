@@ -37,7 +37,6 @@ import {
   ListWorkflowRunResponse,
   MarkdownResponse,
   ProjectParams,
-  ReviewQueueResponse,
   ReviseDraftBody,
   RevisionParams,
   RunCallParams,
@@ -318,12 +317,6 @@ export class GenerationController {
   @RespondFor(200, WorkflowRunResponse)
   validateContinuity(@Params() params: ProjectParams): Promise<WorkflowRunResponse> {
     return this.generationService.validate(params.projectId);
-  }
-
-  @Get('/review-queue')
-  @RespondFor(200, ReviewQueueResponse)
-  getReviewQueue(@Params() params: ProjectParams): Promise<ReviewQueueResponse> {
-    return this.generationService.getReviewQueue(params.projectId);
   }
 
   @Get('/runs')

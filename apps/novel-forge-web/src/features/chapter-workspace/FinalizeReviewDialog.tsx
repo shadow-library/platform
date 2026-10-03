@@ -247,7 +247,7 @@ export function FinalizeReviewDialog({ novelId, chapter, open, onOpenChange, can
           )}
           {phase.kind === 'missing' && draft.data && !final && (
             <Alert intent="info" title="This chapter has no Story Bible review">
-              It was approved before finalize reviews existed, so it finalizes as it always did: its Story Bible updates wait in the Review Queue afterwards.
+              It was approved before finalize reviews existed, so it finalizes as it always did: its Story Bible updates wait for you in the chat afterwards.
             </Alert>
           )}
           {phase.kind === 'error' && (

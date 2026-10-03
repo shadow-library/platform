@@ -83,7 +83,7 @@ export function ForgeBar({ novelId, scope, placeholder }: { novelId: string; sco
           if (isFirstTurn) contextSentFor.current = sessionId;
           setText('');
           setLast(result);
-          if (result.proposal) toast.success('Forge staged a proposal — review it in Proposals');
+          if (result.proposal) toast.success('Forge staged a proposal — it is waiting on you in the chat');
         },
         onError: e => toast.danger(e.message),
       },

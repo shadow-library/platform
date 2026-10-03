@@ -51,13 +51,6 @@ export const EditIcon = (p: IconProps): React.JSX.Element => (
   </SvgIcon>
 );
 
-export const ReviewIcon = (p: IconProps): React.JSX.Element => (
-  <SvgIcon {...p}>
-    <path d="M9 11l3 3L22 4" />
-    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
-  </SvgIcon>
-);
-
 export const ChatIcon = (p: IconProps): React.JSX.Element => (
   <SvgIcon {...p}>
     <path d="M21 11.5a8.38 8.38 0 0 1-9 8.5 8.5 8.5 0 0 1-3.8-.9L3 20l1.9-4.2A8.38 8.38 0 0 1 4 11.5 8.5 8.5 0 0 1 12.5 3 8.38 8.38 0 0 1 21 11.5z" />

@@ -5,6 +5,7 @@ import {
   approvalMessage,
   approvalRefusal,
   blockingHold,
+  buildRepairNote,
   categoryLabel,
   dispositionView,
   findingState,
@@ -325,5 +326,20 @@ describe('visibleForm', () => {
       ),
     ).toBeUndefined();
     expect(visibleForm(form, undefined, 'judge', true)).toBeUndefined();
+  });
+});
+
+describe('buildRepairNote', () => {
+  it('should send the findings and leave the [info] measurement lines out', () => {
+    const judgeNote = '[hard] Pell uses a key the ferryman never gave her\n[info] readability: measured 1914 words\n[soft] readability: "The kitchen held its breath."';
+    expect(buildRepairNote(judgeNote)).toBe(
+      'Resolve the following continuity findings without changing anything else:\n[hard] Pell uses a key the ferryman never gave her\n[soft] readability: "The kitchen held its breath."',
+    );
+  });
+
+  it('should fall back to the generic instruction when the note holds only [info] lines or nothing', () => {
+    const generic = 'Resolve the continuity contradiction the judge flagged for this chapter.';
+    expect(buildRepairNote('[info] readability: measured 1914 words')).toBe(generic);
+    expect(buildRepairNote(null)).toBe(generic);
   });
 });

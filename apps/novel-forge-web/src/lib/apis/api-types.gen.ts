@@ -889,23 +889,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/api/v1/projects/{projectId}/review-queue': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Get Review Queue */
-    get: operations['get_api_v1_projects_projectId_review_queue'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   '/api/v1/projects/{projectId}/runs': {
     parameters: {
       query?: never;
@@ -4058,10 +4041,6 @@ export interface components {
       proposal: {
         [key: string]: unknown;
       };
-    };
-    ReviewQueueResponse: {
-      drafts: components['schemas']['DraftResponse'][];
-      proposals: components['schemas']['ContinuityProposalResponse'][];
     };
     /** @enum {string} */
     RunGraph:
@@ -9330,46 +9309,6 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['WorkflowRunResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  get_api_v1_projects_projectId_review_queue: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ReviewQueueResponse'];
         };
       };
       /** @description Default Response */
@@ -16459,7 +16398,6 @@ export type DiagnosticFactItem = components['schemas']['DiagnosticFactItem'];
 export type ContinuityProposalStatus = components['schemas']['ContinuityProposalStatus'];
 export type ListContinuityProposalResponse = components['schemas']['ListContinuityProposalResponse'];
 export type UpdateContinuityBody = components['schemas']['UpdateContinuityBody'];
-export type ReviewQueueResponse = components['schemas']['ReviewQueueResponse'];
 export type RunGraph = components['schemas']['RunGraph'];
 export type ListWorkflowRunResponse = components['schemas']['ListWorkflowRunResponse'];
 export type WorkflowRunListItemResponse = components['schemas']['WorkflowRunListItemResponse'];
@@ -16824,7 +16762,6 @@ export type GetDraftPromptPathParams = Exclude<paths['/api/v1/projects/{projectI
 export type ListContinuityProposalsQueryParams = Exclude<paths['/api/v1/projects/{projectId}/continuity-proposals']['get']['parameters']['query'], undefined>;
 export type ListContinuityProposalsPathParams = Exclude<paths['/api/v1/projects/{projectId}/continuity-proposals']['get']['parameters']['path'], undefined>;
 export type GetContinuityProposalPathParams = Exclude<paths['/api/v1/projects/{projectId}/chapters/{n}/continuity-proposal']['get']['parameters']['path'], undefined>;
-export type GetReviewQueuePathParams = Exclude<paths['/api/v1/projects/{projectId}/review-queue']['get']['parameters']['path'], undefined>;
 export type ListRunsQueryParams = Exclude<paths['/api/v1/projects/{projectId}/runs']['get']['parameters']['query'], undefined>;
 export type ListRunsPathParams = Exclude<paths['/api/v1/projects/{projectId}/runs']['get']['parameters']['path'], undefined>;
 export type GetRunPathParams = Exclude<paths['/api/v1/projects/{projectId}/runs/{runId}']['get']['parameters']['path'], undefined>;

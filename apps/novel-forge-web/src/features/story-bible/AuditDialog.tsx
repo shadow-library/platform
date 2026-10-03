@@ -154,7 +154,7 @@ export function AuditDialog({ novelId, reportId, names, docTitles, onOpenChange 
           ) : null}
         </Dialog.Body>
         <Dialog.Footer className={styles.footer}>
-          {data?.proposalId && !readOnly && <span className={styles.note}>Kept items become one proposal in the Review Queue — nothing changes until you apply it.</span>}
+          {data?.proposalId && !readOnly && <span className={styles.note}>Kept items become one proposal card in the chat — nothing changes until you apply it.</span>}
           <Dialog.Close asChild>
             <Button variant="ghost">Close</Button>
           </Dialog.Close>

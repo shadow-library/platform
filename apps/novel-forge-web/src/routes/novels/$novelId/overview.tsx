@@ -13,8 +13,10 @@ import {
   projectStatusQueryOptions,
   type ResetBody,
   useCloneProjectMutation,
+  useContinuityProposalsQuery,
   useDeleteCoverMutation,
   useDraftSummaryQuery,
+  useFinalizeReviewsQuery,
   useJobStop,
   useListBriefsQuery,
   useListJobsQuery,
@@ -24,13 +26,13 @@ import {
   useProjectQuery,
   useProjectStatusQuery,
   useResetProjectMutation,
-  useReviewQueueQuery,
   useRunStop,
   useUploadCoverMutation,
   type WorkflowRunDetailResponse,
 } from '@/lib/apis';
 import { LIFECYCLE_PHASES, lifecyclePhase, projectKindLabel, projectTitle, relativeTime } from '@/lib/format';
 import { computeNextStep, deriveNextStepInput, type NextStepTarget } from '@/lib/next-step';
+import { decisionsWaiting, NEEDS_READ } from '@/lib/pending-items';
 import { barPercent, breakdownRows, formatUsd, type UsageBarItem } from '@/lib/usage';
 
 import styles from './overview.module.css';
@@ -196,7 +198,8 @@ function OverviewScreen(): React.JSX.Element {
   const statusQuery = useProjectStatusQuery(novelId);
   const costQuery = useProjectCostQuery(novelId);
   const runsQuery = useListRunsQuery(novelId);
-  const reviewQueueQuery = useReviewQueueQuery(novelId);
+  const continuityQuery = useContinuityProposalsQuery(novelId);
+  const finalizeReviewsQuery = useFinalizeReviewsQuery(novelId);
   const proposalsQuery = useListProposalsQuery(novelId, { status: 'pending', limit: 50 });
   const briefsQuery = useListBriefsQuery(novelId);
   const draftsQuery = useDraftSummaryQuery(novelId);
@@ -229,7 +232,7 @@ function OverviewScreen(): React.JSX.Element {
 
   // Every input the rule engine reads has to have actually arrived — otherwise an empty brief/draft
   // list reads as "nothing outlined" and briefly recommends the wrong action until the real data lands.
-  const nextStepReady = !briefsQuery.isLoading && !reviewQueueQuery.isLoading && !proposalsQuery.isLoading && !draftsQuery.isLoading;
+  const nextStepReady = !briefsQuery.isLoading && !continuityQuery.isLoading && !finalizeReviewsQuery.isLoading && !proposalsQuery.isLoading && !draftsQuery.isLoading;
   const nextStep = nextStepReady
     ? computeNextStep(
         deriveNextStepInput({
@@ -238,8 +241,9 @@ function OverviewScreen(): React.JSX.Element {
           draftsFinal,
           briefs: briefsQuery.data?.items ?? [],
           draftedChapters: draftsQuery.data?.items ?? [],
-          reviewDrafts: reviewQueueQuery.data?.drafts ?? [],
-          pendingContinuityCount: reviewQueueQuery.data?.proposals.length ?? 0,
+          reviewDrafts: (draftsQuery.data?.items ?? []).filter(draft => NEEDS_READ.has(draft.reviewStatus)),
+          pendingDecisionCount: decisionsWaiting(finalizeReviewsQuery.data?.waiting ?? [], finalizeReviewsQuery.data?.settling ?? []).length,
+          pendingContinuityCount: continuityQuery.data?.items.length ?? 0,
           pendingRefinementCount: proposalsQuery.data?.items.length ?? 0,
         }),
       )
@@ -249,9 +253,6 @@ function OverviewScreen(): React.JSX.Element {
     switch (target.screen) {
       case 'chapters':
         navigate({ to: '/novels/$novelId/chapters', params: { novelId }, search: { chapter: target.chapter, review: target.review } });
-        return;
-      case 'review':
-        navigate({ to: '/novels/$novelId/review', params: { novelId } });
         return;
       case 'chat':
         navigate({ to: '/novels/$novelId/chat', params: { novelId } });

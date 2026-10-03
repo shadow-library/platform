@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { pendingItems, type PendingItemsInput, pendingKey, type PendingProposal, pendingTray } from '../src/lib/pending-items';
+import { decisionsWaiting, pendingItems, type PendingItemsInput, pendingKey, type PendingProposal, pendingTray } from '../src/lib/pending-items';
 
 const SESSION = 'session-a';
 
@@ -121,6 +121,14 @@ describe('pendingItems', () => {
 
     expect(asking?.title).toBe('Chapter 2: 2 decisions');
     expect(answered?.title).toBe('Chapter 4: ready to finalize');
+  });
+});
+
+describe('decisionsWaiting', () => {
+  it('should keep the reviews that wait on the author and drop those still reading or settling', () => {
+    const reviews = [review('reading', 3, 0, 'preparing'), review('settling', 4, 0), review('answered', 5, 0), review('open', 6), review('failed', 7, 0, 'failed')];
+
+    expect(decisionsWaiting(reviews, ['settling']).map(entry => entry.id)).toEqual(['answered', 'open', 'failed']);
   });
 });
 

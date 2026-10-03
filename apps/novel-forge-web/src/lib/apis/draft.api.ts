@@ -27,7 +27,6 @@ import {
   type ListContinuityProposalResponse,
   type ListDraftResponse,
   type ProposalResponse,
-  type ReviewQueueResponse,
   type SeedFromBriefBody,
   type UpdateDraftBody,
   type UserFeedbackResponse,
@@ -43,7 +42,6 @@ const draftKeys = {
   continuityProposals: (projectId: string, status: ContinuityProposalStatus) => [...draftKeys.all(projectId), 'continuity-proposals', status] as const,
   detail: (projectId: string, n: number) => [...draftKeys.all(projectId), n] as const,
   revisions: (projectId: string, n: number) => [...draftKeys.all(projectId), n, 'revisions'] as const,
-  reviewQueue: (projectId: string) => ['projects', projectId, 'review-queue'] as const,
 };
 
 export const listDraftsQueryOptions = (projectId: string): UseQueryOptions<ListDraftResponse, ApiError> =>
@@ -120,16 +118,6 @@ export function useDraftQuery(projectId: string, n: number | undefined, enabled 
   return useQuery({ ...draftQueryOptions(projectId, n ?? -1), enabled: enabled && Boolean(projectId) && n !== undefined });
 }
 
-export const reviewQueueQueryOptions = (projectId: string): UseQueryOptions<ReviewQueueResponse, ApiError> =>
-  queryOptions<ReviewQueueResponse, ApiError>({
-    queryKey: draftKeys.reviewQueue(projectId),
-    queryFn: () => APIRequest.get(`/projects/${projectId}/review-queue`).execute(),
-  });
-
-export function useReviewQueueQuery(projectId: string, enabled = true): UseQueryResult<ReviewQueueResponse, ApiError> {
-  return useQuery({ ...reviewQueueQueryOptions(projectId), enabled: enabled && Boolean(projectId) });
-}
-
 export const continuityProposalsQueryOptions = (projectId: string, status: ContinuityProposalStatus = 'pending'): UseQueryOptions<ListContinuityProposalResponse, ApiError> =>
   queryOptions<ListContinuityProposalResponse, ApiError>({
     queryKey: draftKeys.continuityProposals(projectId, status),
@@ -142,7 +130,6 @@ export function useContinuityProposalsQuery(projectId: string, enabled = true): 
 
 export function invalidateDraft(queryClient: ReturnType<typeof useQueryClient>, projectId: string): void {
   queryClient.invalidateQueries({ queryKey: draftKeys.all(projectId) });
-  queryClient.invalidateQueries({ queryKey: draftKeys.reviewQueue(projectId) });
 }
 
 export function useUpdateDraftMutation(projectId: string, n: number): UseMutationResult<DraftResponse, ApiError, UpdateDraftBody> {
@@ -189,7 +176,6 @@ export function useSaveDraftMutation(projectId: string, n: number): UseMutationR
     },
     onSuccess: saved => {
       queryClient.invalidateQueries({ queryKey: draftKeys.all(projectId), refetchType: 'none' });
-      queryClient.invalidateQueries({ queryKey: draftKeys.reviewQueue(projectId), refetchType: 'none' });
       queryClient.setQueryData(draftKeys.detail(projectId, n), saved);
     },
     onError: error => refetchMovedDraft(queryClient, projectId, error),
@@ -302,7 +288,7 @@ export function useApplyContinuityProposalMutation(projectId: string): UseMutati
   return useMutation<ContinuityProposalResponse, ApiError, number>({
     mutationFn: n => APIRequest.post(`/projects/${projectId}/chapters/${n}/continuity-proposal/apply`).body({}).execute(),
     // Applying writes entities, appearances, threads, mysteries, relationships and character states — every
-    // project-scoped read those feed, not just the drafts/review-queue cache, so this invalidates broadly.
+    // project-scoped read those feed, not just the drafts cache, so this invalidates broadly.
     onSuccess: () => {
       invalidateDraft(queryClient, projectId);
       queryClient.invalidateQueries({ queryKey: ['projects', projectId] });

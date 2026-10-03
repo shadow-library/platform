@@ -41,7 +41,6 @@ function draftPath(projectId: string, n: number): string {
 function storeDraft(queryClient: QueryClient, projectId: string, n: number, draft: DraftResponse): void {
   queryClient.setQueryData(draftDetailKey(projectId, n), draft);
   queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'drafts'] });
-  queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'review-queue'] });
   queryClient.invalidateQueries({ queryKey: snapshotsKey(projectId, n) });
 }
 

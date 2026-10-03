@@ -61,11 +61,6 @@ export function auditStageLabel(keptFindingsCount: number): string {
   return `Review ${keptFindingsCount} kept finding${keptFindingsCount === 1 ? '' : 's'}`;
 }
 
-/** Whether one change-set op index is on an audit card's kept selection — undecided (no report loaded yet) reads as kept. */
-export function auditOpKept(report: Pick<BibleAuditReportResponse, 'selection'> | undefined, index: number): boolean {
-  return !report || report.selection.includes(index);
-}
-
 /** The ops of an audit card its Keep and Skip answers leave out — a skipped finding's, and any no finding carries; none while the report is unknown. */
 export function auditSkippedOps(report: Pick<BibleAuditReportResponse, 'selection'> | undefined, total: number): ReadonlySet<number> {
   if (!report) return new Set();
@@ -163,7 +158,7 @@ export function findAuditReport(list: ListBibleAuditsResponse | undefined, runId
   return list?.items.find(item => item.runId === runId);
 }
 
-/** The report behind an audit's proposal card, for the Review Queue's own detail view — the list carries `proposalId`, so no extra endpoint is needed. */
+/** The report behind an audit's proposal card — the list carries `proposalId`, so no extra endpoint is needed. */
 export function findAuditReportByProposal(list: ListBibleAuditsResponse | undefined, proposalId: string): BibleAuditReportResponse | undefined {
   return list?.items.find(item => item.proposalId === proposalId);
 }

@@ -14,8 +14,7 @@ import {
   useRemedyMutation,
   useReviseDraftMutation,
 } from '@/lib/apis';
-import { type OpenFindingForm, repairSource, type ReviewJobState, versionLabel, visibleForm } from '@/lib/chapter-checks';
-import { buildRepairNote } from '@/lib/review-queue';
+import { buildRepairNote, type OpenFindingForm, repairSource, type ReviewJobState, versionLabel, visibleForm } from '@/lib/chapter-checks';
 
 import { ChecksPanel } from './ChecksPanel';
 import styles from './ChecksDrawer.module.css';

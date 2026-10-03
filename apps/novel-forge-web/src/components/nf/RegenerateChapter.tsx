@@ -25,7 +25,7 @@ export function RegenerateChapterButton({ novelId, chapter, label, variant = 'se
     regenerate.mutate(chapter, {
       onSuccess: () => {
         setConfirming(false);
-        toast.success(`Regenerating chapter ${chapter} — it lands in Review once the judge has read it`);
+        toast.success(`Regenerating chapter ${chapter} — it waits for your read in the chat once the judge has read it`);
       },
       onError: err => {
         setConfirming(false);

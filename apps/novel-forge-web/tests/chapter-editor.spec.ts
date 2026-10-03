@@ -5,6 +5,7 @@ import { DraftSaveConflict, resultOrConflict, savedDraftOrThrow } from '../src/l
 import { ApiError } from '../src/lib/apis/transport';
 import {
   canAutosave,
+  chapterTitle,
   type DraftWrite,
   type EditorAction,
   editorReducer,
@@ -56,6 +57,14 @@ describe('wordCount', () => {
 
   it('should count nothing in an empty chapter', () => {
     expect([wordCount(''), wordCount(null), wordCount('   ')]).toEqual([0, 0, 0]);
+  });
+});
+
+describe('chapterTitle', () => {
+  it('should fall back to a placeholder for a missing or blank title', () => {
+    expect(chapterTitle({ title: '  ' })).toBe('Untitled chapter');
+    expect(chapterTitle({ title: null })).toBe('Untitled chapter');
+    expect(chapterTitle({ title: 'The Ledger' })).toBe('The Ledger');
   });
 });
 

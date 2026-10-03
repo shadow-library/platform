@@ -64,6 +64,10 @@ export function wordCount(body?: string | null): number {
   return body.trim().split(/\s+/).filter(Boolean).length;
 }
 
+export function chapterTitle(draft: { title?: string | null }): string {
+  return draft.title?.trim() || 'Untitled chapter';
+}
+
 export function versionOf(draft: ServerDraft): EditorVersion {
   return { draftId: draft.id, revision: draft.revision, saveSeq: draft.saveSeq, title: draft.title ?? '', body: draft.body ?? '' };
 }

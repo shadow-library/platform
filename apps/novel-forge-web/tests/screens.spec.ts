@@ -4,18 +4,7 @@ import { isRetiredScreen, PROJECT_SCREENS, projectHomeRoute, SCREEN_LABEL, topBa
 
 describe('PROJECT_SCREENS', () => {
   it('should list the sidebar in the canvas order, chat first (Main.dc.html l.52-62)', () => {
-    expect(PROJECT_SCREENS.map(screen => screen.segment)).toEqual([
-      'chat',
-      'overview',
-      'story-bible',
-      'chapters',
-      'review',
-      'illustrations',
-      'runs',
-      'publish',
-      'usage',
-      'settings',
-    ]);
+    expect(PROJECT_SCREENS.map(screen => screen.segment)).toEqual(['chat', 'overview', 'story-bible', 'chapters', 'illustrations', 'runs', 'publish', 'usage', 'settings']);
   });
 
   it('should keep only Project Settings below the divider', () => {
@@ -35,7 +24,20 @@ describe('projectHomeRoute', () => {
 
 describe('isRetiredScreen', () => {
   it('should send the Blueprint and the other kinds’ old homes to the project home', () => {
-    for (const splat of ['blueprint', 'blueprint/premise', 'blueprint/gate', 'volumes', 'import-plan', 'transform', 'translation', 'rebrand', 'reforge', 'source']) {
+    for (const splat of [
+      'blueprint',
+      'blueprint/premise',
+      'blueprint/gate',
+      'volumes',
+      'import-plan',
+      'transform',
+      'translation',
+      'rebrand',
+      'reforge',
+      'source',
+      'review',
+      'proposals',
+    ]) {
       expect({ splat, retired: isRetiredScreen(splat) }).toEqual({ splat, retired: true });
     }
   });

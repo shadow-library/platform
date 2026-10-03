@@ -41,3 +41,22 @@ export function continuityHighlights(blob: Record<string, unknown>): ContinuityH
     return [{ label, count: entries.length, items, more: names.length - items.length }];
   });
 }
+
+const CONTINUITY_LIST_FIELDS = ['newEntities', 'threads', 'mysteries', 'timeline', 'relationships', 'power', 'characterStates', 'knowledgeChanges'] as const;
+
+const CONFIDENCE_BEARING_FIELDS = ['threads', 'mysteries', 'relationships', 'characterStates'] as const;
+
+function continuityEntryCount(blob: Record<string, unknown>): number {
+  return CONTINUITY_LIST_FIELDS.reduce((sum, key) => sum + (Array.isArray(blob[key]) ? (blob[key] as unknown[]).length : 0), 0);
+}
+
+/** A held entry is one the continuity model marked `confidence: 'low'` — applying skips it and it stays pending for a human look. */
+export function continuityHasHeldEntries(blob: Record<string, unknown>): boolean {
+  return CONFIDENCE_BEARING_FIELDS.some(key => Array.isArray(blob[key]) && (blob[key] as { confidence?: string }[]).some(entry => entry?.confidence === 'low'));
+}
+
+export function continuityCaption(blob: Record<string, unknown>): string {
+  const count = continuityEntryCount(blob);
+  const base = `${count} continuity update${count === 1 ? '' : 's'}`;
+  return continuityHasHeldEntries(blob) ? `${base} · needs a closer look` : base;
+}

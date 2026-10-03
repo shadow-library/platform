@@ -161,7 +161,7 @@ export function writeRefusalMessage(error: ApiError): string {
 
 export function appliedMessage(applied: Pick<DraftResponse, 'revision' | 'reviewStatus'>): { tone: 'success' | 'warning'; text: string } {
   if (applied.reviewStatus === 'contradiction') {
-    return { tone: 'warning', text: `Saved as version ${applied.revision} — it may give away a locked secret, so the chapter is held as a conflict. Check it in Review.` };
+    return { tone: 'warning', text: `Saved as version ${applied.revision} — it may give away a locked secret, so the chapter is held as a conflict. Check it in the chat.` };
   }
   return { tone: 'success', text: `Passage rewritten — saved as version ${applied.revision}` };
 }

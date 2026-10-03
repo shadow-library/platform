@@ -10,12 +10,10 @@ import {
   useListPluginsQuery,
   useListProposalsQuery,
 } from '@/lib/apis';
-import { type PendingItem, pendingItems, type PendingTray, pendingTray } from '@/lib/pending-items';
+import { NEEDS_READ, type PendingItem, pendingItems, type PendingTray, pendingTray } from '@/lib/pending-items';
 
-// Matches the shell's own pending-proposal query, so the chat reads that cache rather than issuing a second request for the same rows.
+// Matches the Overview's pending-proposal query, so the two read one cache entry rather than issuing a second request for the same rows.
 export const PENDING_PROPOSAL_LIMIT = 50;
-
-const NEEDS_READ: ReadonlySet<string> = new Set(['needs_review', 'contradiction']);
 
 export interface PendingWork {
   items: PendingItem[];

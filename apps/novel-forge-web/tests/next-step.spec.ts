@@ -8,7 +8,7 @@ function input(overrides: Partial<NextStepInput> = {}): NextStepInput {
     draftsTotal: 10,
     draftsFinal: 10,
     briefsRemaining: 0,
-    reviewQueueCount: 0,
+    pendingCount: 0,
     ...overrides,
   };
 }
@@ -31,7 +31,7 @@ describe('computeNextStep', () => {
   });
 
   it('should send the author to the next chapter’s Finalize review once every outlined chapter is drafted and approved', () => {
-    const result = computeNextStep(input({ draftsTotal: 10, draftsFinal: 6, briefsRemaining: 0, reviewQueueCount: 0, notFinalChapterRange: '7–10', nextFinalizeChapter: 7 }));
+    const result = computeNextStep(input({ draftsTotal: 10, draftsFinal: 6, briefsRemaining: 0, pendingCount: 0, notFinalChapterRange: '7–10', nextFinalizeChapter: 7 }));
     expect(result.next).toMatchObject({
       id: 'finalize-chapters',
       label: 'Finalize chapter 7',
@@ -41,39 +41,39 @@ describe('computeNextStep', () => {
   });
 
   it('should give a generic finalize reason when the not-final chapter range is unknown', () => {
-    const result = computeNextStep(input({ draftsTotal: 10, draftsFinal: 6, briefsRemaining: 0, reviewQueueCount: 0 }));
+    const result = computeNextStep(input({ draftsTotal: 10, draftsFinal: 6, briefsRemaining: 0, pendingCount: 0 }));
     expect(result.next?.reason).toBe('Every drafted chapter is approved — finalize them in order, each through its Finalize review.');
   });
 
   it('should use singular phrasing in the finalize reason for a single not-final chapter', () => {
-    const result = computeNextStep(input({ draftsTotal: 10, draftsFinal: 9, briefsRemaining: 0, reviewQueueCount: 0, notFinalChapterRange: '10' }));
+    const result = computeNextStep(input({ draftsTotal: 10, draftsFinal: 9, briefsRemaining: 0, pendingCount: 0, notFinalChapterRange: '10' }));
     expect(result.next?.reason).toBe('Every drafted chapter is approved — finalize chapter 10 through its Finalize review.');
   });
 
   it('should not offer to finalize while anything is still pending review', () => {
-    const result = computeNextStep(input({ draftsTotal: 10, draftsFinal: 6, briefsRemaining: 0, reviewQueueCount: 2 }));
-    expect(result.next?.id).toBe('review-queue');
+    const result = computeNextStep(input({ draftsTotal: 10, draftsFinal: 6, briefsRemaining: 0, pendingCount: 2 }));
+    expect(result.next?.id).toBe('pending-items');
   });
 
   it('should report nothing left to do once the project is fully drafted, approved, and finalized', () => {
-    const result = computeNextStep(input({ draftsTotal: 10, draftsFinal: 10, briefsRemaining: 0, reviewQueueCount: 0 }));
+    const result = computeNextStep(input({ draftsTotal: 10, draftsFinal: 10, briefsRemaining: 0, pendingCount: 0 }));
     expect(result.next).toBeUndefined();
     expect(result.comingUp).toEqual([]);
   });
 
   it('should send a contradicted draft to repair, with the review drawer flagged open, before anything else pending', () => {
-    const result = computeNextStep(input({ contradictedChapter: 5, reviewQueueCount: 3, briefsRemaining: 2, nextBriefChapter: 11 }));
+    const result = computeNextStep(input({ contradictedChapter: 5, pendingCount: 3, briefsRemaining: 2, nextBriefChapter: 11 }));
     expect(result.next).toMatchObject({ id: 'repair-chapter', label: 'Repair chapter 5', target: { screen: 'chapters', chapter: 5, review: true } });
   });
 
-  it('should surface the review queue as coming up right after a repair, since the contradiction is itself in that queue', () => {
-    const result = computeNextStep(input({ contradictedChapter: 5, reviewQueueCount: 1, briefsRemaining: 2, nextBriefChapter: 11 }));
-    expect(result.comingUp[0]).toMatchObject({ id: 'review-queue', label: 'Review 1 item' });
+  it('should surface the pending items as coming up right after a repair, since the contradiction is itself one of them', () => {
+    const result = computeNextStep(input({ contradictedChapter: 5, pendingCount: 1, briefsRemaining: 2, nextBriefChapter: 11 }));
+    expect(result.comingUp[0]).toMatchObject({ id: 'pending-items', label: 'Review 1 item' });
   });
 
-  it('should send pending review items to the queue when nothing is contradicted', () => {
-    const result = computeNextStep(input({ reviewQueueCount: 3 }));
-    expect(result.next).toMatchObject({ id: 'review-queue', label: 'Review 3 items', target: { screen: 'review' } });
+  it('should send pending items to the chat when nothing is contradicted', () => {
+    const result = computeNextStep(input({ pendingCount: 3 }));
+    expect(result.next).toMatchObject({ id: 'pending-items', label: 'Review 3 items', target: { screen: 'chat' } });
   });
 
   it('should cap the coming-up preview at three items', () => {
@@ -91,6 +91,7 @@ function state(overrides: Partial<NextStepStateInput> = {}): NextStepStateInput 
     draftedChapters: [],
     reviewDrafts: [],
     pendingContinuityCount: 0,
+    pendingDecisionCount: 0,
     pendingRefinementCount: 0,
     ...overrides,
   };
@@ -182,8 +183,10 @@ describe('deriveNextStepInput', () => {
     expect(result.contradictedChapter).toBe(4);
   });
 
-  it('should combine queued drafts with pending continuity and refinement proposals into one review-queue count', () => {
-    const result = deriveNextStepInput(state({ reviewDrafts: [{ chapter: 1, reviewStatus: 'needs_review' }], pendingContinuityCount: 2, pendingRefinementCount: 1 }));
-    expect(result.reviewQueueCount).toBe(4);
+  it('should combine queued drafts with pending decisions, continuity and refinement proposals into one pending count', () => {
+    const result = deriveNextStepInput(
+      state({ reviewDrafts: [{ chapter: 1, reviewStatus: 'needs_review' }], pendingDecisionCount: 3, pendingContinuityCount: 2, pendingRefinementCount: 1 }),
+    );
+    expect(result.pendingCount).toBe(7);
   });
 });

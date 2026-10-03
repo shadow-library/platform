@@ -27,14 +27,6 @@ describe('resolveSkeletonVariant', () => {
     expect(resolveSkeletonVariant('/novels/abc123/canon-facts')).toBe('rows');
   });
 
-  it('should resolve the migrated review queue to the rows variant rather than a rail it no longer renders', () => {
-    expect(resolveSkeletonVariant('/novels/abc123/review')).toBe('rows');
-  });
-
-  it('should resolve the migrated proposals inbox to the rows variant rather than a rail it no longer renders', () => {
-    expect(resolveSkeletonVariant('/novels/abc123/proposals')).toBe('rows');
-  });
-
   it('should resolve the migrated workflow runs directory to the rows variant rather than a rail it no longer renders', () => {
     expect(resolveSkeletonVariant('/novels/abc123/runs')).toBe('rows');
   });

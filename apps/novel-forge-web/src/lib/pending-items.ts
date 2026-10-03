@@ -1,8 +1,8 @@
 import { type ChipIntent } from '@/components/nf/StatusChip';
 import { type ContinuityProposalResponse, type DraftSummaryItem, type FinalizeReviewResponse, type ProposalResponse, type RefinementKind } from '@/lib/apis';
 
+import { chapterTitle } from './chapter-editor';
 import { decisionsPhase } from './finalize-review';
-import { chapterTitle } from './review-queue';
 
 export type PendingKind = 'draft' | 'decisions' | 'continuity' | 'proposal';
 
@@ -65,7 +65,7 @@ const PROPOSAL_KINDS: Record<RefinementKind, KindView> = {
   hub: CHAT_KIND,
 };
 
-const NEEDS_READ: ReadonlySet<string> = new Set(['needs_review', 'contradiction']);
+export const NEEDS_READ: ReadonlySet<string> = new Set(['needs_review', 'contradiction']);
 
 export function pendingKey(kind: PendingKind, id: string | number): string {
   return `${kind}:${id}`;
@@ -94,6 +94,10 @@ function proposalSource(proposal: PendingProposal, sessionId: string | undefined
   return PROPOSAL_KINDS[proposal.kind].source;
 }
 
+export function decisionsWaiting<T extends Pick<FinalizeReviewResponse, 'id' | 'status' | 'open'>>(decisions: readonly T[], settling: readonly string[]): T[] {
+  return decisions.filter(review => !['reading', 'settling'].includes(decisionsPhase(review, settling.includes(review.id))));
+}
+
 function byChapter<T extends { chapter: number }>(items: readonly T[]): T[] {
   return [...items].sort((left, right) => left.chapter - right.chapter);
 }
@@ -117,23 +121,21 @@ export function pendingItems(input: PendingItemsInput): PendingItem[] {
     source: draft.reviewStatus === 'contradiction' ? 'conflicts with canon' : 'ready to read',
     inThread: true,
   }));
-  const decisions = byChapter(input.decisions.filter(review => !['reading', 'settling'].includes(decisionsPhase(review, input.settling.includes(review.id))))).map(
-    (review): PendingItem => {
-      const open = review.open.consequential + review.open.routine;
-      return {
-        key: pendingKey('decisions', review.id),
-        kind: 'decisions',
-        chip: { label: 'decisions', intent: review.status === 'failed' ? 'danger' : 'warning' },
-        title:
-          review.status === 'failed'
-            ? `Chapter ${review.chapter}: reading its Story Bible updates failed`
-            : `Chapter ${review.chapter}: ${open > 0 ? plural(open, 'decision') : 'ready to finalize'}`,
-        short: `chapter ${review.chapter} decisions`,
-        source: 'finalize review',
-        inThread: true,
-      };
-    },
-  );
+  const decisions = byChapter(decisionsWaiting(input.decisions, input.settling)).map((review): PendingItem => {
+    const open = review.open.consequential + review.open.routine;
+    return {
+      key: pendingKey('decisions', review.id),
+      kind: 'decisions',
+      chip: { label: 'decisions', intent: review.status === 'failed' ? 'danger' : 'warning' },
+      title:
+        review.status === 'failed'
+          ? `Chapter ${review.chapter}: reading its Story Bible updates failed`
+          : `Chapter ${review.chapter}: ${open > 0 ? plural(open, 'decision') : 'ready to finalize'}`,
+      short: `chapter ${review.chapter} decisions`,
+      source: 'finalize review',
+      inThread: true,
+    };
+  });
   const continuity = byChapter(input.continuity.filter(proposal => proposal.status === 'pending')).map((proposal): PendingItem => ({
     key: pendingKey('continuity', proposal.id),
     kind: 'continuity',

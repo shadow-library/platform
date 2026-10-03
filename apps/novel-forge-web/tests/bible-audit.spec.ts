@@ -7,7 +7,6 @@ import {
   auditGroupLabel,
   auditKeptFindingsCount,
   auditOpenCount,
-  auditOpKept,
   auditPollState,
   auditProposalIntent,
   auditProposalLabel,
@@ -143,7 +142,7 @@ describe('auditKeptFindingsCount', () => {
 });
 
 describe('auditStageLabel', () => {
-  it('should count findings, not ops, and open the Review Queue rather than applying', () => {
+  it('should count findings, not ops, and open the card in the chat rather than applying', () => {
     expect(auditStageLabel(0)).toBe('Review 0 kept findings');
     expect(auditStageLabel(1)).toBe('Review 1 kept finding');
     expect(auditStageLabel(3)).toBe('Review 3 kept findings');
@@ -184,17 +183,6 @@ describe('auditRestageable', () => {
     expect(auditRestageable({ proposalId: 'p1', proposalStatus: 'superseded' })).toBe(true);
     expect(auditRestageable({ proposalId: 'p1', proposalStatus: 'pending' })).toBe(false);
     expect(auditRestageable({ proposalId: 'p1', proposalStatus: 'applied' })).toBe(false);
-  });
-});
-
-describe('auditOpKept', () => {
-  it('should read an op as kept when its index is in the report’s selection', () => {
-    expect(auditOpKept(report({ selection: [0, 2] }), 0)).toBe(true);
-    expect(auditOpKept(report({ selection: [0, 2] }), 1)).toBe(false);
-  });
-
-  it('should read every op as kept while no report has loaded yet', () => {
-    expect(auditOpKept(undefined, 5)).toBe(true);
   });
 });
 

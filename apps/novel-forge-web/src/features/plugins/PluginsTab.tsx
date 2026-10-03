@@ -114,7 +114,7 @@ function PluginCard({ novelId, manifest, row }: PluginCardProps): React.JSX.Elem
   const suggest = (): void => {
     setFailure(undefined);
     augmentCanon.mutate(manifest.id, {
-      onSuccess: result => (result ? toast.success('Staged as a proposal — review it in the Proposals Center') : toast.info('This plugin had nothing to add')),
+      onSuccess: result => (result ? toast.success('Staged as a proposal — it is waiting on you in the chat') : toast.info('This plugin had nothing to add')),
       onError: err => setFailure({ action: 'suggest', message: err.message }),
     });
   };

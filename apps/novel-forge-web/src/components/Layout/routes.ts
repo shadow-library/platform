@@ -8,7 +8,6 @@ export type ProjectRoute =
   | '/novels/$novelId/canon-facts'
   | '/novels/$novelId/chapters'
   | '/novels/$novelId/illustrations'
-  | '/novels/$novelId/review'
   | '/novels/$novelId/chat'
   | '/novels/$novelId/runs'
   | '/novels/$novelId/publish'

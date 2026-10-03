@@ -48,10 +48,9 @@ export function useChapterReviewsQuery(projectId: string, chapter: number, enabl
   });
 }
 
-/** A judge review or an answer to one can hold or release the chapter, so the draft and the review queue refetch with the reviews. */
+/** A judge review or an answer to one can hold or release the chapter, so the draft refetches with the reviews. */
 export function invalidateChapterReviews(queryClient: ReturnType<typeof useQueryClient>, projectId: string): void {
   queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'drafts'] });
-  queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'review-queue'] });
 }
 
 export function useRunReviewMutation(projectId: string, chapter: number): UseMutationResult<StartedReview, ApiError, RunChapterReviewBody> {

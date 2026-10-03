@@ -5,7 +5,7 @@ import { Button, Tooltip } from '@shadow-library/ui';
 import { Markdown, StatusChip } from '@/components/nf';
 import { useDraftApproval } from '@/features/chapter-workspace';
 import { type DraftResponse } from '@/lib/apis';
-import { chapterTitle, wordCount } from '@/lib/review-queue';
+import { chapterTitle, wordCount } from '@/lib/chapter-editor';
 
 import styles from './Chat.module.css';
 

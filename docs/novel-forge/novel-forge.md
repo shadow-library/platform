@@ -7,7 +7,7 @@
   the reader app `web-novel` (`docs/web-novel.md`). A project has one owner; bot-owned projects are shared with the owning organisation.
 - `novel-forge-server`: Bun/Fastify, Postgres + pgvector, LangGraph/LangChain. Every LLM call goes to an OpenRouter-compatible endpoint (OpenRouter or the host's AI CLI gateway);
   Ollama serves embeddings only.
-- `novel-forge-web`: TanStack Start SSR workspace. Authenticates via Identity. The chat is every novel's home; Story Bible, Chapters, Review Queue, Illustrations, Publish, Usage
+- `novel-forge-web`: TanStack Start SSR workspace. Authenticates via Identity. The chat is every novel's home; Story Bible, Chapters, Illustrations, Publish, Usage
   and Settings sit beside it, from one screen list. A link to a retired screen opens the novel's home.
 
 ## Concepts
@@ -116,7 +116,7 @@
   `manual`) or Just discuss (this turn only; every op is a card, and the session's mode is untouched). Edit prose is a separate per-turn permission, never implied by a mode, and
   prose always arrives as a card. The chat model is told the session's mode, but it never decides what applies.
 - **A written chapter is decided in the chat**: every draft awaiting review (`needs_review` or `contradiction`) shows at the end of the thread to be read in full, approved
-  under the Review Queue's own rules (a contradiction needs the AI review first; blocking findings are overridden only on confirmation), or revised by asking — which turns
+  under the approval rules (a contradiction needs the AI review first; blocking findings are overridden only on confirmation), or revised by asking — which turns
   on Edit prose, since a revision is `action.revise_draft`. Chapter writing started anywhere is followed in the thread until the draft lands.
 - **The changes panel** lists a turn's or a job's Story Bible changes (each applied value beside its quote, ideas flagged, each undone and redone on its own) and the
   sources it read; an action the turn runs is never counted or listed as a Story Bible change — its job reports itself; the turn's progress lives only on its last line in

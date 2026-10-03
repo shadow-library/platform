@@ -1,4 +1,4 @@
-export type NextStepScreen = 'chapters' | 'review' | 'chat';
+export type NextStepScreen = 'chapters' | 'chat';
 
 export interface NextStepTarget {
   screen: NextStepScreen;
@@ -7,7 +7,7 @@ export interface NextStepTarget {
   review?: boolean;
 }
 
-export type NextStepId = 'repair-chapter' | 'review-queue' | 'build-plan' | 'generate-chapter' | 'finalize-chapters';
+export type NextStepId = 'repair-chapter' | 'pending-items' | 'build-plan' | 'generate-chapter' | 'finalize-chapters';
 
 export interface NextStepAction {
   id: NextStepId;
@@ -36,8 +36,8 @@ export interface NextStepInput {
   nextBriefChapter?: number;
   /** Chapter number of the lowest draft the judge flagged as contradicting the bible. */
   contradictedChapter?: number;
-  /** Queued drafts, plus pending continuity and refinement proposals — the Review Queue's own count. */
-  reviewQueueCount: number;
+  /** Drafts to read, Story Bible decisions, and pending continuity and refinement proposals — everything the chat's cards and "Waiting on you" tray hold. */
+  pendingCount: number;
   /** Drafted-but-not-final chapters, formatted as e.g. "1–3, 5" — the chapters finalizing would lock in. */
   notFinalChapterRange?: string;
   /** The lowest drafted chapter that is not final — chapters finalize in order, so the one whose Finalize review comes next. */
@@ -66,15 +66,15 @@ const RULES: readonly NextStepRule[] = [
     comingUpLabel: 'Repair the flagged chapter',
   },
   {
-    id: 'review-queue',
-    test: input => input.reviewQueueCount > 0,
+    id: 'pending-items',
+    test: input => input.pendingCount > 0,
     build: input => ({
-      id: 'review-queue',
-      label: `Review ${input.reviewQueueCount} item${input.reviewQueueCount === 1 ? '' : 's'}`,
-      reason: 'Drafts and proposals are waiting on your read.',
-      target: { screen: 'review' },
+      id: 'pending-items',
+      label: `Review ${input.pendingCount} item${input.pendingCount === 1 ? '' : 's'}`,
+      reason: 'Drafts and proposals are waiting on you in the chat.',
+      target: { screen: 'chat' },
     }),
-    comingUpLabel: 'Clear the review queue',
+    comingUpLabel: 'Decide what is waiting on you',
   },
   {
     id: 'build-plan',
@@ -103,7 +103,7 @@ const RULES: readonly NextStepRule[] = [
   {
     id: 'finalize-chapters',
     roadmapIndex: 2,
-    test: input => input.draftsTotal > 0 && input.draftsFinal < input.draftsTotal && input.reviewQueueCount === 0 && input.briefsRemaining <= 0,
+    test: input => input.draftsTotal > 0 && input.draftsFinal < input.draftsTotal && input.pendingCount === 0 && input.briefsRemaining <= 0,
     build: input => ({
       id: 'finalize-chapters',
       label: input.nextFinalizeChapter != null ? `Finalize chapter ${input.nextFinalizeChapter}` : 'Finalize chapters',
@@ -134,7 +134,7 @@ function roadmapAnchorIndex(input: NextStepInput): number {
 /**
  * The Overview "Next step" rule engine: evaluates the fixed priority order below against the project's
  * current state and returns the one action the author should take next, plus a short preview of what
- * follows. Priority (highest first): a contradicted draft, a non-empty review queue, an empty plan,
+ * follows. Priority (highest first): a contradicted draft, pending items waiting on the author, an empty plan,
  * un-drafted briefs, then chapters awaiting finalize. `comingUp` prefers other rules that are
  * independently true right now (in priority order) and pads the rest from the roadmap stages ahead of
  * wherever the author actually is.
@@ -188,6 +188,7 @@ export interface NextStepStateInput {
   draftedChapters: readonly DraftedChapterLike[];
   reviewDrafts: readonly ReviewDraftLike[];
   pendingContinuityCount: number;
+  pendingDecisionCount: number;
   pendingRefinementCount: number;
 }
 
@@ -216,7 +217,7 @@ function formatChapterRange(chapters: readonly number[]): string {
 }
 
 /**
- * Shapes the raw project/brief/draft/review-queue data the Overview screen already has into the rule
+ * Shapes the raw project/brief/draft/pending-item data the Overview screen already has into the rule
  * engine's input. Kept separate from `computeNextStep` so both halves stay independently testable.
  */
 export function deriveNextStepInput(state: NextStepStateInput): NextStepInput {
@@ -243,7 +244,7 @@ export function deriveNextStepInput(state: NextStepStateInput): NextStepInput {
     briefsRemaining,
     nextBriefChapter,
     contradictedChapter,
-    reviewQueueCount: state.reviewDrafts.length + state.pendingContinuityCount + state.pendingRefinementCount,
+    pendingCount: state.reviewDrafts.length + state.pendingDecisionCount + state.pendingContinuityCount + state.pendingRefinementCount,
     notFinalChapterRange,
     nextFinalizeChapter: notFinalChapters.length > 0 ? Math.min(...notFinalChapters) : undefined,
   };

@@ -1672,7 +1672,7 @@ function ChapterWorkspace({ novelId, draft, deleted, onBack, onPick }: ChapterWo
 
   const runExtract = (): void => {
     extract.mutate(undefined, {
-      onSuccess: () => toast.success('Canon proposal drafted — review it in the Review Queue'),
+      onSuccess: () => toast.success('Canon proposal drafted — it is waiting on you in the chat'),
       onError: err => toast.danger(err.message),
     });
   };

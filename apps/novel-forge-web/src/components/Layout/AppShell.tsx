@@ -4,7 +4,7 @@ import { cn, type CommandItem, CommandPalette, IconButton, Kbd, toast, Tooltip, 
 import { AppShell as Chrome, type NavConfig, type NavLeaf } from '@shadow-library/ui/router';
 import { userDisplayName } from '@shadow-library/web';
 
-import { useListProjectsQuery, useListProposalsQuery, useLogoutMutation, useMeQuery, useProjectQuery, useProjectStatusQuery, useReviewQueueQuery } from '@/lib/apis';
+import { useListProjectsQuery, useLogoutMutation, useMeQuery, useProjectQuery, useProjectStatusQuery } from '@/lib/apis';
 import { type JumpScope, type PaletteState, resolvePaletteView } from '@/lib/command-scope';
 import { type LifecyclePhase, lifecyclePhase, projectDotColor, projectKindTag, projectTitle, sharedOwnerTag } from '@/lib/format';
 import { useIsAdmin } from '@/lib/session';
@@ -68,21 +68,13 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
   const projects = useMemo(() => projectsQuery.data?.items ?? [], [projectsQuery.data]);
   const projectQuery = useProjectQuery(novelId ?? '', inProject);
   const statusQuery = useProjectStatusQuery(novelId ?? '', inProject);
-  const reviewQuery = useReviewQueueQuery(novelId ?? '', inProject);
-  const proposalsQuery = useListProposalsQuery(novelId ?? '', { status: 'pending', limit: PROJECT_LIMIT }, inProject);
 
   const project = projectQuery.data;
   const status = statusQuery.data;
   const phase = lifecyclePhase(status, project?.kind);
 
-  // The Review Queue badge folds in every pending proposal type alongside queued chapters — it is the
-  // one inbox count for "things awaiting the author", not just chapters.
   const badges: Record<string, NavLeaf['badge']> = {
     chapters: { count: status?.chaptersTotal ?? 0 },
-    review: {
-      count: (reviewQuery.data?.drafts.length ?? 0) + (reviewQuery.data?.proposals.length ?? 0) + (proposalsQuery.data?.items.length ?? 0),
-      intent: 'warning',
-    },
   };
 
   const options = projects.map(candidate => {
