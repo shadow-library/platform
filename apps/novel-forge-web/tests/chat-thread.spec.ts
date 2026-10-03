@@ -5,7 +5,7 @@ import { answeredInPanel, turnCardsInline } from '../src/features/chat/chat-view
 
 const CHAT = new URL('../src/features/chat/', import.meta.url);
 const OLD_INLINE_UI = ['ProposalSlot', 'SuggestionCard', 'SuggestionGroup', 'OrganiseReceipt', 'AppliedBlock', 'AppliedChange', 'CommitBar'];
-const THREAD_PROPOSAL_VIEWS = ['ChatPlanCard', 'TranscriptPlanCard', 'TurnProposalCard', 'TurnReceipt'];
+const THREAD_PROPOSAL_VIEWS = ['ChatPlanCard', 'ContinuityProposalCard', 'TranscriptPlanCard', 'TurnProposalCard', 'TurnReceipt'];
 
 const source = (file: string): string => readFileSync(new URL(file, CHAT), 'utf-8');
 const sources = readdirSync(CHAT).filter(file => /\.tsx?$/.test(file));

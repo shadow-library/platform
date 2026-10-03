@@ -107,6 +107,7 @@ describe('hub ops and actions', () => {
       { op: 'action.validate', scope: 'chapter', chapter: 4 },
       { op: 'action.finalize', upTo: 3 },
       { op: 'action.advance_volume', volumeKey: 'v1' },
+      { op: 'action.apply_continuity', chapter: 4 },
     ];
     expect(validateChangeSet(ops)).toEqual([]);
   });
@@ -118,6 +119,7 @@ describe('hub ops and actions', () => {
     expect(validateChangeSet([{ op: 'action.revise_draft', chapter: 4 }])[0]).toMatch(/required field 'note'/);
     expect(validateChangeSet([{ op: 'action.audit_bible', target: 'all' }])[0]).toMatch(/unexpected field 'target'/);
     expect(validateChangeSet([{ op: 'action.advance_volume' }])[0]).toMatch(/required field 'volumeKey'/);
+    expect(validateChangeSet([{ op: 'action.apply_continuity' }])[0]).toMatch(/required field 'chapter'/);
   });
 
   it('should classify action ops and render their vocabulary with purposes', () => {

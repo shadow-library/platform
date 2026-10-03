@@ -31,7 +31,15 @@ const INVENTED = [
   'The lamp is secretly powered by the stolen voices of drowned sailors.',
 ];
 const KEYS = ['ada', 'bram', 'lamp', 'market', 'ferry'];
-const ACTIONS = ['action.finalize', 'action.approve_draft', 'action.generate_chapter', 'action.advance_volume', 'action.revise_draft', 'action.organise_notes'] as const;
+const ACTIONS = [
+  'action.finalize',
+  'action.approve_draft',
+  'action.apply_continuity',
+  'action.generate_chapter',
+  'action.advance_volume',
+  'action.revise_draft',
+  'action.organise_notes',
+] as const;
 const REMOVALS = ['entity.remove', 'fact.remove', 'volume.remove', 'brief.remove', 'draft.remove', 'milestone.remove', 'promise.drop', 'bible_document.remove'] as const;
 const CASES_PER_TEST = 25;
 const TESTS = 8;

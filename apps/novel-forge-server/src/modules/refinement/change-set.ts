@@ -258,6 +258,11 @@ interface ApproveDraftAction {
   draftId?: string;
 }
 
+interface ApplyContinuityAction {
+  op: 'action.apply_continuity';
+  chapter: number;
+}
+
 interface ValidateAction {
   op: 'action.validate';
   scope: 'novel' | 'chapter';
@@ -316,6 +321,7 @@ export type ActionOp =
   | JudgeDraftAction
   | ReviseDraftAction
   | ApproveDraftAction
+  | ApplyContinuityAction
   | ValidateAction
   | FinalizeAction
   | OrganiseNotesAction
@@ -457,6 +463,7 @@ const DECLARED_OP_SPECS: Record<OpType, OpSpec> = {
   'action.judge_draft': { required: { chapter: 'number' }, optional: {} },
   'action.revise_draft': { required: { chapter: 'number', note: 'string' }, optional: {} },
   'action.approve_draft': { required: { chapter: 'number' }, optional: { revision: 'number', saveSeq: 'number', draftId: 'string' } },
+  'action.apply_continuity': { required: { chapter: 'number' }, optional: {} },
   'action.validate': { required: { scope: 'string' }, optional: { chapter: 'number' } },
   'action.finalize': { required: {}, optional: { upTo: 'number' } },
   'action.organise_notes': { required: {}, optional: {} },
@@ -498,6 +505,8 @@ const ACTION_PURPOSES: Record<ActionType, string> = {
   'action.judge_draft': 'run the continuity judge on one chapter draft',
   'action.revise_draft': 'revise one chapter draft using `note` as the revision feedback',
   'action.approve_draft': 'approve one reviewed chapter draft',
+  'action.apply_continuity':
+    "add one chapter's pending Story Bible additions (the continuity proposal waiting on the author) to the Story Bible — writes canon, never auto-applied",
   'action.validate': 'run continuity validation over the novel or one chapter',
   'action.finalize': 'finalize drafted chapters into locked canon — irreversible, never auto-applied',
   'action.organise_notes': "organise the author's stored notes into Story Bible pages, records, a timeline and open questions — runs as a job and stages the result as a card",

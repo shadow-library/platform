@@ -14,6 +14,7 @@ import {
   type ApproveDraftBody,
   type ConflictingDraftResponse,
   type ContinuityProposalResponse,
+  type ContinuityProposalStatus,
   type DraftConflictResponse,
   type DraftResponse,
   type DraftSummaryResponse,
@@ -23,6 +24,7 @@ import {
   type JobEnqueueResponse,
   type ListChapterRowsQueryParams,
   type ListChapterRowsResponse,
+  type ListContinuityProposalResponse,
   type ListDraftResponse,
   type ProposalResponse,
   type ReviewQueueResponse,
@@ -38,6 +40,7 @@ const draftKeys = {
   list: (projectId: string) => [...draftKeys.all(projectId), 'list'] as const,
   summary: (projectId: string) => [...draftKeys.all(projectId), 'summary'] as const,
   rows: (projectId: string, params?: ListChapterRowsQueryParams) => [...draftKeys.all(projectId), 'rows', params] as const,
+  continuityProposals: (projectId: string, status: ContinuityProposalStatus) => [...draftKeys.all(projectId), 'continuity-proposals', status] as const,
   detail: (projectId: string, n: number) => [...draftKeys.all(projectId), n] as const,
   revisions: (projectId: string, n: number) => [...draftKeys.all(projectId), n, 'revisions'] as const,
   reviewQueue: (projectId: string) => ['projects', projectId, 'review-queue'] as const,
@@ -123,6 +126,16 @@ export const reviewQueueQueryOptions = (projectId: string): UseQueryOptions<Revi
 
 export function useReviewQueueQuery(projectId: string, enabled = true): UseQueryResult<ReviewQueueResponse, ApiError> {
   return useQuery({ ...reviewQueueQueryOptions(projectId), enabled: enabled && Boolean(projectId) });
+}
+
+export const continuityProposalsQueryOptions = (projectId: string, status: ContinuityProposalStatus = 'pending'): UseQueryOptions<ListContinuityProposalResponse, ApiError> =>
+  queryOptions<ListContinuityProposalResponse, ApiError>({
+    queryKey: draftKeys.continuityProposals(projectId, status),
+    queryFn: () => APIRequest.get(`/projects/${projectId}/continuity-proposals`).query({ status }).execute(),
+  });
+
+export function useContinuityProposalsQuery(projectId: string, enabled = true): UseQueryResult<ListContinuityProposalResponse, ApiError> {
+  return useQuery({ ...continuityProposalsQueryOptions(projectId), enabled: enabled && Boolean(projectId) });
 }
 
 export function invalidateDraft(queryClient: ReturnType<typeof useQueryClient>, projectId: string): void {

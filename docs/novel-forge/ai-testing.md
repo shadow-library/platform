@@ -1586,7 +1586,7 @@ Ordinary hub turns run `chat-refine@2.13.0`, role `chat` (planning-group model),
 
 #### 1.5 Action ops and one-way doors (`never auto-applied`)
 
-- **Entry:** proposals containing `action.*` ops (`ACTION_TYPES`: generate_chapter, audit_bible, enhance_premise, judge_draft, revise_draft, approve_draft, validate, finalize, organise_notes, plan_chapter, advance_volume). Organise, plan and write run as durable jobs (Part 6).
+- **Entry:** proposals containing `action.*` ops (`ACTION_TYPES`: generate_chapter, audit_bible, enhance_premise, judge_draft, revise_draft, approve_draft, apply_continuity, validate, finalize, organise_notes, plan_chapter, advance_volume). Organise, plan and write run as durable jobs (Part 6).
 - **Preconditions:** a pending proposal (any) from 1.1, or a fresh one from a cheap turn.
 - **Run** (deterministic; no model needed to stage):
   1. `PATCH /proposals/$X {"changeSet":[{"op":"entity.upsert","entityKey":"harbour-bell","type":"item","name":"Harbour Bell"},{"op":"action.finalize","upTo":1}]}`

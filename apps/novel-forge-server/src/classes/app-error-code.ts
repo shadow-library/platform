@@ -185,6 +185,7 @@ export class AppErrorCode extends ServerErrorCode {
    * Continuity Errors
    */
   static readonly CNT_001 = AppErrorCode.notFound('CNT_001', 'No pending continuity proposal for this chapter');
+  static readonly CNT_002 = AppErrorCode.badRequest('CNT_002', 'Adding a chapter to the Story Bible is never applied automatically — select the action and apply it deliberately');
 
   /*!
    * Entity Errors

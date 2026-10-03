@@ -137,6 +137,10 @@ describe('defaultDeclined', () => {
     expect([...declined]).toEqual([1]);
   });
 
+  it('should pre-decline adding a chapter to the Story Bible', () => {
+    expect([...defaultDeclined([{ op: 'action.apply_continuity', chapter: 3 }])]).toEqual([0]);
+  });
+
   it('should decline nothing when the change-set holds no guarded op', () => {
     expect(defaultDeclined([{ op: 'entity.upsert' }]).size).toBe(0);
     expect(isGuardedOp({ op: 'entity.upsert' })).toBe(false);

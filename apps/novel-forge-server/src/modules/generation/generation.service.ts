@@ -1021,6 +1021,13 @@ export class GenerationService {
     return proposal;
   }
 
+  listContinuityProposals(projectId: bigint, status: Generation.ContinuityProposalStatus): Promise<Generation.ContinuityProposal[]> {
+    return this.db.query.continuityProposals.findMany({
+      where: and(eq(schema.continuityProposals.projectId, projectId), eq(schema.continuityProposals.status, status)),
+      orderBy: asc(schema.continuityProposals.chapter),
+    });
+  }
+
   async updateContinuityProposal(projectId: bigint, chapter: number, body: UpdateContinuityBody): Promise<Generation.ContinuityProposal> {
     const existing = await this.getContinuityProposal(projectId, chapter);
     const [updated] = await this.db

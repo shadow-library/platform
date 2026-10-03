@@ -222,6 +222,22 @@ describe('ProposalApplyService — action.generate_chapter', () => {
   });
 });
 
+describe('ProposalApplyService — action.apply_continuity', () => {
+  it('should refuse a blanket manual apply, so the author selects the Story Bible additions deliberately', async () => {
+    const { service, executors } = await fakeProject([{ op: 'action.apply_continuity', chapter: 4 }]);
+
+    await expect(service.apply(7n, 300n)).rejects.toMatchObject({ code: 'CNT_002' });
+    expect(executors.get).not.toHaveBeenCalled();
+  });
+
+  it('should refuse an automatic apply that carries it, since actions are always the author’s selection', async () => {
+    const { service, executors } = await fakeProject([{ op: 'action.apply_continuity', chapter: 4 }]);
+
+    await expect(service.apply(7n, 300n, { autoApplied: true })).rejects.toThrow('content ops only');
+    expect(executors.get).not.toHaveBeenCalled();
+  });
+});
+
 describe('ProposalApplyService — action.advance_volume', () => {
   it('should refuse a blanket manual apply, so the author selects "goal met — start next" deliberately', async () => {
     const { service, executors } = await fakeProject([{ op: 'action.advance_volume', volumeKey: 'volume_1' }]);

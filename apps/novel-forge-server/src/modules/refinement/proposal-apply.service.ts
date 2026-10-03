@@ -219,6 +219,7 @@ export function bindApprovalRevision(op: ActionOp, applied: readonly AppliedArti
 const ONE_WAY_DOORS: Partial<Record<ActionOp['op'], ErrorCode>> = {
   'action.finalize': AppErrorCode.RFN_009,
   'action.approve_draft': AppErrorCode.DRF_009,
+  'action.apply_continuity': AppErrorCode.CNT_002,
   'action.generate_chapter': AppErrorCode.DRF_014,
   'action.advance_volume': AppErrorCode.VOL_004,
 };

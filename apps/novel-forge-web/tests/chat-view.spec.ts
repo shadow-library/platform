@@ -65,6 +65,12 @@ describe('bible document ops', () => {
   });
 });
 
+describe('opSubject', () => {
+  it('should title adding a chapter to the Story Bible by its chapter', () => {
+    expect(opSubject({ op: 'action.apply_continuity', chapter: 3 })).toBe('Add chapter 3 to the Story Bible');
+  });
+});
+
 describe('undoImpactView', () => {
   it('should say nothing relies on a change with no dependents', () => {
     expect(undoImpactView({ proposalId: 'p', dependents: [], finalUnaffected: 0 }).empty).toBe(true);
@@ -173,6 +179,7 @@ describe('proposalPresentation', () => {
     expect(proposalPresentation({ kind: 'hub', status: 'discarded', changeSet: [COUNCIL] })).toBe('passed');
     expect(proposalPresentation({ kind: 'hub', status: 'conflicted', changeSet: [COUNCIL] })).toBe('legacy');
     expect(proposalPresentation({ kind: 'hub', status: 'pending', changeSet: [COUNCIL, { op: 'action.advance_volume' }] })).toBe('legacy');
+    expect(proposalPresentation({ kind: 'hub', status: 'pending', changeSet: [{ op: 'action.apply_continuity', chapter: 3 }] })).toBe('legacy');
   });
 });
 
@@ -182,7 +189,15 @@ describe('answeredInPanel', () => {
   });
 
   it('should keep every action, prose, plan edits and plans on their own card in the thread', () => {
-    const ops = ['action.finalize', 'action.approve_draft', 'action.generate_chapter', 'action.advance_volume', 'action.organise_notes', 'action.plan_chapter'];
+    const ops = [
+      'action.finalize',
+      'action.approve_draft',
+      'action.apply_continuity',
+      'action.generate_chapter',
+      'action.advance_volume',
+      'action.organise_notes',
+      'action.plan_chapter',
+    ];
     for (const op of [...ops, 'action.audit_bible', 'draft.update', 'draft.remove', 'action.revise_draft', 'brief.update'])
       expect(answeredInPanel({ kind: 'chat', changeSet: [COUNCIL, { op }] })).toBe(false);
     expect(answeredInPanel({ kind: 'chapter_plan', changeSet: [] })).toBe(false);

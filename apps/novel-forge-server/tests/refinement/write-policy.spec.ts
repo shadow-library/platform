@@ -278,6 +278,11 @@ const ALWAYS_CARD_CASES: Case[] = [
   { name: 'finalize is always a card', op: { op: 'action.finalize', quote: QUOTE }, expected: { side: 'card', reason: 'always_card', rule: 'action' } },
   { name: 'approval is always a card', op: { op: 'action.approve_draft', chapter: 4, quote: QUOTE }, expected: { side: 'card', reason: 'always_card', rule: 'action' } },
   {
+    name: 'adding a chapter to the Story Bible is always a card',
+    op: { op: 'action.apply_continuity', chapter: 4, quote: QUOTE },
+    expected: { side: 'card', reason: 'always_card', rule: 'action' },
+  },
+  {
     name: 'goal met — start next is always a card',
     op: { op: 'action.advance_volume', volumeKey: 'v1', quote: QUOTE },
     expected: { side: 'card', reason: 'always_card', rule: 'action' },
@@ -595,6 +600,11 @@ const EDIT_FREELY_CASES: Case[] = [
   { name: 'unquoted prose stays a card', op: { op: 'draft.update', chapter: 4, body: 'Mira ran.' }, expected: { side: 'card', reason: 'always_card', rule: 'prose' } },
   { name: 'finalize stays a card', op: { op: 'action.finalize' }, expected: { side: 'card', reason: 'always_card', rule: 'action' } },
   { name: 'approval stays a card', op: { op: 'action.approve_draft', chapter: 4 }, expected: { side: 'card', reason: 'always_card', rule: 'action' } },
+  {
+    name: 'adding a chapter to the Story Bible stays a card',
+    op: { op: 'action.apply_continuity', chapter: 4 },
+    expected: { side: 'card', reason: 'always_card', rule: 'action' },
+  },
   { name: 'generating a chapter stays a card', op: { op: 'action.generate_chapter', chapter: 4 }, expected: { side: 'card', reason: 'always_card', rule: 'action' } },
   {
     name: "rewriting a secret's truth stays a card",

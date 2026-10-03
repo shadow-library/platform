@@ -39,6 +39,7 @@ export const FinalizeReviewFlag = EnumType.create('FinalizeReviewFlag', schema.f
 export const JobEventType = EnumType.create('JobEventType', schema.jobEventType.enumValues);
 export const BibleSection = EnumType.create('BibleSection', schema.bibleSection.enumValues);
 export const DraftReviewStatus = EnumType.create('DraftReviewStatus', schema.draftReviewStatus.enumValues);
+export const ContinuityProposalStatus = EnumType.create('ContinuityProposalStatus', schema.continuityProposalStatus.enumValues);
 export const BriefWriteMode = EnumType.create('BriefWriteMode', schema.briefWriteMode.enumValues);
 export const ChapterRowFilter = EnumType.create('ChapterRowFilter', [...CHAPTER_FILTERS]);
 export const ChapterRowKind = EnumType.create('ChapterRowKind', ['written', 'planned']);

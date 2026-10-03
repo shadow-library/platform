@@ -290,6 +290,39 @@ describe('HubActionRegistrar action.approve_draft', () => {
   });
 });
 
+describe('HubActionRegistrar action.apply_continuity', () => {
+  function register() {
+    const registry = new ActionExecutorRegistry();
+    const applied: unknown[][] = [];
+    const generation = {
+      applyContinuityProposal: async (...args: unknown[]) => {
+        if (args[1] !== 4) throw AppErrorCode.CNT_001.create();
+        applied.push(args);
+      },
+    };
+    new HubActionRegistrar(registry, generation as never, {} as never, {} as never, {} as never).onModuleInit();
+    const apply = registry.get('action.apply_continuity');
+    if (!apply) throw new Error('apply_continuity executor missing');
+    return { apply, applied };
+  }
+
+  it('should apply exactly the chapter the card names', async () => {
+    const { apply, applied } = register();
+
+    const result = await apply(1n, { op: 'action.apply_continuity', chapter: 4 }, CARD);
+
+    expect(applied).toEqual([[1n, 4]]);
+    expect(result.summary).toContain('chapter 4');
+  });
+
+  it('should report a chapter with no pending proposal as a missing proposal', async () => {
+    const { apply, applied } = register();
+
+    await expect(apply(1n, { op: 'action.apply_continuity', chapter: 6 }, CARD)).rejects.toMatchObject({ code: 'CNT_001' });
+    expect(applied).toEqual([]);
+  });
+});
+
 describe('HubActionRegistrar action.generate_chapter', () => {
   it('should draft exactly the chapter the card names, through the gate that refuses a chapter with a draft', async () => {
     const registry = new ActionExecutorRegistry();

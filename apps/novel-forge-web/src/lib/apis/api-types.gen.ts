@@ -803,6 +803,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/projects/{projectId}/continuity-proposals': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Continuity Proposals */
+    get: operations['get_api_v1_projects_projectId_continuity_proposals'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/projects/{projectId}/chapters/{n}/continuity-proposal': {
     parameters: {
       query?: never;
@@ -3996,6 +4013,11 @@ export interface components {
       factKey: string;
       /** @description The secret's title: its label, or its key read as words — never its truth. */
       label: string;
+    };
+    /** @enum {string} */
+    ContinuityProposalStatus: 'pending' | 'applied' | 'discarded';
+    ListContinuityProposalResponse: {
+      items: components['schemas']['ContinuityProposalResponse'][];
     };
     UpdateContinuityBody: {
       /** @description Continuity findings and suggested edits produced by the continuity model. */
@@ -9009,6 +9031,48 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ProposalResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_continuity_proposals: {
+    parameters: {
+      query?: {
+        status?: components['schemas']['ContinuityProposalStatus'];
+      };
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ListContinuityProposalResponse'];
         };
       };
       /** @description Default Response */
@@ -16258,6 +16322,8 @@ export type ProposalDiagnosticKind = components['schemas']['ProposalDiagnosticKi
 export type ProposalDiagnosticData = components['schemas']['ProposalDiagnosticData'];
 export type DiagnosticPovItem = components['schemas']['DiagnosticPovItem'];
 export type DiagnosticFactItem = components['schemas']['DiagnosticFactItem'];
+export type ContinuityProposalStatus = components['schemas']['ContinuityProposalStatus'];
+export type ListContinuityProposalResponse = components['schemas']['ListContinuityProposalResponse'];
 export type UpdateContinuityBody = components['schemas']['UpdateContinuityBody'];
 export type ReviewQueueResponse = components['schemas']['ReviewQueueResponse'];
 export type RunGraph = components['schemas']['RunGraph'];
@@ -16619,6 +16685,8 @@ export type FinalizeReadinessPathParams = Exclude<paths['/api/v1/projects/{proje
 export type ListRevisionsPathParams = Exclude<paths['/api/v1/projects/{projectId}/drafts/{n}/revisions']['get']['parameters']['path'], undefined>;
 export type GetRevisionPathParams = Exclude<paths['/api/v1/projects/{projectId}/drafts/{n}/revisions/{r}']['get']['parameters']['path'], undefined>;
 export type GetDraftPromptPathParams = Exclude<paths['/api/v1/projects/{projectId}/drafts/{n}/prompt']['get']['parameters']['path'], undefined>;
+export type ListContinuityProposalsQueryParams = Exclude<paths['/api/v1/projects/{projectId}/continuity-proposals']['get']['parameters']['query'], undefined>;
+export type ListContinuityProposalsPathParams = Exclude<paths['/api/v1/projects/{projectId}/continuity-proposals']['get']['parameters']['path'], undefined>;
 export type GetContinuityProposalPathParams = Exclude<paths['/api/v1/projects/{projectId}/chapters/{n}/continuity-proposal']['get']['parameters']['path'], undefined>;
 export type GetReviewQueuePathParams = Exclude<paths['/api/v1/projects/{projectId}/review-queue']['get']['parameters']['path'], undefined>;
 export type ListRunsQueryParams = Exclude<paths['/api/v1/projects/{projectId}/runs']['get']['parameters']['query'], undefined>;

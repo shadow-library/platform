@@ -10,6 +10,7 @@ import {
   ChapterRowFilter,
   ChapterRowKind,
   ContentMode,
+  ContinuityProposalStatus,
   CostSource,
   CostTier,
   DarkContentRating,
@@ -833,6 +834,18 @@ export class ContinuityProposalResponse {
 
   @Field(() => String, { format: 'date-time' })
   updatedAt: Date;
+}
+
+@Schema()
+export class ListContinuityProposalsQuery {
+  @Field(() => ContinuityProposalStatus, { default: 'pending' })
+  status: Generation.ContinuityProposalStatus;
+}
+
+@Schema()
+export class ListContinuityProposalResponse {
+  @Field(() => [ContinuityProposalResponse])
+  items: ContinuityProposalResponse[];
 }
 
 @Schema()

@@ -64,6 +64,7 @@ export function opSubject(op: ChangeOp): string {
   if (type === 'bible_document.upsert') return text(isRecord(op.frontmatter) ? op.frontmatter.title : undefined) ?? String(op.slug).replace(/[-_]/g, ' ');
   if (type === 'action.plan_chapter') return 'Plan the next chapter';
   if (type === 'action.organise_notes') return 'Organise your notes';
+  if (type === 'action.apply_continuity') return `Add chapter ${String(op.chapter)} to the Story Bible`;
   return text(op.name) ?? String(op.entityKey ?? op.factKey ?? op.op);
 }
 
@@ -138,7 +139,7 @@ export function suggestionCommit(total: number, decisions: ReadonlyMap<number, S
 
 export type ProposalPresentation = 'plan' | 'suggestions' | 'applied' | 'reverted' | 'passed' | 'legacy';
 
-const ONE_WAY_DOORS = new Set(['action.finalize', 'action.approve_draft', 'action.generate_chapter', 'action.advance_volume']);
+const ONE_WAY_DOORS = new Set(['action.finalize', 'action.approve_draft', 'action.apply_continuity', 'action.generate_chapter', 'action.advance_volume']);
 
 /** How the transcript draws a proposal: one-way doors keep the explicit per-op card, where nothing is selected for the author. */
 export function proposalPresentation(proposal: { kind: string; status: string; changeSet: readonly ChangeOp[] }): ProposalPresentation {

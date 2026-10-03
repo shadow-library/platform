@@ -28,6 +28,8 @@ import {
   JobEnqueueResponse,
   JobParams,
   ListBriefSummaryResponse,
+  ListContinuityProposalResponse,
+  ListContinuityProposalsQuery,
   ListDraftResponse,
   ListDraftRevisionResponse,
   ListGenerationJobResponse,
@@ -274,6 +276,13 @@ export class GenerationController {
   @RespondFor(200, ProposalResponse)
   extractToBible(@Params() params: ChapterParams): Promise<ProposalResponse> {
     return this.generationService.extractChapterToBible(params.projectId, params.n).then(serialiseProposal);
+  }
+
+  @Get('/continuity-proposals')
+  @RespondFor(200, ListContinuityProposalResponse)
+  async listContinuityProposals(@Params() params: ProjectParams, @Query() query: ListContinuityProposalsQuery): Promise<ListContinuityProposalResponse> {
+    const items = await this.generationService.listContinuityProposals(params.projectId, query.status);
+    return { items };
   }
 
   @Get('/chapters/:n/continuity-proposal')

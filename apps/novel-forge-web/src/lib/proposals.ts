@@ -27,7 +27,7 @@ export const NEVER_AUTO_NOTE = 'Applies only when you select it deliberately.';
 
 export const CONFLICT_NOTE = 'The canon moved on since this was drafted, so it can no longer apply cleanly. Discard it and ask again for a fresh proposal.';
 
-const GUARDED_OP_TYPES = new Set(['action.finalize', 'action.approve_draft', 'action.generate_chapter']);
+const GUARDED_OP_TYPES = new Set(['action.finalize', 'action.approve_draft', 'action.apply_continuity', 'action.generate_chapter']);
 
 /** A proposal still owed a decision. `conflicted` cannot be applied, but it can be discarded, so it is not settled. */
 const OPEN_STATUSES = new Set<ProposalStatus>(['pending', 'conflicted']);

@@ -31,6 +31,7 @@ import {
   useChatJobStream,
   useChatMessagesQuery,
   useChatTurnStream,
+  useContinuityProposalsQuery,
   useListProposalsQuery,
   useProgressOverrideMutation,
   useProgressQuery,
@@ -54,6 +55,7 @@ import { ChapterDraftCard } from './ChapterDraftCard';
 import { editQueued, inputCaption, type QueuedTurn, queuedView, queueStep, releaseSettings, restoreFailed, type TurnSettings } from './chat-queue';
 import { ChatComposer } from './ChatComposer';
 import { NotesChip, SaveAsNotesOffer } from './ChatExtras';
+import { ContinuityProposalCard } from './ContinuityProposalCard';
 import {
   answeredInPanel,
   applyNoteToast,
@@ -168,6 +170,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
   const saveChatChoice = useUpdateSessionModelMutation(novelId);
   const generation = useGenerationActivity(novelId);
   const reviewQueue = useReviewQueueQuery(novelId);
+  const continuityQuery = useContinuityProposalsQuery(novelId);
   const startNextDraft = useStartNextDraftMutation(novelId);
   const unanswered = useUnansweredCount();
 
@@ -261,6 +264,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
   const looseJobs = jobsByMessage.get('') ?? NO_JOBS;
   const writing = generation.activity && !jobStream.jobs.some(job => job.id === generation.activity?.jobId) ? generation.activity : undefined;
   const draftsForYou = (reviewQueue.data?.drafts ?? []).filter(draft => draft.reviewStatus === 'needs_review' || draft.reviewStatus === 'contradiction');
+  const continuityForYou = continuityQuery.data?.items ?? [];
 
   const shownProposals = new Set<string>();
   for (const message of messages) {
@@ -826,6 +830,9 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
               )}
               {draftsForYou.map(draft => (
                 <ChapterDraftCard key={draft.chapter} novelId={novelId} draft={draft} onAskForChanges={askForChanges} />
+              ))}
+              {continuityForYou.map(proposal => (
+                <ContinuityProposalCard key={proposal.id} novelId={novelId} proposal={proposal} />
               ))}
               {planStartOpen && (
                 <div ref={planStartBar} className={`${styles.indented} ${styles.planStartBar}`}>

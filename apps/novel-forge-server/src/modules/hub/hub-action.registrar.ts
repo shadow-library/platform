@@ -78,6 +78,12 @@ export class HubActionRegistrar {
       return { summary: `approved chapter ${action.chapter} draft at revision ${revision}` };
     });
 
+    registry.register('action.apply_continuity', async (projectId, action) => {
+      if (action.op !== 'action.apply_continuity') throw AppError.internal('executor misrouted');
+      await this.generationService.applyContinuityProposal(projectId, action.chapter);
+      return { summary: `added chapter ${action.chapter}'s additions to the Story Bible` };
+    });
+
     registry.register('action.validate', async (projectId, action) => {
       if (action.op !== 'action.validate') throw AppError.internal('executor misrouted');
       if (action.scope === 'chapter' && action.chapter !== undefined) {

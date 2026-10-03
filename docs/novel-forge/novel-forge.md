@@ -171,7 +171,7 @@
   stack. Redo needs the rest of the turn applied and the records exactly as the undo left them.
 - Undoing an idea turns it down in the Notebook as declining its card does (default `not_now`); redoing it withdraws that rejection. Either commits with the change or not
   at all, and a call that moves nothing writes nothing. Undoing the author's own words records nothing.
-- `action.finalize`, `action.approve_draft` and `action.generate_chapter` MUST NEVER be auto-applied, and a chat action MUST NEVER replace an existing draft. Action ops run after
+- `action.finalize`, `action.approve_draft`, `action.apply_continuity` (adds a chapter's pending Story Bible additions) and `action.generate_chapter` MUST NEVER be auto-applied, and a chat action MUST NEVER replace an existing draft. Action ops run after
   the content transaction commits and stop at first failure.
 - One action starts without the author's click: when the author's own message asks to organise the notes (above), the session is Edit freely and the turn is not just
   discussing, the turn stages the organise card and accepts it whole on the author's behalf, so the job is queued exactly as their accept would queue it. It is no automatic
