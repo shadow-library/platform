@@ -18,6 +18,7 @@ export const ReviewFindingCategoryType = EnumType.create<ReviewFindingCategory>(
   'readability',
   'mechanics',
   'editorial',
+  'proofreading',
 ]);
 
 @Schema()
@@ -37,7 +38,7 @@ export class ReviewFindingParams extends ReviewIdParams {
 export class RunChapterReviewBody {
   @Field(() => ChapterReviewKind, {
     description:
-      'judge: continuity, the plan, the ending contract, kept-back secrets and readability. editorial: an editor’s read against the plan, canon and style. mechanics and readability are deterministic and make no model call.',
+      'judge: continuity, the plan, the ending contract, kept-back secrets and readability. editorial: an editor’s read against the plan, canon and style, with proofreading (grammar, spelling, punctuation, tense, point of view, names and references). mechanics and readability are deterministic and make no model call.',
   })
   kind: Review.Kind;
 

@@ -331,6 +331,10 @@
   releases it only to `needs_review`; "I'll fix it myself" releases nothing. A continuity contradiction and any leak of a secret are blocking; plan and ending-contract shortfalls
   are warnings, because a hand-writer may leave their plan on purpose. A dismissal is remembered for the same text. A check the judge left out is reported as not assessed, so "No
   issue detected" cannot follow from an omission. Reviews of an isolated chapter are marked `isolated`.
+- **Proofreading** is part of the editorial review, so it reaches AI-written and hand-written chapters alike, on request or through the chat's chapter review: grammar,
+  spelling, punctuation, tense and point-of-view slips, a name spelled unlike canon or the rest of the chapter, and a reference to something neither canon nor the chapter has.
+  Each slip quotes its exact span and a fix; one whose quote is not in the prose, whose fix changes nothing or that repeats is dropped, and at most twenty are kept. Slips are
+  `proofreading` warnings, never blocking, and never touch the gate; a contradiction of established fact stays the judge's. Voice in dialogue and the project's style are not slips.
 - **Review before finalize**: approval binds a finalize review to the exact revision, prose and plan approved, and a job reads the Story Bible updates out of that revision.
   Consequential updates (rules, payoffs, knowledge, milestones in doubt, anything inferred) are answered one by one; routine ones as a batch, or kept automatically per category
   when the author opted in. Keep, edit (the record it is about never changes) or skip (with a reason, never asked again). Re-approving the same revision, prose and plan keeps the

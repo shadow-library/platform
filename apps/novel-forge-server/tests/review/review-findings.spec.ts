@@ -3,6 +3,7 @@ import { describe, expect, it } from 'bun:test';
 import { resolveWordTarget } from '@modules/eval/deterministic-metrics';
 import {
   dispositionOf,
+  editorialOutcome,
   findingFingerprint,
   graphJudgeOutcome,
   hashReviewedBody,
@@ -179,6 +180,73 @@ describe('graphJudgeOutcome', () => {
       ['mechanics', 'warning', 'draft is 16 '],
     ]);
     expect(result).toMatchObject({ disposition: 'blocking', briefCompliance: { compliant: false, issues: ['the bribe happens off-page'] } });
+  });
+});
+
+describe('editorialOutcome', () => {
+  const slip = { kind: 'spelling' as const, quote: 'counted the lanterns on the quay twice', fix: 'counted the lanterns on the quay twice over' };
+
+  it('should turn each proofreading slip into a warning quoting the span, with the fix in its text', () => {
+    const result = editorialOutcome(
+      BODY,
+      { disposition: 'approve', findings: [], proofreading: [slip, { kind: 'name', quote: 'Mara counted', fix: 'Marra counted', reason: 'the Story Bible spells it Marra' }] },
+      false,
+    );
+
+    expect(result.findings).toEqual([
+      expect.objectContaining({
+        severity: 'warning',
+        category: 'proofreading',
+        text: 'Spelling: “counted the lanterns on the quay twice” → “counted the lanterns on the quay twice over”',
+        evidence: 'counted the lanterns on the quay twice',
+      }),
+      expect.objectContaining({ severity: 'warning', category: 'proofreading', text: 'Name: “Mara counted” → “Marra counted” (the Story Bible spells it Marra)' }),
+    ]);
+    expect(result.disposition).toBe('issues');
+    expect(result.checked).toContain('grammar, spelling, punctuation, tense, point of view, names and references');
+  });
+
+  it('should drop a slip whose quote is not in the prose, whose fix changes nothing, or that repeats', () => {
+    const result = editorialOutcome(
+      BODY,
+      {
+        disposition: 'approve',
+        proofreading: [
+          { kind: 'grammar', quote: 'the harbour master shouted', fix: 'the harbour master shouts' },
+          { kind: 'punctuation', quote: '“Nine,” she said.', fix: '“Nine,” she said.' },
+          slip,
+          { ...slip, quote: `  ${slip.quote} ` },
+        ],
+      },
+      false,
+    );
+
+    expect(result.findings).toHaveLength(1);
+    expect(result.findings[0]?.evidence).toBe(slip.quote);
+  });
+
+  it('should never block on proofreading, however many slips there are, and keep at most twenty', () => {
+    const slips = Array.from({ length: 25 }, (_, index) => ({ kind: 'tense' as const, quote: 'Mara counted', fix: `Mara counts ${index}` }));
+
+    const result = editorialOutcome(BODY, { disposition: 'revision_requested', proofreading: slips }, false);
+
+    expect(result.findings).toHaveLength(20);
+    expect(result.findings.every(finding => finding.severity === 'warning')).toBe(true);
+    expect(result.disposition).toBe('issues');
+  });
+
+  it('should say proofreading was not assessed when the editor left it out, rather than read as clean', () => {
+    const result = editorialOutcome(BODY, { disposition: 'approve', findings: [] }, true);
+
+    expect(result.findings).toEqual([expect.objectContaining({ severity: 'note', category: 'proofreading', text: expect.stringContaining('Proofreading was not assessed') })]);
+    expect(result.checked).toEqual(['the chapter plan', 'canon', 'prose against the established style']);
+  });
+
+  it('should read an empty proofreading list as checked and clean', () => {
+    const result = editorialOutcome(BODY, { disposition: 'approve', findings: [], proofreading: [] }, false);
+
+    expect(result.disposition).toBe('clear');
+    expect(result.checked).toContain('grammar, spelling, punctuation, tense, point of view, names and references');
   });
 });
 

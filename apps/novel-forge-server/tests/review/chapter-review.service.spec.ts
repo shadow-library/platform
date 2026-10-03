@@ -221,6 +221,22 @@ describe('ChapterReviewService.run', () => {
     expect(review.findings).toContainEqual(expect.objectContaining({ severity: 'note', text: expect.stringContaining('Secret-keeping beyond give-away words was not assessed') }));
   });
 
+  it('should proofread a hand-written chapter without a plan and store its slips as warnings that hold nothing', async () => {
+    const run = reviewHarness({
+      brief: null,
+      editorialAnswer: { disposition: 'approve', findings: [], proofreading: [{ kind: 'spelling', quote: 'his ledger shut', fix: 'his ledger closed' }] },
+    });
+
+    const review = await run.service.run(1n, 4, { kind: 'editorial' });
+
+    expect(run.modelCalls[0]?.prompt).toContain('(no plan was written for this chapter)');
+    expect(review.findings).toEqual([
+      expect.objectContaining({ severity: 'warning', category: 'proofreading', text: 'Spelling: “his ledger shut” → “his ledger closed”', evidence: 'his ledger shut' }),
+    ]);
+    expect(review.openBlocking).toBe(0);
+    expect(run.writesTo(schema.drafts, 'update')).toEqual([]);
+  });
+
   it('should review an isolated chapter on the unrestricted route', async () => {
     const run = reviewHarness({ draft: reviewDraft({ isolated: true }) });
 

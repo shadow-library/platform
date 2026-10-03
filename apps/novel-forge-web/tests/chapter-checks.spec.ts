@@ -5,11 +5,13 @@ import {
   approvalMessage,
   approvalRefusal,
   blockingHold,
+  categoryLabel,
   dispositionView,
   findingState,
   groupFindings,
   holdDetail,
   holdMessage,
+  kindDescription,
   kindStatus,
   kindSubline,
   openFindingsNote,
@@ -64,6 +66,13 @@ function job(overrides: Partial<GenerationJobItem> = {}): GenerationJobItem {
     ...overrides,
   } as GenerationJobItem;
 }
+
+describe('categoryLabel', () => {
+  it('should name proofreading findings and say the editor’s read proofreads', () => {
+    expect(categoryLabel('proofreading')).toBe('Proofreading');
+    expect(kindDescription('editorial')).toContain('proofreading: grammar, spelling, punctuation, tense and point-of-view slips, names and references');
+  });
+});
 
 describe('versionLabel', () => {
   it('should name the draft revision, or the final text when there is none', () => {

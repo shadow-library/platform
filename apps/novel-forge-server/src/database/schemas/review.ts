@@ -6,7 +6,7 @@ import { jsonb } from './jsonb';
 import { contentMode, costTier, projects } from './projects';
 
 export type ReviewFindingSeverity = 'blocking' | 'warning' | 'note';
-export type ReviewFindingCategory = 'continuity' | 'brief' | 'ending' | 'knowledge' | 'readability' | 'mechanics' | 'editorial';
+export type ReviewFindingCategory = 'continuity' | 'brief' | 'ending' | 'knowledge' | 'readability' | 'mechanics' | 'editorial' | 'proofreading';
 
 export interface ChapterReviewFinding {
   /** Stable within its review; remedies address a finding by it. */

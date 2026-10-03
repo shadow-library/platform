@@ -1,6 +1,6 @@
 import { Field, Schema } from '@shadow-library/class-schema';
 
-import { ReviewDisposition, ReviewSeverity } from './enums';
+import { ProofreadKind, type ProofreadKindValue, ReviewDisposition, ReviewSeverity } from './enums';
 
 @Schema()
 export class ReviewFinding {
@@ -15,6 +15,21 @@ export class ReviewFinding {
 }
 
 @Schema()
+export class ProofreadFinding {
+  @Field(() => ProofreadKind)
+  kind: ProofreadKindValue;
+
+  @Field({ minLength: 1, description: 'the exact offending span, copied verbatim from the draft with a few words around the slip' })
+  quote: string;
+
+  @Field({ minLength: 1, description: 'the same span corrected, changing only the slip' })
+  fix: string;
+
+  @Field({ optional: true, description: 'a few words on why, when the fix alone does not say it (the spelling the Story Bible uses, the tense the scene is in)' })
+  reason?: string;
+}
+
+@Schema()
 export class ReviewSchema {
   @Field(() => ReviewDisposition)
   disposition: 'approve' | 'revision_requested';
@@ -24,6 +39,9 @@ export class ReviewSchema {
 
   @Field(() => [ReviewFinding], { optional: true })
   findings?: ReviewFinding[];
+
+  @Field(() => [ProofreadFinding], { optional: true, description: 'every proofreading slip, most important first; an empty array when the prose is clean' })
+  proofreading?: ProofreadFinding[];
 }
 
 export type ReviewOutput = ReviewSchema;

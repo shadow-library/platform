@@ -212,7 +212,7 @@ export function reviewHarness(options: ReviewFakeOptions = {}): ReviewHarness {
     }),
     structured: async (module: { key: string }, input: Record<string, unknown>, _ctx: unknown, project?: { contentMode?: string }) => {
       record(module.key, project, promptText(input));
-      return options.editorialAnswer ?? { disposition: 'approve', findings: [] };
+      return options.editorialAnswer ?? { disposition: 'approve', findings: [], proofreading: [] };
     },
   };
   const pluginPolicy = {

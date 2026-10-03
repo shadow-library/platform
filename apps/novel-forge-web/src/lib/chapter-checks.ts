@@ -32,7 +32,7 @@ const KIND_NOUN: Record<ChapterReviewKind, string> = {
 
 const KIND_DESCRIPTION: Record<ChapterReviewKind, string> = {
   judge: 'Reads the chapter against the Story Bible, the plan, the ending it should reach and the secrets kept from the reader.',
-  editorial: 'An editor’s read against the plan, the canon and your style.',
+  editorial: 'An editor’s read against the plan, the canon and your style, with proofreading: grammar, spelling, punctuation, tense and point-of-view slips, names and references.',
   mechanics: 'Length against the target, repeated paragraphs, reused phrases, stock phrases and dialogue tags. Measured at once, no model call.',
   readability: 'Sentence and paragraph length, reading grade and ornate phrasing. Measured at once, no model call.',
 };
@@ -49,6 +49,7 @@ const CATEGORY_LABEL: Record<ReviewFindingCategory, string> = {
   readability: 'Readability',
   mechanics: 'Mechanics',
   editorial: 'Editorial',
+  proofreading: 'Proofreading',
 };
 
 export type ReviewJobPhase = 'queued' | 'running';

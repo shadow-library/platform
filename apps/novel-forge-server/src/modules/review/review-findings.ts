@@ -5,7 +5,8 @@ import { type ChapterReviewCompliance, type ChapterReviewFinding, type Review, t
 import { checkDraftMechanics } from '../ai/graphs/mechanical-check';
 import { assessReadability, READABILITY_MIN_WORDS, READABILITY_PREFIX } from '../ai/graphs/readability-check';
 import { type JudgeOutput } from '../ai/schemas/judge.schema';
-import { type ReviewOutput } from '../ai/schemas/review.schema';
+import { type ProofreadKindValue } from '../ai/schemas/enums';
+import { type ProofreadFinding, type ReviewOutput } from '../ai/schemas/review.schema';
 import { type FactLike, KNOWLEDGE_LEAK_PREFIX, type KnowledgeLeakIssue } from '../bible/fact/knowledge-view';
 import { countWords, type ResolvedWordTarget } from '../eval/deterministic-metrics';
 
@@ -56,6 +57,16 @@ type OutcomeBase = Omit<ReviewOutcome, 'disposition' | 'findings'>;
 const QUOTED = /["“]([^"“”]{12,}?)["”]/g;
 const ELLIPSIS = /^(?:…|\.{3})|(?:…|\.{3})$/g;
 const MECHANICAL_PREFIX = /^mechanical:\s*/;
+const PROOFREADING_MAX = 20;
+const PROOFREAD_LABEL: Record<ProofreadKindValue, string> = {
+  grammar: 'Grammar',
+  spelling: 'Spelling',
+  punctuation: 'Punctuation',
+  tense: 'Tense slip',
+  pov: 'Point-of-view slip',
+  name: 'Name',
+  reference: 'Unknown reference',
+};
 
 function comparable(text: string): string {
   return text.replace(/[“”]/g, '"').replace(/[‘’]/g, "'").replace(/\s+/g, ' ').trim().toLowerCase();
@@ -232,17 +243,43 @@ export function graphJudgeOutcome(body: string, pass: GraphJudgePass): ReviewOut
   return outcome('judge', body, base, drafts, failed);
 }
 
+/** Proofreading only suggests, so a slip is never blocking; one whose quote is not in the prose, whose fix changes nothing, or that repeats is dropped. */
+export function proofreadingFindings(body: string, slips: ProofreadFinding[]): DraftFinding[] {
+  const seen = new Set<string>();
+  const drafts: DraftFinding[] = [];
+  for (const slip of slips) {
+    const quote = slip.quote.trim();
+    const fix = slip.fix.trim();
+    const key = `${comparable(quote)}|${comparable(fix)}`;
+    if (!fix || comparable(quote) === comparable(fix) || seen.has(key) || !verifiedEvidence(body, [quote])) continue;
+    seen.add(key);
+    const reason = slip.reason?.trim();
+    drafts.push({ severity: 'warning', category: 'proofreading', text: `${PROOFREAD_LABEL[slip.kind]}: “${quote}” → “${fix}”${reason ? ` (${reason})` : ''}`, evidence: quote });
+    if (drafts.length === PROOFREADING_MAX) break;
+  }
+  return drafts;
+}
+
 export function editorialOutcome(body: string, output: ReviewOutput, hasBrief: boolean): ReviewOutcome {
-  const drafts: DraftFinding[] = (output.findings ?? []).map(finding => ({
-    severity: finding.severity === 'blocking' ? 'blocking' : 'note',
-    category: 'editorial',
-    text: finding.text,
-    evidence: finding.evidence,
-  }));
+  const proofread = output.proofreading !== undefined;
+  const drafts: DraftFinding[] = [
+    ...(output.findings ?? []).map(
+      finding => ({ severity: finding.severity === 'blocking' ? 'blocking' : 'note', category: 'editorial', text: finding.text, evidence: finding.evidence }) as const,
+    ),
+    ...proofreadingFindings(body, output.proofreading ?? []),
+    ...(proofread
+      ? []
+      : [{ severity: 'note', category: 'proofreading', text: 'Proofreading was not assessed — the editor left it out. Run the review again to check it.' } as const]),
+  ];
   const base: OutcomeBase = {
     verdict: output.disposition,
     note: output.note?.trim() || null,
-    checked: [...(hasBrief ? ['the chapter plan'] : []), 'canon', 'prose against the established style'],
+    checked: [
+      ...(hasBrief ? ['the chapter plan'] : []),
+      'canon',
+      'prose against the established style',
+      ...(proofread ? ['grammar, spelling, punctuation, tense, point of view, names and references'] : []),
+    ],
     briefCompliance: null,
     readabilityCompliance: null,
     endingCompliance: null,

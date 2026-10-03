@@ -5548,7 +5548,7 @@ export interface components {
     /** @enum {string} */
     ReviewFindingSeverity: 'blocking' | 'warning' | 'note';
     /** @enum {string} */
-    ReviewFindingCategory: 'continuity' | 'brief' | 'ending' | 'knowledge' | 'readability' | 'mechanics' | 'editorial';
+    ReviewFindingCategory: 'continuity' | 'brief' | 'ending' | 'knowledge' | 'readability' | 'mechanics' | 'editorial' | 'proofreading';
     ReviewRemedyResponse: {
       action: components['schemas']['ReviewRemedyAction'];
       reason?: string | null;
@@ -5562,7 +5562,7 @@ export interface components {
       issues: string[];
     };
     RunChapterReviewBody: {
-      /** @description judge: continuity, the plan, the ending contract, kept-back secrets and readability. editorial: an editor’s read against the plan, canon and style. mechanics and readability are deterministic and make no model call. */
+      /** @description judge: continuity, the plan, the ending contract, kept-back secrets and readability. editorial: an editor’s read against the plan, canon and style, with proofreading (grammar, spelling, punctuation, tense, point of view, names and references). mechanics and readability are deterministic and make no model call. */
       kind: components['schemas']['ChapterReviewKind'];
       /** @description Runs this review at this tier instead of the one the chat turn or project would use. Ignored by mechanics and readability. */
       costTier?: components['schemas']['CostTier'];

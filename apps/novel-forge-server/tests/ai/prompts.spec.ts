@@ -25,6 +25,7 @@ import {
   FixSchema,
   IllustrationComposeSchema,
   JudgeSchema,
+  ReviewSchema,
   validateOutlineCoverage,
 } from '@modules/ai/schemas';
 import { parseSchema } from '@modules/ai/schemas/validate';
@@ -662,6 +663,27 @@ describe('Prompt modules', () => {
       expect(parseSchema(JudgeSchema, { verdict: 'consistent', findings: [] }).success).toBe(true);
       expect(parseSchema(JudgeSchema, { verdict: 'consistent', findings: [], readabilityCompliance: { compliant: false, issues: ['"x" — say it plainly'] } }).success).toBe(true);
       expect(parseSchema(JudgeSchema, { verdict: 'consistent', findings: [], readabilityCompliance: { compliant: false } }).success).toBe(false);
+    });
+  });
+
+  describe('proofreading (review v1.2)', () => {
+    it('should ask the editor for every kind of slip, quoted verbatim with a fix, and leave voice and canon contradictions alone', () => {
+      const system = PROMPT_REGISTRY.review.system;
+      expect(PROMPT_REGISTRY.review.version).toBe('1.2.0');
+      for (const kind of ['grammar', 'spelling', 'punctuation', 'tense', 'pov', 'name', 'reference']) expect(system).toContain(kind);
+      expect(system).toContain('copy the exact offending span verbatim from the draft into quote');
+      expect(system).toContain('write the same span corrected in fix, changing only the slip');
+      expect(system).toContain('dialect, slang and broken grammar in dialogue');
+      expect(system).toContain('A contradiction of an established fact belongs in findings, not in proofreading.');
+      expect(system).not.toMatch(/[{}]/);
+    });
+
+    it('should keep proofreading optional in the review schema and require a known kind, a quote and a fix', () => {
+      const slip = { kind: 'spelling', quote: 'Mara recieved the lamp', fix: 'Mara received the lamp' };
+      expect(parseSchema(ReviewSchema, { disposition: 'approve' }).success).toBe(true);
+      expect(parseSchema(ReviewSchema, { disposition: 'approve', proofreading: [slip, { ...slip, kind: 'name', reason: 'the Story Bible spells it Mara' }] }).success).toBe(true);
+      expect(parseSchema(ReviewSchema, { disposition: 'approve', proofreading: [{ ...slip, kind: 'style' }] }).success).toBe(false);
+      expect(parseSchema(ReviewSchema, { disposition: 'approve', proofreading: [{ ...slip, fix: '' }] }).success).toBe(false);
     });
   });
 
