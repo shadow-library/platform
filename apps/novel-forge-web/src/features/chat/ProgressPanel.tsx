@@ -4,7 +4,6 @@ import { Button, Drawer, IconButton } from '@shadow-library/ui';
 import { CheckIcon, CloseIcon, WarningIcon } from '@/components/icons';
 import { Markdown } from '@/components/nf/Markdown';
 import { type ApplyProposalResponse, isApiError, type ProposalResponse, useProposalOpMutation, useProposalQuery } from '@/lib/apis';
-import { useNow } from '@/lib/use-elapsed';
 
 import { type AppliedOpState, currentOpState, type OpRun, updateOpState, useOpState } from './applied-op-store';
 import { opSubject, REJECTION_SCOPE_LABEL, type RejectionScope, rejectionScopeNote, type SessionMode, type SuggestionDecision } from './chat-view';
@@ -19,9 +18,6 @@ import {
   type OpPrompt,
   opSequenceStopped,
   type PanelTurn,
-  type ProgressStep,
-  type ProgressView,
-  progressView,
   runOpSequence,
   type SourcesView,
   sourcesView,
@@ -31,46 +27,6 @@ import {
 import styles from './ProgressPanel.module.css';
 import { useSuggestionAnswers } from './suggestion-store';
 import { useSuggestionAnswering } from './use-suggestion-answering';
-
-const STEP_STATE: Record<ProgressStep['state'], string> = { pending: 'not started', running: 'in progress', done: 'done', stopped: 'stopped', failed: 'didn’t finish' };
-
-export interface ProgressSectionProps {
-  view: ProgressView;
-}
-
-export function ProgressSection({ view }: ProgressSectionProps): React.JSX.Element {
-  const titleId = useId();
-  return (
-    <section className={styles.section} aria-labelledby={titleId}>
-      <h3 id={titleId} className={styles.sectionTitle}>
-        Progress
-        {view.status && <span className={styles.sectionMeta}>{view.status}</span>}
-      </h3>
-      {view.steps.length === 0 ? (
-        <p className={styles.empty}>Send a message to see Forge work through it.</p>
-      ) : (
-        <ol className={styles.steps}>
-          {view.steps.map(step => (
-            <li key={step.key} className={styles.step} data-state={step.state} aria-current={step.state === 'running' ? 'step' : undefined}>
-              <span className={styles.stepMark} aria-hidden="true">
-                {step.state === 'done' && <CheckIcon size={10} />}
-                {step.state === 'failed' && <WarningIcon size={10} />}
-              </span>
-              <span className={styles.stepText}>
-                <span>
-                  {step.label}
-                  <span className={styles.srOnly}>, {STEP_STATE[step.state]}</span>
-                </span>
-                {step.sub && step.state !== 'pending' && <span className={styles.stepSub}>{step.sub}</span>}
-              </span>
-              <span className={styles.stepTime}>{step.time}</span>
-            </li>
-          ))}
-        </ol>
-      )}
-    </section>
-  );
-}
 
 const SOURCE_STATUS: Record<string, string> = { running: 'reading', ok: 'read', error: 'couldn’t be read' };
 
@@ -411,17 +367,12 @@ export interface ProgressPanelProps {
 
 export function ProgressPanel({ novelId, turn, mode, onApplied, reveal, onBackToCurrent }: ProgressPanelProps): React.JSX.Element {
   const refs = turnRefs(turn);
-  const live = turn.kind === 'stream' && (turn.stream.status === 'idle' || turn.stream.status === 'streaming');
-  const now = useNow(live);
   const appliedQuery = useProposalQuery(novelId, refs.appliedProposalId);
   const cardsQuery = useProposalQuery(novelId, refs.proposalId);
   const applied = appliedQuery.data ?? refs.applied;
   const cards = cardsQuery.data ?? refs.cards;
   const answers = useSuggestionAnswers(cards?.id);
   const changes = changesView({ turn, mode, applied, cards, decisions: answers.decisions, scopes: answers.scopes });
-  const settledCount = changes.kind === 'settled' ? [...changes.applied, ...changes.cards].reduce((sum, group) => sum + group.items.length, 0) : 0;
-  const saveMode: SessionMode = turn.kind === 'message' ? (refs.appliedProposalId ? 'auto' : 'manual') : mode;
-  const progress = progressView({ turn, mode: saveMode, now, changes: settledCount, question: refs.question });
   const sectionRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -451,7 +402,6 @@ export function ProgressPanel({ novelId, turn, mode, onApplied, reveal, onBackTo
           </Button>
         </div>
       )}
-      <ProgressSection view={progress} />
       <ChangesSection
         view={changes}
         sectionRef={sectionRef}
@@ -468,7 +418,9 @@ export function ProgressPanel({ novelId, turn, mode, onApplied, reveal, onBackTo
 }
 
 export interface ProgressDockProps extends ProgressPanelProps {
-  asideRef: Ref<HTMLElement>;
+  /** Beside the chat only while changes wait for the author's OK, or once asked for. */
+  docked: boolean;
+  onClose: () => void;
   sheetOpen: boolean;
   onSheetOpenChange: (open: boolean) => void;
   /** The sheet opened from a receipt: focus goes to the changes rather than the sheet's close button. */
@@ -476,14 +428,19 @@ export interface ProgressDockProps extends ProgressPanelProps {
 }
 
 /** The panel beside the chat where the thread keeps its full column, and the same panel as a sheet where it would not. */
-export function ProgressDock({ asideRef, sheetOpen, onSheetOpenChange, sheetReveals, ...panel }: ProgressDockProps): React.JSX.Element {
+export function ProgressDock({ docked, onClose, sheetOpen, onSheetOpenChange, sheetReveals, ...panel }: ProgressDockProps): React.JSX.Element {
   return (
     <>
-      <aside ref={asideRef} className={styles.panel} aria-label="Turn progress">
-        <ProgressPanel {...panel} />
-      </aside>
+      {docked && (
+        <aside className={styles.panel} aria-label="Story Bible changes">
+          <div className={styles.panelBar}>
+            <IconButton variant="ghost" size="sm" aria-label="Close panel" icon={<CloseIcon />} onClick={onClose} />
+          </div>
+          <ProgressPanel {...panel} />
+        </aside>
+      )}
       <Drawer open={sheetOpen} onOpenChange={onSheetOpenChange} size="sm" onOpenAutoFocus={event => sheetReveals && event.preventDefault()}>
-        <Drawer.Header title="Progress" />
+        <Drawer.Header title="Story Bible changes" />
         <Drawer.Body className={styles.sheetBody}>
           <ProgressPanel {...panel} reveal={sheetReveals ? panel.reveal : 0} />
         </Drawer.Body>

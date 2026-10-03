@@ -1985,7 +1985,7 @@ them off `model_calls` rather than trusting a number here. Cost and admin inspec
 - **Input C:** Input A again with `"justDiscussing": true` (the composer's **Just discuss** mode).
 - **Verify:**
   - A: the entity op lands in `appliedProposal` with its `quote`; the assistant message carries `appliedProposalId`.
-    Anything the model added beyond your words (a new trait, a rank) is in `proposal` as a card. The Progress panel's
+    Anything the model added beyond your words (a new trait, a rank) is in `proposal` as a card. The changes panel's
     change list shows each written value beside its quote, with a per-change undo.
   - B and C: nothing applies; every op is a card.
   - Removals, plans, prose, actions, planner-only pages, replacing a filled story field, a secret's truth or its

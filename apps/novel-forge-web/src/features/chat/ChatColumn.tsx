@@ -42,6 +42,7 @@ import { type TurnChoice, turnChoiceDefaults, turnOverride } from '@/lib/chat-mo
 import { chatColumnView, chatTitle } from '@/lib/chat-sessions';
 import { timelineOfTrace, turnTimeline } from '@/lib/chat-turn-timeline';
 import { messageTime, projectTitle } from '@/lib/format';
+import { PANEL_DOCK_MIN } from '@/lib/sidebar-rail';
 import { takePendingFirstTurn } from '@/lib/pending-first-turn';
 
 import { editQueued, inputCaption, type QueuedTurn, queuedView, queueStep, releaseSettings, restoreFailed, type TurnSettings } from './chat-queue';
@@ -83,7 +84,7 @@ import { ComposerModeMenu } from './ComposerModeMenu';
 import { JobProgress } from './JobProgress';
 import { OrganiseReceipt } from './OrganiseReceipt';
 import { ProgressDock } from './ProgressPanel';
-import { panelTurnOf } from './progress-panel-view';
+import { type DockState, dockState, panelTurnOf, turnRefs } from './progress-panel-view';
 import { ProposalSlot } from './ProposalSlot';
 import { QuestionCard } from './QuestionCard';
 import { ReadyChecklist } from './ReadyChecklist';
@@ -182,7 +183,8 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
   const [panelReveal, setPanelReveal] = useState(0);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetReveals, setSheetReveals] = useState(false);
-  const panelRef = useRef<HTMLElement>(null);
+  const [dock, setDock] = useState<DockState>({ kind: 'closed' });
+  const frameRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const composerRef = useRef<HTMLDivElement>(null);
@@ -521,11 +523,17 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
     );
   };
 
-  // The side panel collapses to nothing where the thread would lose its column, and the receipt then opens it as a sheet.
+  // A reveal left over from an earlier review would scroll and focus a panel that opened on its own, taking the author out of the composer.
+  const closeDock = (dismissed: string | undefined): void => {
+    setDock({ kind: 'closed', dismissed });
+    setPanelReveal(0);
+  };
+
+  // The panel docks only where the thread keeps its full column beside it; narrower, the receipt opens it as a sheet.
   const reviewInPanel = (messageId: string): void => {
     setPanelFocus(messageId);
     setPanelReveal(count => count + 1);
-    if ((panelRef.current?.offsetWidth ?? 0) > 0) return;
+    if ((frameRef.current?.offsetWidth ?? 0) >= PANEL_DOCK_MIN) return setDock({ kind: 'open' });
     setSheetReveals(true);
     setSheetOpen(true);
   };
@@ -534,13 +542,11 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
   const [panelSawPending, setPanelSawPending] = useState(pending);
   if (pending !== panelSawPending) {
     setPanelSawPending(pending);
-    if (pending) setPanelFocus(undefined);
+    if (pending) {
+      setPanelFocus(undefined);
+      closeDock(undefined);
+    }
   }
-
-  const openProgress = (): void => {
-    setSheetReveals(false);
-    setSheetOpen(true);
-  };
 
   const planStartBar = useRef<HTMLDivElement>(null);
   const focusPlanStart = useRef(false);
@@ -602,9 +608,14 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
 
   const conversation = view.kind === 'conversation';
   const panelTurn = panelTurnOf({ stream, streamShown: showStream, messages, focus: panelFocus });
+  const panelRefs = turnRefs(panelTurn);
+  const panelCards = useProposalQuery(novelId, panelRefs.proposalId).data ?? panelRefs.cards;
+  const reviewCardsId = panelCards?.status === 'pending' ? panelCards.id : undefined;
+  const nextDock = dockState(dock, reviewCardsId);
+  if (nextDock !== dock) setDock(nextDock);
 
   return (
-    <div className={styles.frame}>
+    <div ref={frameRef} className={styles.frame}>
       <div className={styles.column}>
         <div className={styles.head}>
           <div className={styles.headInner}>
@@ -703,7 +714,6 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
                 <LiveStreamedTurn
                   stream={stream}
                   mode={mode}
-                  onProgress={openProgress}
                   receipt={
                     stream.status === 'done' && (
                       <TurnReceipt
@@ -820,7 +830,8 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
           onApplied={onApplied}
           reveal={panelReveal}
           onBackToCurrent={panelFocus && pending ? () => setPanelFocus(undefined) : undefined}
-          asideRef={panelRef}
+          docked={dock.kind === 'open'}
+          onClose={() => closeDock(reviewCardsId)}
           sheetOpen={sheetOpen}
           onSheetOpenChange={setSheetOpen}
           sheetReveals={sheetReveals}

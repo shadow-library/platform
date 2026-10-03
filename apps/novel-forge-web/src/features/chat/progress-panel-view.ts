@@ -1,8 +1,6 @@
 import { type ChatMessageResponse, type ChatTurnTraceResponse, type ProposalResponse, type TurnHoldReason } from '@/lib/apis/api-types.gen';
 import { type ChatTurnChangeGroup, type ChatTurnStreamState, type ProposalOpDirection, type ProposalOpOutcome } from '@/lib/apis/refinement.api';
-import { turnPhase, turnSummary } from '@/lib/chat-turn-phase';
 import { type TurnSource, turnSources } from '@/lib/chat-turn-timeline';
-import { formatElapsed } from '@/lib/format';
 import { type ChangeOp } from '@/lib/proposals';
 
 import {
@@ -12,7 +10,6 @@ import {
   opSubject,
   opWrittenText,
   proposalPresentation,
-  questionOf,
   type RejectionScope,
   rejectionScopesFor,
   type SessionMode,
@@ -47,6 +44,14 @@ export function panelTurnOf({ stream, streamShown, messages, focus }: PanelTurnI
   return latest.id === watched ? { kind: 'stream', stream } : { kind: 'message', message: latest };
 }
 
+/** Closed until a turn leaves changes waiting for the author's OK; closing it keeps those changes from reopening it, and newer ones still do. */
+export type DockState = { kind: 'closed'; dismissed?: string } | { kind: 'open' };
+
+export function dockState(state: DockState, reviewCardsId: string | undefined): DockState {
+  if (state.kind === 'open' || !reviewCardsId || state.dismissed === reviewCardsId) return state;
+  return { kind: 'open' };
+}
+
 export interface TurnRefs {
   messageId?: string;
   appliedProposalId?: string;
@@ -54,21 +59,19 @@ export interface TurnRefs {
   /** The settled turn's own copies, shown until the proposal queries answer. */
   applied?: ProposalResponse;
   cards?: ProposalResponse;
-  question: boolean;
 }
 
 export function turnRefs(turn: PanelTurn): TurnRefs {
-  if (turn.kind === 'none') return { question: false };
+  if (turn.kind === 'none') return {};
   if (turn.kind === 'message') {
     const { message } = turn;
     return {
       messageId: message.id,
       appliedProposalId: message.appliedProposalId ?? undefined,
       proposalId: message.proposalId ?? undefined,
-      question: Boolean(questionOf(message.question)),
     };
   }
-  if (turn.stream.status !== 'done') return { question: false };
+  if (turn.stream.status !== 'done') return {};
   const { assistantMessage, appliedProposal, proposal } = turn.stream.turn;
   return {
     messageId: assistantMessage.id,
@@ -76,7 +79,6 @@ export function turnRefs(turn: PanelTurn): TurnRefs {
     proposalId: proposal?.id ?? assistantMessage.proposalId ?? undefined,
     applied: appliedProposal,
     cards: proposal,
-    question: Boolean(questionOf(assistantMessage.question)),
   };
 }
 
@@ -84,143 +86,9 @@ function plural(count: number, one: string, many: string): string {
   return `${count} ${count === 1 ? one : many}`;
 }
 
-export type StepKey = 'read' | 'think' | 'write' | 'save' | 'ask';
-
-export type StepState = 'pending' | 'running' | 'done' | 'stopped' | 'failed';
-
-export interface ProgressStep {
-  key: StepKey;
-  label: string;
-  state: StepState;
-  sub?: string;
-  time?: string;
-}
-
-export interface ProgressView {
-  status: string;
-  steps: ProgressStep[];
-}
-
-export interface ProgressInput {
-  turn: PanelTurn;
-  /** Which way the turn's changes land: saved at once, or prepared as suggestions. */
-  mode: SessionMode;
-  now: number;
-  /** How many changes the settled turn saved or suggested; the live stream counts its own. */
-  changes: number;
-  question: boolean;
-}
-
-const STEP_LABEL: Record<Exclude<StepKey, 'save'>, string> = {
-  read: 'Read your notes and Bible',
-  think: 'Think it through',
-  write: 'Write the reply',
-  ask: 'Ask about what’s missing',
-};
-
-const SAVE_LABEL: Record<SessionMode, string> = { auto: 'Save to Story Bible', manual: 'Prepare suggestions' };
-
-function sourcesSub(sources: TurnSource[], live: boolean): string {
-  const settled = sources.filter(source => source.status !== 'running').length;
-  if (live) return `${settled} of ${plural(sources.length, 'source', 'sources')}`;
-  const failed = sources.filter(source => source.status === 'error').length;
-  const read = plural(sources.length - failed, 'source', 'sources');
-  return failed > 0 ? `${read} · ${failed} couldn’t be read` : read;
-}
-
-interface StepClock {
-  readMs: number;
-  thinkMs: number;
-  writeMs?: number;
-  saveMs?: number;
-}
-
-function stepClock(state: ChatTurnStreamState, now: number): StepClock {
-  const { timing } = state;
-  const end = timing.endedAt ?? now;
-  const { thoughtMs } = turnSummary(state, now);
-  const wrote = [timing.replyAt, timing.changeAt].filter((at): at is number => at !== null);
-  const firstWrite = wrote.length > 0 ? Math.min(...wrote) : end;
-  return {
-    readMs: timing.startedAt === null ? 0 : Math.max(0, firstWrite - timing.startedAt - thoughtMs),
-    thinkMs: thoughtMs,
-    writeMs: timing.replyAt === null ? undefined : Math.max(0, (timing.changeAt ?? end) - timing.replyAt),
-    saveMs: timing.changeAt === null ? undefined : Math.max(0, end - timing.changeAt),
-  };
-}
-
-function liveSteps(state: ChatTurnStreamState, mode: SessionMode, now: number): ProgressStep[] {
-  const phase = turnPhase(state, now);
-  const clock = stepClock(state, now);
-  const sources = turnSources(state.lookups);
-  const { replyAt, changeAt } = state.timing;
-  const wrote = replyAt !== null || changeAt !== null;
-  const steps: ProgressStep[] = [];
-  if (sources.length > 0) {
-    const reading = phase.kind === 'reading';
-    steps.push({
-      key: 'read',
-      label: STEP_LABEL.read,
-      state: reading ? 'running' : 'done',
-      sub: sourcesSub(sources, true),
-      time: reading ? undefined : formatElapsed(clock.readMs),
-    });
-  } else if (phase.kind === 'starting') {
-    steps.push({ key: 'read', label: STEP_LABEL.read, state: 'pending' });
-  }
-  const thinkState: StepState = wrote ? 'done' : phase.kind === 'thinking' ? 'running' : 'pending';
-  steps.push({ key: 'think', label: STEP_LABEL.think, state: thinkState, time: thinkState === 'done' ? formatElapsed(clock.thinkMs) : undefined });
-  const writeState: StepState = replyAt === null ? 'pending' : changeAt !== null ? 'done' : 'running';
-  steps.push({ key: 'write', label: STEP_LABEL.write, state: writeState, time: writeState === 'done' && clock.writeMs !== undefined ? formatElapsed(clock.writeMs) : undefined });
-  const saving = changeAt !== null;
-  steps.push({ key: 'save', label: SAVE_LABEL[mode], state: saving ? 'running' : 'pending', sub: saving ? `${state.changes.length} so far` : undefined });
-  return steps;
-}
-
-function settledSteps(clock: StepClock, sources: TurnSource[], input: ProgressInput): ProgressStep[] {
-  const time = (ms: number | undefined): string | undefined => (ms === undefined ? undefined : formatElapsed(ms));
-  return [
-    ...(sources.length > 0 ? [{ key: 'read' as const, label: STEP_LABEL.read, state: 'done' as const, sub: sourcesSub(sources, false), time: time(clock.readMs) }] : []),
-    { key: 'think', label: STEP_LABEL.think, state: 'done', time: time(clock.thinkMs) },
-    { key: 'write', label: STEP_LABEL.write, state: 'done', time: time(clock.writeMs) },
-    ...(input.changes > 0
-      ? [{ key: 'save' as const, label: SAVE_LABEL[input.mode], state: 'done' as const, sub: plural(input.changes, 'change', 'changes'), time: time(clock.saveMs) }]
-      : []),
-    ...(input.question ? [{ key: 'ask' as const, label: STEP_LABEL.ask, state: 'done' as const, sub: '1 question' }] : []),
-  ];
-}
-
-/** A stopped or failed turn keeps the steps it reached; the one it was on carries how it ended, and nothing after it is claimed. */
-function endedSteps(state: ChatTurnStreamState, mode: SessionMode, now: number, ending: 'stopped' | 'failed'): ProgressStep[] {
-  const reached = liveSteps({ ...state, status: 'streaming' }, mode, now).filter(step => step.state !== 'pending');
-  return reached.map((step, index) => (index === reached.length - 1 ? { ...step, state: ending, time: undefined } : step));
-}
-
 function settledTrace(turn: PanelTurn): ChatTurnTraceResponse | null | undefined {
   if (turn.kind === 'message') return turn.message.trace;
   return turn.kind === 'stream' && turn.stream.status === 'done' ? turn.stream.turn.assistantMessage.trace : undefined;
-}
-
-export function progressView(input: ProgressInput): ProgressView {
-  const { turn, mode, now } = input;
-  if (turn.kind === 'none') return { status: '', steps: [] };
-  const trace = settledTrace(turn);
-  if (trace) return { status: `Done · ${formatElapsed(trace.timing.workedMs)}`, steps: settledSteps(trace.timing, turnSources(trace.sources), input) };
-  if (turn.kind === 'message') {
-    const steps: ProgressStep[] = [
-      { key: 'write', label: STEP_LABEL.write, state: 'done' },
-      ...(input.changes > 0 ? [{ key: 'save' as const, label: SAVE_LABEL[mode], state: 'done' as const, sub: plural(input.changes, 'change', 'changes') }] : []),
-      ...(input.question ? [{ key: 'ask' as const, label: STEP_LABEL.ask, state: 'done' as const, sub: '1 question' }] : []),
-    ];
-    return { status: 'Done', steps };
-  }
-  const { stream } = turn;
-  const worked = formatElapsed(turnSummary(stream, now).workedMs);
-  if (stream.status === 'done') return { status: `Done · ${worked}`, steps: settledSteps(stepClock(stream, now), turnSources(stream.lookups), input) };
-  if (stream.status === 'stopped') return { status: `Stopped · ${worked}`, steps: endedSteps(stream, mode, now, 'stopped') };
-  if (stream.status === 'failed') return { status: 'Didn’t finish', steps: endedSteps(stream, mode, now, 'failed') };
-  const phase = turnPhase(stream, now);
-  return { status: phase.kind === 'starting' ? 'Starting' : worked, steps: liveSteps(stream, mode, now) };
 }
 
 export type SourcesView = { kind: 'list'; sources: TurnSource[] } | { kind: 'empty'; note: string };

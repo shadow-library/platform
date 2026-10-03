@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { createElement, type ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
-import { AppliedChangeRow, CardChangeRow, ChangesSection, ProgressSection, SourcesSection } from '../src/features/chat/ProgressPanel';
+import { AppliedChangeRow, CardChangeRow, ChangesSection, SourcesSection } from '../src/features/chat/ProgressPanel';
 import {
   appliedChanges,
   appliedReceipt,
@@ -10,13 +10,13 @@ import {
   cardsReceipt,
   changeBreakdown,
   changesView,
+  dockState,
   opChangeGroup,
   opDependencyPrompt,
   opErrorText,
   opSequenceStopped,
   type PanelTurn,
   panelTurnOf,
-  progressView,
   runOpSequence,
   savedSides,
   sourcesView,
@@ -24,7 +24,6 @@ import {
   turnRefs,
 } from '../src/features/chat/progress-panel-view';
 import { TurnReceiptView } from '../src/features/chat/TurnReceipt';
-import { TurnLiveTail } from '../src/features/chat/TurnTimeline';
 import { type ChatMessageResponse, type ChatTurnResponse, type ChatTurnTraceResponse, type ProposalResponse } from '../src/lib/apis/api-types.gen';
 import {
   type ChatTurnStreamEvent,
@@ -156,120 +155,40 @@ describe('panelTurnOf', () => {
   });
 });
 
+describe('dockState', () => {
+  it('should stay closed until a turn leaves changes waiting for the author’s OK', () => {
+    expect(dockState({ kind: 'closed' }, undefined)).toEqual({ kind: 'closed' });
+    expect(dockState({ kind: 'closed' }, 'cp')).toEqual({ kind: 'open' });
+  });
+
+  it('should keep changes the author closed it on from reopening it, and let newer ones', () => {
+    const closed = { kind: 'closed', dismissed: 'cp' } as const;
+
+    expect(dockState(closed, 'cp')).toBe(closed);
+    expect(dockState(closed, 'cp2')).toEqual({ kind: 'open' });
+  });
+
+  it('should stay open once opened, whatever the changes', () => {
+    const open = { kind: 'open' } as const;
+
+    expect(dockState(open, undefined)).toBe(open);
+  });
+});
+
 describe('turnRefs', () => {
-  it('should read a settled turn’s proposals and question, and nothing from a running one', () => {
+  it('should read a settled turn’s proposals, and nothing from a running one', () => {
     const question = { question: 'Who opposes her?', answers: [{ title: 'The Council' }] };
     const done = reduceChatTurnStream(
       startChatTurnStream(0),
       { type: 'done', turn: turn({ appliedProposal: APPLIED, proposal: CARDS, assistantMessage: message('a2', 4, 'assistant', { question }) }) },
       10,
     );
-    expect(turnRefs(streamTurn(done))).toMatchObject({ messageId: 'a2', appliedProposalId: 'ap', proposalId: 'cp', question: true });
-    expect(turnRefs(streamTurn(startChatTurnStream(0)))).toEqual({ question: false });
+    expect(turnRefs(streamTurn(done))).toMatchObject({ messageId: 'a2', appliedProposalId: 'ap', proposalId: 'cp' });
+    expect(turnRefs(streamTurn(startChatTurnStream(0)))).toEqual({});
     expect(turnRefs({ kind: 'message', message: message('a1', 2, 'assistant', { proposalId: 'cp' }) })).toEqual({
       messageId: 'a1',
       appliedProposalId: undefined,
       proposalId: 'cp',
-      question: false,
-    });
-  });
-});
-
-describe('progressView', () => {
-  const view = (stream: ChatTurnStreamState, now: number, mode: 'auto' | 'manual' = 'auto', changes = 0, question = false) =>
-    progressView({ turn: streamTurn(stream), mode, now, changes, question });
-
-  it('should start with every step still to come', () => {
-    const start = view(startChatTurnStream(0), 500);
-    expect(start.status).toBe('Starting');
-    expect(start.steps.map(step => [step.key, step.state])).toEqual([
-      ['read', 'pending'],
-      ['think', 'pending'],
-      ['write', 'pending'],
-      ['save', 'pending'],
-    ]);
-  });
-
-  it('should spin the step running now, count sources read, and time the ones done', () => {
-    const reading = view(play(FULL.slice(0, 1)), 2000);
-    expect(reading.steps[0]).toMatchObject({ key: 'read', state: 'running', sub: '0 of 1 source' });
-    const writing = view(play(FULL.slice(0, 4)), 12_000);
-    expect(writing.status).toBe('12s');
-    expect(writing.steps.map(step => [step.key, step.state, step.time])).toEqual([
-      ['read', 'done', '3s'],
-      ['think', 'done', '7s'],
-      ['write', 'running', undefined],
-      ['save', 'pending', undefined],
-    ]);
-    const noReply = view(play([[change(0), 500]]), 1000);
-    expect(noReply.steps.find(step => step.key === 'write')?.state).toBe('pending');
-    const saving = view(play(FULL), 23_000, 'manual');
-    expect(saving.steps.at(-1)).toMatchObject({ key: 'save', label: 'Prepare suggestions', state: 'running', sub: '2 so far' });
-  });
-
-  it('should settle into done steps with timings, dropping steps that never ran and adding the question', () => {
-    const done = reduceChatTurnStream(play(FULL), { type: 'done', turn: turn() }, 24_000);
-    const settled = view(done, 99_999, 'auto', 5, true);
-    expect(settled.status).toBe('Done · 24s');
-    expect(settled.steps.map(step => [step.label, step.state, step.sub, step.time])).toEqual([
-      ['Read your notes and Bible', 'done', '2 sources', '3s'],
-      ['Think it through', 'done', undefined, '7s'],
-      ['Write the reply', 'done', undefined, '10s'],
-      ['Save to Story Bible', 'done', '5 changes', '4s'],
-      ['Ask about what’s missing', 'done', '1 question', undefined],
-    ]);
-    const quiet = view(reduceChatTurnStream(play([[delta, 1000]]), { type: 'done', turn: turn() }, 2000), 3000);
-    expect(quiet.steps.map(step => step.key)).toEqual(['think', 'write']);
-  });
-
-  it('should end a stopped or failed turn on the step it reached', () => {
-    const stopped = view(stopChatTurnStream(play(FULL.slice(0, 4)), 15_000), 20_000);
-    expect(stopped.status).toBe('Stopped · 15s');
-    expect(stopped.steps.map(step => [step.key, step.state])).toEqual([
-      ['read', 'done'],
-      ['think', 'done'],
-      ['write', 'stopped'],
-    ]);
-    const failed = view(reduceChatTurnStream(play(FULL.slice(0, 1)), { type: 'error', failure: { code: 'X', message: 'boom' } }, 2000), 3000);
-    expect(failed.status).toBe('Didn’t finish');
-    expect(failed.steps.map(step => [step.key, step.state])).toEqual([['read', 'failed']]);
-  });
-
-  it('should rebuild a reloaded turn’s steps and timings from its trace', () => {
-    const history = progressView({ turn: reloaded(TRACE), mode: 'manual', now: 0, changes: 2, question: true });
-    expect(history.status).toBe('Done · 24s');
-    expect(history.steps.map(step => [step.label, step.state, step.sub, step.time])).toEqual([
-      ['Read your notes and Bible', 'done', '2 sources · 1 couldn’t be read', '3s'],
-      ['Think it through', 'done', undefined, '7s'],
-      ['Write the reply', 'done', undefined, '10s'],
-      ['Prepare suggestions', 'done', '2 changes', '4s'],
-      ['Ask about what’s missing', 'done', '1 question', undefined],
-    ]);
-  });
-
-  it('should leave untimed the steps a reply that streamed nothing never took', () => {
-    const quiet = progressView({ turn: reloaded({ sources: [], timing: { readMs: 0, thinkMs: 5000, workedMs: 6000 } }), mode: 'auto', now: 0, changes: 1, question: false });
-    expect(quiet.status).toBe('Done · 6s');
-    expect(quiet.steps.map(step => [step.key, step.time])).toEqual([
-      ['think', '5s'],
-      ['write', undefined],
-      ['save', undefined],
-    ]);
-  });
-
-  it('should time a watched turn by its saved trace once it is done', () => {
-    const done = reduceChatTurnStream(play(FULL), { type: 'done', turn: turn({ assistantMessage: message('a2', 4, 'assistant', { trace: TRACE }) }) }, 30_000);
-    expect(view(done, 99_999).status).toBe('Done · 24s');
-  });
-
-  it('should show only what a turn older than its trace can prove: its reply, its changes and its question', () => {
-    const history = progressView({ turn: reloaded(null), mode: 'manual', now: 0, changes: 2, question: false });
-    expect(history).toEqual({
-      status: 'Done',
-      steps: [
-        { key: 'write', label: 'Write the reply', state: 'done' },
-        { key: 'save', label: 'Prepare suggestions', state: 'done', sub: '2 changes' },
-      ],
     });
   });
 });
@@ -668,16 +587,6 @@ describe('per-change undo and redo', () => {
 });
 
 describe('ProgressPanel sections', () => {
-  it('should mark the running step for assistive tech and time the finished ones', () => {
-    const out = html(createElement(ProgressSection, { view: progressView({ turn: streamTurn(play(FULL.slice(0, 4))), mode: 'auto', now: 12_000, changes: 0, question: false }) }));
-    expect(out).toContain('Progress');
-    expect(out).toContain('aria-current="step"');
-    expect(out).toContain('Write the reply<span');
-    expect(out).toContain(', in progress');
-    expect(out).toContain('<span>3s</span>');
-    expect(html(createElement(ProgressSection, { view: { status: '', steps: [] } }))).toContain('Send a message');
-  });
-
   it('should list sources with their status in words', () => {
     const out = html(createElement(SourcesSection, { view: sourcesView(streamTurn(play(FULL.slice(0, 1)))) }));
     expect(out).toContain('Your notes');
@@ -784,12 +693,5 @@ describe('TurnReceiptView for a mixed or held turn', () => {
     const out = html(createElement(TurnReceiptView, { view, onReview: noop, onAddAll: noop, onCommit: noop }));
     expect(out).toContain('Add 2 now');
     expect(out).not.toContain('Add all');
-  });
-});
-
-describe('TurnLiveTail progress link', () => {
-  it('should offer the progress sheet from the running turn only when asked to', () => {
-    expect(html(createElement(TurnLiveTail, { tail: { label: 'Thinking', elapsed: '3s', starting: false, slow: false }, onProgress: noop }))).toContain('>Progress</button>');
-    expect(html(createElement(TurnLiveTail, { tail: { label: 'Thinking', elapsed: '3s', starting: false, slow: false } }))).not.toContain('Progress');
   });
 });

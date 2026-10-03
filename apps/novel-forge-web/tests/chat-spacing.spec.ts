@@ -219,17 +219,6 @@ const PANEL: Expected[] = [
   { selector: '.section', values: { gap: '10px', padding: '14px 16px' }, source: 'redesign l.160 .psec padding 14px 16px; l.161 h3 margin-bottom 10' },
   { selector: '.sectionTitle', values: { margin: '0', gap: '8px' }, source: 'redesign l.161 .psec h3 gap 8' },
   { selector: '.empty', values: { margin: '0' }, source: 'paragraph reset' },
-  { selector: '.steps', values: { margin: '0', padding: '0', gap: '2px' }, source: 'redesign l.163 .plan gap 2' },
-  {
-    selector: '.step',
-    values: { 'grid-template-columns': '20px minmax(0, 1fr) auto', gap: '8px', padding: '4px 0' },
-    source: 'redesign l.164 .plan li; padding 5px rounded to .turnRow’s 4px 0',
-  },
-  {
-    selector: '.stepMark',
-    values: { width: '16px', height: '16px', 'margin-top': '2px', 'border-radius': 'var(--sh-radius-full)' },
-    source: 'redesign l.167 .plan .mk 16, margin-top 2, round',
-  },
   { selector: '.groupLabel', values: { margin: '10px 0 4px' }, source: 'redesign l.173 .chg-g margin 10px 0 4px' },
   { selector: '.groupLabel:first-child', values: { 'margin-top': '0' }, source: 'redesign l.174 .chg-g:first-child' },
   { selector: '.changeList', values: { margin: '0', padding: '0' }, source: 'list reset' },
@@ -261,6 +250,7 @@ const PANEL: Expected[] = [
   { selector: '.changeValueText', values: { 'max-width': '100%' }, source: 'the value never widens its row' },
   { selector: '.showMore', values: { padding: '0' }, source: 'chat.module.css .textLink padding 0' },
   { selector: '.backBar', values: { padding: '14px 16px 0' }, source: 'redesign l.160 .psec padding 14px 16px, closing onto the section below' },
+  { selector: '.panelBar', values: { padding: '8px 8px 0' }, source: 'the close button tucked into the corner, closing onto the first section' },
   { selector: '.srOnly', values: { width: '1px', height: '1px' }, source: 'Main l.30 .sr' },
 ];
 
@@ -405,15 +395,12 @@ describe('Chat width arithmetic', () => {
     expect(header - controls - px(base.get('.head')?.gap)).toBeGreaterThanOrEqual(100);
   });
 
-  it('should put the progress panel beside the thread only while the thread keeps its full column, and offer its button otherwise', () => {
+  it('should put the panel beside the thread only while the thread keeps its full column', () => {
     const panelCss = readFileSync(new URL('../src/features/chat/ProgressPanel.module.css', import.meta.url), 'utf-8');
-    const chatCss = readFileSync(new URL('../src/features/chat/Chat.module.css', import.meta.url), 'utf-8');
-    const hiddenBelow = Number(/@container chat \(max-width: (\d+)px\)/.exec(panelCss)?.[1]);
-    const buttonHiddenFrom = Number(/@container chat \(min-width: (\d+)px\)/.exec(chatCss)?.[1]);
+    const docksFrom = Number(/@container chat \(max-width: (\d+)px\)/.exec(panelCss)?.[1]) + 1;
     const panelWidth = px(spacingOf('../src/features/chat/ProgressPanel.module.css').base.get('.panel')?.width);
-    expect(buttonHiddenFrom).toBe(hiddenBelow + 1);
-    expect(buttonHiddenFrom).toBe(listMax + 2 * sidePad + panelWidth);
-    expect(buttonHiddenFrom).toBe(PANEL_DOCK_MIN);
+    expect(docksFrom).toBe(listMax + 2 * sidePad + panelWidth);
+    expect(docksFrom).toBe(PANEL_DOCK_MIN);
   });
 
   it('should dock the progress panel from 1136 beside the rail and from 1334 beside the sidebar', () => {

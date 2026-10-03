@@ -44,7 +44,6 @@ describe('Sidebar rail threshold', () => {
   });
 
   it('should expand the sidebar exactly where the panel can dock beside it', () => {
-    expect(chat).toContain(`@container chat (min-width: ${PANEL_DOCK_MIN}px)`);
     expect(panel).toContain(`@container chat (max-width: ${PANEL_DOCK_MIN - 1}px)`);
     expect(PANEL_DOCK_MIN).toBe(1080);
     expect(SIDEBAR_EXPANDED_MIN).toBe(1334);

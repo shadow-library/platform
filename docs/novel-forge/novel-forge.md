@@ -92,8 +92,10 @@
 - **The mode is the author's choice in the composer**, and its label always names what the next turn will do: Edit freely (session `auto`, the default), Ask first (session
   `manual`) or Just discuss (this turn only; every op is a card, and the session's mode is untouched). Edit prose is a separate per-turn permission, never implied by a mode, and
   prose always arrives as a card. The chat model is told the session's mode, but it never decides what applies.
-- **The Progress panel** lists a turn's steps, its Story Bible changes (each applied value beside its quote, ideas flagged, each undone and redone on its own) and the sources
-  it read. It docks beside the chat where the thread keeps its full column and otherwise opens as a sheet from the turn's receipt; the chat header is unchanged. Wherever the
+- **The changes panel** lists a turn's Story Bible changes (each applied value beside its quote, ideas flagged, each undone and redone on its own) and the sources it read;
+  the turn's progress lives only on its last line in the thread. It opens by itself only when a turn leaves changes waiting for the author's OK, and otherwise only from the
+  turn's receipt; closed, it stays closed on those changes. It docks beside the chat where the thread keeps its full column and otherwise opens as a sheet from the receipt,
+  never by itself; the chat header is unchanged. Wherever the
   expanded app sidebar would leave it too little room, the sidebar folds to its icon rail on every screen, and the author's own toggle holds only until the window crosses
   that width again. Its undo refuses rather than cascades, as the write policy below requires. A turn's suggestions are answered there too, never as cards in the thread:
   the turn's one receipt carries Undo all for what it saved, Add all for what waits and why a hold kept it. An action, prose or a plan edit keeps its own card in the thread
@@ -128,7 +130,7 @@
   in the author's stated sentences nor already in the record. A new record's identifying key counts as written content. An op naming a record only a card creates follows it to
   the cards; an idea that does keeps its quote-rule reason, so a turned-down idea is still filtered. An idea the author turned down in scope is dropped unless an op the
   author's own words back leans on it; if the turned-down ideas cannot be read, every idea stays a card.
-- The checks are lexical: a stated goal rewritten as an outcome in the same words passes them, so the Progress panel's change list shows each written value beside its quote
+- The checks are lexical: a stated goal rewritten as an outcome in the same words passes them, so the changes panel's change list shows each written value beside its quote
   and undo stays one click away. Applied ops form one revertible proposal (`chat_messages.applied_proposal_id`, linked when it commits), applied before the cards, which form a
   second, pending one; a failed apply turns every op back into cards. AI-staged chain proposals (audit, premise) always wait.
 - Undo lists what relies on the change first — everything that names a record it created; for an updated record, unfinalized plans and drafts, knowledge about a changed fact and

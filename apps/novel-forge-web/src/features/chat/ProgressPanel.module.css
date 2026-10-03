@@ -67,82 +67,6 @@
   color: var(--sh-text-tertiary);
 }
 
-.steps {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.step {
-  display: grid;
-  grid-template-columns: 20px minmax(0, 1fr) auto;
-  gap: 8px;
-  align-items: start;
-  padding: 4px 0;
-  font-size: var(--sh-text-body-sm);
-  color: var(--sh-text-tertiary);
-}
-
-.step[data-state='done'],
-.step[data-state='stopped'],
-.step[data-state='failed'] {
-  color: var(--sh-text-secondary);
-}
-
-.step[data-state='running'] {
-  font-weight: 500;
-  color: var(--sh-text-primary);
-}
-
-.stepMark {
-  width: 16px;
-  height: 16px;
-  margin-top: 2px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1.5px solid var(--sh-border-default);
-  border-radius: var(--sh-radius-full);
-}
-
-.step[data-state='done'] .stepMark {
-  border-color: var(--sh-success-solid);
-  background: var(--sh-success-solid);
-  color: var(--sh-success-on-solid);
-}
-
-.step[data-state='running'] .stepMark {
-  border-color: var(--sh-accent);
-  border-top-color: transparent;
-}
-
-.step[data-state='failed'] .stepMark {
-  border-color: var(--sh-danger-border);
-  color: var(--sh-danger-text);
-}
-
-.stepText {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.stepSub {
-  font-size: 12px;
-  font-weight: 400;
-  color: var(--sh-text-secondary);
-}
-
-.stepTime {
-  font-size: 12px;
-  font-weight: 400;
-  color: var(--sh-text-tertiary);
-  font-variant-numeric: tabular-nums;
-}
-
 .changes {
   display: flex;
   flex-direction: column;
@@ -247,6 +171,12 @@
 .backBar {
   display: flex;
   padding: 14px 16px 0;
+}
+
+.panelBar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 8px 8px 0;
 }
 
 .changeQuote,
@@ -393,16 +323,4 @@
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .step[data-state='running'] .stepMark {
-    animation: step-spin 0.9s linear infinite;
-  }
-}
-
-@keyframes step-spin {
-  to {
-    transform: rotate(360deg);
-  }
 }

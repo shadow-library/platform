@@ -292,13 +292,6 @@ button.turnRow:hover {
   color: var(--sh-text-secondary);
 }
 
-/* The running turn's way into the progress sheet, gone where the panel is docked beside the chat (ProgressPanel.module.css .panel). */
-@container chat (min-width: 1080px) {
-  .tailProgress {
-    display: none;
-  }
-}
-
 .turnNote {
   margin: 0;
   font-size: var(--sh-text-body-sm);
