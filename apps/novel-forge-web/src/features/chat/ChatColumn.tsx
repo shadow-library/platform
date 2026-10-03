@@ -264,9 +264,15 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
       setAwayFromLatest(!pinnedRef.current);
     };
     el.addEventListener('scroll', onScroll, { passive: true });
+    // The thread itself shrinks as the composer grows; keeping its bottom edge where it was is what keeps the newest lines in view.
+    let height = el.clientHeight;
     const observer = new ResizeObserver(() => {
+      const shrunk = height - el.clientHeight;
+      height = el.clientHeight;
       if (pinnedRef.current) el.scrollTo({ top: el.scrollHeight });
+      else if (shrunk !== 0) el.scrollTop += shrunk;
     });
+    observer.observe(el);
     if (el.firstElementChild) observer.observe(el.firstElementChild);
     return () => {
       el.removeEventListener('scroll', onScroll);
