@@ -1,6 +1,6 @@
 export const SHELL_DESKTOP_MIN = 768;
-export const CHAT_THREAD_WIDTH = 720;
-export const CHAT_THREAD_PADDING = 20;
+export const CHAT_THREAD_WIDTH = 768;
+export const CHAT_THREAD_PADDING = 24;
 export const PROGRESS_PANEL_WIDTH = 320;
 export const SIDEBAR_WIDTH = 254;
 export const SIDEBAR_RAIL_WIDTH = 56;

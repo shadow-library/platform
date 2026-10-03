@@ -36,7 +36,9 @@ describe('Sidebar rail threshold', () => {
 
   it('should take its widths from the stylesheets that draw them', () => {
     expect(declaration(chat, '.msgList', 'max-width')).toBe(`${CHAT_THREAD_WIDTH}px`);
-    expect(declaration(chat, '.scroll', 'padding')?.split(' ')[1]).toBe(`${CHAT_THREAD_PADDING}px`);
+    expect(declaration(chat, '.scroll', 'padding-inline')).toBe('var(--nf-page-pad-inline)');
+    expect(CHAT_THREAD_WIDTH).toBe(768);
+    expect(CHAT_THREAD_PADDING).toBe(24);
     expect(declaration(panel, '.panel', 'width')).toBe(`${PROGRESS_PANEL_WIDTH}px`);
     expect(declaration(sidebar, '.root', 'width')).toBe(`${SIDEBAR_WIDTH}px`);
     expect(declaration(sidebar, '.root[data-collapsed]', 'width')).toBe(`${SIDEBAR_RAIL_WIDTH}px`);
@@ -45,9 +47,9 @@ describe('Sidebar rail threshold', () => {
 
   it('should expand the sidebar exactly where the panel can dock beside it', () => {
     expect(panel).toContain(`@container chat (max-width: ${PANEL_DOCK_MIN - 1}px)`);
-    expect(PANEL_DOCK_MIN).toBe(1080);
-    expect(SIDEBAR_EXPANDED_MIN).toBe(1334);
-    expect(SIDEBAR_RAIL_QUERY).toBe('(max-width: 1333px)');
+    expect(PANEL_DOCK_MIN).toBe(1136);
+    expect(SIDEBAR_EXPANDED_MIN).toBe(1390);
+    expect(SIDEBAR_RAIL_QUERY).toBe('(max-width: 1389px)');
     expect(SIDEBAR_EXPANDED_MIN - 1 - SIDEBAR_RAIL_WIDTH).toBeGreaterThanOrEqual(PANEL_DOCK_MIN);
   });
 

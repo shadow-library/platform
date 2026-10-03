@@ -94,20 +94,13 @@ export function ChatComposer({
             {queued.note && <span className={styles.queuedNote}>{queued.note}</span>}
           </div>
         )}
-        {!queued && chips.length > 0 && (
-          <div className={styles.chips} role="group" aria-label="Suggested prompts">
-            {chips.map(chip => (
-              <Button key={chip.label} size="sm" variant="secondary" className={styles.chip} disabled={locked} onClick={() => onChip(chip)}>
-                {chip.label}
-              </Button>
-            ))}
-          </div>
-        )}
         {notices}
         <div className={styles.composerInner} data-discussing={justDiscussing || undefined}>
           <Textarea
             ref={inputRef}
             aria-label="Message"
+            variant="bare"
+            size="lg"
             value={input}
             onValueChange={onInputChange}
             placeholder={placeholderOf(running, Boolean(queued), justDiscussing)}
@@ -148,6 +141,15 @@ export function ChatComposer({
             )}
           </div>
         </div>
+        {!queued && chips.length > 0 && (
+          <div className={styles.chips} role="group" aria-label="Suggested prompts">
+            {chips.map(chip => (
+              <Button key={chip.label} size="sm" variant="secondary" className={styles.chip} disabled={locked} onClick={() => onChip(chip)}>
+                {chip.label}
+              </Button>
+            ))}
+          </div>
+        )}
         {caption && (
           <div className={styles.caption} role="status">
             {caption}

@@ -1,9 +1,19 @@
 import { describe, expect, it } from 'bun:test';
 import { readFileSync } from 'node:fs';
 
-import { PANEL_DOCK_MIN, PROGRESS_PANEL_WIDTH, SHELL_DESKTOP_MIN, SIDEBAR_EXPANDED_MIN, SIDEBAR_RAIL_WIDTH, SIDEBAR_WIDTH } from '../src/lib/sidebar-rail';
+import {
+  CHAT_THREAD_PADDING,
+  CHAT_THREAD_WIDTH,
+  PANEL_DOCK_MIN,
+  PROGRESS_PANEL_WIDTH,
+  SHELL_DESKTOP_MIN,
+  SIDEBAR_EXPANDED_MIN,
+  SIDEBAR_RAIL_WIDTH,
+  SIDEBAR_WIDTH,
+} from '../src/lib/sidebar-rail';
 
-const SPACING = /^(padding|padding-top|padding-bottom|margin|margin-top|margin-left|gap|border-radius|width|height|max-width|min-height|grid-template-columns)$/;
+const SPACING =
+  /^(padding|padding-top|padding-bottom|padding-block|padding-inline|margin|margin-top|margin-left|gap|border-radius|width|height|max-width|min-height|grid-template-columns)$/;
 
 type Rules = Map<string, Record<string, string>>;
 
@@ -53,7 +63,12 @@ function spacingOf(path: string): { base: Rules; phone: Rules } {
 const CHAT: Expected[] = [
   { selector: '.frame', values: { 'min-height': '0' }, source: 'chat redesign .shell: the chat beside its progress panel, min-height 0 as .column' },
   { selector: '.column', values: { 'min-height': '0' }, baseline: '.column', source: 'chat.module.css .column' },
-  { selector: '.head', values: { height: '52px', gap: '10px', padding: '0 20px' }, baseline: '.head', source: 'chat.module.css .head; Main l.74; Phone header 52 `0 20px`' },
+  {
+    selector: '.head',
+    values: { height: '52px', gap: '10px', 'padding-inline': 'var(--nf-page-pad-inline)' },
+    source:
+      'chat.module.css .head height 52, gap 10; 2026-10-03 redesign after Claude and ChatGPT: a 768 reading column, the shell gutter (--nf-page-pad-inline) at the pane edges — the header spans the pane, title left and actions right, with no rule under it',
+  },
   {
     selector: '.headTitleButton',
     values: { gap: '6px', padding: '2px 4px', 'border-radius': 'var(--sh-radius-sm)' },
@@ -62,15 +77,24 @@ const CHAT: Expected[] = [
   },
   {
     selector: '.headInner',
-    values: { 'max-width': '720px', margin: '0 auto', gap: '10px' },
-    source: 'chat redesign .chat-head .in: the header aligned to the thread column (.msgList 720, margin 0 auto), keeping .head’s own gap 10',
+    values: { gap: '10px' },
+    source: 'keeps .head’s own gap 10; uncapped, so the header spans the pane as Claude’s and ChatGPT’s do',
   },
   { selector: '.headActions', values: { gap: '8px', 'margin-left': 'auto' }, source: 'Main l.76 header buttons gap 8, margin-left auto' },
   { selector: '.body', values: { 'min-height': '0' }, baseline: '.body', source: 'chat.module.css .body' },
   { selector: ".body[data-view='centred']", values: { 'padding-bottom': '6vh' }, baseline: ".body[data-view='centred']", source: 'chat.module.css centred state' },
-  { selector: '.scroll', values: { 'min-height': '0', padding: '24px 20px' }, baseline: '.scroll', source: 'chat.module.css .scroll; Main l.82' },
+  {
+    selector: '.scroll',
+    values: { 'min-height': '0', 'padding-block': '24px', 'padding-inline': 'var(--nf-page-pad-inline)' },
+    source:
+      'chat.module.css .scroll 24 above and below; 2026-10-03 redesign after Claude and ChatGPT: a 768 reading column, the shell gutter (--nf-page-pad-inline) at the pane edges',
+  },
   { selector: ".body[data-view='centred'] .scroll", values: { padding: '0' }, baseline: ".body[data-view='centred'] .scroll", source: 'chat.module.css centred scroll' },
-  { selector: '.msgList', values: { 'max-width': '720px', margin: '0 auto', gap: '20px' }, baseline: '.msgList', source: 'chat.module.css .msgList; Main l.83' },
+  {
+    selector: '.msgList',
+    values: { 'max-width': '768px', margin: '0 auto', gap: '20px' },
+    source: 'chat.module.css .msgList gap 20; 2026-10-03 redesign after Claude and ChatGPT: a 768 reading column, the shell gutter (--nf-page-pad-inline) at the pane edges',
+  },
   { selector: '.userCol', values: { gap: '8px', 'max-width': '86%' }, source: 'chat.module.css max 86%; Main l.102 user column gap 8 (bubble → notes chip)' },
   { selector: '.userBubble', values: { padding: '11px 14px', 'border-radius': '14px 14px 4px 14px' }, baseline: '.userBubble', source: 'chat.module.css .userBubble; Main l.103' },
   { selector: '.userTime', values: { 'margin-top': '-4px' }, source: 'chat.module.css .userTime margin-top 4 — net 4 under the column gap 8' },
@@ -166,17 +190,30 @@ const CHAT: Expected[] = [
   { selector: '.turnOpSummary', values: { 'margin-top': '6px' }, baseline: '.turnOpSummary', source: 'chat.module.css .turnOpSummary' },
   { selector: '.turnCardNote', values: { padding: '10px 12px' }, baseline: '.turnCardNote', source: 'chat.module.css .turnCardNote' },
   { selector: '.turnCardWarning', values: { padding: '10px 12px' }, baseline: '.turnCardWarning', source: 'chat.module.css .turnCardWarning' },
-  { selector: '.hero', values: { width: '100%', 'max-width': '720px', margin: '0 auto', padding: '0 20px 4px', gap: '10px' }, baseline: '.hero', source: 'chat.module.css .hero' },
+  {
+    selector: '.hero',
+    values: { width: '100%', 'max-width': '768px', margin: '0 auto', 'padding-block': '0 8px', 'padding-inline': 'var(--nf-page-pad-inline)', gap: '10px' },
+    source: 'chat.module.css .hero; 2026-10-03 redesign after Claude and ChatGPT: a 768 reading column, the shell gutter (--nf-page-pad-inline) at the pane edges',
+  },
   { selector: '.heroTitle', values: { margin: '0' }, baseline: '.heroTitle', source: 'chat.module.css .heroTitle' },
   { selector: '.heroSub', values: { margin: '0', 'max-width': '56ch' }, baseline: '.heroSub', source: 'chat.module.css .heroSub' },
-  { selector: '.composer', values: { padding: '6px 20px 16px' }, baseline: '.composer', source: 'chat.module.css .composer; Main l.191' },
-  { selector: '.composerStack', values: { 'max-width': '720px', margin: '0 auto', gap: '8px' }, source: 'Main l.192 max 720, chips → box gap 8' },
+  {
+    selector: '.composer',
+    values: { 'padding-block': '6px 16px', 'padding-inline': 'var(--nf-page-pad-inline)' },
+    source:
+      'chat.module.css .composer 6 above, 16 below; 2026-10-03 redesign after Claude and ChatGPT: a 768 reading column, the shell gutter (--nf-page-pad-inline) at the pane edges',
+  },
+  {
+    selector: '.composerStack',
+    values: { 'max-width': '768px', margin: '0 auto', gap: '8px' },
+    source: 'box → chips gap 8; 2026-10-03 redesign after Claude and ChatGPT: a 768 reading column, the shell gutter (--nf-page-pad-inline) at the pane edges',
+  },
   { selector: '.chips', values: { gap: '8px' }, source: 'Main l.193; chat.module.css .suggestions gap 8' },
   {
     selector: '.composerInner',
-    values: { 'border-radius': 'var(--sh-radius-lg)', padding: '10px 12px' },
-    baseline: '.composerInner',
-    source: 'chat.module.css .composerInner; Main l.199',
+    values: { 'border-radius': '20px', padding: '14px 14px 10px 18px' },
+    source:
+      'one rounded surface around a bare textarea, as Claude’s and ChatGPT’s composers; 2026-10-03 redesign after Claude and ChatGPT: a 768 reading column, the shell gutter (--nf-page-pad-inline) at the pane edges',
   },
   { selector: '.composerBar', values: { gap: '8px', 'margin-top': '8px' }, baseline: '.composerBar', source: 'chat.module.css .composerBar; Main l.202' },
   {
@@ -335,15 +372,23 @@ function sidebarAt(viewport: number): number {
   return viewport < SIDEBAR_EXPANDED_MIN ? SIDEBAR_RAIL_WIDTH : SIDEBAR_WIDTH;
 }
 
+// The chat's sides take the shell's inline gutter: 16 on a phone and 24 from 640 up.
+const GUTTER_VAR = 'var(--nf-page-pad-inline)';
+
+function gutterAt(viewport: number): number {
+  return viewport < 640 ? 16 : CHAT_THREAD_PADDING;
+}
+
 function px(value: string | undefined, index = 0): number {
   const parts = (value ?? '0').split(/\s+/);
   const pick = parts.length === 1 ? parts[0] : parts.length === 2 || parts.length === 3 ? parts[index === 1 || index === 3 ? 1 : 0] : parts[index];
+  if (pick === GUTTER_VAR) return CHAT_THREAD_PADDING;
   return Number.parseFloat(pick ?? '0') || 0;
 }
 
 describe('Chat width arithmetic', () => {
   const { base, phone } = spacingOf('../src/features/chat/Chat.module.css');
-  const sidePad = px(base.get('.scroll')?.padding, 1);
+  const sidePad = px(base.get('.scroll')?.['padding-inline']);
   const listMax = px(base.get('.msgList')?.['max-width']);
   const cardPad = px(base.get('.cardHead')?.padding, 1);
   const optionGap = px(base.get('.questionOptions')?.gap);
@@ -351,7 +396,7 @@ describe('Chat width arithmetic', () => {
   const layout = (viewport: number, sidebar = sidebarAt(viewport)): { list: number; reply: number; option: number; checklistCell: number; appliedText: number } => {
     const content = viewport - sidebar;
     const thread = content >= PANEL_DOCK_MIN ? content - PROGRESS_PANEL_WIDTH : content;
-    const list = Math.min(thread - 2 * sidePad, listMax);
+    const list = Math.min(thread - 2 * gutterAt(viewport), listMax);
     const isPhone = viewport <= PHONE;
     const reply = list;
     const columns = isPhone ? 1 : 2;
@@ -364,19 +409,19 @@ describe('Chat width arithmetic', () => {
   it('should fit the phone at 390 with no horizontal scroll', () => {
     expect(phone.get('.checklistItems, .questionOptions')?.['grid-template-columns']).toBe('minmax(0, 1fr)');
     const at390 = layout(390);
-    expect(at390).toEqual({ list: 350, reply: 350, option: 350, checklistCell: 322, appliedText: 326 });
-    const header = 390 - 2 * px(base.get('.head')?.padding, 1);
+    expect(at390).toEqual({ list: 358, reply: 358, option: 358, checklistCell: 330, appliedText: 334 });
+    const header = 390 - 2 * gutterAt(390);
     const storyBible = 90;
     const iconButton = 34;
     const actions = storyBible + 3 * iconButton + 3 * px(base.get('.headActions')?.gap);
     expect(header - actions - px(base.get('.head')?.gap)).toBeGreaterThanOrEqual(100);
   });
 
-  it('should keep every block readable at 768, 1024 and 1280, with the rail and with the sidebar expanded by hand', () => {
-    expect(layout(768)).toEqual({ list: 672, reply: 672, option: 332, checklistCell: 312, appliedText: 542 });
-    expect(layout(768, SIDEBAR_WIDTH)).toEqual({ list: 474, reply: 474, option: 233, checklistCell: 213, appliedText: 344 });
-    expect(layout(1024)).toEqual({ list: 720, reply: 720, option: 356, checklistCell: 336, appliedText: 590 });
-    expect(layout(1024, SIDEBAR_WIDTH)).toEqual(layout(1024));
+  it('should keep every block readable at 768, 1024 and 1280, with the rail and with the sidebar expanded by hand, and cap it at the 768 reading column', () => {
+    expect(layout(768)).toEqual({ list: 664, reply: 664, option: 328, checklistCell: 308, appliedText: 534 });
+    expect(layout(768, SIDEBAR_WIDTH)).toEqual({ list: 466, reply: 466, option: 229, checklistCell: 209, appliedText: 336 });
+    expect(layout(1024)).toEqual({ list: 768, reply: 768, option: 380, checklistCell: 360, appliedText: 638 });
+    expect(layout(1024, SIDEBAR_WIDTH)).toEqual({ list: 722, reply: 722, option: 357, checklistCell: 337, appliedText: 592 });
     expect(layout(1280)).toEqual(layout(1024));
     expect(layout(1280, SIDEBAR_WIDTH)).toEqual(layout(1024));
     expect(layout(1920)).toEqual(layout(1024));
@@ -389,7 +434,7 @@ describe('Chat width arithmetic', () => {
     expect([...actions.matchAll(/<Button\b/g)]).toHaveLength(4);
     expect(actions).not.toContain('Progress');
 
-    const header = Math.min(768 - SIDEBAR_WIDTH - 2 * px(base.get('.head')?.padding, 1), px(base.get('.headInner')?.['max-width']));
+    const header = 768 - SIDEBAR_WIDTH - 2 * gutterAt(768);
     const labelled = { changes: 96, history: 90, newChat: 100 };
     const controls = labelled.changes + labelled.history + labelled.newChat + 2 * px(base.get('.headActions')?.gap);
     expect(header - controls - px(base.get('.head')?.gap)).toBeGreaterThanOrEqual(100);
@@ -399,23 +444,25 @@ describe('Chat width arithmetic', () => {
     const panelCss = readFileSync(new URL('../src/features/chat/ProgressPanel.module.css', import.meta.url), 'utf-8');
     const docksFrom = Number(/@container chat \(max-width: (\d+)px\)/.exec(panelCss)?.[1]) + 1;
     const panelWidth = px(spacingOf('../src/features/chat/ProgressPanel.module.css').base.get('.panel')?.width);
-    expect(docksFrom).toBe(listMax + 2 * sidePad + panelWidth);
+    expect(docksFrom).toBe(CHAT_THREAD_WIDTH + 2 * sidePad + panelWidth);
     expect(docksFrom).toBe(PANEL_DOCK_MIN);
   });
 
-  it('should dock the progress panel from 1136 beside the rail and from 1334 beside the sidebar', () => {
+  it('should dock the progress panel from 1192 beside the rail and from 1390 beside the sidebar', () => {
     const docks = (viewport: number, sidebar = sidebarAt(viewport)): boolean => viewport - sidebar >= PANEL_DOCK_MIN;
-    expect([1440, 1334, 1280, 1136].map(viewport => docks(viewport))).toEqual([true, true, true, true]);
-    expect([1135, 1024, 768].map(viewport => docks(viewport))).toEqual([false, false, false]);
-    expect(docks(1333, SIDEBAR_WIDTH)).toBe(false);
+    expect([1440, 1390, 1280, 1192].map(viewport => docks(viewport))).toEqual([true, true, true, true]);
+    expect([1191, 1024, 768].map(viewport => docks(viewport))).toEqual([false, false, false]);
+    expect(docks(1389, SIDEBAR_WIDTH)).toBe(false);
     expect(docks(1280, SIDEBAR_WIDTH)).toBe(false);
   });
 
-  it('should let the chat screen fill the pane and cap only the thread and header columns', () => {
+  it('should let the chat screen fill the pane, span the header across it and cap the thread, hero and composer to one column', () => {
     const route = readFileSync(new URL('../src/routes/novels/$novelId/chat.module.css', import.meta.url), 'utf-8');
     const screen = /\n\.screen \{([^}]*)\}/.exec(route)?.[1] ?? '';
     expect(screen).toContain('inset: 0');
     expect(screen).not.toMatch(/max-width|margin/);
-    expect(base.get('.headInner')?.['max-width']).toBe(base.get('.msgList')?.['max-width']);
+    expect(base.get('.headInner')?.['max-width']).toBeUndefined();
+    expect(base.get('.composerStack')?.['max-width']).toBe(base.get('.msgList')?.['max-width']);
+    expect(base.get('.hero')?.['max-width']).toBe(base.get('.msgList')?.['max-width']);
   });
 });

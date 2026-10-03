@@ -1,4 +1,4 @@
-/* Beside the chat only while the thread keeps its full 720 column (720 + 2 × 20 thread padding + this 320); narrower, it opens as a sheet. */
+/* Beside the chat only while the thread keeps its full 768 column (768 + 2 × 24 page gutter + this 320); narrower, it opens as a sheet. */
 .panel {
   /* Holds the absolutely placed screen-reader text, which would otherwise overflow the screen rather than this scroller. */
   position: relative;
@@ -12,7 +12,7 @@
   background: var(--sh-surface-card);
 }
 
-@container chat (max-width: 1079px) {
+@container chat (max-width: 1135px) {
   .panel {
     display: none;
   }

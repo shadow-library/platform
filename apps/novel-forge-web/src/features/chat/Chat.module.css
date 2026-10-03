@@ -24,15 +24,12 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 0 20px;
-  border-bottom: 1px solid var(--sh-border-subtle);
+  padding-inline: var(--nf-page-pad-inline);
 }
 
 .headInner {
   flex: 1;
   min-width: 0;
-  max-width: 720px;
-  margin: 0 auto;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -105,7 +102,8 @@
   position: relative;
   flex: 1;
   min-height: 0;
-  padding: 24px 20px;
+  padding-block: 24px;
+  padding-inline: var(--nf-page-pad-inline);
   /* A classic scrollbar would otherwise pull the centred thread off the header's column by half its width. */
   scrollbar-gutter: stable both-edges;
 }
@@ -137,7 +135,7 @@
 }
 
 .msgList {
-  max-width: 720px;
+  max-width: 768px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
@@ -1006,9 +1004,10 @@ button.turnRow:hover {
 .hero {
   flex: none;
   width: 100%;
-  max-width: 720px;
+  max-width: 768px;
   margin: 0 auto;
-  padding: 0 20px 4px;
+  padding-block: 0 8px;
+  padding-inline: var(--nf-page-pad-inline);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1035,11 +1034,12 @@ button.turnRow:hover {
 
 .composer {
   flex: none;
-  padding: 6px 20px 16px;
+  padding-block: 6px 16px;
+  padding-inline: var(--nf-page-pad-inline);
 }
 
 .composerStack {
-  max-width: 720px;
+  max-width: 768px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
@@ -1057,12 +1057,16 @@ button.turnRow:hover {
   flex-shrink: 0;
 }
 
+.body[data-view='centred'] .chips {
+  justify-content: center;
+}
+
 .composerInner {
   border: 1px solid var(--sh-border-default);
-  border-radius: var(--sh-radius-lg);
+  border-radius: 20px;
   background: var(--sh-surface-card);
-  box-shadow: 0 1px 2px rgb(0 0 0 / 0.05);
-  padding: 10px 12px;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.06);
+  padding: 14px 14px 10px 18px;
 }
 
 .composerInner:focus-within {
@@ -1200,7 +1204,8 @@ button.turnRow:hover {
     padding-bottom: 2px;
   }
 
-  .composerInner textarea {
+  /* 16px keeps iOS from zooming into the field; [data-size] outranks the textarea's own size rule. */
+  .composerInner textarea[data-size] {
     font-size: 16px;
     line-height: 24px;
   }
