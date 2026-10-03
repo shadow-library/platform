@@ -1,10 +1,12 @@
 import { TIMELINE_BAND_LABELS } from '@shadow-library/sdk';
 
+import { type Refinement } from '@server/database';
+
 import { isWriterExcludedBibleDoc, ORGANISED_TIMELINE_DOC } from '../ai/context/bible-docs';
 
 /** The openings the web sends to organise the notes: the new-novel opener and the opener chip. */
 const NOTES_ORGANISE_LEADS = ['here are my notes for the story.', 'organise my notes', 'organize my notes'];
-const ORGANISE_NOTES_OP = 'action.organise_notes';
+export const ORGANISE_NOTES_OP = 'action.organise_notes' as const;
 
 // Anchored to the title's first words, so "Battle plans of the north" or "The future city" stay world pages.
 const PLANS_TITLE = /^(?:(?:the|my|our|story|author'?s?)\s+)?(?:plans?|planned|upcoming|roadmap|(?:future|later)\s+(?:plans|events|arcs?|beats)|what happens (?:next|later))\b/i;
@@ -14,11 +16,18 @@ export const LATER_BAND_HEADINGS = [TIMELINE_BAND_LABELS.early, TIMELINE_BAND_LA
 const TIMELINE_REF = `${ORGANISED_TIMELINE_DOC.section}/${ORGANISED_TIMELINE_DOC.slug}`;
 
 export const ORGANISE_ROUTED_NOTE =
-  'Organising your notes runs as its own step: it keeps the world as the story opens in your Story Bible and puts what happens later in your private timeline, which only planning reads. Accept the card to start it.';
+  'Organising your notes runs as its own step: it keeps the world as the story opens in your Story Bible and puts what happens later in your private timeline, which only planning reads.';
+export const ORGANISE_CARD_NOTE = 'Accept the card to start it.';
 export const PLANS_WITHHELD_NOTE =
   'Forge kept a page of plans for later off the pages the chapter writer reads, so later events cannot leak into chapter prose. Ask again to keep them in your private timeline, which only planning reads.';
 
 type OpLike = Record<string, unknown>;
+
+/**
+ * What a turn does with the organise action: `none` when the author did not ask to organise notes long enough for it, `start` when they
+ * did under Edit freely and are not just discussing, so it starts at turn end without a card, and `card` otherwise.
+ */
+export type OrganiseRouting = 'none' | 'card' | 'start';
 
 interface TurnOutput {
   reply: string;
@@ -28,6 +37,11 @@ interface TurnOutput {
 export function isNotesOrganiseRequest(message: string): boolean {
   const opening = message.trimStart().toLowerCase();
   return NOTES_ORGANISE_LEADS.some(lead => opening.startsWith(lead));
+}
+
+export function organiseRouting(organiseRequest: boolean, mode: Refinement.ChatMode, justDiscussing: boolean): OrganiseRouting {
+  if (!organiseRequest) return 'none';
+  return mode === 'auto' && !justDiscussing ? 'start' : 'card';
 }
 
 function pageTitle(op: OpLike): string {
@@ -71,11 +85,12 @@ export function laterPlanIssues(changeSet: readonly OpLike[] | undefined, organi
  * The turn as staged: a request to organise the notes stages the organise action alone, and a page of plans for later never reaches a
  * page the chapter writer reads. Each says so in the reply when it changed what the model proposed.
  */
-export function withLaterPlansRouted<T extends TurnOutput>(output: T, organiseRequest: boolean): T {
+export function withLaterPlansRouted<T extends TurnOutput>(output: T, organise: OrganiseRouting): T {
   const { changeSet = [], ...rest } = output;
-  if (organiseRequest) {
+  if (organise !== 'none') {
     if (onlyOrganises(changeSet)) return output;
-    return { ...output, reply: `${output.reply}\n\n${ORGANISE_ROUTED_NOTE}`, changeSet: [{ op: ORGANISE_NOTES_OP }] };
+    const note = organise === 'card' ? `${ORGANISE_ROUTED_NOTE} ${ORGANISE_CARD_NOTE}` : ORGANISE_ROUTED_NOTE;
+    return { ...output, reply: `${output.reply}\n\n${note}`, changeSet: [{ op: ORGANISE_NOTES_OP }] };
   }
   const kept = changeSet.filter(op => !writesPlansOnWriterPage(op));
   if (kept.length === changeSet.length) return output;

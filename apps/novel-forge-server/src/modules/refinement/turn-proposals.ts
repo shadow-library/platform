@@ -1,10 +1,12 @@
 import { AppError } from '@shadow-library/common';
 
+import { AppErrorCode } from '@server/classes';
 import { type DbExecutor, type Refinement } from '@server/database';
 
 import { loadCurrentRecords } from './artifact-state';
-import { type ChangeOp, changeSetRefs } from './change-set';
+import { type ActionOp, type ChangeOp, changeSetRefs } from './change-set';
 import { dropRejectedIdeas, filterableIdeaIds } from './idea-filter';
+import { ORGANISE_NOTES_OP } from './later-plans-guard';
 import { PLANNER_ONLY_WARNING } from './planner-only-guard';
 import { type ApplyResult, type OpResult } from './proposal-apply.service';
 import { type ChangeSetSplit, type OpSource, splitChangeSet, type WriteHold } from './write-policy';
@@ -15,6 +17,9 @@ export const APPLY_FAILED_NOTE = 'Your words could not be applied as they stand,
 export const UNLINKED_NOTE = 'Your words were applied, but this reply could not be linked to them — find the change in Change history to undo it.';
 export const CARDS_UNSAVED_NOTE = 'Your words were applied, but the suggestions that came with them could not be saved — ask again to see them.';
 export const IDEAS_DROPPED_NOTE = 'Suggestions you turned down earlier were left out.';
+export const ORGANISE_STARTED_NOTE = 'Organising your notes has started, and its results will arrive here for your review.';
+export const ORGANISE_BUSY_NOTE = 'Another job is running on this novel, so organising your notes waits on the card: accept it once that job finishes.';
+export const ORGANISE_REFUSED_NOTE = 'Organising your notes could not start on its own, so it waits on the card.';
 
 export const TURN_HOLD_REASONS = ['warnings', 'planner_sources'] as const;
 /** Why a turn's cards wait: `warnings` on the turn or its applied side, or `planner_sources` — it drew on the notes or a planner-only page. */
@@ -37,6 +42,20 @@ export interface TurnProposalPort {
   /** Called as soon as the apply commits, so the turn keeps its link to the applied change whatever happens to the cards. */
   linkApplied: (proposal: Refinement.Proposal) => Promise<unknown>;
   discard: (proposalId: bigint) => Promise<unknown>;
+}
+
+export interface OrganiseStartPort {
+  stage: (changeSet: ChangeOp[], warnings: string[], options: StageOptions) => Promise<Refinement.Proposal>;
+  /** Why the organise action would be refused right now, read without starting it. */
+  refusal: (action: ActionOp) => Promise<AppError | undefined>;
+  /** The author's accept of the whole card: a blanket apply, which refuses every one-way door. */
+  accept: (proposalId: bigint) => Promise<ApplyResult>;
+}
+
+export interface OrganiseStart {
+  /** The card left for the author when organising could not start; `null` once its job is queued. */
+  cardProposal: Refinement.Proposal | null;
+  note: string;
 }
 
 export interface TurnOpResult extends OpResult {
@@ -155,4 +174,33 @@ export async function stageTurnChangeSet(port: TurnProposalPort, split: ChangeSe
   } catch {
     return { appliedProposal: result.proposal, applied, cardProposal: null, applyNote: [unlinkedNote, CARDS_UNSAVED_NOTE].filter(Boolean).join(' ') };
   }
+}
+
+function organiseWaitsNote(reason: AppError | string | undefined): string {
+  if (AppError.is(reason) && reason.code === AppErrorCode.JOB_002.code) return ORGANISE_BUSY_NOTE;
+  const message = AppError.is(reason) ? reason.message : reason;
+  return message ? `${ORGANISE_REFUSED_NOTE} ${message.replace(/\.?$/, '.')}` : ORGANISE_REFUSED_NOTE;
+}
+
+/**
+ * Starts the organise action the author's own message asked for by accepting its card on their behalf, so the job is queued exactly as
+ * their accept would queue it, with the card's origin. Anything that would refuse it leaves a pending card instead; an action that fails
+ * after the accept committed leaves that card applied and failed, so a fresh one is staged in its place.
+ */
+export async function startNotesOrganise(port: OrganiseStartPort, warnings: string[]): Promise<OrganiseStart> {
+  const op: ActionOp = { op: ORGANISE_NOTES_OP };
+  const whole: StageOptions = { entityMaterialization: true };
+  const refusal = await port.refusal(op);
+  const card = await port.stage([op], warnings, whole);
+  if (refusal) return { cardProposal: card, note: organiseWaitsNote(refusal) };
+
+  let result: ApplyResult;
+  try {
+    result = await port.accept(card.id);
+  } catch (err) {
+    return { cardProposal: card, note: organiseWaitsNote(AppError.is(err) ? err : undefined) };
+  }
+  const failed = result.opResults.find(opResult => opResult.status === 'failed');
+  if (!failed) return { cardProposal: null, note: ORGANISE_STARTED_NOTE };
+  return { cardProposal: await port.stage([op], warnings, whole), note: organiseWaitsNote(failed.error) };
 }

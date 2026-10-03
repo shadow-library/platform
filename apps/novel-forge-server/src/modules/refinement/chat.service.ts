@@ -28,6 +28,7 @@ import { ProjectEventService } from '../events/project-event.service';
 import { NotesStoreService } from '../notes/notes-store.service';
 import { ORGANISE_MIN_WORDS } from '../notes/organise-plan';
 import { type ForgeCallPolicy, PluginPolicyService } from '../plugins/plugin-policy.service';
+import { ActionExecutorRegistry } from './action-registry';
 import { type ChangeOp } from './change-set';
 import { ChatCompactionService } from './chat-compaction.service';
 import { type ChatTurnEmitter, EmitterRelay } from './chat-turn-emitter';
@@ -36,13 +37,23 @@ import { CHAT_TURN_GRAPH, chatRoutedProject, type ChatSelection, chatSelection, 
 import { sanitizeChatQuestion } from './chat-question';
 import { loadRejectedIdeas } from './idea-rejections';
 import { requestedNegations } from './negation-echo';
-import { isNotesOrganiseRequest, withLaterPlansRouted } from './later-plans-guard';
+import { isNotesOrganiseRequest, ORGANISE_NOTES_OP, type OrganiseRouting, organiseRouting, withLaterPlansRouted } from './later-plans-guard';
 import { chatTurnWarnings, readsPlannerOnlyPage } from './planner-only-guard';
 import { ProposalApplyService } from './proposal-apply.service';
 import { ProposalService } from './proposal.service';
 import { findNegationEchoWarnings } from './proposal-warnings';
 import { PROSE_EDIT_WITHHELD_NOTE, withoutProseEditOps } from './prose-intent';
-import { IDEAS_DROPPED_NOTE, splitTurnChangeSet, stageTurnChangeSet, type TurnApplied, type TurnHoldReason, type TurnProposalPort, type TurnStaging } from './turn-proposals';
+import {
+  IDEAS_DROPPED_NOTE,
+  splitTurnChangeSet,
+  stageTurnChangeSet,
+  startNotesOrganise,
+  type TurnApplied,
+  turnHold,
+  type TurnHoldReason,
+  type TurnProposalPort,
+  type TurnStaging,
+} from './turn-proposals';
 
 /** `contentMode` and `costTier` apply to this turn's reply only; actions the turn starts inherit its tier, never its mode. */
 export interface ChatTurnOptions extends ChatSelectionOverride {
@@ -111,6 +122,11 @@ export interface ChatTurnStatus {
   pendingTurn: PendingTurn | null;
   failedTurn: FailedTurn | null;
   lastOrdinal: number;
+}
+
+interface StagingContext {
+  justDiscussing: boolean;
+  organise: OrganiseRouting;
 }
 
 export interface ChatTurnResult {
@@ -183,6 +199,7 @@ export class ChatService {
     private readonly events: ProjectEventService,
     private readonly notesStore: NotesStoreService,
     private readonly webResearch: WebResearchService,
+    private readonly actionRegistry: ActionExecutorRegistry,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
@@ -426,10 +443,11 @@ export class ChatService {
     const history = await this.compaction.buildHistory(session, project, route.contentMode);
     const proseEdits = options.proseEdits === true;
     const justDiscussing = options.justDiscussing === true;
-    const organiseNotes = isNotesOrganiseRequest(content) && countWords(await this.authorNotes(projectId)) >= ORGANISE_MIN_WORDS;
-    const prompt = buildChatRefinePrompt(session.scopeType, { proseEdits, organiseNotes });
-    const guarded = (output: ChatRefineOutput): ChatRefineOutput => withLaterPlansRouted(withheldProse(output, proseEdits), organiseNotes);
-    const turnRules = renderTurnRules({ proseEdits, justDiscussing, mode: session.mode });
+    const organiseRequest = isNotesOrganiseRequest(content) && countWords(await this.authorNotes(projectId)) >= ORGANISE_MIN_WORDS;
+    const organise = organiseRouting(organiseRequest, session.mode, justDiscussing);
+    const prompt = buildChatRefinePrompt(session.scopeType, { proseEdits, organiseNotes: organiseRequest });
+    const guarded = (output: ChatRefineOutput): ChatRefineOutput => withLaterPlansRouted(withheldProse(output, proseEdits), organise);
+    const turnRules = renderTurnRules({ proseEdits, justDiscussing, organiseNotes: organiseRequest, mode: session.mode });
     const webMode = await this.webResearch.modeFor(route.resolved.model);
     const scopeInstructions = chatScopeInstructions(this.toolRegistry.getRaw(CHAT_HUB_NODE, webMode), webMode);
     const promptTokens = chatPromptTokens(scopeInstructions);
@@ -513,7 +531,7 @@ export class ChatService {
       }
 
       const turnWarnings = chatTurnWarnings(warnings, planner.read);
-      const persisted = await this.persistAssistantTurn(projectId, session, userMessage, output, runId, resolvedModel, turnWarnings, justDiscussing, trace);
+      const persisted = await this.persistAssistantTurn(projectId, session, userMessage, output, runId, resolvedModel, turnWarnings, { justDiscussing, organise }, trace);
       return { ...persisted, assistantMessage: { ...persisted.assistantMessage, ...selection } };
     });
 
@@ -662,7 +680,7 @@ export class ChatService {
     runId: string,
     model: { provider: string; model: string },
     warnings: string[],
-    justDiscussing: boolean,
+    staging: StagingContext,
     trace: TurnTraceCollector,
   ): Promise<Omit<ChatTurnResult, 'runId'>> {
     const question = sanitizeChatQuestion(output.question, PROGRESS_ITEM_KEYS);
@@ -684,12 +702,13 @@ export class ChatService {
       .catch(err => this.databaseService.translateError(err));
     if (!assistantMessage) throw AppErrorCode.CHT_001.create();
 
-    const staging = await this.stageChangeSet(projectId, session, assistantMessage, userMessage.content, output, runId, warnings, justDiscussing);
-    if (staging.cardProposal) await this.linkMessage(assistantMessage, { proposalId: staging.cardProposal.id });
+    const { replyNote, ...staged } = await this.stageChangeSet(projectId, session, assistantMessage, userMessage.content, output, runId, warnings, staging);
+    if (staged.cardProposal) await this.linkMessage(assistantMessage, { proposalId: staged.cardProposal.id });
+    if (replyNote) await this.appendToReply(assistantMessage, replyNote);
     await this.saveTrace(projectId, assistantMessage, trace.finish());
 
     await this.db.update(schema.chatSessions).set({ lastTurnAt: new Date(), updatedAt: new Date() }).where(eq(schema.chatSessions.id, session.id));
-    const { cardProposal: proposal, appliedProposal, applied, applyNote, held } = staging;
+    const { cardProposal: proposal, appliedProposal, applied, applyNote, held } = staged;
     return { userMessage, assistantMessage, proposal, appliedProposal, applied, applyNote, held };
   }
 
@@ -702,10 +721,44 @@ export class ChatService {
     output: ChatRefineOutput,
     runId: string,
     warnings: string[],
-    justDiscussing: boolean,
-  ): Promise<TurnStaging> {
+    { justDiscussing, organise }: StagingContext,
+  ): Promise<TurnStaging & { replyNote?: string }> {
     const ops = (output.changeSet ?? []) as unknown as ChangeOp[];
     if (ops.length === 0) return { appliedProposal: null, cardProposal: null };
+
+    const stage: TurnProposalPort['stage'] = (changeSet, stageWarnings, options) =>
+      this.proposalService
+        .create(projectId, {
+          sessionId: session.id,
+          messageId: message.id,
+          scopeType: session.scopeType,
+          scopeRef: session.scopeRef,
+          kind: session.scopeType === 'project' ? 'hub' : 'chat',
+          summary: output.reply.split('\n', 1)[0]?.slice(0, 300),
+          changeSet,
+          allowedOps: HUB_ALLOWED_OPS,
+          entityMaterialization: options.entityMaterialization,
+          runId,
+          warnings: stageWarnings,
+        })
+        .catch((err: unknown) => {
+          this.logger.warn('chat turn: staging a proposal failed', { projectId, runId, err });
+          throw err;
+        });
+
+    const organiseOnly = ops.length === 1 && ops[0]?.op === ORGANISE_NOTES_OP;
+    if (organise === 'start' && organiseOnly && turnHold(warnings) !== 'turn') {
+      const started = await startNotesOrganise(
+        {
+          stage,
+          refusal: action => this.actionRegistry.refusal(projectId, action),
+          accept: proposalId => this.proposalApplyService.apply(projectId, proposalId),
+        },
+        warnings,
+      );
+      this.logger.info('chat turn: organising the notes the author asked for', { projectId, runId, started: started.cardProposal === null, note: started.note });
+      return { appliedProposal: null, cardProposal: started.cardProposal, replyNote: started.note };
+    }
 
     const rejectedIdeas = (ideaIds: string[]) =>
       loadRejectedIdeas(this.db, projectId, ideaIds).catch((err: unknown) => {
@@ -718,25 +771,7 @@ export class ChatService {
     if (split.ops.length === 0) return { appliedProposal: null, cardProposal: null, applyNote: IDEAS_DROPPED_NOTE };
 
     const port: TurnProposalPort = {
-      stage: (changeSet, stageWarnings, options) =>
-        this.proposalService
-          .create(projectId, {
-            sessionId: session.id,
-            messageId: message.id,
-            scopeType: session.scopeType,
-            scopeRef: session.scopeRef,
-            kind: session.scopeType === 'project' ? 'hub' : 'chat',
-            summary: output.reply.split('\n', 1)[0]?.slice(0, 300),
-            changeSet,
-            allowedOps: HUB_ALLOWED_OPS,
-            entityMaterialization: options.entityMaterialization,
-            runId,
-            warnings: stageWarnings,
-          })
-          .catch((err: unknown) => {
-            this.logger.warn('chat turn: staging a proposal failed', { projectId, runId, err });
-            throw err;
-          }),
+      stage,
       apply: (proposalId, opSources) => this.proposalApplyService.apply(projectId, proposalId, { autoApplied: true, opSources }),
       linkApplied: proposal =>
         this.linkMessage(message, { appliedProposalId: proposal.id }).catch((err: unknown) => {
@@ -750,6 +785,13 @@ export class ChatService {
     const staging = split.droppedIdeas.length > 0 ? { ...staged, applyNote: [staged.applyNote, IDEAS_DROPPED_NOTE].filter(Boolean).join(' ') } : staged;
     if (staging.applyNote) this.logger.info('chat turn: staging left a note for the author', { projectId, runId, note: staging.applyNote });
     return staging;
+  }
+
+  private async appendToReply(message: Refinement.ChatMessage, note: string): Promise<void> {
+    const content = `${message.content}\n\n${note}`;
+    const reply = { content, tokens: countTokens(content) };
+    await this.db.update(schema.chatMessages).set(reply).where(eq(schema.chatMessages.id, message.id));
+    Object.assign(message, reply);
   }
 
   private async linkMessage(message: Refinement.ChatMessage, link: Pick<Refinement.ChatMessage, 'proposalId'> | Pick<Refinement.ChatMessage, 'appliedProposalId'>): Promise<void> {

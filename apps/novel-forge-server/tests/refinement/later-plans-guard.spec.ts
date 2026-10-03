@@ -70,7 +70,7 @@ describe('laterPlanIssues', () => {
 
 describe('withLaterPlansRouted', () => {
   it('should stage the organise action alone for a notes organise request, and say why', () => {
-    const routed = withLaterPlansRouted({ reply: 'Organised.', changeSet: [openingPage, plansPage] }, true);
+    const routed = withLaterPlansRouted({ reply: 'Organised.', changeSet: [openingPage, plansPage] }, 'start');
 
     expect(routed.changeSet).toEqual([organise]);
     expect(routed.reply).toBe(`Organised.\n\n${ORGANISE_ROUTED_NOTE}`);
@@ -78,23 +78,23 @@ describe('withLaterPlansRouted', () => {
 
   it('should add the organise action to a reply that proposed nothing, and leave one that proposed it alone', () => {
     const bare: { reply: string; changeSet?: Record<string, unknown>[] } = { reply: 'Sure.' };
-    expect(withLaterPlansRouted(bare, true).changeSet).toEqual([organise]);
+    expect(withLaterPlansRouted(bare, 'start').changeSet).toEqual([organise]);
     const proposed = { reply: 'Accept the card.', changeSet: [organise] };
-    expect(withLaterPlansRouted(proposed, true)).toBe(proposed);
+    expect(withLaterPlansRouted(proposed, 'card')).toBe(proposed);
   });
 
   it('should withhold a plans page from any other turn and keep the rest', () => {
-    const routed = withLaterPlansRouted({ reply: 'Saved.', changeSet: [openingPage, plansPage], question: { q: 1 } }, false);
+    const routed = withLaterPlansRouted({ reply: 'Saved.', changeSet: [openingPage, plansPage], question: { q: 1 } }, 'none');
 
     expect(routed.changeSet).toEqual([openingPage]);
     expect(routed.reply).toBe(`Saved.\n\n${PLANS_WITHHELD_NOTE}`);
     expect(routed.question).toEqual({ q: 1 });
-    expect(withLaterPlansRouted({ reply: 'Saved.', changeSet: [plansPage] }, false)).toEqual({ reply: `Saved.\n\n${PLANS_WITHHELD_NOTE}` });
+    expect(withLaterPlansRouted({ reply: 'Saved.', changeSet: [plansPage] }, 'none')).toEqual({ reply: `Saved.\n\n${PLANS_WITHHELD_NOTE}` });
   });
 
   it('should leave a turn with no plans page untouched', () => {
     const output = { reply: 'Saved.', changeSet: [openingPage] };
-    expect(withLaterPlansRouted(output, false)).toBe(output);
+    expect(withLaterPlansRouted(output, 'none')).toBe(output);
   });
 });
 

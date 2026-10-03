@@ -7,6 +7,7 @@ import { APP_NAME } from '@server/constants';
 import { type Job, type PrimaryDatabase } from '@server/database';
 
 import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
+import { AuthoringClaimService } from '../jobs/authoring-claim.service';
 import { JobHandlerRegistry } from '../jobs/job-handler.registry';
 import { JobExecutor } from '../jobs/job.executor';
 import { JobService } from '../jobs/job.service';
@@ -36,6 +37,7 @@ export class ActionJobService {
     private readonly planJobs: PlanJobService,
     private readonly registry: ActionExecutorRegistry,
     private readonly jobHandlers: JobHandlerRegistry,
+    private readonly claims: AuthoringClaimService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
@@ -44,10 +46,14 @@ export class ActionJobService {
     this.jobHandlers.register('organise', job => this.organiseJobs.run(job));
     this.jobHandlers.register('plan', job => this.planJobs.run(job));
 
-    this.registry.register('action.organise_notes', async (projectId, _action, context) => {
-      const { jobId, runId, deduped } = await this.organise(projectId, context);
-      return { summary: deduped ? 'your notes are already being organised' : 'organising your notes — the result arrives as a card', jobId, runId };
-    });
+    this.registry.register(
+      'action.organise_notes',
+      async (projectId, _action, context) => {
+        const { jobId, runId, deduped } = await this.organise(projectId, context);
+        return { summary: deduped ? 'your notes are already being organised' : 'organising your notes — the result arrives as a card', jobId, runId };
+      },
+      projectId => this.organiseRefusal(projectId),
+    );
     this.registry.register('action.plan_chapter', async (projectId, action, context) => {
       if (action.op !== 'action.plan_chapter') throw AppError.internal('executor misrouted');
       const { jobId, runId, deduped, chapter } = await this.plan(projectId, action, context);
@@ -56,10 +62,26 @@ export class ActionJobService {
   }
 
   async organise(projectId: bigint, context: ActionContext): Promise<StartedActionJob> {
+    await this.assertOrganisable(projectId);
+    return this.start(projectId, 'organise', ORGANISE_GRAPH, context, {});
+  }
+
+  /** What accepting an organise card would be refused with right now: the organise checks, then the authoring claim the job would reserve. */
+  async organiseRefusal(projectId: bigint): Promise<AppError | undefined> {
+    try {
+      await this.assertOrganisable(projectId);
+    } catch (err) {
+      if (AppError.is(err)) return err;
+      throw err;
+    }
+    const holder = await this.claims.holder(projectId);
+    return holder?.live ? AppErrorCode.JOB_002.create() : undefined;
+  }
+
+  private async assertOrganisable(projectId: bigint): Promise<void> {
     const ledger = await loadActiveLedger(this.db, projectId);
     if (!organiseApplies(ledger)) throw AppErrorCode.NTS_003.create({ words: String(ORGANISE_MIN_WORDS) });
     await assertNotesUnorganised(this.db, projectId);
-    return this.start(projectId, 'organise', ORGANISE_GRAPH, context, {});
   }
 
   async plan(projectId: bigint, action: PlanChapterOp, context: ActionContext): Promise<StartedActionJob & { chapter: number }> {

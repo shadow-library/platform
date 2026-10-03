@@ -11,7 +11,7 @@ import { countTokens } from '../context/token-budget';
 import { type RegisteredTool } from '../tools/types';
 import { type WebMode } from '../web/web-research.service';
 import { type ChatRefineOutput, ChatRefineSchema } from '../schemas/chat-refine.schema';
-import { laterPlanIssues } from '../../refinement/later-plans-guard';
+import { laterPlanIssues, organiseRouting } from '../../refinement/later-plans-guard';
 import { proseEditIssues } from '../../refinement/prose-intent';
 import { AUTHORING_STYLE_PLANNING, EDIT_BY_DELETION } from './authoring-preamble';
 import { HUB_ALLOWED_OPS, HUB_INSTRUCTIONS } from './scope-playbooks';
@@ -93,11 +93,16 @@ const WRITE_RULES: Record<Refinement.ChatMode, string> = {
     'Write policy: Ask first — nothing applies until the author accepts it. Every op, quoted or your own idea, is a suggestion card, so propose your ideas boldly, without a quote.',
 };
 
+const ORGANISE_STARTS_RULE =
+  'Organising the notes: the author asked for it, so it starts by itself at the end of this turn, with no card to accept. Never describe it as a card or ask the author to accept it; the server adds a line saying it started, or why it waits.';
+
 export function renderTurnRules(permissions: ChatTurnPermissions): string {
   const prose = permissions.proseEdits
     ? 'Prose edits: ON — the author turned on Edit prose, so draft.update, draft.remove and action.revise_draft are available this turn.'
     : 'Prose edits: OFF — the author did not turn on Edit prose. draft.update, draft.remove and action.revise_draft will be rejected, along with approving, judging or finalizing that prose; keep a plan edit in the plan.';
-  return `${prose}\n${permissions.justDiscussing ? JUST_DISCUSSING_RULE : WRITE_RULES[permissions.mode]}`;
+  const writes = permissions.justDiscussing ? JUST_DISCUSSING_RULE : WRITE_RULES[permissions.mode];
+  const organise = organiseRouting(permissions.organiseNotes === true, permissions.mode, permissions.justDiscussing === true);
+  return [prose, writes, ...(organise === 'start' ? [ORGANISE_STARTS_RULE] : [])].join('\n');
 }
 
 /**

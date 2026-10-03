@@ -249,6 +249,7 @@ function chat({ outputs, failTraceUpdate = false, tools = [getNotes], webResearc
     { publish: () => undefined } as never,
     { read: async () => ({ text: '' }) } as never,
     webResearch as never,
+    {} as never,
   );
   return { service, updates, inputs, contexts };
 }

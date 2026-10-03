@@ -1,4 +1,5 @@
 import { Injectable } from '@shadow-library/app';
+import { type AppError } from '@shadow-library/common';
 
 import { type ActionOp, type ActionType } from './change-set';
 
@@ -18,6 +19,8 @@ export interface ActionContext {
 }
 
 export type ActionExecutor = (projectId: bigint, action: ActionOp, context: ActionContext) => Promise<ActionExecutionResult>;
+/** Why the action would be refused if it ran now, read without starting anything; nothing when it would start. */
+export type ActionRefusal = (projectId: bigint, action: ActionOp) => Promise<AppError | undefined>;
 
 /**
  * Maps action ops to the service calls that perform them. The registry lives here (dependency-free)
@@ -27,9 +30,15 @@ export type ActionExecutor = (projectId: bigint, action: ActionOp, context: Acti
 @Injectable()
 export class ActionExecutorRegistry {
   private readonly executors = new Map<ActionType, ActionExecutor>();
+  private readonly refusals = new Map<ActionType, ActionRefusal>();
 
-  register(action: ActionType, executor: ActionExecutor): void {
+  register(action: ActionType, executor: ActionExecutor, refusal?: ActionRefusal): void {
     this.executors.set(action, executor);
+    if (refusal) this.refusals.set(action, refusal);
+  }
+
+  async refusal(projectId: bigint, action: ActionOp): Promise<AppError | undefined> {
+    return this.refusals.get(action.op)?.(projectId, action);
   }
 
   has(action: ActionType): boolean {

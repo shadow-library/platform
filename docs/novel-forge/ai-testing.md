@@ -1952,9 +1952,10 @@ them off `model_calls` rather than trusting a number here. Cost and admin inspec
 ### 2. Organise notes (a chat action)
 
 - **Entry:** ask the chat to organise your notes (a new novel's notes opener or the "Organise my notes" chip); with 600+ words of notes the turn stages the
-  `action.organise_notes` card alone, whatever else the model proposed, and never writes pages from the notes itself. Accepting it queues a job
-  (`jobs.kind='organise'`, graph `notes-organise`); follow it with `GET /chat/sessions/$S/jobs` or the SSE
-  `…/jobs/stream`.
+  `action.organise_notes` card alone, whatever else the model proposed, and never writes pages from the notes itself. Under Edit freely (not just
+  discussing) the turn accepts that card itself: the reply links no card, ends "Organising your notes has started…", and the job is queued
+  (`jobs.kind='organise'`, graph `notes-organise`); under Ask first or Just discuss, accepting the card queues it. Follow it with
+  `GET /chat/sessions/$S/jobs` or the SSE `…/jobs/stream`. Sent while another authoring job runs, the card stays pending and the reply says so.
 - **Preconditions:** at least 600 words of notes (`NTS_003`); no organise card still pending (`NTS_004`).
 - **Verify:**
   - Entries whose quote is found in the notes, stated rather than hedged, apply at once as one revertible proposal:

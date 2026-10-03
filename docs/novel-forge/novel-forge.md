@@ -45,8 +45,9 @@
   synchronous run. The holder heartbeats; a claim silent past `jobs.authoring-claim.ttl-ms` (database clock, UTC) may be taken over, and a janitor re-dispatches authoring jobs
   left without a live claim. Heartbeat, release and settle are conditioned on the holder's fencing token, but draft writes are not: a job that lost its claim may still land the
   chapter in flight, then stops and never settles as done. Publish and reindex jobs take no claim.
-- **Durable chat actions**: accepting an organise, plan or write card starts a job (one per accepted op) and never runs the work inline. A job started from a chat carries its
-  origin (session, message, card, op) from the transaction that queues it. Organise and plan retry once on a transient model failure (timeout, rate limit, 5xx, lost connection
+- **Durable chat actions**: accepting an organise, plan or write card starts a job (one per accepted op) and never runs the work inline; the author's own request to organise
+  the notes starts its job through that same accept (see the write policy). A job started from a chat carries its origin (session, message, card, op) from the transaction that
+  queues it. Organise and plan retry once on a transient model failure (timeout, rate limit, 5xx, lost connection
   after the router's own retries), never on a refusal the request caused, after a backoff kept under half the claim TTL; a cancel that lands first settles the job as cancelled. A
   retry never stages a second card: one card per run is enforced by a unique index.
 - **Job events**: every transition of a chat-started job writes a `job_events` row in the same transaction, numbered by a per-session `seq` taken under the session row's lock, so
@@ -93,7 +94,8 @@
   Opposition is whatever pushes back — a person or faction, or the situation itself — and a story with no antagonist is a shape the chat supports, not a gap it fills.
 - **What happens later lives only on the planner-only timeline.** Story Bible pages say how things stand when the story opens; the author's plans for later go on
   `project/timeline` under its band headings, always as a card. A message that asks to organise the notes (the notes opener or the opener chip) stages the organise action
-  alone once the notes reach organise's minimum, whatever the model proposed; shorter notes the chat organises itself. A page titled as plans for later, written where the
+  alone once the notes reach organise's minimum, whatever the model proposed, and under Edit freely starts it at turn end (see the write policy); shorter notes the chat
+  organises itself. A page titled as plans for later, written where the
   chapter writer reads, costs the turn one repair and is then withheld. The title check is lexical: plans written under another title are kept off only by the prompt.
 - **Chapter ideas start from where the story stands**: chapter 1 from the opening state (the pages on how things stand when the story opens and the timeline's opening),
   every later chapter from the previous chapter's ending, read before suggesting. The author's plans play out over chapters in their order and at their pace — at most the
@@ -140,9 +142,9 @@
   reach readers as the published description, tags and illustration prompts, so they are held with the style guide, and the other story fields travel in the same op and are
   held with them; only planner-side records (milestones) apply as usual, unless
   one leans on a held op. Just discuss, Ask first or any other warning on the turn makes every op a card.
-- Always cards, whatever the mode or quote: removals and cleared fields, including a `someday` that empties a payoff target; plans; prose; actions; planner-only and
-  writer-excluded pages; replacing a filled story field; a secret's truth once it exists and its gating (writer note, clues, unlock, reveal chapter, give-away terms) at any
-  time; a volume's order and notes; a promise's disposition (status, payoff target, dormant), progress or reuse of a settled one. The apply engine refuses an always-card kind
+- Always cards, whatever the mode or quote: removals and cleared fields, including a `someday` that empties a payoff target; plans; prose; actions (the author's organise
+  request below aside); planner-only and writer-excluded pages; replacing a filled story field; a secret's truth once it exists and its gating (writer note, clues, unlock,
+  reveal chapter, give-away terms) at any time; a volume's order and notes; a promise's disposition (status, payoff target, dormant), progress or reuse of a settled one. The apply engine refuses an always-card kind
   in an automatic apply, whatever the split decided.
 - A quote supports an op when at least three content words (character bigrams in scripts written without spaces) are found verbatim, whitespace-, case- and typography-normalised,
   in the author's message of that turn, in a sentence stated rather than asked, hedged, negated before the quote or turned down after it; no word the op writes comes only from a
@@ -166,6 +168,11 @@
   at all, and a call that moves nothing writes nothing. Undoing the author's own words records nothing.
 - `action.finalize`, `action.approve_draft` and `action.generate_chapter` MUST NEVER be auto-applied, and a chat action MUST NEVER replace an existing draft. Action ops run after
   the content transaction commits and stop at first failure.
+- One action starts without the author's click: when the author's own message asks to organise the notes (above), the session is Edit freely and the turn is not just
+  discussing, the turn stages the organise card and accepts it whole on the author's behalf, so the job is queued exactly as their accept would queue it. It is no automatic
+  apply: the applied side stays content-only, the reply carries no card and no receipt, and only the job's progress row and its result receipt show under it. The job only
+  stages a proposal for review, and nothing claims it can be undone. A model-proposed organise on any other turn, Ask first, Just discuss, a turn warning other than a
+  planner-only read, and anything that would refuse the job (another authoring job running, a pending organise card, notes too short) keep it a card, the reply saying why.
 - Plan edits stay plan edits: a chat turn MUST NEVER rewrite prose (`draft.update`, `draft.remove`, `action.revise_draft`) unless the author turned on Edit prose for that turn;
   the toggle is the only permission, and only the latest non-final draft may be revised. A prose op without it costs the model one repair and is then withheld with a note,
   together with the judging, approval or finalize that depended on it.
@@ -198,7 +205,7 @@
 
 ### Organise
 
-- Organising the notes is a chat action that runs as a job. Its output follows the quote rule with the notes standing in for the author's message: an entry applies at once "from
+- Organising the notes is a chat action that runs as a job, started by the author's own request under Edit freely and otherwise by accepting its card. Its output follows the quote rule with the notes standing in for the author's message: an entry applies at once "from
   your notes" only when its quote is found in the notes, stated, and it adds little the paragraphs it cites do not say; in an auto-mode chat those entries apply as one revertible
   proposal. Everything else — no quote, a quote not found or hedged, inferred sections, the model's own suggestions, what relies on a suggestion, the planner-only timeline and
   open questions, removals of what an earlier run wrote, and the notes' rules — waits on one card, even under Edit freely: the card is where the author adopts a

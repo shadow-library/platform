@@ -194,6 +194,8 @@ describe('ActionJobService', () => {
     const jobExecutor = { dispatch: async (jobId: string) => void dispatched.push(jobId) };
     const jobHandlers = { register: (kind: Job.Kind, handler: unknown) => handlers.set(kind, handler) };
     const workflowRunService = { createRun: async (...args: unknown[]) => (runs.push(args), 'run-1') };
+    const claims = new FakeAuthoringClaims();
+    if (stored.claimHeldBy) claims.rows.set(1n, { jobId: 'job-0', kind: stored.claimHeldBy, claimedBy: 'token-0', stale: false });
     const service = new ActionJobService(
       databaseOver(stored) as never,
       jobService as never,
@@ -203,6 +205,7 @@ describe('ActionJobService', () => {
       {} as never,
       registry,
       jobHandlers as never,
+      claims as never,
     );
     service.onModuleInit();
     return { service, registry, enqueued, runs, dispatched, handlers };
@@ -295,6 +298,16 @@ describe('ActionJobService', () => {
     expect(enqueued).toEqual([]);
   });
 
+  it('should tell, without starting anything, why organising would be refused right now', async () => {
+    const notes = [ledgerEntry({ topic: 'start.brief', statement: NOTES })];
+    const refusal = (stored: Stored) => actions(stored).registry.refusal(1n, { op: 'action.organise_notes' });
+
+    expect(await refusal({ ledger: notes })).toBeUndefined();
+    expect(await refusal({ ledger: notes, claimHeldBy: 'generate' })).toMatchObject({ code: 'JOB_002' });
+    expect(await refusal({ ledger: notes, appliedOrganise: [{ id: 42n }] })).toMatchObject({ code: 'NTS_004' });
+    expect(await refusal({ ledger: [ledgerEntry({ topic: 'start.brief', statement: 'A few words only' })] })).toMatchObject({ code: 'NTS_003' });
+  });
+
   it('should report a card op whose job is already running instead of starting it again', async () => {
     const { registry, dispatched } = actions({ drafts: [{ chapter: 1 }], dedupe: true });
 
@@ -345,6 +358,7 @@ describe('ActionJobService', () => {
       planJobs as never,
       new ActionExecutorRegistry(),
       jobHandlers,
+      new FakeAuthoringClaims() as never,
     ).onModuleInit();
 
     await executor.onApplicationReady();

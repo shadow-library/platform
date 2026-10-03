@@ -60,6 +60,7 @@ function chat() {
     { publish: () => undefined } as never,
     { read: async () => ({ text: '' }) } as never,
     { modeFor: async () => 'off' } as never,
+    {} as never,
   );
   return { service, inserts, turns };
 }
