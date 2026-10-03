@@ -253,7 +253,7 @@ describe('Prompt modules', () => {
 
     it('should guide AI-assisted writing, a hand-writer’s review or audit, and plain discussion', () => {
       const hub = HUB_INSTRUCTIONS;
-      expect(PROMPT_REGISTRY['chat-refine'].version).toBe('2.15.0');
+      expect(PROMPT_REGISTRY['chat-refine'].version).toBe('2.17.0');
       expect(hub).toContain('Writing with you:');
       expect(hub).toContain('Writing by hand:');
       expect(hub).toContain('fetch before you critique');
@@ -262,7 +262,17 @@ describe('Prompt modules', () => {
       expect(hub).toContain("accept 'undecided for now'");
       expect(hub).toContain('ending is PLANNER-ONLY');
       expect(hub).toContain('outrank every summary');
-      expect(hub).toContain('raise it as a `question` card');
+      expect(hub).toContain("follow the author's lead");
+      expect(hub).toContain('Raise a `question` card only when they ask for options or say they are unsure');
+    });
+
+    it("should follow the author's lead and raise a question card only when asked or when the chapter needs it", () => {
+      const system = PROMPT_REGISTRY['chat-refine'].system;
+      expect(system).toContain('build on it: never ask about it, and never offer alternatives they did not ask for');
+      expect(system).toContain('Raise a "question" card only when the author asks for options or says they are unsure');
+      expect(system).toContain('whether they have something in mind or want suggestions');
+      expect(system).toContain('Never ask about the theme, the ending, the reader promise or the opposition just because they are open');
+      expect(system).not.toContain('next open item');
     });
 
     it('should judge a choice by its effect on the reader, never by whether it serves a theme', () => {

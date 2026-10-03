@@ -1374,7 +1374,7 @@ export class ContextAssembler {
       const overrides = progressOverridesFrom(ledger);
       const fields = progressFieldsFrom(project, volumes, { chapter: next, brief: nextBrief ? { staleReason: nextBrief.staleReason } : undefined });
       const progress = computeProgress(fields, overrides);
-      const progressText = renderProgress(progress, fields.chapterOneWritten);
+      const progressText = renderProgress(progress);
       if (progressText) volatile.push(section('progress', progressText, 'working', caps.progress, { priority: 2 }));
     }
     const plugins = pluginContextSections(opts.policy, [...stable, ...volatile]).map(plugin => ({ ...plugin, segment: 'volatile' as const }));

@@ -149,27 +149,25 @@ function progressItem(overrides: Partial<ProgressItem>): ProgressItem {
 }
 
 describe('renderProgress', () => {
-  it('should list only the open items, each with why it matters', () => {
-    const rendered = renderProgress([progressItem({ key: 'premise', label: 'Premise', why: 'Why it matters.' }), progressItem({ key: 'theme', status: 'answered' })], false);
+  it('should list settled, undecided and open items by label as reference, never as an agenda', () => {
+    const rendered = renderProgress([
+      progressItem({ key: 'premise', label: 'Premise', status: 'answered' }),
+      progressItem({ key: 'ending', label: 'Ending', status: 'undecided' }),
+      progressItem({ key: 'theme', label: 'Theme', why: 'What the book is about underneath the plot.' }),
+      progressItem({ key: 'opposition', label: 'Opposition', status: 'dismissed' }),
+    ]);
 
-    expect(rendered).toContain('- Premise: Why it matters.');
-    expect(rendered).not.toContain('Theme');
+    expect(rendered).toContain('reference only; never ask about an open item unless the author raises it or the chapter being planned needs it');
+    expect(rendered).toContain('- Settled: Premise');
+    expect(rendered).toContain('- Left undecided for now: Ending');
+    expect(rendered).toContain('- Not settled yet: Theme');
+    expect(rendered).not.toContain('underneath the plot');
+    expect(rendered).not.toContain('Opposition');
   });
 
-  it('should return null once every item is answered, undecided or dismissed', () => {
-    const rendered = renderProgress(
-      [progressItem({ status: 'answered' }), progressItem({ key: 'ending', status: 'undecided' }), progressItem({ key: 'opposition', status: 'dismissed' })],
-      false,
-    );
-
-    expect(rendered).toBeNull();
-  });
-
-  it('should title the checklist for a book already underway differently from a brand-new one', () => {
-    const items = [progressItem({})];
-
-    expect(renderProgress(items, false)).toContain('Ready for chapter 1');
-    expect(renderProgress(items, true)).toContain('Story basics still open');
+  it('should return null when every item is dismissed', () => {
+    expect(renderProgress([progressItem({ status: 'dismissed' })])).toBeNull();
+    expect(renderProgress([])).toBeNull();
   });
 });
 

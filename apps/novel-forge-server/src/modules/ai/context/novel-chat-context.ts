@@ -1,4 +1,4 @@
-import { firstUnwrittenChapter, PROGRESS_TOPIC_PREFIX, type ProgressItem } from '@server/common';
+import { firstUnwrittenChapter, PROGRESS_TOPIC_PREFIX, type ProgressItem, type ProgressStatus } from '@server/common';
 import { type Chapter, type Generation, type Knowledge, type Ledger, type Plan, type Project, type Story } from '@server/database';
 
 import { AUTHOR_BRIEF_TOPIC } from '../../ledger/ledger-sections';
@@ -224,11 +224,20 @@ export function renderNotesPointer(notes: string): string | null {
   return `The author's own notes: ${paragraphs.length} paragraphs, about ${words} words. They are the author's words and outrank every summary; read them with get_notes before quoting, organising or critiquing them.`;
 }
 
-export function renderProgress(items: readonly ProgressItem[], chapterOneWritten: boolean): string | null {
-  const open = items.filter(item => item.status === 'open');
-  if (open.length === 0) return null;
-  const heading = chapterOneWritten ? 'Story basics still open' : 'Ready for chapter 1';
-  return `${heading} — advice only, never a reason to refuse planning or writing:\n${open.map(item => `- ${item.label}: ${item.why}`).join('\n')}`;
+const PROGRESS_GROUPS: readonly { status: ProgressStatus; label: string }[] = [
+  { status: 'answered', label: 'Settled' },
+  { status: 'undecided', label: 'Left undecided for now' },
+  { status: 'open', label: 'Not settled yet' },
+];
+
+/** Dismissed items are left out: the author took them off the checklist. */
+export function renderProgress(items: readonly ProgressItem[]): string | null {
+  const lines = PROGRESS_GROUPS.flatMap(({ status, label }) => {
+    const labels = items.filter(item => item.status === status).map(item => item.label);
+    return labels.length > 0 ? [`- ${label}: ${labels.join(', ')}`] : [];
+  });
+  if (lines.length === 0) return null;
+  return `What the author has settled so far — reference only; never ask about an open item unless the author raises it or the chapter being planned needs it, and never a reason to refuse planning or writing:\n${lines.join('\n')}`;
 }
 
 const VOLUME_STATE_LABELS: Record<Plan.Volume['state'], string> = { not_started: 'not started', active: 'active', goal_met: 'goal met' };
