@@ -1,19 +1,19 @@
+import { Link } from '@tanstack/react-router';
 import { type ReactElement } from 'react';
-
 import { Button } from '@shadow-library/ui';
 
 import { SparkIcon } from '@/components/icons';
 
-import { type BibleHealth as BibleHealthSummary, emptyPlaceholdersLabel, topicCoverageLabel } from '@/lib/bible-documents';
-import { suggestionsLabel } from '@/lib/bible-readiness';
+import { type BibleUnresolvedReferenceResponse } from '@/lib/apis';
+import { type BibleHealth as BibleHealthSummary, emptyPlaceholdersLabel, unresolvedReferencesLabel } from '@/lib/bible-documents';
+import { secretTitle } from '@/lib/bible-secrets';
 
 import styles from './BibleHealth.module.css';
-import { StatusChip } from './StatusChip';
 
 export interface BibleHealthProps {
+  novelId: string;
   health: BibleHealthSummary;
-  /** Advisory readiness notes for a bible that is already ready to draft. */
-  suggestions?: readonly string[];
+  unresolvedReferences?: readonly BibleUnresolvedReferenceResponse[];
   onTidy?: () => void;
 }
 
@@ -24,7 +24,7 @@ interface Stat {
   secondary?: boolean;
 }
 
-export function BibleHealth({ health, suggestions = [], onTidy }: BibleHealthProps): ReactElement {
+export function BibleHealth({ novelId, health, unresolvedReferences = [], onTidy }: BibleHealthProps): ReactElement {
   const stats: Stat[] = [
     { label: health.entries === 1 ? 'entry' : 'entries', value: health.entries, secondary: true },
     { label: health.records === 1 ? 'record' : 'records', value: health.records, secondary: true },
@@ -42,11 +42,6 @@ export function BibleHealth({ health, suggestions = [], onTidy }: BibleHealthPro
           </div>
         ))}
       </dl>
-      {health.topics && (
-        <StatusChip intent={health.topics.missing.length === 0 ? 'success' : 'warning'} dot className={styles.topics}>
-          {topicCoverageLabel(health.topics)}
-        </StatusChip>
-      )}
       <span className={styles.spacer} />
       {onTidy && (
         <span className={styles.tidy}>
@@ -57,12 +52,17 @@ export function BibleHealth({ health, suggestions = [], onTidy }: BibleHealthPro
           </Button>
         </span>
       )}
-      {suggestions.length > 0 && (
-        <details className={styles.suggestions}>
-          <summary className={styles.suggestionsToggle}>{suggestionsLabel(suggestions.length)}</summary>
-          <ul className={styles.suggestionList}>
-            {suggestions.map(suggestion => (
-              <li key={suggestion}>{suggestion}</li>
+      {unresolvedReferences.length > 0 && (
+        <details className={styles.references}>
+          <summary className={styles.referencesToggle}>{unresolvedReferencesLabel(unresolvedReferences.length)}</summary>
+          <ul className={styles.referenceList}>
+            {unresolvedReferences.map(reference => (
+              <li key={`${reference.factKey}/${reference.subject}`}>
+                <Link to="/novels/$novelId/story-bible" params={{ novelId }} search={{ view: 'secrets', fact: reference.factKey }} className={styles.referenceLink}>
+                  {secretTitle(reference.factKey)}
+                </Link>{' '}
+                names “{reference.subject}”, which is no longer in the bible.
+              </li>
             ))}
           </ul>
         </details>

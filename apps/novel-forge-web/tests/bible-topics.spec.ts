@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'bun:test';
 
-import { type BibleDocListItem, type BibleReadinessRoleResponse } from '../src/lib/apis/api-types.gen';
+import { type BibleDocListItem, type BibleRoleResponse } from '../src/lib/apis/api-types.gen';
 import { documentTopic, entityTopic, newEntryType, parseBibleTopic, stagesByDocument, tabsFit, topicByKeywords, topicForEntityType } from '../src/lib/bible-topics';
 
 function doc(overrides: Partial<BibleDocListItem> & Pick<BibleDocListItem, 'section' | 'slug'>): BibleDocListItem {
   return { title: overrides.slug, wordCount: 100, isEmpty: false, writerExcluded: false, plannerOnly: false, updatedAt: '2026-01-01T00:00:00.000Z', ...overrides };
 }
 
-function role(overrides: Partial<BibleReadinessRoleResponse> & Pick<BibleReadinessRoleResponse, 'stage'>): BibleReadinessRoleResponse {
-  return { label: overrides.stage, address: 'project/premise', covered: true, coveredBy: [], ...overrides };
+function role(overrides: Partial<BibleRoleResponse> & Pick<BibleRoleResponse, 'stage'>): BibleRoleResponse {
+  return { label: overrides.stage, coveredBy: [], ...overrides };
 }
 
 describe('entityTopic', () => {
@@ -73,7 +73,7 @@ describe('documentTopic', () => {
     expect(documentTopic(doc({ section: 'lore', slug: 'relics', title: 'Relics of the Old Age' }))).toBe('objects');
   });
 
-  it('should use the readiness role a page covers when its title names no topic', () => {
+  it('should use the bible role a page covers when its title names no topic', () => {
     const stages = stagesByDocument([role({ stage: 'characters', coveredBy: ['world/who-is-who'] })]);
     expect(documentTopic(doc({ section: 'world', slug: 'who-is-who', title: 'Who Is Who' }), stages)).toBe('people');
   });
@@ -96,7 +96,7 @@ describe('stagesByDocument', () => {
     expect(stages.get('lore/songs')).toBe('world');
   });
 
-  it('should be empty before readiness has loaded', () => {
+  it('should be empty before the overview has loaded', () => {
     expect(stagesByDocument(undefined).size).toBe(0);
   });
 });

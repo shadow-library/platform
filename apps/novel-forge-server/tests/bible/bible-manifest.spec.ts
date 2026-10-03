@@ -23,15 +23,14 @@ describe('BIBLE_MANIFEST', () => {
     expect(new Set(addresses).size).toBe(addresses.length);
   });
 
-  it('should require at least one entity for every chapter that declares types', () => {
-    for (const chapter of BIBLE_MANIFEST) {
-      if (chapter.materializes.length > 0) expect(chapter.minEntities).toBeGreaterThan(0);
-      else expect(chapter.minEntities).toBe(0);
-    }
+  it('should give every chapter at least one topic to guide the builder and the audit', () => {
+    for (const chapter of BIBLE_MANIFEST) expect(chapter.topics.length).toBeGreaterThan(0);
   });
 
-  it('should give every chapter at least one required topic for the audit to check', () => {
-    for (const chapter of BIBLE_MANIFEST) expect(chapter.requiredTopics.length).toBeGreaterThan(0);
+  it('should never ask the escalation map for an endgame the author has not given', () => {
+    const plot = chapterForStage('plot');
+    expect(plot.topics).not.toContain('endgame vision');
+    expect(plot.purpose).toContain('only where the author has given them');
   });
 
   it('should materialize the cast, the power system, the world and its factions as records', () => {
@@ -105,11 +104,12 @@ describe('LEGACY_CHAPTER_SLUGS', () => {
 });
 
 describe('renderManifest', () => {
-  it('should state the entity requirement and the topics for each chapter', () => {
+  it('should state the record types and the topics for each chapter as guidance, not a quota', () => {
     const rendered = renderManifest();
     expect(rendered).toContain('power/system-and-limits');
-    expect(rendered).toContain('must materialize at least 4 entities of type: power_rule, concept');
-    expect(rendered).toContain('topics it must cover: progression ladder; costs and limits');
+    expect(rendered).toContain('recorded as entities of type: power_rule, concept');
+    expect(rendered).toContain("topics to cover where the author's material supports them: progression ladder; costs and limits");
+    expect(rendered).not.toMatch(/at least \d|must cover/);
   });
 
   it('should not claim an entity requirement for a chapter that materializes nothing', () => {
@@ -117,6 +117,6 @@ describe('renderManifest', () => {
       .split('\n')
       .find(line => line.startsWith('story_state/volume-plan'));
     expect(volumeLine).toBeDefined();
-    expect(volumeLine).not.toContain('must materialize');
+    expect(volumeLine).not.toContain('recorded as entities');
   });
 });

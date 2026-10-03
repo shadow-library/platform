@@ -7,6 +7,6 @@ export * from './fact/fact.service';
 export * from './fact/knowledge-view';
 export * from './fact/writer-disclosure-policy';
 export * from './milestone/milestone.service';
+export * from './overview/bible-overview.service';
 export * from './promise/promise.service';
-export * from './readiness/bible-readiness.service';
 export * from './volume/volume.service';

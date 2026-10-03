@@ -1,30 +1,19 @@
 import { type BibleStage, chapterForStage } from '@modules/bible/bible-manifest';
 
-import { type BibleStageOutput } from '../../schemas/new-novel.schema';
+const GROUNDING =
+  'Build only from the project brief and the sections written before this one. The author gives the world as it stands when the story opens; ' +
+  'never add a character, faction, place, rule or event to fill out the section, and never decide the future the author has not given. ' +
+  'A short section true to the material beats a long one padded past it.';
 
 export function renderStageContract(stage: BibleStage): string {
   const chapter = chapterForStage(stage);
-  const topics = `Cover every one of these topics explicitly, because the bible audit checks for each by name: ${chapter.requiredTopics.join('; ')}.`;
+  const topics = `${GROUNDING}\n\nCover these where the material supports them: ${chapter.topics.join('; ')}. Leave a topic out rather than invent it.`;
   if (chapter.materializes.length === 0) return topics;
 
   const types = chapter.materializes.join(' / ');
   return (
-    `${topics}\n\nMANDATORY — emit \`entities\`. This section's canon must exist as structured records, not only as prose inside \`body\`. ` +
-    `Stage at least ${chapter.minEntities} entities of type ${types}, each with a snake_case \`entityKey\`, a \`name\`, its \`type\`, a \`significance\`, and a \`body\` card concrete enough to write a chapter from. ` +
-    `A body that only narrates the ${types} is not a substitute for the records — the reply is rejected and retried when the records are missing.`
+    `${topics}\n\nEmit \`entities\` for every ${types} the material establishes — this section's canon must exist as structured records, not only as prose inside \`body\`. ` +
+    `Give each a snake_case \`entityKey\`, a \`name\`, its \`type\`, a \`significance\`, and a \`body\` card concrete enough to write a chapter from. ` +
+    `There is no minimum: emit as many as the material establishes, and none when it establishes none.`
   );
-}
-
-export function validateStageCoverage(stage: BibleStage, data: BibleStageOutput): string[] {
-  const chapter = chapterForStage(stage);
-  if (chapter.materializes.length === 0) return [];
-
-  const declared = new Set<string>(chapter.materializes);
-  const matching = (data.entities ?? []).filter(entity => declared.has(entity.type));
-  if (matching.length >= chapter.minEntities) return [];
-
-  return [
-    `entities: ${chapter.section}/${chapter.slug} must materialize at least ${chapter.minEntities} entities of type ${chapter.materializes.join(', ')} — received ${matching.length}. ` +
-      `Re-emit the reply with the records filled in; prose in "body" alone does not satisfy this section.`,
-  ];
 }

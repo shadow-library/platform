@@ -1,80 +1,53 @@
 import { describe, expect, it } from 'bun:test';
 
-import { renderStageContract, validateStageCoverage } from '@modules/ai/prompts/bible-builder/stage-contract';
+import { renderStageContract } from '@modules/ai/prompts/bible-builder/stage-contract';
 import { PROMPT_REGISTRY } from '@modules/ai/prompts';
-import { type BibleStageOutput } from '@modules/ai/schemas';
-import { chapterForStage } from '@modules/bible/bible-manifest';
 
-function stageOutput(entities: BibleStageOutput['entities']): BibleStageOutput {
-  return { body: 'Stage prose.', entities } as BibleStageOutput;
-}
-
-function entity(entityKey: string, type: string): NonNullable<BibleStageOutput['entities']>[number] {
-  return { entityKey, name: entityKey, type } as NonNullable<BibleStageOutput['entities']>[number];
-}
+const STAGE_PROMPT_KEYS = ['bible:foundation', 'bible:world', 'bible:power', 'bible:factions-locations', 'bible:characters', 'bible:plot', 'bible:volumes'] as const;
 
 describe('renderStageContract', () => {
-  it('should mandate records for a stage whose manifest chapter declares entity types', () => {
+  it('should ask for records of every kind the material establishes, with no minimum', () => {
     const contract = renderStageContract('power');
-    expect(contract).toContain('MANDATORY — emit `entities`');
-    expect(contract).toContain('at least 4 entities of type power_rule / concept');
-    expect(contract).toContain('progression ladder');
+    expect(contract).toContain('Emit `entities` for every power_rule / concept the material establishes');
+    expect(contract).toContain('There is no minimum');
+    expect(contract).not.toMatch(/at least \d/);
+  });
+
+  it('should offer topics as guidance to leave out rather than invent', () => {
+    const contract = renderStageContract('power');
+    expect(contract).toContain('Cover these where the material supports them: progression ladder');
+    expect(contract).toContain('Leave a topic out rather than invent it.');
+    expect(contract).not.toContain('audit checks');
   });
 
   it('should ask only for topics on a stage that materializes nothing', () => {
     const contract = renderStageContract('volumes');
-    expect(contract).not.toContain('MANDATORY');
+    expect(contract).not.toContain('`entities`');
     expect(contract).toContain('volume objectives');
   });
 });
 
-describe('validateStageCoverage', () => {
-  it('should reject a stage that returns prose and no records', () => {
-    const errors = validateStageCoverage('characters', stageOutput([]));
-    expect(errors).toHaveLength(1);
-    expect(errors[0]).toContain('project/cast must materialize at least 3 entities of type character — received 0');
-  });
-
-  it('should reject an omitted entities field exactly as it rejects an empty one', () => {
-    expect(validateStageCoverage('characters', stageOutput(undefined))).toHaveLength(1);
-  });
-
-  it('should accept a stage that meets its floor', () => {
-    const entities = [entity('kael', 'character'), entity('mira', 'character'), entity('dane', 'character')];
-    expect(validateStageCoverage('characters', stageOutput(entities))).toEqual([]);
-  });
-
-  it('should not count off-type records toward the floor', () => {
-    const entities = [entity('kael', 'character'), entity('the_choir', 'faction'), entity('spire', 'location')];
-    const errors = validateStageCoverage('characters', stageOutput(entities));
-    expect(errors[0]).toContain('received 1');
-  });
-
-  it('should allow extra records of other types alongside a satisfied floor', () => {
-    const entities = [entity('a', 'character'), entity('b', 'character'), entity('c', 'character'), entity('d', 'faction')];
-    expect(validateStageCoverage('characters', stageOutput(entities))).toEqual([]);
-  });
-
-  it('should stay silent for a stage that materializes nothing', () => {
-    expect(validateStageCoverage('volumes', stageOutput([]))).toEqual([]);
-    expect(validateStageCoverage('plot', stageOutput([]))).toEqual([]);
-  });
-});
-
 describe('bible-builder prompt modules', () => {
-  it('should guard every entity-bearing stage with a postValidate the repair ladder can act on', () => {
-    const entries: [string, ReturnType<typeof chapterForStage>][] = [
-      ['bible:world', chapterForStage('world')],
-      ['bible:power', chapterForStage('power')],
-      ['bible:factions-locations', chapterForStage('factionsAndLocations')],
-      ['bible:characters', chapterForStage('characters')],
-    ];
-    for (const [key, chapter] of entries) {
-      expect(chapter.materializes.length).toBeGreaterThan(0);
-      const prompt = PROMPT_REGISTRY[key as 'bible:power'];
-      expect(prompt.postValidate).toBeDefined();
-      expect(prompt.postValidate?.({ body: 'prose only' } as never)).toHaveLength(1);
-    }
+  it('should never reject and retry a stage for the number of records it returned', () => {
+    for (const key of STAGE_PROMPT_KEYS) expect(PROMPT_REGISTRY[key].postValidate).toBeUndefined();
+  });
+
+  it('should forbid every stage from inventing content to fill the section', () => {
+    for (const key of STAGE_PROMPT_KEYS) expect(PROMPT_REGISTRY[key].system).toContain('never add a character, faction, place, rule or event to fill out the section');
+  });
+
+  it('should keep the escalation map to the opening conflict unless the author gave more', () => {
+    const plot = PROMPT_REGISTRY['bible:plot'];
+    expect(plot.version).toBe('3.0.0');
+    expect(plot.system).toContain('Describe the opening conflict');
+    expect(plot.system).toContain('Never invent an endgame, a climactic confrontation or later volumes the author has not given');
+    expect(plot.system).not.toContain('state that endgame plainly');
+  });
+
+  it('should plan only the volumes the author has named', () => {
+    const volumes = PROMPT_REGISTRY['bible:volumes'];
+    expect(volumes.version).toBe('3.0.0');
+    expect(volumes.system).toContain('Add a later volume only when the project brief or the escalation map names it');
   });
 
   it('should render the worldFacts instruction with real backticks rather than escaped ones', () => {

@@ -11,7 +11,7 @@ Manual test recipes for every AI feature of Novel Forge: the input to use and wh
 | Part                                  | Features                                                                                                              |
 | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | Part 1: setup and observability       | Run locally, AI env vars, auth, project creation, reset between runs, observability                                   |
-| Part 2: lore bible                    | Premise enhancement, bible builder, readiness, audit, proposal-only writes, one end-to-end sample                     |
+| Part 2: lore bible                    | Premise enhancement, bible builder, bible overview, audit, proposal-only writes, one end-to-end sample                |
 | Part 3: planning, generation          | Volumes, chapter plans, chapter generation, judge and repair, revise, finalize, continuity, validation, insert, amend |
 | Part 4: novel import                  | Importing a finished manuscript as a new novel                                                                        |
 | Part 5: chat hub and admin inspection | Chat hub, illustrations, plugins, AI settings and quota, admin inspection (runs, context packs, model calls)          |
@@ -603,11 +603,13 @@ for this workspace — a change in coverage behavior worth confirming is intenti
 
 - **`bible-readiness.spec.ts`** exercises `scoreBibleReadiness` (`src/modules/eval/bible-readiness.ts:137-142`) on
   hand-built rows. Five dimensions — `coverage`, `records`, `substance`, `integrity`, `reveal` (`:10`); only
-  `coverage` and `records` block drafting (`:58,140-141`). `DOC_WORD_FLOOR = 250` (`:54`) and a
+  `coverage` and `records` gate its own `readyToDraft`, which nothing outside evals reads. `DOC_WORD_FLOOR = 250` (`:54`) and a
   `tbd|todo|fixme|[placeholder]|lorem ipsum` regex (`:56`) are the entire "substance" test.
   **A 250-word run of the word "word" passes `substance`** — the spec's own fixture at `:13` is exactly that.
-  This is the same function behind `GET /api/v1/projects/:id/bible/readiness`
-  (`src/modules/bible/readiness/bible-readiness.service.ts:31`); no spec covers that controller or service.
+  It grades the builder for evals only — nothing in drafting or on the Story Bible screen reads the score. `records` holds
+  no count: it judges only a role written as prose and asks for at least one record of its kind. `GET …/bible/overview`
+  (`src/modules/bible/overview/bible-overview.service.ts`) reuses just its role matching (`bibleRoles`) and
+  `unresolvedFactSubjects`; no spec covers that controller or service.
 - **`deterministic-metrics`** (`src/modules/eval/deterministic-metrics.ts`) — word band 1,800–2,600 (aim 2,200),
   sentence band 6–22 words plus the longest out-of-band run, repeated 5–8-gram rate within and across chapters,
   ~21 stock-phrase regexes, said/asked vs 23 alternative dialogue verbs, contraction rate inside quotes only, and
@@ -640,8 +642,8 @@ Real graph, real Postgres, real checkpointer — but the model is stubbed inline
 persistence (entity `body` cards, canon-fact `terms`/`revealChapter`, world facts), `COALESCE` semantics on a
 forced rebuild, the non-forced skip, transactional atomicity (an invalid entity type rolls the whole stage back,
 `:309-326`), and that every manifest chapter is indexed as `bible_doc:<section>/<slug>` (`:352-353`).
-It **cannot** prove a real model meets the entity floors, because `structured` — and therefore the repair
-ladder — is bypassed.
+It **cannot** prove a real model records the canon it writes without inventing any, because `structured` — and
+therefore the repair ladder — is bypassed.
 
 #### Other AI specs worth knowing
 
@@ -655,19 +657,21 @@ ladder — is bypassed.
 - `tests/ai/json-extract.spec.ts` — brace/quote/fence tolerance of `extractJsonCandidates`.
 - `tests/ai/model-router.spec.ts` (709 lines) — role resolution, allowlist coercion, reasoning policy, the
   ladder's call counts, image/vision guards. No real model, no DB.
-- `tests/bible/bible-manifest.spec.ts` — one chapter per stage, unique `section/slug`, `minEntities > 0` iff the
-  chapter materializes types, every chapter has at least one required topic.
+- `tests/bible/bible-manifest.spec.ts` — one chapter per stage, unique `section/slug`, every chapter has at least one
+  guidance topic, the escalation map asks for no endgame, and `renderManifest()` states no count.
+- `tests/ai/bible-stage-contract.spec.ts` — no stage prompt has a `postValidate` (nothing is retried for a record count),
+  every stage forbids inventing to fill a section, and the plot and volumes prompts keep to what the author gave.
 
 #### Honest summary for a tester
 
 **Proven without a model:** prompt/schema wiring and version pins; JSON extraction and the repair ladder;
-fail-closed judge routing; bible-builder persistence and atomicity; manifest floors and readiness arithmetic;
+fail-closed judge routing; bible-builder persistence and atomicity; manifest shape and readiness arithmetic;
 the prose-metric and process-invariant maths.
 
 **Proven for ~$0.04** (`AI_SMOKE_SPEND=1 bun run ai:smoke`): the production models behind four roles are reachable and return
 schema-conformant output.
 
-**Proven by nothing in the repo:** bible content quality; that a real model clears the entity floors; that real
+**Proven by nothing in the repo:** bible content quality; that a real model records what it establishes and invents nothing; that real
 chapters land in the length band or avoid stock phrases; judge accuracy (false positives or negatives); anything
 cross-model, because **there is no fixed corpus, no golden output and no LLM-as-judge anywhere** — `grep` for
 `toMatchSnapshot` in `tests/` returns nothing, and the only prose fixture is
@@ -691,7 +695,7 @@ Closing that gap needs a blind evaluation of real output against a baseline.
 
 ## Part 2: lore bible
 
-Covers: premise enhancement, bible builder, bible readiness, bible audit, and proposal-only writes into bible
+Covers: premise enhancement, bible builder, bible overview, bible audit, and proposal-only writes into bible
 documents / entities / canon facts. The refinement **chat hub** (`/novels/$novelId/chat`) is covered in Part 5 (chat
 hub and admin) — cross-referenced here where it is the only editor for something.
 
@@ -757,51 +761,45 @@ Everything below is read off current code in `apps/novel-forge-server` / `apps/n
 - **Run:** 1. POST (the request blocks for the whole run — minutes). 2. Watch `GET …/runs` for
   `graph='bible-builder'`, `target='all-stages'`. 3. Read `GET …/bible` and `GET …/entities`.
 - **Verify:** `node_trace` = `foundation, world, power, factionsAndLocations, characters, plot, volumes, indexLore`.
-  Seven prompts, one per stage: `bible:foundation@2.0.0`, `bible:world@1.0.0`, `bible:power@1.0.0`,
-  `bible:factions-locations@2.0.0`, `bible:characters@2.0.0`, `bible:plot@2.0.0`, `bible:volumes@2.1.0`. Each stage
+  Seven prompts, one per stage: `bible:foundation@2.2.0`, `bible:world@1.2.0`, `bible:power@1.2.0`,
+  `bible:factions-locations@2.2.0`, `bible:characters@2.2.0`, `bible:plot@3.0.0`, `bible:volumes@3.0.0`. Each stage
   writes `model_calls.role` = its **prompt key** (`bible:foundation`, `bible:world`, …), not `bible` — filter on
   `prompt_key`, not on `role`. `bible_documents` gains the manifest addresses: `project/premise`, `world/setting-overview`,
   `power/system-and-limits`, `world/factions-and-locations`, `project/cast`, `plot/escalation-map`,
-  `story_state/volume-plan`. Coverage floors are enforced in the repair ladder (`validateStageCoverage`):
-  `world` ≥3 `location|concept`, `power` ≥4 `power_rule|concept`, `factionsAndLocations` ≥4 `faction|location`,
-  `characters` ≥3 `character` — as **`entities` rows** (`origin='generated'`, `status='active'`), not prose.
+  `story_state/volume-plan`. There is **no record floor and no retry for one**: each record-bearing stage
+  (`world` `location|concept`, `power` `power_rule|concept`, `factionsAndLocations` `faction|location`, `characters`
+  `character`) emits as many **`entities` rows** (`origin='generated'`, `status='active'`) as the brief establishes —
+  none when it establishes none. Manifest topics are guidance the stage leaves out rather than invents.
   `canon_facts` (`source='generated'`) and `world_facts` may also appear. `lore_chunks` gains `kind='bible_doc'` rows.
   A stage whose document already has a body is **skipped** unless `force: true` (`counts[stage] = 0`, still in `stagesDone`).
-  **Quality:** every character entity's `body` must carry a want, a wound/cost and a voice tic concrete enough to write
-  dialogue from; `power/system-and-limits` must state what the power _cannot_ do and what breaking a rule costs;
-  `project/cast` must name a protagonist, what opposes them and the relationships that generate conflict. The opposition
-  may be a person, a faction or the situation itself — a survival story needs no antagonist — but a cast document that
-  names no pressure at all is the classic weak output here.
-- **Fails when:** repeated `model_calls` rows with `attempt=1` on one stage — the coverage floor was missed and the
-  reply was retried; a stage silently skipped because its document already had a body (`project/premise`,
+  **Quality:** nothing in the bible goes beyond what the brief supports — every character, faction, place and rule
+  traces to it. Character cards carry a want, a wound/cost and a voice tic where the brief gives them, written concrete
+  enough to write dialogue from; `power/system-and-limits` states what the power _cannot_ do and what breaking a rule
+  costs where the brief has a power system; `project/cast` names the protagonist and the pressure the brief puts on them
+  (a person, a faction or the situation itself). `plot/escalation-map` describes the opening conflict and how pressure
+  starts to build, and `story_state/volume-plan` the opening volume — neither states an endgame, a climax or later
+  volumes the brief does not contain. A padded cast or an invented ending is the classic weak output here.
+- **Fails when:** a stage invents canon or an ending the brief does not hold; a stage silently skipped because its document already had a body (`project/premise`,
   `project/cast`, `world/setting-overview`, `power/system-and-limits`); `PRJ_001`; an HTTP timeout at the
   gateway while the run keeps going server-side (check `workflow_runs`, not the response).
 - **Cost:** 7 model calls (fewer if stages skip) + embeddings for `indexLore`; minutes of wall clock.
 
-#### Bible readiness (deterministic score)
+#### Bible overview (deterministic)
 
-- **Entry:** Story Bible screen banner (`BibleReadiness`); `GET /api/v1/projects/{projectId}/bible/readiness`.
-- **Preconditions:** any active project; meaningful after the builder ran.
+- **Entry:** Story Bible screen (topic filing of pages, the "covers" line on a guide, and the broken-reference note);
+  `GET /api/v1/projects/{projectId}/bible/overview`.
+- **Preconditions:** any project.
 - **Input:** none.
-- **Run:** GET, before and after each bible-writing step.
-- **Verify:** five dimensions in order — `coverage` (each of the 7 manifest **roles** is covered: by its canonical
-  address, by any non-empty document in the role's sections whose slug or title carries one of the role's keywords
-  (`BibleChapterSpec.role`), or — for three roles — by records: factions/locations by ≥4 `faction|location` rows with at
-  least one faction, the cast by ≥3 `character` rows not all `minor`, the volume plan by any `volumes` row with an
-  objective), `records` (each of the 4 entity-bearing chapters' `minEntities` met by entity **rows**, counted project-wide by
-  type — a `concept` row therefore counts toward both `world` and `power`), `substance` (each role's documents
-  together ≥ **250 words** — 100 for the premise — and every written doc free of
-  `tbd|todo|fixme|[placeholder]|lorem ipsum`; documents outside every role are never held to a length), `integrity` (every `canon_facts.subjects` entry resolves to an
-  entity key; every `significance='major'` entity has a non-empty `body`), `reveal` (share of facts with a
-  `reveal_chapter`). `readyToDraft` is true only when `coverage` **and** `records` are both `strong`; `blockingGaps`
-  holds exactly those gaps. `roles` lists every role with `coveredBy` (the addresses and record summaries that covered
-  it), so an imported bible filed under other names reads as covered rather than missing. No model call — the response
-  must be byte-identical on two consecutive GETs.
-  **Quality:** the `gaps` strings are author-actionable (`"project/cast needs at least 3 character record(s) — found 1"`).
-- **Fails when:** `readyToDraft` true while the Story Bible screen shows no entities (records dimension miscounted);
-  a role reported missing while a document or record set named in its `role` carries it; `reveal` empty because every generated fact omitted `revealChapter`. For the low-fantasy sample, `power`
-  still demands 4 `power_rule|concept` rows even with no numeric ladder — `concept` rows satisfy it, so a shortfall
-  here means the builder emitted prose instead of records, not that the floor is wrong for the genre.
+- **Run:** GET, before and after each bible-writing step; delete an entity a canon fact names, then GET again.
+- **Verify:** `roles` lists the 7 manifest roles in order, each with `coveredBy` — the addresses and record summaries
+  that carry it, matched by canonical address, by role keywords in a non-empty document's slug or title
+  (`BibleChapterSpec.role`), or by records (a faction, a character that is not minor, a volume with an objective).
+  `unresolvedReferences` lists each `{factKey, subject}` whose subject is no entity key, once per fact. No model call —
+  the response must be byte-identical on two consecutive GETs. The Story Bible screen shows **no** readiness banner,
+  topic checklist or suggestion list; the only note is "N references to missing entries" beside Tidy up, collapsed,
+  each item linking to its fact, and only while `unresolvedReferences` is non-empty (hidden on the phone strip).
+- **Fails when:** the note appears for a bible whose fact subjects all resolve; a role reported uncovered while a
+  document or record set named in its `role` carries it.
 
 #### Bible audit
 
@@ -810,19 +808,20 @@ Everything below is read off current code in `apps/novel-forge-server` / `apps/n
   entity to prove the auditor notices.
 - **Input:** none (empty POST).
 - **Run:** 1. POST. 2. Read `findings[]`. 3. If a proposal came back, review it in **Review Queue**'s Proposals view and apply.
-- **Verify:** run `graph='bible-audit'`, `target='bible'`, prompt `bible-audit@2.1.0`, role `audit`; context pack `purpose='audit'`
+- **Verify:** run `graph='bible-audit'`, `target='bible'`, prompt `bible-audit@2.2.0`, role `audit`; context pack `purpose='audit'`
   (premise + first 5 lines of each doc), plus the rendered doc inventory, entity inventory and `renderManifest()`.
   Findings are keyed `doc:<section>/<slug>` or `entity:<entityKey>` with `action` ∈ `add|revise|remove|keep`.
   A clean bible returns findings and **no** proposal. Otherwise a `kind='bible_audit'` proposal stages
   `bible_document.upsert|remove`, `entity.upsert|remove` — and nothing is written until it is applied.
   **Quality:** the audit must judge against _this_ premise — for the sample (low-fantasy, no numeric progression) a
-  `power/system-and-limits` finding should come back as a justified `keep`/`remove`, not a reflexive `add`.
+  `power/system-and-limits` finding should come back as a justified `keep`/`remove`, not a reflexive `add`. A manifest
+  topic the author has not addressed is never a finding, and a missing escalation map or volume plan is a justified
+  absence, not an `add` with an invented ending.
   No unrevealed plot secret may appear in a document body or entity card (those belong in canon facts, which the audit
   does not write). Delete one `character` entity first: the audit should return an `entity:<key>` add and stage the
   `entity.upsert` that restores it — model output varies, so treat a miss as a weak-prompt signal rather than a crash.
 - **Fails when:** findings reference docs/entities that do not exist; `changeSet` non-empty but no proposal row
-  (`proposalService.create` failed); a `revise` that rewrites a document wholesale instead of filling the missing
-  manifest topic; `model_calls.status='repaired'` from `validateChangeSet` rejecting out-of-vocabulary ops.
+  (`proposalService.create` failed); a `revise` or `add` whose content the premise and pages do not hold; `model_calls.status='repaired'` from `validateChangeSet` rejecting out-of-vocabulary ops.
 - **Cost:** 1 model call.
 
 #### Bible / entity / canon-fact refinement — proposal-only writes
@@ -833,7 +832,7 @@ Everything below is read off current code in `apps/novel-forge-server` / `apps/n
   Part 5 (chat hub and admin).
 - **Preconditions:** a pending proposal from premise-enhance, bible-audit, or a chat turn.
 - **Input:** none for apply; `PATCH …/proposals/{id}` to select a subset of ops first.
-- **Run:** 1. List proposals. 2. Apply. 3. Re-read the affected rows and the readiness score.
+- **Run:** 1. List proposals. 2. Apply. 3. Re-read the affected rows and the bible overview.
 - **Verify:** `refinement_proposals.status` goes `pending → applied` (the other terminal values are `conflicted` when
   a baseline moved, `superseded`, `reverted` and `discarded`). The domain write and the status change are one
   transaction with a baseline conflict check —
@@ -865,38 +864,34 @@ drive `POST …/seed-from-brief` directly.
 ☐ `projects.brief` non-empty ☐ the Story Bible empty state now offers **Generate story bible** instead of **Add a
 brief in Settings**.
 
-**Stage 5 — readiness.** `GET …/bible/readiness`.
-☐ read it once before the bible is built and keep it — the delta to Stage 7 is what the builder is worth
-☐ `substance` judges only the roles a manifest document serves, against its word floor
-☐ `readyToDraft` reads coverage + records only ☐ `blockingGaps` names each missing manifest chapter and each unmet
-entity floor.
-**Expect `substance: thin` while the bible is still a pitch, and do not treat it as a defect.** `project/reader-promise`
-matches no manifest role, so it is only checked for placeholder text and counts for nothing; `project/premise` is the
-`foundation` role and is judged against that role's 100-word floor (`ROLE_WORD_FLOOR`, `eval/bible-readiness.ts`). It
-is non-blocking: `readyToDraft` is coverage + records only.
+**Stage 5 — overview.** `GET …/bible/overview`.
+☐ every role's `coveredBy` empty before the bible is built ☐ `unresolvedReferences` empty ☐ the Story Bible screen shows
+no readiness banner or topic checklist.
 
 **Stage 6 — build the bible.** `POST …/seed-from-brief` with the brief, `force: false`. A stage whose document
 already has a body **skips**, so run it on a fresh project to see every stage.
 ☐ `node_trace` has all 8 nodes ☐ a stage whose document already had a body reports `counts[stage] = 0` and still
-appears in `stagesDone` ☐ all 7 manifest addresses present ☐ entity floors met (≥3 location/concept,
-≥4 power_rule/concept, ≥4 faction/location, ≥3 character) ☐ character cards each have want + cost + a voice tic
+appears in `stagesDone` ☐ all 7 manifest addresses present ☐ every record traces to the brief, none invented to fill a
+section ☐ no `model_calls` retry on any stage ☐ the escalation map states no ending the brief lacks ☐ character cards
+each have want + cost + a voice tic where the brief gives them
 ☐ `lore_chunks` populated.
 
-**Stage 7 — readiness, after.** `GET …/bible/readiness`.
-☐ `coverage` strong ☐ `records` strong ☐ `readyToDraft` true ☐ note which roles `substance` still flags ☐ `reveal` shows how many generated facts got a `revealChapter`.
+**Stage 7 — overview, after.** `GET …/bible/overview`.
+☐ each role the builder wrote lists its address in `coveredBy` ☐ `unresolvedReferences` empty.
 
 **Stage 8 — audit.** Delete one `character` entity, then `POST …/bible/audit` (empty body).
 ☐ an `entity:<key>` finding with `action: add` ☐ a staged `bible_audit` proposal containing the matching
-`entity.upsert` ☐ apply it ☐ the entity is back and `records` returns to strong ☐ no unrevealed secret was written into
+`entity.upsert` ☐ apply it ☐ the entity is back and any fact naming it drops out of `unresolvedReferences` ☐ no
+finding asks for a topic or an ending the brief never gave ☐ no unrevealed secret was written into
 any document body.
 
 **Stage 9 — optional, premise enhance (API only).** `POST …/premise/enhance` with `{"overview": "<the spark>"}`.
 ☐ `rationale` fields returned ☐ a `premise_enhance` proposal staged, nothing written ☐ apply it; `projects.premise`
-moves through `premise.update`, and `project/premise` grows past the 250-word substance floor only if the model also
-staged a `bible_document.upsert` — note which it did ☐ the enhanced premise still never states the ending.
+moves through `premise.update`, and `project/premise` changes only if the model also staged a
+`bible_document.upsert` — note which it did ☐ the enhanced premise still never states the ending.
 
-**Stage 10 — compare.** Export the seven manifest documents + the entity roster and diff against your baseline bible on: a named opposing pressure, a named cost for every power rule, per-character want/wound/voice, escalation stated per
-volume, and whether anything in the bible prose spoils a `canon_facts` reveal.
+**Stage 10 — compare.** Export the seven manifest documents + the entity roster and diff against your baseline bible on: a named opposing pressure, a named cost for every power rule, per-character want/wound/voice, an opening conflict and
+how its pressure builds, no ending or later volume the brief lacks, and whether anything in the bible prose spoils a `canon_facts` reveal.
 
 ---
 
@@ -937,7 +932,7 @@ basenames within `apps/novel-forge-server/src` (server) or `apps/novel-forge-web
 - A project (`POST /projects` → `{name, kind:"new_novel"}`).
 - A bible: `bible_documents` rows, `entities`, and (for the knowledge recipes) `canon_facts` — whatever the
   bible builder wrote or you added by hand.
-  Check with `GET /projects/:projectId/bible/readiness` → `readyToDraft: true`, and the **Story Bible** screen.
+  Check the **Story Bible** screen; nothing gates drafting on a bible score.
 - The `novel-forge:admin` permission for `GET /runs/:runId`, `/runs/:runId/context`, `/runs/:runId/calls/:callId`
   and the **Workflow Runs** screen — these are `@RequirePermission(ADMIN_PERMISSION, {highRisk:true})`
   (`generation.controller.ts:308,323,330`). Without it you cannot inspect the harness at all. See Part 5 §0.1 for

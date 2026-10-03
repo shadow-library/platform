@@ -409,8 +409,18 @@
   no model is called and nothing is saved; a streamed reply is released a screened sentence at a time. Every unrestricted request also carries a system line forbidding such
   content. Standard calls are not screened.
 
+## Story Bible builder and screen
+
+- The builder is author-led: each stage covers what the author's notes, premise and earlier stages support. Manifest topics are guidance, no stage is held to a record count or
+  retried for one, and nothing is invented to fill a section. The escalation map and volume plan describe the opening conflict and how pressure starts to build; an endgame or
+  later volumes appear only when the author gave them. Canon a stage does establish is still recorded as entities, not only prose.
+- The Story Bible screen scores nothing and never says drafting is blocked. The only problem it reports is a canon fact whose subject resolves to no entity, as a quiet note
+  beside Tidy up that links to the fact. The readiness score in `modules/eval` grades the builder for evals; nothing in drafting or on screen reads it.
+
 ## Story Bible audit
 
+- The manifest is guidance, not a checklist: a topic or chapter the author has not given material for is never a gap, and the audit adds a page or record only from material the
+  premise and pages already hold.
 - Two passes stored as one report — coverage against the manifest and a contradiction check of pages, entity records, canon facts and the summaries of finalized, non-isolated
   chapters — always run as an `audit` job. A report claims only what was read; isolated chapters are never read, not even their summaries.
 - Evidence cites only a source the audit read, and a quote only when three or more of its words are found there; a contradiction with no such quote is dropped, and one that does

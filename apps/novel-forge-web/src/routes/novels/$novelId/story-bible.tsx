@@ -5,7 +5,7 @@ import { Alert, Button, Dialog, Input, Select, Tabs, toast, useMediaQuery } from
 
 import { ClockIcon, LockIcon, SearchIcon, SparkIcon } from '@/components/icons';
 import { useCollectionJump } from '@/components/Layout';
-import { BibleHealth, BibleReadiness, EmptyState, PaneLoader } from '@/components/nf';
+import { BibleHealth, EmptyState, PaneLoader } from '@/components/nf';
 import { BibleTidyDialog } from '@/components/nf/BibleTidyDialog';
 import {
   AuditDialog,
@@ -46,7 +46,7 @@ import {
   seedAuditReport,
   type UpdateEntityBody,
   useAuditBibleMutation,
-  useBibleReadinessQuery,
+  useBibleOverviewQuery,
   useCreateEntityMutation,
   useDeleteEntityMutation,
   useDeleteFactMutation,
@@ -78,7 +78,6 @@ import {
   recordId,
   visibleTopics,
 } from '@/lib/bible-entries';
-import { readinessDisplay } from '@/lib/bible-readiness';
 import { BIBLE_VIEWS, type BibleSearch, type BibleView, parseBibleSearch } from '@/lib/bible-search';
 import { groupSecrets, isSecret, secretCountsBySubject, secretTitle } from '@/lib/bible-secrets';
 import { type BibleTopic, newEntryType, parseBibleTopic, stagesByDocument, TOPIC_LABEL } from '@/lib/bible-topics';
@@ -123,7 +122,7 @@ function StoryBibleScreen(): React.JSX.Element {
   const entitiesQuery = useListEntitiesQuery(novelId, { limit: 500 });
   const docsQuery = useListBibleDocsQuery(novelId);
   const factsQuery = useListFactsQuery(novelId);
-  const readiness = useBibleReadinessQuery(novelId);
+  const overview = useBibleOverviewQuery(novelId);
   const projectQuery = useProjectQuery(novelId);
   const audit = useAuditBibleMutation(novelId);
   const seed = useSeedFromBriefMutation(novelId);
@@ -162,11 +161,11 @@ function StoryBibleScreen(): React.JSX.Element {
   const entities = useMemo(() => entitiesQuery.data?.items ?? [], [entitiesQuery.data]);
   const docs = useMemo(() => docsQuery.data?.docs ?? [], [docsQuery.data]);
   const facts = useMemo(() => factsQuery.data?.facts ?? [], [factsQuery.data]);
-  const readinessSettled = readiness.data !== undefined || readiness.error !== null;
-  const resolved = Boolean(entitiesQuery.data && docsQuery.data && factsQuery.data) && readinessSettled;
+  const overviewSettled = overview.data !== undefined || overview.error !== null;
+  const resolved = Boolean(entitiesQuery.data && docsQuery.data && factsQuery.data) && overviewSettled;
   const failure = entitiesQuery.error ?? docsQuery.error ?? factsQuery.error;
 
-  const catalogue = useMemo(() => buildCatalogue(entities, docs, stagesByDocument(readiness.data?.roles)), [entities, docs, readiness.data]);
+  const catalogue = useMemo(() => buildCatalogue(entities, docs, stagesByDocument(overview.data?.roles)), [entities, docs, overview.data]);
   const entries = catalogue.entries;
   const counts = useMemo(() => countByTopic(entries), [entries]);
   const secretGroups = useMemo(() => groupSecrets(facts), [facts]);
@@ -177,9 +176,8 @@ function StoryBibleScreen(): React.JSX.Element {
   const docTitles = useMemo(() => new Map(docs.map(doc => [docAddress(doc), doc.title])), [docs]);
   const entryById = useMemo(() => new Map(entries.map(entry => [entry.id, entry])), [entries]);
   const factByKey = useMemo(() => new Map(facts.map(fact => [fact.factKey, fact])), [facts]);
-  const covers = useMemo(() => topicsByDocument(readiness.data?.roles), [readiness.data]);
+  const covers = useMemo(() => topicsByDocument(overview.data?.roles), [overview.data]);
   const recent = useMemo(() => recentEntries(entries, new Date()), [entries]);
-  const readinessView = useMemo(() => readinessDisplay(readiness.data), [readiness.data]);
 
   const guideAddress = parseGuideAddress(search.guide);
   const selectedEntry = search.entity ? entryById.get(recordId(search.entity)) : guideAddress ? entryById.get(guideId(guideAddress)) : undefined;
@@ -526,7 +524,6 @@ function StoryBibleScreen(): React.JSX.Element {
         guides: entries.length - entities.length,
         secrets: secretTotal,
         emptyPages: catalogue.emptyDocs.length,
-        roles: readinessView.alert ? undefined : readiness.data?.roles,
       })
     : undefined;
 
@@ -598,8 +595,7 @@ function StoryBibleScreen(): React.JSX.Element {
     body = (
       <>
         <div className={styles.notices}>
-          {health && <BibleHealth health={health} suggestions={readinessView.suggestions} onTidy={() => setTidying(true)} />}
-          {readinessView.alert && readiness.data && <BibleReadiness report={readiness.data} onAudit={runAudit} auditPending={audit.isPending} />}
+          {health && <BibleHealth novelId={novelId} health={health} unresolvedReferences={overview.data?.unresolvedReferences} onTidy={() => setTidying(true)} />}
         </div>
         <div ref={observeContainer} className={styles.tabs}>
           {tabsFit ? (

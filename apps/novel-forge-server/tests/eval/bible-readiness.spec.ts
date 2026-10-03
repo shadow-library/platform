@@ -10,6 +10,7 @@ import {
   type ReadinessEntity,
   type ReadinessFact,
   scoreBibleReadiness,
+  unresolvedFactSubjects,
 } from '@modules/eval/bible-readiness';
 
 const PROSE = `${'word '.repeat(DOC_WORD_FLOOR + 20)}`;
@@ -26,7 +27,6 @@ function records(prefix: string, type: ReadinessEntity['type'], count: number, s
   return Array.from({ length: count }, (_, index) => ({ entityKey: `${prefix}_${index}`, type, significance, body: 'card' }));
 }
 
-/** Enough records to clear every manifest floor: 3 characters, 2 factions, 2 locations, 3 power rules, 1 concept. */
 function fullEntities(): ReadinessEntity[] {
   return [
     ...records('char', 'character', 3),
@@ -52,7 +52,6 @@ describe('scoreBibleReadiness', () => {
     const report = score({ docs: [], entities: [], facts: [] });
     expect(report.readyToDraft).toBe(false);
     expect(verdictOf(report, 'coverage')).toBe('empty');
-    expect(verdictOf(report, 'records')).toBe('empty');
   });
 
   it('should call a complete bible ready to draft', () => {
@@ -68,7 +67,7 @@ describe('scoreBibleReadiness', () => {
     expect(verdictOf(report, 'coverage')).toBe('strong');
     expect(verdictOf(report, 'records')).toBe('empty');
     expect(report.readyToDraft).toBe(false);
-    expect(report.blockingGaps.join('\n')).toContain('needs at least 4 power_rule/concept record(s) — found 0');
+    expect(report.blockingGaps.join('\n')).toContain('Power system is written as prose with no power_rule/concept records');
   });
 
   it('should name every uncovered role as a coverage gap', () => {
@@ -163,12 +162,27 @@ describe('scoreBibleReadiness', () => {
     expect(gapsOf(report, 'reveal').join('\n')).toContain('1 of 2 canon fact(s) have no revealChapter');
   });
 
-  it('should count entities of a declared type from anywhere in the bible toward a chapter floor', () => {
-    const entities: ReadinessEntity[] = Array.from({ length: 4 }, (_, index) => ({ entityKey: `c_${index}`, type: 'concept', significance: 'minor', body: 'card' }));
+  it('should count a record of a declared type from anywhere in the bible toward a chapter', () => {
+    const entities: ReadinessEntity[] = [{ entityKey: 'c_0', type: 'concept', significance: 'minor', body: 'card' }];
     const report = score({ docs: fullDocs(), entities, facts: [] });
-    const powerGap = gapsOf(report, 'records').join('\n');
-    expect(powerGap).not.toContain('power/system-and-limits');
-    expect(powerGap).toContain('project/cast needs at least 3 character record(s) — found 0');
+    const gaps = gapsOf(report, 'records').join('\n');
+    expect(gaps).not.toContain('Power system');
+    expect(gaps).toContain('Cast is written as prose with no character records');
+  });
+
+  it('should hold no chapter to a record count, so one record of its kind is enough', () => {
+    const entities: ReadinessEntity[] = [
+      ...records('char', 'character', 1),
+      ...records('faction', 'faction', 1),
+      ...records('place', 'location', 1),
+      ...records('rule', 'power_rule', 1),
+    ];
+    expect(verdictOf(score({ docs: fullDocs(), entities }), 'records')).toBe('strong');
+  });
+
+  it('should not ask for records of a chapter the author has not written', () => {
+    const report = score({ docs: [{ section: 'project', slug: 'premise', body: PROSE }] });
+    expect(gapsOf(report, 'records')).toEqual([]);
   });
 
   describe('roles', () => {
@@ -276,8 +290,22 @@ describe('scoreBibleReadiness', () => {
       expect(report.roles.map(role => role.covered)).toEqual(BIBLE_MANIFEST.map(() => false));
       const gaps = report.blockingGaps.join('\n');
       for (const chapter of BIBLE_MANIFEST) expect(gaps).toContain(`${chapter.role.label} is missing — write ${chapter.section}/${chapter.slug}`);
-      expect(gaps).toContain('at least 3 character records, not all of them minor');
+      expect(gaps).toContain('a character record that is not minor');
       expect(gaps).toContain('volume records with goals');
     });
+  });
+});
+
+describe('unresolvedFactSubjects', () => {
+  it('should name each fact subject no entity carries, once per fact', () => {
+    const facts: ReadinessFact[] = [
+      { factKey: 'betrayal', subjects: ['ghost', 'ghost', 'lead'] },
+      { factKey: 'oath', subjects: null },
+    ];
+    expect(unresolvedFactSubjects([{ entityKey: 'lead' }], facts)).toEqual([{ factKey: 'betrayal', subject: 'ghost' }]);
+  });
+
+  it('should find nothing when every subject resolves', () => {
+    expect(unresolvedFactSubjects([{ entityKey: 'lead' }], [{ factKey: 'oath', subjects: ['lead'] }])).toEqual([]);
   });
 });

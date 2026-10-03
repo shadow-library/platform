@@ -7,7 +7,7 @@ import {
   type AuditFindingDecisionBody,
   type BibleAuditReportResponse,
   type BibleDocResponse,
-  type BibleReadinessResponse,
+  type BibleOverviewResponse,
   type BibleSection,
   type BibleTidyPreviewResponse,
   type ListBibleAuditsResponse,
@@ -25,7 +25,7 @@ import { ApiError, APIRequest, type PollingOptions } from './transport';
 const bibleKeys = {
   list: (projectId: string) => ['projects', projectId, 'bible', 'list'] as const,
   doc: (projectId: string, section: BibleSection, slug: string) => ['projects', projectId, 'bible', section, slug] as const,
-  readiness: (projectId: string) => ['projects', projectId, 'bible', 'readiness'] as const,
+  overview: (projectId: string) => ['projects', projectId, 'bible', 'overview'] as const,
   tidy: (projectId: string) => ['projects', projectId, 'bible', 'tidy'] as const,
   audits: (projectId: string) => ['projects', projectId, 'bible', 'audits'] as const,
   auditReport: (projectId: string, reportId: string) => [...bibleKeys.audits(projectId), reportId] as const,
@@ -61,10 +61,10 @@ export function useUpsertBibleDocMutation(projectId: string): UseMutationResult<
   });
 }
 
-export function useBibleReadinessQuery(projectId: string, enabled = true): UseQueryResult<BibleReadinessResponse, ApiError> {
-  return useQuery<BibleReadinessResponse, ApiError>({
-    queryKey: bibleKeys.readiness(projectId),
-    queryFn: () => APIRequest.get(`/projects/${projectId}/bible/readiness`).execute(),
+export function useBibleOverviewQuery(projectId: string, enabled = true): UseQueryResult<BibleOverviewResponse, ApiError> {
+  return useQuery<BibleOverviewResponse, ApiError>({
+    queryKey: bibleKeys.overview(projectId),
+    queryFn: () => APIRequest.get(`/projects/${projectId}/bible/overview`).execute(),
     enabled: enabled && Boolean(projectId),
   });
 }

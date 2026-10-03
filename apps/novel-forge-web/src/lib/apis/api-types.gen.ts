@@ -2717,15 +2717,15 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/api/v1/projects/{projectId}/bible/readiness': {
+  '/api/v1/projects/{projectId}/bible/overview': {
     parameters: {
       query?: never;
       header?: never;
       path?: never;
       cookie?: never;
     };
-    /** Readiness */
-    get: operations['get_api_v1_projects_projectId_bible_readiness'];
+    /** Overview */
+    get: operations['get_api_v1_projects_projectId_bible_overview'];
     put?: never;
     post?: never;
     delete?: never;
@@ -6183,43 +6183,27 @@ export interface components {
     };
     /** @enum {string} */
     DueStanding: 'not_due' | 'due' | 'overdue';
-    BibleReadinessResponse: {
-      dimensions: components['schemas']['BibleReadinessDimensionResponse'][];
-      /** @description one entry per bible role, in manifest order, explaining what the coverage dimension counted */
-      roles?: components['schemas']['BibleReadinessRoleResponse'][];
-      /** @description false while canon is absent or exists only as prose the Story Bible cannot read */
-      readyToDraft: boolean;
-      /** @description the coverage and record gaps that hold `readyToDraft` false */
-      blockingGaps: string[];
+    BibleOverviewResponse: {
+      /** @description one entry per bible role, in manifest order, so pages filed under any name are grouped with the role they carry */
+      roles: components['schemas']['BibleRoleResponse'][];
+      /** @description canon-fact subjects that resolve to no entity — the only bible errors the Story Bible screen reports */
+      unresolvedReferences: components['schemas']['BibleUnresolvedReferenceResponse'][];
     };
-    BibleReadinessDimensionResponse: {
-      dimension: components['schemas']['BibleReadinessDimension'];
-      /** @description strong = every check passed, thin = some passed, empty = none passed */
-      verdict: components['schemas']['BibleReadinessVerdict'];
-      /** @description checks this dimension passed */
-      satisfied: number;
-      /** @description checks this dimension ran; zero means the dimension had nothing to judge and reads as strong */
-      total: number;
-      /** @description what to fix, phrased as an action an author can take */
-      gaps: string[];
-    };
-    /** @enum {string} */
-    BibleReadinessDimension: 'coverage' | 'records' | 'substance' | 'integrity' | 'reveal';
-    /** @enum {string} */
-    BibleReadinessVerdict: 'strong' | 'thin' | 'empty';
-    BibleReadinessRoleResponse: {
+    BibleRoleResponse: {
       stage: components['schemas']['BibleStage'];
-      /** @description what the role is called on the readiness banner */
+      /** @description what the role is called where a page is shown as covering it */
       label: string;
-      /** @description the canonical `section/slug` the bible builder writes this role to */
-      address: string;
-      /** @description true when any document or record set carries the substance this role needs, whatever it is named */
-      covered: boolean;
-      /** @description the documents (`section/slug`) and record summaries that cover the role; empty when it is uncovered */
+      /** @description the documents (`section/slug`) and record summaries that carry the role, whatever they are named; empty when nothing does */
       coveredBy: string[];
     };
     /** @enum {string} */
     BibleStage: 'foundation' | 'world' | 'power' | 'factionsAndLocations' | 'characters' | 'plot' | 'volumes';
+    BibleUnresolvedReferenceResponse: {
+      /** @description the canon fact that names the missing subject */
+      factKey: string;
+      /** @description the entity key the fact names, which no entity in this bible has */
+      subject: string;
+    };
     CreateProjectBody: {
       name: string;
       kind: components['schemas']['ProjectKind'];
@@ -15049,7 +15033,7 @@ export interface operations {
       };
     };
   };
-  get_api_v1_projects_projectId_bible_readiness: {
+  get_api_v1_projects_projectId_bible_overview: {
     parameters: {
       query?: never;
       header?: never;
@@ -15066,7 +15050,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['BibleReadinessResponse'];
+          'application/json': components['schemas']['BibleOverviewResponse'];
         };
       };
       /** @description Default Response */
@@ -16545,12 +16529,10 @@ export type PromiseSort = components['schemas']['PromiseSort'];
 export type ListPromisesResponse = components['schemas']['ListPromisesResponse'];
 export type PromiseItemResponse = components['schemas']['PromiseItemResponse'];
 export type DueStanding = components['schemas']['DueStanding'];
-export type BibleReadinessResponse = components['schemas']['BibleReadinessResponse'];
-export type BibleReadinessDimensionResponse = components['schemas']['BibleReadinessDimensionResponse'];
-export type BibleReadinessDimension = components['schemas']['BibleReadinessDimension'];
-export type BibleReadinessVerdict = components['schemas']['BibleReadinessVerdict'];
-export type BibleReadinessRoleResponse = components['schemas']['BibleReadinessRoleResponse'];
+export type BibleOverviewResponse = components['schemas']['BibleOverviewResponse'];
+export type BibleRoleResponse = components['schemas']['BibleRoleResponse'];
 export type BibleStage = components['schemas']['BibleStage'];
+export type BibleUnresolvedReferenceResponse = components['schemas']['BibleUnresolvedReferenceResponse'];
 export type CreateProjectBody = components['schemas']['CreateProjectBody'];
 export type ProjectKind = components['schemas']['ProjectKind'];
 export type ProjectWordTarget = components['schemas']['ProjectWordTarget'];
@@ -16717,7 +16699,7 @@ export type GetFactPathParams = Exclude<paths['/api/v1/projects/{projectId}/fact
 export type ListMilestonesPathParams = Exclude<paths['/api/v1/projects/{projectId}/milestones']['get']['parameters']['path'], undefined>;
 export type ListPromisesQueryParams = Exclude<paths['/api/v1/projects/{projectId}/promises']['get']['parameters']['query'], undefined>;
 export type ListPromisesPathParams = Exclude<paths['/api/v1/projects/{projectId}/promises']['get']['parameters']['path'], undefined>;
-export type ReadinessPathParams = Exclude<paths['/api/v1/projects/{projectId}/bible/readiness']['get']['parameters']['path'], undefined>;
+export type OverviewPathParams = Exclude<paths['/api/v1/projects/{projectId}/bible/overview']['get']['parameters']['path'], undefined>;
 export type ListProjectsQueryParams = Exclude<paths['/api/v1/projects']['get']['parameters']['query'], undefined>;
 export type GetProjectPathParams = Exclude<paths['/api/v1/projects/{projectId}']['get']['parameters']['path'], undefined>;
 export type GetProjectStatusPathParams = Exclude<paths['/api/v1/projects/{projectId}/status']['get']['parameters']['path'], undefined>;

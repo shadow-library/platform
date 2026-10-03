@@ -33,10 +33,9 @@ interface TidyItem {
   slug: string;
 }
 
-interface BibleReadinessResponse {
-  readyToDraft: boolean;
-  blockingGaps: string[];
-  roles?: { stage: string; covered: boolean }[];
+interface BibleOverviewResponse {
+  roles: { stage: string; coveredBy: string[] }[];
+  unresolvedReferences: { factKey: string; subject: string }[];
 }
 
 interface WorkflowRunResponse {
@@ -139,17 +138,16 @@ test.describe('novel-forge Story Bible documents', () => {
     expect((await ordinary.json()) as BibleDocResponse).toMatchObject({ writerExcluded: false, plannerOnly: false });
   });
 
-  test('should report a brand-new project as not ready to draft, with every bible role uncovered', async ({ forge }) => {
-    const owner = await forge.actor({ label: 'bibdoc-readiness' });
-    const projectId = await newProject(owner, 'bibdoc-readiness');
+  test('should report every bible role uncovered and no broken reference on a brand-new project', async ({ forge }) => {
+    const owner = await forge.actor({ label: 'bibdoc-overview' });
+    const projectId = await newProject(owner, 'bibdoc-overview');
 
-    const readiness = await owner.ctx.get(`/api/v1/projects/${projectId}/bible/readiness`);
-    expect(readiness.status(), await readiness.text()).toBe(200);
-    const body = (await readiness.json()) as BibleReadinessResponse;
-    expect(body.readyToDraft).toBe(false);
-    expect(body.blockingGaps.length).toBeGreaterThan(0);
-    expect(body.roles?.length).toBe(7);
-    expect(body.roles?.every(role => role.covered === false)).toBe(true);
+    const overview = await owner.ctx.get(`/api/v1/projects/${projectId}/bible/overview`);
+    expect(overview.status(), await overview.text()).toBe(200);
+    const body = (await overview.json()) as BibleOverviewResponse;
+    expect(body.roles).toHaveLength(7);
+    expect(body.roles.every(role => role.coveredBy.length === 0)).toBe(true);
+    expect(body.unresolvedReferences).toEqual([]);
   });
 });
 

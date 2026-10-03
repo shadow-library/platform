@@ -79,25 +79,25 @@ const PLACEHOLDER_PATTERN = /\b(?:tbd|todo|fixme)\b|\[(?:placeholder|fill in|tbd
 const BLOCKING_DIMENSIONS: readonly BibleReadinessDimensionName[] = ['coverage', 'records'];
 
 interface RecordCoverage {
-  hint: (chapter: BibleChapterSpec) => string;
-  coveredBy: (input: BibleReadinessInput, chapter: BibleChapterSpec) => string | null;
+  hint: () => string;
+  coveredBy: (input: BibleReadinessInput) => string | null;
 }
 
 const RECORD_COVERAGE: Partial<Record<BibleStage, RecordCoverage>> = {
   factionsAndLocations: {
-    hint: chapter => `at least ${chapter.minEntities} faction/location records, one of them a faction`,
-    coveredBy: (input, chapter) => {
+    hint: () => 'a faction record',
+    coveredBy: input => {
       const factions = input.entities.filter(entity => entity.type === 'faction').length;
       const locations = input.entities.filter(entity => entity.type === 'location').length;
-      if (factions === 0 || factions + locations < chapter.minEntities) return null;
+      if (factions === 0) return null;
       return `${plural(factions, 'faction record')} and ${plural(locations, 'location record')}`;
     },
   },
   characters: {
-    hint: chapter => `at least ${chapter.minEntities} character records, not all of them minor`,
-    coveredBy: (input, chapter) => {
+    hint: () => 'a character record that is not minor',
+    coveredBy: input => {
       const characters = input.entities.filter(entity => entity.type === 'character');
-      if (characters.length < chapter.minEntities || characters.every(entity => entity.significance === 'minor')) return null;
+      if (characters.every(entity => entity.significance === 'minor')) return null;
       return plural(characters.length, 'character record');
     },
   },
@@ -147,9 +147,9 @@ function dimension(name: BibleReadinessDimensionName, satisfied: number, total: 
   return { dimension: name, verdict: verdictFor(satisfied, total), satisfied, total, gaps };
 }
 
-function roles(input: BibleReadinessInput): BibleReadinessRole[] {
+export function bibleRoles(input: BibleReadinessInput): BibleReadinessRole[] {
   return BIBLE_MANIFEST.map(chapter => {
-    const recordCoverage = RECORD_COVERAGE[chapter.stage]?.coveredBy(input, chapter);
+    const recordCoverage = RECORD_COVERAGE[chapter.stage]?.coveredBy(input);
     const coveredBy = [...roleDocs(input.docs, chapter).map(address), ...(recordCoverage ? [recordCoverage] : [])];
     return { stage: chapter.stage, label: chapter.role.label, address: address(chapter), covered: coveredBy.length > 0, coveredBy };
   });
@@ -161,21 +161,21 @@ function coverage(covered: readonly BibleReadinessRole[]): BibleReadinessDimensi
     .map(role => {
       const chapter = chapterForStage(role.stage);
       const recordCoverage = RECORD_COVERAGE[chapter.stage];
-      const alternatives = [`another ${chapter.role.sections.join('/')} document on it`, ...(recordCoverage ? [recordCoverage.hint(chapter)] : [])].join(', or ');
+      const alternatives = [`another ${chapter.role.sections.join('/')} document on it`, ...(recordCoverage ? [recordCoverage.hint()] : [])].join(', or ');
       return `${role.label} is missing — write ${role.address} (or ${alternatives}): ${chapter.purpose}`;
     });
   return dimension('coverage', covered.length - gaps.length, covered.length, gaps);
 }
 
-function records(entities: readonly ReadinessEntity[]): BibleReadinessDimension {
-  const chapters = BIBLE_MANIFEST.filter(chapter => chapter.materializes.length > 0);
+/** Counts no quota: a chapter is judged only once prose establishes its canon, and then needs that canon as at least one record. */
+function records(docs: readonly ReadinessDoc[], entities: readonly ReadinessEntity[]): BibleReadinessDimension {
+  const chapters = BIBLE_MANIFEST.filter(chapter => chapter.materializes.length > 0 && roleDocs(docs, chapter).length > 0);
   const gaps: string[] = [];
   let satisfied = 0;
   for (const chapter of chapters) {
     const declared = new Set<string>(chapter.materializes);
-    const count = entities.filter(entity => declared.has(entity.type)).length;
-    if (count >= chapter.minEntities) satisfied += 1;
-    else gaps.push(`${chapter.section}/${chapter.slug} needs at least ${chapter.minEntities} ${chapter.materializes.join('/')} record(s) — found ${count}`);
+    if (entities.some(entity => declared.has(entity.type))) satisfied += 1;
+    else gaps.push(`${chapter.role.label} is written as prose with no ${chapter.materializes.join('/')} records`);
   }
   return dimension('records', satisfied, chapters.length, gaps);
 }
@@ -212,19 +212,31 @@ function substance(docs: readonly ReadinessDoc[]): BibleReadinessDimension {
   return dimension('substance', satisfied, total, gaps);
 }
 
-function integrity(entities: readonly ReadinessEntity[], facts: readonly ReadinessFact[]): BibleReadinessDimension {
-  const keys = new Set(entities.map(entity => entity.entityKey));
-  const gaps: string[] = [];
-  let total = 0;
-  let satisfied = 0;
+export interface UnresolvedFactSubject {
+  factKey: string;
+  subject: string;
+}
 
+export function unresolvedFactSubjects(entities: readonly Pick<ReadinessEntity, 'entityKey'>[], facts: readonly ReadinessFact[]): UnresolvedFactSubject[] {
+  const keys = new Set(entities.map(entity => entity.entityKey));
+  const seen = new Set<string>();
+  const unresolved: UnresolvedFactSubject[] = [];
   for (const fact of facts) {
     for (const subject of fact.subjects ?? []) {
-      total += 1;
-      if (keys.has(subject)) satisfied += 1;
-      else gaps.push(`canon fact '${fact.factKey}' names subject '${subject}', which is not an entity in this bible`);
+      const id = `${fact.factKey}\u0000${subject}`;
+      if (keys.has(subject) || seen.has(id)) continue;
+      seen.add(id);
+      unresolved.push({ factKey: fact.factKey, subject });
     }
   }
+  return unresolved;
+}
+
+function integrity(entities: readonly ReadinessEntity[], facts: readonly ReadinessFact[]): BibleReadinessDimension {
+  const unresolved = unresolvedFactSubjects(entities, facts);
+  const gaps = unresolved.map(({ factKey, subject }) => `canon fact '${factKey}' names subject '${subject}', which is not an entity in this bible`);
+  let total = facts.reduce((sum, fact) => sum + new Set(fact.subjects ?? []).size, 0);
+  let satisfied = total - unresolved.length;
 
   for (const entity of entities.filter(candidate => candidate.significance === 'major')) {
     total += 1;
@@ -243,8 +255,8 @@ function reveal(facts: readonly ReadinessFact[]): BibleReadinessDimension {
 }
 
 export function scoreBibleReadiness(input: BibleReadinessInput): BibleReadinessReport {
-  const covered = roles(input);
-  const dimensions = [coverage(covered), records(input.entities), substance(input.docs), integrity(input.entities, input.facts), reveal(input.facts)];
+  const covered = bibleRoles(input);
+  const dimensions = [coverage(covered), records(input.docs, input.entities), substance(input.docs), integrity(input.entities, input.facts), reveal(input.facts)];
 
   const blocking = dimensions.filter(entry => BLOCKING_DIMENSIONS.includes(entry.dimension) && entry.verdict !== 'strong');
   return { dimensions, roles: covered, readyToDraft: blocking.length === 0, blockingGaps: blocking.flatMap(entry => entry.gaps) };

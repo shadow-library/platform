@@ -1,4 +1,4 @@
-import { type BibleDocListItem, type BibleReadinessRoleResponse, type BibleSection, type BibleStage, type EntityType } from './apis/api-types.gen';
+import { type BibleDocListItem, type BibleRoleResponse, type BibleSection, type BibleStage, type EntityType } from './apis/api-types.gen';
 import { docAddress } from './bible-documents';
 
 export type BibleTopic = 'core' | 'people' | 'factions' | 'places' | 'power' | 'lore' | 'objects' | 'author';
@@ -259,8 +259,8 @@ export function topicForEntityType(type: EntityType): BibleTopic | undefined {
 
 const STAGE_ORDER: readonly BibleStage[] = ['foundation', 'world', 'power', 'factionsAndLocations', 'characters', 'plot', 'volumes'];
 
-/** A document covering several readiness roles files under the earliest one in manifest order. */
-export function stagesByDocument(roles: readonly Pick<BibleReadinessRoleResponse, 'stage' | 'coveredBy'>[] | undefined): Map<string, BibleStage> {
+/** A document covering several bible roles files under the earliest one in manifest order. */
+export function stagesByDocument(roles: readonly Pick<BibleRoleResponse, 'stage' | 'coveredBy'>[] | undefined): Map<string, BibleStage> {
   const stages = new Map<string, BibleStage>();
   for (const role of roles ?? []) {
     for (const address of role.coveredBy) {
@@ -276,7 +276,7 @@ const CORE_OVERRIDES: readonly BibleTopic[] = ['people', 'factions', 'places'];
 
 /**
  * Author-only markers win; a power document stays with power; otherwise the author's own title decides, then
- * the readiness role the document covers, then its storage section.
+ * the bible role the document covers, then its storage section.
  */
 export function documentTopic(doc: Pick<BibleDocListItem, 'section' | 'slug' | 'title'>, stages?: ReadonlyMap<string, BibleStage>): BibleTopic {
   const label = `${doc.title} ${doc.slug.replace(/[-_]+/g, ' ')}`;

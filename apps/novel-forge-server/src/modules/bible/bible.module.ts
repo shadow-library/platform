@@ -11,18 +11,18 @@ import { FactController } from './fact/fact.controller';
 import { FactService } from './fact/fact.service';
 import { MilestoneController } from './milestone/milestone.controller';
 import { MilestoneService } from './milestone/milestone.service';
+import { BibleOverviewController } from './overview/bible-overview.controller';
+import { BibleOverviewService } from './overview/bible-overview.service';
 import { PromiseController } from './promise/promise.controller';
 import { PromiseService } from './promise/promise.service';
-import { BibleReadinessController } from './readiness/bible-readiness.controller';
-import { BibleReadinessService } from './readiness/bible-readiness.service';
 import { VolumeActionRegistrar } from './volume/volume-action.registrar';
 import { VolumeController } from './volume/volume.controller';
 import { VolumeService } from './volume/volume.service';
 
 @Module({
   imports: [ActionRegistryModule, DatabaseModule, StorageModule, RefinementModule],
-  controllers: [EntityController, VolumeController, BibleDocumentController, FactController, MilestoneController, PromiseController, BibleReadinessController],
-  providers: [EntityService, VolumeService, BibleDocumentService, FactService, MilestoneService, PromiseService, BibleReadinessService, VolumeActionRegistrar],
-  exports: [EntityService, VolumeService, BibleDocumentService, FactService, MilestoneService, PromiseService, BibleReadinessService],
+  controllers: [EntityController, VolumeController, BibleDocumentController, FactController, MilestoneController, PromiseController, BibleOverviewController],
+  providers: [EntityService, VolumeService, BibleDocumentService, FactService, MilestoneService, PromiseService, BibleOverviewService, VolumeActionRegistrar],
+  exports: [EntityService, VolumeService, BibleDocumentService, FactService, MilestoneService, PromiseService, BibleOverviewService],
 })
 export class BibleModule {}
