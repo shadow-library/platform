@@ -42,14 +42,9 @@ export function ProseToolbar({ tools, onTool, variant = 'boxed', leading, childr
 }
 
 export interface ProseToolbarNoteProps {
-  id?: string;
   children: ReactNode;
 }
 
-export function ProseToolbarNote({ id, children }: ProseToolbarNoteProps): React.JSX.Element {
-  return (
-    <span id={id} className={styles.toolbarNote}>
-      {children}
-    </span>
-  );
+export function ProseToolbarNote({ children }: ProseToolbarNoteProps): React.JSX.Element {
+  return <span className={styles.toolbarNote}>{children}</span>;
 }

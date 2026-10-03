@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import { type DraftVersionResponse, type VersionComparisonResponse } from '../src/lib/apis';
+import { ApiError } from '../src/lib/apis/transport';
 import {
   diffParagraphs,
   diffView,
@@ -10,6 +11,7 @@ import {
   restoreConsequences,
   restoredMessage,
   restoreGate,
+  restoreRefusalMessage,
   versionSourceLabel,
 } from '../src/lib/draft-versions';
 
@@ -67,6 +69,14 @@ describe('restoredMessage', () => {
   it('should report a restore of identical text as a no-op', () => {
     expect(restoredMessage({ revision: 4, saveSeq: 9 }, { revision: 4, saveSeq: 9 }, 2)).toBe('Version 2 is the same as the current text — nothing changed.');
     expect(restoredMessage({ revision: 4, saveSeq: 9 }, { revision: 5, saveSeq: 10 }, 2)).toBe('Version 2 restored as version 5');
+  });
+});
+
+describe('restoreRefusalMessage', () => {
+  it('should word the restore refusals for the author and fall back to the server message', () => {
+    expect(restoreRefusalMessage(new ApiError(409, { code: 'DRF_013', type: 'CONFLICT', message: 'moved' }))).toContain('newest text is on screen');
+    expect(restoreRefusalMessage(new ApiError(400, { code: 'VER_002', type: 'CLIENT_ERROR', message: 'final' }))).toBe(FINAL_RESTORE_REASON);
+    expect(restoreRefusalMessage(new ApiError(500, { code: 'X', type: 'SERVER_ERROR', message: 'Boom' }))).toBe('Boom');
   });
 });
 

@@ -1,4 +1,12 @@
-import { type DiffHunkResponse, type DiffOp, type DraftResponse, type DraftRevisionSource, type DraftVersionResponse, type VersionComparisonResponse } from '@/lib/apis';
+import {
+  type ApiError,
+  type DiffHunkResponse,
+  type DiffOp,
+  type DraftResponse,
+  type DraftRevisionSource,
+  type DraftVersionResponse,
+  type VersionComparisonResponse,
+} from '@/lib/apis';
 
 const SOURCE_LABELS: Record<DraftRevisionSource, string> = {
   generated: 'Written from the plan',
@@ -24,6 +32,17 @@ type RestoreDraft = Pick<DraftResponse, 'status' | 'reviewStatus' | 'approvedRev
 export type RestoreGate = { allowed: true } | { allowed: false; reason: string };
 
 export const FINAL_RESTORE_REASON = 'Restore isn’t available on a final chapter — Amend the text instead.';
+
+const RESTORE_REFUSALS: Record<string, string> = {
+  DRF_013: 'The chapter changed while you were working — the newest text is on screen now. Check it, then try again.',
+  DRF_019: 'The chapter is being written — try again once that’s done.',
+  VER_001: 'That version is no longer kept — pick another one.',
+  VER_002: FINAL_RESTORE_REASON,
+};
+
+export function restoreRefusalMessage(error: ApiError): string {
+  return RESTORE_REFUSALS[error.code] ?? error.message;
+}
 
 export function restoreGate(draft: RestoreDraft, version: Pick<DraftVersionResponse, 'current'>, generating: boolean): RestoreGate {
   if (draft.status === 'final') return { allowed: false, reason: FINAL_RESTORE_REASON };

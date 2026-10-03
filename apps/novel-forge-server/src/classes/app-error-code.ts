@@ -428,16 +428,6 @@ export class AppErrorCode extends ServerErrorCode {
   );
 
   /*!
-   * Passage rewrite errors
-   */
-  static readonly PSG_001 = AppErrorCode.notFound('PSG_001', 'Passage suggestion not found');
-  static readonly PSG_002 = AppErrorCode.badRequest('PSG_002', 'Select between 1 and {max} characters inside the chapter to ask for changes');
-  static readonly PSG_003 = AppErrorCode.conflict('PSG_003', 'The selected text no longer matches the chapter — select the passage again');
-  static readonly PSG_004 = AppErrorCode.conflict('PSG_004', 'This suggestion is stale — the passage moved or changed since it was made; ask again');
-  static readonly PSG_005 = AppErrorCode.conflict('PSG_005', 'This suggestion was already {status}');
-  static readonly PSG_006 = AppErrorCode.badRequest('PSG_006', 'Chapter {chapter} is final — its prose is locked, so a passage cannot be rewritten; change it through Amend');
-
-  /*!
    * Draft version errors
    */
   static readonly VER_001 = AppErrorCode.notFound('VER_001', 'Chapter {chapter} has no stored version {revision}');

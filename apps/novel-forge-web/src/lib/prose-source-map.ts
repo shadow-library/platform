@@ -168,14 +168,14 @@ function childrenOf(token: LexToken): LexToken[] | undefined {
 }
 
 /** Built from `marked`'s own lexer with the reader's options, so the tokens are the ones the reader rendered. Undefined for CRLF text, which the lexer rewrites. */
-export function proseSourceMap(markdown: string, base = 0): ProseSourceMap | undefined {
+export function proseSourceMap(markdown: string): ProseSourceMap | undefined {
   if (markdown.includes('\r')) return undefined;
   const builder = new MapBuilder();
   let cursor = 0;
   for (const token of marked.lexer(markdown, { gfm: true, breaks: true }) as unknown as LexToken[]) {
     const raw = token.raw ?? '';
     const at = markdown.indexOf(raw, cursor);
-    builder.walk(token, at === -1 ? Number.NaN : base + at);
+    builder.walk(token, at === -1 ? Number.NaN : at);
     if (at !== -1) cursor = at + raw.length;
   }
   return { text: builder.text.join(''), starts: builder.starts, ends: builder.ends, syntax: builder.syntax };

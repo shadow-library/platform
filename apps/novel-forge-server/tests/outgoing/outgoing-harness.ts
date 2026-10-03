@@ -1,5 +1,4 @@
 import { AIMessage, type BaseMessage, HumanMessage } from '@langchain/core/messages';
-import { and, eq } from 'drizzle-orm';
 
 import { CatalogService } from '@modules/ai/context/catalog.service';
 import { ContextAssembler } from '@modules/ai/context/context-assembler.service';
@@ -9,11 +8,8 @@ import { buildChatRefinePrompt, chatScopeInstructions, renderTurnRules } from '@
 import { ToolRegistryService } from '@modules/ai/tools/tool-registry.service';
 import { serializeMessages, WriterSnapshotService } from '@modules/ai/writer-snapshot.service';
 import { loadWriterDisclosurePolicy } from '@modules/bible/fact/writer-disclosure-policy';
-import { passageHash } from '@modules/generation/passage-anchor';
-import { PassageRewriteService } from '@modules/generation/passage-rewrite.service';
 import { IllustrationService } from '@modules/illustration/illustration.service';
 import { WriterPreviewService } from '@modules/refinement/writer-preview.service';
-import { schema } from '@server/database';
 import { type WriterSnapshotMessage } from '@server/database/schemas';
 
 import { draftRow, fakeGenerationDb, makeGenerationService } from '../generation/generation-fixtures';
@@ -28,7 +24,6 @@ const DRAFTED = { title: 'Low Water', body: LONG_BODY, summary: 'The keeper wait
 const ANSWERS: Record<string, unknown> = {
   generation: DRAFTED,
   revision: DRAFTED,
-  'passage-rewrite': { replacement: 'The tide holds its breath.' },
   fix: { action: 'rewrite', body: LONG_BODY },
   'chat-refine': { reply: 'Noted.' },
   title: { title: 'Low Water' },
@@ -213,33 +208,6 @@ export async function reviseCall(spec: WorldSpec, chapter: number, call: { note:
     { modelRouter: router, contextAssembler: assembler(reads), pluginPolicy: { resolve: async () => policy }, writerSnapshots: snapshots.service },
   );
   await service.reviseDraft(PROJECT_ID, chapter, { note: call.note });
-  await settle();
-  return outgoing(wire, snapshots.rows);
-}
-
-const REFUSED_AFTER_THE_CALL = 'outgoing: the suggestion write is not under test';
-
-/** An Ask-for-changes passage rewrite on chapter `chapter` through the real service, router and snapshot capture; the suggestion write that follows is refused. */
-export async function passageCall(spec: WorldSpec, chapter: number, call: { passage: string; request: string; plugin?: PluginSpec }): Promise<Outgoing> {
-  const reads = worldDb(worldTables(spec));
-  const db = { ...reads, transaction: async () => Promise.reject(new Error(REFUSED_AFTER_THE_CALL)) };
-  const { router, wire } = capturingRouter();
-  const snapshots = snapshotStore();
-  const policy = policyOf(call.plugin);
-  const service = new PassageRewriteService({ getPostgresClient: () => db } as never, router, assembler(reads), { resolve: async () => policy } as never, snapshots.service);
-  const draft = (await reads.query['drafts']?.findFirst({ where: and(eq(schema.drafts.projectId, PROJECT_ID), eq(schema.drafts.chapter, chapter)) })) as Row;
-  const body = String(draft['body']);
-  const start = body.indexOf(call.passage);
-  const request = {
-    base: { draftId: draft['id'] as bigint, revision: draft['revision'] as number, saveSeq: 0 },
-    start,
-    end: start + call.passage.length,
-    passageHash: passageHash(call.passage),
-    request: call.request,
-  };
-  await service.request(PROJECT_ID, chapter, request).catch((err: unknown) => {
-    if (!(err instanceof Error) || err.message !== REFUSED_AFTER_THE_CALL) throw err;
-  });
   await settle();
   return outgoing(wire, snapshots.rows);
 }

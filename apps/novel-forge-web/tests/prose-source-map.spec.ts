@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { marked } from 'marked';
 
-import { renderedSelection } from '../src/lib/passage-selection';
 import { alignRendered, proseSourceMap, sourceRangeOf } from '../src/lib/prose-source-map';
 
 const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'", copy: '©' };
@@ -18,8 +17,10 @@ function select(markdown: string, rendered: string, occurrence = 0): string | { 
   let at = -1;
   for (let seen = 0; seen <= occurrence; seen++) at = dom.indexOf(rendered, at + 1);
   if (at === -1) throw new Error(`“${rendered}” is not in the DOM text “${dom}”`);
-  const result = renderedSelection(markdown, { source: markdown, from: 0 }, dom, at, at + rendered.length);
-  return result.kind === 'ok' ? markdown.slice(result.selection.start, result.selection.end) : { kind: result.kind };
+  const map = proseSourceMap(markdown);
+  if (!map) throw new Error('the markdown has no source map');
+  const result = sourceRangeOf(markdown, map, dom, at, at + rendered.length);
+  return result.kind === 'ok' ? markdown.slice(result.start, result.end) : { kind: result.kind };
 }
 
 describe('proseSourceMap', () => {
@@ -88,29 +89,15 @@ describe('reader selections', () => {
 
   it('should find the right one of two identical passages, not the first', () => {
     const markdown = 'No tick.\n\nThen nothing.\n\nNo tick.';
-    expect(renderedSelection(markdown, { source: markdown, from: 0 }, domTextOf(markdown), 0, 8)).toEqual({
-      kind: 'ok',
-      selection: { start: 0, end: 8, text: 'No tick.' },
-    });
-    const second = domTextOf(markdown).lastIndexOf('No tick.');
-    expect(renderedSelection(markdown, { source: markdown, from: 0 }, domTextOf(markdown), second, second + 8)).toEqual({
-      kind: 'ok',
-      selection: { start: 25, end: 33, text: 'No tick.' },
-    });
+    const map = proseSourceMap(markdown);
+    const dom = domTextOf(markdown);
+    expect(map && sourceRangeOf(markdown, map, dom, 0, 8)).toEqual({ kind: 'ok', start: 0, end: 8 });
+    const second = dom.lastIndexOf('No tick.');
+    expect(map && sourceRangeOf(markdown, map, dom, second, second + 8)).toEqual({ kind: 'ok', start: 25, end: 33 });
   });
 
-  it('should map across paragraphs and line breaks, and offset a later piece of the body by where it starts', () => {
+  it('should map across paragraphs and line breaks', () => {
     expect(select('Tin box.\n\nThe pages\nwere damp.', 'box.\nThe pages')).toBe('box.\n\nThe pages');
-    const body = 'First piece.\n\nSecond *piece* here.';
-    const piece = { source: body.slice(12), from: 12 };
-    const dom = domTextOf(piece.source);
-    const at = dom.indexOf('piece here');
-    const result = renderedSelection(body, piece, dom, at, at + 'piece here'.length);
-    expect(result.kind === 'ok' && result.selection.text).toBe('*piece* here');
-  });
-
-  it('should refuse a body with CRLF line endings', () => {
-    expect(renderedSelection('a\r\nb', { source: 'a\r\nb', from: 0 }, 'a b', 0, 1)).toEqual({ kind: 'line-endings' });
   });
 
   it('should give nothing for a selection of only the whitespace between blocks', () => {

@@ -34,26 +34,6 @@ function check(path: string, table: Expected[]): void {
 }
 
 // Line numbers are in scratch-pad/novel-forge/design/Chapter.dc.html; "reference" is scratch-pad/novel-forge/ui-spacing-reference.md.
-const PASSAGE: Expected[] = [
-  {
-    selector: '.card',
-    values: { gap: '8px', margin: '0 0 18px', padding: '12px', 'border-radius': 'var(--sh-radius-lg)' },
-    source: 'canvas l.94 ask box, l.104 suggestion, l.114 stale: margin 0 0 18px, padding 12px, radius 8px, gap 8px',
-  },
-  { selector: '.quote', values: { margin: '0', padding: '0' }, source: 'blockquote reset; spacing comes from the card gap' },
-  { selector: '.chips', values: { gap: '6px' }, source: 'canvas l.96 quick requests gap 6px' },
-  { selector: '.actions', values: { gap: '8px' }, source: 'canvas l.99 and l.109 action rows gap 8px' },
-  { selector: '.hint', values: { 'margin-left': 'auto' }, source: 'canvas l.99 “Only this passage changes” margin-left auto' },
-  { selector: '.leaks', values: { margin: '0', padding: '0 0 0 1.6em' }, source: 'list indent of .nf-md ul (styles.css), the reader’s own lists' },
-  { selector: '.staleRow', values: { gap: '10px' }, source: 'canvas l.114 stale row gap 10px' },
-  { selector: '.segment:not(:last-child)', values: { 'margin-bottom': '1.1em' }, source: '.nf-md p margin 0 0 1.1em (styles.css), restored between split Markdown blocks' },
-  {
-    selector: '.selectionNote',
-    values: { 'max-width': '360px', padding: '10px 12px', 'border-radius': 'var(--sh-radius-md)' },
-    source: 'ChecksPanel .notice padding 10px 12px, radius md; reference Drawer sm 360 as the narrowest reading column',
-  },
-];
-
 const DETAILS: Expected[] = [
   { selector: '.panel', values: { 'border-radius': '0' }, source: 'canvas l.140 aside is border-left only; reference SidePanel “next to a transcript: border-left only”' },
   { selector: '.tab', values: { gap: '14px' }, source: 'canvas l.144 aside body gap 14px' },
@@ -130,10 +110,6 @@ describe('Chapter workspace layout', () => {
 });
 
 describe('Chapter workspace spacing', () => {
-  it('should keep the passage cards on the canvas values, with nothing uncited', () => {
-    check('features/chapter-workspace/PassageAsk.module.css', PASSAGE);
-  });
-
   it('should keep the details panel on the canvas values, with nothing uncited', () => {
     check('features/chapter-workspace/ChapterDetails.module.css', DETAILS);
   });

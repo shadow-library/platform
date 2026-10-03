@@ -404,7 +404,7 @@ const CHAPTER_PANEL: Expected[] = [
   {
     selector: '.toolbarProblem',
     values: { 'max-width': '360px', padding: '10px 12px', 'border-radius': 'var(--sh-radius-md)' },
-    source: 'PassageAsk.module.css .selectionNote, the note shown for a selection that cannot be used',
+    source: 'ChecksPanel .notice padding 10px 12px, radius md; reference Drawer sm 360 as the narrowest reading column',
   },
   {
     selector: '.comment.comment',
@@ -412,7 +412,7 @@ const CHAPTER_PANEL: Expected[] = [
     source: 'mockup screen 2: the comment popover ≈360 wide; chat .composerInner 14 inside, 10 between rows',
   },
   { selector: '.commentPassage', values: { gap: '8px' }, source: 'mockup screen 2: the ref chip 8 before its quote, as chat .sentPassageHead' },
-  { selector: '.quick', values: { gap: '6px' }, source: 'PassageAsk.module.css .chips gap 6' },
+  { selector: '.quick', values: { gap: '6px' }, source: 'canvas l.96 quick requests gap 6px' },
   { selector: '.commentFoot', values: { gap: '8px' }, source: 'chat .row gap 8' },
 ];
 

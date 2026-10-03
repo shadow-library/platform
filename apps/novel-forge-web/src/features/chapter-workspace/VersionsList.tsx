@@ -5,8 +5,7 @@ import { PaneError, PaneLoader } from '@/components/nf';
 import { type DraftResponse, type DraftVersionResponse, isApiError, useDraftVersionsQuery, useRestoreVersionMutation } from '@/lib/apis';
 import { type SettledBase, unsettledMessage } from '@/lib/chapter-editor';
 import { relativeTime } from '@/lib/format';
-import { FINAL_RESTORE_REASON, restoreConsequences, restoredMessage, restoreGate, versionSourceLabel } from '@/lib/draft-versions';
-import { writeRefusalMessage } from '@/lib/passage-suggestions';
+import { FINAL_RESTORE_REASON, restoreConsequences, restoredMessage, restoreGate, restoreRefusalMessage, versionSourceLabel } from '@/lib/draft-versions';
 
 import { CompareVersionsDialog } from './CompareVersionsDialog';
 import styles from './ChapterDetails.module.css';
@@ -45,7 +44,7 @@ export function VersionsList({ novelId, draft, generating, settledBase }: Versio
         const restored = await restore.mutateAsync({ revision: version.revision, base: { baseDraftId: base.draftId, baseRevision: base.revision, baseSaveSeq: base.saveSeq } });
         toast.success(restoredMessage(base, restored, version.revision));
       } catch (error) {
-        toast.warning(isApiError(error) ? writeRefusalMessage(error) : 'The restore didn’t go through — try again.');
+        toast.warning(isApiError(error) ? restoreRefusalMessage(error) : 'The restore didn’t go through — try again.');
       } finally {
         setConfirming(undefined);
       }

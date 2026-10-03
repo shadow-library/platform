@@ -10,7 +10,6 @@ import {
   fillCall,
   type Outgoing,
   outlinePack,
-  passageCall,
   previewParity,
   type PreviewParity,
   reviseCall,
@@ -70,7 +69,6 @@ const FUTURE_SUMMARY = 'The council hangs Dace from the lighthouse gallery.';
 const FUTURE_THREAD = 'The winter debt comes due with the ice.';
 const PROVISIONAL_EVENT = 'Mira burns the harbour charter in a rage.';
 const PRESENT_STATUS = 'deceased';
-const PASSAGE = 'The tide turns late.';
 
 const bellLeak = (spec: WorldSpec, chapter = 5): WorldSpec => leakEverywhere(spec, chapter, BELL_PAYLOAD);
 const learnsBell = (extra: Partial<BriefSpec> = {}): Partial<BriefSpec> => ({ cast: ['mira'], learns: [['mira', BELL_KEY]], ...extra });
@@ -388,18 +386,6 @@ const SCENARIOS: Scenario[] = [
     untitled: true,
     plugin: { systemMessage: `Plugin tone. ${BELL_PAYLOAD}` },
   }),
-  {
-    name: 'a passage rewrite with the secret in a plugin system message, the surrounding chapter context and the request',
-    kind: 'writer',
-    run: () =>
-      passageCall(bellLeak(coast({ facts: [bell()], drafts: [{ chapter: 5, body: `The keeper counts the ships. ${PASSAGE} The ferry waits.` }] })), 5, {
-        passage: PASSAGE,
-        request: `Make it tense. ${BELL_PAYLOAD}`,
-        plugin: { systemMessage: `Plugin tone. ${BELL_PAYLOAD}` },
-      }),
-    forbidden: [...BELL, ...PLANNED],
-    allowed: [BELL_CLUE, 'Plugin tone.', 'Make it tense.', `[[PASSAGE]]${PASSAGE}[[/PASSAGE]]`],
-  },
   writer('a plugin system message quoting the secret', coast({ facts: [bell()] }), BELL, [BELL_CLUE, 'Plugin tone.'], 5, {
     plugin: { systemMessage: `Plugin tone. ${BELL_PAYLOAD}` },
   }),

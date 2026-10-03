@@ -43,7 +43,6 @@ const REFUSALS: Record<ReaderRefusal, string | undefined> = {
   unmapped: 'The reader can’t place that selection in the chapter’s text — select a little less.',
   'cuts-markup': 'That selection cuts through a link, code, a list or other formatting — select all of it, or only words inside it.',
   'line-endings': 'This chapter’s line endings differ from what the editor shows — save it from Edit first, then select again.',
-  unsaved: 'Your edits aren’t saved yet — save them, then select again.',
   'in-preview': 'Select outside the proposed change — apply or decline it on its card first.',
 };
 

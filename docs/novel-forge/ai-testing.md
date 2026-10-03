@@ -2057,22 +2057,14 @@ them off `model_calls` rather than trusting a number here. Cost and admin inspec
 - **Fails when:** `FRV_002` still preparing; `FRV_003` reading failed (prepare again); `FRV_005` items unanswered;
   `FRV_006` a skipped milestone that a reveal in this plan needs; `FRV_010` a skip with no reason.
 
-### 7. Passage rewrite and versions
+### 7. Versions
 
-- **Entry:** Chapter workspace → select a passage → "Ask for changes"; `POST /drafts/:n/passage-suggestions
-{"baseDraftId","baseRevision","baseSaveSeq","start","end","passageHash","request"}` (UTF-16 offsets, SHA-256 hex of the
-  selected text), then `…/:suggestionId/apply` (the same three base fields) or `…/dismiss`.
+- **Entry:** Chapter workspace → Versions; `GET /drafts/:n/versions`, `…/versions/compare?from=&to=`; `POST …/versions/:r/restore`
+  (`{"baseDraftId","baseRevision","baseSaveSeq"}`).
 - **Verify:**
-  - A `passage-rewrite` call on the chapter's writer route, captured as a `writer_snapshots` row with role `passage`.
-    The draft does not change until you apply.
-  - The suggestion's `location.freshness` is `fresh` as made; `relocated` after you move the passage cleanly (its
-    text and the 32 characters either side occur exactly once); `stale` after an edit in or around it, and applying
-    is then `PSG_004`.
-  - Applying writes a new revision (`passage_rewritten`), resets approval and marks later drafts stale. A rewrite that
-    brings a locked secret's give-away terms into the passage is held as a contradiction (`leakLines` lists them).
-  - Versions: `GET /drafts/:n/versions`, `…/versions/compare?from=&to=`; `POST …/versions/:r/restore` (base fields)
-    writes a new `restored` revision, and history is never rewritten.
-- **Fails when:** `PSG_003` the selection no longer matches; `PSG_006` / `VER_002` on a final chapter (use Amend).
+  - Restore writes a new `restored` revision, resets approval and marks later drafts stale; history is never rewritten.
+  - Restoring text the draft already holds changes nothing.
+- **Fails when:** `VER_001` an unknown revision; `VER_002` on a final chapter (use Amend).
 
 ### 8. Comment on a passage and apply its rewrite card
 
@@ -2117,7 +2109,7 @@ them off `model_calls` rather than trusting a number here. Cost and admin inspec
 ### 9. Writer's view
 
 - **Entry:** Chapter workspace → Writer's view; `GET /chapters/:n/writer-snapshots`, `…/:snapshotId`.
-- **Verify:** one row per writer attempt (`draft`, `repair`, `rewrite`, `revise`, `passage`) holding the exact messages,
+- **Verify:** one row per writer attempt (`draft`, `repair`, `rewrite`, `revise`) holding the exact messages,
   `keptBack`, plan revision, prompt key and version and the model route as they were at the time, never rebuilt from
   today's state. Attempts of the current revision and the two before it are kept. On an isolated chapter the
   messages read "Prose: walled off" and `bibleHash` is null.

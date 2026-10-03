@@ -21,10 +21,6 @@ export function passageHash(passage: string): string {
   return createHash('sha256').update(passage).digest('hex');
 }
 
-export function isWithinBody(body: string, start: number, end: number): boolean {
-  return Number.isInteger(start) && Number.isInteger(end) && start >= 0 && end > start && end <= body.length && end - start <= MAX_PASSAGE_CHARS;
-}
-
 export function anchorContext(body: string, start: number, end: number): Pick<PassageAnchor, 'contextBefore' | 'contextAfter'> {
   return { contextBefore: body.slice(Math.max(0, start - ANCHOR_CONTEXT_CHARS), start), contextAfter: body.slice(end, end + ANCHOR_CONTEXT_CHARS) };
 }

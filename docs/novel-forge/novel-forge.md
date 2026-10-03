@@ -121,7 +121,8 @@
 - **A chapter opens beside the chat**, only on the author's click, in a panel on the right that stays open for that chat (`?chapter=N`) until closed, across a
   reload; switching chats closes it. The draft is on screen once: while the panel holds a chapter, that chapter's card in the thread is a one-line pointer.
   Approve in the panel and on the card is the same approval of the same draft, and waits for the author's unsaved edits to be saved. Hand edits go through the
-  Chapters page's editor (autosave, the conflict choice, the hand-save path), and leaving the chapter with text unsaved asks first. A final chapter opens
+  Chapters page's editor (autosave, the conflict choice, the hand-save path), and leaving the chapter with text unsaved asks first. The Chapters page itself only reads and
+  edits; commenting on a passage lives in the chat, which the page links to. A final chapter opens
   read-only and one being written shows its progress, never an editor. Only one panel holds the right side: the changes panel folds to a strip and reviews
   in its sheet while a chapter is open. Below 1024px the chapter is a full sheet over the chat.
 - **A passage is commented on in the panel**: selecting text in the chapter's reading view offers Comment (⌘K), Rewrite with AI, Edit and Copy; a comment
@@ -146,7 +147,7 @@
   isolated or being-written chapter, a chapter the same reply rewrites whole, or no change — is left out with a line in the reply saying why, never
   placed by a guess. The card stores the anchor staging found (draft, revision, save sequence, offsets, hash, paragraph and the text either side);
   it is always a card the author applies passage by passage. An edit elsewhere in the chapter leaves it standing: applying finds each passage
-  again as the Chapters page's suggestions are found — in place, or moved when it and its surroundings occur exactly once — and writes every
+  again — in place, or moved when it and its surroundings occur exactly once — and writes every
   selected rewrite of a chapter as one `passage_rewritten` revision through the hand-save path. A passage edited in or around, no longer told
   apart, or in a replaced draft refuses the apply naming that rewrite (`RFN_021`), leaving the card to apply without it; two selected rewrites
   of the same words are refused (`RFN_020`). One that brings in a locked secret its passage did not already give away holds the draft as a
@@ -301,7 +302,7 @@
   reveal scheduled later stays gated on that cast's ledger even after its chapter has passed. Without a contract, visibility is the schedule alone.
 - A locked fact's allowed clues reach the writer unscrubbed, and a clue may not name its fact's give-away terms (checked when the clues or terms are written; an older clue that
   still does is dropped from the writer's clues).
-- **Disclosure policy**: every string the chapter writer reads (generation, revision, repair, passage rewrite) passes one policy for that chapter, loaded once per run: locked
+- **Disclosure policy**: every string the chapter writer reads (generation, revision, repair) passes one policy for that chapter, loaded once per run: locked
   facts' text, author note, key and give-away terms, the ending and ending question (until the chapter planned as the ending) and later volumes' goals and notes are withheld
   wherever copied — previous prose, summaries, continuation state, entity sheets, pages, cited refs, style, writer lines, the plan, feedback and findings. It is lexical: it
   catches copies, not paraphrase, and a passage of one word, of two words under twelve characters, or under six characters in a script without spaces is caught only by give-away
@@ -380,8 +381,7 @@
   it sits. A save names the draft, revision and save sequence it read (all three or none) and is refused (`DRF_013`, answered with the draft as it stands) once another write
   moved on. No hand save lands while the AI is writing the chapter. An autosave folds into the revision it continues only while that revision is the author's own hand edit, under
   ten minutes old, never approved, reviewed or stale; the cascade (later drafts stale, reveals revoked) runs on every save. A plan is optional for a hand-written chapter.
-- Finalized prose (`chapters.locked`) MUST NEVER change except through amend. Every write to draft or chapter prose — generation, revision, chat apply, import, restore, passage
-  apply, job replay — carries a predicate on non-final status, so a delayed model call cannot overwrite a finalized draft. Proposals NEVER edit plans at or before the story
+- Finalized prose (`chapters.locked`) MUST NEVER change except through amend. Every write to draft or chapter prose — generation, revision, chat apply, import, restore, job replay — carries a predicate on non-final status, so a delayed model call cannot overwrite a finalized draft. Proposals NEVER edit plans at or before the story
   cursor or prose of a final draft.
 - Prose is stored with LF line endings on every write path, so a body's line count and every hash taken over it are platform-independent. A scheduled or failed publication
   whose ledgered hash predates that normalisation is repaired once at boot, and only when its chapter has not been edited since.
@@ -432,19 +432,13 @@
 - **Insert** MUST shift every chapter-number column via the explicit `SHIFT_TARGETS` list (an unlisted column is silently not shifted); it is legal only after the last written
   chapter (`CHP_009`) and only while it holds the authoring claim (`CHP_004`). The insert planner sanitises its own output against the reveal rule.
 
-### Passage rewrite and versions
+### Versions
 
-- "Ask for changes" on a selection runs on the chapter's writer route (revise role, disclosure policy, a writer snapshot as a `passage` attempt) and stores a suggestion anchored
-  to the draft id, revision, save sequence, UTF-16 offsets, a SHA-256 of the selected text and up to 32 characters either side, with the containment it ran under; nothing touches
-  the draft until it is applied.
-- The passage is fresh where its offsets still hold that text between that context, and relocated only when text and context together occur exactly once elsewhere; anything else
-  — an edit in or around it, an ambiguous copy — is stale and refused (`PSG_004`).
-- Applying and restoring decide under the draft's row lock and write through the hand-save path as a new revision (`passage_rewritten`, `restored`), so they never fold into an
-  autosave, never rewrite history, and reset approval and mark later drafts stale as an edit does. Restoring the approved revision needs approving again; restoring text the draft
-  already holds changes nothing. A final chapter refuses both (`PSG_006`, `VER_002`).
-- An applied rewrite keeps the unrestricted containment it was written under, and one that brings in a locked secret the passage did not already give away is held as a
-  contradiction, judged by the disclosure policy at apply time.
-- History is bounded to a draft's newest 50 revisions plus the approved one; each draft keeps its newest 20 suggestions.
+- Restoring decides under the draft's row lock and writes through the hand-save path as a new `restored` revision, so it never folds into an autosave, never rewrites history,
+  and resets approval and marks later drafts stale as an edit does. Restoring the approved revision needs approving again; restoring text the draft already holds changes
+  nothing. A final chapter refuses it (`VER_002`).
+- History is bounded to a draft's newest 50 revisions plus the approved one.
+- `passage_suggestions` rows remain only as dismissed history; nothing reads or writes them.
 
 ### Writer's context and snapshots
 
@@ -456,7 +450,7 @@
   own cast first, then open canon, then the latest learned) and recorded in the pack's omitted list, NEVER failing a chapter; the plan, its reveals and clues, the volume goal and
   the writer lines are not cut, and a call that writes or revises fails with a message naming the section when one is over. Readers of the pack (judge, review, previews) take it
   as it is. Optional material (cited pages, cast state, other sheets, plugin sections) fills what is left.
-- Every writer attempt (draft, repair, rewrite, revision, passage) stores a snapshot: the exact messages sent, what was kept back and why, the plan revision, the Story Bible
+- Every writer attempt (draft, repair, rewrite, revision) stores a snapshot: the exact messages sent, what was kept back and why, the plan revision, the Story Bible
   hash, the prompt version and the model route. The Writer's view reads the snapshot, never regenerates it from today's state, and walls off the messages of an attempt that was
   isolated or whose chapter is isolated now. A snapshot write never fails the generation it captures; attempts are kept for the current revision and the two before it.
 
@@ -468,8 +462,7 @@
   written isolated, and NEVER falls back to a standard model: an off-allowlist resolution refuses (`AI_003`).
 - Containment MUST key on `isolated`, NEVER on `generator` or `contentMode`. A call whose writer class a plugin raised (or an unrestricted fill) writes `generator: unrestricted`
   and `isolated: true`, sticky for the run. Draft and isolated content MUST NEVER be indexed, retrieved or searched.
-- **Read policy**: raw isolated prose is readable only by the author, the unrestricted route and the Amend editor. Author HTTP routes (the draft, its versions and compare,
-  passage suggestions) read it raw; every model-bound, chat, plugin, publish and search read goes through `isolation-read-policy.ts` and sees only what the author approved in the
+- **Read policy**: raw isolated prose is readable only by the author, the unrestricted route and the Amend editor. Author HTTP routes (the draft, its versions and compare) read it raw; every model-bound, chat, plugin, publish and search read goes through `isolation-read-policy.ts` and sees only what the author approved in the
   bridge — never prose, free-text state, judge notes or review evidence, on any route. Every revision records whether it was isolated, and restoring one keeps the draft isolated.
 - **Bridge**: what a standard call may know about an isolated chapter is only the items its author approved against its current revision — a short non-graphic summary and
   positions of roster characters (places of at most 60 characters) — never lines that cross the hard line. The summary is always asked, and positions one by one. Editing the

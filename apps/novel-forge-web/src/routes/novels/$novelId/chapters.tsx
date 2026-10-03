@@ -1,7 +1,7 @@
 import { type ContentRating, normalizeContentRating } from '@shadow-library/sdk';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import DOMPurify from 'dompurify';
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Button,
@@ -46,9 +46,6 @@ import {
   EditorStrip,
   FinalizeButton,
   HeldActions,
-  PassageAskCard,
-  PassageReader,
-  PassageSuggestionCard,
   type ProseTool,
   ProseToolbar,
   ProseToolbarNote,
@@ -56,7 +53,6 @@ import {
   UnsavedChangesGuard,
   useChapterEditor,
   useOverrideConfirm,
-  usePassageAsk,
   useProseFormatting,
   useReviewJobs,
   useSaveShortcut,
@@ -140,8 +136,6 @@ import {
   workspaceActions,
 } from '@/lib/chapter-workspace';
 import { chapterGeneration, type ChapterGeneration } from '@/lib/generation-activity';
-import { type PassageRange } from '@/lib/passage-selection';
-import { editorSelection, type ProseAnchor, selectionProblem, suggestionView } from '@/lib/passage-suggestions';
 import { useGenerationActivity } from '@/lib/use-generation-activity';
 
 import styles from './chapters.module.css';
@@ -1370,8 +1364,6 @@ function ChapterWorkspace({ novelId, draft, deleted, onBack, onPick }: ChapterWo
   const generation = chapterGeneration(activity, chapter);
   const editor = useChapterEditor(novelId, draft, deleted);
   const { title, body } = editor.state;
-  const passageAsk = usePassageAsk(novelId, draft, editor.settledBase);
-  const [proseSelection, setProseSelection] = useState<PassageRange>({ start: 0, end: 0 });
 
   // A `?review=1` hand-off (e.g. from Overview's Next step card) opens straight into the drawer; this
   // is read once at mount, matching the drawer's own open state being otherwise locally controlled.
@@ -1416,72 +1408,12 @@ function ChapterWorkspace({ novelId, draft, deleted, onBack, onPick }: ChapterWo
   const finalizeBlocked = isFinalizeBlocked(draft);
   const runBlockedReason = generation ? 'The chapter is being written — review it once it’s done.' : !draft.body?.trim() ? 'There’s no text to review yet.' : undefined;
   const displayTitle = draft.title?.trim() || 'Untitled chapter';
-  const askable = actions.askForge && !generation && draft.reviewStatus !== 'generating';
-  const askBlockedReason = saveBlocked ? 'Resolve the save problem first' : proseSelection.start === proseSelection.end ? 'Select a passage to ask for changes' : undefined;
+  const commentable = actions.askForge && !generation && draft.reviewStatus !== 'generating';
 
   const format = useProseFormatting(editorRef, body, editor.setBody);
-  const askReasonId = useId();
 
   const finishEditing = async (): Promise<void> => {
     if (await editor.save()) setEditing(false);
-  };
-
-  // A suggestion is anchored to saved text, so the edits are saved first and the ask opens in the reader, where the suggestion lands.
-  const askFromEditor = async (): Promise<void> => {
-    const result = editorSelection(body, editorRef.current?.value ?? '', proseSelection.start, proseSelection.end);
-    if (result.kind !== 'ok') {
-      const problem = selectionProblem(result);
-      if (problem) toast.warning(problem);
-      return;
-    }
-    if (!(await editor.save())) {
-      toast.warning('Your edits aren’t saved yet — save them, then ask for changes.');
-      return;
-    }
-    setEditing(false);
-    passageAsk.open(result.selection);
-  };
-
-  const suggestionViews = new Map(passageAsk.suggestions.map(suggestion => [suggestion.id, suggestionView(suggestion, draft, Boolean(generation))]));
-  const proseAnchors: ProseAnchor[] = [
-    ...(passageAsk.ask ? [{ key: 'ask', at: passageAsk.ask.selection.end }] : []),
-    ...passageAsk.suggestions.map(suggestion => ({ key: suggestion.id, at: suggestionViews.get(suggestion.id)?.anchorEnd })),
-  ];
-
-  const newestStaleId = passageAsk.suggestions.find(suggestion => suggestionViews.get(suggestion.id)?.state === 'stale')?.id;
-
-  const renderProseCard = (key: string): React.ReactNode => {
-    const { ask } = passageAsk;
-    if (key === 'ask') {
-      return (
-        ask && (
-          <PassageAskCard
-            selection={ask.selection}
-            request={ask.request}
-            requesting={passageAsk.requesting}
-            onRequestChange={passageAsk.setRequest}
-            onSubmit={() => void passageAsk.submit()}
-            onCancel={passageAsk.cancel}
-          />
-        )
-      );
-    }
-    const suggestion = passageAsk.suggestions.find(candidate => candidate.id === key);
-    const view = suggestionViews.get(key);
-    if (!suggestion || !view) return null;
-    const retry = askable ? passageAsk.retryTarget(suggestion) : undefined;
-    return (
-      <PassageSuggestionCard
-        suggestion={suggestion}
-        view={view}
-        busy={passageAsk.busy}
-        announce={suggestion.id === newestStaleId}
-        applying={passageAsk.busyId === suggestion.id}
-        onRetry={retry && (() => passageAsk.open(retry, suggestion.request, suggestion.id))}
-        onApply={() => void passageAsk.apply(suggestion)}
-        onDismiss={() => void passageAsk.dismiss(suggestion)}
-      />
-    );
   };
 
   const recovery = editorRecovery(editor, setEditing);
@@ -1719,29 +1651,12 @@ function ChapterWorkspace({ novelId, draft, deleted, onBack, onPick }: ChapterWo
                 {tab === 'write' ? (
                   <>
                     <ProseToolbar tools={CHAPTER_TOOLS} onTool={format.apply}>
-                      {askable && askBlockedReason && <ProseToolbarNote id={askReasonId}>{askBlockedReason}</ProseToolbarNote>}
-                      {askable && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          disabled={Boolean(askBlockedReason)}
-                          aria-describedby={askBlockedReason ? askReasonId : undefined}
-                          onMouseDown={e => e.preventDefault()}
-                          onClick={() => void askFromEditor()}
-                        >
-                          Ask for changes
-                        </Button>
-                      )}
                       <ProseToolbarNote>Markdown supported</ProseToolbarNote>
                     </ProseToolbar>
                     <textarea
                       ref={editorRef}
                       value={body}
-                      onChange={e => {
-                        editor.setBody(e.target.value);
-                        setProseSelection({ start: e.currentTarget.selectionStart, end: e.currentTarget.selectionEnd });
-                      }}
-                      onSelect={e => setProseSelection({ start: e.currentTarget.selectionStart, end: e.currentTarget.selectionEnd })}
+                      onChange={e => editor.setBody(e.target.value)}
                       onKeyDown={format.onKeyDown}
                       readOnly={textLocked}
                       spellCheck
@@ -1796,15 +1711,20 @@ function ChapterWorkspace({ novelId, draft, deleted, onBack, onPick }: ChapterWo
                 )}
                 {draft.title && <div className={styles.chapterEyebrow}>Chapter {chapter}</div>}
                 {draft.body?.trim() ? (
-                  <PassageReader body={draft.body} askable={askable} anchors={proseAnchors} renderCard={renderProseCard} onAsk={selection => passageAsk.open(selection)} />
+                  <Markdown content={draft.body} />
                 ) : (
                   <p className={styles.emptyProse}>
                     {draft.status === 'final' ? 'This chapter has no prose.' : 'This chapter has no prose yet. Use “Edit prose” to write it, or generate a draft from its brief.'}
                   </p>
                 )}
                 {!actions.askForge && <p className={styles.finalNote}>The chat can’t change a final chapter. To change the text yourself, use Amend.</p>}
-                {askable && Boolean(draft.body?.trim()) && (
-                  <p className={styles.finalNote}>Select any passage to ask for changes to it — or, from the keyboard, select it in Edit prose and press Ask for changes.</p>
+                {commentable && Boolean(draft.body?.trim()) && (
+                  <p className={styles.finalNote}>
+                    <button type="button" className={styles.linkButton} onClick={() => navigate({ to: '/novels/$novelId/chat', params: { novelId }, search: { chapter } })}>
+                      Comment in the chat
+                    </button>{' '}
+                    to change a passage — select it there and say what you want different.
+                  </p>
                 )}
 
                 <section className={styles.sceneImages}>

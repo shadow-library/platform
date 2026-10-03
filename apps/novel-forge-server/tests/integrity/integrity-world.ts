@@ -10,8 +10,6 @@ import { bridgedSummary, loadIsolationBridges } from '@modules/finalize-review/i
 import { ChapterAmendService } from '@modules/generation/chapter-amend.service';
 import { DraftVersionService } from '@modules/generation/draft-versions.service';
 import { GenerationService } from '@modules/generation/generation.service';
-import { passageHash } from '@modules/generation/passage-anchor';
-import { PassageRewriteService } from '@modules/generation/passage-rewrite.service';
 import { loadArtifactStates } from '@modules/refinement/artifact-state';
 import { type ChangeOp, changeSetRefs } from '@modules/refinement/change-set';
 import { ProposalApplyService } from '@modules/refinement/proposal-apply.service';
@@ -159,7 +157,6 @@ export class IntegrityWorld {
   readonly generation: GenerationService;
   readonly reviews: FinalizeReviewService;
   readonly versions: DraftVersionService;
-  readonly passages: PassageRewriteService;
   readonly amends: ChapterAmendService;
   readonly proposals: ProposalApplyService;
   private readonly flights: Flight[] = [];
@@ -207,7 +204,6 @@ export class IntegrityWorld {
     );
     this.reviews = new FinalizeReviewService(database, this.desk as never, jobHandlers as never, this.generation);
     this.versions = new DraftVersionService(database);
-    this.passages = new PassageRewriteService(database, this.desk as never, contextAssembler as never, pluginPolicy as never, writerSnapshots as never);
     this.amends = new ChapterAmendService(database, indexing as never);
     this.proposals = new ProposalApplyService(database, { has: () => false, get: () => undefined } as never);
   }
@@ -692,59 +688,6 @@ export class IntegrityWorld {
     return `restored ch ${chapter} to rev ${revision}`;
   }
 
-  async passage(): Promise<string> {
-    const chapter = this.anyChapter();
-    const current = this.copy(this.draft(chapter));
-    if (!current || String(current['body']).length === 0) return `no prose to rewrite in ch ${chapter}`;
-    const body = String(current['body']);
-    const end = body.indexOf('.') + 1;
-    if (end <= 0) return `no sentence to rewrite in ch ${chapter}`;
-    const passage = body.slice(0, end);
-    this.desk.answer = () => ({ replacement: 'The water holds its breath.' });
-    const requested = await this.attempt(
-      'passage request',
-      this.passages.request(P, chapter, {
-        base: { draftId: current['id'] as bigint, revision: Number(current['revision']), saveSeq: Number(current['saveSeq']) },
-        start: 0,
-        end,
-        passageHash: passageHash(passage),
-        request: 'Make it tense.',
-      }),
-      ['DRF_001', 'DRF_013', 'DRF_019', 'PSG_002', 'PSG_003', 'PSG_006'],
-    ).finally(() => (this.desk.answer = null));
-    if (!requested.ok) {
-      if (current['status'] === 'final') this.expect(requested.code === 'PSG_006', 'a passage request on a final chapter must answer PSG_006', requested.code);
-      return `request refused ${requested.code} (ch ${chapter})`;
-    }
-    const suggestion = requested.value as { id: bigint };
-    if (this.rng.chance(0.3)) await this.write();
-    const live = this.copy(this.draft(chapter));
-    const base = live && this.rng.chance(0.5) ? { draftId: live['id'] as bigint, revision: Number(live['revision']), saveSeq: Number(live['saveSeq']) } : undefined;
-    const before = this.store.writes();
-    const outcome = await this.attempt('passage apply', this.passages.apply(P, chapter, suggestion.id, base), [
-      'DRF_001',
-      'DRF_013',
-      'DRF_019',
-      'PSG_001',
-      'PSG_004',
-      'PSG_005',
-      'PSG_006',
-    ]);
-    if (!outcome.ok) {
-      this.expectUnchanged(before, 'passage apply');
-      if (live?.['status'] === 'final') this.expect(outcome.code === 'PSG_006', 'a passage apply on a final chapter must answer PSG_006', outcome.code);
-      return `apply refused ${outcome.code} (ch ${chapter})`;
-    }
-    this.expect(live?.['status'] !== 'final', 'a passage was applied to a final chapter');
-    this.expectNotGenerating(chapter, 'a passage rewrite', before);
-    this.expect(String(live?.['body']).includes(passage), 'a passage applied where its text no longer stands');
-    const applied = this.draft(chapter) as Row;
-    this.expect(live?.['isolated'] !== true || applied['isolated'] === true, 'a passage rewrite lifted isolation');
-    this.expect(String(applied['body']).includes('The water holds its breath.') && applied['reviewStatus'] !== 'approved', 'the passage did not land as an unapproved revision');
-    this.expectCascade(chapter, 'a passage rewrite');
-    return `passage applied in ch ${chapter}`;
-  }
-
   async revert(): Promise<string> {
     const applied = this.store.rows(schema.finalizeReviews).filter(row => row['status'] === 'applied');
     const chapter = applied.length > 0 && this.rng.chance(0.85) ? Number(this.rng.pick(applied)['chapter']) : this.anyChapter();
@@ -1200,7 +1143,6 @@ export type OperationName =
   | 'amend'
   | 'prepareBridge'
   | 'restore'
-  | 'passage'
   | 'revert'
   | 'planEdit'
   | 'chatStage'
@@ -1229,7 +1171,6 @@ export const OPERATION_WEIGHTS: readonly (readonly [OperationName, number])[] = 
   ['amend', 3],
   ['prepareBridge', 2],
   ['restore', 4],
-  ['passage', 4],
   ['revert', 3],
   ['planEdit', 5],
   ['chatStage', 4],

@@ -279,20 +279,20 @@ describe('savedDraftOrThrow', () => {
 });
 
 describe('resultOrConflict', () => {
-  it('should raise a passage or version refusal read with modeled(409), such as a stale suggestion, as a conflict without a current draft', () => {
+  it('should raise a version refusal read with modeled(409), such as an unknown revision, as a conflict without a current draft', () => {
     try {
-      resultOrConflict({ code: 'PSG_004', message: 'stale' });
+      resultOrConflict({ code: 'VER_001', message: 'gone' });
       throw new Error('expected a conflict');
     } catch (error) {
       expect(error).toBeInstanceOf(DraftSaveConflict);
-      expect([(error as DraftSaveConflict).code, (error as DraftSaveConflict).current]).toEqual(['PSG_004', undefined]);
+      expect([(error as DraftSaveConflict).code, (error as DraftSaveConflict).current]).toEqual(['VER_001', undefined]);
     }
   });
 
-  it('should pass an applied suggestion through, though it carries no id of its own', () => {
-    const applied = { draft: { id: 'd1' } as DraftResponse, suggestion: { id: 's1' } };
+  it('should pass a result through, though it carries no id of its own', () => {
+    const result = { draft: { id: 'd1' } as DraftResponse, note: 'restored' };
 
-    expect(resultOrConflict(applied)).toBe(applied);
+    expect(resultOrConflict(result)).toBe(result);
   });
 });
 

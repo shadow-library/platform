@@ -461,14 +461,6 @@ export async function restoreVersionAsRead(ctx: APIRequestContext, projectId: st
   return readDraft(ctx, projectId, chapter);
 }
 
-export async function applySuggestionAsRead(ctx: APIRequestContext, projectId: string, chapter: number, suggestionId: string, base: Draft): Promise<Draft> {
-  const response = await mutate(ctx, 'post', `/api/v1/projects/${projectId}/drafts/${chapter}/passage-suggestions/${suggestionId}/apply`, {
-    data: { baseDraftId: base.id, baseRevision: base.revision, baseSaveSeq: base.saveSeq },
-  });
-  await expectStatus(response, 200, `applying suggestion ${suggestionId} on chapter ${chapter}`);
-  return readDraft(ctx, projectId, chapter);
-}
-
 /** `Draft` (`forge-helpers.ts`) omits `staleReason`, which the API does return — read through this instead of an ad hoc cast. */
 export interface StaleDraft extends Draft {
   readonly staleReason: string | null;

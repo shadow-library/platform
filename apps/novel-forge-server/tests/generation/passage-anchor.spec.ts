@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { anchorContext, isWithinBody, locatePassage, MAX_PASSAGE_CHARS, passageHash, replacePassage } from '@modules/generation/passage-anchor';
+import { anchorContext, locatePassage, passageHash, replacePassage } from '@modules/generation/passage-anchor';
 
 const BODY = 'The keeper counts the ships at the harbour wall. The tide turns late tonight. The ferry waits by the empty pier for dawn.';
 const PASSAGE = 'The tide turns late tonight.';
@@ -43,25 +43,6 @@ describe('locatePassage', () => {
 
   it('should mark a moved passage stale when the stored text does not match its hash', () => {
     expect(locatePassage(`Night falls over the town. ${BODY}`, { ...ANCHOR, passageHash: passageHash('something else') }).freshness).toBe('stale');
-  });
-});
-
-describe('isWithinBody', () => {
-  it.each([
-    ['an empty selection', 5, 5, false],
-    ['a reversed selection', 6, 5, false],
-    ['a selection past the end', 0, BODY.length + 1, false],
-    ['a negative start', -1, 4, false],
-    ['a fractional offset', 0.5, 4, false],
-    ['a selection inside the body', 0, 4, true],
-  ])('should judge %s', (_, start, end, within) => {
-    expect(isWithinBody(BODY, start, end)).toBe(within);
-  });
-
-  it('should refuse a selection longer than the passage limit', () => {
-    const long = 'a'.repeat(MAX_PASSAGE_CHARS + 1);
-
-    expect(isWithinBody(long, 0, long.length)).toBe(false);
   });
 });
 

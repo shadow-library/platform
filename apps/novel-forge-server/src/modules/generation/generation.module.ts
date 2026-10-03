@@ -19,7 +19,6 @@ import { ChapterWorkspaceController } from './chapter-workspace.controller';
 import { DraftVersionService } from './draft-versions.service';
 import { GenerationController } from './generation.controller';
 import { GenerationService } from './generation.service';
-import { PassageRewriteService } from './passage-rewrite.service';
 import { WriterSnapshotController } from './writer-snapshot.controller';
 
 @Module({
@@ -33,7 +32,7 @@ import { WriterSnapshotController } from './writer-snapshot.controller';
     WriterSnapshotController,
     ChapterWorkspaceController,
   ],
-  providers: [GenerationService, ChapterImageService, ChapterInsertService, ChapterAmendService, ChapterRowsService, DraftVersionService, PassageRewriteService],
+  providers: [GenerationService, ChapterImageService, ChapterInsertService, ChapterAmendService, ChapterRowsService, DraftVersionService],
   exports: [GenerationService, ChapterImageService, ChapterInsertService, ChapterAmendService],
 })
 export class GenerationModule {}
