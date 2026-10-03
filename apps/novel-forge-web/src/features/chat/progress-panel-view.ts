@@ -1,4 +1,5 @@
 import { type ChatMessageResponse, type ChatTurnTraceResponse, type ProposalResponse, type TurnHoldReason } from '@/lib/apis/api-types.gen';
+import { type ChatJobState, type OrganiseCardEntry, type OrganiseEntryLabel, type OrganiseReceipt } from '@/lib/apis/chat.api';
 import { type ChatTurnChangeGroup, type ChatTurnStreamState, type ProposalOpDirection, type ProposalOpOutcome } from '@/lib/apis/refinement.api';
 import { type TurnSource, turnSources } from '@/lib/chat-turn-timeline';
 import { type ChangeOp } from '@/lib/proposals';
@@ -16,30 +17,59 @@ import {
   type SuggestionDecision,
 } from './chat-view';
 
-/** The turn the panel follows: the one running, one this tab watched settle, or one from the transcript. */
-export type PanelTurn = { kind: 'none' } | { kind: 'stream'; stream: ChatTurnStreamState } | { kind: 'message'; message: ChatMessageResponse };
+/** What a finished job left for the author — an organise round's applied changes and card — or a card no reply carries. */
+export interface PanelProposals {
+  key: string;
+  appliedProposalId?: string;
+  proposalId?: string;
+  organised?: OrganiseReceipt;
+  /** The ordinal of the reply it came after; without one the panel shows it only when its receipt asks. */
+  after?: number;
+}
+
+/** The turn the panel follows: the one running, one this tab watched settle, one from the transcript, or a job's changes. */
+export type PanelTurn =
+  { kind: 'none' } | { kind: 'stream'; stream: ChatTurnStreamState } | { kind: 'message'; message: ChatMessageResponse } | { kind: 'proposals'; proposals: PanelProposals };
 
 export interface PanelTurnInput {
   stream: ChatTurnStreamState;
   /** The transcript is still drawing the stream rather than the saved reply: running, stopped, failed, or done but not yet refetched. */
   streamShown: boolean;
   messages: readonly ChatMessageResponse[];
-  /** A reply the author asked to review from its receipt; otherwise the panel follows the latest turn. */
+  /** A reply or a job's changes the author asked to review from its receipt; otherwise the panel follows the latest turn. */
   focus?: string;
+  proposals?: readonly PanelProposals[];
 }
 
 function hasChanges(message: ChatMessageResponse): boolean {
   return Boolean(message.appliedProposalId || message.proposalId);
 }
 
-export function panelTurnOf({ stream, streamShown, messages, focus }: PanelTurnInput): PanelTurn {
+/** A job's changes, once it has finished with any. A plan has its own card in the thread, and a canon refresh card is answered in Review. */
+export function jobProposals(job: ChatJobState, after: number | undefined): PanelProposals | undefined {
+  const { appliedProposalId, proposalId, organised } = job.progress;
+  if (job.status !== 'done' || job.kind === 'plan' || job.kind === 'canon_refresh' || !(appliedProposalId || proposalId)) return undefined;
+  return { key: job.id, appliedProposalId, proposalId, organised, after };
+}
+
+function latestFollowed(proposals: readonly PanelProposals[]): PanelProposals | undefined {
+  let latest: PanelProposals | undefined;
+  for (const entry of proposals) if (entry.after !== undefined && (latest?.after === undefined || entry.after >= latest.after)) latest = entry;
+  return latest;
+}
+
+export function panelTurnOf({ stream, streamShown, messages, focus, proposals = [] }: PanelTurnInput): PanelTurn {
   const watched = stream.status === 'done' ? stream.turn.assistantMessage.id : undefined;
   const focused = focus ? messages.find(message => message.id === focus && message.role === 'assistant') : undefined;
   if (focused) return focused.id === watched ? { kind: 'stream', stream } : { kind: 'message', message: focused };
+  const asked = focus ? proposals.find(entry => entry.key === focus) : undefined;
+  if (asked) return { kind: 'proposals', proposals: asked };
   if (streamShown) return { kind: 'stream', stream };
   const replies = messages.filter(message => message.role === 'assistant');
-  if (watched && replies.at(-1)?.id === watched) return { kind: 'stream', stream };
-  const latest = [...replies].reverse().find(hasChanges);
+  const last = replies.at(-1);
+  const latest = watched && last?.id === watched ? last : [...replies].reverse().find(hasChanges);
+  const job = latestFollowed(proposals);
+  if (job?.after !== undefined && (!latest || job.after >= latest.ordinal)) return { kind: 'proposals', proposals: job };
   if (!latest) return { kind: 'none' };
   return latest.id === watched ? { kind: 'stream', stream } : { kind: 'message', message: latest };
 }
@@ -59,10 +89,15 @@ export interface TurnRefs {
   /** The settled turn's own copies, shown until the proposal queries answer. */
   applied?: ProposalResponse;
   cards?: ProposalResponse;
+  organised?: OrganiseReceipt;
 }
 
 export function turnRefs(turn: PanelTurn): TurnRefs {
   if (turn.kind === 'none') return {};
+  if (turn.kind === 'proposals') {
+    const { appliedProposalId, proposalId, organised } = turn.proposals;
+    return { appliedProposalId, proposalId, organised };
+  }
   if (turn.kind === 'message') {
     const { message } = turn;
     return {
@@ -95,6 +130,11 @@ export type SourcesView = { kind: 'list'; sources: TurnSource[] } | { kind: 'emp
 
 export function sourcesView(turn: PanelTurn): SourcesView {
   if (turn.kind === 'none') return { kind: 'empty', note: 'Nothing yet.' };
+  if (turn.kind === 'proposals') {
+    const { organised } = turn.proposals;
+    if (!organised) return { kind: 'empty', note: 'Sources aren’t kept for this step.' };
+    return { kind: 'list', sources: [{ key: 'notes', tool: 'get_notes', label: `Your notes · ${plural(organised.paragraphs, 'paragraph', 'paragraphs')}`, status: 'ok' }] };
+  }
   const trace = settledTrace(turn);
   if (trace) return sourceList(turnSources(trace.sources), false);
   if (turn.kind === 'message') return { kind: 'empty', note: 'Sources weren’t kept for this turn.' };
@@ -155,7 +195,8 @@ export interface AppliedPanelChange {
   /** Long enough to clamp, with a way to read the rest. */
   valueLong: boolean;
   group: ChatTurnChangeGroup;
-  quote?: string;
+  /** Where its words came from — the author's message, or the notes paragraphs an organise round read. */
+  cite?: string;
   idea: boolean;
   state: 'applied' | 'reverted' | 'failed';
   error?: string;
@@ -173,7 +214,10 @@ export interface CardPanelChange {
   value?: string;
   valueLong: boolean;
   group: ChatTurnChangeGroup;
-  quote?: string;
+  cite?: string;
+  /** How an organise round labelled it: not in the notes, planner-only, or a rule. */
+  tag?: string;
+  note?: string;
   state: CardState;
   /** False for actions, prose, plan edits and plans, which are answered on their own card in the thread. */
   decidable: boolean;
@@ -194,10 +238,41 @@ function writtenValue(op: ChangeOp): Pick<AppliedPanelChange, 'value' | 'valueLo
   return { value, valueLong: value.length > LONG_VALUE || value.includes('\n') };
 }
 
+function citation(kind: string, op: ChangeOp, entry: OrganiseCardEntry | undefined): string | undefined {
+  const quote = text(op.quote);
+  if (kind !== 'organise') return quote && `from your message: “${quote}”`;
+  const cited = entry?.paragraphs.length ? `, ${entry.paragraphs.map(number => `¶${number}`).join(', ')}` : '';
+  if (quote) return `from your notes${cited}: “${quote}”`;
+  return cited ? `from your notes${cited}` : undefined;
+}
+
+function entriesByOp(entries: readonly OrganiseCardEntry[]): Map<number, OrganiseCardEntry> {
+  return new Map(entries.map(entry => [entry.opIndex, entry]));
+}
+
+const ENTRY_TAG: Partial<Record<OrganiseEntryLabel, string>> = { suggested: 'not in your notes', planner_only: 'planner-only', rule: 'rule' };
+
+const RETIRED_NOTE = 'Takes out an earlier organise entry';
+const RETIRES_NOTE = 'Already in your Notebook — declining it takes it out.';
+
+function entryNote(entry: OrganiseCardEntry | undefined): string | undefined {
+  if (entry?.label === 'retired') return RETIRED_NOTE;
+  return entry?.retires?.length ? RETIRES_NOTE : undefined;
+}
+
+/** The suggestions an organise round made up rather than found in the notes: Forge's ideas, as a turn's are. */
+export function organiseIdeas(organised: OrganiseReceipt | undefined): ReadonlySet<number> {
+  return new Set((organised?.card ?? []).filter(entry => entry.label === 'suggested').map(entry => entry.opIndex));
+}
+
 const APPLIED_STATES: ReadonlySet<string> = new Set(['applied', 'reverted', 'failed']);
 
-export function appliedChanges(proposal: Pick<ProposalResponse, 'id' | 'status' | 'revertible' | 'changeSet' | 'opResults'>): AppliedPanelChange[] {
+export function appliedChanges(
+  proposal: Pick<ProposalResponse, 'id' | 'kind' | 'status' | 'revertible' | 'changeSet' | 'opResults'>,
+  entries: readonly OrganiseCardEntry[] = [],
+): AppliedPanelChange[] {
   const results = new Map((proposal.opResults ?? []).map(result => [result.index, result]));
+  const cited = entriesByOp(entries);
   const whole = proposal.status === 'reverted';
   return proposal.changeSet.flatMap((op, index) => {
     const result = results.get(index);
@@ -212,7 +287,7 @@ export function appliedChanges(proposal: Pick<ProposalResponse, 'id' | 'status' 
         label: opSubject(op),
         ...writtenValue(op),
         group: opChangeGroup(op),
-        quote: text(op.quote),
+        cite: citation(proposal.kind, op, cited.get(index)),
         idea: result?.source === 'idea',
         state,
         error: result?.error,
@@ -228,8 +303,10 @@ export function cardChanges(
   proposal: Pick<ProposalResponse, 'id' | 'kind' | 'status' | 'changeSet' | 'opResults'>,
   decisions: ReadonlyMap<number, SuggestionDecision>,
   scopes: ReadonlyMap<number, RejectionScope> = new Map(),
+  entries: readonly OrganiseCardEntry[] = [],
 ): CardPanelChange[] {
   const added = new Set((proposal.opResults ?? []).filter(result => result.status === 'applied').map(result => result.index));
+  const labelled = entriesByOp(entries);
   const inPanel = answeredInPanel(proposal);
   const decidable = inPanel && proposal.status === 'pending' && proposalPresentation(proposal) === 'suggestions';
   const settled = (index: number): CardState => {
@@ -238,22 +315,28 @@ export function cardChanges(
     if (proposal.status === 'reverted') return added.has(index) ? 'undone' : 'declined';
     return proposal.status === 'discarded' ? 'declined' : 'replaced';
   };
-  return proposal.changeSet.map((op, index) => {
+  return proposal.changeSet.flatMap((op, index) => {
+    if (isActionOp(op)) return [];
     const state = settled(index);
     const scope = scopes.get(index);
     const asked = inPanel && !scope && REMEMBERED_STATES.has(state) && decisions.get(index) === 'decline';
-    return {
-      key: `${proposal.id}:${index}`,
-      index,
-      label: opSubject(op),
-      ...writtenValue(op),
-      group: opChangeGroup(op),
-      quote: text(op.quote),
-      state,
-      decidable,
-      askScope: asked ? rejectionScopesFor(op) : [],
-      scope,
-    };
+    const entry = labelled.get(index);
+    return [
+      {
+        key: `${proposal.id}:${index}`,
+        index,
+        label: opSubject(op),
+        ...writtenValue(op),
+        group: opChangeGroup(op),
+        cite: citation(proposal.kind, op, entry),
+        tag: entry && ENTRY_TAG[entry.label],
+        note: entryNote(entry),
+        state,
+        decidable,
+        askScope: asked ? rejectionScopesFor(op) : [],
+        scope,
+      },
+    ];
   });
 }
 
@@ -269,11 +352,12 @@ export interface ChangesInput {
   cards?: ProposalResponse;
   decisions: ReadonlyMap<number, SuggestionDecision>;
   scopes?: ReadonlyMap<number, RejectionScope>;
+  organised?: OrganiseReceipt;
 }
 
 const WAITING_NOTE: Record<SessionMode, string> = { auto: 'Changes appear here as they’re saved.', manual: 'Changes appear here for you to review.' };
 
-export function changesView({ turn, mode, applied, cards, decisions, scopes }: ChangesInput): ChangesView {
+export function changesView({ turn, mode, applied, cards, decisions, scopes, organised }: ChangesInput): ChangesView {
   if (turn.kind === 'none') return { kind: 'empty', note: 'Nothing yet.' };
   if (turn.kind === 'stream' && turn.stream.status !== 'done') {
     const { stream } = turn;
@@ -282,9 +366,10 @@ export function changesView({ turn, mode, applied, cards, decisions, scopes }: C
     const streamed = stream.changes.map(change => ({ key: String(change.index), label: change.label, group: change.group }));
     return { kind: 'streamed', count: `${stream.changes.length} so far`, groups: groupChanges(streamed) };
   }
-  const appliedRows = applied ? appliedChanges(applied) : [];
-  const cardRows = cards && cards.kind !== 'chapter_plan' ? cardChanges(cards, decisions, scopes) : [];
-  if (appliedRows.length === 0 && cardRows.length === 0) return { kind: 'empty', note: 'No Story Bible changes this turn.' };
+  const appliedRows = applied ? appliedChanges(applied, organised?.applied) : [];
+  const cardRows = cards && cards.kind !== 'chapter_plan' ? cardChanges(cards, decisions, scopes, organised?.card) : [];
+  if (appliedRows.length === 0 && cardRows.length === 0)
+    return { kind: 'empty', note: turn.kind === 'proposals' ? 'No Story Bible changes.' : 'No Story Bible changes this turn.' };
   const saved = appliedRows.filter(row => row.state === 'applied').length;
   const open = cardRows.filter(row => row.state === 'open').length;
   const count = [...(appliedRows.length > 0 ? [`${saved} saved`] : []), ...(open > 0 ? [`${open} to review`] : [])].join(' · ');
@@ -321,7 +406,11 @@ export function savedSides(applied: ProposalResponse | undefined, cards: Proposa
   return [...added, ...(applied ? [applied] : [])];
 }
 
-export function appliedReceipt(sides: readonly ProposalResponse[], waitingCards: number): ReceiptView {
+function ideasPhrase(count: number): string {
+  return count === 1 ? '1 is Forge’s idea' : `${count} are Forge’s ideas`;
+}
+
+export function appliedReceipt(sides: readonly ProposalResponse[], waitingCards: number, waitingIdeas = 0): ReceiptView {
   if (sides.length === 0) return { kind: 'none' };
   if (sides.every(side => side.status === 'reverted')) return { kind: 'reverted', title: 'Undone — your Story Bible is back as it was.' };
   const rows = sides.flatMap(side => appliedChanges(side));
@@ -334,10 +423,14 @@ export function appliedReceipt(sides: readonly ProposalResponse[], waitingCards:
   const standing = sides.filter(side => side.status === 'applied');
   const detail = [
     changeBreakdown(live),
-    ...(ideas > 0 ? [ideas === 1 ? '1 is Forge’s idea' : `${ideas} are Forge’s ideas`] : []),
+    ...(ideas > 0 ? [ideasPhrase(ideas)] : []),
     ...(undone > 0 ? [`${undone} undone`] : []),
     ...(passed > 0 ? [`passed on ${passed}`] : []),
-    ...(waitingCards > 0 ? [waitingCards === 1 ? '1 needs your OK' : `${waitingCards} need your OK`] : []),
+    ...(waitingCards > 0
+      ? [
+          `${waitingCards === 1 ? '1 needs your OK' : `${waitingCards} need your OK`}${waitingIdeas > 0 ? `, ${waitingIdeas} of them Forge’s ${waitingIdeas === 1 ? 'idea' : 'ideas'}` : ''}`,
+        ]
+      : []),
   ].join(' · ');
   return {
     kind: 'applied',
@@ -365,24 +458,37 @@ function answeredDetail({ committing, error }: CardsReceiptInput): string {
   return error ? `Couldn’t finish: ${error}` : 'Nothing is saved until you add it';
 }
 
-export function cardsReceipt(cards: ProposalResponse, answers: CardsReceiptInput): ReceiptView {
+/** The indexes of a card's Story Bible changes: an action it runs is not one, and its job reports itself. */
+function storyIndexes(cards: Pick<ProposalResponse, 'changeSet'>): number[] {
+  return cards.changeSet.flatMap((op, index) => (isActionOp(op) ? [] : [index]));
+}
+
+function undecided(indexes: Iterable<number>, decisions: ReadonlyMap<number, SuggestionDecision>): number {
+  return [...indexes].filter(index => !decisions.has(index)).length;
+}
+
+export function cardsReceipt(cards: ProposalResponse, answers: CardsReceiptInput, ideas: ReadonlySet<number> = new Set()): ReceiptView {
   const presentation = proposalPresentation(cards);
   if (presentation === 'plan' || (cards.status === 'pending' && !answeredInPanel(cards))) return { kind: 'none' };
-  const total = cards.changeSet.length;
+  const story = storyIndexes(cards);
+  const total = story.length;
+  if (total === 0) return { kind: 'none' };
   if (cards.status === 'pending') {
-    const waiting = total - answers.decisions.size;
+    const waiting = undecided(story, answers.decisions);
+    const waitingIdeas = undecided(ideas, answers.decisions);
     if (waiting > 0)
       return {
         kind: 'cards',
         tone: 'waiting',
         count: waiting,
         title: `${plural(waiting, 'change', 'changes')} waiting for you`,
-        detail: 'Nothing is saved until you add it',
+        detail: [...(waitingIdeas > 0 ? [ideasPhrase(waitingIdeas)] : []), 'Nothing is saved until you add it'].join(' · '),
         canAddAll: !answers.committing,
       };
     return { kind: 'cards', tone: 'waiting', count: 0, title: 'All changes answered', detail: answeredDetail(answers), canAddAll: false, ...owedCommit(cards, answers) };
   }
-  const added = (cards.opResults ?? []).filter(result => result.status === 'applied').length;
+  const kept = new Set(story);
+  const added = (cards.opResults ?? []).filter(result => result.status === 'applied' && kept.has(result.index)).length;
   if (cards.status === 'applied' || cards.status === 'reverted') {
     const passed = total - added;
     return {
@@ -416,14 +522,24 @@ export interface TurnReceiptInput {
   cards?: ProposalResponse;
   answers: CardsReceiptInput;
   held?: TurnHoldReason;
+  /** The card's ops that are Forge's ideas rather than the author's words, where only the receipt knows it (an organise round's). */
+  ideas?: ReadonlySet<number>;
+  /** Why something resting on the author's words was carded instead of applied. */
+  note?: string;
 }
 
-export function turnReceipt({ applied, cards, answers, held }: TurnReceiptInput): ReceiptView {
+export function turnReceipt(input: TurnReceiptInput): ReceiptView {
+  const view = receiptOf(input);
+  if (!input.note || (view.kind !== 'applied' && view.kind !== 'cards')) return view;
+  return { ...view, hold: [view.hold, input.note].filter(Boolean).join(' ') };
+}
+
+function receiptOf({ applied, cards, answers, held, ideas = new Set() }: TurnReceiptInput): ReceiptView {
   const pending = cards?.status === 'pending' && cards.kind !== 'chapter_plan' ? cards : undefined;
-  const waiting = pending ? pending.changeSet.length - answers.decisions.size : 0;
+  const waiting = pending ? undecided(storyIndexes(pending), answers.decisions) : 0;
   const panelCards = pending && answeredInPanel(pending) ? pending : undefined;
   const hold = panelCards && waiting > 0 ? holdLine(panelCards, held) : undefined;
-  const saved = appliedReceipt(savedSides(applied, cards), waiting);
+  const saved = appliedReceipt(savedSides(applied, cards), waiting, panelCards ? undecided(ideas, answers.decisions) : 0);
   if (saved.kind === 'applied') {
     if (!panelCards) return saved;
     if (waiting > 0) return { ...saved, canAddAll: !answers.committing, ...(hold && { hold }) };
@@ -431,7 +547,7 @@ export function turnReceipt({ applied, cards, answers, held }: TurnReceiptInput)
     return { ...saved, detail: [saved.detail, ...owed].join(' · '), ...owedCommit(panelCards, answers) };
   }
   if (saved.kind === 'reverted' && !panelCards) return saved;
-  const carded = cards ? cardsReceipt(cards, answers) : ({ kind: 'none' } as const);
+  const carded = cards ? cardsReceipt(cards, answers, ideas) : ({ kind: 'none' } as const);
   if (carded.kind === 'cards') return { ...carded, ...(hold && { hold }) };
   return saved.kind === 'none' ? carded : saved;
 }

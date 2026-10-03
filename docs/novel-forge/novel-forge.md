@@ -110,14 +110,16 @@
 - **The mode is the author's choice in the composer**, and its label always names what the next turn will do: Edit freely (session `auto`, the default), Ask first (session
   `manual`) or Just discuss (this turn only; every op is a card, and the session's mode is untouched). Edit prose is a separate per-turn permission, never implied by a mode, and
   prose always arrives as a card. The chat model is told the session's mode, but it never decides what applies.
-- **The changes panel** lists a turn's Story Bible changes (each applied value beside its quote, ideas flagged, each undone and redone on its own) and the sources it read;
-  the turn's progress lives only on its last line in the thread. It opens by itself only when a turn leaves changes waiting for the author's OK, and otherwise only from the
+- **The changes panel** lists a turn's or a job's Story Bible changes (each applied value beside its quote, ideas flagged, each undone and redone on its own) and the
+  sources it read; an action the turn runs is never counted or listed as a Story Bible change — its job reports itself; the turn's progress lives only on its last line in
+  the thread. It opens by itself only when a turn or a job leaves changes waiting for the author's OK, and otherwise only from the
   turn's receipt; closed, it stays closed on those changes. It docks beside the chat where the thread keeps its full column and otherwise opens as a sheet from the receipt,
   never by itself; the chat header is unchanged. Wherever the
   expanded app sidebar would leave it too little room, the sidebar folds to its icon rail on every screen, and the author's own toggle holds only until the window crosses
-  that width again. Its undo refuses rather than cascades, as the write policy below requires. A turn's suggestions are answered there too, never as cards in the thread:
-  the turn's one receipt carries Undo all for what it saved, Add all for what waits and why a hold kept it. An action, prose or a plan edit keeps its own card in the thread
-  and is never added in bulk.
+  that width again. Its undo refuses rather than cascades, as the write policy below requires. Every chat-produced proposal — a turn's, an organise round's, or a card no
+  reply carries — is reviewed there from its one receipt, never as inline cards in the thread: the receipt carries Undo all for what was saved, Add all for what waits and
+  why a hold kept it. An action, prose or a plan edit keeps its own card in the thread and is never added in bulk; a plan keeps its plan card, and a canon refresh card is
+  answered in Review.
 - **One message may be queued while a turn runs**, and it is sent only after this tab's own turn settles cleanly. A failed or stopped reply, a turn started in another tab or a
   locked chat holds it for the author, who can edit it or send it now. A message released on its own keeps the settings it was queued with.
 - A chat turn MUST NEVER propose a whole-record overwrite for a record it did not fetch in the same turn; every turn is a fresh run, and state lives in chat tables.
@@ -208,7 +210,9 @@
 - Undoing an organise proposal puts the ledger back as that apply found it, leaving no "kept, then undone" trail in the Notebook; a row the author has since withdrawn or reworded
   stays theirs. Undo is refused (`NTS_010`) while a later organise change builds on a row it wrote. A card without its record is refused (`NTS_009`). Starting organise is refused
   (`NTS_004`) while an organise card is pending or a card staged before records existed stays applied; a round that stages while another card still waits supersedes it.
-- Every entry cites the notes paragraphs it draws on; the receipt lists the paragraphs nothing draws on as "not used yet", with the notes digest they refer to. Notes longer than
+- A finished organise job ends in the thread as one receipt, the same as a turn's, and its applied changes and card are reviewed in the changes panel, which opens by
+  itself while the card waits. Each row there cites the notes paragraphs it draws on and is flagged when it is not in the notes, planner-only or a rule; Add all keeps
+  only the whole of a page offered in two halves. The panel lists the paragraphs nothing draws on as "not used yet", with the notes digest they refer to. Notes longer than
   one pass's word limit are organised in several passes, each told what the passes before it wrote. On an unrestricted project, what the model inferred or suggested is held to
   the hard line before it reaches a card.
 

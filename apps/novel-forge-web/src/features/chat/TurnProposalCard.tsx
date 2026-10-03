@@ -7,9 +7,9 @@ import { type ChipIntent, RegenerateAppliedBriefs, StatusChip } from '@/componen
 import { ChangeOpBody, PluginSourceChip } from '@/features/proposals';
 import { type ApplyProposalResponse, type ProposalResponse, useApplyProposalMutation, useDiscardProposalMutation, useRevertProposalMutation } from '@/lib/apis';
 import { appliedBriefChapters } from '@/lib/chapter-brief';
-import { defaultDeclined, isGuardedOp, NEVER_AUTO_NOTE, opLabel } from '@/lib/proposals';
+import { defaultDeclined, isGuardedOp, NEVER_AUTO_NOTE } from '@/lib/proposals';
 
-import { finalizeReviewBlocked, finalizeReviewChapter } from './chat-view';
+import { finalizeReviewBlocked, finalizeReviewChapter, opSubject } from './chat-view';
 import styles from './Chat.module.css';
 
 const OP_RESULT_INTENT: Record<string, ChipIntent> = {
@@ -30,7 +30,7 @@ interface FinalizeRefusal {
   chapter?: number;
 }
 
-/** The explicit per-op card: kept for one-way doors, conflicts and anything the transcript has no friendlier view of. */
+/** The explicit per-op card for what is answered in the thread rather than the panel: actions, one-way doors, prose and plan edits. */
 export function TurnProposalCard({ novelId, proposal, onApplied }: TurnProposalCardProps): React.JSX.Element {
   const apply = useApplyProposalMutation(novelId);
   const discard = useDiscardProposalMutation(novelId);
@@ -104,9 +104,9 @@ export function TurnProposalCard({ novelId, proposal, onApplied }: TurnProposalC
           return (
             <div key={i} className={styles.turnOp} data-declined={declined.has(i)}>
               <div className={styles.turnOpRow}>
-                {isPending && <Checkbox checked={!declined.has(i)} onCheckedChange={() => toggle(declined, i, setDeclined)} aria-label={`include ${opLabel(op)}`} />}
+                {isPending && <Checkbox checked={!declined.has(i)} onCheckedChange={() => toggle(declined, i, setDeclined)} aria-label={`include ${opSubject(op)}`} />}
                 <button type="button" className={styles.turnOpLabel} aria-expanded={expanded.has(i)} onClick={() => toggle(expanded, i, setExpanded)}>
-                  {opLabel(op)}
+                  {opSubject(op)}
                 </button>
                 {isAction && <StatusChip intent="info">action</StatusChip>}
                 {result && (

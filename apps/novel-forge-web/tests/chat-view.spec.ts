@@ -3,7 +3,6 @@ import { textDigest } from '@shadow-library/sdk';
 
 import {
   answeredInPanel,
-  appliedRows,
   applyNoteToast,
   awaitingAnswer,
   checklistView,
@@ -12,7 +11,6 @@ import {
   composerChips,
   composerModeChange,
   composerModeOf,
-  entryNotes,
   finalizeReviewBlocked,
   finalizeReviewChapter,
   heroText,
@@ -23,31 +21,20 @@ import {
   lastUserOrdinal,
   mergeUndoImpacts,
   notesOpenerId,
+  notUsedView,
   offersNotes,
-  opCardTitle,
   openerChip,
-  opEyebrow,
   opSubject,
-  opTopicLabel,
   opTouchesRecord,
   opWrittenText,
-  opWrittenValue,
-  organiseReceiptView,
-  pendingDecisionLabel,
-  picksOf,
-  picksSentence,
   promptChips,
   proposalPresentation,
   questionEyebrow,
   questionOf,
-  rationaleOf,
   rejectionScopeNote,
   rejectionScopesFor,
   rejectionWhy,
-  RETIRES_NOTE,
-  rowSource,
   shouldRefocusComposer,
-  SUGGESTED_EYEBROW,
   suggestionCommit,
   turnAnnouncement,
   turnCardsInline,
@@ -59,22 +46,6 @@ import { type ChatMessageResponse, type ChatTurnResponse, type ProposalResponse 
 import { type ChatJobState, type OrganiseReceipt } from '../src/lib/apis/chat.api';
 
 const COUNCIL = { op: 'entity.upsert', entityKey: 'council', type: 'faction', name: 'The Tidewarden’s council', body: 'The families who grew rich trading memories.' };
-
-describe('opWrittenValue', () => {
-  it('should show the written value beside the name, since a quote alone cannot prove the value is faithful', () => {
-    expect(opWrittenValue(COUNCIL)).toBe('The Tidewarden’s council: The families who grew rich trading memories.');
-  });
-
-  it('should show a volume goal under its title', () => {
-    expect(opWrittenValue({ op: 'volume.upsert', volumeKey: 'v1', title: 'The Ledger', objective: 'Tamsin learns why she never paid' })).toBe(
-      'The Ledger: Tamsin learns why she never paid',
-    );
-  });
-
-  it('should fall back to the subject when the op writes no text', () => {
-    expect(opWrittenValue({ op: 'milestone.upsert', milestoneKey: 'rank-3' })).toBe('rank-3');
-  });
-});
 
 describe('bible document ops', () => {
   const doc = { op: 'bible_document.upsert', section: 'project', slug: 'default', frontmatter: { title: 'Project' }, body: '# Heading\n\n**bold**' };
@@ -91,55 +62,6 @@ describe('bible document ops', () => {
   it('should return the written value alone without the subject prefix', () => {
     expect(opWrittenText(doc)).toBe('# Heading\n\n**bold**');
     expect(opWrittenText({ op: 'milestone.upsert', milestoneKey: 'rank-3' })).toBe('rank-3');
-  });
-
-  it('should join topic and subject in the card title unless they are the same', () => {
-    expect(opCardTitle({ op: 'premise.update', premise: 'x' })).toBe('The story: Premise');
-    expect(opCardTitle({ op: 'premise.update', opposition: 'The campus itself' })).toBe('The story: Opposition');
-    expect(opCardTitle({ op: 'premise.update', premise: 'x', theme: 'y', readerPromise: 'z' })).toBe('The story: Premise, Theme, Reader promise');
-    expect(opCardTitle({ op: 'bible_document.upsert', section: 'project', slug: 'story-core', frontmatter: { title: 'Story core' } })).toBe('Story core');
-  });
-});
-
-describe('opEyebrow', () => {
-  const op = (rationale?: string) => ({ op: 'premise.update', premise: 'x', rationale });
-
-  it('should cite the note paragraphs in the rationale compactly', () => {
-    expect(opEyebrow(op('Organises the setting from notes ¶1, ¶4 and ¶13.'))).toBe('From your notes · ¶1, ¶4, ¶13');
-  });
-
-  it('should keep a paragraph range as written', () => {
-    expect(opEyebrow(op('Draws on ¶4–¶10 of your notes.'))).toBe('From your notes · ¶4–¶10');
-  });
-
-  it('should stay suggested when the rationale cites no paragraph', () => {
-    expect(opEyebrow(op('A fitting ¶ mark, nothing more.'))).toBe(SUGGESTED_EYEBROW);
-    expect(opEyebrow(op())).toBe(SUGGESTED_EYEBROW);
-  });
-});
-
-describe('opTopicLabel', () => {
-  it('should file ops under the Story Bible topic they land in', () => {
-    expect(opTopicLabel({ op: 'premise.update', premise: 'x' })).toBe('The story');
-    expect(opTopicLabel({ op: 'entity.upsert', type: 'character' })).toBe('People');
-    expect(opTopicLabel({ op: 'entity.upsert', type: 'location' })).toBe('Places');
-    expect(opTopicLabel({ op: 'fact.upsert', factKey: 'k', unlock: { milestones: ['m'] } })).toBe('Secrets');
-    expect(opTopicLabel({ op: 'fact.upsert', factKey: 'k' })).toBe('Facts');
-    expect(opTopicLabel({ op: 'organise.rule', rule: 'No magic at sea', optionId: 'r1' })).toBe('Notebook');
-  });
-});
-
-describe('appliedRows + rowSource', () => {
-  it('should keep each op’s quote and name where it came from', () => {
-    const [row] = appliedRows([{ ...COUNCIL, quote: 'the families who grew rich' }]);
-    expect(row).toMatchObject({ topic: 'Factions & peoples', quote: 'the families who grew rich' });
-    expect(rowSource(row!, 'message')).toBe('from your message: “the families who grew rich”');
-  });
-
-  it('should cite note paragraphs for an organise row', () => {
-    const [row] = appliedRows([COUNCIL], new Map([[0, [4, 6]]]));
-    expect(rowSource(row!, 'notes')).toBe('from your notes, ¶4, ¶6');
-    expect(rowSource(row!, 'message')).toBeUndefined();
   });
 });
 
@@ -520,7 +442,7 @@ describe('offersNotes', () => {
   });
 });
 
-describe('organiseReceiptView', () => {
+describe('notUsedView', () => {
   const notes = 'The sea refuses a payment.\n\nmaybe the lamp remembers every keeper?\n\nboat names: Gull’s Due';
   const receipt: OrganiseReceipt = {
     notesDigest: textDigest(notes),
@@ -537,8 +459,7 @@ describe('organiseReceiptView', () => {
   };
 
   it('should list the unused paragraphs with their text while the notes are unchanged', () => {
-    const view = organiseReceiptView(receipt, notes);
-    expect(view.summary).toBe('4 entries from your notes · 1 suggestion — read from 3 paragraphs');
+    const view = notUsedView(receipt, notes);
     expect(view.unused).toEqual([
       { number: 2, text: 'maybe the lamp remembers every keeper?' },
       { number: 3, text: 'boat names: Gull’s Due' },
@@ -547,17 +468,9 @@ describe('organiseReceiptView', () => {
   });
 
   it('should keep only the numbers once the notes have changed', () => {
-    const view = organiseReceiptView(receipt, `${notes}\n\nA new paragraph`);
+    const view = notUsedView(receipt, `${notes}\n\nA new paragraph`);
     expect(view.renumbered).toBe(true);
     expect(view.unused).toEqual([{ number: 2 }, { number: 3 }]);
-  });
-
-  it('should label each card op by where it came from', () => {
-    expect([...entryNotes(receipt.card).values()]).toEqual([
-      { eyebrow: 'A rule from your notes', retires: false },
-      { eyebrow: 'Suggested — not in your notes', retires: false },
-    ]);
-    expect(entryNotes([{ opIndex: 0, label: 'suggested', paragraphs: [], retires: ['e1'] }]).get(0)?.retires).toBe(true);
   });
 
   it('should turn an unused paragraph into the author’s own words for the chat', () => {
@@ -566,33 +479,8 @@ describe('organiseReceiptView', () => {
 });
 
 describe('answering a card', () => {
-  it('should say what will happen before the card commits', () => {
-    expect(pendingDecisionLabel('The council', 'People', 2, false)).toBe('Will add “The council” to People — 2 left to answer.');
-    expect(pendingDecisionLabel('The council', 'People', 0, true)).toBe('Will add “The council” to People — adding now.');
-    expect(pendingDecisionLabel('The council', 'People', 0, false)).toBe('Will add “The council” to People.');
+  it('should warn while a card waits on the rest of its answers', () => {
     expect(unansweredWarning(1)).toBe('1 suggestion still needs an answer — nothing on that card is added until you answer the rest or add the picked ones now.');
-  });
-
-  it('should list what had been picked on a replaced card', () => {
-    const picks = picksOf(
-      [COUNCIL, { op: 'entity.upsert', entityKey: 'maren', type: 'character', name: 'Maren' }],
-      new Map([
-        [1, 'decline'],
-        [0, 'add'],
-      ]),
-    );
-    expect(picksSentence(picks)).toBe('You had picked: add “The Tidewarden’s council”, not “Maren”.');
-    expect(picksSentence([])).toBe('You had not answered any of it yet.');
-  });
-
-  it('should say the retire note once, from the receipt rather than the rationale', () => {
-    expect(rationaleOf({ op: 'organise.rule', rationale: `A rule from your notes (¶2). ${RETIRES_NOTE}` })).toBe('A rule from your notes (¶2).');
-  });
-});
-
-describe('appliedRows', () => {
-  it('should leave actions out: a started job reports itself', () => {
-    expect(appliedRows([COUNCIL, { op: 'action.plan_chapter', chapter: 4 }]).map(row => row.index)).toEqual([0]);
   });
 });
 

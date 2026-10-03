@@ -2,7 +2,8 @@ import { describe, expect, it } from 'bun:test';
 import { createElement, type ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
-import { AppliedChangeRow, CardChangeRow, ChangesSection, SourcesSection } from '../src/features/chat/ProgressPanel';
+import { notUsedView } from '../src/features/chat/chat-view';
+import { AppliedChangeRow, CardChangeRow, ChangesSection, NotUsedSection, SourcesSection } from '../src/features/chat/ProgressPanel';
 import {
   appliedChanges,
   appliedReceipt,
@@ -11,10 +12,13 @@ import {
   changeBreakdown,
   changesView,
   dockState,
+  jobProposals,
   opChangeGroup,
   opDependencyPrompt,
   opErrorText,
   opSequenceStopped,
+  organiseIdeas,
+  type PanelProposals,
   type PanelTurn,
   panelTurnOf,
   runOpSequence,
@@ -25,6 +29,7 @@ import {
 } from '../src/features/chat/progress-panel-view';
 import { TurnReceiptView } from '../src/features/chat/TurnReceipt';
 import { type ChatMessageResponse, type ChatTurnResponse, type ChatTurnTraceResponse, type ProposalResponse } from '../src/lib/apis/api-types.gen';
+import { type ChatJobState, type OrganiseReceipt } from '../src/lib/apis/chat.api';
 import {
   type ChatTurnStreamEvent,
   type ChatTurnStreamState,
@@ -228,8 +233,8 @@ describe('changes', () => {
   });
 
   it('should list what a turn applied with its source and state, leaving out actions', () => {
-    expect(appliedChanges(APPLIED).map(row => [row.index, row.label, row.idea, row.state, row.actionable, row.quote])).toEqual([
-      [0, 'Premise', false, 'applied', true, 'she keeps the lamps'],
+    expect(appliedChanges(APPLIED).map(row => [row.index, row.label, row.idea, row.state, row.actionable, row.cite])).toEqual([
+      [0, 'Premise', false, 'applied', true, 'from your message: “she keeps the lamps”'],
       [1, 'The lamps', true, 'applied', true, undefined],
       [2, 'Tamsin', true, 'reverted', true, undefined],
       [3, 'The harbour', false, 'applied', true, undefined],
@@ -263,7 +268,10 @@ describe('changes', () => {
       ['declined', false],
     ]);
     expect(cardChanges({ ...CARDS, status: 'superseded' }, new Map())[0]?.state).toBe('replaced');
-    expect(cardChanges({ ...CARDS, changeSet: [{ op: 'action.finalize' }] }, new Map())[0]?.decidable).toBe(false);
+    expect(cardChanges({ ...CARDS, changeSet: [...CARDS.changeSet, { op: 'action.finalize' }] }, new Map()).map(row => [row.index, row.decidable])).toEqual([
+      [0, false],
+      [1, false],
+    ]);
   });
 
   it('should carry what a suggestion would write and the words it quotes', () => {
@@ -271,7 +279,7 @@ describe('changes', () => {
       ...CARDS,
       changeSet: [{ op: 'entity.upsert', entityKey: 'council', name: 'The Council', body: 'Families who trade memories.', quote: 'the council trades' }],
     });
-    expect(cardChanges(quoted, new Map())[0]).toMatchObject({ value: 'Families who trade memories.', valueLong: false, quote: 'the council trades' });
+    expect(cardChanges(quoted, new Map())[0]).toMatchObject({ value: 'Families who trade memories.', valueLong: false, cite: 'from your message: “the council trades”' });
     expect(cardChanges(CARDS, new Map())[0]?.value).toBeUndefined();
   });
 
@@ -284,7 +292,7 @@ describe('changes', () => {
     expect(cardChanges(committed, declined, new Map([[0, 'not_now']]))[0]).toMatchObject({ askScope: [], scope: 'not_now' });
     expect(cardChanges(committed, new Map())[0]?.askScope).toEqual([]);
     expect(cardChanges({ ...CARDS, status: 'superseded' }, declined)[0]?.askScope).toEqual([]);
-    expect(cardChanges({ ...CARDS, changeSet: [{ op: 'action.plan_chapter' }] }, declined)[0]?.askScope).toEqual([]);
+    expect(cardChanges({ ...CARDS, changeSet: [{ op: 'action.plan_chapter' }] }, declined)).toEqual([]);
   });
 
   it('should mark the suggestions of an undone card as undone', () => {
@@ -399,7 +407,7 @@ describe('turnReceipt', () => {
     expect(turnReceipt({ applied: APPLIED, cards: ONE_WAY, answers: answers(), held: 'warnings' })).toEqual({
       kind: 'applied',
       title: 'Updated your Story Bible · 3 changes',
-      detail: 'The story, 1 page, 1 record · 1 is Forge’s idea · 1 undone · 3 need your OK',
+      detail: 'The story, 1 page, 1 record · 1 is Forge’s idea · 1 undone · 2 need your OK',
       canUndoAll: true,
       canAddAll: false,
     });
@@ -622,7 +630,7 @@ describe('ProgressPanel sections', () => {
     expect(out).toContain('aria-label="Answer “The Council”"');
     expect(out).toContain('aria-label="Add"');
     expect(out).toContain('aria-pressed="true"');
-    const oneWay = cardChanges({ ...CARDS, changeSet: [{ op: 'action.finalize', upTo: 3 }] }, new Map())[0];
+    const oneWay = cardChanges({ ...CARDS, changeSet: [...CARDS.changeSet, { op: 'action.finalize', upTo: 3 }] }, new Map())[0];
     expect(html(createElement(CardChangeRow, { change: oneWay!, busy: false, onDecide: noop, onScope: noop }))).toContain('Answer it on its card in the chat');
   });
 
@@ -693,5 +701,162 @@ describe('TurnReceiptView for a mixed or held turn', () => {
     const out = html(createElement(TurnReceiptView, { view, onReview: noop, onAddAll: noop, onCommit: noop }));
     expect(out).toContain('Add 2 now');
     expect(out).not.toContain('Add all');
+  });
+});
+
+const ORGANISED: OrganiseReceipt = {
+  notesDigest: 'd',
+  paragraphs: 12,
+  unusedParagraphs: [7],
+  fromNotes: 1,
+  suggested: 1,
+  rules: 1,
+  applied: [{ opIndex: 0, label: 'from_notes', paragraphs: [2, 3] }],
+  card: [
+    { opIndex: 0, label: 'suggested', paragraphs: [4] },
+    { opIndex: 1, label: 'planner_only', paragraphs: [5] },
+    { opIndex: 2, label: 'rule', paragraphs: [6], retires: ['e1'] },
+  ],
+};
+
+const ORGANISE_APPLIED = proposal({
+  id: 'oa',
+  kind: 'organise',
+  changeSet: [{ op: 'entity.upsert', type: 'location', entityKey: 'harbour', name: 'The harbour', quote: 'the harbour never sleeps' }],
+  opResults: [{ index: 0, status: 'applied', source: 'quoted' }],
+});
+
+const ORGANISE_CARD = proposal({
+  id: 'oc',
+  kind: 'organise',
+  status: 'pending',
+  autoApplied: false,
+  revertible: false,
+  changeSet: [
+    { op: 'entity.upsert', type: 'faction', entityKey: 'council', name: 'The Council' },
+    { op: 'bible_document.upsert', section: 'project', slug: 'timeline', frontmatter: { title: 'Timeline' }, body: '## Later\n- The flood' },
+    { op: 'organise.rule', rule: 'No magic at sea' },
+  ],
+});
+
+function job(overrides: Partial<ChatJobState> = {}): ChatJobState {
+  return {
+    id: 'j1',
+    kind: 'organise',
+    status: 'done',
+    progress: { appliedProposalId: 'oa', proposalId: 'oc', organised: ORGANISED },
+    retrying: false,
+    messageId: 'a1',
+    seq: 4,
+    firstSeq: 1,
+    ...overrides,
+  };
+}
+
+describe('a job’s changes in the panel', () => {
+  const messages = [message('u1', 1, 'user'), message('a1', 2, 'assistant', { proposalId: 'organise-action' }), message('u2', 3, 'user'), message('a2', 4, 'assistant')];
+  const idle = startChatTurnStream(0);
+  const changes = (after?: number): PanelProposals => ({ key: 'j1', appliedProposalId: 'oa', proposalId: 'oc', organised: ORGANISED, after });
+
+  it('should map a finished organise job to its applied changes and card, and leave plans, canon refreshes and unfinished jobs out', () => {
+    expect(jobProposals(job(), 2)).toEqual(changes(2));
+    expect(jobProposals(job({ status: 'in_progress' }), 2)).toBeUndefined();
+    expect(jobProposals(job({ kind: 'plan', progress: { proposalId: 'plan' } }), 2)).toBeUndefined();
+    expect(jobProposals(job({ kind: 'canon_refresh', progress: { proposalId: 'audit' } }), 2)).toBeUndefined();
+    expect(jobProposals(job({ kind: 'generate', progress: {} }), 2)).toBeUndefined();
+  });
+
+  it('should follow a job that finished after the latest turn with changes, and the turn when it came later', () => {
+    expect(panelTurnOf({ stream: idle, streamShown: false, messages: messages.slice(0, 2), proposals: [changes(2)] })).toEqual({ kind: 'proposals', proposals: changes(2) });
+    expect(panelTurnOf({ stream: idle, streamShown: false, messages, proposals: [changes(2)] })).toEqual({ kind: 'proposals', proposals: changes(2) });
+    const later = [...messages, message('a3', 6, 'assistant', { appliedProposalId: 'ap' })];
+    expect(panelTurnOf({ stream: idle, streamShown: false, messages: later, proposals: [changes(2)] })).toMatchObject({ kind: 'message', message: { id: 'a3' } });
+    expect(panelTurnOf({ stream: idle, streamShown: false, messages, proposals: [changes()] })).toMatchObject({ kind: 'message', message: { id: 'a1' } });
+  });
+
+  it('should show a job’s changes its receipt asked for, but never over a running turn it was not asked for', () => {
+    expect(panelTurnOf({ stream: idle, streamShown: false, messages, focus: 'j1', proposals: [changes()] })).toEqual({ kind: 'proposals', proposals: changes() });
+    const live = play([[delta, 100]]);
+    expect(panelTurnOf({ stream: live, streamShown: true, messages, proposals: [changes(4)] })).toEqual({ kind: 'stream', stream: live });
+  });
+
+  it('should read the job’s proposals and say the notes were its source', () => {
+    const turn: PanelTurn = { kind: 'proposals', proposals: changes(2) };
+    expect(turnRefs(turn)).toEqual({ appliedProposalId: 'oa', proposalId: 'oc', organised: ORGANISED });
+    expect(sourcesView(turn)).toEqual({ kind: 'list', sources: [{ key: 'notes', tool: 'get_notes', label: 'Your notes · 12 paragraphs', status: 'ok' }] });
+    expect(sourcesView({ kind: 'proposals', proposals: { key: 'p' } })).toEqual({ kind: 'empty', note: 'Sources aren’t kept for this step.' });
+  });
+
+  it('should cite the notes paragraphs and flag what is not in the notes, planner-only or a rule', () => {
+    const view = changesView({
+      turn: { kind: 'proposals', proposals: changes(2) },
+      mode: 'auto',
+      applied: ORGANISE_APPLIED,
+      cards: ORGANISE_CARD,
+      decisions: new Map(),
+      organised: ORGANISED,
+    });
+    expect(view).toMatchObject({ kind: 'settled', count: '1 saved · 3 to review', cardsTitle: 'Needs your OK' });
+    const applied = view.kind === 'settled' ? view.applied.flatMap(group => group.items) : [];
+    expect(applied.map(row => row.cite)).toEqual(['from your notes, ¶2, ¶3: “the harbour never sleeps”']);
+    const cards = view.kind === 'settled' ? view.cards.flatMap(group => group.items).sort((a, b) => a.index - b.index) : [];
+    expect(cards.map(row => [row.label, row.cite, row.tag, row.note, row.decidable])).toEqual([
+      ['The Council', 'from your notes, ¶4', 'not in your notes', undefined, true],
+      ['Timeline', 'from your notes, ¶5', 'planner-only', undefined, true],
+      ['Rule', 'from your notes, ¶6', 'rule', 'Already in your Notebook — declining it takes it out.', true],
+    ]);
+    const out = html(createElement(CardChangeRow, { change: cards[0]!, busy: false, onDecide: noop, onScope: noop }));
+    expect(out).toContain('not in your notes');
+    expect(out).toContain('from your notes, ¶4');
+  });
+
+  it('should sum the job up in one receipt line, counting Forge’s ideas and saying why part of it waits', () => {
+    const answers = { decisions: new Map(), committing: false };
+    const ideas = organiseIdeas(ORGANISED);
+    expect([...ideas]).toEqual([0]);
+    expect(turnReceipt({ applied: ORGANISE_APPLIED, cards: ORGANISE_CARD, answers, ideas, note: 'One entry quotes a question.' })).toEqual({
+      kind: 'applied',
+      title: 'Updated your Story Bible · 1 change',
+      detail: '1 record · 3 need your OK, 1 of them Forge’s idea',
+      canUndoAll: true,
+      canAddAll: true,
+      hold: 'One entry quotes a question.',
+    });
+    expect(turnReceipt({ cards: ORGANISE_CARD, answers, ideas })).toMatchObject({
+      kind: 'cards',
+      title: '3 changes waiting for you',
+      detail: '1 is Forge’s idea · Nothing is saved until you add it',
+    });
+  });
+
+  it('should list the notes paragraphs nothing drew on, each with a way to add or leave it', () => {
+    const view = notUsedView({ ...ORGANISED, unusedParagraphs: [2, 3], notesDigest: 'stale' }, 'One.\n\nTwo.\n\nThree.');
+    const out = html(createElement(NotUsedSection, { view, left: new Set<number>(), busy: false, onAdd: noop, onLeave: noop }));
+    expect(out).toContain('Not used yet');
+    expect(out).toContain('these numbers may point elsewhere now');
+    expect(out).toContain('Open your notes to read it.');
+    expect(out.match(/Add to Story Bible/g)).toHaveLength(2);
+    const left = html(createElement(NotUsedSection, { view, left: new Set([2, 3]), busy: false, onAdd: noop, onLeave: noop }));
+    expect(left).toContain('Everything here is left in your notes for now.');
+  });
+});
+
+describe('an action in a turn’s card', () => {
+  const ORGANISE_ACTION = proposal({
+    id: 'act',
+    status: 'applied',
+    autoApplied: false,
+    changeSet: [{ op: 'action.organise_notes' }],
+    opResults: [{ index: 0, status: 'applied' }],
+  });
+
+  it('should never count or list the action itself as a Story Bible change', () => {
+    const answers = { decisions: new Map(), committing: false };
+    expect(cardsReceipt(ORGANISE_ACTION, answers)).toEqual({ kind: 'none' });
+    expect(turnReceipt({ cards: ORGANISE_ACTION, answers })).toEqual({ kind: 'none' });
+    expect(turnReceipt({ cards: { ...ORGANISE_ACTION, status: 'pending', opResults: [] }, answers })).toEqual({ kind: 'none' });
+    expect(cardChanges(ORGANISE_ACTION, new Map())).toEqual([]);
+    const quiet: PanelTurn = { kind: 'message', message: message('a1', 2, 'assistant', { proposalId: 'act' }) };
+    expect(changesView({ turn: quiet, mode: 'auto', cards: ORGANISE_ACTION, decisions: new Map() })).toEqual({ kind: 'empty', note: 'No Story Bible changes this turn.' });
   });
 });

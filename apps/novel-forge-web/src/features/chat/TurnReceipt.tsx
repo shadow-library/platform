@@ -5,10 +5,12 @@ import { CheckIcon } from '@/components/icons';
 import { type ApplyProposalResponse, type ProposalResponse, type TurnHoldReason, useProposalQuery } from '@/lib/apis';
 
 import chatStyles from './Chat.module.css';
-import { appliedReceipt, type ReceiptView, savedSides, turnReceipt } from './progress-panel-view';
-import { useRevertFlow } from './ProposalSlot';
+import { type CardsReceiptInput, type ReceiptView, savedSides, turnReceipt } from './progress-panel-view';
 import styles from './ProgressPanel.module.css';
+import { useRevertFlow } from './use-revert-flow';
 import { useSuggestionAnswering } from './use-suggestion-answering';
+
+const NO_ANSWERS: CardsReceiptInput = { decisions: new Map(), committing: false };
 
 export interface TurnReceiptViewProps {
   view: ReceiptView;
@@ -93,14 +95,16 @@ interface CardsReceiptProps {
   applied?: ProposalResponse;
   cards: ProposalResponse;
   held?: TurnHoldReason;
+  ideas?: ReadonlySet<number>;
+  note?: string;
   onReview: () => void;
   onApplied: (result: ApplyProposalResponse) => void;
 }
 
-function CardsReceipt({ novelId, applied, cards, held, onReview, onApplied }: CardsReceiptProps): React.JSX.Element | null {
+function CardsReceipt({ novelId, applied, cards, held, ideas, note, onReview, onApplied }: CardsReceiptProps): React.JSX.Element | null {
   const rootRef = useRef<HTMLDivElement>(null);
   const { answers, addAll, commit } = useSuggestionAnswering(novelId, cards, { onApplied });
-  const view = turnReceipt({ applied, cards, answers, held });
+  const view = turnReceipt({ applied, cards, answers, held, ideas, note });
   const owed = (): void => commit();
   if (view.kind === 'none') return null;
   const sides = savedSides(applied, cards);
@@ -121,17 +125,21 @@ export interface TurnReceiptProps {
   cards?: ProposalResponse;
   /** Why the turn's cards were held; only the tab that ran the turn knows it. */
   held?: TurnHoldReason;
+  /** The card's ops that are Forge's ideas, where only the job's receipt says so. */
+  ideas?: ReadonlySet<number>;
+  /** Why something resting on the author's words waits on the card. */
+  note?: string;
   onReview: () => void;
   onApplied: (result: ApplyProposalResponse) => void;
 }
 
-/** What a turn changed, in one line after its reply: saved changes with Undo all, suggestions waiting with Add all, or both. The panel has the detail. */
-export function TurnReceipt({ novelId, appliedProposalId, proposalId, held, onReview, onApplied, ...fallback }: TurnReceiptProps): React.JSX.Element | null {
+/** What a turn or a job changed, in one line: saved changes with Undo all, suggestions waiting with Add all, or both. The panel has the detail. */
+export function TurnReceipt({ novelId, appliedProposalId, proposalId, held, ideas, note, onReview, onApplied, ...fallback }: TurnReceiptProps): React.JSX.Element | null {
   const appliedQuery = useProposalQuery(novelId, appliedProposalId);
   const cardsQuery = useProposalQuery(novelId, proposalId);
   const applied = appliedQuery.data ?? fallback.applied;
   const cards = cardsQuery.data ?? fallback.cards;
-  if (cards) return <CardsReceipt novelId={novelId} applied={applied} cards={cards} held={held} onReview={onReview} onApplied={onApplied} />;
-  if (applied) return <AppliedReceipt novelId={novelId} sides={[applied]} view={appliedReceipt([applied], 0)} onReview={onReview} />;
-  return null;
+  if (cards) return <CardsReceipt novelId={novelId} applied={applied} cards={cards} held={held} ideas={ideas} note={note} onReview={onReview} onApplied={onApplied} />;
+  if (!applied) return null;
+  return <AppliedReceipt novelId={novelId} sides={[applied]} view={turnReceipt({ applied, answers: NO_ANSWERS, note })} onReview={onReview} />;
 }

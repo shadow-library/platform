@@ -122,7 +122,6 @@ const CHAT: Expected[] = [
   { selector: '.row', values: { gap: '8px' }, source: 'Main l.158 card buttons gap 8; rule 6' },
   { selector: '.pushEnd', values: { 'margin-left': 'auto' }, source: 'Main l.206 Send margin-left auto' },
   { selector: '.srOnly', values: { width: '1px', height: '1px' }, source: 'Main l.30 .sr' },
-  { selector: '.textLink', values: { padding: '0' }, source: 'Main l.35 .link' },
   { selector: '.checklist', values: { 'border-radius': 'var(--sh-radius-lg)' }, source: 'Main l.85 checklist radius 8' },
   {
     selector: '.checklistHead',
@@ -143,26 +142,16 @@ const CHAT: Expected[] = [
   { selector: '.checklistActions', values: { gap: '8px' }, source: 'rule 6: 8 between controls' },
   { selector: '.checklistNote', values: { margin: '0', padding: '0 14px 12px' }, source: 'Main l.98 note padding 0 14px 12px' },
   { selector: '.checklistStatus', values: { gap: '8px' }, source: 'rule 6: 8 between controls (spinner → text)' },
-  { selector: '.applied, .turnCard', values: { 'border-radius': 'var(--sh-radius-lg)' }, source: 'Main l.113 applied block radius 8; chat.module.css .turnCard' },
+  { selector: '.turnCard', values: { 'border-radius': 'var(--sh-radius-lg)' }, baseline: '.turnCard', source: 'chat.module.css .turnCard' },
   { selector: '.cardHead', values: { gap: '8px', padding: '10px 12px' }, baseline: '.turnCardHead', source: 'Main l.114 head; chat.module.css .turnCardHead' },
-  { selector: '.cardHeadNote', values: { 'margin-left': 'auto' }, source: 'Main l.117' },
-  { selector: '.badgeSuccess', values: { padding: '2px 8px', 'border-radius': 'var(--sh-radius-full)' }, source: 'Main l.116 "Your own words" badge 2px 8px pill' },
   { selector: '.badgeAccent', values: { padding: '1px 6px', 'border-radius': 'var(--sh-radius-full)' }, source: 'Main l.174 "Claude’s pick" badge 1px 6px pill' },
-  { selector: '.appliedRows', values: { margin: '0', padding: '8px 12px', gap: '8px' }, source: 'Main l.119 list padding 8px 12px, gap 8' },
-  { selector: '.appliedRow', values: { gap: '10px' }, source: 'Main l.120 row gap 10' },
-  { selector: '.appliedTopic', values: { width: '96px', 'padding-top': '2px' }, source: 'Main l.120 topic width 96, padding-top 2' },
-  { selector: '.appliedText', values: { gap: '2px' }, source: 'Main l.120 value → quote gap 2' },
   { selector: '.cardActions', values: { gap: '8px', padding: '10px 12px' }, baseline: '.turnCardActions', source: 'Main l.139 actions; chat.module.css .turnCardActions' },
-  { selector: '.notice', values: { gap: '8px', padding: '12px 14px', 'border-radius': 'var(--sh-radius-lg)' }, source: 'Main l.165 declined notice; l.146 undone notice padding' },
-  { selector: '.willAdd', values: { gap: '10px', padding: '12px 14px', 'border-radius': 'var(--sh-radius-lg)' }, source: 'Main l.162 accepted strip, before the card commits' },
   { selector: '.indented', values: { gap: '8px' }, source: 'gap 8 as .assistantCol; no avatar, so no indent' },
   { selector: '.composerNotice', values: { gap: '8px', padding: '8px 10px', 'border-radius': 'var(--sh-radius-md)' }, source: 'Main l.214 strip padding 8px 10px radius 6' },
   { selector: '.impact', values: { gap: '12px' }, source: 'rule 6: 12 inside cards' },
   { selector: '.impactList', values: { margin: '0', padding: '0', gap: '6px' }, source: 'NextChapter l.76 owed list gap 6' },
   { selector: '.impactRow', values: { gap: '8px' }, source: 'rule 6: 8' },
   { selector: '.dialogText', values: { margin: '0' }, source: 'paragraph reset; rule 9 (Dialog body gap)' },
-  { selector: '.suggestions, .waiting', values: { gap: '8px' }, source: 'chat.module.css .turnCard margin-top 8 between cards' },
-  { selector: '.suggestion', values: { gap: '8px', padding: '12px 14px', 'border-radius': 'var(--sh-radius-lg)' }, source: 'Main l.154 suggestion card; Phone suggestion' },
   { selector: '.question', values: { gap: '10px' }, source: 'Main l.168 question gap 10' },
   {
     selector: '.questionOptions',
@@ -178,10 +167,6 @@ const CHAT: Expected[] = [
   { selector: '.jobHead', values: { gap: '8px' }, source: 'rule 6: 8' },
   { selector: '.jobDone', values: { gap: '12px' }, source: 'Main l.110 receipt → applied block gap 12' },
   { selector: '.receipt', values: { gap: '8px' }, source: 'Main l.111 receipt line gap 8' },
-  { selector: '.unused', values: { gap: '8px', padding: '10px 12px', 'border-radius': 'var(--sh-radius-lg)' }, source: 'Main l.127 "Not used yet" strip gap 8, padding 10px 12px' },
-  { selector: '.unusedList', values: { gap: '8px' }, source: 'Main l.127 strip gap 8' },
-  { selector: '.unusedRow', values: { gap: '10px', padding: '8px 10px', 'border-radius': 'var(--sh-radius-md)' }, source: 'Main l.131 paragraph row' },
-  { selector: '.unusedNumber', values: { width: '34px' }, source: 'Main l.132 ¶ column width 34' },
   { selector: '.offer', values: { gap: '8px' }, source: 'rule 6: 8 between controls' },
   { selector: '.turnOp', values: { padding: '8px 12px' }, baseline: '.turnOp', source: 'chat.module.css .turnOp' },
   { selector: '.turnOpRow', values: { gap: '8px' }, baseline: '.turnOpRow', source: 'chat.module.css .turnOpRow' },
@@ -228,8 +213,6 @@ const CHAT: Expected[] = [
 const CHAT_PHONE: Expected[] = [
   { selector: '.headLabel', values: { width: '1px', height: '1px' }, source: 'visually hidden label: icon buttons keep their names at 390' },
   { selector: '.checklistItems, .questionOptions', values: { 'grid-template-columns': 'minmax(0, 1fr)' }, source: 'Phone one column' },
-  { selector: '.appliedRow', values: { gap: '2px' }, source: 'Main l.120 value → quote gap 2, stacked on phone' },
-  { selector: '.appliedTopic', values: { width: 'auto', 'padding-top': '0' }, source: 'topic stacked above the value on phone' },
   { selector: '.chips', values: { 'padding-bottom': '2px' }, source: 'Phone chips row padding-bottom 2 (scrolls sideways)' },
 ];
 
@@ -391,10 +374,9 @@ describe('Chat width arithmetic', () => {
   const { base, phone } = spacingOf('../src/features/chat/Chat.module.css');
   const sidePad = px(base.get('.scroll')?.['padding-inline']);
   const listMax = px(base.get('.msgList')?.['max-width']);
-  const cardPad = px(base.get('.cardHead')?.padding, 1);
   const optionGap = px(base.get('.questionOptions')?.gap);
 
-  const layout = (viewport: number, sidebar = sidebarAt(viewport)): { list: number; reply: number; option: number; checklistCell: number; appliedText: number } => {
+  const layout = (viewport: number, sidebar = sidebarAt(viewport)): { list: number; reply: number; option: number; checklistCell: number } => {
     const content = viewport - sidebar;
     const thread = content >= PANEL_DOCK_MIN ? content - PROGRESS_PANEL_WIDTH : content;
     const list = Math.min(thread - 2 * gutterAt(viewport), listMax);
@@ -403,14 +385,13 @@ describe('Chat width arithmetic', () => {
     const columns = isPhone ? 1 : 2;
     const option = (reply - optionGap * (columns - 1)) / columns;
     const checklistCell = isPhone ? list - 2 * 14 : (list - 2 * 14 - 20) / 2;
-    const appliedText = isPhone ? reply - 2 * cardPad : reply - 2 * cardPad - px(base.get('.appliedTopic')?.width) - px(base.get('.appliedRow')?.gap);
-    return { list, reply, option, checklistCell, appliedText };
+    return { list, reply, option, checklistCell };
   };
 
   it('should fit the phone at 390 with no horizontal scroll', () => {
     expect(phone.get('.checklistItems, .questionOptions')?.['grid-template-columns']).toBe('minmax(0, 1fr)');
     const at390 = layout(390);
-    expect(at390).toEqual({ list: 358, reply: 358, option: 358, checklistCell: 330, appliedText: 334 });
+    expect(at390).toEqual({ list: 358, reply: 358, option: 358, checklistCell: 330 });
     const header = 390 - 2 * gutterAt(390);
     const storyBible = 90;
     const iconButton = 34;
@@ -419,10 +400,10 @@ describe('Chat width arithmetic', () => {
   });
 
   it('should keep every block readable at 768, 1024 and 1280, with the rail and with the sidebar expanded by hand, and cap it at the 768 reading column', () => {
-    expect(layout(768)).toEqual({ list: 664, reply: 664, option: 328, checklistCell: 308, appliedText: 534 });
-    expect(layout(768, SIDEBAR_WIDTH)).toEqual({ list: 466, reply: 466, option: 229, checklistCell: 209, appliedText: 336 });
-    expect(layout(1024)).toEqual({ list: 768, reply: 768, option: 380, checklistCell: 360, appliedText: 638 });
-    expect(layout(1024, SIDEBAR_WIDTH)).toEqual({ list: 722, reply: 722, option: 357, checklistCell: 337, appliedText: 592 });
+    expect(layout(768)).toEqual({ list: 664, reply: 664, option: 328, checklistCell: 308 });
+    expect(layout(768, SIDEBAR_WIDTH)).toEqual({ list: 466, reply: 466, option: 229, checklistCell: 209 });
+    expect(layout(1024)).toEqual({ list: 768, reply: 768, option: 380, checklistCell: 360 });
+    expect(layout(1024, SIDEBAR_WIDTH)).toEqual({ list: 722, reply: 722, option: 357, checklistCell: 337 });
     expect(layout(1280)).toEqual(layout(1024));
     expect(layout(1280, SIDEBAR_WIDTH)).toEqual(layout(1024));
     expect(layout(1920)).toEqual(layout(1024));

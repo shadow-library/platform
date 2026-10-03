@@ -6,7 +6,17 @@ import { Markdown } from '@/components/nf/Markdown';
 import { type ApplyProposalResponse, isApiError, type ProposalResponse, useProposalOpMutation, useProposalQuery } from '@/lib/apis';
 
 import { type AppliedOpState, currentOpState, type OpRun, updateOpState, useOpState } from './applied-op-store';
-import { opSubject, REJECTION_SCOPE_LABEL, type RejectionScope, rejectionScopeNote, type SessionMode, type SuggestionDecision } from './chat-view';
+import {
+  type NotUsedView,
+  notUsedView,
+  opSubject,
+  REJECTION_SCOPE_LABEL,
+  type RejectionScope,
+  rejectionScopeNote,
+  type SessionMode,
+  type SuggestionDecision,
+  type UnusedParagraph,
+} from './chat-view';
 import {
   type AppliedPanelChange,
   type CardPanelChange,
@@ -29,6 +39,7 @@ import { useSuggestionAnswers } from './suggestion-store';
 import { useSuggestionAnswering } from './use-suggestion-answering';
 
 const SOURCE_STATUS: Record<string, string> = { running: 'reading', ok: 'read', error: 'couldn’t be read' };
+const NOTES_PARAGRAPH_LONG = 90;
 
 export interface SourcesSectionProps {
   view: SourcesView;
@@ -146,9 +157,9 @@ export function AppliedChangeRow({ change, locked, busy, error, prompt, onToggle
         <span />
       )}
       {change.value && <WrittenValue value={change.value} long={change.valueLong} />}
-      {change.quote && (
-        <span className={styles.changeQuote} title={change.quote}>
-          from your message: “{change.quote}”
+      {change.cite && (
+        <span className={styles.changeQuote} title={change.cite}>
+          {change.cite}
         </span>
       )}
       {change.state === 'failed' && <span className={styles.changeError}>Couldn’t be saved{change.error ? `: ${change.error}` : ''}</span>}
@@ -192,6 +203,7 @@ export function CardChangeRow({ change, busy, onDecide, onScope }: CardChangeRow
         <span className={styles.changeLabel} title={change.label}>
           {change.label}
         </span>
+        {change.tag && <span className={styles.ideaTag}>{change.tag}</span>}
       </span>
       {change.decidable ? (
         <span className={styles.decide} role="group" aria-label={`Answer “${change.label}”`}>
@@ -210,11 +222,12 @@ export function CardChangeRow({ change, busy, onDecide, onScope }: CardChangeRow
         <span />
       )}
       {change.value && <WrittenValue value={change.value} long={change.valueLong} />}
-      {change.quote && (
-        <span className={styles.changeQuote} title={change.quote}>
-          from your message: “{change.quote}”
+      {change.cite && (
+        <span className={styles.changeQuote} title={change.cite}>
+          {change.cite}
         </span>
       )}
+      {change.note && <span className={styles.changeNote}>{change.note}</span>}
       {note && <span className={styles.changeNote}>{note}</span>}
       {!change.decidable && change.state === 'open' && <span className={styles.changeNote}>Answer it on its card in the chat</span>}
       {change.scope && <span className={styles.changeNote}>Won’t be suggested again {rejectionScopeNote(change.scope)}</span>}
@@ -344,6 +357,54 @@ export function ChangesSection({ view, sectionRef, applied, cards }: ChangesSect
   );
 }
 
+export interface NotUsedSectionProps {
+  view: NotUsedView;
+  /** Paragraphs the author chose to leave in the notes for now. */
+  left: ReadonlySet<number>;
+  busy: boolean;
+  onAdd: (paragraph: UnusedParagraph) => void;
+  onLeave: (number: number) => void;
+}
+
+/** The notes paragraphs an organise round drew nothing from, each one message away from the Story Bible. */
+export function NotUsedSection({ view, left, busy, onAdd, onLeave }: NotUsedSectionProps): React.JSX.Element {
+  const titleId = useId();
+  const unused = view.unused.filter(paragraph => !left.has(paragraph.number));
+  return (
+    <section className={styles.section} aria-labelledby={titleId}>
+      <h3 id={titleId} className={styles.sectionTitle}>
+        Not used yet
+        <span className={styles.sectionMeta}>
+          {view.unused.length} {view.unused.length === 1 ? 'paragraph' : 'paragraphs'}
+        </span>
+      </h3>
+      <p className={styles.empty}>{view.renumbered ? 'Your notes changed since this pass, so these numbers may point elsewhere now.' : 'Still in your notes, nothing lost.'}</p>
+      {unused.length === 0 ? (
+        <p className={styles.empty}>Everything here is left in your notes for now.</p>
+      ) : (
+        <ul className={styles.changeList}>
+          {unused.map(paragraph => (
+            <li key={paragraph.number} className={styles.change}>
+              <span className={styles.changeName}>
+                <span className={styles.changeLabel}>¶{paragraph.number}</span>
+              </span>
+              <span className={styles.promptActions}>
+                <Button size="sm" variant="secondary" disabled={busy} onClick={() => onAdd(paragraph)}>
+                  Add to Story Bible
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => onLeave(paragraph.number)}>
+                  Leave in notes
+                </Button>
+              </span>
+              <WrittenValue value={paragraph.text ? `“${paragraph.text}”` : 'Open your notes to read it.'} long={(paragraph.text?.length ?? 0) > NOTES_PARAGRAPH_LONG} />
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 // scrollIntoView also moves every scrollable ancestor, so it dragged the chat screen under the top bar; this moves only the panel's own scroller.
 function scrollToTopOfScroller(element: HTMLElement): void {
   for (let scroller = element.parentElement; scroller; scroller = scroller.parentElement) {
@@ -363,16 +424,24 @@ export interface ProgressPanelProps {
   reveal: number;
   /** Shown while the panel is held on an earlier turn and another one is running. */
   onBackToCurrent?: () => void;
+  notes?: string;
+  /** A chat turn is running or the chat is locked, so a paragraph can't be sent to it yet. */
+  busy: boolean;
+  onAddParagraph: (paragraph: UnusedParagraph) => void;
 }
 
-export function ProgressPanel({ novelId, turn, mode, onApplied, reveal, onBackToCurrent }: ProgressPanelProps): React.JSX.Element {
+export function ProgressPanel({ novelId, turn, mode, onApplied, reveal, onBackToCurrent, notes, busy, onAddParagraph }: ProgressPanelProps): React.JSX.Element {
   const refs = turnRefs(turn);
   const appliedQuery = useProposalQuery(novelId, refs.appliedProposalId);
   const cardsQuery = useProposalQuery(novelId, refs.proposalId);
   const applied = appliedQuery.data ?? refs.applied;
   const cards = cardsQuery.data ?? refs.cards;
   const answers = useSuggestionAnswers(cards?.id);
-  const changes = changesView({ turn, mode, applied, cards, decisions: answers.decisions, scopes: answers.scopes });
+  const changes = changesView({ turn, mode, applied, cards, decisions: answers.decisions, scopes: answers.scopes, organised: refs.organised });
+  const notUsed = refs.organised && refs.organised.unusedParagraphs.length > 0 ? notUsedView(refs.organised, notes) : undefined;
+  const leftKey = turn.kind === 'proposals' ? turn.proposals.key : '';
+  const [left, setLeft] = useState<{ key: string; numbers: ReadonlySet<number> }>({ key: leftKey, numbers: new Set() });
+  if (left.key !== leftKey) setLeft({ key: leftKey, numbers: new Set() });
   const sectionRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -412,6 +481,15 @@ export function ProgressPanel({ novelId, turn, mode, onApplied, reveal, onBackTo
           changes.cards.length > 0 && <CardChanges novelId={novelId} proposal={cards} groups={changes.cards} title={changes.cardsTitle} onApplied={onApplied} />
         }
       />
+      {notUsed && (
+        <NotUsedSection
+          view={notUsed}
+          left={left.numbers}
+          busy={busy}
+          onAdd={onAddParagraph}
+          onLeave={number => setLeft(current => ({ ...current, numbers: new Set(current.numbers).add(number) }))}
+        />
+      )}
       <SourcesSection view={sourcesView(turn)} />
     </>
   );

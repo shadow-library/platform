@@ -1,4 +1,4 @@
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Button, toast } from '@shadow-library/ui';
@@ -9,8 +9,8 @@ import { ChatModelMenu, MessageModelTag } from '@/components/nf/ChatModel';
 import { Markdown } from '@/components/nf/Markdown';
 import { ChatPlanCard, PlanStart } from '@/features/plan-card';
 import {
+  type ApiError,
   type ApplyProposalResponse,
-  type ChatJobProgress,
   type ChatJobState,
   type ChatJobStreamStatus,
   type ChatMessageResponse,
@@ -22,6 +22,7 @@ import {
   jobSettled,
   type ProgressItemKey,
   type ProgressOverrideStatus,
+  type ProposalResponse,
   transcriptTurnState,
   type TurnHoldReason,
   useAuthorNotesQuery,
@@ -49,6 +50,7 @@ import { editQueued, inputCaption, type QueuedTurn, queuedView, queueStep, relea
 import { ChatComposer } from './ChatComposer';
 import { NotesChip, SaveAsNotesOffer } from './ChatExtras';
 import {
+  answeredInPanel,
   applyNoteToast,
   awaitingAnswer,
   checklistView,
@@ -56,7 +58,6 @@ import {
   type ComposerMode,
   composerModeChange,
   composerModeOf,
-  entryNotes,
   heroText,
   jobKindForOp,
   jobView,
@@ -64,7 +65,6 @@ import {
   notesOpenerId,
   offersNotes,
   openerChip,
-  organiseReceiptView,
   type PromptChip,
   promptChips,
   questionEyebrow,
@@ -76,21 +76,19 @@ import {
   turnCardsInline,
   type TurnOutcome,
   unansweredWarning,
-  type UnusedParagraph,
   unusedParagraphPrompt,
 } from './chat-view';
 import styles from './Chat.module.css';
 import { ComposerModeMenu } from './ComposerModeMenu';
 import { JobProgress } from './JobProgress';
-import { OrganiseReceipt } from './OrganiseReceipt';
 import { ProgressDock } from './ProgressPanel';
-import { type DockState, dockState, panelTurnOf, turnRefs } from './progress-panel-view';
-import { ProposalSlot } from './ProposalSlot';
+import { type DockState, dockState, jobProposals, organiseIdeas, type PanelProposals, panelTurnOf, turnRefs } from './progress-panel-view';
 import { QuestionCard } from './QuestionCard';
 import { ReadyChecklist } from './ReadyChecklist';
 import { RenameInput } from './RenameInput';
 import { LiveStreamedTurn } from './StreamedTurn';
 import { useUnansweredCount } from './suggestion-store';
+import { TurnProposalCard } from './TurnProposalCard';
 import { TurnReceipt } from './TurnReceipt';
 import { TurnTrace } from './TurnTimeline';
 
@@ -125,8 +123,8 @@ interface TranscriptActions {
   answer: (option: QuestionOption) => void;
   leaveUndecided: (key: ProgressItemKey | undefined) => void;
   focusComposer: () => void;
-  addParagraph: (paragraph: UnusedParagraph) => void;
-  reviewInPanel: (messageId: string) => void;
+  /** A reply's id, or the key of a job's changes. */
+  reviewInPanel: (key: string) => void;
 }
 
 function lastAssistantOrdinal(messages: ChatMessageResponse[]): number {
@@ -240,6 +238,11 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
   const waiting = (proposalsQuery.data?.items ?? []).filter(proposal => session && proposal.sessionId === session.id && !shownProposals.has(proposal.id));
   const waitingPlans = waiting.filter(proposal => proposal.kind === PLAN_KIND);
   const waitingCards = waiting.filter(proposal => proposal.kind !== PLAN_KIND);
+  const ordinals = new Map(messages.map(message => [message.id, message.ordinal]));
+  const panelProposals: PanelProposals[] = [
+    ...jobStream.jobs.flatMap(job => jobProposals(job, job.messageId ? ordinals.get(job.messageId) : undefined) ?? []),
+    ...waitingCards.filter(answeredInPanel).map(proposal => ({ key: proposal.id, proposalId: proposal.id })),
+  ];
 
   const opener = openerChip(project?.kind, messages.length, notes);
   const chips: PromptChip[] = composerChips([...(opener ? [opener] : []), ...promptChips(nextChapter)], {
@@ -326,6 +329,19 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
       jobStatuses.current.set(job.id, job.status);
     }
   }, [jobStream.jobs]);
+
+  // A job that ends with changes while the panel follows the latest settled turn takes the panel, so its card opens the dock as a turn's would.
+  const [jobsSeen, setJobsSeen] = useState(jobStream.jobs);
+  if (jobsSeen !== jobStream.jobs) {
+    setJobsSeen(jobStream.jobs);
+    const before = new Map(jobsSeen.map(job => [job.id, job.status]));
+    const endedNow = (job: ChatJobState): boolean => {
+      const was = before.get(job.id);
+      return jobSettled(job.status) && (was === undefined ? job.seq > 0 : !jobSettled(was));
+    };
+    const ended = jobStream.jobs.find(job => endedNow(job) && jobProposals(job, undefined));
+    if (ended && !pending && panelFocus === undefined) setPanelFocus(ended.id);
+  }
 
   const currentSettings = (): TurnSettings => ({ proseEdits, justDiscussing, choice: turnChoice });
 
@@ -530,8 +546,8 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
   };
 
   // The panel docks only where the thread keeps its full column beside it; narrower, the receipt opens it as a sheet.
-  const reviewInPanel = (messageId: string): void => {
-    setPanelFocus(messageId);
+  const reviewInPanel = (key: string): void => {
+    setPanelFocus(key);
     setPanelReveal(count => count + 1);
     if ((frameRef.current?.offsetWidth ?? 0) >= PANEL_DOCK_MIN) return setDock({ kind: 'open' });
     setSheetReveals(true);
@@ -585,7 +601,6 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
       answer: option => sendTurn(option.title),
       leaveUndecided,
       focusComposer: () => inputRef.current?.focus(),
-      addParagraph: paragraph => sendTurn(unusedParagraphPrompt(paragraph)),
       reviewInPanel,
     };
   });
@@ -598,8 +613,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
       answer: option => latest.current?.answer(option),
       leaveUndecided: key => latest.current?.leaveUndecided(key),
       focusComposer: () => latest.current?.focusComposer(),
-      addParagraph: paragraph => latest.current?.addParagraph(paragraph),
-      reviewInPanel: messageId => latest.current?.reviewInPanel(messageId),
+      reviewInPanel: key => latest.current?.reviewInPanel(key),
     }),
     [],
   );
@@ -607,7 +621,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
   const notices = unanswered > 0 && <div className={styles.composerNotice}>{unansweredWarning(unanswered)}</div>;
 
   const conversation = view.kind === 'conversation';
-  const panelTurn = panelTurnOf({ stream, streamShown: showStream, messages, focus: panelFocus });
+  const panelTurn = panelTurnOf({ stream, streamShown: showStream, messages, focus: panelFocus, proposals: panelProposals });
   const panelRefs = turnRefs(panelTurn);
   const panelCards = useProposalQuery(novelId, panelRefs.proposalId).data ?? panelRefs.cards;
   const reviewCardsId = panelCards?.status === 'pending' ? panelCards.id : undefined;
@@ -704,7 +718,6 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
                     jobs={jobsByMessage.get(m.id) ?? NO_JOBS}
                     streamStatus={jobStream.status}
                     cancellingJob={cancellingJob}
-                    notes={notes}
                     nextChapter={nextChapter}
                     actions={actions}
                   />
@@ -735,16 +748,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
               {looseJobs.length > 0 && (
                 <div className={styles.indented}>
                   {looseJobs.map(job => (
-                    <TranscriptJob
-                      key={job.id}
-                      novelId={novelId}
-                      job={job}
-                      stream={jobStream.status}
-                      cancelling={cancellingJob === job.id}
-                      notes={notes}
-                      busy={busy}
-                      actions={actions}
-                    />
+                    <TranscriptJob key={job.id} novelId={novelId} job={job} stream={jobStream.status} cancelling={cancellingJob === job.id} actions={actions} />
                   ))}
                 </div>
               )}
@@ -752,10 +756,21 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
                 <TranscriptPlanCard key={job.id} novelId={novelId} proposalId={job.progress.proposalId ?? ''} nextChapter={nextChapter} actions={actions} />
               ))}
               {waitingCards.length > 0 && (
-                <section className={`${styles.waiting} ${styles.indented}`} aria-label="Waiting on you">
-                  {waitingCards.map(proposal => (
-                    <ProposalSlot key={proposal.id} novelId={novelId} proposalId={proposal.id} onApplied={onApplied} />
-                  ))}
+                <section className={styles.indented} aria-label="Waiting on you">
+                  {waitingCards.map(proposal =>
+                    answeredInPanel(proposal) ? (
+                      <TurnReceipt
+                        key={proposal.id}
+                        novelId={novelId}
+                        proposalId={proposal.id}
+                        cards={proposal}
+                        onReview={() => reviewInPanel(proposal.id)}
+                        onApplied={onApplied}
+                      />
+                    ) : (
+                      <TurnProposalCard key={proposal.id} novelId={novelId} proposal={proposal} onApplied={onApplied} />
+                    ),
+                  )}
                 </section>
               )}
               {waitingPlans.map(proposal => (
@@ -835,6 +850,9 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
           sheetOpen={sheetOpen}
           onSheetOpenChange={setSheetOpen}
           sheetReveals={sheetReveals}
+          notes={notes}
+          busy={busy}
+          onAddParagraph={paragraph => sendTurn(unusedParagraphPrompt(paragraph))}
         />
       )}
     </div>
@@ -865,72 +883,69 @@ interface TranscriptJobProps {
   job: ChatJobState;
   stream: ChatJobStreamStatus;
   cancelling: boolean;
-  notes?: string;
-  busy: boolean;
   actions: TranscriptActions;
 }
 
-function TranscriptJob({ novelId, job, stream, cancelling, notes, busy, actions }: TranscriptJobProps): React.JSX.Element {
+function TranscriptJob({ novelId, job, stream, cancelling, actions }: TranscriptJobProps): React.JSX.Element {
   const view = jobView(job);
   return (
     <JobProgress view={view} stream={stream} cancelling={cancelling} onCancel={() => actions.cancelJob(job.id)}>
-      {view.tone === 'done' && job.kind !== 'plan' && <JobOutcome novelId={novelId} progress={job.progress} notes={notes} busy={busy} actions={actions} />}
+      {view.tone === 'done' && <JobOutcome novelId={novelId} job={job} actions={actions} />}
     </JobProgress>
   );
 }
 
 interface JobOutcomeProps {
   novelId: string;
-  progress: ChatJobProgress;
-  notes?: string;
-  busy: boolean;
+  job: ChatJobState;
   actions: TranscriptActions;
 }
 
-/** What a finished job left behind: an organise receipt with its applied block, unused paragraphs and card. A plan is mounted beside the reply instead. */
-function JobOutcome({ novelId, progress, notes, busy, actions }: JobOutcomeProps): React.JSX.Element {
-  const [expanded, setExpanded] = useState(false);
-  const [left, setLeft] = useState<ReadonlySet<number>>(new Set());
-  const receipt = progress.organised;
-  const applied = progress.appliedProposalId && (
-    <ProposalSlot novelId={novelId} proposalId={progress.appliedProposalId} paragraphs={receipt && new Map(receipt.applied.map(entry => [entry.opIndex, entry.paragraphs]))} />
-  );
-  const card = progress.proposalId && (
-    <ProposalSlot
-      novelId={novelId}
-      proposalId={progress.proposalId}
-      onApplied={actions.onApplied}
-      notes={receipt && entryNotes(receipt.card)}
-      paragraphs={receipt && new Map(receipt.card.map(entry => [entry.opIndex, entry.paragraphs]))}
-    />
-  );
-  if (!receipt) {
+/** What a finished job left: one receipt whose changes are reviewed in the panel. A plan is mounted beside the reply, and a canon refresh card is answered in Review. */
+function JobOutcome({ novelId, job, actions }: JobOutcomeProps): React.JSX.Element | null {
+  const { progress } = job;
+  if (job.kind === 'canon_refresh') {
+    if (!progress.proposalId) return null;
     return (
-      <>
-        {progress.applyNote && (
-          <Alert intent="warning" title="Some of it waits for you">
-            {progress.applyNote}
-          </Alert>
-        )}
-        {applied}
-        {card}
-      </>
+      <div className={styles.row}>
+        <Button asChild size="sm" variant="secondary">
+          <Link to="/novels/$novelId/review" params={{ novelId }} search={{ view: 'proposals', proposal: progress.proposalId }}>
+            Review the Story Bible updates
+          </Link>
+        </Button>
+      </div>
     );
   }
+  if (!jobProposals(job, undefined)) return null;
   return (
-    <OrganiseReceipt
-      view={organiseReceiptView(receipt, notes)}
-      applyNote={progress.applyNote}
-      applied={applied}
-      card={card}
-      expanded={expanded}
-      onToggle={() => setExpanded(open => !open)}
-      left={left}
-      busy={busy}
-      onAdd={actions.addParagraph}
-      onLeave={number => setLeft(current => new Set(current).add(number))}
+    <TurnReceipt
+      novelId={novelId}
+      appliedProposalId={progress.appliedProposalId}
+      proposalId={progress.proposalId}
+      ideas={organiseIdeas(progress.organised)}
+      note={progress.applyNote}
+      onReview={() => actions.reviewInPanel(job.id)}
+      onApplied={actions.onApplied}
     />
   );
+}
+
+interface OwnCardProps {
+  novelId: string;
+  query: UseQueryResult<ProposalResponse, ApiError>;
+  onApplied: (result: ApplyProposalResponse) => void;
+}
+
+/** An action, prose or a plan edit keeps its own card in the thread; every other change is reviewed in the panel from the receipt. */
+function OwnCard({ novelId, query, onApplied }: OwnCardProps): React.JSX.Element | null {
+  if (query.error) {
+    return (
+      <Alert intent="danger" title="Couldn’t load these changes" action={{ label: 'Try again', onClick: () => void query.refetch() }}>
+        {query.error.message}
+      </Alert>
+    );
+  }
+  return query.data ? <TurnProposalCard novelId={novelId} proposal={query.data} onApplied={onApplied} /> : null;
 }
 
 interface AssistantMessageProps {
@@ -944,7 +959,6 @@ interface AssistantMessageProps {
   jobs: readonly ChatJobState[];
   streamStatus: ChatJobStreamStatus;
   cancellingJob?: string;
-  notes?: string;
   nextChapter: number;
   actions: TranscriptActions;
 }
@@ -960,7 +974,6 @@ const AssistantMessage = memo(function AssistantMessage({
   jobs,
   streamStatus,
   cancellingJob,
-  notes,
   nextChapter,
   actions,
 }: AssistantMessageProps): React.JSX.Element {
@@ -991,7 +1004,7 @@ const AssistantMessage = memo(function AssistantMessage({
             onApplied={actions.onApplied}
           />
         )}
-        {ownCard && message.proposalId && <ProposalSlot novelId={novelId} proposalId={message.proposalId} onApplied={actions.onApplied} />}
+        {ownCard && <OwnCard novelId={novelId} query={staged} onApplied={actions.onApplied} />}
         {question && (
           <QuestionCard
             key={`${message.id}:question`}
@@ -1005,7 +1018,7 @@ const AssistantMessage = memo(function AssistantMessage({
           />
         )}
         {jobs.map(job => (
-          <TranscriptJob key={job.id} novelId={novelId} job={job} stream={streamStatus} cancelling={cancellingJob === job.id} notes={notes} busy={busy} actions={actions} />
+          <TranscriptJob key={job.id} novelId={novelId} job={job} stream={streamStatus} cancelling={cancellingJob === job.id} actions={actions} />
         ))}
       </div>
       {isPlan && message.proposalId && <TranscriptPlanCard novelId={novelId} proposalId={message.proposalId} nextChapter={nextChapter} actions={actions} />}

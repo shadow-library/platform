@@ -33,14 +33,30 @@ export function plannedCommit({ status, committing, total, decisions, force }: C
   return suggestionCommit(total, decisions, force);
 }
 
-/** Undefined for a card answered on its own card in the thread, which is never added in bulk. */
+function organisePage(proposal: Pick<ProposalResponse, 'kind' | 'changeSet'>, index: number): string | undefined {
+  const op = proposal.changeSet[index];
+  if (proposal.kind !== 'organise' || op?.op !== 'bible_document.upsert') return undefined;
+  return `${String(op.section)}/${String(op.slug)}`;
+}
+
+/**
+ * Undefined for a card answered on its own card in the thread. An organise card offers a mixed page twice, its notes-backed half before the whole,
+ * and refuses keeping both (NTS_007): Add all keeps the later one unless the author already picked one, and leaves the other out unanswered.
+ */
 export function addAllDecisions(
   proposal: Pick<ProposalResponse, 'kind' | 'changeSet'>,
   decisions: ReadonlyMap<number, SuggestionDecision>,
 ): ReadonlyMap<number, SuggestionDecision> | undefined {
   if (!answeredInPanel(proposal)) return undefined;
   const next = new Map(decisions);
-  for (let index = 0; index < proposal.changeSet.length; index++) if (!next.has(index)) next.set(index, 'add');
+  const kept = new Set([...decisions].flatMap(([index, decision]) => (decision === 'add' ? [organisePage(proposal, index)] : [])));
+  for (let index = proposal.changeSet.length - 1; index >= 0; index--) {
+    if (next.has(index)) continue;
+    const page = organisePage(proposal, index);
+    if (page !== undefined && kept.has(page)) continue;
+    kept.add(page);
+    next.set(index, 'add');
+  }
   return next;
 }
 
@@ -101,7 +117,7 @@ export function useSuggestionAnswering(novelId: string, proposal: ProposalRespon
     const next = addAllDecisions(proposal, currentAnswers(proposal.id).decisions);
     if (!next) return;
     updateAnswers(proposal.id, current => ({ ...current, decisions: next }));
-    void commitWith(next, false);
+    void commitWith(next, true);
   };
 
   const remember = async (index: number, scope: RejectionScope): Promise<void> => {

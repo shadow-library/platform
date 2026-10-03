@@ -3,16 +3,14 @@ import { createElement, type ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 import { MessageModelTagView, TurnModelPanel, type TurnModelPanelProps } from '../src/components/nf/ChatModel';
-import { AppliedBlock, type AppliedBlockProps, UndoImpactBody } from '../src/features/chat/AppliedBlock';
 import { ChatComposer, type ChatComposerProps } from '../src/features/chat/ChatComposer';
-import { checklistView, type OrganiseReceiptView } from '../src/features/chat/chat-view';
+import { checklistView } from '../src/features/chat/chat-view';
 import { ComposerModeMenu } from '../src/features/chat/ComposerModeMenu';
 import { JobProgress } from '../src/features/chat/JobProgress';
-import { OrganiseReceipt, type OrganiseReceiptProps } from '../src/features/chat/OrganiseReceipt';
 import { QuestionCard, QuestionCardView, type QuestionCardViewProps } from '../src/features/chat/QuestionCard';
 import { ReadyChecklist, type ReadyChecklistProps } from '../src/features/chat/ReadyChecklist';
 import { StreamedTurn } from '../src/features/chat/StreamedTurn';
-import { CommitBar, SuggestionCard, type SuggestionCardProps } from '../src/features/chat/SuggestionCard';
+import { UndoImpactBody } from '../src/features/chat/UndoImpactDialog';
 import { idleChatTurnStream } from '../src/lib/apis/refinement.api';
 import { ApiError } from '../src/lib/apis/transport';
 
@@ -68,42 +66,6 @@ describe('ReadyChecklist', () => {
   });
 });
 
-function applied(overrides: Partial<AppliedBlockProps> = {}): string {
-  return html(
-    createElement(AppliedBlock, {
-      rows: [{ index: 0, topic: 'People', value: 'Tamsin Rook: a lamp-keeper’s daughter', quote: 'Tamsin is the keeper’s daughter' }],
-      origin: 'words',
-      state: 'applied',
-      revertible: true,
-      onUndo: noop,
-      ...overrides,
-    }),
-  );
-}
-
-describe('AppliedBlock', () => {
-  it('should list each change with the written value beside the quote it rests on', () => {
-    const block = applied();
-    expect(block).toContain('Added to your Story Bible — from your words');
-    expect(block).toContain('Tamsin Rook: a lamp-keeper’s daughter');
-    expect(block).toContain('from your message: “Tamsin is the keeper’s daughter”');
-    expect(block).toContain('Undo this change');
-  });
-
-  it('should cite note paragraphs for an organise block', () => {
-    const block = applied({ quoteSource: 'notes', rows: [{ index: 0, topic: 'Places', value: 'Low Harrow', paragraphs: [5] }] });
-    expect(block).toContain('— from your notes');
-    expect(block).toContain('from your notes, ¶5');
-  });
-
-  it('should drop Undo when the change cannot be reverted and say so once it is undone', () => {
-    expect(applied({ revertible: false })).not.toContain('Undo this change');
-    const undone = applied({ state: 'reverted' });
-    expect(undone).toContain('Undone — your Story Bible is back as it was.');
-    expect(undone).not.toContain('role="status"');
-  });
-});
-
 describe('UndoImpactBody', () => {
   const body = (props: Partial<Parameters<typeof UndoImpactBody>[0]>): string => html(createElement(UndoImpactBody, { loading: false, onRetry: noop, ...props }));
 
@@ -130,109 +92,6 @@ describe('UndoImpactBody', () => {
     expect(list).toContain('hollis knows debt (since chapter 2)');
     expect(list).toContain('final — stays as it is');
     expect(list).toContain('1 final chapter or plan also rely on it');
-  });
-});
-
-const COUNCIL = {
-  op: 'entity.upsert',
-  entityKey: 'council',
-  type: 'faction',
-  name: 'The Tidewarden’s council',
-  body: 'Families who trade memories.',
-  rationale: 'Gives chapter one a pressure.',
-};
-
-function suggestion(overrides: Partial<SuggestionCardProps> = {}): string {
-  return html(
-    createElement(SuggestionCard, {
-      op: COUNCIL,
-      remaining: 1,
-      busy: false,
-      onAdd: noop,
-      onEditFirst: noop,
-      onDraftChange: noop,
-      onSaveEdit: noop,
-      onCancelEdit: noop,
-      onDecline: noop,
-      onUndoDecision: noop,
-      onScope: noop,
-      ...overrides,
-    }),
-  );
-}
-
-describe('SuggestionCard', () => {
-  it('should offer Add, Edit first and Not this on a labelled suggestion', () => {
-    const card = suggestion();
-    expect(card).toContain('Suggested — not in your notes');
-    expect(card).toContain('Factions &amp; peoples: The Tidewarden’s council');
-    expect(card).toContain('Gives chapter one a pressure.');
-    for (const label of ['Add to Story Bible', 'Edit first', 'Not this']) expect(card).toContain(label);
-  });
-
-  it('should cite the notes paragraphs when there is no organise entry, and render the body as markdown', () => {
-    const card = suggestion({ op: { ...COUNCIL, body: 'Families who **trade** memories.', rationale: 'Straight from ¶3 and ¶5–¶6.' }, note: undefined });
-    expect(card).toContain('From your notes · ¶3, ¶5–¶6');
-    expect(card).toContain('Factions &amp; peoples: The Tidewarden’s council');
-    expect(card).toContain('<strong>trade</strong>');
-  });
-
-  it('should carry an organise label instead of the default eyebrow, and say when declining retires a Notebook entry', () => {
-    expect(suggestion({ note: { eyebrow: 'A rule from your notes', retires: false } })).toContain('A rule from your notes');
-    expect(suggestion({ note: { eyebrow: 'A rule from your notes', retires: true } })).toContain('declining it takes it out');
-  });
-
-  it('should edit the written value before adding it', () => {
-    const editing = suggestion({ draft: 'Families who sell memories.' });
-    expect(editing).toContain('aria-label="Edit “The Tidewarden’s council” before adding"');
-    expect(editing).toContain('Save and add');
-    expect(suggestion({ draft: '  ' })).toContain('disabled=""');
-  });
-
-  it('should confirm an add, then ask when to suggest a declined idea again', () => {
-    const willAdd = suggestion({ decision: 'add' });
-    expect(willAdd).toContain('Will add “The Tidewarden’s council” to Factions &amp; peoples — 1 left to answer.');
-    expect(willAdd).not.toContain('Added');
-    expect(willAdd).not.toContain('role="status"');
-    expect(suggestion({ decision: 'add', remaining: 0 })).not.toContain('adding now');
-    expect(suggestion({ decision: 'add', remaining: 0, committing: true })).toContain('adding now');
-    const declined = suggestion({ decision: 'decline' });
-    expect(declined).toContain('Should it ever be suggested again?');
-    expect(declined).toContain('Never');
-    expect(declined).toContain('Not now — maybe later');
-    expect(declined).toContain('Not for this version');
-    expect(declined).toContain('Change');
-    const scoped = suggestion({ decision: 'decline', scope: 'not_now' });
-    expect(scoped).toContain('Noted in your Notebook');
-    expect(scoped).toContain('aria-pressed="true"');
-    expect(suggestion({ decision: 'decline', canUndo: false })).not.toContain('Change');
-  });
-
-  it('should offer no scope past "not now" for a rule, which the server refuses to anchor to no record (LDG_008)', () => {
-    const declined = suggestion({ op: { op: 'organise.rule', rule: 'No magic at sea' }, decision: 'decline' });
-    expect(declined).toContain('Never');
-    expect(declined).toContain('Not now — maybe later');
-    expect(declined).not.toContain('Not for this version');
-  });
-
-  it('should hide Change once a decline has a recorded scope, so it can’t flip back to Keep', () => {
-    expect(suggestion({ decision: 'decline' })).toContain('Change');
-    expect(suggestion({ decision: 'decline', scope: 'never' })).not.toContain('Change');
-    expect(suggestion({ decision: 'decline', scope: 'not_this_version' })).not.toContain('Change');
-  });
-
-  it('should offer a plain "Don’t run it" decline for an action, with no scope buttons and no Notebook mention', () => {
-    const action = { op: 'action.organise_notes' };
-    const pending = suggestion({ op: action, decision: undefined });
-    expect(pending).toContain('Don’t run it');
-    expect(pending).not.toContain('Not this');
-    const declined = suggestion({ op: action, decision: 'decline' });
-    expect(declined).toContain('Won’t run “Organise your notes”.');
-    expect(declined).not.toContain('Never');
-    expect(declined).not.toContain('Not now');
-    expect(declined).not.toContain('Noted in your Notebook');
-    expect(declined).toContain('Change');
-    expect(suggestion({ op: action, decision: 'decline', canUndo: false })).not.toContain('Change');
   });
 });
 
@@ -366,36 +225,6 @@ describe('JobProgress', () => {
     );
     expect(done).toContain('Planned chapter 4');
     expect(done).toContain('<p>the card</p>');
-  });
-});
-
-describe('OrganiseReceipt', () => {
-  const view: OrganiseReceiptView = {
-    summary: '4 entries from your notes — read from 3 paragraphs',
-    unused: [{ number: 2, text: 'maybe the lamp remembers?' }, { number: 3 }],
-    renumbered: false,
-  };
-  const receipt = (overrides: Partial<OrganiseReceiptProps> = {}): string =>
-    html(createElement(OrganiseReceipt, { view, expanded: true, onToggle: noop, left: new Set<number>(), busy: false, onAdd: noop, onLeave: noop, ...overrides }));
-
-  it('should list the unused paragraphs with a way to add or leave each', () => {
-    const block = receipt();
-    expect(block).toContain('Not used yet: 2 paragraphs of your notes');
-    expect(block).toContain('“maybe the lamp remembers?”');
-    expect(block).toContain('Open your notes to read it.');
-    expect(block).toContain('aria-expanded="true"');
-    expect(block.match(/Add to Story Bible/g)).toHaveLength(2);
-  });
-
-  it('should surface why part of it waits and warn when the numbers moved', () => {
-    const block = receipt({ applyNote: 'One entry quotes a question.', view: { ...view, renumbered: true } });
-    expect(block).toContain('One entry quotes a question.');
-    expect(block).toContain('these numbers may point elsewhere now');
-  });
-
-  it('should collapse the list and drop paragraphs left in the notes', () => {
-    expect(receipt({ expanded: false })).not.toContain('maybe the lamp');
-    expect(receipt({ left: new Set([2, 3]) })).toContain('Everything here is left in your notes for now.');
   });
 });
 
@@ -561,19 +390,5 @@ describe('MessageModelTagView', () => {
   it('should read model · tier · cost · time', () => {
     const tag = html(createElement(MessageModelTagView, { parts: ['Claude Sonnet 5', 'Balanced', '$0.041'], createdAt: '2026-09-26T10:04:00.000Z' }));
     expect(tag).toMatch(/Claude Sonnet 5 · Balanced · \$0\.041 · <time/);
-  });
-});
-
-describe('CommitBar', () => {
-  it('should show the retry with the failure next to it, and nothing to click while committing', () => {
-    const failed = html(
-      createElement(CommitBar, { view: { kind: 'ready', action: 'Add 1 now', text: 'Couldn’t finish: gone. Your answers are kept.', failed: true }, onCommit: noop }),
-    );
-    expect(failed).toContain('Add 1 now');
-    expect(failed).toContain('Your answers are kept.');
-    const committing = html(createElement(CommitBar, { view: { kind: 'committing', text: 'Adding to your Story Bible…' }, onCommit: noop }));
-    expect(committing).toContain('aria-busy="true"');
-    expect(committing).not.toContain('<button');
-    expect(html(createElement(CommitBar, { view: { kind: 'none' }, onCommit: noop }))).toBe('');
   });
 });

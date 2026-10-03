@@ -1,61 +1,9 @@
-import { type ReactNode } from 'react';
 import { Alert, Button, Dialog, Spinner } from '@shadow-library/ui';
 
 import { type ApiError, type UndoImpactResponse } from '@/lib/apis';
 
-import { type AppliedRow, dependentLabel, type QuoteSource, rowSource, undoImpactView } from './chat-view';
+import { dependentLabel, undoImpactView } from './chat-view';
 import styles from './Chat.module.css';
-
-export type AppliedOrigin = 'words' | 'accepted';
-
-export interface AppliedBlockProps {
-  rows: AppliedRow[];
-  origin: AppliedOrigin;
-  state: 'applied' | 'reverted';
-  revertible: boolean;
-  onUndo: () => void;
-  quoteSource?: QuoteSource;
-  /** A link into the Story Bible; a slot so the block renders without a router. */
-  bibleLink?: ReactNode;
-}
-
-const ORIGIN_BADGE: Record<AppliedOrigin, string> = { words: 'Your own words', accepted: 'You added' };
-
-export function AppliedBlock({ rows, origin, state, revertible, onUndo, quoteSource = 'message', bibleLink }: AppliedBlockProps): React.JSX.Element {
-  if (state === 'reverted') {
-    return <div className={styles.notice}>Undone — your Story Bible is back as it was.</div>;
-  }
-  const quoted = rows.some(row => rowSource(row, quoteSource));
-  return (
-    <section className={styles.applied} aria-label="Added to your Story Bible">
-      <div className={styles.cardHead}>
-        <span className={styles.cardTitle}>Added to your Story Bible{origin === 'words' && ` — from your ${quoteSource === 'notes' ? 'notes' : 'words'}`}</span>
-        <span className={styles.badgeSuccess}>{ORIGIN_BADGE[origin]}</span>
-        {quoted && <span className={styles.cardHeadNote}>Each line quotes where it came from</span>}
-      </div>
-      <ul className={styles.appliedRows}>
-        {rows.map(row => (
-          <li key={row.index} className={styles.appliedRow}>
-            <span className={styles.appliedTopic}>{row.topic}</span>
-            <span className={styles.appliedText}>
-              <span>{row.value}</span>
-              {rowSource(row, quoteSource) && <span className={styles.caption}>{rowSource(row, quoteSource)}</span>}
-            </span>
-          </li>
-        ))}
-      </ul>
-      <div className={styles.cardActions}>
-        {bibleLink}
-        {revertible && (
-          <Button size="sm" variant="ghost" onClick={onUndo}>
-            Undo this change
-          </Button>
-        )}
-        {revertible && <span className={styles.caption}>Shows what relies on it first</span>}
-      </div>
-    </section>
-  );
-}
 
 export interface UndoImpactBodyProps {
   impact?: UndoImpactResponse;

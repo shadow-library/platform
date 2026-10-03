@@ -136,4 +136,25 @@ describe('addAllDecisions', () => {
     expect(addAllDecisions({ kind: 'chat', changeSet: [{ op: 'draft.update', chapter: 2, body: 'New prose.' }] }, new Map())).toBeUndefined();
     expect(addAllDecisions({ kind: 'chapter_plan', changeSet: [] }, new Map())).toBeUndefined();
   });
+
+  it('should keep one half of an organise page offered twice, which the server refuses to keep both of (NTS_007)', () => {
+    const half = { op: 'bible_document.upsert', section: 'world', slug: 'harbour', body: 'From the notes.' };
+    const whole = { ...half, body: 'From the notes, and more.' };
+    const changeSet = [half, council, whole];
+    const entries = (next: ReadonlyMap<number, string> | undefined): [number, string][] => [...(next ?? [])].sort(([a], [b]) => a - b);
+    expect(entries(addAllDecisions({ kind: 'organise', changeSet }, new Map()))).toEqual([
+      [1, 'add'],
+      [2, 'add'],
+    ]);
+    expect(entries(addAllDecisions({ kind: 'organise', changeSet }, new Map([[0, 'add' as const]])))).toEqual([
+      [0, 'add'],
+      [1, 'add'],
+    ]);
+    expect(entries(addAllDecisions({ kind: 'organise', changeSet }, new Map([[2, 'decline' as const]])))).toEqual([
+      [0, 'add'],
+      [1, 'add'],
+      [2, 'decline'],
+    ]);
+    expect(entries(addAllDecisions({ kind: 'chat', changeSet }, new Map()))).toHaveLength(3);
+  });
 });

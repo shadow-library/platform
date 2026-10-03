@@ -360,12 +360,6 @@ button.turnRow:hover {
   }
 }
 
-.commitError {
-  font-size: 12px;
-  line-height: 18px;
-  color: var(--sh-danger-text);
-}
-
 .caption {
   font-size: 12px;
   line-height: 18px;
@@ -392,30 +386,11 @@ button.turnRow:hover {
   white-space: nowrap;
 }
 
-.textLink {
-  padding: 0;
-  border: none;
-  background: none;
-  font: inherit;
-  color: var(--sh-accent-text);
-  cursor: pointer;
-}
-
-.textLink:disabled {
-  cursor: default;
-  opacity: 0.5;
-}
-
-.textLink:hover:not(:disabled) {
-  text-decoration: underline;
-}
-
 .checklistHead:hover {
   background: var(--sh-bg-hover);
 }
 
 .headTitleButton:focus-visible,
-.textLink:focus-visible,
 .modeTrigger:focus-visible,
 .option:focus-visible,
 .checklistHead:focus-visible {
@@ -535,7 +510,6 @@ button.turnRow:hover {
   color: var(--sh-text-secondary);
 }
 
-.applied,
 .turnCard {
   border: 1px solid var(--sh-border-default);
   border-radius: var(--sh-radius-lg);
@@ -566,21 +540,6 @@ button.turnRow:hover {
   color: var(--sh-text-primary);
 }
 
-.cardHeadNote {
-  margin-left: auto;
-  font-size: 12px;
-  color: var(--sh-text-secondary);
-}
-
-.badgeSuccess {
-  padding: 2px 8px;
-  border-radius: var(--sh-radius-full);
-  background: var(--sh-success-bg-subtle);
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--sh-success-text-on-subtle);
-}
-
 .badgeAccent {
   flex: none;
   padding: 1px 6px;
@@ -592,37 +551,6 @@ button.turnRow:hover {
   color: var(--sh-accent-text);
 }
 
-.appliedRows {
-  margin: 0;
-  padding: 8px 12px;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  font-size: var(--sh-text-body-sm);
-}
-
-.appliedRow {
-  display: flex;
-  gap: 10px;
-}
-
-.appliedTopic {
-  width: 96px;
-  flex-shrink: 0;
-  padding-top: 2px;
-  font-size: 12px;
-  color: var(--sh-text-secondary);
-}
-
-.appliedText {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  overflow-wrap: anywhere;
-}
-
 .cardActions {
   display: flex;
   align-items: center;
@@ -630,26 +558,6 @@ button.turnRow:hover {
   gap: 8px;
   padding: 10px 12px;
   border-top: 1px solid var(--sh-border-subtle);
-}
-
-.notice {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 12px 14px;
-  border: 1px solid var(--sh-border-default);
-  border-radius: var(--sh-radius-lg);
-  font-size: var(--sh-text-body);
-}
-
-.willAdd {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 14px;
-  border: 1px solid var(--sh-border-default);
-  border-radius: var(--sh-radius-lg);
-  font-size: var(--sh-text-body);
 }
 
 .focusTarget:focus {
@@ -701,44 +609,6 @@ button.turnRow:hover {
   white-space: pre-wrap;
   font-size: var(--sh-text-body);
   line-height: 1.6;
-}
-
-.suggestions,
-.waiting {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.suggestion {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 12px 14px;
-  border: 1px solid var(--sh-warning-border);
-  border-radius: var(--sh-radius-lg);
-  background: var(--sh-warning-bg-subtle);
-}
-
-.suggestionEyebrow {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--sh-warning-text-on-subtle);
-}
-
-.suggestionTitle {
-  font-size: 15px;
-  font-weight: 600;
-}
-
-.suggestionBody {
-  font-size: var(--sh-text-body);
-  line-height: 22px;
-  overflow-wrap: anywhere;
-}
-
-.editFirst textarea {
-  background: var(--sh-surface-card);
 }
 
 .question {
@@ -879,51 +749,6 @@ button.turnRow:hover {
   color: var(--sh-success-text);
 }
 
-.unused {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 10px 12px;
-  border-radius: var(--sh-radius-lg);
-  background: var(--sh-bg-hover);
-}
-
-.unusedTitle {
-  font-size: var(--sh-text-body);
-  font-weight: 600;
-}
-
-.unusedList {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.unusedRow {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 10px;
-  padding: 8px 10px;
-  border: 1px solid var(--sh-border-subtle);
-  border-radius: var(--sh-radius-md);
-  background: var(--sh-surface-card);
-  font-size: var(--sh-text-body-sm);
-}
-
-.unusedNumber {
-  width: 34px;
-  flex-shrink: 0;
-  font-family: var(--sh-font-mono);
-  color: var(--sh-text-secondary);
-}
-
-.unusedText {
-  flex: 1 1 200px;
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
 .offer {
   display: flex;
   align-items: center;
@@ -960,8 +785,8 @@ button.turnRow:hover {
   border: none;
   padding: 0;
   cursor: pointer;
-  font-family: var(--sh-font-mono);
-  font-size: 12px;
+  font: inherit;
+  font-size: var(--sh-text-body-sm);
   font-weight: 600;
   color: var(--sh-text-primary);
   text-align: left;
@@ -1188,16 +1013,6 @@ button.turnRow:hover {
   .checklistItems,
   .questionOptions {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .appliedRow {
-    flex-direction: column;
-    gap: 2px;
-  }
-
-  .appliedTopic {
-    width: auto;
-    padding-top: 0;
   }
 
   .chips {

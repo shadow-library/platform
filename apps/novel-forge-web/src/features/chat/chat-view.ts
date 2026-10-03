@@ -1,23 +1,19 @@
 import { textDigest } from '@shadow-library/sdk';
 
-import { type ChatJobState, type OrganiseCardEntry, type OrganiseEntryLabel, type OrganiseReceipt } from '@/lib/apis/chat.api';
+import { type ChatJobState, type OrganiseReceipt } from '@/lib/apis/chat.api';
 import { isRecord } from '@/lib/is-record';
 import {
-  type BibleSection,
   type ChatMessageResponse,
   type ChatQuestionResponse,
   type ChatTurnResponse,
-  type EntityType,
   type JobKind,
   type LedgerRejectionScope,
   type ProgressItemKey,
   type ProgressItemResponse,
   type UndoImpactResponse,
 } from '@/lib/apis/api-types.gen';
-import { documentTopic, TOPIC_LABEL, topicForEntityType } from '@/lib/bible-topics';
 import { type ChangeOp } from '@/lib/proposals';
 
-const STORY_LABEL = 'The story';
 const PROSE_FIELDS = [
   'body',
   'rule',
@@ -47,23 +43,6 @@ const STORY_FIELD_LABELS = {
 
 function text(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
-}
-
-function isSecret(op: ChangeOp): boolean {
-  return (op.unlock !== undefined && op.unlock !== null) || typeof op.revealChapter === 'number';
-}
-
-export function opTopicLabel(op: ChangeOp): string {
-  const type = String(op.op);
-  if (type === 'premise.update' || type === 'volume.upsert') return STORY_LABEL;
-  if (type === 'entity.upsert') return TOPIC_LABEL[topicForEntityType(op.type as EntityType) ?? 'lore'];
-  if (type === 'fact.upsert') return isSecret(op) ? 'Secrets' : 'Facts';
-  if (type === 'milestone.upsert') return 'Milestones';
-  if (type === 'organise.rule') return 'Notebook';
-  if (type === 'brief.update') return 'Chapter plan';
-  if (type === 'bible_document.upsert') return TOPIC_LABEL[documentTopic({ section: op.section as BibleSection, slug: String(op.slug), title: String(op.slug) })];
-  if (type.startsWith('action.')) return 'Action';
-  return 'Change';
 }
 
 /** Names the story basics a premise.update sets, with "Premise" standing for the premise, brief, themes and instructions together. */
@@ -99,46 +78,6 @@ export function opWrittenField(op: ChangeOp): (typeof PROSE_FIELDS)[number] | 'l
 export function opWrittenText(op: ChangeOp): string {
   const field = opWrittenField(op);
   return (field ? text(op[field]) : undefined) ?? opSubject(op);
-}
-
-export function opCardTitle(op: ChangeOp): string {
-  const topic = opTopicLabel(op);
-  const subject = opSubject(op);
-  return topic.toLowerCase() === subject.toLowerCase() ? subject : `${topic}: ${subject}`;
-}
-
-export function opWrittenValue(op: ChangeOp): string {
-  const field = opWrittenField(op);
-  const value = field ? text(op[field]) : undefined;
-  const subject = opSubject(op);
-  if (!value || value === subject) return subject;
-  return `${subject}: ${value}`;
-}
-
-export interface AppliedRow {
-  index: number;
-  topic: string;
-  value: string;
-  quote?: string;
-  paragraphs?: number[];
-}
-
-export type QuoteSource = 'message' | 'notes';
-
-/** What the change wrote into the Story Bible; an action it started is not an entry, and its job reports itself. */
-export function appliedRows(changeSet: readonly ChangeOp[], paragraphs?: ReadonlyMap<number, number[]>): AppliedRow[] {
-  return changeSet
-    .map((op, index) => ({ op, index }))
-    .filter(({ op }) => !String(op.op).startsWith('action.'))
-    .map(({ op, index }) => ({ index, topic: opTopicLabel(op), value: opWrittenValue(op), quote: text(op.quote), paragraphs: paragraphs?.get(index) }));
-}
-
-/** Where a row's words came from, so the author can check the written value against them. */
-export function rowSource(row: Pick<AppliedRow, 'quote' | 'paragraphs'>, source: QuoteSource): string | undefined {
-  const cited = row.paragraphs?.length ? row.paragraphs.map(number => `¶${number}`).join(', ') : '';
-  const origin = source === 'notes' ? `from your notes${cited ? `, ${cited}` : ''}` : 'from your message';
-  if (row.quote) return `${origin}: “${row.quote}”`;
-  return source === 'notes' && cited ? origin : undefined;
 }
 
 export interface UndoImpactView {
@@ -278,30 +217,6 @@ export function rejectionWhy(scope: RejectionScope): string {
   if (scope === 'never') return 'Declined in the chat: not for this story.';
   if (scope === 'not_now') return 'Declined in the chat for now; it may fit later.';
   return 'Declined in the chat for this version; a later edit to what it touches makes it eligible again.';
-}
-
-export interface DecisionPick {
-  subject: string;
-  decision: SuggestionDecision;
-}
-
-export function picksOf(changeSet: readonly ChangeOp[], decisions: ReadonlyMap<number, SuggestionDecision>): DecisionPick[] {
-  return [...decisions.entries()]
-    .sort(([a], [b]) => a - b)
-    .flatMap(([index, decision]) => {
-      const op = changeSet[index];
-      return op ? [{ subject: opSubject(op), decision }] : [];
-    });
-}
-
-export function picksSentence(picks: readonly DecisionPick[]): string {
-  if (picks.length === 0) return 'You had not answered any of it yet.';
-  return `You had picked: ${picks.map(pick => `${pick.decision === 'add' ? 'add' : 'not'} “${pick.subject}”`).join(', ')}.`;
-}
-
-export function pendingDecisionLabel(subject: string, topic: string, remaining: number, committing: boolean): string {
-  if (remaining > 0) return `Will add “${subject}” to ${topic} — ${remaining} left to answer.`;
-  return `Will add “${subject}” to ${topic}${committing ? ' — adding now' : ''}.`;
 }
 
 export type CommitBarView =
@@ -539,15 +454,10 @@ export interface UnusedParagraph {
   text?: string;
 }
 
-export interface OrganiseReceiptView {
-  summary: string;
+export interface NotUsedView {
   unused: UnusedParagraph[];
   /** The notes changed after this round: its paragraph numbers no longer match what the author sees. */
   renumbered: boolean;
-}
-
-function plural(count: number, one: string, many: string): string {
-  return `${count} ${count === 1 ? one : many}`;
 }
 
 /** Split exactly as the server's `notesParagraphs`, so ¶N here is the paragraph the round cited. */
@@ -558,53 +468,10 @@ export function notesParagraphs(notes: string): string[] {
     .filter(Boolean);
 }
 
-export function organiseReceiptView(receipt: OrganiseReceipt, notes: string | undefined): OrganiseReceiptView {
+export function notUsedView(receipt: OrganiseReceipt, notes: string | undefined): NotUsedView {
   const renumbered = notes === undefined || textDigest(notes) !== receipt.notesDigest;
   const paragraphs = renumbered ? [] : notesParagraphs(notes);
-  const parts = [plural(receipt.fromNotes, 'entry from your notes', 'entries from your notes')];
-  if (receipt.suggested > 0) parts.push(plural(receipt.suggested, 'suggestion', 'suggestions'));
-  if (receipt.rules > 0) parts.push(plural(receipt.rules, 'rule', 'rules'));
-  return {
-    summary: `${parts.join(' · ')} — read from ${plural(receipt.paragraphs, 'paragraph', 'paragraphs')}`,
-    unused: receipt.unusedParagraphs.map(number => ({ number, text: paragraphs[number - 1] })),
-    renumbered,
-  };
-}
-
-const ENTRY_EYEBROW: Record<OrganiseEntryLabel, string> = {
-  from_notes: 'From your notes — waiting for your yes',
-  suggested: 'Suggested — not in your notes',
-  planner_only: 'From your notes — planner-only',
-  retired: 'Takes out an earlier organise entry',
-  rule: 'A rule from your notes',
-};
-
-export const SUGGESTED_EYEBROW = ENTRY_EYEBROW.suggested;
-
-export interface CardEntryNote {
-  eyebrow: string;
-  /** Declining it takes an earlier organise answer out of the Notebook. */
-  retires: boolean;
-}
-
-export function entryNotes(entries: readonly OrganiseCardEntry[]): Map<number, CardEntryNote> {
-  return new Map(entries.map(entry => [entry.opIndex, { eyebrow: ENTRY_EYEBROW[entry.label] ?? SUGGESTED_EYEBROW, retires: Boolean(entry.retires?.length) }]));
-}
-
-const NOTES_CITATION = /¶\d+(?:\s*[–-]\s*¶?\d+)?/g;
-
-export function opEyebrow(op: ChangeOp): string {
-  const cited = rationaleOf(op).match(NOTES_CITATION);
-  if (!cited) return SUGGESTED_EYEBROW;
-  return `From your notes · ${cited.join(', ')}`;
-}
-
-export const RETIRES_NOTE = 'Already in your Notebook — declining it takes it out.';
-
-/** The server appends the retire note to the rationale; the card says it once, from the receipt. */
-export function rationaleOf(op: ChangeOp): string {
-  const rationale = typeof op.rationale === 'string' ? op.rationale.trim() : '';
-  return rationale.replace(RETIRES_NOTE, '').trim();
+  return { unused: receipt.unusedParagraphs.map(number => ({ number, text: paragraphs[number - 1] })), renumbered };
 }
 
 export type SessionMode = 'manual' | 'auto';
