@@ -58,7 +58,7 @@ export function chatPromptTokens(scopeInstructions: string): number {
 
 export const chatRefinePrompt: PromptModule<ChatRefineOutput> = {
   key: 'chat-refine',
-  version: '2.19.0',
+  version: '2.20.0',
   kind: 'authoring',
   role: 'chat',
   cacheStrategy: { stableVars: ['scopeInstructions', 'stableContext'] },

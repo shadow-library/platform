@@ -2,6 +2,7 @@ import { type QueryClient, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 
 import { type JobStatus } from './api-types.gen';
+import { invalidateSoon } from './batched-invalidation';
 import { invalidateJobs } from './insight.api';
 import { setEventStreamLive } from './live-polling';
 import { invalidateAudits } from './bible.api';
@@ -21,6 +22,7 @@ export type ProjectEvent =
 const PROJECT_EVENT_TYPES = ['run', 'job', 'chat'] as const;
 const SESSION_TARGET_PREFIX = 'session:';
 const CANON_REFRESH_JOB_KIND = 'canon_refresh';
+const FINALIZE_REVIEW_JOB_KIND = 'finalize_review';
 // Settled is the complement of the two in-flight statuses rather than a list of the terminal ones: a
 // status the server adds later that this misses would leave a finished job on screen forever, while
 // mistaking a new in-flight status for a settled one costs only a refetch.
@@ -49,7 +51,10 @@ export function parseProjectEvent(data: unknown): ProjectEvent | undefined {
 export function applyProjectEvent(queryClient: QueryClient, projectId: string, event: ProjectEvent): void {
   if (event.type === 'job') {
     invalidateJobs(queryClient, projectId);
-    if (event.kind !== CANON_REFRESH_JOB_KIND || !jobSettled(event.status)) return;
+    if (!jobSettled(event.status)) return;
+    // Reading a review may finalize the chapter it reads when approval left nothing to ask, which rewrites the Story Bible and the chapter list.
+    if (event.kind === FINALIZE_REVIEW_JOB_KIND) return invalidateSoon(queryClient, { queryKey: ['projects', projectId] });
+    if (event.kind !== CANON_REFRESH_JOB_KIND) return;
     invalidateProposalLists(queryClient, projectId);
     invalidateAudits(queryClient, projectId);
     return;

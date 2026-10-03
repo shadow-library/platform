@@ -129,7 +129,7 @@ export class ProjectModelOverrides {
 export class ProjectFinalizeReviewConfig {
   @Field(() => [FinalizeReviewCategory], {
     optional: true,
-    description: 'Categories whose routine finalize-review updates are kept without asking. Consequential updates are always asked one by one.',
+    description: 'Categories whose routine finalize-review updates are kept without asking; unset, every routine category is. Consequential updates are always asked one by one.',
   })
   autoKeep?: FinalizeReview.Category[];
 }

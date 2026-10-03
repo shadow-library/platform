@@ -32,6 +32,7 @@ import {
   useChatMessagesQuery,
   useChatTurnStream,
   useContinuityProposalsQuery,
+  useFinalizeReviewsQuery,
   useListProposalsQuery,
   useProgressOverrideMutation,
   useProgressQuery,
@@ -56,6 +57,8 @@ import { editQueued, inputCaption, type QueuedTurn, queuedView, queueStep, relea
 import { ChatComposer } from './ChatComposer';
 import { NotesChip, SaveAsNotesOffer } from './ChatExtras';
 import { ContinuityProposalCard } from './ContinuityProposalCard';
+import { FinalizeDecisionsCard } from './FinalizeDecisionsCard';
+import { hiddenReceipts, hideReceipt } from './hidden-receipts';
 import {
   answeredInPanel,
   applyNoteToast,
@@ -94,6 +97,7 @@ import { type DockState, dockState, jobProposals, organiseIdeas, type PanelPropo
 import { QuestionCard } from './QuestionCard';
 import { ReadyChecklist } from './ReadyChecklist';
 import { RenameInput } from './RenameInput';
+import { StoryBibleReceiptCard } from './StoryBibleReceiptCard';
 import { LiveStreamedTurn } from './StreamedTurn';
 import { useUnansweredCount } from './suggestion-store';
 import { TurnProposalCard } from './TurnProposalCard';
@@ -171,6 +175,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
   const generation = useGenerationActivity(novelId);
   const reviewQueue = useReviewQueueQuery(novelId);
   const continuityQuery = useContinuityProposalsQuery(novelId);
+  const finalizeReviewsQuery = useFinalizeReviewsQuery(novelId);
   const startNextDraft = useStartNextDraftMutation(novelId);
   const unanswered = useUnansweredCount();
 
@@ -185,6 +190,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
   const [planStartOpen, setPlanStartOpen] = useState(false);
   const [announcement, setAnnouncement] = useState('');
   const [cancellingJob, setCancellingJob] = useState<string>();
+  const [hiddenBibleReceipts, setHiddenBibleReceipts] = useState(hiddenReceipts);
   // Where the transcript's assistant messages stood when this tab's turn began; the turn's own reply is the first one past it.
   const [assistantWatermark, setAssistantWatermark] = useState(0);
   const [awayFromLatest, setAwayFromLatest] = useState(false);
@@ -265,6 +271,9 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
   const writing = generation.activity && !jobStream.jobs.some(job => job.id === generation.activity?.jobId) ? generation.activity : undefined;
   const draftsForYou = (reviewQueue.data?.drafts ?? []).filter(draft => draft.reviewStatus === 'needs_review' || draft.reviewStatus === 'contradiction');
   const continuityForYou = continuityQuery.data?.items ?? [];
+  const bibleReceipts = (finalizeReviewsQuery.data?.applied ?? []).filter(review => !hiddenBibleReceipts.has(review.id));
+  const bibleDecisions = finalizeReviewsQuery.data?.waiting ?? [];
+  const hideBibleReceipt = (reviewId: string): void => setHiddenBibleReceipts(hideReceipt(reviewId));
 
   const shownProposals = new Set<string>();
   for (const message of messages) {
@@ -557,8 +566,8 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
   };
 
   // A revision rewrites the prose, so the request goes out with Edit prose on; the author finishes the sentence with what to change.
-  const askForChanges = (chapter: number): void => {
-    const draft = `Revise chapter ${chapter}: `;
+  const askForChanges = (chapter: number, note = ''): void => {
+    const draft = `Revise chapter ${chapter}: ${note}`;
     setProseEdits(true);
     setInput(draft);
     requestAnimationFrame(() => {
@@ -833,6 +842,24 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
               ))}
               {continuityForYou.map(proposal => (
                 <ContinuityProposalCard key={proposal.id} novelId={novelId} proposal={proposal} />
+              ))}
+              {bibleReceipts.map(review => (
+                <StoryBibleReceiptCard
+                  key={review.id}
+                  novelId={novelId}
+                  review={review}
+                  undoable={review.chapter === finalizeReviewsQuery.data?.undoableChapter}
+                  onHide={() => hideBibleReceipt(review.id)}
+                />
+              ))}
+              {bibleDecisions.map(review => (
+                <FinalizeDecisionsCard
+                  key={review.id}
+                  novelId={novelId}
+                  review={review}
+                  settling={finalizeReviewsQuery.data?.settling.includes(review.id) ?? false}
+                  onFixChapter={askForChanges}
+                />
               ))}
               {planStartOpen && (
                 <div ref={planStartBar} className={`${styles.indented} ${styles.planStartBar}`}>

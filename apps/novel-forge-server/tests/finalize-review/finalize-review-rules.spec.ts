@@ -3,7 +3,7 @@ import { type SQL } from 'drizzle-orm';
 import { PgDialect } from 'drizzle-orm/pg-core';
 
 import { reviewRefusal, type ReviewWithItems } from '@modules/finalize-review/finalize-review-gate';
-import { buildReviewItems, editedChange, type ReviewMaterial } from '@modules/finalize-review/finalize-review-items';
+import { buildReviewItems, editedChange, effectiveAutoKeep, type ReviewMaterial } from '@modules/finalize-review/finalize-review-items';
 import { applyKeptItems, type ChangeApplier, drizzleRowStore, type KeptItem, revertAppliedItems, type RowRef, type RowStore } from '@modules/finalize-review/review-event-apply';
 import { hashReviewedBody } from '@modules/review/review-findings';
 import { type ContinuityOutput } from '@modules/ai/schemas';
@@ -31,7 +31,8 @@ function material(overrides: Partial<ReviewMaterial> = {}): ReviewMaterial {
     isolated: false,
     claimedMilestones: ['lamp_rank_4'],
     milestones: [{ milestoneKey: 'lamp_rank_4', label: 'Mira reaches the fourth rank', state: 'planned' }],
-    entityKeys: new Set(['mira']),
+    entityNames: new Map([['mira', 'Mira']]),
+    settledPromises: new Set(),
     plannedLearns: new Set(),
     plannedFactKeys: ['lamp_rank_4_rule'],
     facts: [{ factKey: 'lamp_rank_4_rule', revealChapter: null, unlock: { all: [{ milestone: 'lamp_rank_4' }] }, source: 'manual' }],
@@ -123,6 +124,62 @@ describe('buildReviewItems', () => {
     const [state] = buildReviewItems(material({ isolated: true })).filter(item => item.category === 'character_state');
 
     expect(state?.evidence).not.toContain('tower');
+  });
+
+  it('should ask before a reported new entity renames a record already in the Story Bible, even in an auto-keep category', () => {
+    const extraction = { ...EXTRACTION, appeared: [], newEntities: [{ entityKey: 'mira', name: 'Mirabel', type: 'character' as const }] };
+    const [renamed] = buildReviewItems(material({ extraction, autoKeep: new Set(['entity']) })).filter(item => item.category === 'entity');
+
+    expect(renamed).toMatchObject({ triage: 'consequential', flag: 'renamed_record', claim: 'Renames mira from "Mira" to "Mirabel"', decision: null, autoKept: false });
+  });
+
+  it('should ask before a confident open report reopens a thread already paid off, even in an auto-keep category', () => {
+    const extraction = { ...EXTRACTION, threads: [{ threadKey: 'lamp_debt', status: 'open' as const, summary: 'Mira owes the keeper' }] };
+    const [reopened] = buildReviewItems(material({ extraction, settledPromises: new Set(['thread:lamp_debt']), autoKeep: new Set(['promise']) })).filter(
+      item => item.category === 'promise',
+    );
+
+    expect(reopened).toMatchObject({ triage: 'consequential', flag: 'reopened_promise', claim: 'Reopens: Mira owes the keeper', decision: null, autoKept: false });
+  });
+
+  it('should ask before a confident open report reopens a question already answered', () => {
+    const extraction = { ...EXTRACTION, threads: [], mysteries: [{ mysteryKey: 'cold_lamp', status: 'open' as const, question: 'Why does the lamp burn cold?' }] };
+    const [reopened] = buildReviewItems(material({ extraction, settledPromises: new Set(['mystery:cold_lamp']), autoKeep: new Set(['promise']) })).filter(
+      item => item.category === 'promise',
+    );
+
+    expect(reopened).toMatchObject({ triage: 'consequential', flag: 'reopened_promise', claim: 'Reopens the question: Why does the lamp burn cold?', autoKept: false });
+  });
+
+  it('should keep a confident open report on a promise still open as routine', () => {
+    const extraction = { ...EXTRACTION, threads: [{ threadKey: 'lamp_debt', status: 'open' as const, summary: 'Mira owes the keeper' }] };
+    const [open] = buildReviewItems(material({ extraction, settledPromises: new Set(['mystery:lamp_debt']), autoKeep: new Set(['promise']) })).filter(
+      item => item.category === 'promise',
+    );
+
+    expect(open).toMatchObject({ triage: 'routine', flag: null, claim: 'Open: Mira owes the keeper', decision: 'kept', autoKept: true });
+  });
+
+  it('should read a reported new entity that is already a record under the same name as an appearance', () => {
+    const extraction = { ...EXTRACTION, appeared: [], newEntities: [{ entityKey: 'mira', name: 'Mira', type: 'character' as const }] };
+    const items = buildReviewItems(material({ extraction })).filter(item => item.subjectKey === 'mira');
+
+    expect(items.map(item => [item.category, item.triage])).toEqual([
+      ['appearance', 'routine'],
+      ['character_state', 'routine'],
+    ]);
+  });
+});
+
+describe('effectiveAutoKeep', () => {
+  it('should keep every routine category until the author chooses', () => {
+    expect(effectiveAutoKeep(null)).toEqual(['appearance', 'character_state', 'relationship', 'promise', 'entity', 'milestone']);
+    expect(effectiveAutoKeep({ finalizeReview: {} })).toEqual(['appearance', 'character_state', 'relationship', 'promise', 'entity', 'milestone']);
+  });
+
+  it("should follow the author's choice once made, including turning every category off", () => {
+    expect(effectiveAutoKeep({ finalizeReview: { autoKeep: ['appearance'] } })).toEqual(['appearance']);
+    expect(effectiveAutoKeep({ finalizeReview: { autoKeep: [] } })).toEqual([]);
   });
 });
 

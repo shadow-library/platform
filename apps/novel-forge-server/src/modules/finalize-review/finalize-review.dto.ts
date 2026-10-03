@@ -77,7 +77,7 @@ export class FinalizeReviewItemResponse {
     optional: true,
     nullable: true,
     description:
-      'missed_milestone: the plan claims it but the prose does not reach it, so it stays locked. unclaimed_milestone: the prose seems to reach one the plan does not claim. unplanned_disclosure: a character learns a fact still locked here.',
+      'Set when the chapter disagrees with the plan or canon, so the update is never kept automatically. missed_milestone: the plan claims it but the prose does not reach it, so it stays locked. unclaimed_milestone: the prose seems to reach one the plan does not claim. unplanned_disclosure: a character learns a fact still locked here. renamed_record: keeping it renames a record already in the Story Bible. reopened_promise: keeping it reopens a thread already paid off or a question already answered.',
   })
   flag?: FinalizeReview.Flag | null;
 
@@ -198,7 +198,7 @@ export class FinalizeReviewResponse {
   @Field(() => [FinalizeReviewItemResponse])
   routine: FinalizeReviewItemResponse[];
 
-  @Field(() => [FinalizeReviewCategory])
+  @Field(() => [FinalizeReviewCategory], { description: 'The categories whose routine updates are kept without asking: every routine category until the author chooses.' })
   autoKeep: FinalizeReview.Category[];
 
   @Field(() => String, { optional: true, nullable: true, format: 'date-time' })
@@ -214,4 +214,23 @@ export class FinalizeReviewResponse {
 
   @Field(() => String, { optional: true, nullable: true, format: 'date-time' })
   revertedAt?: Date | null;
+}
+
+@Schema()
+export class FinalizeReviewListResponse {
+  @Field(() => [FinalizeReviewResponse], {
+    description: 'Reviews of approved chapters still being read, failed, or waiting on an answer or on finalize, oldest chapter first. A review the prose moved past is left out.',
+  })
+  waiting: FinalizeReviewResponse[];
+
+  @Field(() => [String], {
+    description: 'Ids of waiting reviews whose reading job still runs: one with nothing left to ask may be finalizing on its own, so it offers no finalize of its own yet.',
+  })
+  settling: bigint[];
+
+  @Field(() => [FinalizeReviewResponse], { description: 'Reviews whose updates were written to the Story Bible in the last 24 hours, oldest chapter first.' })
+  applied: FinalizeReviewResponse[];
+
+  @Field(() => Integer, { optional: true, nullable: true, description: 'The chapter whose applied updates can be undone now — only the latest final chapter’s can.' })
+  undoableChapter?: number | null;
 }

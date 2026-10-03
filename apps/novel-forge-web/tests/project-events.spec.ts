@@ -45,6 +45,20 @@ describe('applyProjectEvent', () => {
     expect(invalidated).toEqual(['projects/7/bible/audits', 'projects/7/jobs', 'projects/7/refinement-proposals']);
   });
 
+  it('should refetch every project read once a review is read, since it may have finalized the chapter', () => {
+    applyProjectEvent(queryClient, '7', { type: 'job', jobId: 'j1', kind: 'finalize_review', status: 'done' });
+    flushInvalidations(queryClient);
+
+    expect(invalidated).toEqual(['projects/7/jobs', 'projects/7']);
+  });
+
+  it('should refetch only the job list while a review is being read', () => {
+    applyProjectEvent(queryClient, '7', { type: 'job', jobId: 'j1', kind: 'finalize_review', status: 'in_progress' });
+    flushInvalidations(queryClient);
+
+    expect(invalidated).toEqual(['projects/7/jobs']);
+  });
+
   it('should refetch only the job list while a chapter’s Story Bible refresh runs', () => {
     applyProjectEvent(queryClient, '7', { type: 'job', jobId: 'j1', kind: 'canon_refresh', status: 'in_progress' });
     flushInvalidations(queryClient);

@@ -177,6 +177,11 @@ const CHAT: Expected[] = [
   { selector: '.turnOpNote', values: { 'margin-top': '4px' }, baseline: '.turnOpNote', source: 'chat.module.css .turnOpNote' },
   { selector: '.turnOpError', values: { 'margin-top': '6px' }, baseline: '.turnOpError', source: 'chat.module.css .turnOpError' },
   { selector: '.turnOpSummary', values: { 'margin-top': '6px' }, baseline: '.turnOpSummary', source: 'chat.module.css .turnOpSummary' },
+  {
+    selector: '.turnOpActions',
+    values: { gap: '8px', 'margin-top': '8px' },
+    source: 'mockup screen 5 (Approve.dc.html): an item’s Add / Skip and conflict choice, 8 apart as .row; 8 under the item as .draftFoot gap 8',
+  },
   { selector: '.turnCardNote', values: { padding: '10px 12px' }, baseline: '.turnCardNote', source: 'chat.module.css .turnCardNote' },
   { selector: '.turnCardWarning', values: { padding: '10px 12px' }, baseline: '.turnCardWarning', source: 'chat.module.css .turnCardWarning' },
   {

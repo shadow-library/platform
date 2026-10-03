@@ -3,9 +3,14 @@ import { describe, expect, it } from 'bun:test';
 import { type FinalizeReviewItemResponse, type FinalizeReviewResponse } from '../src/lib/apis/api-types.gen';
 import { ApiError } from '../src/lib/apis/transport';
 import {
+  askedItems,
   autoKeepChoices,
   decisionAnnouncement,
   decisionMode,
+  decisionsCaption,
+  decisionsPhase,
+  decisionsTitle,
+  decisionTag,
   editable,
   editPatch,
   editValues,
@@ -14,12 +19,17 @@ import {
   finalizeBlockers,
   finalizeLabel,
   finalizeReviewPhase,
+  fixChapterNote,
+  isCanonConflict,
   itemStakes,
   itemTag,
   keepAllLabel,
   keptCount,
   latestFinalChapter,
   nextOpenItemId,
+  receiptLine,
+  receiptTitle,
+  storyBibleReceipt,
   toggledAutoKeep,
 } from '../src/lib/finalize-review';
 
@@ -265,5 +275,87 @@ describe('latestFinalChapter', () => {
       ]),
     ).toBe(2);
     expect(latestFinalChapter([{ chapter: 1, status: 'draft' }])).toBeUndefined();
+  });
+});
+
+describe('storyBibleReceipt', () => {
+  it('should list what finalize kept, and call it automatic when approval kept every update on its own', () => {
+    const kept = item({ id: '2', triage: 'routine', decision: 'kept', autoKept: true });
+    const receipt = storyBibleReceipt(review({ consequential: [], routine: [kept, item({ id: '3', triage: 'routine', decision: 'kept', autoKept: true })] }));
+
+    expect(receipt.added.map(entry => entry.id)).toEqual(['2', '3']);
+    expect(receipt.automatic).toBe(true);
+  });
+
+  it('should not call it automatic once the author answered something, and leave skipped updates off', () => {
+    const receipt = storyBibleReceipt(
+      review({ consequential: [item({ decision: 'skipped', reason: 'not yet' })], routine: [item({ id: '2', triage: 'routine', decision: 'kept', autoKept: true })] }),
+    );
+
+    expect(receipt.added.map(entry => entry.id)).toEqual(['2']);
+    expect(receipt.automatic).toBe(false);
+  });
+
+  it('should title the receipt by what it added, and say when it added nothing', () => {
+    expect(receiptTitle(3, 4)).toBe('Chapter 3: added 4 to the Story Bible');
+    expect(receiptTitle(3, 0)).toBe('Chapter 3 is final — nothing new for the Story Bible');
+  });
+
+  it('should mark an update the author edited', () => {
+    expect(receiptLine({ claim: 'Mira is at the tower', decision: 'edited' })).toBe('Mira is at the tower · as you edited it');
+    expect(receiptLine({ claim: 'Mira is at the tower', decision: 'kept' })).toBe('Mira is at the tower');
+  });
+});
+
+describe('the chat decisions card', () => {
+  it('should ask about everything approval did not keep on its own, answered or not', () => {
+    const asked = askedItems(
+      review({
+        consequential: [item({ decision: 'kept' })],
+        routine: [item({ id: '2', triage: 'routine', decision: 'kept', autoKept: true }), item({ id: '3', triage: 'routine' })],
+      }),
+    );
+
+    expect(asked.map(entry => entry.id)).toEqual(['1', '3']);
+  });
+
+  it('should tell a conflict from an unsure update', () => {
+    expect(isCanonConflict(item({ flag: 'missed_milestone' }))).toBe(true);
+    expect(decisionTag(item({ flag: 'unplanned_disclosure', basis: 'inferred', category: 'knowledge' }))).toEqual({ label: 'conflicts', intent: 'danger' });
+    expect(decisionTag(item({ basis: 'inferred' }))).toEqual({ label: 'unsure', intent: 'neutral' });
+    expect(decisionTag(item({ basis: 'inferred', category: 'summary' }))).toEqual({ label: 'Summary later chapters see', intent: 'accent' });
+  });
+
+  it('should offer the two-way conflict choice for a rename or a reopened promise the server flagged', () => {
+    const renamed = item({ category: 'entity', flag: 'renamed_record', claim: 'Renames mira from "Mira" to "Mirabel"' });
+    const reopened = item({ category: 'promise', flag: 'reopened_promise', claim: 'Reopens: Mira owes the keeper' });
+
+    expect([renamed, reopened].map(isCanonConflict)).toEqual([true, true]);
+    expect([renamed, reopened].map(entry => decisionTag(entry).label)).toEqual(['conflicts', 'conflicts']);
+    expect([renamed, reopened].map(entry => itemTag(entry).label)).toEqual(['Renames a record', 'Reopens a promise']);
+    expect(itemStakes(reopened)).toBe('The Story Bible has this settled; keeping it opens it again.');
+  });
+
+  it('should hold a review that asks nothing as settling while its reading job may still be finalizing it', () => {
+    expect(decisionsPhase(review(ANSWERED), true)).toBe('settling');
+    expect(decisionsPhase(review(ANSWERED), false)).toBe('answered');
+    expect(decisionsPhase(review(), true)).toBe('asking');
+    expect(decisionsPhase(review({ status: 'preparing' }), false)).toBe('reading');
+    expect(decisionsPhase(review({ status: 'failed' }), true)).toBe('failed');
+  });
+
+  it('should count what is left to decide, and say when the chapter is ready', () => {
+    expect(decisionsTitle(review())).toBe('Chapter 4: 2 decisions for the Story Bible');
+    expect(decisionsTitle(review({ open: { consequential: 1, routine: 0 } }))).toBe('Chapter 4: 1 decision for the Story Bible');
+    expect(decisionsTitle(review(ANSWERED))).toBe('Chapter 4: ready for the Story Bible');
+  });
+
+  it('should say what Done writes', () => {
+    expect(decisionsCaption(review({ consequential: [item({ decision: 'kept' })], routine: [] }))).toBe('Done makes chapter 4 final and adds 1 update to the Story Bible.');
+    expect(decisionsCaption(review({ consequential: [item({ decision: 'skipped' })], routine: [] }))).toBe('Done makes chapter 4 final and adds nothing to the Story Bible.');
+  });
+
+  it('should ask for a chapter fix that keeps canon, naming the conflict', () => {
+    expect(fixChapterNote({ claim: 'Mira learns the lamp rule' })).toBe('keep the Story Bible as it is and change the chapter instead — Mira learns the lamp rule');
   });
 });

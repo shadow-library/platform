@@ -3,12 +3,14 @@ import { type QueryClient, useMutation, type UseMutationResult, useQuery, useQue
 import {
   type FinalizeReviewCategory,
   type FinalizeReviewItemDecisionBody,
+  type FinalizeReviewListResponse,
   type FinalizeReviewResponse,
   type FinalizeReviewSettingsResponse,
   type IsolationBridgeResponse,
   type WorkflowRunResponse,
 } from './api-types.gen';
 import { draftDetailKey } from './interstitial.api';
+import { livePolling } from './live-polling';
 import { type ApiError, APIRequest } from './transport';
 
 const PREPARING_POLL_MS = 2000;
@@ -22,6 +24,11 @@ const CHAPTER_MOVED_CODES: ReadonlySet<string> = new Set(['BRG_001', 'BRG_002'])
 // Keyed under the chapter's draft so an approval, a save or any draft mutation reads the review again.
 export function finalizeReviewKey(projectId: string, n: number): readonly [string, string, string, number, string] {
   return [...draftDetailKey(projectId, n), 'finalize-review'] as const;
+}
+
+// Under the project's drafts, so an approval or any draft mutation reads the list again.
+export function finalizeReviewsKey(projectId: string): readonly [string, string, string, string] {
+  return ['projects', projectId, 'drafts', 'finalize-reviews'] as const;
 }
 
 function readinessKey(projectId: string, n: number): readonly [string, string, string, number, string] {
@@ -46,10 +53,24 @@ export function useFinalizeReviewQuery(projectId: string, n: number, enabled = t
   });
 }
 
+/** Every review waiting on the author or still being read, and the updates written in the last day: the chat's Story Bible cards. */
+export function useFinalizeReviewsQuery(projectId: string, enabled = true): UseQueryResult<FinalizeReviewListResponse, ApiError> {
+  return useQuery<FinalizeReviewListResponse, ApiError>({
+    queryKey: finalizeReviewsKey(projectId),
+    queryFn: () => APIRequest.get(`/projects/${projectId}/finalize-reviews`).execute(),
+    enabled: enabled && Boolean(projectId),
+    refetchInterval: livePolling(projectId, query => {
+      const list = query.state.data;
+      return list && (list.settling.length > 0 || list.waiting.some(review => review.status === 'preparing')) ? PREPARING_POLL_MS : false;
+    }),
+  });
+}
+
 // A poll or refetch already in flight would land after this write and put the older review back.
 async function storeReview(queryClient: QueryClient, projectId: string, n: number, review: FinalizeReviewResponse): Promise<void> {
   await queryClient.cancelQueries({ queryKey: finalizeReviewKey(projectId, n), exact: true });
   queryClient.setQueryData(finalizeReviewKey(projectId, n), review);
+  queryClient.invalidateQueries({ queryKey: finalizeReviewsKey(projectId) });
   queryClient.invalidateQueries({ queryKey: readinessKey(projectId, n) });
   queryClient.invalidateQueries({ queryKey: isolationBridgeKey(projectId, n) });
 }
@@ -57,6 +78,7 @@ async function storeReview(queryClient: QueryClient, projectId: string, n: numbe
 function refetchMovedReview(queryClient: QueryClient, projectId: string, n: number, error: ApiError): void {
   if (!REVIEW_MOVED_CODES.has(error.code)) return;
   queryClient.invalidateQueries({ queryKey: finalizeReviewKey(projectId, n) });
+  queryClient.invalidateQueries({ queryKey: finalizeReviewsKey(projectId) });
   queryClient.invalidateQueries({ queryKey: readinessKey(projectId, n) });
 }
 
@@ -134,6 +156,7 @@ export function useFinalizeReviewedChapterMutation(projectId: string, n: number)
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['projects', projectId] }),
     onError: () => {
       queryClient.invalidateQueries({ queryKey: finalizeReviewKey(projectId, n) });
+      queryClient.invalidateQueries({ queryKey: finalizeReviewsKey(projectId) });
       queryClient.invalidateQueries({ queryKey: readinessKey(projectId, n) });
     },
   });

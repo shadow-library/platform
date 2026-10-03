@@ -1,4 +1,4 @@
-import { and, eq, isNull, sql } from 'drizzle-orm';
+import { and, asc, eq, gte, inArray, isNull, or, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
@@ -28,7 +28,7 @@ import { GenerationService } from '../generation/generation.service';
 import { JobHandlerRegistry } from '../jobs/job-handler.registry';
 import { hashReviewedBody } from '../review/review-findings';
 import { dropBriefClaims, isReviewCurrent, loadChapterReviews, revealsStrandedByRevert, revertedMilestoneKeys, type ReviewWithItems } from './finalize-review-gate';
-import { buildReviewItems, editedChange, type ProposedChange, sameProposal } from './finalize-review-items';
+import { buildReviewItems, editedChange, effectiveAutoKeep, openItems, type ProposedChange, sameProposal } from './finalize-review-items';
 import { type BridgePosition, decidingBridges, readBridgeCandidates } from './isolation-bridge';
 import { drizzleRowStore, revertAppliedItems } from './review-event-apply';
 
@@ -87,6 +87,21 @@ export interface ItemDecisionRequest {
   edited?: Record<string, unknown>;
   reason?: string;
 }
+
+export interface FinalizeReviewListView {
+  waiting: FinalizeReviewView[];
+  /** Waiting reviews whose prepare job still runs: one with nothing left to ask may be finalizing on its own right now. */
+  settling: bigint[];
+  applied: FinalizeReviewView[];
+  /** The one chapter whose applied updates revert would accept now: the latest final one. */
+  undoableChapter: number | null;
+}
+
+/** How long a chapter's applied updates stay listed as just written, for the receipt the chat shows. */
+export const RECENTLY_APPLIED_MS = 24 * 60 * 60 * 1000;
+
+const WAITING_STATUSES: FinalizeReview.Status[] = ['preparing', 'ready', 'failed'];
+const LIVE_JOB_STATUSES: Job.Status[] = ['pending', 'in_progress'];
 
 interface PreparePayload {
   reviewId: string;
@@ -169,8 +184,9 @@ export function presentFinalizeReview(
 }
 
 /**
- * Review-before-finalize: on approval a job reads the Story Bible updates out of the exact approved revision; the author keeps, edits or skips
- * each (routine ones as a batch, or automatically per category); finalize then applies only the kept set, as one revertible unit.
+ * Review-before-finalize: on approval a job reads the Story Bible updates out of the exact approved revision; routine ones are kept
+ * automatically per category, and the author keeps, edits or skips the rest; finalize then applies only the kept set, as one revertible unit —
+ * at once when approval left nothing to ask.
  */
 @Injectable()
 export class FinalizeReviewService {
@@ -194,6 +210,55 @@ export class FinalizeReviewService {
     const [reviews, draft, autoKeep] = await Promise.all([loadChapterReviews(this.db, projectId, chapter), this.findDraft(this.db, projectId, chapter), this.autoKeep(projectId)]);
     const review = this.latest(reviews, draft);
     return presentFinalizeReview(review, draft, autoKeep, appliedRevision(reviews));
+  }
+
+  /**
+   * Every chapter whose review waits on the author or the reader, and the updates written in the last day — one read for the chat's cards and
+   * the "waiting on you" tray. A review the prose moved past is left out: approving the chapter again stages a new one.
+   */
+  async list(projectId: bigint): Promise<FinalizeReviewListView> {
+    const since = new Date(Date.now() - RECENTLY_APPLIED_MS);
+    const [reviews, autoKeep, frontier] = await Promise.all([
+      this.db.query.finalizeReviews.findMany({
+        where: and(
+          eq(schema.finalizeReviews.projectId, projectId),
+          eq(schema.finalizeReviews.bridgeOnly, false),
+          or(inArray(schema.finalizeReviews.status, WAITING_STATUSES), and(eq(schema.finalizeReviews.status, 'applied'), gte(schema.finalizeReviews.appliedAt, since))),
+        ),
+        with: { items: { orderBy: asc(schema.finalizeReviewItems.position) } },
+      }),
+      this.autoKeep(projectId),
+      planFrontier(this.db, projectId),
+    ]);
+    const chapters = [...new Set(reviews.map(review => review.chapter))];
+    const drafts =
+      chapters.length === 0
+        ? []
+        : await this.db.query.drafts.findMany({
+            columns: { chapter: true, id: true, revision: true, body: true, isolated: true, status: true },
+            where: and(eq(schema.drafts.projectId, projectId), inArray(schema.drafts.chapter, chapters)),
+          });
+    const draftOf = new Map(drafts.map(draft => [draft.chapter, draft]));
+    const byChapter = (left: ReviewWithItems, right: ReviewWithItems): number => left.chapter - right.chapter;
+    const waiting = reviews.filter(review => {
+      const draft = draftOf.get(review.chapter);
+      return WAITING_STATUSES.includes(review.status) && draft !== undefined && draft.status !== 'final' && isReviewCurrent(review, draft);
+    });
+    const applied = reviews.filter(review => review.status === 'applied' && draftOf.get(review.chapter)?.status === 'final');
+    const jobIds = waiting.flatMap(review => (review.status === 'ready' && review.jobId ? [review.jobId] : []));
+    const liveJobs =
+      jobIds.length === 0
+        ? []
+        : await this.db.query.jobs.findMany({ columns: { id: true }, where: and(inArray(schema.jobs.id, jobIds), inArray(schema.jobs.status, LIVE_JOB_STATUSES)) });
+    const live = new Set(liveJobs.map(job => job.id));
+    const present = (review: ReviewWithItems): FinalizeReviewView =>
+      presentFinalizeReview(review, draftOf.get(review.chapter) ?? null, autoKeep, review.status === 'applied' ? review.draftRevision : null);
+    return {
+      waiting: waiting.sort(byChapter).map(present),
+      settling: waiting.filter(review => review.jobId && live.has(review.jobId)).map(review => review.id),
+      applied: applied.sort(byChapter).map(present),
+      undoableChapter: applied.find(review => review.chapter >= frontier)?.chapter ?? null,
+    };
   }
 
   /** Enqueues the prepare job again for a review still preparing or one whose reading failed. */
@@ -376,16 +441,41 @@ export class FinalizeReviewService {
         .where(and(eq(schema.finalizeReviews.id, review.id), eq(schema.finalizeReviews.status, 'preparing')));
       throw err;
     }
+    if (!review.bridgeOnly) await this.finalizeWhenSettled(review.projectId, review.chapter, review.id);
+  }
+
+  /**
+   * Approving was the author's answer to everything the review kept on its own: when nothing is left to ask on a standard chapter, it finalizes here, through
+   * the same refusals as the author's own finalize. Anything that refuses leaves the review answered and waiting; the prepared review stands
+   * either way, so a refusal never fails the job.
+   */
+  private async finalizeWhenSettled(projectId: bigint, chapter: number, reviewId: bigint): Promise<void> {
+    try {
+      const review = (await loadChapterReviews(this.db, projectId, chapter)).find(candidate => candidate.id === reviewId);
+      if (review?.status !== 'ready' || review.isolated || openItems(review.items).length > 0) return;
+      const readiness = await this.generationService.finalizeReadiness(projectId, chapter);
+      if (!readiness.ready) {
+        this.logger.info('finalize review answered; chapter left for the author to finalize', { projectId, chapter, blockers: readiness.blockers.map(blocker => blocker.code) });
+        return;
+      }
+      const run = await this.generationService.finalize(projectId, { chapter });
+      if (run.status === 'completed') this.logger.info('chapter finalized on approval', { projectId, chapter, reviewId, runId: run.runId });
+      else this.logger.warn('chapter not finalized on approval', { projectId, chapter, reviewId, runId: run.runId, status: run.status });
+    } catch (err) {
+      this.logger.warn('chapter not finalized on approval', { err, projectId, chapter, reviewId });
+    }
   }
 
   private async readItems(review: FinalizeReview.Row, draft: Draft): Promise<ReturnType<typeof buildReviewItems>> {
     const { projectId, chapter } = review;
-    const [project, plan, milestones, entities, roster] = await Promise.all([
+    const [project, plan, milestones, entities, roster, threads, mysteries] = await Promise.all([
       this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
       loadPlanState(this.db, projectId),
       this.db.query.milestones.findMany({ columns: { milestoneKey: true, label: true, state: true }, where: eq(schema.milestones.projectId, projectId) }),
-      this.db.query.entities.findMany({ columns: { entityKey: true }, where: eq(schema.entities.projectId, projectId) }),
+      this.db.query.entities.findMany({ columns: { entityKey: true, name: true }, where: eq(schema.entities.projectId, projectId) }),
       continuityRoster(this.db, projectId),
+      this.db.query.plotThreads.findMany({ columns: { threadKey: true }, where: and(eq(schema.plotThreads.projectId, projectId), eq(schema.plotThreads.status, 'closed')) }),
+      this.db.query.mysteries.findMany({ columns: { mysteryKey: true }, where: and(eq(schema.mysteries.projectId, projectId), eq(schema.mysteries.status, 'resolved')) }),
     ]);
     const brief = plan.plans.find(candidate => candidate.chapter === chapter);
     const claimed = brief?.claimedMilestones ?? [];
@@ -411,12 +501,13 @@ export class FinalizeReviewService {
       bridgeOnly: review.bridgeOnly,
       claimedMilestones: claimed,
       milestones,
-      entityKeys: new Set(entities.map(entity => entity.entityKey)),
+      entityNames: new Map(entities.map(entity => [entity.entityKey, entity.name])),
+      settledPromises: new Set([...threads.map(thread => `thread:${thread.threadKey}`), ...mysteries.map(mystery => `mystery:${mystery.mysteryKey}`)]),
       plannedLearns: new Set(learns.map(reveal => `${reveal.entityKey}:${reveal.factKey}`)),
       plannedFactKeys: learnedFactKeys(brief?.knowledgeContract),
       facts: plan.facts,
       unlock,
-      autoKeep: new Set((project?.config as ProjectConfigData | null)?.finalizeReview?.autoKeep ?? []),
+      autoKeep: new Set(effectiveAutoKeep(project?.config as ProjectConfigData | null)),
     });
   }
 
@@ -506,6 +597,6 @@ export class FinalizeReviewService {
 
   private async autoKeep(projectId: bigint): Promise<FinalizeReview.Category[]> {
     const project = await this.db.query.projects.findFirst({ columns: { config: true }, where: eq(schema.projects.id, projectId) });
-    return project?.config?.finalizeReview?.autoKeep ?? [];
+    return effectiveAutoKeep(project?.config);
   }
 }

@@ -66,11 +66,18 @@ function within(row: Row, column: string | undefined, low: unknown, high: unknow
   return !isNullish(value) && Number(value) >= Number(low) && Number(value) <= Number(high);
 }
 
+// A timestamp reaches the filter as a Date on the row and as the ISO string drizzle renders for the parameter.
+function ordinal(value: unknown): number {
+  if (value instanceof Date) return value.getTime();
+  const number = Number(value);
+  return typeof value === 'string' && Number.isNaN(number) ? Date.parse(value) : number;
+}
+
 function compare(left: unknown, operator: string, right: unknown): boolean {
   if (isNullish(left)) return false;
   if (operator === '=') return String(left) === String(right);
   if (operator === '<>') return String(left) !== String(right);
-  const [a, b] = [Number(left), Number(right)];
+  const [a, b] = [ordinal(left), ordinal(right)];
   if (operator === '<=') return a <= b;
   if (operator === '>=') return a >= b;
   if (operator === '<') return a < b;

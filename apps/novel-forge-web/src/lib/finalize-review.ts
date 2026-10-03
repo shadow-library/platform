@@ -164,6 +164,8 @@ export function itemTag(item: Pick<FinalizeReviewItemResponse, 'flag' | 'basis' 
   if (item.flag === 'unplanned_disclosure') return { label: 'Unplanned disclosure', intent: 'danger' };
   if (item.flag === 'missed_milestone') return { label: 'Missed milestone', intent: 'warning' };
   if (item.flag === 'unclaimed_milestone') return { label: 'Unplanned milestone', intent: 'warning' };
+  if (item.flag === 'renamed_record') return { label: 'Renames a record', intent: 'warning' };
+  if (item.flag === 'reopened_promise') return { label: 'Reopens a promise', intent: 'warning' };
   if (item.basis === 'inferred' && item.category !== 'summary') return { label: 'Interpretation', intent: 'warning' };
   return { label: categoryLabel(item.category), intent: 'accent' };
 }
@@ -177,6 +179,8 @@ export function itemStakes(item: Pick<FinalizeReviewItemResponse, 'flag' | 'depe
   }
   if (item.flag === 'unplanned_disclosure') return dependents.length > 0 ? `Still waiting on: ${list}.` : 'A character learns something the plan keeps locked here.';
   if (item.flag === 'unclaimed_milestone') return 'The plan doesn’t claim this milestone for this chapter.';
+  if (item.flag === 'renamed_record') return 'The Story Bible already has this record under another name.';
+  if (item.flag === 'reopened_promise') return 'The Story Bible has this settled; keeping it opens it again.';
   return null;
 }
 
@@ -382,4 +386,72 @@ export function droppedByHardLineNote(dropped: number): string | null {
   if (dropped === 0) return null;
   const lines = dropped === 1 ? 'One approved line was' : `${dropped} approved lines were`;
   return `${lines} left out because ${dropped === 1 ? 'it crosses' : 'they cross'} the hard line — standard chapters never read what crosses it, even when you kept it.`;
+}
+
+export interface StoryBibleReceipt {
+  added: FinalizeReviewItemResponse[];
+  /** Nothing in the review needed the author: approval kept every update on its own. */
+  automatic: boolean;
+}
+
+/** What an applied review wrote to the Story Bible, for the chat's receipt. */
+export function storyBibleReceipt(review: Pick<FinalizeReviewResponse, 'consequential' | 'routine'>): StoryBibleReceipt {
+  const items = [...review.consequential, ...review.routine];
+  return { added: items.filter(item => item.decision === 'kept' || item.decision === 'edited'), automatic: items.every(item => item.autoKept) };
+}
+
+export function receiptTitle(chapter: number, added: number): string {
+  if (added === 0) return `Chapter ${chapter} is final — nothing new for the Story Bible`;
+  return `Chapter ${chapter}: added ${added} to the Story Bible`;
+}
+
+export function receiptLine(item: Pick<FinalizeReviewItemResponse, 'claim' | 'decision'>): string {
+  return item.decision === 'edited' ? `${item.claim} · as you edited it` : item.claim;
+}
+
+/** The updates the chat's decisions card asks about: everything approval did not keep on its own, open or already answered. */
+export function askedItems(review: Pick<FinalizeReviewResponse, 'consequential' | 'routine'>): FinalizeReviewItemResponse[] {
+  return [...review.consequential, ...review.routine].filter(item => !item.autoKept);
+}
+
+/** The server flags every update where the chapter disagrees with the plan or canon: the author changes the chapter, or lets canon follow it. */
+export function isCanonConflict(item: Pick<FinalizeReviewItemResponse, 'flag'>): boolean {
+  return Boolean(item.flag);
+}
+
+/** The chat card's tag: a conflict or an interpretation the author confirms, else what the update is about. */
+export function decisionTag(item: Pick<FinalizeReviewItemResponse, 'flag' | 'basis' | 'category'>): { label: string; intent: ChipIntent } {
+  if (isCanonConflict(item)) return { label: 'conflicts', intent: 'danger' };
+  if (item.basis === 'inferred' && item.category !== 'summary') return { label: 'unsure', intent: 'neutral' };
+  return { label: categoryLabel(item.category), intent: 'accent' };
+}
+
+export function decisionsTitle(review: Pick<FinalizeReviewResponse, 'chapter' | 'open'>): string {
+  const open = review.open.consequential + review.open.routine;
+  if (open === 0) return `Chapter ${review.chapter}: ready for the Story Bible`;
+  return `Chapter ${review.chapter}: ${open} decision${open === 1 ? '' : 's'} for the Story Bible`;
+}
+
+export function decisionsCaption(review: Pick<FinalizeReviewResponse, 'chapter' | 'consequential' | 'routine'>): string {
+  const kept = keptCount(review);
+  const adds = kept === 0 ? 'adds nothing to the Story Bible' : `adds ${kept} update${kept === 1 ? '' : 's'} to the Story Bible`;
+  return `Done makes chapter ${review.chapter} final and ${adds}.`;
+}
+
+/** The revision request "Keep canon, fix the chapter" starts in the composer; nothing is recorded until the revised chapter is approved again. */
+export function fixChapterNote(item: Pick<FinalizeReviewItemResponse, 'claim'>): string {
+  return `keep the Story Bible as it is and change the chapter instead — ${item.claim}`;
+}
+
+export type DecisionsPhase = 'reading' | 'failed' | 'settling' | 'asking' | 'answered';
+
+/**
+ * Where a waiting review's chat card stands. A review that asks nothing while its reading job still runs may be finalizing on its own, so it
+ * shows as settling, without a finalize the server would refuse for the held claim.
+ */
+export function decisionsPhase(review: Pick<FinalizeReviewResponse, 'status' | 'open'>, settling: boolean): DecisionsPhase {
+  if (review.status === 'preparing') return 'reading';
+  if (review.status === 'failed') return 'failed';
+  if (review.open.consequential + review.open.routine > 0) return 'asking';
+  return settling ? 'settling' : 'answered';
 }

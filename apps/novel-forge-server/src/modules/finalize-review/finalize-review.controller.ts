@@ -7,6 +7,7 @@ import { ChapterParams, ProjectParams, WorkflowRunResponse } from '../generation
 import {
   FinalizeReviewItemDecisionBody,
   FinalizeReviewItemParams,
+  FinalizeReviewListResponse,
   FinalizeReviewResponse,
   FinalizeReviewSettingsBody,
   FinalizeReviewSettingsResponse,
@@ -19,6 +20,12 @@ import { FinalizeReviewService } from './finalize-review.service';
 @HttpController('/api/v1/projects/:projectId')
 export class FinalizeReviewController {
   constructor(private readonly reviewService: FinalizeReviewService) {}
+
+  @Get('/finalize-reviews')
+  @RespondFor(200, FinalizeReviewListResponse)
+  listReviews(@Params() params: ProjectParams): Promise<FinalizeReviewListResponse> {
+    return this.reviewService.list(params.projectId);
+  }
 
   @Get('/drafts/:n/finalize-review')
   @RespondFor(200, FinalizeReviewResponse)

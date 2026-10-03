@@ -2032,16 +2032,24 @@ them off `model_calls` rather than trusting a number here. Cost and admin inspec
 
 ### 6. Review before finalize
 
-- **Entry:** Chapter workspace → Approve → Finalize. Routes: `GET /drafts/:n/finalize-review`,
+- **Entry:** the chat's draft card → Approve, then its Story Bible cards; or Chapter workspace → Approve → Finalize. Routes:
+  `GET /finalize-reviews` (every waiting review and the updates applied in the last day), `GET /drafts/:n/finalize-review`,
   `POST …/finalize-review/prepare`, `POST …/finalize-review/items/:itemId/decision {"decision","reason"?}` (`kept`,
   `edited` with the inline edit, or `skipped`), `POST …/finalize-review/keep-routine`, `POST …/finalize-review/finalize`,
   `POST …/finalize-review/revert`, and `PUT /finalize-review/settings {"autoKeep":[…]}`.
-- **Run:** approve chapter 1 (Part 3), wait for the `finalize_review` job, answer every item, finalize.
+- **Run:** approve chapter 1 (Part 3), wait for the `finalize_review` job; answer what the chat's decisions card asks
+  and press Done, or — when it asks nothing — read the "Added N to the Story Bible" receipt and try its Undo.
 - **Verify:**
   - The items are read from the approved revision by a `continuity` call. Consequential ones (rules, payoffs,
-    knowledge, milestones in doubt, anything inferred, low-confidence changes) are asked one by one; routine ones
-    (appearances, positions) as a batch; categories in `autoKeep` (`entity`, `appearance`, `character_state`,
-    `relationship`, `promise`, `knowledge`, `milestone`, `summary`) are kept at once.
+    knowledge, milestones in doubt, anything inferred, low-confidence changes, a rename of an existing record, a
+    closed thread or answered question reported open again) are
+    asked one by one; routine ones (appearances, positions, relationships, open promises, new records, claimed
+    milestones reached) are kept at once in an `autoKeep` category — every one while `autoKeep` is unset — and asked
+    as a batch in a category the author turned off. An isolated chapter keeps nothing automatically.
+  - With nothing left to ask on a standard chapter, the job finalizes it itself (log `chapter finalized on approval`; a
+    finalize run that fails logs `chapter not finalized on approval` with its status); a refusal
+    (`FIN_001` an earlier chapter not final, a held claim, …) logs `finalize review answered; chapter left for the
+    author to finalize` and the chat card offers Done instead. Answering the last item never finalizes by itself.
   - Finalize applies only the kept and edited items, logging each row before and after, and reaches only the claimed
     milestones you kept; a claimed milestone you skip is dropped from the plan.
   - Editing the prose after approval makes the review stale (`FRV_004`) until you approve again.

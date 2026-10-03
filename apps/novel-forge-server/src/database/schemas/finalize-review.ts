@@ -44,7 +44,7 @@ export const finalizeReviewCategory = pgEnum('finalize_review_category', [
 export const finalizeReviewTriage = pgEnum('finalize_review_triage', ['consequential', 'routine']);
 export const finalizeReviewBasis = pgEnum('finalize_review_basis', ['observed', 'inferred']);
 export const finalizeReviewDecision = pgEnum('finalize_review_decision', ['kept', 'edited', 'skipped']);
-export const finalizeReviewFlag = pgEnum('finalize_review_flag', ['missed_milestone', 'unclaimed_milestone', 'unplanned_disclosure']);
+export const finalizeReviewFlag = pgEnum('finalize_review_flag', ['missed_milestone', 'unclaimed_milestone', 'unplanned_disclosure', 'renamed_record', 'reopened_promise']);
 
 /** The Story Bible updates read out of one approved revision, waiting for the author before finalize applies the kept ones. */
 export const finalizeReviews = pgTable(

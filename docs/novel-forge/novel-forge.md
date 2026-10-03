@@ -361,9 +361,15 @@
   Each slip quotes its exact span and a fix; one whose quote is not in the prose, whose fix changes nothing or that repeats is dropped, and at most twenty are kept. Slips are
   `proofreading` warnings, never blocking, and never touch the gate; a contradiction of established fact stays the judge's. Voice in dialogue and the project's style are not slips.
 - **Review before finalize**: approval binds a finalize review to the exact revision, prose and plan approved, and a job reads the Story Bible updates out of that revision.
-  Consequential updates (rules, payoffs, knowledge, milestones in doubt, anything inferred) are answered one by one; routine ones as a batch, or kept automatically per category
-  when the author opted in. Keep, edit (the record it is about never changes) or skip (with a reason, never asked again). Re-approving the same revision, prose and plan keeps the
-  answers; anything else sends the review back to be prepared, carrying answers over only onto the same proposed change.
+  Consequential updates (rules, payoffs, knowledge, milestones in doubt, anything inferred, a rename of an existing record, a settled promise reported open again, anything
+  flagged against the plan) are answered one by one and MUST NEVER be kept automatically; routine ones are kept automatically per category — every category until the author
+  turns one off, when that category is asked as a batch — except on an isolated chapter, where everything is asked. Keep, edit (the record it is about never changes) or skip
+  (with a reason, never asked again). Re-approving the same revision, prose and plan keeps the answers; anything else sends the review back to be prepared, carrying answers
+  over only onto the same proposed change.
+- **Approval finalizes what it settles**: when the prepared review of a standard chapter leaves nothing to ask, the job finalizes the chapter itself through the same refusals
+  as the author's own finalize; a refusal or failure leaves the review answered and waiting for the author's finalize, never fails the read, and nothing claims the Story Bible
+  was written until the review is applied. With anything left to ask, finalize waits for the author's explicit finalize once every update is answered — a decision alone never
+  finalizes. A conflict is settled either by letting canon follow the chapter (keep) or by revising the chapter, which records nothing and sends the chapter back for approval.
 - **Finalize** runs strictly in order and commits only the approved revision it read; it refuses when an earlier chapter needs re-validation, the latest validation report holds
   an error for this chapter, the draft is stale, a blocking finding is open, the review no longer matches the prose (`FRV_004`), is still reading or failed, has unanswered items
   (`FRV_005`), or leaves a claimed milestone unreached while the plan reveals something that needs it (`FRV_006`). Readiness answers from the same checks. The commit applies only

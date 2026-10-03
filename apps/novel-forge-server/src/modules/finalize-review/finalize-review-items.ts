@@ -1,5 +1,5 @@
 import { type RevealFact, revealRequirements, type UnlockContext } from '@server/common';
-import { type FinalizeReview, type Knowledge } from '@server/database';
+import { type FinalizeReview, type Knowledge, type ProjectConfigData } from '@server/database';
 
 import { WALLED_OFF_EXCERPT } from '../ai/isolation-read-policy';
 import {
@@ -45,7 +45,10 @@ export interface ReviewMaterial {
   /** Milestones the approved plan claims for this chapter. */
   claimedMilestones: readonly string[];
   milestones: readonly Pick<Knowledge.Milestone, 'milestoneKey' | 'label' | 'state'>[];
-  entityKeys: ReadonlySet<string>;
+  /** The Story Bible's records by key, with the name each carries now. */
+  entityNames: ReadonlyMap<string, string>;
+  /** Promises already settled, as `thread:<key>` for a closed thread and `mystery:<key>` for a resolved mystery: reporting one open reopens it. */
+  settledPromises: ReadonlySet<string>;
   /** Pairs the approved plan's `learns` already ledgered, as `entityKey:factKey`. */
   plannedLearns: ReadonlySet<string>;
   /** Facts this chapter's plan reveals, for the reveals a missed milestone would leave without their condition. */
@@ -60,6 +63,14 @@ type Draft = Omit<ProposedItem, 'itemKey' | 'decision' | 'autoKept' | 'triage' |
   Partial<Pick<ProposedItem, 'flag' | 'dependents'>> & { consequential: boolean };
 
 const RULE_ENTITY_TYPES: ReadonlySet<Knowledge.EntityType> = new Set(['power_rule', 'concept']);
+
+/** Every category a routine item can have: confident updates are kept on approval unless the author turned their category off. */
+export const ROUTINE_CATEGORIES: readonly FinalizeReview.Category[] = ['appearance', 'character_state', 'relationship', 'promise', 'entity', 'milestone'];
+
+/** The categories kept without asking: the author's own choice once they made one, every routine category until then. */
+export function effectiveAutoKeep(config: ProjectConfigData | null | undefined): FinalizeReview.Category[] {
+  return config?.finalizeReview?.autoKeep ?? [...ROUTINE_CATEGORIES];
+}
 
 function basisOf(entry: { confidence?: 'high' | 'low' }): FinalizeReview.Basis {
   return entry.confidence === 'low' ? 'inferred' : 'observed';
@@ -112,18 +123,30 @@ export function sameProposal(left: unknown, right: unknown): boolean {
   return canonicalJson(left) === canonicalJson(right);
 }
 
-function entityItems(extraction: ContinuityOutput): Draft[] {
-  const created = (extraction.newEntities ?? []).map(entity => ({
-    category: 'entity' as const,
-    basis: 'observed' as const,
-    subjectKey: entity.entityKey,
-    claim: `New ${entity.type.replace('_', ' ')}: ${entity.name}${entity.notes ? ` — ${entity.notes}` : ''}`,
-    evidence: null,
-    proposed: { category: 'entity' as const, entity },
-    consequential: RULE_ENTITY_TYPES.has(entity.type),
-  }));
+/** A reported "new" entity that is already a record only appears in the chapter, unless keeping it would rename the record — a conflict with canon. */
+function entityItems(extraction: ContinuityOutput, entityNames: ReadonlyMap<string, string>): Draft[] {
+  const reported = extraction.newEntities ?? [];
+  const existing = new Set(reported.filter(entity => entityNames.get(entity.entityKey) === entity.name).map(entity => entity.entityKey));
+  const created = reported
+    .filter(entity => !existing.has(entity.entityKey))
+    .map(entity => {
+      const current = entityNames.get(entity.entityKey);
+      return {
+        category: 'entity' as const,
+        basis: 'observed' as const,
+        subjectKey: entity.entityKey,
+        claim:
+          current === undefined
+            ? `New ${entity.type.replace('_', ' ')}: ${entity.name}${entity.notes ? ` — ${entity.notes}` : ''}`
+            : `Renames ${entity.entityKey} from "${current}" to "${entity.name}"`,
+        evidence: null,
+        proposed: { category: 'entity' as const, entity },
+        consequential: current !== undefined || RULE_ENTITY_TYPES.has(entity.type),
+        ...(current !== undefined ? { flag: 'renamed_record' as const } : {}),
+      };
+    });
   const createdKeys = new Set(created.map(item => item.subjectKey));
-  const appeared = [...new Set(extraction.appeared ?? [])]
+  const appeared = [...new Set([...(extraction.appeared ?? []), ...existing])]
     .filter(entityKey => !createdKeys.has(entityKey))
     .map(entityKey => ({
       category: 'appearance' as const,
@@ -170,25 +193,36 @@ function characterItems(extraction: ContinuityOutput, isolated: boolean): Draft[
   return [...states, ...relationships];
 }
 
-function promiseItems(extraction: ContinuityOutput): Draft[] {
-  const threads = (extraction.threads ?? []).map(thread => ({
-    category: 'promise' as const,
-    basis: basisOf(thread),
-    subjectKey: thread.threadKey,
-    claim: thread.status === 'closed' ? `Paid off: ${thread.summary ?? thread.threadKey}` : `Open: ${thread.summary ?? thread.threadKey}`,
-    evidence: null,
-    proposed: { category: 'promise' as const, thread: withoutConfidence(thread) },
-    consequential: thread.status !== 'open' || thread.confidence === 'low',
-  }));
-  const mysteries = (extraction.mysteries ?? []).map(mystery => ({
-    category: 'promise' as const,
-    basis: basisOf(mystery),
-    subjectKey: mystery.mysteryKey,
-    claim: mystery.status === 'resolved' ? `Answered: ${mystery.question ?? mystery.mysteryKey}` : `Open question: ${mystery.question ?? mystery.mysteryKey}`,
-    evidence: null,
-    proposed: { category: 'promise' as const, mystery: withoutConfidence(mystery) },
-    consequential: mystery.status !== 'open' || Boolean(mystery.truthFactKey) || mystery.confidence === 'low',
-  }));
+/** A settled promise reported open would be reopened by keeping it: a conflict with canon, never kept without the author. */
+function promiseItems(extraction: ContinuityOutput, settled: ReadonlySet<string>): Draft[] {
+  const threads = (extraction.threads ?? []).map(thread => {
+    const reopens = thread.status === 'open' && settled.has(`thread:${thread.threadKey}`);
+    const label = thread.summary ?? thread.threadKey;
+    return {
+      category: 'promise' as const,
+      basis: basisOf(thread),
+      subjectKey: thread.threadKey,
+      claim: reopens ? `Reopens: ${label}` : thread.status === 'closed' ? `Paid off: ${label}` : `Open: ${label}`,
+      evidence: null,
+      proposed: { category: 'promise' as const, thread: withoutConfidence(thread) },
+      consequential: reopens || thread.status !== 'open' || thread.confidence === 'low',
+      ...(reopens ? { flag: 'reopened_promise' as const } : {}),
+    };
+  });
+  const mysteries = (extraction.mysteries ?? []).map(mystery => {
+    const reopens = mystery.status === 'open' && settled.has(`mystery:${mystery.mysteryKey}`);
+    const label = mystery.question ?? mystery.mysteryKey;
+    return {
+      category: 'promise' as const,
+      basis: basisOf(mystery),
+      subjectKey: mystery.mysteryKey,
+      claim: reopens ? `Reopens the question: ${label}` : mystery.status === 'resolved' ? `Answered: ${label}` : `Open question: ${label}`,
+      evidence: null,
+      proposed: { category: 'promise' as const, mystery: withoutConfidence(mystery) },
+      consequential: reopens || mystery.status !== 'open' || Boolean(mystery.truthFactKey) || mystery.confidence === 'low',
+      ...(reopens ? { flag: 'reopened_promise' as const } : {}),
+    };
+  });
   return [...threads, ...mysteries];
 }
 
@@ -293,18 +327,19 @@ function summaryItems(material: ReviewMaterial): Draft[] {
 
 /**
  * Turns what the continuity extractor read from the approved revision into review items. Consequential items (rules, payoffs, knowledge,
- * milestones in doubt, anything inferred) wait for the author one by one; routine ones are batched, and kept at once in an auto-keep category.
+ * milestones in doubt, anything inferred, a rename or a reopened promise) wait for the author one by one; routine ones are kept at once in an
+ * auto-keep category, and batched otherwise.
  * Unknown entities are dropped here rather than failing at apply. An isolated chapter's evidence is withheld before it is ever stored.
  */
 export function buildReviewItems(material: ReviewMaterial): ProposedItem[] {
-  const known = new Set([...material.entityKeys, ...(material.extraction.newEntities ?? []).map(entity => entity.entityKey)]);
+  const known = new Set([...material.entityNames.keys(), ...(material.extraction.newEntities ?? []).map(entity => entity.entityKey)]);
   const drafts = material.bridgeOnly
     ? summaryItems(material)
     : [
         ...summaryItems(material),
-        ...entityItems(material.extraction),
+        ...entityItems(material.extraction, material.entityNames),
         ...characterItems(material.extraction, material.isolated),
-        ...promiseItems(material.extraction),
+        ...promiseItems(material.extraction, material.settledPromises),
         ...knowledgeItems(material),
         ...milestoneItems(material),
       ];

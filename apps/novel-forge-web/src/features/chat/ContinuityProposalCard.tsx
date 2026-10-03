@@ -1,4 +1,5 @@
-import { Button, toast } from '@shadow-library/ui';
+import { useState } from 'react';
+import { Button, ConfirmDialog, toast } from '@shadow-library/ui';
 
 import { StatusChip } from '@/components/nf';
 import { type ContinuityProposalResponse, useApplyContinuityProposalMutation, useDiscardContinuityProposalMutation } from '@/lib/apis';
@@ -12,13 +13,14 @@ export interface ContinuityProposalCardProps {
   proposal: ContinuityProposalResponse;
 }
 
-/** What a written chapter adds to the Story Bible, decided where it was asked for: add it, or leave it out. */
+/** Story Bible additions finalize staged outside a finalize review — an isolated chapter, or one approved before reviews existed: add them, or leave them out. */
 export function ContinuityProposalCard({ novelId, proposal }: ContinuityProposalCardProps): React.JSX.Element {
   const apply = useApplyContinuityProposalMutation(novelId);
   const discard = useDiscardContinuityProposalMutation(novelId);
   const highlights = continuityHighlights(proposal.proposal);
   const held = continuityHasHeldEntries(proposal.proposal);
   const busy = apply.isPending || discard.isPending;
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
 
   const doApply = (): void =>
     apply.mutate(proposal.chapter, {
@@ -31,7 +33,10 @@ export function ContinuityProposalCard({ novelId, proposal }: ContinuityProposal
 
   const doDiscard = (): void =>
     discard.mutate(proposal.chapter, {
-      onSuccess: () => toast.success('Story Bible additions discarded'),
+      onSuccess: () => {
+        toast.success('Story Bible additions discarded');
+        setConfirmDiscard(false);
+      },
       onError: error => toast.danger(error.message),
     });
 
@@ -68,10 +73,20 @@ export function ContinuityProposalCard({ novelId, proposal }: ContinuityProposal
         <Button size="sm" variant="primary" loading={apply.isPending} disabled={busy} onClick={doApply}>
           Apply
         </Button>
-        <Button size="sm" variant="ghost" loading={discard.isPending} disabled={busy} onClick={doDiscard}>
+        <Button size="sm" variant="ghost" disabled={busy} onClick={() => setConfirmDiscard(true)}>
           Discard
         </Button>
       </div>
+      <ConfirmDialog
+        open={confirmDiscard}
+        onOpenChange={setConfirmDiscard}
+        intent="danger"
+        title="Discard these Story Bible additions?"
+        description={`What chapter ${proposal.chapter} would add won't be applied to canon. This cannot be undone.`}
+        confirmLabel="Discard"
+        loading={discard.isPending}
+        onConfirm={doDiscard}
+      />
     </section>
   );
 }

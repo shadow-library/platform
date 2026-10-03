@@ -1989,6 +1989,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/projects/{projectId}/finalize-reviews': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Reviews */
+    get: operations['get_api_v1_projects_projectId_finalize_reviews'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/projects/{projectId}/drafts/{n}/finalize-review': {
     parameters: {
       query?: never;
@@ -5387,6 +5404,16 @@ export interface components {
       title?: string;
       content?: string;
     };
+    FinalizeReviewListResponse: {
+      /** @description Reviews of approved chapters still being read, failed, or waiting on an answer or on finalize, oldest chapter first. A review the prose moved past is left out. */
+      waiting: components['schemas']['FinalizeReviewResponse'][];
+      /** @description Ids of waiting reviews whose reading job still runs: one with nothing left to ask may be finalizing on its own, so it offers no finalize of its own yet. */
+      settling: string[];
+      /** @description Reviews whose updates were written to the Story Bible in the last 24 hours, oldest chapter first. */
+      applied: components['schemas']['FinalizeReviewResponse'][];
+      /** @description The chapter whose applied updates can be undone now — only the latest final chapter’s can. */
+      undoableChapter?: number | null;
+    };
     FinalizeReviewResponse: {
       id: string;
       chapter: number;
@@ -5405,6 +5432,7 @@ export interface components {
       open: components['schemas']['FinalizeReviewOpenResponse'];
       consequential: components['schemas']['FinalizeReviewItemResponse'][];
       routine: components['schemas']['FinalizeReviewItemResponse'][];
+      /** @description The categories whose routine updates are kept without asking: every routine category until the author chooses. */
       autoKeep: components['schemas']['FinalizeReviewCategory'][];
       /** Format: date-time */
       appliedAt?: string | null;
@@ -5447,7 +5475,7 @@ export interface components {
       edited?: {
         [key: string]: unknown;
       } | null;
-      /** @description missed_milestone: the plan claims it but the prose does not reach it, so it stays locked. unclaimed_milestone: the prose seems to reach one the plan does not claim. unplanned_disclosure: a character learns a fact still locked here. */
+      /** @description Set when the chapter disagrees with the plan or canon, so the update is never kept automatically. missed_milestone: the plan claims it but the prose does not reach it, so it stays locked. unclaimed_milestone: the prose seems to reach one the plan does not claim. unplanned_disclosure: a character learns a fact still locked here. renamed_record: keeping it renames a record already in the Story Bible. reopened_promise: keeping it reopens a thread already paid off or a question already answered. */
       flag?: components['schemas']['FinalizeReviewFlag'] | null;
       /** @description What the flag puts at stake: the reveals that need a missed milestone, or what a disclosure still waits on. */
       dependents?: string[] | null;
@@ -5465,7 +5493,7 @@ export interface components {
     /** @enum {string} */
     FinalizeReviewBasis: 'observed' | 'inferred';
     /** @enum {string} */
-    FinalizeReviewFlag: 'missed_milestone' | 'unclaimed_milestone' | 'unplanned_disclosure';
+    FinalizeReviewFlag: 'missed_milestone' | 'unclaimed_milestone' | 'unplanned_disclosure' | 'renamed_record' | 'reopened_promise';
     /** @enum {string} */
     FinalizeReviewDecision: 'kept' | 'edited' | 'skipped';
     FinalizeReviewItemDecisionBody: {
@@ -6315,7 +6343,7 @@ export interface components {
       model: string;
     };
     ProjectFinalizeReviewConfig: {
-      /** @description Categories whose routine finalize-review updates are kept without asking. Consequential updates are always asked one by one. */
+      /** @description Categories whose routine finalize-review updates are kept without asking; unset, every routine category is. Consequential updates are always asked one by one. */
       autoKeep?: components['schemas']['FinalizeReviewCategory'][];
     };
     ListProjectResponse: {
@@ -12654,6 +12682,46 @@ export interface operations {
       };
     };
   };
+  get_api_v1_projects_projectId_finalize_reviews: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['FinalizeReviewListResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   get_api_v1_projects_projectId_drafts_n_finalize_review: {
     parameters: {
       query?: never;
@@ -16488,6 +16556,7 @@ export type ChapterSearchResponse = components['schemas']['ChapterSearchResponse
 export type ChapterSearchHit = components['schemas']['ChapterSearchHit'];
 export type ChapterResponse = components['schemas']['ChapterResponse'];
 export type UpdateChapterBody = components['schemas']['UpdateChapterBody'];
+export type FinalizeReviewListResponse = components['schemas']['FinalizeReviewListResponse'];
 export type FinalizeReviewResponse = components['schemas']['FinalizeReviewResponse'];
 export type FinalizeReviewStatus = components['schemas']['FinalizeReviewStatus'];
 export type FinalizeReviewDisclosureResponse = components['schemas']['FinalizeReviewDisclosureResponse'];
@@ -16739,12 +16808,13 @@ export type SearchChaptersQueryParams = Exclude<paths['/api/v1/projects/{project
 export type SearchChaptersPathParams = Exclude<paths['/api/v1/projects/{projectId}/source/chapters/search']['get']['parameters']['path'], undefined>;
 export type GetChapterPathParams = Exclude<paths['/api/v1/projects/{projectId}/source/chapters/{n}']['get']['parameters']['path'], undefined>;
 export type ExportNovelPathParams = Exclude<paths['/api/v1/projects/{projectId}/export/novel']['get']['parameters']['path'], undefined>;
+export type ApiV1ProjectsProjectIdFinalizeReviewsPathParams = Exclude<paths['/api/v1/projects/{projectId}/finalize-reviews']['get']['parameters']['path'], undefined>;
 export type ApiV1ProjectsProjectIdDraftsNFinalizeReviewPathParams = Exclude<
   paths['/api/v1/projects/{projectId}/drafts/{n}/finalize-review']['get']['parameters']['path'],
   undefined
 >;
 export type GetBridgePathParams = Exclude<paths['/api/v1/projects/{projectId}/drafts/{n}/bridge']['get']['parameters']['path'], undefined>;
-export type ListReviewsPathParams = Exclude<paths['/api/v1/projects/{projectId}/chapters/{n}/reviews']['get']['parameters']['path'], undefined>;
+export type ApiV1ProjectsProjectIdChaptersNReviewsPathParams = Exclude<paths['/api/v1/projects/{projectId}/chapters/{n}/reviews']['get']['parameters']['path'], undefined>;
 export type ApiV1ProjectsProjectIdChaptersNReviewsReviewIdPathParams = Exclude<
   paths['/api/v1/projects/{projectId}/chapters/{n}/reviews/{reviewId}']['get']['parameters']['path'],
   undefined
