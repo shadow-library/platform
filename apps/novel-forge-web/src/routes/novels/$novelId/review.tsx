@@ -4,7 +4,7 @@ import { Alert, Button, ConfirmDialog, Dialog, FormField, Kbd, SegmentedControl,
 
 import { CheckIcon, ProposalsIcon, WarningIcon } from '@/components/icons';
 import { useCollectionJump } from '@/components/Layout';
-import { type ChipIntent, CollectionPage, DetailPage, EmptyState, ItemPager, type ItemPagerJump, PaneError, PaneLoader, StatusChip } from '@/components/nf';
+import { type ChipIntent, CollectionPage, DetailPage, EmptyState, ItemPager, type ItemPagerJump, Markdown, PaneError, PaneLoader, StatusChip } from '@/components/nf';
 import { useOverrideConfirm } from '@/features/chapter-workspace';
 import { ChangeOpBody, PluginSourceChip } from '@/features/proposals';
 import {
@@ -275,7 +275,9 @@ function ReviewDetail({ novelId, draft, total, ids, jump, onSelect }: ReviewDeta
         }
       >
         <div className={`nf-eyebrow ${styles.draftLabel}`}>Draft · {wordCount(draft.body).toLocaleString()} words</div>
-        <DetailPage.Prose className={styles.draft}>{prose}</DetailPage.Prose>
+        <DetailPage.Prose className={styles.draft}>
+          <Markdown content={prose} />
+        </DetailPage.Prose>
       </DetailPage>
 
       {overrideConfirm.dialog}
