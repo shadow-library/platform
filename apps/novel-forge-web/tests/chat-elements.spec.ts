@@ -258,6 +258,7 @@ function composer(overrides: Partial<ChatComposerProps> = {}): string {
       onEditQueued: noop,
       onSendQueued: noop,
       announcement: 'Forge replied.',
+      sendable: Boolean(overrides.input?.trim()),
       ...overrides,
     }),
   );
@@ -289,6 +290,13 @@ describe('ChatComposer', () => {
   it('should disable Send on an empty draft and keep it a labelled round button', () => {
     expect(composer()).toMatch(/aria-label="Send"[^>]*disabled=""|disabled=""[^>]*aria-label="Send"/);
     expect(composer({ input: 'go' })).not.toMatch(/disabled=""[^>]*aria-label="Send"|aria-label="Send"[^>]*disabled=""/);
+  });
+
+  it('should stack passage comments above the input, invite a note for the whole revision and send them without text', () => {
+    const box = composer({ passages: createElement('ul', { 'aria-label': 'Passage comments' }), sendable: true });
+    expect(box.indexOf('aria-label="Passage comments"')).toBeLessThan(box.indexOf('aria-label="Message"'));
+    expect(box).toContain('Add a note for the whole revision…');
+    expect(box).not.toMatch(/disabled=""[^>]*aria-label="Send"|aria-label="Send"[^>]*disabled=""/);
   });
 
   it('should turn Send into a labelled Stop while a turn runs and keep the box usable for a queued message', () => {

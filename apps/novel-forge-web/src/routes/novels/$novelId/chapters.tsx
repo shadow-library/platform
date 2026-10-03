@@ -140,7 +140,8 @@ import {
   workspaceActions,
 } from '@/lib/chapter-workspace';
 import { chapterGeneration, type ChapterGeneration } from '@/lib/generation-activity';
-import { editorSelection, type PassageRange, type ProseAnchor, selectionProblem, suggestionView } from '@/lib/passage-suggestions';
+import { type PassageRange } from '@/lib/passage-selection';
+import { editorSelection, type ProseAnchor, selectionProblem, suggestionView } from '@/lib/passage-suggestions';
 import { useGenerationActivity } from '@/lib/use-generation-activity';
 
 import styles from './chapters.module.css';

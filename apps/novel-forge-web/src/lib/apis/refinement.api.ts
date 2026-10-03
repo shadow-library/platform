@@ -22,6 +22,7 @@ import {
   type ChangeOpItem,
   type ChatMessageResponse,
   type ChatPassageContextBody,
+  type ChatPassageContextResponse,
   type ChatSessionResponse,
   type ChatTurnResponse,
   type ChatTurnStatusResponse,
@@ -92,6 +93,11 @@ export interface ChatTurnRequest {
 
 interface ForgeTurnVariables extends ChatTurnRequest {
   sessionId: string;
+}
+
+/** A turn as the composer sends it: the request, and the passages as the author's message shows them until the server's own copy arrives. */
+export interface ChatTurnVariables extends ChatTurnRequest {
+  shown?: ChatPassageContextResponse[];
 }
 
 // The optimistic-update rollback snapshot for a chat turn: the messages cache as it was before the
@@ -292,7 +298,7 @@ export function useCreateChatSessionMutation(projectId: string): UseMutationResu
  * the server has already persisted this message so any other tab sees it too. Shared by the request and
  * the stream, which must open a turn identically.
  */
-async function beginChatTurn(queryClient: QueryClient, projectId: string, sessionId: string, content: string): Promise<ChatTurnContext> {
+async function beginChatTurn(queryClient: QueryClient, projectId: string, sessionId: string, content: string, contexts?: ChatPassageContextResponse[]): Promise<ChatTurnContext> {
   const messagesKey = refinementKeys.messages(projectId, sessionId);
   await queryClient.cancelQueries({ queryKey: messagesKey });
   const previous = queryClient.getQueryData<ListChatMessagesResponse>(messagesKey);
@@ -302,6 +308,7 @@ async function beginChatTurn(queryClient: QueryClient, projectId: string, sessio
     ordinal: (previous?.messages.at(-1)?.ordinal ?? 0) + 1,
     role: 'user',
     content,
+    contexts: contexts?.length ? contexts : null,
     createdAt: new Date().toISOString(),
   };
   // No run to name yet — the fresh trailing user message is what `turnState` reads as pending, and
@@ -314,11 +321,11 @@ function rollbackChatTurn(queryClient: QueryClient, projectId: string, sessionId
   if (context?.previous) queryClient.setQueryData(refinementKeys.messages(projectId, sessionId), context.previous);
 }
 
-export function useChatTurnMutation(projectId: string, sessionId: string): UseMutationResult<ChatTurnResponse, ApiError, ChatTurnRequest, ChatTurnContext> {
+export function useChatTurnMutation(projectId: string, sessionId: string): UseMutationResult<ChatTurnResponse, ApiError, ChatTurnVariables, ChatTurnContext> {
   const queryClient = useQueryClient();
-  return useMutation<ChatTurnResponse, ApiError, ChatTurnRequest, ChatTurnContext>({
-    mutationFn: request => APIRequest.post(`/projects/${projectId}/chat/sessions/${sessionId}/messages`).body(request).execute(),
-    onMutate: ({ content }) => beginChatTurn(queryClient, projectId, sessionId, content),
+  return useMutation<ChatTurnResponse, ApiError, ChatTurnVariables, ChatTurnContext>({
+    mutationFn: ({ shown: _shown, ...request }) => APIRequest.post(`/projects/${projectId}/chat/sessions/${sessionId}/messages`).body(request).execute(),
+    onMutate: ({ content, shown }) => beginChatTurn(queryClient, projectId, sessionId, content, shown),
     onError: (_err, _content, context) => rollbackChatTurn(queryClient, projectId, sessionId, context),
     // Reconcile against the server on both outcomes: on success the real exchange arrives; on a
     // post-persist failure the user message is still there, minus a reply.
@@ -560,6 +567,8 @@ export function stopChatTurnStream(state: ChatTurnStreamState, at: number): Chat
 }
 
 export interface ChatTurnHandlers {
+  /** The server took the turn: its passages anchored and the author's message stored. */
+  onAccepted?: () => void;
   onSuccess?: (turn: ChatTurnResponse) => void;
   onError?: (error: ApiError, context: ChatTurnContext | undefined) => void;
 }
@@ -570,7 +579,7 @@ export interface ChatTurnStopHandlers {
 }
 
 export interface ChatTurnSender {
-  send: (content: string, handlers?: ChatTurnHandlers, options?: Omit<ChatTurnRequest, 'content'>) => void;
+  send: (content: string, handlers?: ChatTurnHandlers, options?: Omit<ChatTurnVariables, 'content'>) => void;
   isPending: boolean;
   stream: ChatTurnStreamState;
   // The run this tab's own POST opened, without the composer having to read the stream's internals to find it.
@@ -627,7 +636,7 @@ export function useChatTurnStream(projectId: string, sessionId: string): ChatTur
     };
   }, [projectId, sessionId]);
 
-  const run = async (request: ChatTurnRequest, handlers?: ChatTurnHandlers): Promise<void> => {
+  const run = async ({ shown, ...request }: ChatTurnVariables, handlers?: ChatTurnHandlers): Promise<void> => {
     const { content } = request;
     const token = ++tokenRef.current;
     const current = (): boolean => mountedRef.current && tokenRef.current === token;
@@ -636,7 +645,7 @@ export function useChatTurnStream(projectId: string, sessionId: string): ChatTur
     setStream(startChatTurnStream(Date.now()));
     setStreaming(true);
     setRunId(null);
-    const context = await beginChatTurn(queryClient, projectId, sessionId, content);
+    const context = await beginChatTurn(queryClient, projectId, sessionId, content, shown);
 
     let openedRunId: string;
     try {
@@ -648,6 +657,7 @@ export function useChatTurnStream(projectId: string, sessionId: string): ChatTur
       handlers?.onError?.(isApiError(err) ? err : turnFailureError(UNKNOWN_TURN_FAILURE), context);
       return;
     }
+    handlers?.onAccepted?.();
     if (!current()) return;
     setRunId(openedRunId);
 
@@ -695,10 +705,14 @@ export function useChatTurnStream(projectId: string, sessionId: string): ChatTur
     };
   };
 
-  const send = (content: string, handlers?: ChatTurnHandlers, options?: Omit<ChatTurnRequest, 'content'>): void => {
+  const send = (content: string, handlers?: ChatTurnHandlers, options?: Omit<ChatTurnVariables, 'content'>): void => {
     const request = { content, ...options };
     if (typeof EventSource === 'undefined') {
-      fallback.mutate(request, { onSuccess: turn => handlers?.onSuccess?.(turn), onError: (err, _request, context) => handlers?.onError?.(err, context) });
+      const onSuccess = (turn: ChatTurnResponse): void => {
+        handlers?.onAccepted?.();
+        handlers?.onSuccess?.(turn);
+      };
+      fallback.mutate(request, { onSuccess, onError: (err, _request, context) => handlers?.onError?.(err, context) });
       return;
     }
     void run(request, handlers);

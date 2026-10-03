@@ -16,7 +16,7 @@
       "default": "./dist/publishing/index.js"
     }
   },
-  "description": "Shared Shadow Library novel vocabulary (genres, tags, content ratings) and the cross-app publishing content-hash contract",
+  "description": "Shared Shadow Library novel vocabulary (genres, tags, content ratings), the shared prose paragraph count and the cross-app publishing content-hash contract",
   "repository": {
     "type": "git",
     "url": "git+ssh://git@github.com/shadow-library/platform.git",

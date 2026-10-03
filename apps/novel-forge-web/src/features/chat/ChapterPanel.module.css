@@ -83,23 +83,21 @@
   overflow-y: auto;
 }
 
-/* A reading aid over the rendered blocks, not the chat's own paragraph count. Generated content is never part of a selection's text, and the empty alt text keeps the numbers out of what a screen reader reads. */
 .reader {
   padding: 28px 56px 28px 64px;
   font-size: 15px;
   line-height: 1.8;
   color: var(--sh-text-primary);
-  counter-reset: paragraph;
 }
 
-.reader :global(.nf-md) > * {
+.reader :global(.nf-md) > [data-paragraph] {
   position: relative;
-  counter-increment: paragraph;
 }
 
-.reader :global(.nf-md) > *::before {
-  content: counter(paragraph);
-  content: counter(paragraph) / '';
+/* The paragraph numbers the chat cites. Generated content is never part of a selection's text, and the empty alt text keeps the numbers out of what a screen reader reads. */
+.reader :global(.nf-md) > [data-paragraph]::before {
+  content: attr(data-paragraph);
+  content: attr(data-paragraph) / '';
   position: absolute;
   top: 0;
   left: -48px;
@@ -177,6 +175,145 @@
   color: var(--sh-accent-text);
 }
 
+/* Positioned over the prose it acts on: the toolbar above a selection, or below it near the top of the reader. */
+.selection {
+  position: relative;
+}
+
+.selection:focus {
+  outline: none;
+}
+
+.toolbar,
+.toolbarProblem {
+  position: absolute;
+  z-index: 2;
+  transform: translateY(-100%);
+  font-family: var(--sh-font-sans);
+  font-size: var(--sh-text-caption);
+  line-height: var(--sh-text-caption--line-height);
+}
+
+.toolbar[data-below],
+.toolbarProblem[data-below] {
+  transform: none;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  max-width: 100%;
+  padding: 4px;
+  border-radius: var(--sh-radius-md);
+  background: var(--sh-surface-tooltip);
+  color: var(--sh-text-on-tooltip);
+  box-shadow: var(--sh-shadow-e2);
+}
+
+.toolbarButton.toolbarButton {
+  color: inherit;
+}
+
+.toolbarButton.toolbarButton:hover:not(:disabled) {
+  background: color-mix(in srgb, currentColor 14%, transparent);
+}
+
+.toolbarKbd {
+  margin-left: 6px;
+  opacity: 0.8;
+}
+
+.toolbarNote {
+  max-width: 240px;
+  padding: 0 8px;
+}
+
+.toolbarProblem {
+  max-width: 360px;
+  padding: 10px 12px;
+  border-radius: var(--sh-radius-md);
+  background: var(--sh-surface-raised);
+  box-shadow: var(--sh-shadow-e2);
+  color: var(--sh-text-secondary);
+}
+
+.comment.comment {
+  width: 360px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  box-shadow: var(--sh-shadow-e3);
+}
+
+.commentPassage {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.commentQuote {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--sh-text-body-sm);
+  font-style: italic;
+  color: var(--sh-text-secondary);
+}
+
+.commentLabel {
+  font-size: var(--sh-text-body-sm);
+  font-weight: 600;
+  color: var(--sh-text-primary);
+}
+
+.quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.commentFoot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.commentCaption {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  color: var(--sh-text-tertiary);
+}
+
+::highlight(nf-passage-commented) {
+  text-decoration: underline 2px var(--sh-warning-border);
+  text-underline-offset: 4px;
+}
+
+::highlight(nf-passage-selected) {
+  background-color: var(--sh-accent-soft);
+}
+
+::highlight(nf-passage-flash) {
+  background-color: var(--sh-warning-bg-subtle);
+}
+
+/* A pending rewrite, read in place: the words it takes out struck through, the words it puts in underlined beside them. */
+.reader del[data-proposed] {
+  background: var(--sh-danger-bg-subtle);
+  color: var(--sh-danger-text-on-subtle);
+}
+
+.reader ins[data-proposed] {
+  background: var(--sh-success-bg-subtle);
+  color: var(--sh-success-text-on-subtle);
+  text-decoration: none;
+}
+
 @container chapter-panel (max-width: 479px) {
   .revision {
     display: none;
@@ -225,7 +362,7 @@
     padding: 20px 16px 20px 44px;
   }
 
-  .reader :global(.nf-md) > *::before {
+  .reader :global(.nf-md) > [data-paragraph]::before {
     left: -36px;
     width: 24px;
   }

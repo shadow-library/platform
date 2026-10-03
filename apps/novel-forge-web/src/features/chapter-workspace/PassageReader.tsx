@@ -2,7 +2,8 @@ import { Fragment, useEffect, useRef, useState } from 'react';
 import { Button } from '@shadow-library/ui';
 
 import { Markdown } from '@/components/nf';
-import { type PassageSelection, type ProseAnchor, type ProseSegment, renderedSelection, selectionProblem, splitAtAnchors } from '@/lib/passage-suggestions';
+import { type PassageSelection, renderedSelection } from '@/lib/passage-selection';
+import { type ProseAnchor, type ProseSegment, selectionProblem, splitAtAnchors } from '@/lib/passage-suggestions';
 
 import styles from './PassageAsk.module.css';
 

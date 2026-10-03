@@ -2,7 +2,8 @@ import { useId } from 'react';
 import { Button, Textarea } from '@shadow-library/ui';
 
 import { type PassageSuggestionResponse } from '@/lib/apis';
-import { type PassageSelection, QUICK_REQUESTS, type SuggestionView } from '@/lib/passage-suggestions';
+import { type PassageSelection } from '@/lib/passage-selection';
+import { QUICK_REQUESTS, type SuggestionView } from '@/lib/passage-suggestions';
 
 import styles from './PassageAsk.module.css';
 

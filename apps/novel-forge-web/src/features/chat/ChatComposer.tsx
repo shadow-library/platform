@@ -26,6 +26,10 @@ export interface ChatComposerProps {
   switching: boolean;
   chips: PromptChip[];
   onChip: (chip: PromptChip) => void;
+  /** Passage comments riding the next message, stacked above the input. */
+  passages?: ReactNode;
+  /** Whether Send has something to send: text, or comments in a chat that exists. */
+  sendable: boolean;
   modeMenu: ReactNode;
   modelMenu: ReactNode;
   justDiscussing: boolean;
@@ -44,8 +48,9 @@ export interface ChatComposerProps {
   announcement: string;
 }
 
-function placeholderOf(running: boolean, queued: boolean, justDiscussing: boolean): string {
+function placeholderOf(running: boolean, queued: boolean, justDiscussing: boolean, commented: boolean): string {
   if (running) return queued ? 'One message is queued. Edit it or wait for this reply.' : 'Type to queue a message. It sends when this reply finishes.';
+  if (commented) return 'Add a note for the whole revision…';
   if (justDiscussing) return 'Think out loud — what if…';
   return 'Tell the chat what you want, or ask it anything…';
 }
@@ -64,6 +69,8 @@ export function ChatComposer({
   switching,
   chips,
   onChip,
+  passages,
+  sendable,
   modeMenu,
   modelMenu,
   justDiscussing,
@@ -100,6 +107,7 @@ export function ChatComposer({
         )}
         {notices}
         <div className={styles.composerInner} data-discussing={justDiscussing || undefined}>
+          {passages}
           <Textarea
             ref={inputRef}
             aria-label="Message"
@@ -107,7 +115,7 @@ export function ChatComposer({
             size="lg"
             value={input}
             onValueChange={onInputChange}
-            placeholder={placeholderOf(running, Boolean(queued), justDiscussing)}
+            placeholder={placeholderOf(running, Boolean(queued), justDiscussing, Boolean(passages))}
             minRows={1}
             maxRows={6}
             autoGrow
@@ -139,7 +147,7 @@ export function ChatComposer({
                 aria-label="Send"
                 icon={<ArrowUpIcon size={16} />}
                 loading={sending}
-                disabled={locked || sending || switching || input.trim().length === 0}
+                disabled={locked || sending || switching || !sendable}
                 onClick={onSend}
               />
             )}

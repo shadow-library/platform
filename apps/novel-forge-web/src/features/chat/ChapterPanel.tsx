@@ -1,13 +1,12 @@
 import { Link } from '@tanstack/react-router';
-import { type ReactNode, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Button, IconButton, SegmentedControl, Tooltip } from '@shadow-library/ui';
 
 import { ChevronLeftIcon, CloseIcon } from '@/components/icons';
-import { GenerationStatus, Markdown, PaneError, PaneLoader, StatusChip } from '@/components/nf';
+import { GenerationStatus, PaneError, PaneLoader, StatusChip } from '@/components/nf';
 import {
   editorRecovery,
   EditorStrip,
-  PassageReader,
   type ProseTool,
   ProseToolbar,
   ProseToolbarNote,
@@ -18,7 +17,7 @@ import {
   useSaveShortcut,
   WorkspaceStrip,
 } from '@/features/chapter-workspace';
-import { type DraftResponse, useDraftQuery } from '@/lib/apis';
+import { type DraftResponse, type ProposalResponse, useDraftQuery } from '@/lib/apis';
 import { chapterTitle, hasUnsavedWork, isDirty, isSaveBlocked, leaveWarning, saveLabel, unsettledMessage, wordCount } from '@/lib/chapter-editor';
 import {
   CHAPTER_PANEL_WIDTH_KEY,
@@ -35,16 +34,16 @@ import {
   panelWidthForKey,
   storedPanelWidth,
 } from '@/lib/chapter-panel';
+import { proposedPassages, type TextSpan } from '@/lib/chapter-reader';
 import { chapterGeneration, type ChapterGeneration } from '@/lib/generation-activity';
-import { type ProseAnchor } from '@/lib/passage-suggestions';
+import { type ChipReveal, commentGate, isUnanswered, locateChip, type PassageChip } from '@/lib/passage-comments';
+import { type PassageSelection } from '@/lib/passage-selection';
 import { useGenerationActivity } from '@/lib/use-generation-activity';
 
 import styles from './ChapterPanel.module.css';
+import { ChapterReader, type CommentFollowUp, NumberedProse, type ReaderReveal } from './ChapterReader';
 
 const PANEL_TOOLS: readonly ProseTool[] = ['bold', 'italic', 'sceneBreak'];
-const NO_ANCHORS: readonly ProseAnchor[] = [];
-const noCard = (): null => null;
-const noAsk = (): void => undefined;
 
 function readStoredWidth(): number {
   try {
@@ -67,9 +66,24 @@ function isEditable(target: EventTarget | null): boolean {
   return target.isContentEditable || target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT';
 }
 
+/** The chat's side of commenting: the comments waiting in its composer, and the pending cards whose rewrites show in the prose. */
+export interface PanelComments {
+  chips: readonly PassageChip[];
+  limitReason?: string;
+  proposals: readonly ProposalResponse[];
+  /** A chip the author clicked, to scroll to and flash. */
+  reveal?: ChipReveal;
+  /** The reveal was answered, so reopening the chapter does not answer it again. */
+  onRevealed: () => void;
+  onAdd: (chip: PassageChip, then: CommentFollowUp) => boolean;
+  /** The chip's passage is no longer in the chapter as it was selected. */
+  onMissing: (chipId: string) => void;
+}
+
 export interface ChapterPanelProps {
   novelId: string;
   chapter: number;
+  comments: PanelComments;
   /** Set when the author's click opened the panel just now, rather than a reload or a shared link: it takes focus, and `edit` opens the editor. */
   request?: ChapterOpenMode;
   onClose: () => void;
@@ -78,7 +92,7 @@ export interface ChapterPanelProps {
 }
 
 /** A chapter read, hand-edited and approved beside the chat, the thread keeping the rest of the row. */
-export function ChapterPanel({ novelId, chapter, request, onClose, strip }: ChapterPanelProps): React.JSX.Element {
+export function ChapterPanel({ novelId, chapter, comments, request, onClose, strip }: ChapterPanelProps): React.JSX.Element {
   const draftQuery = useDraftQuery(novelId, chapter);
   const { activity } = useGenerationActivity(novelId);
   const generation = chapterGeneration(activity, chapter);
@@ -97,7 +111,7 @@ export function ChapterPanel({ novelId, chapter, request, onClose, strip }: Chap
   return (
     <PanelFrame label={heading} focusOnOpen={request !== undefined} onClose={onClose}>
       {draft ? (
-        <DraftView novelId={novelId} draft={draft} deleted={missing} generation={generation} request={request} onClose={onClose} strip={strip} />
+        <DraftView novelId={novelId} draft={draft} deleted={missing} generation={generation} comments={comments} request={request} onClose={onClose} strip={strip} />
       ) : generation ? (
         placeholder(<WritingState generation={generation} />)
       ) : missing ? (
@@ -189,7 +203,15 @@ function PanelFrame({ label, focusOnOpen, onClose, children }: PanelFrameProps):
   };
 
   return (
-    <aside ref={ref} id={panelId} tabIndex={-1} className={styles.panel} aria-label={label} style={{ '--chapter-panel-width': `${shown}px` } as React.CSSProperties}>
+    <aside
+      ref={ref}
+      id={panelId}
+      tabIndex={-1}
+      data-chapter-panel
+      className={styles.panel}
+      aria-label={label}
+      style={{ '--chapter-panel-width': `${shown}px` } as React.CSSProperties}
+    >
       <div
         role="separator"
         tabIndex={0}
@@ -257,12 +279,24 @@ interface DraftViewProps {
   /** The chapter was deleted after it loaded; the draft on screen is the last one seen. */
   deleted: boolean;
   generation?: ChapterGeneration;
+  comments: PanelComments;
   request?: ChapterOpenMode;
   onClose: () => void;
   strip?: ReactNode;
 }
 
-function DraftView({ novelId, draft, deleted, generation, request, onClose, strip }: DraftViewProps): React.JSX.Element {
+function focusIsIn(element: HTMLElement | null): boolean {
+  const panel = element?.closest('[data-chapter-panel]');
+  return Boolean(panel?.contains(document.activeElement));
+}
+
+function spanIn(text: string, wanted: PassageSelection): TextSpan | undefined {
+  if (text.slice(wanted.start, wanted.end) === wanted.text) return wanted;
+  const found = text.indexOf(wanted.text);
+  return found === -1 || text.indexOf(wanted.text, found + 1) !== -1 ? undefined : { start: found, end: found + wanted.text.length };
+}
+
+function DraftView({ novelId, draft, deleted, generation, comments, request, onClose, strip }: DraftViewProps): React.JSX.Element {
   const chapter = draft.chapter;
   const writing = isBeingWritten(draft, Boolean(generation));
   const editor = useChapterEditor(novelId, draft, deleted);
@@ -279,15 +313,55 @@ function DraftView({ novelId, draft, deleted, generation, request, onClose, stri
   const status = chapterPanelStatus(draft, writing, inEditor);
   const approve = panelApproval(draft, { writing, pendingEdits: unsaved ? unsettledMessage(editor.state.status) : undefined, refusal: approval.refusal });
 
+  const gate = commentGate(draft, writing);
+  const proposed = useMemo(() => proposedPassages(comments.proposals, draft), [comments.proposals, draft]);
+  const chapterChips = useMemo(() => comments.chips.filter(chip => chip.context.chapter === chapter), [comments.chips, chapter]);
+  const body = draft.body ?? '';
+  const commented = useMemo(() => chapterChips.flatMap(chip => locateChip(body, draft.id, chip.context) ?? []), [chapterChips, body, draft.id]);
+  const wanted = comments.reveal;
+  const revealed = wanted && chapterChips.find(chip => chip.id === wanted.chipId);
+  const revealSpan = revealed && locateChip(body, draft.id, revealed.context);
+  const readerReveal: ReaderReveal | undefined = wanted && revealSpan && !inEditor ? { span: revealSpan, nonce: wanted.nonce } : undefined;
+  const editAt = useRef<PassageSelection | undefined>(undefined);
+
   useSaveShortcut(inEditor, editor.save);
 
-  // A reload that lands on an empty chapter opens it in the editor without taking the author out of the composer.
-  const quietOpen = useRef(request === undefined);
+  // The panel opening on the author's click hands the editor focus; later — writing ending, the tab switching back — only focus already in the panel
+  // follows it there, so a reload, or the author typing in the composer, keeps their place.
+  const opened = useRef(false);
   useEffect(() => {
-    const quiet = quietOpen.current;
-    quietOpen.current = false;
-    if (inEditor && tab === 'write' && !quiet) editorRef.current?.focus();
-  }, [inEditor, tab]);
+    const first = !opened.current;
+    opened.current = true;
+    const area = editorRef.current;
+    if (!inEditor || tab !== 'write' || !area) return;
+    const wanted = editAt.current;
+    editAt.current = undefined;
+    if (!wanted && !(first ? request !== undefined : focusIsIn(area))) return;
+    area.focus();
+    const span = wanted && spanIn(area.value, wanted);
+    if (span) area.setSelectionRange(span.start, span.end);
+  }, [inEditor, tab, request]);
+
+  const editPassage = (selection: PassageSelection): void => {
+    editAt.current = selection;
+    setTab('write');
+    setEditing(true);
+  };
+
+  // The reader flashes a passage it can show; one gone from the chapter is marked on its chip, and in the editor the passage is selected instead.
+  const answeredReveal = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    if (!isUnanswered(wanted, answeredReveal.current) || !revealed) return;
+    answeredReveal.current = wanted.nonce;
+    comments.onRevealed();
+    if (!revealSpan) return comments.onMissing(revealed.id);
+    if (!inEditor) return;
+    const area = editorRef.current;
+    const inArea = area && spanIn(area.value, { ...revealSpan, text: revealed.context.quote });
+    if (!area || !inArea) return comments.onMissing(revealed.id);
+    area.focus();
+    area.setSelectionRange(inArea.start, inArea.end);
+  });
 
   const finishEditing = async (): Promise<void> => {
     if (await editor.save()) setEditing(false);
@@ -395,7 +469,7 @@ function DraftView({ novelId, draft, deleted, generation, request, onClose, stri
           ) : (
             <div className={`nf-scroll ${styles.scroll}`}>
               <div className={styles.reader}>
-                <Markdown content={editor.state.body} />
+                <NumberedProse body={editor.state.body} />
               </div>
             </div>
           )}
@@ -422,8 +496,17 @@ function DraftView({ novelId, draft, deleted, generation, request, onClose, stri
           {writing && <WritingState generation={generation} />}
           <article className={styles.reader}>
             {draft.judgeNote && draft.status !== 'final' && <p className={styles.note}>{draft.judgeNote}</p>}
-            {draft.body?.trim() ? (
-              <PassageReader body={draft.body} askable={false} anchors={NO_ANCHORS} renderCard={noCard} onAsk={noAsk} />
+            {body.trim() ? (
+              <ChapterReader
+                draft={draft}
+                gate={gate}
+                limitReason={comments.limitReason}
+                proposed={proposed}
+                commented={commented}
+                reveal={readerReveal}
+                onAdd={comments.onAdd}
+                onEdit={editPassage}
+              />
             ) : (
               <p className={styles.empty}>{edit.allowed ? 'No prose yet — use Edit to write it.' : 'This chapter has no prose yet.'}</p>
             )}

@@ -11,7 +11,8 @@ import {
   useRequestPassageMutation,
 } from '@/lib/apis';
 import { type DraftBase, type SettledBase, unsettledMessage } from '@/lib/chapter-editor';
-import { appliedMessage, passageHash, type PassageSelection, SELECTION_CHANGED_MESSAGE, selectionOf, writeRefusalMessage } from '@/lib/passage-suggestions';
+import { passageHash, type PassageSelection, selectionOf } from '@/lib/passage-selection';
+import { appliedMessage, SELECTION_CHANGED_MESSAGE, writeRefusalMessage } from '@/lib/passage-suggestions';
 
 import { useSingleFlight } from './use-single-flight';
 

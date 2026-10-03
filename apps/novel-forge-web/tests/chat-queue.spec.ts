@@ -1,9 +1,28 @@
 import { describe, expect, it } from 'bun:test';
 
-import { editQueued, inputCaption, queuedNote, type QueuedTurn, queuedView, type QueueState, queueStep, releaseSettings, restoreFailed } from '../src/features/chat/chat-queue';
+import {
+  afterFailedSend,
+  editQueued,
+  inputCaption,
+  queuedNote,
+  type QueuedTurn,
+  queuedView,
+  type QueueState,
+  queueStep,
+  releaseSettings,
+  restoreFailed,
+} from '../src/features/chat/chat-queue';
+import { type PassageChip } from '../src/lib/passage-comments';
 
+const chip: PassageChip = {
+  id: '7:4:12',
+  context: { kind: 'passage', chapter: 3, draftId: '7', revision: 2, saveSeq: 5, start: 4, end: 12, passageHash: 'h', quote: 'the pier', comment: 'Tighten' },
+  firstParagraph: 1,
+  lastParagraph: 1,
+};
 const queued: QueuedTurn = {
   content: 'Make it darker',
+  chips: [],
   proseEdits: true,
   justDiscussing: false,
   choice: { contentMode: 'standard', costTier: 'economy' },
@@ -51,6 +70,11 @@ describe('queueStep', () => {
 });
 
 describe('queuedView', () => {
+  it('should count the comments a queued message carries, alone when it has no text', () => {
+    expect(queuedView({ ...queued, chips: [chip] }, 'waiting', 'streaming')?.text).toBe('Make it darker · 1 passage comment');
+    expect(queuedView({ ...queued, content: '', chips: [chip, { ...chip, id: 'b' }] }, 'waiting', 'streaming')?.text).toBe('2 passage comments');
+  });
+
   it('should show nothing without a queued message', () => {
     expect(queuedView(undefined, 'none', 'idle')).toBeUndefined();
   });
@@ -85,12 +109,23 @@ describe('releaseSettings', () => {
 
 describe('editQueued', () => {
   it('should restore the text and the settings it was queued with', () => {
-    expect(editQueued(queued, '')).toEqual({ input: 'Make it darker', settings: { proseEdits: true, justDiscussing: false, choice: queued.choice } });
+    expect(editQueued(queued, '')).toEqual({ input: 'Make it darker', chips: [], settings: { proseEdits: true, justDiscussing: false, choice: queued.choice } });
   });
 
   it('should put the queued text above anything typed since', () => {
     expect(editQueued(queued, '  ').input).toBe('Make it darker');
     expect(editQueued(queued, 'and shorter').input).toBe('Make it darker\nand shorter');
+  });
+});
+
+describe('afterFailedSend', () => {
+  it('should hand nothing back once the server stored the message, so its comments never ride a second one', () => {
+    expect(afterFailedSend(true, { ...queued, chips: [chip] }, 'Make it darker', false)).toEqual({ stored: true });
+  });
+
+  it('should hand the message back as restoreFailed does when the server never took it', () => {
+    expect(afterFailedSend(false, { ...queued, chips: [chip] }, undefined, true)).toEqual({ stored: false, input: 'Make it darker', chips: [chip] });
+    expect(afterFailedSend(false, undefined, 'hello', false)).toEqual({ stored: false, input: 'hello' });
   });
 });
 
@@ -101,6 +136,11 @@ describe('restoreFailed', () => {
 
   it('should fall back to the box when a newer message has taken the queue', () => {
     expect(restoreFailed(queued, undefined, true)).toEqual({ input: 'Make it darker' });
+  });
+
+  it('should hand a queued message’s comments back to the composer with its text', () => {
+    expect(restoreFailed({ ...queued, chips: [chip] }, undefined, true)).toEqual({ input: 'Make it darker', chips: [chip] });
+    expect(editQueued({ ...queued, chips: [chip] }, '').chips).toEqual([chip]);
   });
 
   it('should return a typed draft to the box and do nothing without one', () => {

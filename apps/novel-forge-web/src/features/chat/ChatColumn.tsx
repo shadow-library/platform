@@ -16,6 +16,7 @@ import {
   type ChatMessageResponse,
   type ChatSessionResponse,
   type ChatTurnResponse,
+  draftQueryOptions,
   invalidateDraft,
   invalidateProgress,
   isTurnFailureRecorded,
@@ -49,14 +50,16 @@ import { chatChoiceUpdate, sameChoice, type TurnChoice, turnChoiceDefaults, turn
 import { chatColumnView, chatTitle } from '@/lib/chat-sessions';
 import { timelineOfTrace, turnTimeline } from '@/lib/chat-turn-timeline';
 import { messageTime, projectTitle } from '@/lib/format';
+import { chipContexts, chipLimitReason, type ChipReveal, chipsOfSent, nextReveal, type PassageChip, rewriteChip, shownContexts, staleChipIds } from '@/lib/passage-comments';
 import { PANEL_DOCK_MIN } from '@/lib/sidebar-rail';
 import { takePendingFirstTurn } from '@/lib/pending-first-turn';
 import { type PendingItem, pendingKey } from '@/lib/pending-items';
 import { useGenerationActivity } from '@/lib/use-generation-activity';
 
 import { ChapterDraftCard } from './ChapterDraftCard';
-import { ChapterPanel } from './ChapterPanel';
-import { editQueued, inputCaption, type QueuedTurn, queuedView, queueStep, releaseSettings, restoreFailed, type TurnSettings } from './chat-queue';
+import { ChapterPanel, type PanelComments } from './ChapterPanel';
+import { type CommentFollowUp } from './ChapterReader';
+import { afterFailedSend, editQueued, inputCaption, type QueuedTurn, queuedView, queueStep, releaseSettings, type TurnSettings } from './chat-queue';
 import { ChatComposer } from './ChatComposer';
 import { NotesChip, SaveAsNotesOffer } from './ChatExtras';
 import { ContinuityProposalCard } from './ContinuityProposalCard';
@@ -95,6 +98,7 @@ import {
 import styles from './Chat.module.css';
 import { ComposerModeMenu } from './ComposerModeMenu';
 import { JobProgress } from './JobProgress';
+import { ComposerPassages, SentPassages } from './PassageChips';
 import { findPending, revealPending } from './pending-reveal';
 import { ProgressDock, ProgressDockStrip } from './ProgressPanel';
 import { type DockState, dockState, jobProposals, organiseIdeas, type PanelProposals, panelTurnOf, turnRefs } from './progress-panel-view';
@@ -107,11 +111,15 @@ import { useUnansweredCount } from './suggestion-store';
 import { TurnProposalCard } from './TurnProposalCard';
 import { TurnReceipt } from './TurnReceipt';
 import { TurnTrace } from './TurnTimeline';
+import { usePassageChips } from './use-passage-chips';
 import { PENDING_PROPOSAL_LIMIT, usePendingItems } from './use-pending-items';
 import { PendingAnchor, WaitingTray } from './WaitingTray';
 
 const PLAN_KIND = 'chapter_plan';
 const NO_JOBS: readonly ChatJobState[] = [];
+const NO_PROPOSALS: readonly ProposalResponse[] = [];
+// The server refuses these before the turn starts, naming a passage the author has to select again or take out.
+const PASSAGE_REFUSALS = new Set(['CHT_009', 'CHT_010', 'CHT_011']);
 // A card brought into the chat appears once the card list refetches; past this the reveal gives up rather than jumping later.
 const REVEAL_WAIT_MS = 10_000;
 
@@ -216,6 +224,9 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetReveals, setSheetReveals] = useState(false);
   const [dock, setDock] = useState<DockState>({ kind: 'closed' });
+  const [chipReveal, setChipReveal] = useState<ChipReveal>();
+  const revealCount = useRef(0);
+  const passages = usePassageChips(novelId, session?.id);
   const frameRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -304,6 +315,10 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
   }, [messages, jobStream.jobs]);
   const pendingWork = usePendingItems(novelId, session?.id, shownProposals);
   const draftsForYou = pendingWork.drafts;
+  const sessionProposals = useMemo(
+    () => (session ? (proposalsQuery.data?.items ?? NO_PROPOSALS).filter(proposal => proposal.sessionId === session.id) : NO_PROPOSALS),
+    [proposalsQuery.data, session],
+  );
   const waiting = (proposalsQuery.data?.items ?? []).filter(proposal => session && proposal.sessionId === session.id && !shownProposals.has(proposal.id));
   const waitingPlans = waiting.filter(proposal => proposal.kind === PLAN_KIND);
   const waitingCards = waiting.filter(proposal => proposal.kind !== PLAN_KIND);
@@ -414,13 +429,33 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
 
   const currentSettings = (): TurnSettings => ({ proseEdits, justDiscussing, choice: turnChoice });
 
-  const sendTurn = (content: string, draft?: string, settings: TurnSettings = currentSettings(), requeue?: QueuedTurn): void => {
-    if (!session || !content || pending) return;
+  // A refusal names one chapter at most, so the chips are checked against their drafts as they stand now to tell which changed.
+  const markChanged = async (chips: readonly PassageChip[]): Promise<void> => {
+    const chapters = [...new Set(chips.map(chip => chip.context.chapter))];
+    const fresh = await Promise.all(
+      chapters.map(async chapter => [chapter, await queryClient.fetchQuery({ ...draftQueryOptions(novelId, chapter), staleTime: 0 }).catch(() => undefined)] as const),
+    );
+    passages.markStale(staleChipIds(chips, new Map(fresh)));
+  };
+
+  // Chips a turn has taken but the server has not answered for yet: they stay in the composer until it does, but never ride a second message.
+  const inFlight = useRef(new Set<string>());
+  const settle = (ids: ReadonlySet<string>): void => ids.forEach(id => inFlight.current.delete(id));
+
+  const sendTurn = (content: string, draft?: string, settings: TurnSettings = currentSettings(), requeue?: QueuedTurn, chips: readonly PassageChip[] = []): void => {
+    if (!session || (!content && chips.length === 0) || pending) return;
     setAssistantWatermark(lastAssistantOrdinal(messages));
     const override = turnOverride(settings.choice, defaults.choice);
+    const sent = new Set(chips.map(chip => chip.id));
+    sent.forEach(id => inFlight.current.add(id));
+    const passageOptions = chips.length > 0 ? { contexts: chipContexts(chips), shown: shownContexts(chips) } : {};
     turn.send(
       content,
       {
+        onAccepted: () => {
+          settle(sent);
+          passages.drop(sent);
+        },
         onSuccess: result => {
           announce(turnAnnouncement(turnOutcome(result)));
           invalidateProgress(queryClient, novelId);
@@ -430,45 +465,56 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
         },
         onError: async (err, context) => {
           announce(turnAnnouncement({ applied: 0, suggested: 0, failed: true }));
-          if (await isTurnFailureRecorded(queryClient, novelId, session.id, context?.previous)) return;
+          const refused = PASSAGE_REFUSALS.has(err.code);
+          const recorded = await isTurnFailureRecorded(queryClient, novelId, session.id, context?.previous);
+          const { stored, queue, input: restored, chips: back } = afterFailedSend(recorded, requeue, draft, Boolean(queueNow.current) || refused);
+          settle(sent);
+          if (stored) return passages.drop(sent);
           toast.danger(err.message);
-          const { queue, input: restored } = restoreFailed(requeue, draft, Boolean(queueNow.current));
           if (queue) setQueued(queue);
-          if (restored !== undefined) setInput(current => (current.trim() ? `${restored}\n${current}` : restored));
+          if (back) passages.restore(back);
+          if (restored) setInput(current => (current.trim() ? `${restored}\n${current}` : restored));
+          if (err.code === 'CHT_009') void markChanged(chips);
         },
       },
-      { proseEdits: settings.proseEdits, justDiscussing: settings.justDiscussing, ...override },
+      { proseEdits: settings.proseEdits, justDiscussing: settings.justDiscussing, ...override, ...passageOptions },
     );
   };
 
-  const enqueue = (content: string): void => {
+  const enqueue = (content: string, chips: readonly PassageChip[]): void => {
     if (queued || locked) return;
-    setQueued({ content, ...currentSettings(), watching: turn.isPending, after: finishedId });
+    setQueued({ content, chips, ...currentSettings(), watching: turn.isPending, after: finishedId });
     setInput('');
+    passages.drop(new Set(chips.map(chip => chip.id)));
   };
+
+  const staleChips = passages.chips.some(chip => chip.stale);
+  const sendable = !staleChips && (input.trim().length > 0 || (Boolean(session) && passages.chips.length > 0));
 
   const send = (): void => {
     const content = input.trim();
-    if (!content) return;
+    const chips = passages.latest().filter(chip => !inFlight.current.has(chip.id));
+    if ((!content && chips.length === 0) || chips.some(chip => chip.stale)) return;
     if (!session) {
-      if (!starting) props.onStart(content, draftMode);
+      if (content && !starting) props.onStart(content, draftMode);
       return;
     }
     if (switching) return;
-    if (pending) return enqueue(content);
+    if (pending) return enqueue(content, chips);
     setInput('');
-    sendTurn(content, content);
+    sendTurn(content, content, currentSettings(), undefined, chips);
   };
 
   const releaseQueued = (via: 'auto' | 'now'): void => {
     if (!queued || pending || locked) return;
     setQueued(undefined);
-    sendTurn(queued.content, undefined, releaseSettings(queued, currentSettings(), via), queued);
+    sendTurn(queued.content, undefined, releaseSettings(queued, currentSettings(), via), queued, queued.chips);
   };
 
   const editQueuedMessage = (): void => {
     if (!queued) return;
     const edited = editQueued(queued, input);
+    passages.restore(edited.chips);
     setInput(edited.input);
     setProseEdits(edited.settings.proseEdits);
     setJustDiscussing(edited.settings.justDiscussing);
@@ -497,7 +543,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
       initialConsumed.current = true;
       onInitialTurnSent?.();
       setInput(current => (current.trim() === content ? '' : current));
-      sendTurn(content, content);
+      sendTurn(content, content, currentSettings(), undefined, passages.latest());
     });
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sends once per handed-off message; initialConsumed guards every later run
@@ -570,6 +616,49 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
     if (chip.label === `Plan chapter ${nextChapter}`) return openPlanStart();
     setInput(chip.prompt);
     inputRef.current?.focus();
+  };
+
+  // A failed turn's retry sends its comments again with it; a message of comments alone would otherwise have nothing to send.
+  const retryTurn = (content: string): void => {
+    const last = messages.filter(message => message.role === 'user').at(-1);
+    sendTurn(content, undefined, currentSettings(), undefined, chipsOfSent(last?.contexts));
+  };
+
+  const revealChip = (chip: PassageChip): void => {
+    if (chip.context.chapter !== chapter) props.onOpenChapter(chip.context.chapter, 'read');
+    setChipReveal(nextReveal(chip.id, revealCount.current++));
+  };
+
+  // "Rewrite with AI" needs Edit prose for the chat to answer with a rewrite card, and leaves the author in the composer to add what to change.
+  const addComment = (added: PassageChip, then: CommentFollowUp): boolean => {
+    const chip =
+      then === 'rewrite'
+        ? rewriteChip(
+            added,
+            passages.latest().find(existing => existing.id === added.id),
+          )
+        : added;
+    if (!passages.add(chip)) return false;
+    if (then === 'rewrite' && !proseEdits) {
+      setProseEdits(true);
+      toast.info('Edit prose is now on, so the chat can rewrite the passage.');
+    }
+    if (then === 'send' && session && !locked) send();
+    else if (then !== 'stay') inputRef.current?.focus();
+    return true;
+  };
+
+  const panelComments: PanelComments = {
+    chips: passages.chips,
+    limitReason: chipLimitReason(passages.chips.length),
+    proposals: sessionProposals,
+    reveal: chipReveal,
+    onRevealed: () => setChipReveal(undefined),
+    onAdd: addComment,
+    onMissing: chipId => {
+      passages.markStale(new Set([chipId]));
+      toast.warning('That passage changed — select it again.');
+    },
   };
 
   const markProgress = (key: ProgressItemKey, status: ProgressOverrideStatus): void => {
@@ -757,6 +846,12 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
     [],
   );
 
+  const passageCaption = staleChips
+    ? 'A passage you commented on changed — select it again, or remove its comment.'
+    : !session && passages.chips.length > 0 && !input.trim()
+      ? 'Write a message to start the chat — your comments go with it.'
+      : undefined;
+
   const notices = unanswered > 0 && <div className={styles.composerNotice}>{unansweredWarning(unanswered)}</div>;
 
   const conversation = view.kind === 'conversation';
@@ -838,7 +933,8 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
                 m.role === 'user' ? (
                   <div key={m.id} className={styles.userRow}>
                     <div className={styles.userCol}>
-                      <div className={styles.userBubble}>{m.content}</div>
+                      {m.contexts && m.contexts.length > 0 && <SentPassages contexts={m.contexts} />}
+                      {m.content.trim() && <div className={styles.userBubble}>{m.content}</div>}
                       {m.id === notesOpener && notes?.trim() && <NotesChip notes={notes} />}
                       {session && offersNotes(m) && <SaveAsNotesOffer novelId={novelId} sessionId={session.id} messageId={m.id} />}
                       <time className={styles.userTime} dateTime={m.createdAt} title={new Date(m.createdAt).toLocaleString()}>
@@ -884,7 +980,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
                   footer={stream.status === 'done' ? <MessageModelTag message={stream.turn.assistantMessage} worked={finishedWorked} /> : undefined}
                 />
               )}
-              {showTurnStatus && <TurnStatus state={state} sending={turn.isPending} fallbackLabel="Forge is reading your ask" onRetry={content => sendTurn(content)} />}
+              {showTurnStatus && <TurnStatus state={state} sending={turn.isPending} fallbackLabel="Forge is reading your ask" onRetry={retryTurn} />}
               {looseJobs.length > 0 && (
                 <div className={styles.indented}>
                   {looseJobs.map(job => (
@@ -998,6 +1094,8 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
             switching={switching}
             chips={chips}
             onChip={onChip}
+            passages={passages.chips.length > 0 && <ComposerPassages chips={passages.chips} onReveal={revealChip} onRemove={passages.remove} />}
+            sendable={sendable}
             modeMenu={<ComposerModeMenu value={composerModeOf(shownMode, justDiscussing)} onChange={changeMode} disabled={locked || pending || switching} />}
             modelMenu={<ChatModelMenu novelId={novelId} session={session} disabled={locked} turn={{ choice: turnChoice, onChange: chooseModel }} />}
             justDiscussing={justDiscussing}
@@ -1006,7 +1104,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
             queued={queuedView(queued, step, stream.status)}
             onEditQueued={editQueuedMessage}
             onSendQueued={() => releaseQueued('now')}
-            caption={inputCaption({ input, running: pending, queued: Boolean(queued), switching })}
+            caption={inputCaption({ input, running: pending, queued: Boolean(queued), switching }) ?? passageCaption}
             notices={notices}
             tray={
               session && (
@@ -1029,6 +1127,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
           key={chapter}
           novelId={novelId}
           chapter={chapter}
+          comments={panelComments}
           request={props.chapterRequest}
           onClose={props.onCloseChapter}
           strip={

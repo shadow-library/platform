@@ -124,11 +124,20 @@
   Chapters page's editor (autosave, the conflict choice, the hand-save path), and leaving the chapter with text unsaved asks first. A final chapter opens
   read-only and one being written shows its progress, never an editor. Only one panel holds the right side: the changes panel folds to a strip and reviews
   in its sheet while a chapter is open. Below 1024px the chapter is a full sheet over the chat.
+- **A passage is commented on in the panel**: selecting text in the chapter's reading view offers Comment (⌘K), Rewrite with AI, Edit and Copy; a comment
+  becomes a chip in the composer, built from the draft the author selected in, and rides the next message — with or without text of its own. Chips are kept
+  per chat in the tab's session storage, ten at most, and leave the composer only once the server has accepted the turn: a passage it can no longer find
+  (`CHT_009`) stays as a chip marked to be selected again. An isolated chapter and one being written offer no Comment; a final one can be asked about but
+  not rewritten. While this chat's rewrite card for the open chapter is pending, its passages read in place as struck-out and inserted text; applying stays
+  on the card.
+- **One paragraph count**: "¶k" is the k-th block of the chapter as `@shadow-library/sdk`'s `proseParagraphs` splits it — a paragraph, a heading, a whole
+  list, a quote or a code block, never a scene break — and the panel's gutter, the comment chips, the stored comments and the rewrite cards all number
+  from it. A message stores the paragraph numbers it was sent with, so its history renders the same however the count is later read.
 - **Passage comments ride the message**: an author's message may carry up to ten comments on passages of chapter drafts (`contexts`), each sent with its draft, revision,
   UTF-16 offsets and a hash of its quote. The server re-anchors each to the draft as it stands — in place; else, when the revision the author read survives, only the copy
   still between the words that surrounded it there; else the quote's one occurrence — and stores it on the message at that draft's current offsets; a passage it cannot
   find refuses the turn (`CHT_009`) rather than send a stale quote. The comments render into the author's turn as one deterministic block (chapter, revision, paragraphs
-  counted by blank lines, range, quote, comment, each part on its own lines and never escaped, so the hard line reads them as written), byte-identical in that turn's
+  by the one paragraph count, range, quote, comment, each part on its own lines and never escaped, so the hard line reads them as written), byte-identical in that turn's
   prompt and in every later turn's history. A comment is the author's own words for the quote rule and planning; the quoted chapter text never is. An isolated chapter's
   passage is refused on every route (`CHT_011`), as the read policy keeps its prose from every chat call.
 - **A passage comment is answered with a passage rewrite**: with Edit prose on, the chat answers each comment with `draft.rewrite_passage` — the chapter,

@@ -7,7 +7,7 @@ import { findHardLine, HARD_LINE_LEXICON, isHardLineRefusal } from '@modules/ai/
 import { passageHash } from '@modules/generation/passage-anchor';
 import { ChatService } from '@modules/refinement/chat.service';
 import { ChatCompactionService } from '@modules/refinement/chat-compaction.service';
-import { authorWords, paragraphAt, type PassageContextInput, renderTurnContent, resolvePassageContexts, turnScreens } from '@modules/refinement/passage-context';
+import { authorWords, type PassageContextInput, renderTurnContent, resolvePassageContexts, turnScreens } from '@modules/refinement/passage-context';
 import { serialiseMessage } from '@modules/refinement/serialise';
 
 const BODY = 'The keeper counts the ships at the harbour wall.\n\nThe tide turns late tonight. The ferry waits by the empty pier.\n\nGulls cry over the water.';
@@ -83,23 +83,6 @@ function context(overrides: Partial<Refinement.ChatPassageContext> = {}): Refine
     ...overrides,
   };
 }
-
-describe('paragraphAt', () => {
-  it('should count paragraphs by blank lines, as a reader does', () => {
-    expect(paragraphAt(BODY, 0)).toBe(1);
-    expect(paragraphAt(BODY, START)).toBe(2);
-    expect(paragraphAt(BODY, BODY.indexOf('Gulls'))).toBe(3);
-  });
-
-  it('should give an offset between two paragraphs to the next one, ignoring leading blank lines and spaces on a blank line', () => {
-    const body = '\n\nFirst line\nstill first.\n  \t\nSecond.';
-
-    expect(paragraphAt(body, 0)).toBe(1);
-    expect(paragraphAt(body, body.indexOf('still'))).toBe(1);
-    expect(paragraphAt(body, body.indexOf('  \t'))).toBe(2);
-    expect(paragraphAt(body, body.indexOf('Second'))).toBe(2);
-  });
-});
 
 describe('resolvePassageContexts', () => {
   it('should keep a passage that still stands where it was selected, with its paragraph and a trimmed comment', async () => {

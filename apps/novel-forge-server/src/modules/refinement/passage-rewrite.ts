@@ -1,4 +1,5 @@
 import { and, eq, inArray } from 'drizzle-orm';
+import { paragraphAt } from '@shadow-library/sdk';
 
 import { AppErrorCode } from '@server/classes';
 import { normalizeLineEndings } from '@server/common';
@@ -6,7 +7,6 @@ import { type Generation, type PrimaryDatabase, type Refinement, schema } from '
 
 import { anchorContext, fitReplacement, locatePassage, MAX_PASSAGE_CHARS, passageHash, replacePassage } from '../generation/passage-anchor';
 import { type ChangeOp, changeSetRefs, type DraftRewritePassageOp, type PassageRewriteAnchor } from './change-set';
-import { paragraphAt } from './passage-context';
 
 export type RewriteDropReason = 'no_draft' | 'locked' | 'isolated' | 'generating' | 'whole_chapter' | 'too_long' | 'not_found' | 'ambiguous' | 'unchanged';
 

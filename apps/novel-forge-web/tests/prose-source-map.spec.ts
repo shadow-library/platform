@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { marked } from 'marked';
 
-import { renderedSelection } from '../src/lib/passage-suggestions';
+import { renderedSelection } from '../src/lib/passage-selection';
 import { alignRendered, proseSourceMap, sourceRangeOf } from '../src/lib/prose-source-map';
 
 const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'", copy: '©' };

@@ -177,6 +177,39 @@
   color: var(--sh-text-tertiary);
 }
 
+/* The passages a sent message commented on, right-aligned above its bubble. */
+.sentPassages {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sentPassage {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 100%;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--sh-border-default);
+  border-radius: var(--sh-radius-md);
+  background: var(--sh-surface-card);
+  font-size: var(--sh-text-body-sm);
+  line-height: 18px;
+}
+
+.sentPassageHead {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
 .assistantCol {
   min-width: 0;
   display: flex;
@@ -972,6 +1005,89 @@ button.turnRow:hover {
 
 .composerInner:focus-within {
   border-color: var(--sh-border-focus);
+}
+
+/* The passages the next message comments on, stacked in the composer above its input. */
+.passages {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.passage {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  border-radius: var(--sh-radius-md);
+  background: var(--sh-surface-well);
+}
+
+.passage[data-stale] {
+  background: var(--sh-danger-bg-subtle);
+}
+
+.passageOpen {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 8px;
+  border: none;
+  border-radius: var(--sh-radius-md);
+  background: none;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+
+.passageOpen:focus-visible {
+  outline: 2px solid var(--sh-border-focus);
+  outline-offset: -2px;
+}
+
+/* "Ch 3 · ¶4": how the chat, the composer and the panel cite a passage. */
+.passageRef {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: var(--sh-radius-sm);
+  background: var(--sh-accent-soft);
+  color: var(--sh-accent-text);
+  font-family: var(--sh-font-mono);
+  font-size: 11px;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+.passageText {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  font-size: var(--sh-text-body-sm);
+  line-height: 18px;
+}
+
+.passageQuote {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-style: italic;
+  color: var(--sh-text-secondary);
+}
+
+.passageComment {
+  overflow-wrap: anywhere;
+  color: var(--sh-text-primary);
+}
+
+.passageStale {
+  color: var(--sh-danger-text);
 }
 
 .composerInner[data-discussing] {

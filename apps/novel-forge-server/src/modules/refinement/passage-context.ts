@@ -1,4 +1,5 @@
 import { and, eq, inArray } from 'drizzle-orm';
+import { paragraphAt } from '@shadow-library/sdk';
 
 import { AppErrorCode } from '@server/classes';
 import { type Generation, type PrimaryDatabase, type Refinement, schema } from '@server/database';
@@ -32,18 +33,7 @@ interface PassageSpan {
 
 type DraftReader = Pick<PrimaryDatabase, 'query'>;
 
-const PARAGRAPH = /\S[\s\S]*?(?=\n[ \t]*\n|\s*$)/g;
 const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
-
-/** Counted as a reader counts them: blocks separated by a blank line, from 1. An offset between two paragraphs belongs to the next one. */
-export function paragraphAt(body: string, offset: number): number {
-  let count = 0;
-  for (const match of body.matchAll(PARAGRAPH)) {
-    count++;
-    if (match.index + match[0].length > offset) return count;
-  }
-  return Math.max(count, 1);
-}
 
 function uniqueSpan(body: string, quote: string): PassageSpan | null {
   const found = body.indexOf(quote);

@@ -1,19 +1,8 @@
 import { describe, expect, it } from 'bun:test';
-import { createHash } from 'node:crypto';
 
 import { type PassageSuggestionResponse } from '../src/lib/apis';
 import { ApiError } from '../src/lib/apis/transport';
-import {
-  appliedMessage,
-  editorSelection,
-  MAX_PASSAGE_CHARS,
-  passageHash,
-  selectionOf,
-  selectionProblem,
-  splitAtAnchors,
-  suggestionView,
-  writeRefusalMessage,
-} from '../src/lib/passage-suggestions';
+import { appliedMessage, editorSelection, selectionProblem, splitAtAnchors, suggestionView, writeRefusalMessage } from '../src/lib/passage-suggestions';
 
 const BODY = 'Hollis kept the ledger in a tin box.\n\nThe pages inside were *swollen* with damp.\n\nNothing. No tick.';
 
@@ -21,32 +10,6 @@ type Suggestion = Pick<PassageSuggestionResponse, 'baseRevision' | 'leakLines' |
 
 const FRESH: Suggestion = { baseRevision: 3, leakLines: [], location: { freshness: 'fresh', start: 38, end: 80 } };
 const DRAFT = { status: 'draft' as const, reviewStatus: 'needs_review' as const, approvedRevision: null };
-
-describe('passageHash', () => {
-  it('should hash the UTF-8 bytes as lowercase hex, matching the server', async () => {
-    expect(await passageHash('abc')).toBe('ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
-    const text = '“Low Harrow paid” — é 🌊';
-    expect(await passageHash(text)).toBe(createHash('sha256').update(text, 'utf8').digest('hex'));
-  });
-});
-
-describe('selectionOf', () => {
-  it('should anchor on UTF-16 offsets with the end exclusive, so the slice is the passage', () => {
-    const body = 'Sea 🌊 wall';
-    const result = selectionOf(body, 4, 6);
-    expect(result).toEqual({ kind: 'ok', selection: { start: 4, end: 6, text: '🌊' } });
-  });
-
-  it('should drop surrounding whitespace and accept a backwards drag', () => {
-    expect(selectionOf(BODY, 38, 35)).toEqual({ kind: 'ok', selection: { start: 35, end: 36, text: '.' } });
-    expect(selectionOf('  word  ', 0, 8)).toEqual({ kind: 'ok', selection: { start: 2, end: 6, text: 'word' } });
-  });
-
-  it('should refuse an empty or over-long selection', () => {
-    expect(selectionOf(BODY, 36, 38)).toEqual({ kind: 'empty' });
-    expect(selectionOf('x'.repeat(MAX_PASSAGE_CHARS + 1), 0, MAX_PASSAGE_CHARS + 1)).toEqual({ kind: 'too-long' });
-  });
-});
 
 describe('editorSelection', () => {
   it('should take the textarea offsets when its value is the saved body', () => {

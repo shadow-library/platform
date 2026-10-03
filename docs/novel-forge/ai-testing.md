@@ -2076,7 +2076,9 @@ them off `model_calls` rather than trusting a number here. Cost and admin inspec
 
 ### 8. Comment on a passage and apply its rewrite card
 
-- **Entry:** the chapter beside the chat → select a line → comment → send with **Edit prose** on; or
+- **Entry:** open chapter 3 beside the chat (a draft card's Open, or `?chapter=3`) → select a sentence in the reading view → **Comment** (⌘K) →
+  type the comment → **Add to chat** (↵; ⌘↵ adds and sends) → repeat for the second sentence → type the message → send with **Edit prose** on
+  (**Rewrite with AI** adds the chip as "Rewrite this" and turns Edit prose on); or
   `POST /chat/sessions/$S/messages {"content","proseEdits":true,"contexts":[…]}`, each context
   `{"kind":"passage","chapter","draftId","revision","saveSeq","start","end","passageHash","quote","comment"}` (UTF-16
   offsets into the draft body, SHA-256 hex of `quote`). Apply with `POST /proposals/:id/apply {"opIndexes":[…]}`, undo
@@ -2089,6 +2091,10 @@ them off `model_calls` rather than trusting a number here. Cost and admin inspec
     the reply stages one `draft.rewrite_passage` per comment: `passage` is the quoted sentence, `contextIndex` its
     entry, a short `label`. The stored op carries an `anchor` (`draftId`, `revision`, `saveSeq`, `start`, `end`,
     `passageHash`, `paragraph`) the server found, whatever the model sent.
+  - In the browser: each comment is a chip in the composer ("Ch 3 · ¶k", the quote, the comment, ×) and its passage is underlined in the reader;
+    the placeholder reads "Add a note for the whole revision…"; clicking a chip scrolls the reader to the passage and flashes it. The chips survive
+    closing the panel and a reload, and clear only once the turn is accepted; the sent message shows them above its bubble with the same ¶ numbers
+    as the panel's gutter. While the card below is pending, its passages read in the panel as struck-out and inserted text.
   - The thread shows one card, "2 changes to chapter 3", each change checked by default as "¶k · label" over a red
     line (the words taken out) and a green line (the words put in). Nothing applies in the turn, in any mode.
   - Applying both writes ONE new revision (`draft_revisions.source='passage_rewritten'`), resets approval and marks
@@ -2103,7 +2109,8 @@ them off `model_calls` rather than trusting a number here. Cost and admin inspec
     prose on.
   - Ask for a rewrite of words that occur twice in the chapter without a comment on them, or of words the chapter does
     not hold: the reply ends "Forge left out a passage rewrite: …" naming why, and no card holds it.
-- **Fails when:** `RFN_021` a checked rewrite's passage was edited in or around since the card was staged;
+- **Fails when:** `CHT_009` on send after a commented sentence was edited away (its chip turns "changed — select it again" and the message stays in
+  the composer); `CHT_011` on an isolated chapter (the panel offers no Comment there); `RFN_021` a checked rewrite's passage was edited in or around since the card was staged;
   `RFN_003` the draft was removed (the card turns conflicted); `RFN_020` two checked rewrites change the same words; `RFN_010` the chapter turned final; `RFN_012` it turned
   isolated; `RFN_006` on revert after a later edit.
 

@@ -4988,7 +4988,7 @@ export interface components {
       passageHash: string;
       quote: string;
       comment: string;
-      /** @description The paragraph the passage starts in, counted from 1 by blank lines as a reader counts them. */
+      /** @description The paragraph the passage starts in, from 1, numbered as the chapter panel numbers its blocks: a heading, a whole list or a code block counts once and a scene break not at all. */
       firstParagraph: number;
       /** @description The paragraph the passage ends in. */
       lastParagraph: number;

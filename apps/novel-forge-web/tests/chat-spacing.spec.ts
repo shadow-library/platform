@@ -247,6 +247,33 @@ const CHAT: Expected[] = [
   },
 ];
 
+// Passage comments: mockup screen 2 (chips in the composer) and screen 3 (sent chips above the bubble).
+const PASSAGES: Expected[] = [
+  {
+    selector: '.sentPassages',
+    values: { gap: '6px', 'max-width': '100%', margin: '0', padding: '0' },
+    source: 'mockup screen 3: the sent chips stacked 6 apart above the bubble; list reset',
+  },
+  {
+    selector: '.sentPassage',
+    values: { gap: '2px', 'max-width': '100%', padding: '8px 10px', 'border-radius': 'var(--sh-radius-md)' },
+    source: 'mockup screen 3: white bordered mini-cards; chat .composerNotice 8px 10px, radius-md',
+  },
+  { selector: '.sentPassageHead', values: { gap: '8px' }, source: 'mockup screen 3: the ref chip 8 before its quote' },
+  {
+    selector: '.passages',
+    values: { gap: '6px', margin: '0 0 8px', padding: '0' },
+    source: 'mockup screen 2: chips 6 apart inside the composer, 8 above the input as .composerBar margin-top',
+  },
+  { selector: '.passage', values: { gap: '4px', 'border-radius': 'var(--sh-radius-md)' }, source: 'mockup screen 2: a chip row with its × close beside it; .queued radius-md' },
+  {
+    selector: '.passageOpen',
+    values: { gap: '8px', padding: '6px 8px', 'border-radius': 'var(--sh-radius-md)' },
+    source: 'chat .queued padding 6px 10px less the × button’s side; .row gap 8',
+  },
+  { selector: '.passageRef', values: { padding: '1px 6px', 'border-radius': 'var(--sh-radius-sm)' }, source: 'mockup screen 2: the "Ch 3 · ¶4" chip, mono 11 on accent-soft' },
+];
+
 const CHAT_PHONE: Expected[] = [
   { selector: '.headLabel', values: { width: '1px', height: '1px' }, source: 'visually hidden label: icon buttons keep their names at 390' },
   { selector: '.checklistItems, .questionOptions', values: { 'grid-template-columns': 'minmax(0, 1fr)' }, source: 'Phone one column' },
@@ -356,7 +383,7 @@ const CHAPTER_PANEL: Expected[] = [
   { selector: '.headActions', values: { gap: '8px', 'margin-left': 'auto' }, source: 'chat .headActions gap 8, margin-left auto' },
   { selector: '.scroll', values: { 'min-height': '0' }, source: 'as chat .scroll' },
   { selector: '.reader', values: { padding: '28px 56px 28px 64px' }, source: 'mockup reading view padding 28px 56px 28px 64px' },
-  { selector: '.reader :global(.nf-md) > *::before', values: { width: '32px' }, source: 'mockup paragraph-number gutter: 32 wide, 16 short of the prose' },
+  { selector: '.reader :global(.nf-md) > [data-paragraph]::before', values: { width: '32px' }, source: 'mockup paragraph-number gutter: 32 wide, 16 short of the prose' },
   { selector: '.note', values: { margin: '0 0 16px' }, source: 'the judge’s note above the prose; ProgressPanel .section 16' },
   { selector: '.empty', values: { margin: '0' }, source: 'paragraph reset' },
   { selector: '.state', values: { gap: '12px', padding: '28px 56px 0 64px' }, source: 'the reading view’s padding (.reader), 12 between a status and its line as chat .receipt' },
@@ -367,6 +394,26 @@ const CHAPTER_PANEL: Expected[] = [
     source: 'mockup edit view: the textarea fills the panel, its text where the reading view’s prose sits',
   },
   { selector: '.statusBar', values: { gap: '4px 8px', padding: '6px 16px' }, source: 'mockup status bar; ProgressPanel .section 16 at the sides' },
+  {
+    selector: '.toolbar',
+    values: { gap: '2px', 'max-width': '100%', padding: '4px', 'border-radius': 'var(--sh-radius-md)' },
+    source: 'mockup screen 2: the dark toolbar above a selection, its small buttons 4 inside its edge; the tooltip surface’s radius-md',
+  },
+  { selector: '.toolbarKbd', values: { 'margin-left': '6px' }, source: 'mockup screen 2: "Comment ⌘K", the shortcut 6 after the word as ui Tooltip .shortcut' },
+  { selector: '.toolbarNote', values: { 'max-width': '240px', padding: '0 8px' }, source: 'ui Tooltip .content max-width 240, a button’s 8 at the sides' },
+  {
+    selector: '.toolbarProblem',
+    values: { 'max-width': '360px', padding: '10px 12px', 'border-radius': 'var(--sh-radius-md)' },
+    source: 'PassageAsk.module.css .selectionNote, the note shown for a selection that cannot be used',
+  },
+  {
+    selector: '.comment.comment',
+    values: { width: '360px', gap: '10px', padding: '14px' },
+    source: 'mockup screen 2: the comment popover ≈360 wide; chat .composerInner 14 inside, 10 between rows',
+  },
+  { selector: '.commentPassage', values: { gap: '8px' }, source: 'mockup screen 2: the ref chip 8 before its quote, as chat .sentPassageHead' },
+  { selector: '.quick', values: { gap: '6px' }, source: 'PassageAsk.module.css .chips gap 6' },
+  { selector: '.commentFoot', values: { gap: '8px' }, source: 'chat .row gap 8' },
 ];
 
 const CHAPTER_PANEL_AT: Record<string, Expected[]> = {
@@ -380,7 +427,7 @@ const CHAPTER_PANEL_AT: Record<string, Expected[]> = {
       values: { padding: '20px 16px 20px 44px' },
       source: 'the phone gutter (16, --nf-page-pad-inline) at the right, 44 at the left for the numbers',
     },
-    { selector: '.reader :global(.nf-md) > *::before', values: { width: '24px' }, source: 'the gutter narrowed with its padding' },
+    { selector: '.reader :global(.nf-md) > [data-paragraph]::before', values: { width: '24px' }, source: 'the gutter narrowed with its padding' },
     { selector: '.state', values: { padding: '20px 16px 0' }, source: 'the phone gutter' },
   ],
 };
@@ -403,7 +450,7 @@ describe('Chat spacing', () => {
   const today = spacingOf('./fixtures/chat.baseline.module.css').base;
 
   it('should keep every chat spacing value equal to its cited source — today’s value where it names one — and cite every one', () => {
-    check(chat.base, CHAT, today);
+    check(chat.base, [...CHAT, ...PASSAGES], today);
   });
 
   it('should size the mode pill with the model pill’s own class and keep the Edit prose note inline', () => {
