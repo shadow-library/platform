@@ -2,6 +2,7 @@ import { ThemeProvider, Toaster, TooltipProvider } from '@shadow-library/ui';
 import { themeCookieDomain } from '@shadow-library/web';
 
 import { SidebarRailProvider } from '@/components/Layout';
+import { UpdateBar } from '@/components/UpdateBar';
 
 export interface AppProvidersProps {
   children?: React.ReactNode;
@@ -22,6 +23,7 @@ export function AppProviders(props: AppProvidersProps): React.JSX.Element {
         <SidebarRailProvider>{props.children}</SidebarRailProvider>
       </TooltipProvider>
       <Toaster placement="top-end" />
+      <UpdateBar />
     </ThemeProvider>
   );
 }

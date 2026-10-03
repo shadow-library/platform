@@ -68,6 +68,8 @@
 - The web never renders a containment badge from `generator` (it reads `isolated`; `generator` only drives a provenance chip). `novel-forge:admin` (role `NovelForgeAdmin`, never
   default or bot-grantable) gates run inspection; it is an RBAC permission evaluated per organisation, so the web reads it from `GET /api/v1/access`, never the session, and each
   admin route gates itself in `beforeLoad`. Bots reach almost every project route but cannot publish.
+- **Stale tabs**: a tab whose server now runs a different web build (`GET /build-id`, the commit `gitops build` passes as `APP_VERSION`) shows a dismissible "Reload to
+  update" bar and never reloads itself, since the author may be mid-sentence. A built deploy only; the dev server reloads on its own.
 
 ## The chat
 

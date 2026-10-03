@@ -4,8 +4,11 @@ import { tanstackStart } from '@tanstack/react-start/plugin/vite';
 import viteReact from '@vitejs/plugin-react';
 import { visualizer } from 'rollup-plugin-visualizer';
 import { defineConfig, type PluginOption } from 'vite';
+import { resolveBuildId } from '@shadow-library/web';
 
 const API_ORIGIN = process.env.API_ORIGIN || 'http://localhost:8080';
+/* `gitops build` passes the commit as APP_VERSION. Vite evaluates this file once per environment in the same process, so the id is pinned in the env for the SSR build to reuse. */
+const BUILD_ID = (process.env.SHADOW_BUILD_ID ??= resolveBuildId(process.env.APP_VERSION, Date.now()));
 
 // Bundle analysis is opt-in (`ANALYZE=1 bun run build`) so ordinary builds — which now run twice, once
 // per environment under TanStack Start — stay quiet and don't fight over stats.html.
@@ -15,6 +18,7 @@ export default defineConfig({
   // The generated route tree lives under `generated/` (the ecosystem's convention for generated
   // artifacts) so `shadow verify`'s lint/format globs never fight the generator's own output style.
   plugins: [tanstackStart({ router: { generatedRouteTree: '../generated/routeTree.gen.ts' } }), viteReact(), ...analyze],
+  define: { __BUILD_ID__: JSON.stringify(BUILD_ID) },
   resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
   // `@shadow-library/ui` reads `import.meta.env` in a static field initializer, which Vite only injects
   // when it transforms the module. Left external (the default for node_modules during dev SSR) that access

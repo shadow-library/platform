@@ -37,6 +37,8 @@ COPY packages/web/ packages/web/
 COPY packages/sdk/ packages/sdk/
 RUN bun scripts/build.ts apps/novel-forge-web --deps
 COPY apps/novel-forge-web/ apps/novel-forge-web/
+# Declared after the dependency build so a new commit invalidates only this layer; the id is compiled into the bundle, not read at runtime.
+ARG APP_VERSION
 RUN bun scripts/build.ts apps/novel-forge-web
 
 FROM oven/bun:${BUN_VERSION}-slim AS prod-deps
