@@ -57,6 +57,7 @@ import { type TelemetryContext, TelemetryHandler } from '../ai/telemetry.handler
 import { type CallRoute } from '../ai/unrestricted-route';
 import { type CallUsageTotals, emptyCallUsageTotals, type GroupedUsageRow, summarizeCallUsage, summarizeGroupedCallUsage } from '../ai/usage/call-usage';
 import { WriterSnapshotService } from '../ai/writer-snapshot.service';
+import { canonRefreshTarget } from '../audit/chapter-canon-refresh.service';
 import { loadWriterDisclosurePolicy } from '../bible/fact/writer-disclosure-policy';
 import { resolveWordTarget } from '../eval/deterministic-metrics';
 import { FINALIZE_REVIEW_JOB_TARGET, stageFinalizeReview } from '../finalize-review/finalize-review-stage';
@@ -708,17 +709,32 @@ export class GenerationService {
     return this.db.transaction(tx => saveHandWrittenDraft(tx, { projectId, chapter, source: 'imported', fields, base })).catch(asRetryableSave);
   }
 
-  /** Finalizing commits knowledge, milestones and reader disclosure the next chapter's writer reads, so it holds the authoring claim like a job. */
-  async finalize(projectId: bigint, body: FinalizeBody): Promise<WorkflowRunResult> {
-    return this.claims.runExclusive(
+  /**
+   * Finalizing commits knowledge, milestones and reader disclosure the next chapter's writer reads, so it holds the authoring claim like a job.
+   * A chapter that finalized queues its Story Bible refresh once the claim is released; `origin` is the chat card it was accepted from.
+   */
+  async finalize(projectId: bigint, body: FinalizeBody, origin?: JobOrigin): Promise<WorkflowRunResult> {
+    const { chapter, run } = await this.claims.runExclusive(
       projectId,
       'finalize',
       () => AppErrorCode.JOB_002.create(),
       () => this.finalizeClaimed(projectId, body),
     );
+    if (run.status === 'completed') await this.queueCanonRefresh(projectId, chapter, origin);
+    return run;
   }
 
-  private async finalizeClaimed(projectId: bigint, body: FinalizeBody): Promise<WorkflowRunResult> {
+  /** Best effort: the chapter is final whatever happens here, and the refresh only ever stages a card for the author. */
+  private async queueCanonRefresh(projectId: bigint, chapter: number, origin?: JobOrigin): Promise<void> {
+    try {
+      const job = await this.jobService.enqueueJob(projectId, 'canon_refresh', canonRefreshTarget(chapter), { chapter, ...(origin ? { origin } : {}) });
+      if (job.outcome !== 'deduped') this.jobExecutor.dispatch(job.id).catch(err => this.logger.error('canon refresh dispatch failed', { err, jobId: job.id, projectId, chapter }));
+    } catch (err) {
+      this.logger.warn('canon refresh not queued after finalize', { err, projectId, chapter });
+    }
+  }
+
+  private async finalizeClaimed(projectId: bigint, body: FinalizeBody): Promise<{ chapter: number; run: WorkflowRunResult }> {
     const draft =
       body.chapter === undefined
         ? await this.db.query.drafts.findFirst({
@@ -733,7 +749,7 @@ export class GenerationService {
     if (draft.status === 'final') this.logger.warn('finalize: resuming a partially finalized chapter', { projectId, chapter: draft.chapter, draftId: draft.id });
     this.logger.info('finalize: finalizing chapter', { projectId, chapter: draft.chapter, draftId: draft.id, generator: draft.generator });
 
-    return this.workflowRunService.runChapterFinalization({
+    const run = await this.workflowRunService.runChapterFinalization({
       projectId,
       chapter: draft.chapter,
       draftId: draft.id,
@@ -745,6 +761,7 @@ export class GenerationService {
       generator: draft.generator,
       isolated: draft.isolated,
     });
+    return { chapter: draft.chapter, run };
   }
 
   /** What finalize would answer for this chapter right now, from the same checks, without taking the authoring claim it would need. */

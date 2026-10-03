@@ -38,6 +38,20 @@ describe('applyProjectEvent', () => {
     expect(invalidated).toEqual(['projects/7/jobs']);
   });
 
+  it('should refetch the proposals and audits once a chapter’s Story Bible refresh settles', () => {
+    applyProjectEvent(queryClient, '7', { type: 'job', jobId: 'j1', kind: 'canon_refresh', status: 'done' });
+    flushInvalidations(queryClient);
+
+    expect(invalidated).toEqual(['projects/7/bible/audits', 'projects/7/jobs', 'projects/7/refinement-proposals']);
+  });
+
+  it('should refetch only the job list while a chapter’s Story Bible refresh runs', () => {
+    applyProjectEvent(queryClient, '7', { type: 'job', jobId: 'j1', kind: 'canon_refresh', status: 'in_progress' });
+    flushInvalidations(queryClient);
+
+    expect(invalidated).toEqual(['projects/7/jobs']);
+  });
+
   it('should refetch the transcript a message landed in', () => {
     applyProjectEvent(queryClient, '7', { type: 'chat', sessionId: 's1' });
     flushInvalidations(queryClient);

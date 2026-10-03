@@ -344,6 +344,12 @@
   (`FRV_005`), or leaves a claimed milestone unreached while the plan reveals something that needs it (`FRV_006`). Readiness answers from the same checks. The commit applies only
   the kept items, recording each row's before and after, drops claims the review says the prose did not reach, and commits knowledge; a replay finds nothing left to do. A chapter
   approved before reviews existed finalizes on the direct continuity path.
+- **Story Bible refresh**: a chapter that finalized queues a `canon_refresh` job once finalize has released its claim (it takes none), carrying the chat card finalize
+  was accepted from. It reads the pages the writer reads, the records, the facts, the chapter and the author's review answers, and stages the pages and records the
+  chapter left out of date as one pending audit card behind a report scoped to that chapter — never applied by itself. An update stands only on the chapter's own words
+  found in it; it never changes a plan page, adds a record (new records come from the review), rewrites a page or record it read only in part, or writes a secret where
+  the writer reads it. A failure to queue or run it never fails finalize. It runs once per chapter: a report already stored answers a re-run, and a chapter that changed
+  nothing stores no report. Isolated chapters are not refreshed.
 - **Revert** of a finalize review puts back every row its kept set changed as one unit, only for the latest final chapter, refusing when any of those rows changed since
   (`FRV_007`) or when it would un-reach a milestone one of the chapter's reveals depends on (`FRV_013`); otherwise it drops the milestones it reached and marks later
   drafts stale. Proposal apply and revert are separate: every apply captures inverse ops, and revert runs through

@@ -27,6 +27,7 @@ export type PromptKey =
   | 'premise-enhance'
   | 'bible-audit'
   | 'bible-contradiction'
+  | 'chapter-canon-refresh'
   | 'chat-refine'
   | 'chat-compact'
   | 'chat-title'

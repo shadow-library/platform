@@ -28,10 +28,11 @@ export interface BibleAuditFinding {
   withheld: string | null;
 }
 
-export type BibleAuditPass = 'coverage' | 'contradictions';
+export type BibleAuditPass = 'coverage' | 'contradictions' | 'chapter';
 
 export interface BibleAuditChecked {
-  passes: Record<BibleAuditPass, 'ran' | 'failed'>;
+  /** A whole-bible audit runs coverage and contradictions; a chapter's canon refresh runs only `chapter`. */
+  passes: Partial<Record<BibleAuditPass, 'ran' | 'failed'>>;
   documents: { count: number; sections: string[]; clipped: number; omitted: number };
   entities: { count: number; byType: Record<string, number>; omitted: number };
   /** Zero when the contradiction pass did not run: only it reads the facts. */
@@ -58,7 +59,7 @@ export namespace Job {
   export type EventType = InferEnum<typeof jobEventType>;
 }
 
-export const jobKind = pgEnum('job_kind', ['generate', 'finalize', 'backfill', 'publish', 'import', 'organise', 'plan', 'review', 'audit', 'finalize_review']);
+export const jobKind = pgEnum('job_kind', ['generate', 'finalize', 'backfill', 'publish', 'import', 'organise', 'plan', 'review', 'audit', 'finalize_review', 'canon_refresh']);
 export const jobStatus = pgEnum('job_status', ['pending', 'in_progress', 'done', 'failed', 'cancelled']);
 export const jobEventType = pgEnum('job_event_type', ['queued', 'started', 'step', 'retrying', 'done', 'failed', 'cancelled']);
 export const validationScope = pgEnum('validation_scope', ['novel', 'chapter', 'bible']);

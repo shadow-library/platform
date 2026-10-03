@@ -32,7 +32,7 @@ import { PluginPolicyService } from '../plugins/plugin-policy.service';
 import { type ChangeOp, type OpType } from '../refinement/change-set';
 import { type ArtifactState, loadArtifactStates } from '../refinement/artifact-state';
 import { DISCARDABLE, ProposalService } from '../refinement/proposal.service';
-import { type AuditRows, currentRecords, describeChecked, renderAuditMaterial, secretFacts } from './bible-audit-material';
+import { type AuditRows, currentRecords, describeChecked, renderAuditMaterial, secretFacts, type WholeBiblePasses } from './bible-audit-material';
 import { buildAuditReport, renderReportSummary } from './bible-audit-report';
 
 export type FindingDecision = Job.FindingDecisionKind;
@@ -49,6 +49,7 @@ export interface AuditFindingView extends BibleAuditFinding {
 export interface BibleAuditView {
   id: bigint;
   summary: string;
+  chapter: number | null;
   checked: BibleAuditChecked;
   findings: AuditFindingView[];
   openFindings: number;
@@ -155,7 +156,7 @@ export class BibleAuditService {
         ]);
         if (!coverage.ok && !contradictions.ok) throw AppErrorCode.AUD_004.create();
 
-        const passes: Record<BibleAuditPass, 'ran' | 'failed'> = { coverage: coverage.ok ? 'ran' : 'failed', contradictions: contradictions.ok ? 'ran' : 'failed' };
+        const passes: WholeBiblePasses = { coverage: coverage.ok ? 'ran' : 'failed', contradictions: contradictions.ok ? 'ran' : 'failed' };
         const existingRefs = new Set([...rows.documents.map(doc => `doc:${doc.section}/${doc.slug}`), ...rows.entities.map(entity => `entity:${entity.entityKey}`)]);
         const built = buildAuditReport({
           coverage: coverage.ok ? coverage.output : null,
@@ -421,6 +422,7 @@ function present(report: ReportRow, proposalStatus: Refinement.ProposalStatus | 
   return {
     id: report.id,
     summary: report.summary ?? '',
+    chapter: report.chapter,
     checked: report.checked,
     findings: views,
     openFindings: views.filter(view => view.decision === null).length,

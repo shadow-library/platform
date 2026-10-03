@@ -83,13 +83,16 @@ export class BibleAuditFindingResponse {
   decision?: AuditFindingDecisionResponse | null;
 }
 
-@Schema()
+@Schema({ description: 'The checks this report ran; a whole-bible audit runs coverage and contradictions, a chapter’s canon refresh only chapter.' })
 export class AuditPassesResponse {
-  @Field(() => AuditPassStatus, { description: 'Missing and thin pages and records against the Story Bible manifest.' })
-  coverage: 'ran' | 'failed';
+  @Field(() => AuditPassStatus, { optional: true, description: 'Missing and thin pages and records against the Story Bible manifest.' })
+  coverage?: 'ran' | 'failed';
 
-  @Field(() => AuditPassStatus, { description: 'Pages, records, facts and finalized chapter summaries compared against each other.' })
-  contradictions: 'ran' | 'failed';
+  @Field(() => AuditPassStatus, { optional: true, description: 'Pages, records, facts and finalized chapter summaries compared against each other.' })
+  contradictions?: 'ran' | 'failed';
+
+  @Field(() => AuditPassStatus, { optional: true, description: 'Pages and records compared against what one newly finalized chapter established.' })
+  chapter?: 'ran' | 'failed';
 }
 
 @Schema()
@@ -143,7 +146,7 @@ export class AuditCheckedChaptersResponse {
 @Schema({ description: 'Exactly what this audit read — the report never claims more.' })
 export class AuditCheckedResponse {
   @Field(() => AuditPassesResponse)
-  passes: Record<BibleAuditPass, 'ran' | 'failed'>;
+  passes: Partial<Record<BibleAuditPass, 'ran' | 'failed'>>;
 
   @Field(() => AuditCheckedDocumentsResponse)
   documents: AuditCheckedDocumentsResponse;
@@ -177,6 +180,13 @@ export class BibleAuditReportResponse {
 
   @Field({ description: 'What was found and what was checked, in one line; "Nothing found. Checked: …" for a clean audit.' })
   summary: string;
+
+  @Field(() => Integer, {
+    optional: true,
+    nullable: true,
+    description: 'The finalized chapter this report checked the Story Bible against, queued after that chapter was finalized; null for a whole-bible audit.',
+  })
+  chapter?: number | null;
 
   @Field(() => AuditCheckedResponse)
   checked: AuditCheckedResponse;

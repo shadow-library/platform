@@ -433,6 +433,7 @@ const JOB_TITLE: Record<string, { running: string; done: string }> = {
   generate: { running: 'Writing chapter', done: 'Wrote chapter' },
   review: { running: 'Checking chapter', done: 'Checked chapter' },
   audit: { running: 'Auditing the Story Bible', done: 'Audited the Story Bible' },
+  canon_refresh: { running: 'Checking the Story Bible against', done: 'Checked the Story Bible against' },
 };
 
 const PHASE_LABEL: Record<string, string> = {
@@ -441,15 +442,23 @@ const PHASE_LABEL: Record<string, string> = {
   planning: 'Drafting the plan',
   generating: 'Drafting',
   awaiting_review: 'Checking the draft',
+  refreshing: 'Reading what the chapter changed',
 };
 
 function chapterSuffix(job: ChatJobState): string {
   return job.progress.current && /^\d+$/.test(job.progress.current) ? ` ${job.progress.current}` : '';
 }
 
+function refreshedChapter(job: ChatJobState): string {
+  const chapter = chapterSuffix(job);
+  return chapter ? ` chapter${chapter}` : ' the new chapter';
+}
+
 export function jobView(job: ChatJobState): JobView {
   const titles = JOB_TITLE[job.kind] ?? { running: 'Working', done: 'Finished' };
-  const suffix = job.kind === 'organise' || job.kind === 'audit' ? '' : chapterSuffix(job);
+  const suffix = job.kind === 'canon_refresh' ? refreshedChapter(job) : job.kind === 'organise' || job.kind === 'audit' ? '' : chapterSuffix(job);
+  if (job.status === 'done' && job.kind === 'canon_refresh' && job.progress.phase === 'unchanged')
+    return { title: `${titles.done}${suffix}`, detail: 'Nothing on your pages needs updating.', tone: 'done', cancellable: false };
   if (job.status === 'done') return { title: `${titles.done}${suffix}`, tone: 'done', cancellable: false, proposalId: job.progress.proposalId };
   if (job.status === 'failed')
     return { title: `${titles.running}${suffix} stopped with an error`, detail: job.error ?? 'Try again from the chat.', tone: 'failed', cancellable: false };

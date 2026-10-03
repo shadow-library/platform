@@ -8,6 +8,7 @@ import { plotPrompt } from './bible-builder/plot.prompt';
 import { powerPrompt } from './bible-builder/power.prompt';
 import { volumesPrompt } from './bible-builder/volumes.prompt';
 import { worldPrompt } from './bible-builder/world.prompt';
+import { chapterCanonRefreshPrompt } from './chapter-canon-refresh.prompt';
 import { chapterExpandPrompt } from './chapter-expand.prompt';
 import { chapterExtractPrompt } from './chapter-extract.prompt';
 import { chapterPlanPrompt } from './chapter-plan.prompt';
@@ -54,6 +55,7 @@ export const PROMPT_REGISTRY: Record<PromptKey, PromptModule<unknown>> = {
   'premise-enhance': premiseEnhancePrompt as PromptModule<unknown>,
   'bible-audit': bibleAuditPrompt as PromptModule<unknown>,
   'bible-contradiction': bibleContradictionPrompt as PromptModule<unknown>,
+  'chapter-canon-refresh': chapterCanonRefreshPrompt as PromptModule<unknown>,
   'chat-refine': chatRefinePrompt as PromptModule<unknown>,
   'chat-compact': chatCompactPrompt as PromptModule<unknown>,
   'chat-title': chatTitlePrompt as PromptModule<unknown>,
@@ -70,5 +72,6 @@ export * from './authoring-preamble';
 export * from './scope-playbooks';
 export { buildChatRefinePrompt, chatPromptTokens, chatScopeInstructions, type ChatTurnPermissions, renderTurnRules } from './chat-refine.prompt';
 export { CONTRADICTION_OPS } from './bible-contradiction.prompt';
+export { CANON_REFRESH_OPS } from './chapter-canon-refresh.prompt';
 export { buildOutlinePrompt, outlineWordTargetVars } from './outline.prompt';
 export { chapterPlanPrompt } from './chapter-plan.prompt';

@@ -2,7 +2,7 @@ import { revealTermPattern } from '@server/common';
 import { type BibleAuditEvidence, type BibleAuditFinding, type BibleAuditGroup } from '@server/database';
 
 import { isWriterExcludedBibleDoc } from '../ai/context/bible-docs';
-import { type BibleAuditOutput, type BibleContradictionOutput } from '../ai/schemas';
+import { type BibleAuditOutput, type BibleContradictionOutput, type ChapterCanonRefreshOutput } from '../ai/schemas';
 import { type FactLike } from '../bible/fact/knowledge-view';
 import { type ChangeOp, changeSetRefs } from '../refinement/change-set';
 import { contentTokens, normaliseForQuote, quoteFoundIn } from '../refinement/write-policy';
@@ -18,6 +18,14 @@ export interface AuditReportInput {
   secrets: readonly FactLike[];
 }
 
+export interface CanonRefreshReportInput extends Pick<AuditReportInput, 'sources' | 'existingRefs' | 'current' | 'secrets'> {
+  refresh: ChapterCanonRefreshOutput;
+  /** `chapter:<n>`: the label the finalized chapter was read under. */
+  chapterRef: string;
+  /** Refs read only in part: a rewrite written from the part would drop the rest. */
+  partial: ReadonlySet<string>;
+}
+
 export interface BuiltAuditReport {
   findings: BibleAuditFinding[];
   /** The one change-set the report stages as a card; every finding's `opIndexes` point into it. */
@@ -27,6 +35,9 @@ export interface BuiltAuditReport {
 export const SECRET_WITHHELD = 'The suggested fix would write a secret the reader has not been told into a page or record the chapter writer reads, so no card was staged for it.';
 export const REVEAL_WITHHELD = 'The suggested fix would change when or how a secret is revealed, which only the author decides, so no card was staged for it.';
 export const COLLISION_WITHHELD = 'Another finding already changes this page or record, so this change was not staged — keep that finding or run the audit again.';
+export const PLAN_PAGE_WITHHELD = 'This page holds the author’s plans, not what the story has established, so a chapter’s refresh never changes it.';
+export const NEW_RECORD_WITHHELD = 'New records come from the chapter’s finalize review, so this refresh does not add one.';
+export const UNREAD_WITHHELD = 'This page or record was too long to read whole, so a rewrite of it would lose what was not read — update it yourself.';
 export const EVIDENCE_WITHHELD = 'The quoted evidence does not show both sides of this contradiction, so no change was staged — check the sources yourself.';
 
 const GROUP_ORDER: readonly BibleAuditGroup[] = ['contradiction', 'add', 'revise', 'remove'];
@@ -163,16 +174,11 @@ function rationaleOf(op: ChangeOp): string | null {
   return typeof rationale === 'string' && rationale.trim() ? rationale.trim() : null;
 }
 
-/**
- * Turns both passes into one report: contradictions with the evidence that survives checking against what was read, then coverage findings
- * grouped by what they ask for, and a single change-set every finding points into. An op that risks a secret, or that would change a record
- * another finding already changes differently, stays off the card and its finding says why.
- */
-export function buildAuditReport(input: AuditReportInput): BuiltAuditReport {
+function createStager(input: Pick<AuditReportInput, 'secrets' | 'current'>, guard: (op: ChangeOp) => string | null = () => null) {
   const changeSet: ChangeOp[] = [];
   const indexByRef = new Map<string, number>();
   const stage = (op: ChangeOp): StageOutcome => {
-    const risk = secretRisk(op, input.secrets, input.current.get(refOf(op)));
+    const risk = guard(op) ?? secretRisk(op, input.secrets, input.current.get(refOf(op)));
     if (risk) return { withheld: risk };
     const existing = indexByRef.get(refOf(op));
     if (existing !== undefined) return canonical(changeSet[existing]) === canonical(op) ? { index: existing } : { withheld: COLLISION_WITHHELD };
@@ -185,6 +191,20 @@ export function buildAuditReport(input: AuditReportInput): BuiltAuditReport {
     const reasons = [...new Set(outcomes.flatMap(outcome => ('withheld' in outcome ? [outcome.withheld] : [])))];
     return { opIndexes: [...new Set(outcomes.flatMap(outcome => ('index' in outcome ? [outcome.index] : [])))], withheld: reasons.length > 0 ? reasons.join(' ') : null };
   };
+  return { changeSet, stageAll };
+}
+
+function ordered(drafts: readonly Omit<BibleAuditFinding, 'id'>[]): BibleAuditFinding[] {
+  return GROUP_ORDER.flatMap(group => drafts.filter(draft => draft.group === group)).map((finding, index) => ({ id: `f${index + 1}`, ...finding }));
+}
+
+/**
+ * Turns both passes into one report: contradictions with the evidence that survives checking against what was read, then coverage findings
+ * grouped by what they ask for, and a single change-set every finding points into. An op that risks a secret, or that would change a record
+ * another finding already changes differently, stays off the card and its finding says why.
+ */
+export function buildAuditReport(input: AuditReportInput): BuiltAuditReport {
+  const { changeSet, stageAll } = createStager(input);
 
   const drafts: Omit<BibleAuditFinding, 'id'>[] = [];
   for (const item of input.contradictions?.contradictions ?? []) {
@@ -214,8 +234,34 @@ export function buildAuditReport(input: AuditReportInput): BuiltAuditReport {
     }
   }
 
-  const ordered = GROUP_ORDER.flatMap(group => drafts.filter(draft => draft.group === group));
-  return { findings: ordered.map((finding, index) => ({ id: `f${index + 1}`, ...finding })), changeSet };
+  return { findings: ordered(drafts), changeSet };
+}
+
+/**
+ * Turns a chapter's canon refresh into a report of the same shape. An update stands only on the chapter's own words found in the chapter,
+ * and its ops reach the card only when they change a page or record the refresh read whole, never a plan page and never a new record.
+ */
+export function buildCanonRefreshReport(input: CanonRefreshReportInput): BuiltAuditReport {
+  const guard = (op: ChangeOp): string | null => {
+    if (op.op === 'bible_document.upsert' && isWriterExcludedBibleDoc({ section: op.section, slug: op.slug })) return PLAN_PAGE_WITHHELD;
+    const ref = refOf(op);
+    if (op.op === 'entity.upsert' && !input.existingRefs.has(ref)) return NEW_RECORD_WITHHELD;
+    if (input.existingRefs.has(ref) && (input.partial.has(ref) || !input.sources.has(ref))) return UNREAD_WITHHELD;
+    return null;
+  };
+  const { changeSet, stageAll } = createStager(input, guard);
+
+  const drafts: Omit<BibleAuditFinding, 'id'>[] = [];
+  for (const item of input.refresh.updates) {
+    const evidence = evidenceFor(item.evidence, input.sources);
+    if (!evidence.some(entry => entry.ref === input.chapterRef && entry.quote !== null)) continue;
+    const ops = item.changeSet as unknown as ChangeOp[];
+    const first = ops[0];
+    if (!first) continue;
+    const ref = refOf(first);
+    drafts.push({ group: input.existingRefs.has(ref) ? 'revise' : 'add', ref, text: item.finding, evidence, ...stageAll(ops) });
+  }
+  return { findings: ordered(drafts), changeSet };
 }
 
 export function renderReportSummary(findings: readonly BibleAuditFinding[], checkedCopy: string): string {

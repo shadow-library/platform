@@ -50,6 +50,13 @@
       "when": 1790959716582,
       "tag": "0006_chat_message_trace",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791007751976,
+      "tag": "0007_canon_refresh_job_kind",
+      "breakpoints": true
     }
   ]
 }

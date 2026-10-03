@@ -88,9 +88,9 @@ export class HubActionRegistrar {
       return { summary: `novel validation ${run.status}: ${run.outcome}`, runId: run.runId };
     });
 
-    registry.register('action.finalize', async (projectId, action) => {
+    registry.register('action.finalize', async (projectId, action, context) => {
       if (action.op !== 'action.finalize') throw AppError.internal('executor misrouted');
-      const run = await this.generationService.finalize(projectId, { chapter: action.upTo });
+      const run = await this.generationService.finalize(projectId, { chapter: action.upTo }, actionJobOrigin(context));
       return { summary: `finalize ${run.status}: ${run.outcome}`, runId: run.runId };
     });
 

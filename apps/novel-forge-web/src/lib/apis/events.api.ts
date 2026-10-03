@@ -4,7 +4,8 @@ import { useEffect } from 'react';
 import { type JobStatus } from './api-types.gen';
 import { invalidateJobs } from './insight.api';
 import { setEventStreamLive } from './live-polling';
-import { invalidateChat, invalidateChatSession, invalidateChatSessions } from './refinement.api';
+import { invalidateAudits } from './bible.api';
+import { invalidateChat, invalidateChatSession, invalidateChatSessions, invalidateProposalLists } from './refinement.api';
 import { invalidateRuns } from './run.api';
 import { APIRequest } from './transport';
 
@@ -19,6 +20,7 @@ export type ProjectEvent =
 
 const PROJECT_EVENT_TYPES = ['run', 'job', 'chat'] as const;
 const SESSION_TARGET_PREFIX = 'session:';
+const CANON_REFRESH_JOB_KIND = 'canon_refresh';
 // Settled is the complement of the two in-flight statuses rather than a list of the terminal ones: a
 // status the server adds later that this misses would leave a finished job on screen forever, while
 // mistaking a new in-flight status for a settled one costs only a refetch.
@@ -47,6 +49,9 @@ export function parseProjectEvent(data: unknown): ProjectEvent | undefined {
 export function applyProjectEvent(queryClient: QueryClient, projectId: string, event: ProjectEvent): void {
   if (event.type === 'job') {
     invalidateJobs(queryClient, projectId);
+    if (event.kind !== CANON_REFRESH_JOB_KIND || !jobSettled(event.status)) return;
+    invalidateProposalLists(queryClient, projectId);
+    invalidateAudits(queryClient, projectId);
     return;
   }
   if (event.type === 'chat') return invalidateChatSession(queryClient, projectId, event.sessionId);

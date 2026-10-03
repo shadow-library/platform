@@ -65,6 +65,8 @@ export interface GenerationDeps {
   pluginPolicy?: object;
   claims?: FakeAuthoringClaims;
   writerSnapshots?: object;
+  jobService?: object;
+  jobExecutor?: object;
 }
 
 /** A `WriterSnapshotService` that never touches a database — `onMessages` returns a no-op, once-guarded like the real one. */
@@ -208,8 +210,8 @@ export function makeGenerationService(db: object, deps: GenerationDeps = {}): Ge
     absent,
     absent,
     absent,
-    absent,
-    absent,
+    (deps.jobService ?? absent) as never,
+    (deps.jobExecutor ?? absent) as never,
     (deps.proposalService ?? absent) as never,
     (deps.chapterImages ?? absent) as never,
     (deps.pluginPolicy ?? absent) as never,

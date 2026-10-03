@@ -431,6 +431,27 @@ describe('jobView', () => {
     expect(jobView(job({ status: 'failed', error: 'Gateway timed out' }))).toMatchObject({ tone: 'failed', detail: 'Gateway timed out', cancellable: false });
     expect(jobView(job({ status: 'cancelled' })).title).toBe('Planning chapter 4 — cancelled');
   });
+
+  it('should name the chapter a Story Bible refresh read, and hand over its card', () => {
+    expect(jobView(job({ kind: 'canon_refresh', progress: { current: '5', phase: 'refreshing' } }))).toMatchObject({
+      title: 'Checking the Story Bible against chapter 5…',
+      detail: 'Reading what the chapter changed',
+    });
+    expect(jobView(job({ kind: 'canon_refresh', status: 'pending', progress: {} })).title).toBe('Checking the Story Bible against the new chapter…');
+    expect(jobView(job({ kind: 'canon_refresh', status: 'done', progress: { current: '5', proposalId: 'p9' } }))).toMatchObject({
+      title: 'Checked the Story Bible against chapter 5',
+      proposalId: 'p9',
+    });
+  });
+
+  it('should say a Story Bible refresh that found nothing left nothing to review', () => {
+    expect(jobView(job({ kind: 'canon_refresh', status: 'done', progress: { current: '5', phase: 'unchanged' } }))).toEqual({
+      title: 'Checked the Story Bible against chapter 5',
+      detail: 'Nothing on your pages needs updating.',
+      tone: 'done',
+      cancellable: false,
+    });
+  });
 });
 
 describe('jobKindForOp', () => {

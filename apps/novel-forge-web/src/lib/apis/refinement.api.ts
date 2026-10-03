@@ -125,6 +125,11 @@ function isSessionList(query: Query): boolean {
   return typeof query.queryKey[3] !== 'string';
 }
 
+/** The proposal lists, for a card staged away from any turn — a chapter's Story Bible refresh. */
+export function invalidateProposalLists(queryClient: QueryClient, projectId: string): void {
+  invalidateSoon(queryClient, { queryKey: refinementKeys.proposals(projectId) });
+}
+
 /** Everything a finished turn can have moved: its transcript, the session lists, proposals and the change history. */
 export function invalidateChat(queryClient: QueryClient, projectId: string, sessionId: string): void {
   invalidateSoon(queryClient, { queryKey: refinementKeys.messages(projectId, sessionId), exact: true });

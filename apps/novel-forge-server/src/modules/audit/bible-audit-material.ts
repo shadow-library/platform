@@ -1,7 +1,7 @@
 import { isOpenCanon } from '@server/common';
 import { type Bible, type BibleAuditChecked, type BibleAuditPass, type Chapter, type Knowledge } from '@server/database';
 
-import { clipAtBoundary } from '../ai/context/bible-docs';
+import { clipAtBoundary, isWriterExcludedBibleDoc } from '../ai/context/bible-docs';
 import { type FactLike } from '../bible/fact/knowledge-view';
 
 export type AuditDocumentRow = Pick<Bible.Document, 'section' | 'slug' | 'body'>;
@@ -39,6 +39,8 @@ interface Budget {
   total: number;
   item: number;
 }
+
+export type WholeBiblePasses = Record<Exclude<BibleAuditPass, 'chapter'>, 'ran' | 'failed'>;
 
 const BUDGETS = {
   documents: { total: 120_000, item: 8_000 },
@@ -191,7 +193,7 @@ function renderChapterRange(numbers: readonly number[]): string {
  * and chapter summaries, and it may have read part of the bible when the material ran over its budget — so a failed pass or a budget cut
  * narrows the claim instead of vanishing from it.
  */
-export function describeChecked(passes: Record<BibleAuditPass, 'ran' | 'failed'>, rows: AuditRows, material: AuditMaterial): BibleAuditChecked {
+export function describeChecked(passes: WholeBiblePasses, rows: AuditRows, material: AuditMaterial): BibleAuditChecked {
   const compared = passes.contradictions === 'ran';
   const pages = rows.documents.filter(doc => doc.body?.trim());
   const examined = material.examined;
@@ -228,5 +230,108 @@ export function describeChecked(passes: Record<BibleAuditPass, 'ran' | 'failed'>
     chaptersIsolated: isolated,
     chaptersOmitted: compared ? examined.chaptersOmitted : 0,
     copy: [`Checked: ${parts.join(', ')}.`, ...caveats].join(' '),
+  };
+}
+
+export interface RefreshChapterRow extends AuditChapterRow {
+  content: string;
+}
+
+export interface RefreshReviewItem {
+  claim: string;
+  decision: 'kept' | 'edited' | 'skipped';
+}
+
+export interface RefreshRows {
+  documents: AuditDocumentRow[];
+  entities: AuditEntityRow[];
+  facts: AuditFactRow[];
+  chapter: RefreshChapterRow;
+  /** What the author answered in the chapter's finalize review, its summary left out. */
+  reviewItems: RefreshReviewItem[];
+}
+
+export interface RefreshMaterial {
+  bible: string;
+  chapter: string;
+  sources: ReadonlyMap<string, string>;
+  /** Labels read only in part. */
+  partial: ReadonlySet<string>;
+  checked: BibleAuditChecked;
+}
+
+const CHAPTER_PROSE_BUDGET = 60_000;
+
+function bulleted(heading: string, lines: readonly string[]): string {
+  return `## ${heading}\n\n${lines.length === 0 ? '(none)' : lines.map(line => `- ${line}`).join('\n')}`;
+}
+
+/**
+ * What a chapter's canon refresh reads: the pages the chapter writer reads (plan pages stay out), the records and facts within the audit's
+ * budgets, then the chapter itself and the author's answers from its finalize review. Evidence may cite only what made it in.
+ */
+export function renderRefreshMaterial(rows: RefreshRows): RefreshMaterial {
+  const pages = rows.documents.filter(doc => doc.body?.trim() && !isWriterExcludedBibleDoc(doc));
+  const documents = fitted(pages, BUDGETS.documents, doc => ({ label: `doc:${doc.section}/${doc.slug}`, text: doc.body?.trim() ?? '' }));
+  const entities = fitted(rows.entities, BUDGETS.entities, entity => ({ label: `entity:${entity.entityKey}`, text: entityText(entity) }));
+  const facts = fitted(rows.facts, BUDGETS.facts, fact => ({ label: `fact:${fact.factKey}`, text: factText(fact) }));
+
+  const { chapter } = rows;
+  const chapterRef = `chapter:${chapter.number}`;
+  const prose = chapter.content.trim();
+  const proseRead = prose.length > CHAPTER_PROSE_BUDGET ? clipAtBoundary(prose, CHAPTER_PROSE_BUDGET) : prose;
+  const chapterText = [chapter.title?.trim(), chapter.summary?.trim(), proseRead].filter(Boolean).join('\n\n');
+  const kept = rows.reviewItems.filter(item => item.decision !== 'skipped').map(item => item.claim);
+  const declined = rows.reviewItems.filter(item => item.decision === 'skipped').map(item => item.claim);
+
+  const block = (heading: string, entries: { label: string; text: string }[]) =>
+    `## ${heading}\n\n${entries.length === 0 ? '(none)' : entries.map(entry => `[${entry.label}]\n${entry.text}`).join('\n\n')}`;
+  const bible = [block('Story Bible pages', documents.entries), block('Entity records', entities.entries), block('Canon facts', facts.entries)].join('\n\n');
+  const chapterBlock = [
+    `## The finalized chapter\n\n[${chapterRef}]\n${chapterText}`,
+    bulleted('Updates the author kept from its review', kept),
+    bulleted('Updates the author declined', declined),
+  ].join('\n\n');
+
+  const clippedLabels = (entries: { label: string; text: string }[], source: (label: string) => string) =>
+    entries.filter(entry => entry.text !== source(entry.label)).map(entry => entry.label);
+  const pageBodies = new Map(pages.map(doc => [`doc:${doc.section}/${doc.slug}`, doc.body?.trim() ?? '']));
+  const entityBodies = new Map(rows.entities.map(entity => [`entity:${entity.entityKey}`, entityText(entity)]));
+  const partial = new Set([...clippedLabels(documents.entries, label => pageBodies.get(label) ?? ''), ...clippedLabels(entities.entries, label => entityBodies.get(label) ?? '')]);
+
+  const byType: Record<string, number> = {};
+  const entityByLabel = new Map(rows.entities.map(entity => [`entity:${entity.entityKey}`, entity]));
+  for (const entry of entities.entries) {
+    const type = entityByLabel.get(entry.label)?.type ?? 'concept';
+    byType[type] = (byType[type] ?? 0) + 1;
+  }
+  const caveats: string[] = [];
+  if (proseRead !== prose) caveats.push(`Chapter ${chapter.number} was too long and only partly read.`);
+  if (documents.clipped > 0) caveats.push(`${plural(documents.clipped, ['page was', 'pages were'])} too long and only partly read.`);
+  const skipped = documents.omitted + entities.omitted + facts.omitted;
+  if (skipped > 0) caveats.push(`${plural(skipped, ['entry', 'entries'])} did not fit and were not compared.`);
+  const parts = [plural(documents.entries.length, ['page', 'pages']), renderEntityCounts(byType), plural(facts.entries.length, ['fact', 'facts'])];
+
+  return {
+    bible,
+    chapter: chapterBlock,
+    sources: new Map([...documents.entries, ...entities.entries, ...facts.entries, { label: chapterRef, text: chapterText }].map(entry => [entry.label, entry.text])),
+    partial,
+    checked: {
+      passes: { chapter: 'ran' },
+      documents: {
+        count: documents.entries.length,
+        sections: [...new Set(documents.entries.map(entry => entry.label.slice('doc:'.length).split('/')[0] ?? ''))],
+        clipped: documents.clipped,
+        omitted: documents.omitted,
+      },
+      entities: { count: entities.entries.length, byType, omitted: entities.omitted },
+      facts: { count: facts.entries.length, omitted: facts.omitted },
+      chapters: { from: chapter.number, to: chapter.number, count: 1 },
+      chaptersWithoutSummary: [],
+      chaptersIsolated: [],
+      chaptersOmitted: 0,
+      copy: [`Checked against chapter ${chapter.number}: ${parts.join(', ')}.`, ...caveats].join(' '),
+    },
   };
 }

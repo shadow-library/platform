@@ -3134,7 +3134,7 @@ export interface components {
       updatedAt: string;
     };
     /** @enum {string} */
-    JobKind: 'generate' | 'finalize' | 'backfill' | 'publish' | 'import' | 'organise' | 'plan' | 'review' | 'audit' | 'finalize_review';
+    JobKind: 'generate' | 'finalize' | 'backfill' | 'publish' | 'import' | 'organise' | 'plan' | 'review' | 'audit' | 'finalize_review' | 'canon_refresh';
     /** @enum {string} */
     JobStatus: 'pending' | 'in_progress' | 'done' | 'failed' | 'cancelled';
     /** @description The chat card a job was started from. */
@@ -5170,6 +5170,8 @@ export interface components {
       id: string;
       /** @description What was found and what was checked, in one line; "Nothing found. Checked: …" for a clean audit. */
       summary: string;
+      /** @description The finalized chapter this report checked the Story Bible against, queued after that chapter was finalized; null for a whole-bible audit. */
+      chapter?: number | null;
       checked: components['schemas']['AuditCheckedResponse'];
       /** @description Contradictions first, then pages and records to add, revise and remove. */
       findings: components['schemas']['BibleAuditFindingResponse'][];
@@ -5200,11 +5202,14 @@ export interface components {
       /** @description The sentence to show, e.g. "Checked: 14 pages, 38 characters, 21 facts, chapters 1–12." */
       copy: string;
     };
+    /** @description The checks this report ran; a whole-bible audit runs coverage and contradictions, a chapter’s canon refresh only chapter. */
     AuditPassesResponse: {
       /** @description Missing and thin pages and records against the Story Bible manifest. */
-      coverage: components['schemas']['AuditPassStatus'];
+      coverage?: components['schemas']['AuditPassStatus'];
       /** @description Pages, records, facts and finalized chapter summaries compared against each other. */
-      contradictions: components['schemas']['AuditPassStatus'];
+      contradictions?: components['schemas']['AuditPassStatus'];
+      /** @description Pages and records compared against what one newly finalized chapter established. */
+      chapter?: components['schemas']['AuditPassStatus'];
     };
     /** @enum {string} */
     AuditPassStatus: 'ran' | 'failed';

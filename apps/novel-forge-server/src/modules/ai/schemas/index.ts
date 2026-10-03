@@ -16,6 +16,7 @@ export * from './knowledge-contract.schema';
 export * from './premise.schema';
 export * from './bible-audit.schema';
 export * from './bible-contradiction.schema';
+export * from './chapter-canon-refresh.schema';
 export * from './chat-refine.schema';
 export * from './chat-title.schema';
 export * from './illustration.schema';
