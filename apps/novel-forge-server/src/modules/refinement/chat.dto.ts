@@ -503,7 +503,7 @@ export class ChatTurnBody {
   @Field({
     optional: true,
     description:
-      "The author's explicit permission for this turn to rewrite chapter prose (draft.update, draft.remove, action.revise_draft). Off by default: a plan edit changes the brief and the chapter is regenerated from it.",
+      "The author's explicit permission for this turn to rewrite chapter prose (draft.rewrite_passage, draft.update, draft.remove, action.revise_draft). Off by default: a plan edit changes the brief and the chapter is regenerated from it.",
   })
   proseEdits?: boolean;
 

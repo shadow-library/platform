@@ -109,6 +109,36 @@ export interface DraftRemoveOp {
   chapter: number;
 }
 
+/**
+ * Where a rewrite's passage sat in the draft when it was staged: offsets are UTF-16 code units into that revision's body, `paragraph` counted from
+ * 1, and the text either side is what finds the passage again once an edit elsewhere has moved it.
+ */
+export interface PassageRewriteAnchor {
+  draftId: string;
+  revision: number;
+  saveSeq: number;
+  start: number;
+  end: number;
+  passageHash: string;
+  paragraph: number;
+  contextBefore: string;
+  contextAfter: string;
+}
+
+/**
+ * Rewrites one passage of a draft in place. The model names the words by `passage`, never by offsets; staging finds them and stamps `anchor`,
+ * so apply rewrites exactly the words the author saw on the card.
+ */
+export interface DraftRewritePassageOp {
+  op: 'draft.rewrite_passage';
+  chapter: number;
+  passage: string;
+  replacement: string;
+  label?: string;
+  contextIndex?: number;
+  anchor?: PassageRewriteAnchor;
+}
+
 export interface EntityUpsertOp {
   op: 'entity.upsert';
   entityKey: string;
@@ -302,6 +332,7 @@ export type ContentOp =
   | BriefRemoveOp
   | DraftUpdateOp
   | DraftRemoveOp
+  | DraftRewritePassageOp
   | EntityUpsertOp
   | EntityRemoveOp
   | FactUpsertOp
@@ -410,6 +441,12 @@ const DECLARED_OP_SPECS: Record<OpType, OpSpec> = {
   'brief.remove': { required: { chapter: 'number' }, optional: {} },
   'draft.update': { required: { chapter: 'number' }, optional: { title: 'string', body: 'string', summary: 'string' } },
   'draft.remove': { required: { chapter: 'number' }, optional: {} },
+  'draft.rewrite_passage': {
+    required: { chapter: 'number', passage: 'string', replacement: 'string' },
+    optional: { label: 'string', contextIndex: 'number', anchor: 'object' },
+    description:
+      'rewrites one passage of a chapter draft and leaves every other word of the chapter as it is. passage is the exact text to replace, copied character for character from the draft or from a passage comment’s Quote lines without their indentation — never paraphrased, shortened or wrapped in quotation marks — and it must occur in the draft exactly once unless contextIndex names the passage comment it answers; replacement is the new text for exactly those words; label names the change in a few words ("the wrist injury"); contextIndex is the number of the passage comment it answers. Always a card the author applies passage by passage.',
+  },
   'entity.upsert': {
     required: { entityKey: 'string', type: 'string' },
     optional: { name: 'string', status: 'string', motivation: 'string', notes: 'string', body: 'string' },
@@ -476,6 +513,13 @@ const DECLARED_OP_SPECS: Record<OpType, OpSpec> = {
 // stamps both, so no model is shown them.
 export const OP_METADATA_FIELDS = ['rationale', 'quote', 'startedEmpty', 'ideaId'] as const;
 const SERVER_METADATA_FIELDS: readonly string[] = ['startedEmpty', 'ideaId'];
+/** Fields the server stamps when a proposal is staged, whatever the model sent — so no model is ever shown them, and they are no part of an idea. */
+const SERVER_STAMPED_FIELDS: Partial<Record<OpType, readonly string[]>> = {
+  'action.approve_draft': ['revision', 'saveSeq', 'draftId'],
+  'draft.rewrite_passage': ['anchor'],
+};
+// A rewrite's words are the chapter's, in `passage`, and it is always a card: a `quote` of the author's words beside it would only be mistaken for it.
+const UNQUOTED_OPS: ReadonlySet<OpType> = new Set(['draft.rewrite_passage']);
 const OP_SPECS = Object.fromEntries(
   (Object.entries(DECLARED_OP_SPECS) as [OpType, OpSpec][]).map(([op, spec]): [OpType, OpSpec] => [
     op,
@@ -483,10 +527,11 @@ const OP_SPECS = Object.fromEntries(
   ]),
 ) as Record<OpType, OpSpec>;
 
-/** The artifact fields an op may carry, metadata excluded. */
+/** The artifact fields an op may carry, metadata and server stamps excluded. */
 export function declaredOpFields(op: OpType): string[] {
   const spec = DECLARED_OP_SPECS[op];
-  return [...Object.keys(spec.required), ...Object.keys(spec.optional)];
+  const stamped = SERVER_STAMPED_FIELDS[op] ?? [];
+  return [...Object.keys(spec.required), ...Object.keys(spec.optional)].filter(field => !stamped.includes(field));
 }
 
 const OP_TYPES = Object.keys(OP_SPECS) as OpType[];
@@ -571,6 +616,22 @@ function validateKnowledgeContract(value: unknown, path: string, errors: string[
       if (key !== 'entityKey' && key !== 'factKey') errors.push(`${at}: unexpected field '${key}'`);
     }
   });
+}
+
+const ANCHOR_COUNTS = ['revision', 'saveSeq', 'start', 'end', 'paragraph'] as const;
+
+function validatePassageRewrite(record: Record<string, unknown>): string[] {
+  const errors: string[] = [];
+  if (typeof record['passage'] === 'string' && record['passage'].trim() === '') errors.push('passage must not be blank');
+  if (typeof record['contextIndex'] === 'number' && record['contextIndex'] < 1) errors.push('contextIndex must be >= 1');
+  if (record['anchor'] === undefined) return errors;
+  const anchor = isKind(record['anchor'], 'object') ? (record['anchor'] as Record<string, unknown>) : {};
+  const wellFormed =
+    ['draftId', 'passageHash', 'contextBefore', 'contextAfter'].every(field => typeof anchor[field] === 'string') &&
+    ANCHOR_COUNTS.every(field => isKind(anchor[field], 'number') && (anchor[field] as number) >= 0) &&
+    (anchor['end'] as number) > (anchor['start'] as number);
+  if (!wellFormed) errors.push('anchor must be {draftId, revision, saveSeq, start, end, passageHash, paragraph, contextBefore, contextAfter} with end after start');
+  return errors;
 }
 
 /**
@@ -693,6 +754,7 @@ export function validateChangeSet(value: unknown, allowedOps?: readonly OpType[]
     if (op === 'draft.update' && record['title'] === undefined && record['body'] === undefined && record['summary'] === undefined) {
       errors.push(`${path}: draft.update must set at least one of title, body, summary`);
     }
+    if (op === 'draft.rewrite_passage') errors.push(...validatePassageRewrite(record).map(error => `${path}: ${error}`));
     if (op === 'action.validate' && !VALIDATION_SCOPES.includes(record['scope'] as string)) errors.push(`${path}: scope must be one of ${VALIDATION_SCOPES.join(', ')}`);
     if (op === 'action.generate_chapter' && typeof record['chapter'] === 'number' && record['chapter'] < 1) errors.push(`${path}: chapter must be >= 1`);
     if (op.startsWith('promise.') && !PROMISE_KINDS.includes(record['kind'] as string)) errors.push(`${path}: kind must be one of ${PROMISE_KINDS.join(', ')}`);
@@ -750,6 +812,11 @@ export interface OpVocabularyOptions {
   quotes?: boolean;
 }
 
+function modelHiddenFields(op: OpType, options: OpVocabularyOptions): string[] {
+  const quoted = options.quotes === true && !isActionOp(op) && !UNQUOTED_OPS.has(op);
+  return [...SERVER_METADATA_FIELDS, ...(SERVER_STAMPED_FIELDS[op] ?? []), ...(quoted ? [] : ['quote'])];
+}
+
 /**
  * Renders the exact JSON shape of each allowed op for prompt use — weak local models return
  * malformed change-sets when the vocabulary is named but never shown.
@@ -758,8 +825,9 @@ export function renderOpVocabulary(ops: readonly OpType[], options: OpVocabulary
   const lines = ops.map(op => {
     const spec = OP_SPECS[op];
     const required = Object.entries(spec.required).map(([key, kind]) => `"${key}": <${kind}, required>`);
+    const hidden = modelHiddenFields(op, options);
     const optional = Object.entries(spec.optional)
-      .filter(([key]) => (options.quotes || key !== 'quote') && !SERVER_METADATA_FIELDS.includes(key))
+      .filter(([key]) => !hidden.includes(key))
       .map(([key, kind]) => `"${key}": <${kind}, optional>`);
     return `- {"op": "${op}"${[...required, ...optional].map(f => `, ${f}`).join('')}}${spec.description ? ` — ${spec.description}` : ''}`;
   });
@@ -776,17 +844,14 @@ export function renderOpVocabulary(ops: readonly OpType[], options: OpVocabulary
   return `changeSet, when present, must be an ARRAY of operation objects. Allowed operations and their fields:\n${lines.join('\n')}\n${RATIONALE_NOTE}${quoteNote}${contractShape}${knowledgeShape}${factRules}`;
 }
 
-/** Fields the server stamps when a proposal is staged, whatever the model sent — so no model is ever shown them. */
-const SERVER_STAMPED_FIELDS: Partial<Record<ActionType, readonly string[]>> = { 'action.approve_draft': ['revision', 'saveSeq', 'draftId'] };
-
 /** Action shapes + what each one does — the pipeline half of the hub playbook. */
 export function renderActionVocabulary(actions: readonly ActionType[]): string {
   const lines = actions.map(action => {
     const spec = OP_SPECS[action];
-    const stamped = SERVER_STAMPED_FIELDS[action] ?? [];
+    const hidden = modelHiddenFields(action, {});
     const required = Object.entries(spec.required).map(([key, kind]) => `"${key}": <${kind}, required>`);
     const optional = Object.entries(spec.optional)
-      .filter(([key]) => !stamped.includes(key) && key !== 'quote' && !SERVER_METADATA_FIELDS.includes(key))
+      .filter(([key]) => !hidden.includes(key))
       .map(([key, kind]) => `"${key}": <${kind}, optional>`);
     return `- {"op": "${action}"${[...required, ...optional].map(f => `, ${f}`).join('')}} — ${ACTION_PURPOSES[action]}`;
   });
@@ -848,14 +913,15 @@ const WIRE_FIELDS: Partial<Record<OpType, Record<string, WireSchema | null>>> = 
   'promise.update': { ...PROMISE_REF, status: { type: 'string', enum: PROMISE_STATUSES } },
   'promise.set_payoff': PROMISE_REF,
   'promise.drop': PROMISE_REF,
+  'draft.rewrite_passage': { passage: NON_BLANK, contextIndex: { type: 'integer', minimum: 1 } },
   'action.generate_chapter': { chapter: { type: 'integer', minimum: 1 } },
   'action.validate': { scope: { type: 'string', enum: VALIDATION_SCOPES } },
 };
 
 function opWireSchema(op: OpType, options: OpVocabularyOptions): WireSchema {
   const spec = OP_SPECS[op];
-  const hidden = isActionOp(op) ? ['quote', ...(SERVER_STAMPED_FIELDS[op as ActionType] ?? [])] : options.quotes ? [] : ['quote'];
-  const fields = Object.entries({ ...spec.required, ...spec.optional }).filter(([key]) => !hidden.includes(key) && !SERVER_METADATA_FIELDS.includes(key));
+  const hidden = modelHiddenFields(op, options);
+  const fields = Object.entries({ ...spec.required, ...spec.optional }).filter(([key]) => !hidden.includes(key));
   const properties: Record<string, WireSchema> = { op: { type: 'string', enum: [op] } };
   for (const [key, kind] of fields) {
     const typed = WIRE_FIELDS[op]?.[key];
@@ -884,7 +950,7 @@ export function changeSetRefs(ops: ChangeOp[]): string[] {
     if (op.op === 'milestone.upsert' || op.op === 'milestone.remove') return [`milestone:${op.milestoneKey}`];
     if (op.op === 'promise.create' || op.op === 'promise.update' || op.op === 'promise.set_payoff' || op.op === 'promise.drop') return [`promise:${op.kind}:${op.key}`];
     if (op.op === 'organise.rule') return [];
-    if (op.op === 'draft.update' || op.op === 'draft.remove') return [`draft:${op.chapter}`];
+    if (op.op === 'draft.update' || op.op === 'draft.remove' || op.op === 'draft.rewrite_passage') return [`draft:${op.chapter}`];
     return [`chapter:${op.chapter}`];
   });
   return [...new Set(refs)];

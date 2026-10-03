@@ -50,6 +50,13 @@ export function locatePassage(body: string, anchor: PassageAnchor): PassageLocat
   return { freshness: 'relocated', start, end: start + anchor.passage.length };
 }
 
+/** A rewrite returns the passage's words; the passage's own leading and trailing whitespace stays, so paragraph breaks around it survive. */
+export function fitReplacement(passage: string, replacement: string): string {
+  const leading = /^\s*/.exec(passage)?.[0] ?? '';
+  const trailing = /\s*$/.exec(passage)?.[0] ?? '';
+  return `${leading}${replacement.trim()}${trailing}`;
+}
+
 export function replacePassage(body: string, location: { start: number; end: number }, replacement: string): string {
   return `${body.slice(0, location.start)}${replacement}${body.slice(location.end)}`;
 }

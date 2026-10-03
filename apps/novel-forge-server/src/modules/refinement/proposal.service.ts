@@ -14,6 +14,7 @@ import { type ChangeOp, changeSetRefs, type ChangeSetValidationOptions, type Con
 import { planCardDiagnostics, proposalDiagnostics } from './plan-diagnostics';
 import { stampIdeaIds } from './idea-id';
 import { type OpUndoRecord } from './op-undo';
+import { rewriteDrafts, rewritesApart, stampPassageAnchors } from './passage-rewrite';
 import { type OpResult } from './proposal-apply.service';
 import { findNegationEchoWarnings, findRevealClearWarnings } from './proposal-warnings';
 import { type ListChangesQuery, type ListProposalsQuery } from './refinement.dto';
@@ -140,7 +141,8 @@ export class ProposalService {
     if (errors.length > 0) throw AppErrorCode.RFN_004.create();
 
     const trusted = input.kind === 'chapter_plan' ? input.changeSet : stampStartedEmpty(input.changeSet);
-    const changeSet = await stampApprovalRevisions(executor, projectId, stampIdeaIds(trusted), false);
+    const anchored = await stampPassageAnchors(executor, projectId, trusted);
+    const changeSet = await stampApprovalRevisions(executor, projectId, stampIdeaIds(anchored), false);
     const refs = changeSetRefs(changeSet);
     const baseline = input.baseline ? pickBaseline(input.baseline, refs) : await loadArtifactStates(executor, projectId, refs);
     // Caller warnings replace only the negation-echo review; the reveal-clear check always runs so an undate cannot slip past auto-apply.
@@ -176,7 +178,7 @@ export class ProposalService {
     if (!proposal) throw AppErrorCode.RFN_001.create();
 
     const owner = supersessionOwner(input);
-    if (owner) await this.supersedeOverlapping(projectId, owner, proposal.id, refs, executor);
+    if (owner) await this.supersedeOverlapping(projectId, owner, proposal.id, changeSet, executor);
     return proposal;
   }
 
@@ -210,12 +212,19 @@ export class ProposalService {
     }
   }
 
-  private async supersedeOverlapping(projectId: bigint, owner: SQL, newProposalId: bigint, refs: string[], executor: DbExecutor): Promise<void> {
+  /** A card rewriting other passages of the same chapter is not replaced: only one whose passages the new card touches, or that no longer stand. */
+  private async supersedeOverlapping(projectId: bigint, owner: SQL, newProposalId: bigint, changeSet: ChangeOp[], executor: DbExecutor): Promise<void> {
     const pending = await executor.query.refinementProposals.findMany({
       where: and(eq(schema.refinementProposals.projectId, projectId), owner, eq(schema.refinementProposals.status, 'pending'), ne(schema.refinementProposals.id, newProposalId)),
     });
 
-    const overlapping = pending.filter(p => changeSetRefs(p.changeSet as ChangeOp[]).some(ref => refs.includes(ref)));
+    const refs = changeSetRefs(changeSet);
+    const drafts = await rewriteDrafts(executor, projectId, changeSet);
+    const overlapping = pending.filter(p => {
+      const older = p.changeSet as ChangeOp[];
+      const shared = changeSetRefs(older).filter(ref => refs.includes(ref));
+      return shared.length > 0 && !rewritesApart(older, changeSet, shared, drafts);
+    });
     for (const proposal of overlapping) {
       await executor.update(schema.refinementProposals).set({ status: 'superseded', updatedAt: new Date() }).where(eq(schema.refinementProposals.id, proposal.id));
       this.logger.debug(`proposal ${proposal.id} superseded by ${newProposalId}`);
@@ -300,7 +309,8 @@ export class ProposalService {
     const errors = validateOps(existing.kind, changeSet);
     if (errors.length > 0) throw AppErrorCode.RFN_004.create();
 
-    const ops = await stampApprovalRevisions(this.db, projectId, stampIdeaIds(stampStartedEmpty(changeSet as ChangeOp[], existing.changeSet as ChangeOp[])), true);
+    const anchored = await stampPassageAnchors(this.db, projectId, stampStartedEmpty(changeSet as ChangeOp[], existing.changeSet as ChangeOp[]));
+    const ops = await stampApprovalRevisions(this.db, projectId, stampIdeaIds(anchored), true);
     const baseline = await loadArtifactStates(this.db, projectId, changeSetRefs(ops));
     const diagnostics = proposalDiagnostics(
       [...(await this.reviewWarnings(this.db, projectId, ops)), ...(await this.revealClearWarnings(this.db, projectId, ops))],

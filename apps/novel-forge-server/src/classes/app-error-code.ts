@@ -262,6 +262,11 @@ export class AppErrorCode extends ServerErrorCode {
   // A user-facing 500: the author must learn the undo did not happen, and why
   static readonly RFN_018 = new AppErrorCode('RFN_018', 'Change {opIndex} could not be put back exactly as it was before, so nothing was undone', 500);
   static readonly RFN_019 = AppErrorCode.conflict('RFN_019', 'Only a change still waiting on you can be brought into a chat — this one was answered or replaced meanwhile');
+  static readonly RFN_020 = AppErrorCode.badRequest('RFN_020', 'Two of the selected rewrites change the same words of chapter {chapter} — select only one of them');
+  static readonly RFN_021 = AppErrorCode.conflict(
+    'RFN_021',
+    'The rewrite of {passage} in chapter {chapter} no longer matches the chapter — uncheck it to apply the others, or ask again',
+  );
 
   /*!
    * Context Errors

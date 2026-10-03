@@ -182,6 +182,12 @@ const CHAT: Expected[] = [
     values: { gap: '8px', 'margin-top': '8px' },
     source: 'mockup screen 5 (Approve.dc.html): an item’s Add / Skip and conflict choice, 8 apart as .row; 8 under the item as .draftFoot gap 8',
   },
+  {
+    selector: '.passageDiff',
+    values: { 'margin-top': '6px', 'border-radius': 'var(--sh-radius-md)' },
+    source: 'mockup screen 3 (Context.dc.html) .op gap 6 between the passage’s row and its .diff, radius 6; 6 under the row as .turnOpError',
+  },
+  { selector: '.passageRemoved, .passageAdded', values: { padding: '4px 8px' }, source: 'mockup screen 3 (Context.dc.html) .diff div padding 4px 8px' },
   { selector: '.turnCardNote', values: { padding: '10px 12px' }, baseline: '.turnCardNote', source: 'chat.module.css .turnCardNote' },
   { selector: '.turnCardWarning', values: { padding: '10px 12px' }, baseline: '.turnCardWarning', source: 'chat.module.css .turnCardWarning' },
   {

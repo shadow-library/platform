@@ -77,6 +77,8 @@ export function ideaLabel(op: ContentOp): string {
       return withText(`Rewrite of chapter ${op.chapter}`, op.title);
     case 'draft.remove':
       return `Remove the draft of chapter ${op.chapter}`;
+    case 'draft.rewrite_passage':
+      return withText(`Passage rewrite in chapter ${op.chapter}`, op.label);
     case 'entity.upsert':
       return withText(`${op.name ?? op.entityKey} (${op.type})`, op.motivation, op.status, op.notes, op.body);
     case 'entity.remove':

@@ -53,9 +53,28 @@ function storySubject(op: ChangeOp): string {
   return [...(premise ? ['Premise'] : []), ...named].join(', ');
 }
 
+export function isPassageRewrite(op: ChangeOp): boolean {
+  return String(op.op) === 'draft.rewrite_passage';
+}
+
+/** The paragraph a passage rewrite starts in, as the server anchored it when the card was staged. */
+function rewriteParagraph(op: ChangeOp): number | undefined {
+  const paragraph = isRecord(op.anchor) ? op.anchor.paragraph : undefined;
+  return typeof paragraph === 'number' ? paragraph : undefined;
+}
+
+function rewriteSubject(op: ChangeOp): string {
+  const paragraph = rewriteParagraph(op);
+  const label = text(op.label);
+  const chapter = String(op.chapter);
+  if (paragraph === undefined) return label ? `Chapter ${chapter} · ${label}` : `A passage of chapter ${chapter}`;
+  return label ? `¶${paragraph} · ${label}` : `¶${paragraph} of chapter ${chapter}`;
+}
+
 export function opSubject(op: ChangeOp): string {
   const type = String(op.op);
   if (type === 'premise.update') return storySubject(op);
+  if (isPassageRewrite(op)) return rewriteSubject(op);
   if (type === 'organise.rule') return 'Rule';
   if (type === 'volume.upsert') return text(op.title) ?? `Volume ${String(op.volumeKey)}`;
   if (type === 'milestone.upsert') return text(op.label) ?? String(op.milestoneKey);
@@ -97,6 +116,24 @@ const DEPENDENT_NOUN: Record<string, [string, string]> = {
 
 function counted(count: number, [one, many]: [string, string]): string {
   return `${count} ${count === 1 ? one : many}`;
+}
+
+/** A card whose every change rewrites passages of one chapter names that chapter, as "2 changes to chapter 3". */
+export function turnCardTitle(changeSet: readonly ChangeOp[]): string {
+  const count = counted(changeSet.length, ['change', 'changes']);
+  const chapters = new Set(changeSet.map(op => (isPassageRewrite(op) ? String(op.chapter) : undefined)));
+  const [chapter] = chapters;
+  return chapters.size === 1 && chapter !== undefined ? `${count} to chapter ${chapter}` : count;
+}
+
+export interface PassageDiffView {
+  removed: string;
+  added: string;
+}
+
+/** The words a passage rewrite takes out and puts in, each without the surrounding whitespace the server keeps in place. */
+export function passageDiffView(op: ChangeOp): PassageDiffView {
+  return { removed: String(op.passage ?? '').trim(), added: String(op.replacement ?? '').trim() };
 }
 
 export function mergeUndoImpacts(impacts: readonly UndoImpactResponse[]): UndoImpactResponse | undefined {
@@ -159,7 +196,7 @@ export function proposalPresentation(proposal: { kind: string; status: string; c
   return 'suggestions';
 }
 
-const OWN_CARD_OPS = new Set(['draft.update', 'draft.remove', 'brief.update']);
+const OWN_CARD_OPS = new Set(['draft.update', 'draft.remove', 'draft.rewrite_passage', 'brief.update']);
 
 /** An action starts work or walks through a one-way door, and prose or a plan edit is read in full, so each keeps its own card in the thread. */
 export function answeredInPanel(proposal: { kind: string; changeSet: readonly ChangeOp[] }): boolean {

@@ -27,6 +27,7 @@ import {
   opSubject,
   opTouchesRecord,
   opWrittenText,
+  passageDiffView,
   promptChips,
   proposalPresentation,
   questionEyebrow,
@@ -38,6 +39,7 @@ import {
   suggestionCommit,
   turnAnnouncement,
   turnCardsInline,
+  turnCardTitle,
   unansweredWarning,
   undoImpactView,
   unusedParagraphPrompt,
@@ -69,6 +71,38 @@ describe('bible document ops', () => {
 describe('opSubject', () => {
   it('should title adding a chapter to the Story Bible by its chapter', () => {
     expect(opSubject({ op: 'action.apply_continuity', chapter: 3 })).toBe('Add chapter 3 to the Story Bible');
+  });
+
+  it.each([
+    ['its paragraph and label', { label: 'the wrist injury', anchor: { paragraph: 2 } }, '¶2 · the wrist injury'],
+    ['its paragraph and chapter when it has no label', { anchor: { paragraph: 2 } }, '¶2 of chapter 3'],
+    ['its chapter and label before it is anchored', { label: 'the wrist injury' }, 'Chapter 3 · the wrist injury'],
+    ['its chapter alone with neither', {}, 'A passage of chapter 3'],
+  ])('should title a passage rewrite by %s', (_, fields, title) => {
+    expect(opSubject({ op: 'draft.rewrite_passage', chapter: 3, passage: 'a', replacement: 'b', ...fields })).toBe(title);
+  });
+});
+
+describe('turnCardTitle', () => {
+  const rewrite = (chapter: number) => ({ op: 'draft.rewrite_passage', chapter, passage: 'a', replacement: 'b' });
+
+  it('should name the chapter when every change rewrites passages of it', () => {
+    expect(turnCardTitle([rewrite(3), rewrite(3)])).toBe('2 changes to chapter 3');
+    expect(turnCardTitle([rewrite(3)])).toBe('1 change to chapter 3');
+  });
+
+  it('should count the changes alone across chapters or kinds', () => {
+    expect(turnCardTitle([rewrite(3), rewrite(4)])).toBe('2 changes');
+    expect(turnCardTitle([rewrite(3), { op: 'action.approve_draft', chapter: 3 }])).toBe('2 changes');
+  });
+});
+
+describe('passageDiffView', () => {
+  it('should show the words taken out and put in without the whitespace kept around them', () => {
+    expect(passageDiffView({ op: 'draft.rewrite_passage', chapter: 3, passage: '\n\nHe was afraid.', replacement: '\n\nHis grip was damp.' })).toEqual({
+      removed: 'He was afraid.',
+      added: 'His grip was damp.',
+    });
   });
 });
 
@@ -199,7 +233,7 @@ describe('answeredInPanel', () => {
       'action.organise_notes',
       'action.plan_chapter',
     ];
-    for (const op of [...ops, 'action.audit_bible', 'draft.update', 'draft.remove', 'action.revise_draft', 'brief.update'])
+    for (const op of [...ops, 'action.audit_bible', 'draft.update', 'draft.remove', 'draft.rewrite_passage', 'action.revise_draft', 'brief.update'])
       expect(answeredInPanel({ kind: 'chat', changeSet: [COUNCIL, { op }] })).toBe(false);
     expect(answeredInPanel({ kind: 'chapter_plan', changeSet: [] })).toBe(false);
   });

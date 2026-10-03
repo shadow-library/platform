@@ -2074,7 +2074,40 @@ them off `model_calls` rather than trusting a number here. Cost and admin inspec
     writes a new `restored` revision, and history is never rewritten.
 - **Fails when:** `PSG_003` the selection no longer matches; `PSG_006` / `VER_002` on a final chapter (use Amend).
 
-### 8. Writer's view
+### 8. Comment on a passage and apply its rewrite card
+
+- **Entry:** the chapter beside the chat → select a line → comment → send with **Edit prose** on; or
+  `POST /chat/sessions/$S/messages {"content","proseEdits":true,"contexts":[…]}`, each context
+  `{"kind":"passage","chapter","draftId","revision","saveSeq","start","end","passageHash","quote","comment"}` (UTF-16
+  offsets into the draft body, SHA-256 hex of `quote`). Apply with `POST /proposals/:id/apply {"opIndexes":[…]}`, undo
+  with `POST /proposals/:id/revert`.
+- **Preconditions:** a drafted, non-final, non-isolated chapter.
+- **Input:** two comments on chapter 3 — on one sentence "Make this the old wrist injury." and on another "Too
+  on-the-nose. Show the fear through his grip." — and the message "Fix these two and leave the rest alone."
+- **Verify:**
+  - The prompt (`model_calls`, `chat-refine`) ends the author's turn with the numbered "Passage comments:" block, and
+    the reply stages one `draft.rewrite_passage` per comment: `passage` is the quoted sentence, `contextIndex` its
+    entry, a short `label`. The stored op carries an `anchor` (`draftId`, `revision`, `saveSeq`, `start`, `end`,
+    `passageHash`, `paragraph`) the server found, whatever the model sent.
+  - The thread shows one card, "2 changes to chapter 3", each change checked by default as "¶k · label" over a red
+    line (the words taken out) and a green line (the words put in). Nothing applies in the turn, in any mode.
+  - Applying both writes ONE new revision (`draft_revisions.source='passage_rewritten'`), resets approval and marks
+    later drafts stale; unchecking one writes only the other. Every other word of the chapter is unchanged.
+  - Hand-edit another paragraph of the chapter (or let a summary save) before applying: the card still applies,
+    at the moved offsets. Edit inside or right beside one rewrite's sentence: applying both is refused with
+    `RFN_021` naming that rewrite, the card stays pending, and applying the other alone works.
+  - Comment on another paragraph of the same chapter in a later turn: the first card stays pending beside the new
+    one. Comment on the same words again: the first card turns `superseded`.
+  - Revert puts the body back as the apply found it, as a `chat_edited` revision.
+  - With Edit prose off the turn stages no rewrite: the reply says what it would change and suggests turning Edit
+    prose on.
+  - Ask for a rewrite of words that occur twice in the chapter without a comment on them, or of words the chapter does
+    not hold: the reply ends "Forge left out a passage rewrite: …" naming why, and no card holds it.
+- **Fails when:** `RFN_021` a checked rewrite's passage was edited in or around since the card was staged;
+  `RFN_003` the draft was removed (the card turns conflicted); `RFN_020` two checked rewrites change the same words; `RFN_010` the chapter turned final; `RFN_012` it turned
+  isolated; `RFN_006` on revert after a later edit.
+
+### 9. Writer's view
 
 - **Entry:** Chapter workspace → Writer's view; `GET /chapters/:n/writer-snapshots`, `…/:snapshotId`.
 - **Verify:** one row per writer attempt (`draft`, `repair`, `rewrite`, `revise`, `passage`) holding the exact messages,
@@ -2082,7 +2115,7 @@ them off `model_calls` rather than trusting a number here. Cost and admin inspec
   today's state. Attempts of the current revision and the two before it are kept. On an isolated chapter the
   messages read "Prose: walled off" and `bibleHash` is null.
 
-### 9. An unrestricted chapter and its bridge
+### 10. An unrestricted chapter and its bridge
 
 - **Entry:** set the plan card's content to Unrestricted, write the chapter, approve it.
 - **Verify:**
@@ -2096,7 +2129,7 @@ them off `model_calls` rather than trusting a number here. Cost and admin inspec
     isolated). Reverting the chapter's Story Bible updates keeps the bridge.
   - Input that crosses the hard line is refused before any call with `AI_015`, naming the record.
 
-### 10. Portraits as of a chapter and the wiki gate
+### 11. Portraits as of a chapter and the wiki gate
 
 - **Entry:** Illustrations, or a character's portrait → "as of chapter N"; `POST /illustrations {…,"depictsChapter":N}`;
   uploads through `POST /entities/:key/image` or `…/images` with `depictsChapter`; re-date with `PATCH …/image` or
@@ -2108,7 +2141,7 @@ them off `model_calls` rather than trusting a number here. Cost and admin inspec
   `imageVisibleFromOrdinal` when the reader advertises the headline-gate capability, and otherwise joins the gated
   gallery; a reader short of that chapter sees no portrait on the entry page.
 
-### 11. Promises, volumes and usage
+### 12. Promises, volumes and usage
 
 - **Promises:** `GET /promises?kind=&status=` lists threads and mysteries with `due`: `overdue` (a chapter window
   passed, or the payoff volume's goal is met), `due` (the payoff milestone reached, or the payoff volume active),

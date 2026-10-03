@@ -5034,7 +5034,7 @@ export interface components {
       content: string;
       /** @description Passages of chapter drafts the author commented on, sent with this message. Each is re-anchored to its draft as it stands; a passage that can no longer be found refuses the turn (`CHT_009`) so the author selects it again. */
       contexts?: components['schemas']['ChatPassageContextBody'][];
-      /** @description The author's explicit permission for this turn to rewrite chapter prose (draft.update, draft.remove, action.revise_draft). Off by default: a plan edit changes the brief and the chapter is regenerated from it. */
+      /** @description The author's explicit permission for this turn to rewrite chapter prose (draft.rewrite_passage, draft.update, draft.remove, action.revise_draft). Off by default: a plan edit changes the brief and the chapter is regenerated from it. */
       proseEdits?: boolean;
       /** @description Just discussing: nothing the turn proposes applies — every change becomes a suggestion card for the author to accept or decline. Off by default. */
       justDiscussing?: boolean;

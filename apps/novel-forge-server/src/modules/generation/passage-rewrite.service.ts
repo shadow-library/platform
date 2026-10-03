@@ -20,7 +20,8 @@ import { WriterSnapshotService } from '../ai/writer-snapshot.service';
 import { loadWriterDisclosurePolicy } from '../bible/fact/writer-disclosure-policy';
 import { PluginPolicyService } from '../plugins/plugin-policy.service';
 import { asRetryableSave, assertDraftBase, baseOfDraft, type DraftBase, lockDraft, saveHandWrittenDraft } from './draft-save';
-import { anchorContext, isWithinBody, locatePassage, MAX_PASSAGE_CHARS, passageHash, type PassageLocation, replacePassage } from './passage-anchor';
+import { anchorContext, fitReplacement, isWithinBody, locatePassage, MAX_PASSAGE_CHARS, passageHash, type PassageLocation, replacePassage } from './passage-anchor';
+import { holdNewLeaks } from './passage-leaks';
 
 /** Suggestions carry their own passage text, so older ones are only clutter; a draft keeps its newest twenty. */
 export const PASSAGE_SUGGESTIONS_KEPT = 20;
@@ -63,13 +64,6 @@ function anchorOf(suggestion: Generation.PassageSuggestion): Parameters<typeof l
 function presentSuggestion(suggestion: Generation.PassageSuggestion, body: string): PassageSuggestionView {
   const { projectId: _projectId, draftId: _draftId, passageHash: _hash, contextBefore: _before, contextAfter: _after, updatedAt: _updatedAt, leakLines, ...rest } = suggestion;
   return { ...rest, leakLines: leakLines ?? [], location: locatePassage(body, anchorOf(suggestion)) };
-}
-
-/** The model returns the passage's words; the selection's own leading and trailing whitespace stays, so paragraph breaks around it survive. */
-function fitReplacement(passage: string, replacement: string): string {
-  const leading = /^\s*/.exec(passage)?.[0] ?? '';
-  const trailing = /\s*$/.exec(passage)?.[0] ?? '';
-  return `${leading}${replacement.trim()}${trailing}`;
 }
 
 @Injectable()
@@ -209,7 +203,7 @@ export class PassageRewriteService {
             ...(suggestion.isolated ? { generator: 'unrestricted' as const, isolated: true } : {}),
           },
         });
-        const draft = await holdNewLeaks(tx, saved, suggestion);
+        const draft = await holdNewLeaks(tx, saved, [suggestion]);
         const [row] = await tx
           .update(schema.passageSuggestions)
           .set({ status: 'applied', appliedRevision: draft.revision, updatedAt: new Date() })
@@ -240,19 +234,6 @@ export class PassageRewriteService {
     if (!draft) throw AppErrorCode.DRF_001.create();
     return draft;
   }
-}
-
-/** Like a revise: a rewrite that brings in a locked secret the passage did not already give away is held as a contradiction, judged by the policy as it stands now. */
-async function holdNewLeaks(tx: PrimaryTransaction, draft: Generation.Draft, suggestion: Generation.PassageSuggestion): Promise<Generation.Draft> {
-  const disclosure = await loadWriterDisclosurePolicy(tx, draft.projectId, draft.chapter);
-  const before = new Set(disclosure.leakLines(suggestion.passage));
-  if (disclosure.leakLines(suggestion.replacement).every(line => before.has(line))) return draft;
-  const [held] = await tx
-    .update(schema.drafts)
-    .set({ reviewStatus: 'contradiction' })
-    .where(and(eq(schema.drafts.id, draft.id), eq(schema.drafts.revision, draft.revision)))
-    .returning();
-  return held ?? draft;
 }
 
 async function findOpenSuggestion(db: Pick<PrimaryDatabase, 'query'>, draft: Generation.Draft, suggestionId: bigint): Promise<Generation.PassageSuggestion> {

@@ -109,6 +109,7 @@ export const ALWAYS_CARD: Readonly<Partial<Record<OpType, AlwaysCardRule>>> = {
   'promise.drop': 'removal',
   'brief.update': 'plan',
   'draft.update': 'prose',
+  'draft.rewrite_passage': 'prose',
   'promise.set_payoff': 'promise_disposition',
   ...(Object.fromEntries(ACTION_TYPES.map(action => [action, 'action'])) as Record<ActionType, AlwaysCardRule>),
 };
@@ -127,6 +128,7 @@ export const IDEA_POLICY: Readonly<Record<OpType, 'idea' | AlwaysCardRule>> = {
   'brief.remove': 'removal',
   'draft.update': 'prose',
   'draft.remove': 'removal',
+  'draft.rewrite_passage': 'prose',
   'entity.upsert': 'idea',
   'entity.remove': 'removal',
   'fact.upsert': 'secret_truth',

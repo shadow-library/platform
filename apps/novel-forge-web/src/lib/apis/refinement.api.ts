@@ -830,6 +830,8 @@ export function useApplyProposalMutation(projectId: string): UseMutationResult<A
       queryClient.setQueryData(refinementKeys.proposal(projectId, result.proposal.id), result.proposal);
       invalidateProposals(queryClient, projectId);
     },
+    // A refused apply may still have settled the card, as a conflict does, so the card is read again rather than left showing pending.
+    onError: () => invalidateProposals(queryClient, projectId),
   });
 }
 

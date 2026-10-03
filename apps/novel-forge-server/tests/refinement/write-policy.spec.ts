@@ -275,6 +275,11 @@ const ALWAYS_CARD_CASES: Case[] = [
     expected: { side: 'card', reason: 'always_card', rule: 'plan' },
   },
   { name: 'prose is always a card', op: { op: 'draft.update', chapter: 4, body: 'Mira ran.', quote: QUOTE }, expected: { side: 'card', reason: 'always_card', rule: 'prose' } },
+  {
+    name: 'a passage rewrite is always a card',
+    op: { op: 'draft.rewrite_passage', chapter: 4, passage: 'Mira walked.', replacement: 'Mira ran.', quote: QUOTE },
+    expected: { side: 'card', reason: 'always_card', rule: 'prose' },
+  },
   { name: 'finalize is always a card', op: { op: 'action.finalize', quote: QUOTE }, expected: { side: 'card', reason: 'always_card', rule: 'action' } },
   { name: 'approval is always a card', op: { op: 'action.approve_draft', chapter: 4, quote: QUOTE }, expected: { side: 'card', reason: 'always_card', rule: 'action' } },
   {
@@ -598,6 +603,11 @@ const EDIT_FREELY_CASES: Case[] = [
   { name: 'an unquoted removal stays a card', op: { op: 'entity.remove', entityKey: 'mira' }, expected: { side: 'card', reason: 'always_card', rule: 'removal' } },
   { name: 'an unquoted plan stays a card', op: { op: 'brief.update', chapter: 4, body: 'Mira robs the court.' }, expected: { side: 'card', reason: 'always_card', rule: 'plan' } },
   { name: 'unquoted prose stays a card', op: { op: 'draft.update', chapter: 4, body: 'Mira ran.' }, expected: { side: 'card', reason: 'always_card', rule: 'prose' } },
+  {
+    name: 'a passage rewrite stays a card',
+    op: { op: 'draft.rewrite_passage', chapter: 4, passage: 'Mira walked.', replacement: 'Mira ran.' },
+    expected: { side: 'card', reason: 'always_card', rule: 'prose' },
+  },
   { name: 'finalize stays a card', op: { op: 'action.finalize' }, expected: { side: 'card', reason: 'always_card', rule: 'action' } },
   { name: 'approval stays a card', op: { op: 'action.approve_draft', chapter: 4 }, expected: { side: 'card', reason: 'always_card', rule: 'action' } },
   {

@@ -857,6 +857,35 @@ button.turnRow:hover {
   margin-top: 8px;
 }
 
+.passageDiff {
+  display: flex;
+  flex-direction: column;
+  margin-top: 6px;
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: var(--sh-radius-md);
+  overflow: hidden;
+  font-size: var(--sh-text-body-sm);
+  line-height: 20px;
+}
+
+.passageRemoved,
+.passageAdded {
+  padding: 4px 8px;
+  text-decoration: none;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.passageRemoved {
+  background: var(--sh-danger-bg-subtle);
+  color: var(--sh-danger-text-on-subtle);
+}
+
+.passageAdded {
+  background: var(--sh-success-bg-subtle);
+  color: var(--sh-success-text-on-subtle);
+}
+
 .turnCardNote {
   padding: 10px 12px;
   border-top: 1px solid var(--sh-border-subtle);

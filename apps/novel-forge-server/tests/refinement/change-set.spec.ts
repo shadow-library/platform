@@ -247,6 +247,38 @@ describe('changeSetRefs', () => {
   });
 });
 
+describe('draft.rewrite_passage', () => {
+  const op = { op: 'draft.rewrite_passage', chapter: 3, passage: 'Corin flexed his hand.', replacement: 'Corin rolled his wrist.' };
+  const anchor = { draftId: '3', revision: 1, saveSeq: 0, start: 10, end: 32, passageHash: 'abc', paragraph: 2, contextBefore: 'The salle. ', contextAfter: ' Again.' };
+  const malformed = 'changeSet[0]: anchor must be {draftId, revision, saveSeq, start, end, passageHash, paragraph, contextBefore, contextAfter} with end after start';
+
+  it('should accept a rewrite with or without its staged anchor, label and comment number', () => {
+    expect(validateChangeSet([op])).toEqual([]);
+    expect(validateChangeSet([{ ...op, label: 'the wrist', contextIndex: 1, anchor }])).toEqual([]);
+  });
+
+  it.each([
+    ['a blank passage', { passage: '  ' }, 'changeSet[0]: passage must not be blank'],
+    ['a comment number below 1', { contextIndex: 0 }, 'changeSet[0]: contextIndex must be >= 1'],
+    ['an anchor that is not one', { anchor: { ...anchor, end: 4 } }, malformed],
+    ['an anchor missing its draft', { anchor: { ...anchor, draftId: undefined } }, malformed],
+    ['an anchor missing the text either side of it', { anchor: { ...anchor, contextAfter: undefined } }, malformed],
+  ])('should refuse %s', (_, change, error) => {
+    expect(validateChangeSet([{ ...op, ...change }])).toContain(error);
+  });
+
+  it('should touch the chapter’s draft', () => {
+    expect(changeSetRefs([op as ChangeOp])).toEqual(['draft:3']);
+  });
+
+  it('should show the model the passage, never the anchor the server stamps nor a quote of the author’s words', () => {
+    const vocabulary = renderOpVocabulary(['draft.rewrite_passage'], { quotes: true });
+    expect(vocabulary).toContain(
+      '{"op": "draft.rewrite_passage", "chapter": <number, required>, "passage": <string, required>, "replacement": <string, required>, "label": <string, optional>, "contextIndex": <number, optional>, "rationale": <string, optional>}',
+    );
+  });
+});
+
 describe('validateChangeSet draft containment', () => {
   it.each([
     ['isolated', { isolated: false }],

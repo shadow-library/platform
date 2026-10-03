@@ -39,11 +39,12 @@ import { loadRejectedIdeas } from './idea-rejections';
 import { requestedNegations } from './negation-echo';
 import { isNotesOrganiseRequest, ORGANISE_NOTES_OP, type OrganiseRouting, organiseRouting, withLaterPlansRouted } from './later-plans-guard';
 import { authorWords, type PassageContextInput, renderTurnContent, resolvePassageContexts, turnScreens } from './passage-context';
+import { anchorPassageRewrites, droppedRewritesNote } from './passage-rewrite';
 import { chatTurnWarnings, readsPlannerOnlyPage } from './planner-only-guard';
 import { ProposalApplyService } from './proposal-apply.service';
 import { ProposalService } from './proposal.service';
 import { findNegationEchoWarnings } from './proposal-warnings';
-import { PROSE_EDIT_WITHHELD_NOTE, withoutProseEditOps } from './prose-intent';
+import { proseWithheldNote, withoutProseEditOps } from './prose-intent';
 import {
   IDEAS_DROPPED_NOTE,
   splitTurnChangeSet,
@@ -135,6 +136,8 @@ interface AuthoredMessage {
 interface StagingContext {
   justDiscussing: boolean;
   organise: OrganiseRouting;
+  /** The passage comments the author sent this turn, which tell a rewrite's passage apart when its words occur more than once. */
+  contexts: readonly Refinement.ChatPassageContext[];
 }
 
 export interface ChatTurnResult {
@@ -169,7 +172,7 @@ function withheldProse(output: ChatRefineOutput, proseEdits: boolean): ChatRefin
   const { kept, withheld } = withoutProseEditOps(output.changeSet);
   if (withheld === 0) return output;
   return {
-    reply: `${output.reply}\n\n${PROSE_EDIT_WITHHELD_NOTE}`,
+    reply: `${output.reply}\n\n${proseWithheldNote(output.changeSet)}`,
     ...(kept.length > 0 ? { changeSet: kept } : {}),
     ...(output.question ? { question: output.question } : {}),
   };
@@ -542,7 +545,8 @@ export class ChatService {
       }
 
       const turnWarnings = chatTurnWarnings(warnings, planner.read);
-      const persisted = await this.persistAssistantTurn(projectId, session, userMessage, output, runId, resolvedModel, turnWarnings, { justDiscussing, organise }, trace);
+      const staging = { justDiscussing, organise, contexts };
+      const persisted = await this.persistAssistantTurn(projectId, session, userMessage, output, runId, resolvedModel, turnWarnings, staging, trace);
       return { ...persisted, assistantMessage: { ...persisted.assistantMessage, ...selection } };
     });
 
@@ -734,7 +738,7 @@ export class ChatService {
     return { userMessage, assistantMessage, proposal, appliedProposal, applied, applyNote, held };
   }
 
-  /** Splits the change-set by the write policy and stages it as at most two proposals: what applies in the turn, and the rest as cards. */
+  /** A rewrite that cannot be placed in its chapter is left out before the split, and the reply says which and why. */
   private async stageChangeSet(
     projectId: bigint,
     session: Refinement.ChatSession,
@@ -743,11 +747,32 @@ export class ChatService {
     output: ChatRefineOutput,
     runId: string,
     warnings: string[],
+    staging: StagingContext,
+  ): Promise<TurnStaging & { replyNote?: string }> {
+    const proposed = (output.changeSet ?? []) as unknown as ChangeOp[];
+    if (proposed.length === 0) return { appliedProposal: null, cardProposal: null };
+    const { ops, dropped } = await anchorPassageRewrites(this.db, projectId, proposed, staging.contexts);
+    if (dropped.length > 0) this.logger.info('chat turn: left out passage rewrites it could not place', { projectId, runId, dropped });
+    const staged: TurnStaging & { replyNote?: string } =
+      ops.length === 0
+        ? { appliedProposal: null, cardProposal: null }
+        : await this.stageAnchored(projectId, session, message, authorMessage, output, ops, runId, warnings, staging);
+    const replyNote = [staged.replyNote, droppedRewritesNote(dropped)].filter(Boolean).join('\n\n');
+    return { ...staged, ...(replyNote ? { replyNote } : {}) };
+  }
+
+  /** Splits the change-set by the write policy and stages it as at most two proposals: what applies in the turn, and the rest as cards. */
+  private async stageAnchored(
+    projectId: bigint,
+    session: Refinement.ChatSession,
+    message: Refinement.ChatMessage,
+    authorMessage: string,
+    output: ChatRefineOutput,
+    ops: ChangeOp[],
+    runId: string,
+    warnings: string[],
     { justDiscussing, organise }: StagingContext,
   ): Promise<TurnStaging & { replyNote?: string }> {
-    const ops = (output.changeSet ?? []) as unknown as ChangeOp[];
-    if (ops.length === 0) return { appliedProposal: null, cardProposal: null };
-
     const stage: TurnProposalPort['stage'] = (changeSet, stageWarnings, options) =>
       this.proposalService
         .create(projectId, {

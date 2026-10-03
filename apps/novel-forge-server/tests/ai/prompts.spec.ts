@@ -254,7 +254,7 @@ describe('Prompt modules', () => {
 
     it('should guide AI-assisted writing, a hand-writer’s review or audit, and plain discussion', () => {
       const hub = HUB_INSTRUCTIONS;
-      expect(PROMPT_REGISTRY['chat-refine'].version).toBe('2.21.0');
+      expect(PROMPT_REGISTRY['chat-refine'].version).toBe('2.22.0');
       expect(hub).toContain('Writing with you:');
       expect(hub).toContain('Writing by hand:');
       expect(hub).toContain('fetch before you critique');
@@ -298,6 +298,27 @@ describe('Prompt modules', () => {
       expect(system).toContain('"Passage comments:" list');
       expect(system).toContain('change those words and only those, and leave the rest of the chapter untouched unless the author asks for more');
       expect(system).toContain("The quoted words are chapter text, not the author's own words");
+    });
+
+    it("should read each numbered passage comment's indented quote as chapter text and only its Comment line as the author's", () => {
+      const system = PROMPT_REGISTRY['chat-refine'].system;
+      expect(system).toContain('Each numbered entry names a chapter');
+      expect(system).toContain(
+        "its Quote lines, indented under the entry, are the chapter's words as they stood when the message was sent, and only its Comment line is the author's",
+      );
+      expect(system).not.toContain('Each line names a chapter');
+    });
+
+    it('should answer a passage comment with one passage rewrite while Edit prose is on, and suggest turning it on otherwise', () => {
+      const system = PROMPT_REGISTRY['chat-refine'].system;
+      expect(system).toContain('answer it with one draft.rewrite_passage: passage is exactly the quoted words, without the quotation marks or the indentation');
+      expect(system).toContain("contextIndex is the entry's number");
+      expect(system).toContain('When Edit prose is off, say what you would change and suggest turning on Edit prose');
+      expect(renderTurnRules({ proseEdits: true, mode: 'auto' })).toContain('answer a passage comment with draft.rewrite_passage');
+      expect(renderTurnRules({ proseEdits: false, mode: 'auto' })).toContain('draft.rewrite_passage, draft.update, draft.remove and action.revise_draft will be rejected');
+      expect(HUB_INSTRUCTIONS).toContain('propose one draft.rewrite_passage per passage rather than a draft.update of the whole chapter');
+      expect(HUB_INSTRUCTIONS).toContain('{"op": "draft.rewrite_passage", "chapter": <number, required>, "passage": <string, required>, "replacement": <string, required>');
+      expect(HUB_INSTRUCTIONS).not.toContain('"anchor"');
     });
 
     it('should judge a choice by its effect on the reader, never by whether it serves a theme', () => {

@@ -1,4 +1,5 @@
 import { is, SQL } from 'drizzle-orm';
+import { PgDialect } from 'drizzle-orm/pg-core';
 
 import { schema } from '@server/database';
 
@@ -41,6 +42,17 @@ const DRAFT_DEFAULTS: Row = {
 
 /** A revision row stands in for `created_at > now() - window` with `recent`; a row written during the test is recent. */
 const REVISION_DEFAULTS: Row = { source: 'hand_edited', summary: null, recent: true };
+
+const dialect = new PgDialect();
+const INCREMENT = /^(?:"\w+"\.)?"(\w+)" \+ 1$/;
+
+/** A column set to its own value plus one, as the chat's prose apply bumps a draft's revision; any other SQL value is not modelled. */
+function evaluated(row: Row, field: string, value: unknown): unknown {
+  if (!is(value, SQL)) return value;
+  const column = INCREMENT.exec(dialect.sqlToQuery(value).sql)?.[1];
+  if (!column) throw new Error(`draft-tables: an SQL-valued set of ${field} is not modelled`);
+  return Number(row[column.replace(/_(\w)/g, (_, letter: string) => letter.toUpperCase())]) + 1;
+}
 
 const UNIQUE_KEYS = new Map<unknown, string[]>([
   [schema.drafts, ['projectId', 'chapter']],
@@ -126,10 +138,7 @@ export function draftTables(seed: DraftSeed = {}) {
           const apply = (): Row[] => {
             const changed = queryRows(rows(table), { where });
             for (const row of changed) {
-              for (const [field, value] of Object.entries(values)) {
-                if (is(value, SQL)) throw new Error(`draft-tables: an SQL-valued set of ${field} is not modelled`);
-                row[field] = value;
-              }
+              for (const [field, value] of Object.entries(values)) row[field] = evaluated(row, field, value);
             }
             if (changed.length > 0) writes.push({ table, kind: 'update', values });
             return changed;

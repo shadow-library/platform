@@ -28,12 +28,14 @@ import {
   volumeContentHash,
 } from '@server/common';
 import { APP_NAME } from '@server/constants';
-import { type PrimaryDatabase, type PrimaryTransaction, type Project, type Refinement, schema, type Story } from '@server/database';
+import { type Generation, type PrimaryDatabase, type PrimaryTransaction, type Project, type Refinement, schema, type Story } from '@server/database';
 
 import { defaultChapterMode } from '../ai/chapter-route';
 import { runWithCostTier } from '../ai/cost-tier-scope';
 import { isCostTier } from '../ai/defaults';
 import { writingInstructionAdditions } from '../ai/prompts/writing-instructions';
+import { baseOfDraft, lockDraft, saveHandWrittenDraft } from '../generation/draft-save';
+import { holdNewLeaks } from '../generation/passage-leaks';
 import { hasOrganiseUndo, recordOrganiseDecision, revertOrganiseDecision, wholeOrganiseSelection } from '../notes/organise-record';
 import { type ActionExecutionResult, type ActionExecutor, ActionExecutorRegistry } from './action-registry';
 import { type ArtifactState, loadArtifactStates, MISSING_ARTIFACT } from './artifact-state';
@@ -49,6 +51,7 @@ import {
   changeSetRefs,
   type ContentOp,
   type DraftRemoveOp,
+  type DraftRewritePassageOp,
   type DraftUpdateOp,
   type EntityRemoveOp,
   type EntityUpsertOp,
@@ -68,6 +71,7 @@ import {
   type VolumeUpsertOp,
 } from './change-set';
 import { AppliedOpGraph, type OpUndoRecord } from './op-undo';
+import { isPassageRewrite, rewrittenBody } from './passage-rewrite';
 import { ALWAYS_CARD, type OpSource } from './write-policy';
 
 export interface AppliedArtifact {
@@ -189,6 +193,19 @@ interface PromiseRow {
 // The same for a removed draft's containment: reverting a removal must bring an isolated draft back isolated, whatever the op's author wrote.
 type DraftRestoreOp = Restorable<DraftUpdateOp, 'title' | 'summary'> & { isolated?: boolean; generator?: Project.ContentGenerator };
 
+function draftRestoreOp(draft: Generation.Draft): ContentOp {
+  const inverse: DraftRestoreOp = {
+    op: 'draft.update',
+    chapter: draft.chapter,
+    title: draft.title,
+    body: draft.body,
+    summary: draft.summary,
+    isolated: draft.isolated,
+    generator: draft.generator,
+  };
+  return inverse as ContentOp;
+}
+
 /** An op's value for a field, or the row's when the op leaves it out; only a restore op's `null` clears it. */
 function keptOr<T>(value: T | null | undefined, existing: T | null | undefined): T | null {
   return value === undefined ? (existing ?? null) : value;
@@ -265,6 +282,18 @@ function sameContent(refs: readonly string[], expected: Readonly<Record<string, 
     const found = actual[ref] ?? MISSING_ARTIFACT;
     return want !== undefined && want.exists === found.exists && want.contentHash === found.contentHash;
   });
+}
+
+/**
+ * Every selected rewrite of a chapter lands as one revision, so they are written together where the first of them stands. Staging refuses a
+ * change-set that also rewrites one of those chapters whole, which the baseline check would otherwise wave through.
+ */
+function rewritesByChapter(ops: readonly ContentOp[]): Map<number, DraftRewritePassageOp[]> {
+  const byChapter = new Map<number, DraftRewritePassageOp[]>();
+  for (const op of ops) if (isPassageRewrite(op)) byChapter.set(op.chapter, [...(byChapter.get(op.chapter) ?? []), op]);
+  const whole = ops.find(op => (op.op === 'draft.update' || op.op === 'draft.remove') && byChapter.has(op.chapter));
+  if (whole) throw AppError.internal(`a change-set never rewrites chapter ${String((whole as DraftUpdateOp).chapter)} whole beside its passage rewrites`);
+  return byChapter;
 }
 
 /** The change-set indexes in the order an apply runs their ops. */
@@ -382,10 +411,12 @@ export class ProposalApplyService {
       const selectedContent = contentOps.map(entry => entry.op);
       if (selectedContent.some(op => PLAN_STATE_OPS.has(op.op))) await lockProjectPlan(tx, projectId);
       if (proposal.kind === 'chapter_plan') await assertPlanCardCurrent(ctx.tx, projectId, selectedContent);
+      const rewrites = rewritesByChapter(selectedContent);
       for (const op of removalsLast(selectedContent)) {
+        const chapterRewrites = isPassageRewrite(op) ? rewrites.get(op.chapter) : undefined;
+        if (chapterRewrites && chapterRewrites[0] !== op) continue;
         const beforeState = perOpUndo ? await loadArtifactStates(ctx.tx, projectId, changeSetRefs([op])) : {};
-        const inverse = await this.captureInverse(ctx, op);
-        await this.applyOp(ctx, op);
+        const inverse = chapterRewrites ? await this.applyPassageRewrites(ctx, chapterRewrites) : await this.captureAndApply(ctx, op);
         if (!inverse) continue;
         inverseOps.unshift(inverse);
         opUndo[indexOf.get(op) as number] = { inverse, beforeState };
@@ -520,6 +551,7 @@ export class ProposalApplyService {
   private async findBaselineMismatches(tx: PrimaryDatabase, projectId: bigint, ops: ChangeOp[], baseline: Record<string, ArtifactState>): Promise<BaselineMismatch[]> {
     const refs = changeSetRefs(ops);
     const current = await loadArtifactStates(tx, projectId, refs);
+    const passageOnly = new Set(refs.filter(ref => ops.every(op => !changeSetRefs([op]).includes(ref) || isPassageRewrite(op))));
 
     const mismatches: BaselineMismatch[] = [];
     for (const ref of refs) {
@@ -530,8 +562,9 @@ export class ProposalApplyService {
         mismatches.push({ artifactRef: ref, expected, actual });
         continue;
       }
-      const changed = expected.exists !== actual.exists || expected.revision !== actual.revision || expected.contentHash !== actual.contentHash;
-      if (changed) mismatches.push({ artifactRef: ref, expected, actual });
+      // A rewrite finds its own passage again at apply, so an edit elsewhere in the chapter leaves its card standing.
+      const moved = !passageOnly.has(ref) && (expected.revision !== actual.revision || expected.contentHash !== actual.contentHash);
+      if (expected.exists !== actual.exists || moved) mismatches.push({ artifactRef: ref, expected, actual });
     }
     return mismatches;
   }
@@ -557,6 +590,7 @@ export class ProposalApplyService {
         return this.inverseBrief(ctx, op);
       case 'draft.update':
       case 'draft.remove':
+      case 'draft.rewrite_passage':
         return this.inverseDraft(ctx, op);
       case 'entity.upsert':
       case 'entity.remove':
@@ -640,19 +674,10 @@ export class ProposalApplyService {
     return inverse as ContentOp;
   }
 
-  private async inverseDraft(ctx: ApplyContext, op: DraftUpdateOp | DraftRemoveOp): Promise<ContentOp | null> {
+  private async inverseDraft(ctx: ApplyContext, op: DraftUpdateOp | DraftRemoveOp | DraftRewritePassageOp): Promise<ContentOp | null> {
     const draft = await ctx.tx.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, ctx.projectId), eq(schema.drafts.chapter, op.chapter)) });
     if (!draft) return op.op === 'draft.update' ? { op: 'draft.remove', chapter: op.chapter } : null;
-    const inverse: DraftRestoreOp = {
-      op: 'draft.update',
-      chapter: op.chapter,
-      title: draft.title,
-      body: draft.body,
-      summary: draft.summary,
-      isolated: draft.isolated,
-      generator: draft.generator,
-    };
-    return inverse as ContentOp;
+    return draftRestoreOp(draft);
   }
 
   private async inverseEntity(ctx: ApplyContext, op: EntityUpsertOp | EntityRemoveOp): Promise<ContentOp | null> {
@@ -806,6 +831,8 @@ export class ProposalApplyService {
         return this.applyDraftUpdate(ctx, op);
       case 'draft.remove':
         return this.applyDraftRemove(ctx, op);
+      case 'draft.rewrite_passage':
+        return this.applyPassageRewrites(ctx, [op]).then(() => undefined);
       case 'entity.upsert':
         return this.applyEntityUpsert(ctx, op);
       case 'entity.remove':
@@ -1054,6 +1081,38 @@ export class ProposalApplyService {
     await markDescendantDraftsStale(ctx.tx, ctx.projectId, op.chapter, `ancestor chapter ${op.chapter} was removed`);
     await revokeProvisionalReveals(ctx.tx, ctx.projectId, op.chapter);
     ctx.applied.push({ artifactRef: `draft:${op.chapter}`, newRevision: null });
+  }
+
+  private async captureAndApply(ctx: ApplyContext, op: ContentOp): Promise<ContentOp | null> {
+    const inverse = await this.captureInverse(ctx, op);
+    await this.applyOp(ctx, op);
+    return inverse;
+  }
+
+  /**
+   * A chapter's selected rewrites, written through the hand-save path as one `passage_rewritten` revision under the draft's row lock, each where
+   * its passage stands now. Refused naming the rewrite whose passage can no longer be found (`RFN_021`), when two of them change the same words, and
+   * on a final, isolated or being-written draft. Returns the inverse, read from the locked row: an autosave committed before the lock is part of
+   * what the rewrite applied onto, so a revert must keep it.
+   */
+  private async applyPassageRewrites(ctx: ApplyContext, ops: readonly DraftRewritePassageOp[]): Promise<ContentOp | null> {
+    const [first] = ops;
+    if (!first) return null;
+    const { chapter } = first;
+    const project = await ctx.tx.query.projects.findFirst({ where: eq(schema.projects.id, ctx.projectId) });
+    if (!project) throw AppErrorCode.PRJ_001.create();
+    if (chapter <= (project.storyCurrentChapter ?? 0)) throw AppErrorCode.RFN_010.create();
+
+    const tx = ctx.tx as unknown as PrimaryTransaction;
+    const current = await lockDraft(tx, ctx.projectId, chapter);
+    if (current.status === 'final') throw AppErrorCode.RFN_010.create();
+    if (current.isolated) throw AppErrorCode.RFN_012.create();
+    const inverse = draftRestoreOp(current);
+    const body = rewrittenBody(current, ops);
+    const saved = await saveHandWrittenDraft(tx, { projectId: ctx.projectId, chapter, source: 'passage_rewritten', base: baseOfDraft(current), fields: { body } });
+    const written = await holdNewLeaks(tx, saved, ops);
+    ctx.applied.push({ artifactRef: `draft:${chapter}`, newRevision: written.revision, newSaveSeq: written.saveSeq, newDraftId: written.id });
+    return inverse;
   }
 
   private async applyEntityUpsert(ctx: ApplyContext, op: EntityRestoreOp): Promise<void> {

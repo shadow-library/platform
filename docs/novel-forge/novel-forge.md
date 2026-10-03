@@ -125,6 +125,18 @@
   counted by blank lines, range, quote, comment, each part on its own lines and never escaped, so the hard line reads them as written), byte-identical in that turn's
   prompt and in every later turn's history. A comment is the author's own words for the quote rule and planning; the quoted chapter text never is. An isolated chapter's
   passage is refused on every route (`CHT_011`), as the read policy keeps its prose from every chat call.
+- **A passage comment is answered with a passage rewrite**: with Edit prose on, the chat answers each comment with `draft.rewrite_passage` — the chapter,
+  the exact words to replace and their replacement, never offsets. Staging finds those words in the draft as it stands: once, or once within the
+  comment they answer (only while that comment still describes the draft). A rewrite it cannot place — words not found or still ambiguous, a final,
+  isolated or being-written chapter, a chapter the same reply rewrites whole, or no change — is left out with a line in the reply saying why, never
+  placed by a guess. The card stores the anchor staging found (draft, revision, save sequence, offsets, hash, paragraph and the text either side);
+  it is always a card the author applies passage by passage. An edit elsewhere in the chapter leaves it standing: applying finds each passage
+  again as the Chapters page's suggestions are found — in place, or moved when it and its surroundings occur exactly once — and writes every
+  selected rewrite of a chapter as one `passage_rewritten` revision through the hand-save path. A passage edited in or around, no longer told
+  apart, or in a replaced draft refuses the apply naming that rewrite (`RFN_021`), leaving the card to apply without it; two selected rewrites
+  of the same words are refused (`RFN_020`). One that brings in a locked secret its passage did not already give away holds the draft as a
+  contradiction. A new card replaces a chat's earlier rewrite card of the same chapter only when their passages overlap or the earlier one no
+  longer stands, or either rewrites the chapter whole. Reverting the card writes the body back as the apply found it.
 - **The changes panel** lists a turn's or a job's Story Bible changes (each applied value beside its quote, ideas flagged, each undone and redone on its own) and the
   sources it read; an action the turn runs is never counted or listed as a Story Bible change — its job reports itself; the turn's progress lives only on its last line in
   the thread. It opens by itself only when a turn or a job leaves changes waiting for the author's OK, and otherwise only from the
@@ -193,7 +205,7 @@
   apply: the applied side stays content-only, the reply carries no card and no receipt, and only the job's progress row and its result receipt show under it. The job only
   stages a proposal for review, and nothing claims it can be undone. A model-proposed organise on any other turn, Ask first, Just discuss, a turn warning other than a
   planner-only read, and anything that would refuse the job (another authoring job running, a pending organise card, notes too short) keep it a card, the reply saying why.
-- Plan edits stay plan edits: a chat turn MUST NEVER rewrite prose (`draft.update`, `draft.remove`, `action.revise_draft`) unless the author turned on Edit prose for that turn;
+- Plan edits stay plan edits: a chat turn MUST NEVER rewrite prose (`draft.update`, `draft.remove`, `draft.rewrite_passage`, `action.revise_draft`) unless the author turned on Edit prose for that turn;
   the toggle is the only permission, and only the latest non-final draft may be revised. A prose op without it costs the model one repair and is then withheld with a note,
   together with the judging, approval or finalize that depended on it.
 - To remove something, an AI edit deletes it; it MUST NEVER write the absence ("no X", "without X") unless the author asked for that rule, because a named idea re-primes every

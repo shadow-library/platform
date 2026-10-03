@@ -9,3 +9,4 @@ export * from './negation-echo';
 export * from './prose-intent';
 export * from './proposal-warnings';
 export * from './passage-context';
+export * from './passage-rewrite';

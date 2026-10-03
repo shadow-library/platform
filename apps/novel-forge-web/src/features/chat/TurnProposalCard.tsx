@@ -8,9 +8,9 @@ import { ChangeOpBody, PluginSourceChip } from '@/features/proposals';
 import { type ApplyProposalResponse, type ProposalResponse, useApplyProposalMutation, useDiscardProposalMutation, useRevertProposalMutation } from '@/lib/apis';
 import { auditApplyIndexes } from '@/lib/bible-audit';
 import { appliedBriefChapters } from '@/lib/chapter-brief';
-import { defaultDeclined, isGuardedOp, NEVER_AUTO_NOTE } from '@/lib/proposals';
+import { type ChangeOp, defaultDeclined, isGuardedOp, NEVER_AUTO_NOTE } from '@/lib/proposals';
 
-import { finalizeReviewBlocked, finalizeReviewChapter, opSubject } from './chat-view';
+import { finalizeReviewBlocked, finalizeReviewChapter, isPassageRewrite, opSubject, passageDiffView, turnCardTitle } from './chat-view';
 import styles from './Chat.module.css';
 import { useAuditSkippedOps } from './use-suggestion-answering';
 
@@ -30,6 +30,25 @@ export interface TurnProposalCardProps {
 interface FinalizeRefusal {
   /** The chapter the action named; absent when the server picked one on its own and the client has no way to know which. */
   chapter?: number;
+}
+
+/** A passage rewrite as a diff: the chapter's words it takes out, then the words it puts in. */
+function PassageDiff({ op }: { op: ChangeOp }): React.JSX.Element {
+  const { removed, added } = passageDiffView(op);
+  return (
+    <div className={styles.passageDiff}>
+      <del className={styles.passageRemoved}>
+        <span aria-hidden="true">− </span>
+        {removed}
+      </del>
+      {added && (
+        <ins className={styles.passageAdded}>
+          <span aria-hidden="true">+ </span>
+          {added}
+        </ins>
+      )}
+    </div>
+  );
 }
 
 /** The explicit per-op card for what is answered in the thread rather than the panel: actions, one-way doors, prose and plan edits. */
@@ -92,9 +111,7 @@ export function TurnProposalCard({ novelId, proposal, onApplied }: TurnProposalC
     <div className={styles.turnCard} data-status={proposal.status}>
       <div className={styles.cardHead}>
         <ProposalsIcon size={14} />
-        <span className={styles.cardTitle}>
-          {proposal.changeSet.length} change{proposal.changeSet.length === 1 ? '' : 's'}
-        </span>
+        <span className={styles.cardTitle}>{turnCardTitle(proposal.changeSet)}</span>
         <StatusChip intent={proposal.status === 'applied' ? 'success' : proposal.status === 'pending' ? 'warning' : proposal.status === 'conflicted' ? 'danger' : 'neutral'}>
           {proposal.status}
         </StatusChip>
@@ -106,13 +123,15 @@ export function TurnProposalCard({ novelId, proposal, onApplied }: TurnProposalC
         {proposal.changeSet.map((op, i) => {
           const result = opResults.find(r => r.index === i);
           const isAction = String(op.op).startsWith('action.');
+          const rewrite = isPassageRewrite(op);
+          const open = rewrite ? !expanded.has(i) : expanded.has(i);
           return (
             <div key={i} className={styles.turnOp} data-declined={isDeclined(i)}>
               <div className={styles.turnOpRow}>
                 {isPending && (
                   <Checkbox checked={!isDeclined(i)} disabled={skipped.has(i)} onCheckedChange={() => toggle(declined, i, setDeclined)} aria-label={`include ${opSubject(op)}`} />
                 )}
-                <button type="button" className={styles.turnOpLabel} aria-expanded={expanded.has(i)} onClick={() => toggle(expanded, i, setExpanded)}>
+                <button type="button" className={styles.turnOpLabel} aria-expanded={open} onClick={() => toggle(expanded, i, setExpanded)}>
                   {opSubject(op)}
                 </button>
                 {isAction && <StatusChip intent="info">action</StatusChip>}
@@ -123,7 +142,7 @@ export function TurnProposalCard({ novelId, proposal, onApplied }: TurnProposalC
                 )}
               </div>
               {isPending && isGuardedOp(op) && <div className={styles.turnOpNote}>{NEVER_AUTO_NOTE}</div>}
-              {expanded.has(i) && <ChangeOpBody op={op} />}
+              {open && (rewrite ? <PassageDiff op={op} /> : <ChangeOpBody op={op} />)}
               {result?.error && <div className={styles.turnOpError}>{result.error}</div>}
               {result?.result?.summary !== undefined && <div className={styles.turnOpSummary}>{String(result.result.summary)}</div>}
             </div>
