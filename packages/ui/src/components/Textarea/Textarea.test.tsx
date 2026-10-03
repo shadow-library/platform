@@ -59,6 +59,15 @@ describe('Textarea', () => {
     expect(screen.getByRole('textbox')).toHaveAttribute('data-autogrow', 'false');
   });
 
+  it('measures auto-grow on a twin kept out of focus and the accessibility tree', () => {
+    const { container, rerender } = render(<Textarea aria-label="Notes" />);
+    const twin = container.querySelector('textarea[aria-hidden]');
+    expect(screen.getAllByRole('textbox')).toHaveLength(1);
+    expect(twin).toHaveAttribute('tabindex', '-1');
+    rerender(<Textarea aria-label="Notes" autoGrow={false} />);
+    expect(container.querySelector('textarea[aria-hidden]')).toBeNull();
+  });
+
   it('hides the counter until 80% of the limit, then flags the limit', () => {
     const { rerender } = render(<Textarea aria-label="Bio" showCount maxLength={10} value="1234" onValueChange={() => {}} />);
     const counter = screen.getByText('4 / 10');

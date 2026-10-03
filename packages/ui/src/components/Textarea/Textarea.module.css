@@ -8,6 +8,7 @@
   /* No `width: 100%`: this block-level box already fills a block or grid parent, and declaring the
      width would also make it the flex base size, starving any flex row it sits in. See Input's `.root`. */
   display: block;
+  position: relative;
 }
 
 .field {
@@ -83,6 +84,18 @@
   border-radius: 0;
   background: transparent;
   box-shadow: none;
+}
+
+/* The auto-grow measuring copy: the field's box and type at zero height, so its scrollHeight is the content's alone. */
+.field.twin {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 0;
+  min-height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
 }
 
 /* ── Character counter (below-right, quiet until the last 20%) */

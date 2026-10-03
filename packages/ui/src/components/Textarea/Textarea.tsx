@@ -16,7 +16,7 @@ import { type TextareaProps } from './Textarea.types';
  */
 
 /** Clamp the element's height to its content between minRows and maxRows, toggling internal scroll. */
-function fitToContent(el: HTMLTextAreaElement, minRows: number, maxRows: number): void {
+function fitToContent(el: HTMLTextAreaElement, twin: HTMLTextAreaElement, minRows: number, maxRows: number): void {
   const style = getComputedStyle(el);
   const lineHeight = Number.parseFloat(style.lineHeight) || 20;
   const verticalPadding = Number.parseFloat(style.paddingTop) + Number.parseFloat(style.paddingBottom);
@@ -24,8 +24,10 @@ function fitToContent(el: HTMLTextAreaElement, minRows: number, maxRows: number)
   const minHeight = lineHeight * minRows + verticalPadding + verticalBorder;
   const maxHeight = lineHeight * maxRows + verticalPadding + verticalBorder;
 
-  el.style.height = 'auto';
-  const contentHeight = el.scrollHeight + verticalBorder;
+  // Measured on the twin: collapsing the field itself to `height: auto` shrinks its ancestors for one forced layout, and a scroller
+  // resting at its end clamps its scrollTop then and never gets it back in WebKit, which has no scroll anchoring.
+  twin.value = el.value;
+  const contentHeight = twin.scrollHeight + verticalBorder;
   const height = Math.min(Math.max(contentHeight, minHeight), maxHeight);
   el.style.height = `${height}px`;
   el.style.overflowY = contentHeight > maxHeight ? 'auto' : 'hidden';
@@ -59,6 +61,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function 
   ref,
 ) {
   const fieldRef = useRef<HTMLTextAreaElement>(null);
+  const twinRef = useRef<HTMLTextAreaElement>(null);
   const counterId = useId();
   const isControlled = value !== undefined;
   const [uncontrolledValue, setUncontrolledValue] = useState(() => (defaultValue != null ? String(defaultValue) : ''));
@@ -66,7 +69,8 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function 
 
   const resize = useCallback(() => {
     const el = fieldRef.current;
-    if (el && autoGrow) fitToContent(el, minRows, maxRows);
+    const twin = twinRef.current;
+    if (el && twin && autoGrow) fitToContent(el, twin, minRows, maxRows);
   }, [autoGrow, minRows, maxRows]);
 
   // Re-fit whenever the value or bounds change (covers controlled updates and programmatic resets).
@@ -104,6 +108,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function 
         aria-describedby={describedBy}
         {...props}
       />
+      {autoGrow && <textarea ref={twinRef} className={cn(styles.field, styles.twin)} data-size={size} data-variant={variant} rows={1} tabIndex={-1} aria-hidden />}
       {hasCounter ? (
         <div className={styles.counter} id={counterId} data-visible={nearLimit ? 'true' : undefined} data-state={atLimit ? 'limit' : undefined}>
           {length} / {maxLength}
