@@ -90,6 +90,11 @@
   width: 560px;
 }
 
+.body[data-sticky-aside] .aside {
+  position: sticky;
+  top: 24px;
+}
+
 .prose {
   max-width: 660px;
   font-size: var(--sh-text-body);
@@ -118,5 +123,9 @@
   .aside {
     width: auto;
     margin-top: 32px;
+  }
+
+  .body[data-sticky-aside] .aside {
+    position: static;
   }
 }

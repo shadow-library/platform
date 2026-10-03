@@ -21,10 +21,12 @@ export interface DetailPageProps {
   /** Accessible name for the `aside` region. */
   asideLabel?: string;
   asideWidth?: DetailAsideWidth;
+  /** Keeps the aside in view while a long body scrolls — for decisions taken after reading it all. */
+  stickyAside?: boolean;
   children: ReactNode;
 }
 
-function DetailPageRoot({ back, identity, pager, actions, aside, asideLabel = 'Details', asideWidth = 'summary', children }: DetailPageProps): ReactElement {
+function DetailPageRoot({ back, identity, pager, actions, aside, asideLabel = 'Details', asideWidth = 'summary', stickyAside = false, children }: DetailPageProps): ReactElement {
   return (
     <div className={styles.root}>
       <div className={styles.header}>
@@ -40,7 +42,7 @@ function DetailPageRoot({ back, identity, pager, actions, aside, asideLabel = 'D
         {actions && <div className={styles.actions}>{actions}</div>}
       </div>
 
-      <div className={styles.body} data-aside={asideWidth}>
+      <div className={styles.body} data-aside={asideWidth} data-sticky-aside={stickyAside || undefined}>
         <div className={styles.main}>{children}</div>
         {aside && (
           <aside className={styles.aside} aria-label={asideLabel}>

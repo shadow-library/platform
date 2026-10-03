@@ -218,7 +218,7 @@ function ReviewDetail({ novelId, draft, total, ids, jump, onSelect }: ReviewDeta
     return () => window.removeEventListener('keydown', onKey);
   });
 
-  const excerpt = draft.body ?? draft.summary ?? 'No prose available for this draft yet.';
+  const prose = draft.body ?? draft.summary ?? 'No prose available for this draft yet.';
 
   return (
     <>
@@ -244,6 +244,7 @@ function ReviewDetail({ novelId, draft, total, ids, jump, onSelect }: ReviewDeta
           </Button>
         }
         asideLabel={`Chapter ${draft.chapter} review decision`}
+        stickyAside
         aside={
           <>
             <section className={styles.verdict} data-contradiction={isContradiction}>
@@ -273,11 +274,8 @@ function ReviewDetail({ novelId, draft, total, ids, jump, onSelect }: ReviewDeta
           </>
         }
       >
-        <div className={`nf-eyebrow ${styles.excerptLabel}`}>Draft excerpt · {wordCount(draft.body).toLocaleString()} words</div>
-        <DetailPage.Prose className={styles.excerpt}>
-          {excerpt.slice(0, 900)}
-          {excerpt.length > 900 ? '…' : ''}
-        </DetailPage.Prose>
+        <div className={`nf-eyebrow ${styles.draftLabel}`}>Draft · {wordCount(draft.body).toLocaleString()} words</div>
+        <DetailPage.Prose className={styles.draft}>{prose}</DetailPage.Prose>
       </DetailPage>
 
       {overrideConfirm.dialog}
