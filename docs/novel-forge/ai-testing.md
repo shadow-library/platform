@@ -250,7 +250,7 @@ key upper-snaked (`ai.openrouter.api.key` → `AI_OPENROUTER_API_KEY`). The rows
 | Env var                       | Default                                          | Declared                                    | What it changes                                                                                                                                    |
 | ----------------------------- | ------------------------------------------------ | ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `NODE_ENV`                    | `development`                                    | `config.service.ts:96`                      | the real dev switch: gates OpenAPI, the health port, and the `LOG_LEVEL` default                                                                   |
-| `APP_STAGE`                   | `prod`                                           | `packages/common/.../config.service.ts:105` | changes nothing here — its only reader is `Config.isProductionDeployment()` (`:333-334`), which no `novel-forge-server` or `packages/*` path calls |
+| `APP_STAGE`                   | `prod`                                           | `packages/common/.../config.service.ts:105` | the first part of the chat's gateway session key (`modules/ai/gateway-session.ts`), so dev and prod conversations stay apart on the host's gateway |
 | `LOG_LEVEL`                   | `debug` when `NODE_ENV=development`, else `info` | `config.service.ts:107`                     | **keep it `debug`** — the full prompt input and raw output only ride on debug (§7)                                                                 |
 | `SERVER_PORT` / `SERVER_HOST` | `8080` / `0.0.0.0`                               | `bootstrap.ts:40-41`                        |                                                                                                                                                    |
 | `DATABASE_POSTGRES_URL`       | `…@localhost:7070/novel_forge` in the example    | `.env.example:14`                           | pgvector required; `src/migrate.ts:15` falls back to the same DSN without the port                                                                 |
@@ -2155,3 +2155,20 @@ them off `model_calls` rather than trusting a number here. Cost and admin inspec
 - **Chat lookups:** ask "what did chapter 3 cost?" and "what did the checks find in chapter 3?". The run's
   `tool_calls` show `get_usage` (no prompt or answer content) and `get_review`; on an isolated chapter `get_review`
   returns findings without their evidence.
+
+### 13. The chat's gateway session (prompt caching)
+
+- **Precondition:** the server points `AI_OPENROUTER_API_URL` at the AI gateway and the chat runs a Claude model in standard mode. The gateway's
+  own web tools do not matter: a web-tools turn is keyed like any other.
+- **Entry:** one chat, four or five short turns in a row, one of which needs a lookup ("what do my notes say about …") and one a web search.
+- **Verify** in Loki (`shadow-logs-dev` / `shadow-logs-prod`), reading only the session and token fields — never `prompt` or `answer`, which hold the
+  author's content:
+  `{environment="host",app="gateway",component="requests"} | json | kind="metrics" | session!="none" | line_format "{{.session}} {{.session_key}} {{.cached_tokens}} {{.cache_write_tokens}} {{.input_tokens}}"`
+  - The chat's first call is `new`; every later call of the chat, a turn's lookup rounds included, is `resumed` under the same `session_key`, with
+    `cached_tokens` covering nearly all of `input_tokens`.
+  - A compaction (past twelve messages or the history budget) shows one `reset:history-diverged`, then `resumed` again. Switching the chat to another vendor's model or to
+    Unrestricted shows `session="none"` on those turns, and the first Claude turn after them is `reset:history-diverged`.
+  - Compaction, the chat title and every job show `session="none"` (and no `session_key`), so the query above leaves them out.
+  - `chat_messages.exchange` is set on each keyed reply; only the turn that opened a segment carries `opening`.
+- **Fails when:** a turn on an unchanged chat shows `reset:system-changed` (something per-turn reached the system prompt) or
+  `reset:history-diverged` without a compaction or a model or mode switch (a replayed message differs from what was sent).

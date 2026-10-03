@@ -78,6 +78,13 @@
       "when": 1791056155081,
       "tag": "0010_dismiss_open_passage_suggestions",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1791059499595,
+      "tag": "0011_chat_message_exchange",
+      "breakpoints": true
     }
   ]
 }

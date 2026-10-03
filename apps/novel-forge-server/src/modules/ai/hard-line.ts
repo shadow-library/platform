@@ -157,6 +157,7 @@ const BACKGROUND_INPUTS: Readonly<Record<string, string>> = {
   milestones: 'The story context',
   task: 'The story context',
   history: 'The earlier conversation',
+  rounds: 'The earlier conversation',
   transcript: 'The earlier conversation',
   priorSummary: 'The earlier conversation',
   prose: 'The chapter text',

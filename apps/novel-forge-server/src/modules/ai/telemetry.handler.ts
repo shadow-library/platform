@@ -26,6 +26,10 @@ export interface TelemetryContext {
   chapter?: number;
   /** Asks the AI gateway to run this call with the model's own web search, where it serves the model on a CLI that has one. */
   webTools?: boolean;
+  /** The conversation this call continues, sent as `x-gateway-session` wherever the gateway keeps a session for the call's model. */
+  gatewaySession?: string;
+  /** Fired before a repair re-ask with the rejected reply and the request that follows it, the two messages the re-ask adds to the conversation. */
+  onRepair?: (reply: string, request: string) => void;
   /**
    * Fired once, synchronously, with the exact messages `buildMessages` produced for this call and the provider/model it
    * resolved to — before the request is sent. Only a writer-attempt call site sets it, to snapshot what the router received

@@ -107,8 +107,10 @@ export function renderPluginSection(title: string, content: string): string {
   return `## ${title.toUpperCase()}\n\n${content}`;
 }
 
+export const SECTION_SEPARATOR = '\n\n---\n\n';
+
 export function joinSections(sections: ContextSection[]): string {
-  return sections.map(s => s.rendered).join('\n\n---\n\n');
+  return sections.map(s => s.rendered).join(SECTION_SEPARATOR);
 }
 
 /** Re-derives the stable/volatile split from a persisted pack's sections, for callers that reload a pack by id. */

@@ -78,6 +78,20 @@
   (an isolated chapter only as its bridge), the next chapter's plan, what waits on the author (a count of pending cards, and by chapter the Story Bible additions and
   finalize reviews, each with the action that settles it), a compaction summary and recent messages. The stable sections get a fixed reservation so the cached prefix stays byte-identical across a session; the handoff is always kept, so a request near the
   history ceiling can run past the budget. The author's own words render before, and outrank, any AI summary.
+- **The chat's prompt only grows at its end while the AI gateway keeps a session for it**, so the gateway resumes one Claude session per chat and the
+  earlier turns are a cached prefix. That holds for a standard turn on a Claude model the gateway runs on its CLI, with or without its own web
+  tools (never with tools bound by the caller); only then do the turn's calls send `X-Gateway-Session: <app stage>:<projectId>:<chatSessionId>`, and no other call (compaction, titles, jobs) ever does.
+  The system prompt carries the reply's JSON schema on these calls (every other call still ends with it) and nothing per turn; lookup results, the
+  negation fix and the router's repair re-asks follow the turn's own message; and every call — the next turn's first included — repeats what the call
+  before sent, then its reply, then only new messages. When the turn keeps a reply other than the last call's (a negation fix answered with lookups),
+  the next turn continues from the kept one and the gateway starts over once. Earlier lookup results stay in the conversation, and the model is told
+  they show the story as it stood when fetched.
+  The stable context is the one the conversation segment opened with: a later turn's message carries only the context sections, stable or volatile,
+  that changed since the conversation last received them, each replacing its earlier version, or says nothing changed; a held section the budget
+  leaves out is flagged as possibly out of date and sent whole when it returns. Each reply stores what its turn sent (`chat_messages.exchange`, never
+  sent to the client) for the next turn to repeat; a compaction clears the chat's exchanges, since none can be replayed after it. A new segment, and with it a fresh gateway session,
+  starts after a compaction, when the playbook changes, after a turn the gateway kept no session for (another vendor's model, or unrestricted),
+  and once a segment's replayed history passes 24,000 tokens. Any other turn sends the plain window: the summary, then each message as stored.
 - Detail comes through declared lookups (never native tool binding): Story Bible pages, entities, canon facts, threads and promises, chapter summaries, a plan, a draft, a
   character timeline, a volume, lore and prose search, the author's notes, usage and a chapter's reviews. A turn that reads the notes or a planner-only page holds for review
   every change the chapter writer or a reader can see; only planner-side records (milestones) still apply (see the write policy).

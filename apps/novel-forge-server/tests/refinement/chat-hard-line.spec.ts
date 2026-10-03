@@ -149,7 +149,8 @@ describe('ChatCompactionService.compactIfNeeded under the hard line', () => {
     expect(runId).toBe('run-c');
     expect(run.transcripts[0]).not.toContain(PROBE);
     expect(run.transcripts[0]).toContain('Message 2.');
-    expect(run.updates).toHaveLength(1);
+    expect(run.updates).toHaveLength(2);
+    expect(run.updates[1]).toEqual({ exchange: null });
   });
 
   it('should skip a fold the hard line refuses rather than fail the turn', async () => {

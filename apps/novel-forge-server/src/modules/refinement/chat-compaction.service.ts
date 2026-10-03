@@ -1,5 +1,5 @@
 import { AIMessage, type BaseMessage, HumanMessage } from '@langchain/core/messages';
-import { and, asc, desc, eq, gt, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, isNotNull, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
@@ -18,6 +18,7 @@ import { resolveUnrestrictedRoute } from '../ai/unrestricted-route';
 import { PluginPolicyService } from '../plugins/plugin-policy.service';
 import { type ChatSelection, loadTurnSelections } from './chat-selection';
 import { renderQuestionForHistory } from './chat-question';
+import { type ChatSegment, heldSegment, replayWindow } from './chat-exchange';
 import { renderTurnContent, turnScreens } from './passage-context';
 
 // Compaction thresholds: fold history once the verbatim window outgrows its token
@@ -27,8 +28,28 @@ const MAX_VERBATIM_TURNS = 12;
 const KEEP_VERBATIM_TURNS = 6;
 const CHAT_COMPACT_GRAPH = 'chat-compact';
 
+// A segment replays every context update and lookup result since it opened; past this it starts over from the plain window instead.
+const MAX_SEGMENT_TOKENS = 24_000;
+
 export const UNRESTRICTED_REPLY_PLACEHOLDER = '[reply written with the unrestricted model — omitted]';
 export const UNRESTRICTED_SUMMARY_PLACEHOLDER = '[earlier conversation summarised with the unrestricted model — omitted]';
+
+export interface ChatConversation {
+  /** The summary and each stored message as written, whatever the turn sends: what the history budget and the turn's web links read. */
+  plain: BaseMessage[];
+  history: BaseMessage[];
+  segment: ChatSegment | null;
+}
+
+interface ChatWindow {
+  rows: Refinement.ChatMessage[];
+  opening: BaseMessage[];
+  render: (message: Refinement.ChatMessage) => BaseMessage[];
+}
+
+function countMessageTokens(messages: readonly BaseMessage[]): number {
+  return messages.reduce((sum, message) => sum + countTokens(typeof message.content === 'string' ? message.content : JSON.stringify(message.content)), 0);
+}
 
 /** The conversation window every chat-shaped turn pipeline shares: the rolling summary, the watermark that moves it, and the prompt messages read back off it. */
 @Injectable()
@@ -50,31 +71,44 @@ export class ChatCompactionService {
    * replies and a summary it produced are replaced by placeholders, while the author's own messages stay.
    */
   async buildHistory(session: Refinement.ChatSession, project: ProjectConfig | undefined, turnMode: Project.ContentMode): Promise<BaseMessage[]> {
-    const verbatim = await this.verbatimWindow(session);
+    const window = await this.window(session, project, turnMode);
+    return [...window.opening, ...window.rows.flatMap(window.render)];
+  }
+
+  /**
+   * A standard turn's history when the gateway keeps a session for it: the open segment's turns exactly as they were sent, so the request only
+   * appends to the one before. With no segment to continue — a compaction since, another playbook, a reply the gateway kept no session for, or
+   * a segment grown past its budget — the history is the plain window and this turn opens a new segment.
+   */
+  async continueConversation(session: Refinement.ChatSession, project: ProjectConfig | undefined, playbook: string): Promise<ChatConversation> {
+    const window = await this.window(session, project, 'standard');
+    const plain = [...window.opening, ...window.rows.flatMap(window.render)];
+    const segment = heldSegment(window.rows, session.summaryThroughOrdinal, playbook);
+    if (!segment) return { plain, history: plain, segment: null };
+    const history = [...window.opening, ...replayWindow(window.rows, segment.id, window.render)];
+    if (countMessageTokens(history) > MAX_SEGMENT_TOKENS) return { plain, history: plain, segment: null };
+    return { plain, history, segment };
+  }
+
+  private async window(session: Refinement.ChatSession, project: ProjectConfig | undefined, turnMode: Project.ContentMode): Promise<ChatWindow> {
+    const rows = await this.verbatimWindow(session);
     const fallback = modeOf(project?.contentMode);
     const standard = turnMode === 'standard';
-    const unrestricted = standard ? await this.unrestrictedReplies(verbatim, fallback) : new Set<bigint>();
+    const unrestricted = standard ? await this.unrestrictedReplies(rows, fallback) : new Set<bigint>();
     const hideSummary = standard && session.summary !== null && (await this.summaryMode(session, fallback)) === 'unrestricted';
 
-    const history: BaseMessage[] = [];
+    const opening: BaseMessage[] = [];
     if (session.summary) {
       const summary = hideSummary ? UNRESTRICTED_SUMMARY_PLACEHOLDER : session.summary;
-      history.push(new HumanMessage(`Conversation so far (compacted summary):\n${summary}`));
+      opening.push(new HumanMessage(`Conversation so far (compacted summary):\n${summary}`));
     }
-    for (const message of verbatim) {
-      if (message.role !== 'assistant') {
-        if (!standard && refusesAuthored(message)) continue;
-        history.push(new HumanMessage(renderTurnContent(message.content, message.contexts)));
-        continue;
-      }
-      if (unrestricted.has(message.id)) {
-        history.push(new AIMessage(UNRESTRICTED_REPLY_PLACEHOLDER));
-        continue;
-      }
+    const render = (message: Refinement.ChatMessage): BaseMessage[] => {
+      if (message.role !== 'assistant') return !standard && refusesAuthored(message) ? [] : [new HumanMessage(renderTurnContent(message.content, message.contexts))];
+      if (unrestricted.has(message.id)) return [new AIMessage(UNRESTRICTED_REPLY_PLACEHOLDER)];
       const askedLine = renderQuestionForHistory(message.question);
-      history.push(new AIMessage(askedLine ? `${message.content}\n\n${askedLine}` : message.content));
-    }
-    return history;
+      return [new AIMessage(askedLine ? `${message.content}\n\n${askedLine}` : message.content)];
+    };
+    return { rows, opening, render };
   }
 
   /**
@@ -140,6 +174,11 @@ export class ChatCompactionService {
     const { runId: compactionRunId, result: summary } = compacted;
 
     await this.db.update(schema.chatSessions).set({ summary, summaryThroughOrdinal: watermark, updatedAt: new Date() }).where(eq(schema.chatSessions.id, session.id));
+    // Every segment opened before this fold is over, so no exchange in the chat can be replayed again.
+    await this.db
+      .update(schema.chatMessages)
+      .set({ exchange: null })
+      .where(and(eq(schema.chatMessages.sessionId, session.id), isNotNull(schema.chatMessages.exchange)));
     session.summary = summary;
     session.summaryThroughOrdinal = watermark;
     this.logger.debug(`compacted session ${session.id} through ordinal ${watermark}`, { contentMode });

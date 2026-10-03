@@ -194,7 +194,7 @@ interface Turn {
 
 function chat({ outputs, failTraceUpdate = false, tools = [getNotes], webResearch = { modeFor: async () => 'off' } }: Turn) {
   const updates: Record<string, unknown>[] = [];
-  const inputs: { history: { content: unknown }[] }[] = [];
+  const inputs: { rounds: { content: unknown }[] }[] = [];
   const contexts: { webTools?: boolean }[] = [];
   const pending = [...outputs];
   const db = {
@@ -217,7 +217,7 @@ function chat({ outputs, failTraceUpdate = false, tools = [getNotes], webResearc
   };
   const modelRouter = {
     routeModel: () => ({ resolved: { provider: 'p', model: 'm' }, source: 'tier', costTier: 'balanced', contentMode: 'standard' }),
-    structured: async (_prompt: unknown, input: { history: { content: unknown }[] }, ctx: { webTools?: boolean }) => {
+    structured: async (_prompt: unknown, input: { rounds: { content: unknown }[] }, ctx: { webTools?: boolean }) => {
       inputs.push(input);
       contexts.push(ctx);
       return pending.shift();
@@ -331,7 +331,7 @@ describe('ChatService.turn — web lookups', () => {
 
     expect(authorTexts).toEqual([['Look at https://example.com/hatchet']]);
     expect(run.contexts.every(ctx => ctx.webTools === false)).toBe(true);
-    expect(String(run.inputs[1]?.history.at(-1)?.content)).toContain('error: That page was not fetched: only a page this turn’s search returned');
+    expect(String(run.inputs[1]?.rounds.at(-1)?.content)).toContain('error: That page was not fetched: only a page this turn’s search returned');
   });
 
   it('should not open Brave lookups for a turn whose model searches the web itself', async () => {

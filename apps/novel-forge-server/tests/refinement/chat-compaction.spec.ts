@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
+import { schema } from '@server/database';
+
 import { COST_TIER_DEFAULTS } from '@modules/ai/defaults';
 import { type ProjectConfig } from '@modules/ai/model-router.service';
 import { ChatCompactionService, UNRESTRICTED_REPLY_PLACEHOLDER, UNRESTRICTED_SUMMARY_PLACEHOLDER } from '@modules/refinement/chat-compaction.service';
@@ -24,6 +26,7 @@ function fakeCompaction(scenario: Scenario = {}) {
   const turnModes = scenario.turnModes ?? {};
   const runs: unknown[] = [];
   const calls: { project: ProjectConfig; policy: unknown }[] = [];
+  const updates: { table: unknown; values: Record<string, unknown> }[] = [];
   const db = {
     query: { chatMessages: { findMany: async () => messages } },
     select: (columns: Record<string, unknown>) => ({
@@ -36,7 +39,7 @@ function fakeCompaction(scenario: Scenario = {}) {
         },
       }),
     }),
-    update: () => ({ set: () => ({ where: async () => undefined }) }),
+    update: (table: unknown) => ({ set: (values: Record<string, unknown>) => ({ where: async () => void updates.push({ table, values }) }) }),
   };
   const workflowRunService = {
     runChain: async (_projectId: bigint, graph: string, _target: string, input: unknown, fn: (runId: string) => Promise<unknown>) => {
@@ -54,7 +57,7 @@ function fakeCompaction(scenario: Scenario = {}) {
   const pluginPolicy = { resolve: async () => ({ writerClass: 'permissive' }) };
   const service = new ChatCompactionService({ getPostgresClient: () => db } as never, modelRouter as never, workflowRunService as never, pluginPolicy as never);
   const session = { id: 'session-1', summary: scenario.summary ?? null, summaryThroughOrdinal: 0, contentMode: scenario.sessionMode ?? null, costTier: null } as never;
-  return { service, session, runs, calls };
+  return { service, session, runs, calls, updates };
 }
 
 const standardTurn: ChatSelection = { contentMode: 'standard', costTier: 'economy' };
@@ -68,6 +71,22 @@ describe('ChatCompactionService.compactIfNeeded', () => {
 
     expect(runs).toEqual([{ graph: 'chat-compact', input: { watermark: 2, contentMode: 'standard' } }]);
     expect(calls[0]).toMatchObject({ project: { contentMode: 'standard', costTier: 'economy' }, policy: undefined });
+  });
+
+  it('should clear the chat’s exchanges once it folds, since no segment opened before the fold can be replayed', async () => {
+    const { service, session, updates } = fakeCompaction({ turnModes: { t1: 'standard' } });
+
+    await service.compactIfNeeded(1n, session, 0, standardNovel, standardTurn);
+
+    expect(updates.filter(update => update.table === schema.chatMessages).map(update => update.values)).toEqual([{ exchange: null }]);
+  });
+
+  it('should keep the exchanges when nothing needs folding', async () => {
+    const { service, session, updates } = fakeCompaction({ turnModes: { t1: 'standard' } });
+
+    await service.compactIfNeeded(1n, session, 1_000_000, standardNovel, standardTurn);
+
+    expect(updates).toEqual([]);
   });
 
   it.each([

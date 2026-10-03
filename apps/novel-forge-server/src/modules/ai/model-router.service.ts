@@ -15,6 +15,7 @@ import { type PrimaryDatabase, type Project, schema } from '@server/database';
 
 import { type ForgeCallPolicy } from '../plugins/plugin-policy.service';
 import { GatewayChatOpenAI, type RequestGuard } from './gateway-chat-openai';
+import { GATEWAY_SESSION_HEADER, keepsGatewaySession } from './gateway-session';
 import { type AiRole, COST_TIER_DEFAULTS, DEFAULT_COST_TIER, isCostTier, isUnrestrictedAllowed, type ResolvedModel, resolveReasoningEffort, ROLE_GROUP } from './defaults';
 import { AiQuotaService } from './ai-quota.service';
 import { scopedCostTier } from './cost-tier-scope';
@@ -119,13 +120,20 @@ export function supportsPromptCaching(resolved: ResolvedModel): boolean {
   return resolveProvider(resolved) === 'openrouter' && resolved.model.startsWith('anthropic/');
 }
 
+function afterLeadingSystemMessages(messages: BaseMessage[], inserted: BaseMessage[]): BaseMessage[] {
+  let insertAt = 0;
+  while (messages[insertAt]?.getType() === 'system') insertAt++;
+  return [...messages.slice(0, insertAt), ...inserted, ...messages.slice(insertAt)];
+}
+
 // `prompt.contribute`: contributions land directly after the module's own leading system messages and
 // before cache control, so the three Anthropic breakpoints still key on the module's static system message.
 function withPluginSystemMessages(messages: BaseMessage[], policy?: ForgeCallPolicy): BaseMessage[] {
   if (!policy?.systemMessages.length) return messages;
-  let insertAt = 0;
-  while (messages[insertAt]?.getType() === 'system') insertAt++;
-  return [...messages.slice(0, insertAt), ...policy.systemMessages.map(message => new SystemMessage(message.content)), ...messages.slice(insertAt)];
+  return afterLeadingSystemMessages(
+    messages,
+    policy.systemMessages.map(message => new SystemMessage(message.content)),
+  );
 }
 
 function withImageAttached(messages: BaseMessage[], image: string): BaseMessage[] {
@@ -370,7 +378,7 @@ export class ModelRouterService {
   // protocol. The registry's one `ollama` entry is the embedder, which never reaches a chat client.
   buildClient(
     resolved: ResolvedModel,
-    opts?: { role?: AiRole; telemetry?: TelemetryConfig; guard?: RequestGuard; responseSchema?: ResponseSchema; webTools?: boolean },
+    opts?: { role?: AiRole; telemetry?: TelemetryConfig; guard?: RequestGuard; responseSchema?: ResponseSchema; webTools?: boolean; session?: string },
   ): BaseChatModel {
     // Fail-closed backstop: the sink never dispatches a model absent from the registry. An id that is
     // present but explicitly paired with a different provider is left alone — that precedence is by
@@ -392,6 +400,7 @@ export class ModelRouterService {
     // missing-configuration fault surfaces three pointless retries later as a 400 "unparseable response".
     const apiKey = Config.get('ai.openrouter.api.key');
     if (!apiKey) throw AppErrorCode.AI_006.create();
+    const headers = { ...(opts?.webTools ? { [GATEWAY_WEB_TOOLS_HEADER]: 'on' } : {}), ...(opts?.session ? { [GATEWAY_SESSION_HEADER]: opts.session } : {}) };
     // `invokeResilient` owns retries. Left at LangChain's default of 6, each of its attempts became seven
     // with exponential backoff, and a gateway refusing in milliseconds took five minutes to fail a turn.
     // OpenRouter's `usage.cost` is dropped by @langchain/openai's parser; `__includeRawResponse` keeps it on
@@ -402,7 +411,7 @@ export class ModelRouterService {
         model: override || resolved.model,
         apiKey,
         maxRetries: 0,
-        configuration: { baseURL: Config.get('ai.openrouter.api.url'), ...(opts?.webTools ? { defaultHeaders: { [GATEWAY_WEB_TOOLS_HEADER]: 'on' } } : {}) },
+        configuration: { baseURL: Config.get('ai.openrouter.api.url'), ...(Object.keys(headers).length > 0 ? { defaultHeaders: headers } : {}) },
         __includeRawResponse: true,
         ...(Object.keys(modelKwargs).length > 0 ? { modelKwargs } : {}),
         ...opts?.telemetry,
@@ -479,8 +488,15 @@ export class ModelRouterService {
     if (image !== undefined && !MODEL_MAP[resolved.model]?.supportsImageInput) throw AppErrorCode.AI_011.create({ model: resolved.model });
     await this.refuseHardLine(route, [...inputScreens(input), ...pluginScreens(policy)], ctx);
     const responseSchema = this.responseSchemaFor(promptModule);
-    const llm = this.buildClient(resolved, { role, guard: this.hardLineGuard(route), webTools: ctx.webTools === true, ...(responseSchema ? { responseSchema } : {}) });
-    const messages = await this.buildMessages(promptModule, input, resolved, policy, image);
+    const session = ctx.gatewaySession && keepsGatewaySession(resolved.model) ? ctx.gatewaySession : undefined;
+    const llm = this.buildClient(resolved, {
+      role,
+      guard: this.hardLineGuard(route),
+      webTools: ctx.webTools === true,
+      ...(session ? { session } : {}),
+      ...(responseSchema ? { responseSchema } : {}),
+    });
+    const messages = await this.buildMessages(promptModule, input, resolved, { policy, image, schemaInSystem: session !== undefined });
     if (ctx.onMessages) {
       try {
         ctx.onMessages(messages, { provider: resolveProvider(resolved), model: resolved.model });
@@ -555,13 +571,9 @@ export class ModelRouterService {
     else this.logger.warn('Attempt 1 has advisory issues only — repairing once', { ...attempt1Meta, advisory: true });
     this.logger.debug('Attempt 1 raw output', { role, runId: ctx.runId, rawOutput: rawOutput1 });
 
-    const repairMessages: BaseMessage[] = [
-      ...messages,
-      new AIMessage(rawOutput1),
-      new HumanMessage(
-        `That response could not be used. Issues:\n${issues1}\n\nRespond again with ONLY one valid JSON object matching the required schema — fix the listed issues, keep the content, no prose outside the JSON, no markdown fences.`,
-      ),
-    ];
+    const repairRequest = `That response could not be used. Issues:\n${issues1}\n\nRespond again with ONLY one valid JSON object matching the required schema — fix the listed issues, keep the content, no prose outside the JSON, no markdown fences.`;
+    ctx.onRepair?.(rawOutput1, repairRequest);
+    const repairMessages: BaseMessage[] = [...messages, new AIMessage(rawOutput1), new HumanMessage(repairRequest)];
 
     const rawOutput2 = await this.invokeResilient(llm, repairMessages, this.invokeConfig(ctx, route, role, 1, policy), role, runSignal);
     const parsed2 = this.parseOutput(promptModule, tryParseJson(rawOutput2));
@@ -728,25 +740,23 @@ export class ModelRouterService {
   }
 
   // Formats the module's template into messages. Anthropic models get cache_control breakpoints on
-  // cacheStrategy modules, and every call gets the required JSON schema appended in-band — without it
+  // cacheStrategy modules, and every call carries the required JSON schema in-band — without it
   // the creative roles, whose prompts never mention JSON, answer with plain prose. The in-band schema
-  // carries the descriptions and constraints the AJV pass judges the reply against.
+  // carries the descriptions and constraints the AJV pass judges the reply against. It closes the
+  // conversation, except on a call the gateway keeps a session for: there it is a system message, so a
+  // conversation that grows by appending keeps every earlier message where it was.
   private async buildMessages<T>(
     promptModule: PromptModule<T>,
     input: Record<string, unknown>,
     resolved: ResolvedModel,
-    policy?: ForgeCallPolicy,
-    image?: string,
+    { policy, image, schemaInSystem }: { policy?: ForgeCallPolicy; image?: string; schemaInSystem: boolean },
   ): Promise<BaseMessage[]> {
-    let messages = withPluginSystemMessages(await promptModule.template.formatMessages(input), policy);
+    const schemaInstruction = `Respond with ONLY one valid JSON object matching this JSON schema — all prose goes inside the JSON string fields, nothing outside the JSON, no markdown fences:\n${JSON.stringify(toHostedPromptSchema(promptModule.schema))}`;
+    const formatted = await promptModule.template.formatMessages(input);
+    let messages = withPluginSystemMessages(schemaInSystem ? afterLeadingSystemMessages(formatted, [new SystemMessage(schemaInstruction)]) : formatted, policy);
     if (image !== undefined) messages = withImageAttached(messages, image);
     if (promptModule.cacheStrategy && supportsPromptCaching(resolved)) messages = applyAnthropicCacheControl(messages);
-    return [
-      ...messages,
-      new HumanMessage(
-        `Respond with ONLY one valid JSON object matching this JSON schema — all prose goes inside the JSON string fields, nothing outside the JSON, no markdown fences:\n${JSON.stringify(toHostedPromptSchema(promptModule.schema))}`,
-      ),
-    ];
+    return schemaInSystem ? messages : [...messages, new HumanMessage(schemaInstruction)];
   }
 
   // Default `prompt` mode returns nothing, so a deployment that never sets the key sends exactly the request it always did.

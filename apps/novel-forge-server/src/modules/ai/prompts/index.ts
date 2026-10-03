@@ -68,7 +68,15 @@ export const PROMPT_REGISTRY: Record<PromptKey, PromptModule<unknown>> = {
 export * from './types';
 export * from './authoring-preamble';
 export * from './scope-playbooks';
-export { buildChatRefinePrompt, chatPromptTokens, chatScopeInstructions, type ChatTurnPermissions, renderTurnRules } from './chat-refine.prompt';
+export {
+  buildChatRefinePrompt,
+  chatPromptTokens,
+  chatScopeInstructions,
+  type ChatTurnPermissions,
+  renderTurnMessage,
+  renderTurnRules,
+  type TurnMessageParts,
+} from './chat-refine.prompt';
 export { CONTRADICTION_OPS } from './bible-contradiction.prompt';
 export { CANON_REFRESH_OPS } from './chapter-canon-refresh.prompt';
 export { buildOutlinePrompt, outlineWordTargetVars } from './outline.prompt';

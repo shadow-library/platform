@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
 import { AIMessage, type BaseMessage, HumanMessage } from '@langchain/core/messages';
 import { and, asc, desc, eq, gt, inArray, isNull, lt, sql } from 'drizzle-orm';
@@ -14,10 +14,11 @@ import { type PrimaryDatabase, type PrimaryTransaction, type Project, type Refin
 import { CHAT_HISTORY_BUDGET, ContextAssembler } from '../ai/context/context-assembler.service';
 import { countTokens } from '../ai/context/token-budget';
 import { isRegisteredModel } from '../ai/defaults';
+import { gatewaySessionKey, keepsGatewaySession } from '../ai/gateway-session';
 import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { hardLineError, screenTexts } from '../ai/hard-line';
 import { type ModelRoute, ModelRouterService, type ProjectConfig } from '../ai/model-router.service';
-import { buildChatRefinePrompt, chatPromptTokens, chatScopeInstructions, HUB_ALLOWED_OPS, PROMPT_REGISTRY, renderTurnRules } from '../ai/prompts';
+import { buildChatRefinePrompt, chatPromptTokens, chatScopeInstructions, HUB_ALLOWED_OPS, PROMPT_REGISTRY, renderTurnMessage, renderTurnRules } from '../ai/prompts';
 import { RetrievalService } from '../ai/retrieval';
 import { type ChatRefineOutput, type ChatTitleOutput } from '../ai/schemas';
 import { type ToolContext, ToolRegistryService } from '../ai/tools';
@@ -30,7 +31,8 @@ import { ORGANISE_MIN_WORDS } from '../notes/organise-plan';
 import { type ForgeCallPolicy, PluginPolicyService } from '../plugins/plugin-policy.service';
 import { ActionExecutorRegistry } from './action-registry';
 import { type ChangeOp } from './change-set';
-import { ChatCompactionService } from './chat-compaction.service';
+import { ChatCompactionService, type ChatConversation } from './chat-compaction.service';
+import { contextUpdate, playbookDigest, toExchangeMessage } from './chat-exchange';
 import { type ChatTurnEmitter, EmitterRelay } from './chat-turn-emitter';
 import { TurnTraceCollector } from './chat-turn-trace';
 import { CHAT_TURN_GRAPH, chatRoutedProject, type ChatSelection, chatSelection, type ChatSelectionOverride, loadTurnSelections, withChatModel } from './chat-selection';
@@ -79,7 +81,7 @@ export interface SessionModelUpdate {
 }
 
 /** The selection is absent on user messages and on turns older than selections. */
-export type ChatMessageView = Refinement.ChatMessage & Partial<ChatSelection>;
+export type ChatMessageView = Omit<Refinement.ChatMessage, 'exchange'> & Partial<ChatSelection>;
 
 interface LookupObservers {
   round: number;
@@ -93,6 +95,10 @@ interface LookupObservers {
 // A web lookup's refusal says why — not configured, the engine failed, or the page is off limits — so the model can search again or answer
 // without it; every other handler failure stays the bare "lookup failed".
 const WEB_LOOKUP_REFUSALS: ReadonlySet<string> = new Set([AppErrorCode.AI_019.code, AppErrorCode.AI_020.code, AppErrorCode.AI_021.code]);
+
+function plainConversation(history: BaseMessage[]): ChatConversation {
+  return { plain: history, history, segment: null };
+}
 
 function authorTexts(content: string, history: readonly BaseMessage[]): string[] {
   const earlier = history.filter(message => message instanceof HumanMessage && typeof message.content === 'string').map(message => message.content as string);
@@ -337,7 +343,12 @@ export class ChatService {
     await this.getSession(projectId, sessionId);
     const conditions = [eq(schema.chatMessages.sessionId, sessionId)];
     if (opts.before !== undefined) conditions.push(lt(schema.chatMessages.ordinal, opts.before));
-    const rows = await this.db.query.chatMessages.findMany({ where: and(...conditions), orderBy: desc(schema.chatMessages.ordinal), limit: opts.limit ?? 50 });
+    const rows = await this.db.query.chatMessages.findMany({
+      columns: { exchange: false },
+      where: and(...conditions),
+      orderBy: desc(schema.chatMessages.ordinal),
+      limit: opts.limit ?? 50,
+    });
     const runIds = [...new Set(rows.flatMap(row => (row.role === 'assistant' && row.runId ? [row.runId] : [])))];
     const selections = await loadTurnSelections(this.db, runIds);
     return rows.reverse().map(row => (row.role === 'assistant' && row.runId ? { ...row, ...selections.get(row.runId) } : row));
@@ -454,7 +465,6 @@ export class ChatService {
       this.logger.warn('chat turn refused by the hard line before it was saved', { projectId, sessionId, rule: refused.rule, source: refused.source });
       throw hardLineError(refused);
     }
-    const history = await this.compaction.buildHistory(session, project, route.contentMode);
     const proseEdits = options.proseEdits === true;
     const justDiscussing = options.justDiscussing === true;
     const organiseRequest = isNotesOrganiseRequest(content) && countWords(await this.authorNotes(projectId)) >= ORGANISE_MIN_WORDS;
@@ -464,10 +474,18 @@ export class ChatService {
     const turnRules = renderTurnRules({ proseEdits, justDiscussing, organiseNotes: organiseRequest, mode: session.mode });
     const webMode = await this.webResearch.modeFor(route.resolved.model);
     const scopeInstructions = chatScopeInstructions(this.toolRegistry.getRaw(CHAT_HUB_NODE, webMode), webMode);
+    const playbook = playbookDigest(scopeInstructions);
+    const keyed = route.contentMode === 'standard' && keepsGatewaySession(route.resolved.model);
+    const conversation = keyed
+      ? await this.compaction.continueConversation(session, project, playbook)
+      : plainConversation(await this.compaction.buildHistory(session, project, route.contentMode));
     const promptTokens = chatPromptTokens(scopeInstructions);
-    const historyTexts = history.map(message => (typeof message.content === 'string' ? message.content : JSON.stringify(message.content)));
+    const historyTexts = conversation.plain.map(message => (typeof message.content === 'string' ? message.content : JSON.stringify(message.content)));
     const requestTokens = [turnRules, message, ...historyTexts].reduce((sum, part) => sum + countTokens(part), 0);
     const pack = await this.contextAssembler.forNovelChat(projectId, session.createdAt, { policy, promptTokens, requestTokens });
+    const context = keyed ? contextUpdate(pack, conversation.segment?.sections) : null;
+    const stableContext = conversation.segment?.stableContext ?? pack.renderedStable;
+    const turnParts = { volatileContext: context?.text ?? (pack.renderedVolatile || 'nothing'), turnRules, userMessage: message };
 
     // Pinned into `config.models.chat` so every round of this turn — lookups and repairs included — lands on the model recorded on the reply.
     const resolvedModel = route.resolved;
@@ -493,21 +511,28 @@ export class ChatService {
       // Not awaited: must overlap the turn, not delay it. Its own workflow run, not this one — this
       // run may already be marked complete by the time it resolves.
       if (userMessage.ordinal === 1) this.nameSession(projectId, session, content, routed, runId);
-      const ctx = { projectId, runId, node: 'chat-turn', promptKey: prompt.key, promptVersion: prompt.version, role: 'chat', webTools: webMode === 'native' };
-      const turnHistory = [...history];
-      const invoke = (): Promise<ChatRefineOutput> => {
-        const input = {
-          scopeInstructions,
-          stableContext: pack.renderedStable,
-          history: turnHistory,
-          volatileContext: pack.renderedVolatile || 'nothing',
-          turnRules,
-          userMessage: message,
-        };
+      // Every call of the turn — lookup rounds, the negation fix and the router's repairs — appends to `rounds`, and `settled` marks the
+      // rounds the last answered call sent, which is where the next turn's conversation picks up.
+      const rounds: BaseMessage[] = [];
+      let settled = 0;
+      const gatewaySession = keyed ? gatewaySessionKey(projectId, sessionId) : undefined;
+      const ctx = {
+        projectId,
+        runId,
+        node: 'chat-turn',
+        promptKey: prompt.key,
+        promptVersion: prompt.version,
+        role: 'chat',
+        webTools: webMode === 'native',
+        ...(gatewaySession ? { gatewaySession, onRepair: (reply: string, request: string) => void rounds.push(new AIMessage(reply), new HumanMessage(request)) } : {}),
+      };
+      const invoke = async (): Promise<ChatRefineOutput> => {
+        const input = { scopeInstructions, stableContext, history: conversation.history, ...turnParts, rounds: [...rounds] };
         const output = streamHandlers
-          ? this.modelRouter.streamStructured(prompt, input, ctx, streamHandlers, effectiveProject, policy)
-          : this.modelRouter.structured(prompt, input, ctx, effectiveProject, policy);
-        return output as Promise<ChatRefineOutput>;
+          ? await this.modelRouter.streamStructured(prompt, input, ctx, streamHandlers, effectiveProject, policy)
+          : await this.modelRouter.structured(prompt, input, ctx, effectiveProject, policy);
+        settled = rounds.length;
+        return output as ChatRefineOutput;
       };
 
       // Declared-lookup rounds: execute the requested read-only tools,
@@ -515,12 +540,12 @@ export class ChatService {
       let output = await invoke();
       const lookupCallCounts = new Map<string, number>();
       const planner = { read: false };
-      const web = webMode === 'brave' ? this.webResearch.forTurn(authorTexts(authorWords(content, contexts), history)) : undefined;
+      const web = webMode === 'brave' ? this.webResearch.forTurn(authorTexts(authorWords(content, contexts), conversation.plain)) : undefined;
       for (let round = 0; round < MAX_LOOKUP_ROUNDS && (output.lookups?.length ?? 0) > 0; round++) {
         this.logger.debug('chat turn: executing declared lookups', { runId, round, lookups: output.lookups?.map(l => l.tool) });
         const results = await this.executeLookups(projectId, runId, output.lookups ?? [], lookupCallCounts, { round, relay, trace, planner, web, webMode });
         const exhausted = round === MAX_LOOKUP_ROUNDS - 1 ? '\n\nLookup budget exhausted — answer with what you have; do not request more lookups.' : '';
-        turnHistory.push(new AIMessage(JSON.stringify({ reply: output.reply, lookups: output.lookups })), new HumanMessage(`Lookup results:\n${results}${exhausted}`));
+        rounds.push(new AIMessage(JSON.stringify({ reply: output.reply, lookups: output.lookups })), new HumanMessage(`Lookup results:\n${results}${exhausted}`));
         supersede();
         output = await invoke();
       }
@@ -532,7 +557,8 @@ export class ChatService {
       output = guarded(output);
       let warnings = await this.negationWarnings(projectId, output, exempt);
       if (warnings.length > 0) {
-        turnHistory.push(new AIMessage(JSON.stringify({ reply: output.reply, changeSet: output.changeSet })), new HumanMessage(negationFixRequest(warnings)));
+        const unrevised = settled;
+        rounds.push(new AIMessage(JSON.stringify({ reply: output.reply, changeSet: output.changeSet })), new HumanMessage(negationFixRequest(warnings)));
         supersede();
         const revised = await invoke().catch((err: unknown) => {
           this.logger.warn('chat turn: negation fix round failed — keeping the flagged change-set', { projectId, sessionId, runId, err });
@@ -541,12 +567,21 @@ export class ChatService {
         if (revised && (revised.lookups?.length ?? 0) === 0) {
           output = guarded(revised);
           warnings = await this.negationWarnings(projectId, output, exempt);
+        } else {
+          // The kept reply is the one before the fix, so the next turn continues from it; the gateway, holding the discarded one, starts over.
+          settled = unrevised;
         }
       }
 
       const turnWarnings = chatTurnWarnings(warnings, planner.read);
       const staging = { justDiscussing, organise, contexts };
-      const persisted = await this.persistAssistantTurn(projectId, session, userMessage, output, runId, resolvedModel, turnWarnings, staging, trace);
+      const exchange: Refinement.ChatExchange | null = context && {
+        segment: conversation.segment?.id ?? randomUUID(),
+        ...(conversation.segment ? {} : { opening: { through: session.summaryThroughOrdinal, playbook, stableContext } }),
+        sections: context.sections,
+        messages: [{ role: 'user', content: renderTurnMessage(turnParts) }, ...rounds.slice(0, settled).map(toExchangeMessage)],
+      };
+      const persisted = await this.persistAssistantTurn(projectId, session, userMessage, output, runId, { model: resolvedModel, exchange }, turnWarnings, staging, trace);
       return { ...persisted, assistantMessage: { ...persisted.assistantMessage, ...selection } };
     });
 
@@ -703,7 +738,7 @@ export class ChatService {
     userMessage: Refinement.ChatMessage,
     output: ChatRefineOutput,
     runId: string,
-    model: { provider: string; model: string },
+    { model, exchange }: { model: { provider: string; model: string }; exchange: Refinement.ChatExchange | null },
     warnings: string[],
     staging: StagingContext,
     trace: TurnTraceCollector,
@@ -722,6 +757,7 @@ export class ChatService {
         modelId: model.model,
         tokens: countTokens(output.reply),
         question: question as Record<string, unknown> | undefined,
+        exchange,
       })
       .returning()
       .catch(err => this.databaseService.translateError(err));

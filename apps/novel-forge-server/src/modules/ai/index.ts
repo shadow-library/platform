@@ -6,6 +6,7 @@ export * from './chapter-route';
 export * from './context';
 export * from './cost-tier-scope';
 export * from './defaults';
+export * from './gateway-session';
 export * from './graphs';
 export * from './hard-line';
 export * from './isolation-read-policy';

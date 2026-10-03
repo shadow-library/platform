@@ -96,6 +96,40 @@ export namespace Refinement {
     timing: ChatTraceTiming;
   }
 
+  export interface ChatExchangeMessage {
+    role: 'user' | 'assistant';
+    content: string;
+  }
+
+  /** A context section as the conversation last received it: its digest, and the heading line it was sent under. */
+  export interface ChatHeldSection {
+    digest: string;
+    heading: string;
+  }
+
+  /** What a turn opened its conversation segment with: every later turn of the segment sends the same opening again. */
+  export interface ChatSegmentOpening {
+    /** The session's compaction watermark when the segment opened; a compaction since ends the segment. */
+    through: number;
+    /** SHA-256 of the scope playbook the segment was opened with; a different playbook ends the segment. */
+    playbook: string;
+    stableContext: string;
+  }
+
+  /**
+   * A chat turn's share of the model conversation as it was sent, so the next turn sends it again unchanged and only appends: the gateway
+   * resumes its own Claude session for a conversation it already holds.
+   */
+  export interface ChatExchange {
+    /** Every turn since the segment opened carries its id; only the opening turn carries `opening`. */
+    segment: string;
+    opening?: ChatSegmentOpening;
+    /** Each context section the conversation holds now, so the next turn sends only the sections that changed. */
+    sections: Record<string, ChatHeldSection>;
+    /** The turn's own message, then the reply and the follow-up of every further call it made, in order; the final reply is the message's content. */
+    messages: ChatExchangeMessage[];
+  }
+
   /** A passage the author commented on, anchored to the draft as it stood when the message was sent; offsets are UTF-16 code units into its body. */
   export interface ChatPassageContext {
     kind: 'passage';
@@ -184,6 +218,8 @@ export const chatMessages = pgTable(
     trace: jsonb('trace').$type<Refinement.ChatTurnTrace>(),
     // The passages an author's message comments on, frozen when it was sent so the turn renders the same in every later prompt. Null on replies.
     contexts: jsonb('contexts').$type<Refinement.ChatPassageContext[]>(),
+    // Null on user messages, on replies older than the column, and on a reply whose turn the gateway kept no session for.
+    exchange: jsonb('exchange').$type<Refinement.ChatExchange>(),
     createdAt: timestamp('created_at').notNull().defaultNow(),
   },
   t => [unique('chat_messages_session_id_ordinal_unique').on(t.sessionId, t.ordinal), index('chat_messages_applied_proposal_id_idx').on(t.appliedProposalId)],
