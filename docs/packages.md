@@ -31,6 +31,8 @@
 - `ui`: style only through CSS Modules using `--sh-*` tokens; no Tailwind, no hard-coded hex/px/shadow/duration; add a missing token (light and dark) first.
 - `ui`: components never use the global `utilities.css` layer; overlays wrap Radix (never forked); dist stays SSR-import-safe; do not strip the `'use client'` banners.
 - `web`: keep server-fetch contract types beside browser code; importing them from the server-only file drags server code into the client bundle.
+- `web`: `useBuildUpdate` compares the build id stamped into the client against the app's no-store `buildIdResponse` route; it only reports, so reloading stays the user's
+  choice. Stamp both from one `resolveBuildId` in the app's Vite config.
 
 ## sdk contract (Novel Forge to Web Novel)
 
