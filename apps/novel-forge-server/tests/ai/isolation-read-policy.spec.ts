@@ -334,6 +334,24 @@ describe('an isolated chapter never reaches a standard call', () => {
     expect(draft).toContain(BRIDGE);
   });
 
+  it('should give the chat an isolated latest chapter’s ending only as its bridge', async () => {
+    const rows = tables();
+    rows.set(
+      'drafts',
+      (rows.get('drafts') ?? []).filter(draft => draft['chapter'] === 4),
+    );
+    rows.set(
+      'chapters',
+      (rows.get('chapters') ?? []).filter(chapter => Number(chapter['number']) <= 4),
+    );
+    const pack = await writerAssembler(writerDb(rows)).forNovelChat(7n, new Date(0), { promptTokens: 4_000, requestTokens: 0 });
+    const ending = pack.sections.find(section => section.key === 'prev_ending')?.rendered ?? '';
+
+    expect(ending).toContain(BRIDGE);
+    expect(pack.rendered).not.toContain(MARKER);
+    expect(pack.rendered).not.toContain(ISOLATED_PROSE);
+  });
+
   it('should compose chapter art from the bridge, not the prose', async () => {
     const pack = await writerAssembler(writerDb(tables())).forIllustration(7n, 'chapter', '4');
 

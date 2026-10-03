@@ -16,6 +16,10 @@ What steers the plan, strongest first:
 - THE AUTHOR'S INTENT is what the author says happens in this chapter. It is binding: plan exactly that, in the author's terms, and fill in only what it leaves open.
 - THE CHOSEN DIRECTION is the direction the author picked for this chapter. Plan it faithfully; where it and the intent differ, the intent wins.
 - Without either, choose the chapter yourself from the OBLIGATIONS and the catalog: what the previous chapter's ending hands on, the promise that has waited longest, and what the current volume's goal needs next. Move at least one obligation, and say which in "moves".
+- The DECISION LEDGER's decisions and author directions bind every chapter; never plan anything it lists under "Do not propose". Its backlog is the author's ideas for later: let it shape setup, and play one out only when the author's intent asks for it.
+- THE AUTHOR'S PLANS FOR LATER are where the author means the story to go. Let them shape this chapter's setup and foreshadowing, but never reveal, state or play out a later event before its place, and never quote them. They never outrank the author's intent for this chapter.
+
+Continuity. The chapter continues from the PREVIOUS CHAPTER ENDING and its CONTINUATION STATE: open from where they leave the people, the place and the moment, and never contradict them, unless the author's intent says the chapter opens elsewhere.
 
 Scenes. Plan the chapter as scenes in order, each with a one-sentence summary the author reads, a goal (what the POV character wants), an obstacle (who or what resists), a turn (how things stand differently when it ends), its on-page beats and estimatedWords, its share of the chapter's length. Each scene names its point of view: the entity key of a character from the catalog. The chapter's writer receives what EVERY scene's point of view knows, for the whole chapter, so change point of view only when the chapter needs it; one point of view for the whole chapter is often best.
 
@@ -36,7 +40,7 @@ Respond with ONLY one valid JSON object, nothing outside it and no markdown fenc
 
 export const chapterPlanPrompt: PromptModule<ChapterPlanOutput> = {
   key: 'chapter-plan',
-  version: '1.1.0',
+  version: '1.2.0',
   kind: 'authoring',
   role: 'outline',
   system,

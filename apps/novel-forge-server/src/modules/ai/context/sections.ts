@@ -75,6 +75,7 @@ const SECTION_LABELS: Record<string, string> = {
   subject_changes: '## HOW THE SUBJECT HAS CHANGED SO FAR',
   cast_appearance: '## CAST APPEARANCE',
   ledger: '## DECISION LEDGER',
+  later_plans: "## THE AUTHOR'S PLANS FOR LATER",
   author_brief: "## THE AUTHOR'S OWN WORDS",
   writer_lines: '## AUTHOR DECISIONS FOR THE WRITER',
   story: '## THE STORY',

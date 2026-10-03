@@ -71,8 +71,8 @@
 ## The chat
 
 - **One conversation over the whole novel.** Its context is the novel's durable state, not its text: the story (planner-only parts labelled), the progress map, the Notebook,
-  inventories of Story Bible pages and entities by name and key, the chapter list, open promises, the last chapter's ending and the next chapter's plan, a compaction summary and
-  recent messages. The stable sections get a fixed reservation so the cached prefix stays byte-identical across a session; the handoff is always kept, so a request near the
+  inventories of Story Bible pages and entities by name and key, the chapter list, open promises, the last chapter's planned ending, its closing prose and continuation state
+  (an isolated chapter only as its bridge), the next chapter's plan, a compaction summary and recent messages. The stable sections get a fixed reservation so the cached prefix stays byte-identical across a session; the handoff is always kept, so a request near the
   history ceiling can run past the budget. The author's own words render before, and outrank, any AI summary.
 - Detail comes through declared lookups (never native tool binding): Story Bible pages, entities, canon facts, threads and promises, chapter summaries, a plan, a draft, a
   character timeline, a volume, lore and prose search, the author's notes, usage and a chapter's reviews. A turn that reads the notes or a planner-only page holds for review
@@ -211,6 +211,10 @@
 - A plan starts from a direction the chat offered, from what the author says happens (which must be found in their own message, or it becomes a direction), or empty for the
   author to fill; an empty plan is refused over an existing one. The recap surfaces two or three obligations: the previous chapter's hook, the most pressing promise, and what the
   volume goal needs.
+- The planner reads, beside the catalog and the last three summaries: the previous chapter's closing prose and continuation state, built as the writer's but unscrubbed, the
+  active Notebook (decisions, directions, backlog, do-not-propose), and the organised timeline as the author's private plans for later, once an organise lock has written it.
+  It continues from that ending, lets later plans shape setup and foreshadowing but never states one before its place, and the author's intent for the chapter still wins. The
+  catalog gives way to these under budget pressure; the timeline is capped.
 - The planner (the `outline` role) proposes milestone claims; the reveal rule cuts every claim the plan may not make and every reveal whose unlock does not hold, from the
   contract and from every text field, so a card never proposes what the author could not apply. A scene's point of view must be a character of the novel. The writer's knowledge
   is pooled over the scenes' points of view for the whole chapter, and the card warns when they differ in what they know.
@@ -240,7 +244,7 @@
   chapter for a cover — which is that chapter's writer policy with the ending and the ending question always withheld. Reference labels, notes and names and the vision
   description are scrubbed before both the compose call and the image call; the author's own per-image instructions are not, by the author's choice.
 - Planner-only pages — the organised timeline (`project/timeline`) and open questions (`project/open-questions`) — are left out of the planner's citable catalog and the lore
-  index, never resolve into a writer pack whatever ref names them, and are dropped from planned refs. Their lines are withheld only from what copies authored canon (pages, entity
+  index (the chapter planner reads the timeline as its own section), never resolve into a writer pack whatever ref names them, and are dropped from planned refs. Their lines are withheld only from what copies authored canon (pages, entity
   sheets, cited refs, plugin sections), because the chapter's own plan legitimately repeats them.
 - For the writer, a `volume:` ref resolves only to the chapter's own or an earlier volume, a `chapter:` ref only to an earlier chapter, a thread or mystery only once opened (one
   with no opening chapter always), and the volume-plan and escalation-map pages never. A chapter-scoped `fact:` ref obeys the fact gate plus the plan's `mustNotResolve`, and
@@ -457,3 +461,5 @@
   until the cascade locks them in chapter order.
 - The hard line is a lexical screen, so it refuses conservatively and can be evaded by wording. By a standing conservative policy, "sex" and "molest" paired with a minor on the
   author's own text are refused, so a survivor's backstory written in plain words on the unrestricted route is refused.
+- The writer's scrub withholds timeline lines only where authored canon is copied, never from the plan, so a later timeline event the planner writes into a plan reaches the
+  writer; only the planner's instructions keep it out.

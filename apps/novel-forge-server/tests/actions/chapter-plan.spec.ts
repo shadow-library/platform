@@ -363,10 +363,17 @@ describe('chapterPlanPrompt', () => {
   it('should be a new versioned planner that plans one chapter with a point of view per scene, intent first', () => {
     const human = JSON.stringify(chapterPlanPrompt.template);
 
-    expect([chapterPlanPrompt.key, chapterPlanPrompt.version, chapterPlanPrompt.role]).toEqual(['chapter-plan', '1.1.0', 'outline']);
+    expect([chapterPlanPrompt.key, chapterPlanPrompt.version, chapterPlanPrompt.role]).toEqual(['chapter-plan', '1.2.0', 'outline']);
     expect(chapterPlanPrompt.system).toContain('You plan ONE chapter');
     expect(chapterPlanPrompt.system).toContain('Each scene names its point of view');
     expect(human.indexOf('{authorIntent}')).toBeLessThan(human.indexOf('{chosenDirection}'));
+  });
+
+  it('should continue from the previous ending and set later plans up without revealing them, under the author’s intent', () => {
+    expect(chapterPlanPrompt.system).toContain('The chapter continues from the PREVIOUS CHAPTER ENDING and its CONTINUATION STATE');
+    expect(chapterPlanPrompt.system).toContain("Let them shape this chapter's setup and foreshadowing, but never reveal, state or play out a later event before its place");
+    expect(chapterPlanPrompt.system).toContain("They never outrank the author's intent for this chapter.");
+    expect(chapterPlanPrompt.system).toContain('never plan anything it lists under "Do not propose"');
   });
 
   it('should require a handoff beat only when the chapter continues', () => {
@@ -445,7 +452,7 @@ describe('ChapterPlanService', () => {
       milestones: expect.stringContaining('claiming it unlocks: lamp_origin'),
     });
     expect(calls[0]?.vars['catalog']).toContain('## Chapter 3: The Gate');
-    expect(calls[0]?.ctx).toMatchObject({ promptKey: 'chapter-plan', promptVersion: '1.1.0', runId: 'run-1', chapter: 4 });
+    expect(calls[0]?.ctx).toMatchObject({ promptKey: 'chapter-plan', promptVersion: '1.2.0', runId: 'run-1', chapter: 4 });
     expect(op).toMatchObject({ chapter: 4, direction: 'Mara tests the lamp', pov: 'mara' });
   });
 

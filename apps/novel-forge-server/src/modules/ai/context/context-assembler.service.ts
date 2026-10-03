@@ -24,7 +24,7 @@ import {
 import { loadWriterDisclosurePolicy, WriterDisclosurePolicy, type WriterField } from '../../bible/fact/writer-disclosure-policy';
 import { bridgedSummary, type BridgeLoader, bridgeLoader, type BridgeSubject, type IsolationBridge, loadIsolationBridges } from '../../finalize-review/isolation-bridge';
 import { loadActiveLedger } from '../../ledger/ledger-entries';
-import { AUTHOR_BRIEF_TOPIC, writerLinesSection } from '../../ledger/ledger-sections';
+import { AUTHOR_BRIEF_TOPIC, ledgerSection, writerLinesSection } from '../../ledger/ledger-sections';
 import { type ForgeCallPolicy } from '../../plugins/plugin-policy.service';
 import { withoutLapsedRejections } from '../../refinement/idea-rejections';
 import { hardLineError, screenTexts, sectionScreens } from '../hard-line';
@@ -32,7 +32,7 @@ import { NO_APPROVED_BRIDGE, NO_BRIDGE_SUMMARY, standardReadableState } from '..
 import { effectiveWritingInstructions, writingInstructionAdditions } from '../prompts/writing-instructions';
 import { type RetrievalHit, RetrievalService } from '../retrieval';
 import { renderEventsAsOf } from './art-context';
-import { isWriterExcludedBibleDoc } from './bible-docs';
+import { isWriterExcludedBibleDoc, ORGANISED_TIMELINE_DOC } from './bible-docs';
 import { type ChapterSpan } from './canon-guard';
 import { type CatalogOptions, CatalogService } from './catalog.service';
 import {
@@ -52,6 +52,7 @@ import {
   renderPromises,
   renderVolumeGoals,
 } from './novel-chat-context';
+import { organisedTimelineText } from './organised-timeline';
 import { pluginContextSections } from './plugin-sections';
 import {
   type AssembledPack,
@@ -158,6 +159,13 @@ export const CHAT_SUMMARY_BUDGET = 1_500;
 export const NOVEL_CHAT_HISTORY_ALLOWANCE = CHAT_HISTORY_BUDGET + CHAT_SUMMARY_BUDGET + NOVEL_CHAT_MESSAGE_ALLOWANCE;
 // A planning pack carries the whole catalog — every canon fact and a description per entity.
 export const OUTLINE_BUDGET = 32_000;
+// Room for an organise run's full timeline; a page edited past it loses its last lines rather than crowding out the catalog.
+export const OUTLINE_TIMELINE_CAP = 2_500;
+export const LATER_PLANS_LEAD = [
+  'Planner-only: the chapter writer and readers never see this, and you never quote or cite it. It is where the author means the story to go.',
+  'Let what is placed later shape this chapter: set it up, seed it, foreshadow it and put people and things where it will need them.',
+  'Never state, reveal or play out a later event before its place.',
+].join(' ');
 // Token counts of a section's parts and of the rendered whole differ by a few tokens; the margin keeps a sized section inside the budget.
 const SIZED_SECTION_MARGIN = 32;
 export const PREMISE_BUDGET = 8_000;
@@ -491,6 +499,69 @@ function renderIsolatedEnding(summary: string | null, state: unknown, disclosure
   return `${head}${state ? fittedState(state, disclosure, maxTokens - countTokens(head)) : 'null'}`;
 }
 
+const DRAFT_LABEL = '[DRAFT — not yet canon]\n';
+
+interface PreviousEndingSource {
+  /** The chapter whose ending is read: the one before the chapter being written or planned. */
+  chapter: number;
+  row: Pick<typeof schema.chapters.$inferSelect, 'status' | 'isolated' | 'content' | 'summary'> | null | undefined;
+  draft: Pick<typeof schema.drafts.$inferSelect, 'body' | 'summary' | 'state' | 'isolated' | 'staleReason'> | null | undefined;
+  bridge: IsolationBridge | undefined;
+  /** The unrestricted route reads an isolated chapter as written; every other reader gets only its approved bridge. */
+  rawIsolated: boolean;
+  disclosure: WriterDisclosurePolicy;
+  caps?: PreviousEndingCaps;
+}
+
+interface PreviousEndingCaps {
+  ending: number;
+  state: number;
+}
+
+const WRITER_PREVIOUS_ENDING_CAPS: PreviousEndingCaps = { ending: WRITER_SECTION_CAPS.prevEnding, state: WRITER_SECTION_CAPS.continuationState };
+
+interface PreviousEnding {
+  ending: ContextSection | null;
+  state: ContextSection | null;
+}
+
+/** How a chapter ends and the state it carries on, as the next chapter's writer reads them, each within its cap. */
+function previousEnding({ chapter, row, draft, bridge, rawIsolated, disclosure, caps = WRITER_PREVIOUS_ENDING_CAPS }: PreviousEndingSource): PreviousEnding {
+  const refs = [`chapter:${chapter}`];
+  const stale = staleDraftPrefix(draft);
+  const isolated = Boolean(row?.isolated || draft?.isolated);
+  const carried = isolated && !rawIsolated ? standardReadableState(bridge) : draft?.state;
+  const endingRoom = sizedSectionCeiling('prev_ending', caps.ending);
+  const isolatedEnding = (summary: string | null, room: number): string => {
+    if (rawIsolated) return renderIsolatedEnding(summary, carried, disclosure, room);
+    return bridge ? renderIsolatedEnding(bridge.summary, carried, disclosure, room) : NO_APPROVED_BRIDGE;
+  };
+  const ending = (): ContextSection | null => {
+    if (row) {
+      const tier: ContextTier = row.status === 'done' ? 'canonical' : 'working';
+      if (row.isolated) return makeSection('prev_ending', isolatedEnding(row.summary, endingRoom), tier, refs);
+      return makeSectionTail('prev_ending', scrubbedTail(row.content ?? '', disclosure), PREV_ENDING_TAIL, tier, refs);
+    }
+    if (draft?.isolated) {
+      const label = `${DRAFT_LABEL}${stale}`;
+      return makeSection('prev_ending', `${label}${isolatedEnding(draft.summary, endingRoom - countTokens(label))}`, 'working', refs);
+    }
+    if (!draft?.body) return null;
+    // Chapter N-1 hasn't been finalized yet (mid-batch): the `chapters` row doesn't exist, so fall back
+    // to the just-drafted prose tail instead of leaving chapter N with only continuation-state fields.
+    const { text, truncated } = truncateAtParagraphTail(scrubbedTail(draft.body, disclosure), PREV_ENDING_TAIL);
+    const rendered = renderSection('prev_ending', `${DRAFT_LABEL}${stale}${text}`);
+    return { key: 'prev_ending', tier: 'working', segment: 'volatile', tokens: countTokens(rendered), truncated, sourceRefs: refs, rendered };
+  };
+  const stateSection = (): ContextSection | null => {
+    if (carried == null) return null;
+    const state = fittedState(carried, disclosure, sizedSectionCeiling('continuation_state', caps.state) - countTokens(stale));
+    return fitToCap(makeSection('continuation_state', `${stale}${state}`, 'working', refs), caps.state);
+  };
+  const found = ending();
+  return { ending: found && fitToCap(found, caps.ending), state: stateSection() };
+}
+
 // `entity_relationships` is append-only — one row per chapter that observed the pair — so current state
 // is the highest-chapter row per (entityId, targetKey, kind), with the later insert winning a tie.
 function latestRelationships(rows: EntityRelationshipRow[]): EntityRelationshipRow[] {
@@ -777,8 +848,6 @@ export class ContextAssembler {
       this.completedVolumesSection(projectId, chapter, currentVolume, disclosure, loadBridges),
       knowledgeContract ? null : this.openCanonSection(projectId, disclosure, chapterCast),
     ]);
-    const prevStale = staleDraftPrefix(prevDraft);
-    const prevRefs = [`chapter:${chapter - 1}`];
     const derivedCuts: OmittedSection[] = [...(openCanon?.omitted ?? [])];
 
     const planTokens = countTokens(writerBrief.chapterBrief) + countTokens(writerBrief.endingContract);
@@ -789,10 +858,7 @@ export class ContextAssembler {
       reservations.push({ name, tokens: section.tokens, cap, fromPlan });
     };
     const reserveDerived = (section: ContextSection, name: string, cap: number, fromPlan = false): void => reserve(fitToCap(section, cap), name, cap, fromPlan);
-    const isolatedEndingRoom = sizedSectionCeiling('prev_ending', WRITER_SECTION_CAPS.prevEnding);
-    const reservePrevEnding = (section: ContextSection): void => reserveDerived(section, "the previous chapter's ending", WRITER_SECTION_CAPS.prevEnding);
     const prevIsolated = Boolean(prevChapter?.isolated || prevDraft?.isolated);
-    // The unrestricted route may read an isolated chapter as written; every other reader gets only its approved bridge.
     const rawIsolated = opts?.policy?.writerClass === 'permissive';
     const bridgeSubjects: BridgeSubject[] = [
       ...recentChapters.map(row => ({ chapter: row.number, isolated: row.isolated })),
@@ -800,42 +866,9 @@ export class ContextAssembler {
       { chapter: chapter - 1, isolated: prevIsolated },
     ];
     const bridges = rawIsolated ? new Map<number, IsolationBridge>() : await loadBridges(bridgeSubjects);
-    const prevBridge = bridges.get(chapter - 1);
-    const prevState = prevIsolated && !rawIsolated ? standardReadableState(prevBridge) : prevDraft?.state;
-    const isolatedEnding = (summary: string | null, room: number): string => {
-      if (rawIsolated) return renderIsolatedEnding(summary, prevState, disclosure, room);
-      return prevBridge ? renderIsolatedEnding(prevBridge.summary, prevState, disclosure, room) : NO_APPROVED_BRIDGE;
-    };
-
-    if (prevChapter) {
-      const tier: ContextTier = prevChapter.status === 'done' ? 'canonical' : 'working';
-      if (prevChapter.isolated) {
-        reservePrevEnding(makeSection('prev_ending', isolatedEnding(prevChapter.summary, isolatedEndingRoom), tier, prevRefs));
-      } else {
-        reservePrevEnding(makeSectionTail('prev_ending', scrubbedTail(prevChapter.content ?? '', disclosure), PREV_ENDING_TAIL, tier, prevRefs));
-      }
-    } else if (prevDraft?.isolated) {
-      reservePrevEnding(
-        makeSection(
-          'prev_ending',
-          `[DRAFT — not yet canon]\n${prevStale}${isolatedEnding(prevDraft.summary, isolatedEndingRoom - countTokens(`[DRAFT — not yet canon]\n${prevStale}`))}`,
-          'working',
-          prevRefs,
-        ),
-      );
-    } else if (prevDraft?.body) {
-      // Chapter N-1 hasn't been finalized yet (mid-batch): the `chapters` row doesn't exist, so fall back
-      // to the just-drafted prose tail instead of leaving chapter N with only continuation-state fields.
-      const { text, truncated } = truncateAtParagraphTail(scrubbedTail(prevDraft.body, disclosure), PREV_ENDING_TAIL);
-      const rendered = renderSection('prev_ending', `[DRAFT — not yet canon]\n${prevStale}${text}`);
-      reservePrevEnding({ key: 'prev_ending', tier: 'working', segment: 'volatile', tokens: countTokens(rendered), truncated, sourceRefs: prevRefs, rendered });
-    }
-
-    if (prevState != null) {
-      const cap = WRITER_SECTION_CAPS.continuationState;
-      const state = fittedState(prevState, disclosure, sizedSectionCeiling('continuation_state', cap) - countTokens(prevStale));
-      reserveDerived(makeSection('continuation_state', `${prevStale}${state}`, 'working', prevRefs), 'the continuation state', cap);
-    }
+    const previous = previousEnding({ chapter: chapter - 1, row: prevChapter, draft: prevDraft, bridge: bridges.get(chapter - 1), rawIsolated, disclosure });
+    if (previous.ending) reserveDerived(previous.ending, "the previous chapter's ending", WRITER_SECTION_CAPS.prevEnding);
+    if (previous.state) reserveDerived(previous.state, 'the continuation state', WRITER_SECTION_CAPS.continuationState);
 
     if (currentVolume?.objective) {
       const content = disclosure.scrub(currentVolume.objective, 'plan');
@@ -1168,7 +1201,8 @@ export class ContextAssembler {
   async forOutline(projectId: bigint, chapter: number, opts?: OutlinePackOptions): Promise<AssembledPack & { id: bigint | null }> {
     const budgetTokens = opts?.budgetTokens ?? OUTLINE_BUDGET;
 
-    const [currentVolume, recentChapters] = await Promise.all([
+    const previous = chapter - 1;
+    const [currentVolume, recentChapters, prevChapter, prevDraft, ledger, timelineDocs] = await Promise.all([
       (opts?.volumeKey !== undefined ? Promise.resolve(opts.volumeKey) : nearestVolumeKey(this.db, projectId, opts?.insertAfter ?? chapter)).then(volumeKey =>
         this.volumeByKey(projectId, volumeKey),
       ),
@@ -1176,6 +1210,23 @@ export class ContextAssembler {
         where: and(eq(schema.chapters.projectId, projectId), sql`${schema.chapters.number} < ${chapter}`, eq(schema.chapters.status, 'done')),
         orderBy: sql`${schema.chapters.number} DESC`,
         limit: 3,
+      }),
+      this.db.query.chapters.findFirst({
+        columns: { status: true, isolated: true, content: true, summary: true },
+        where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, previous)),
+      }),
+      this.db.query.drafts.findFirst({
+        columns: { body: true, summary: true, state: true, isolated: true, staleReason: true },
+        where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, previous)),
+      }),
+      loadActiveLedger(this.db, projectId),
+      this.db.query.bibleDocuments.findMany({
+        columns: { section: true, slug: true, body: true },
+        where: and(
+          eq(schema.bibleDocuments.projectId, projectId),
+          eq(schema.bibleDocuments.section, ORGANISED_TIMELINE_DOC.section),
+          eq(schema.bibleDocuments.slug, ORGANISED_TIMELINE_DOC.slug),
+        ),
       }),
     ]);
 
@@ -1185,11 +1236,10 @@ export class ContextAssembler {
       sections.push({ ...makeSection('volume_objective', currentVolume.objective, 'approved_intent', [`volume:${currentVolume.volumeKey}`]), required: true });
     }
 
-    const outlineBridges = await loadIsolationBridges(
-      this.db,
-      projectId,
-      recentChapters.map(row => ({ chapter: row.number, isolated: row.isolated })),
-    );
+    const outlineBridges = await loadIsolationBridges(this.db, projectId, [
+      ...recentChapters.map(row => ({ chapter: row.number, isolated: row.isolated })),
+      { chapter: previous, isolated: Boolean(prevChapter?.isolated || prevDraft?.isolated) },
+    ]);
     const recentLines = recentChapters
       .slice()
       .reverse()
@@ -1198,6 +1248,19 @@ export class ContextAssembler {
     if (recentLines.length > 0) {
       sections.push({ ...makeSection('memory', recentLines.join('\n'), 'canonical', []), required: true });
     }
+
+    const ending = previousEnding({
+      chapter: previous,
+      row: prevChapter,
+      draft: prevDraft,
+      bridge: outlineBridges.get(previous),
+      rawIsolated: opts?.policy?.writerClass === 'permissive',
+      disclosure: WriterDisclosurePolicy.planner(),
+    });
+    for (const found of [ending.ending, ending.state]) if (found) sections.push({ ...found, required: true });
+    sections.push(ledgerSection(await withoutLapsedRejections(this.db, projectId, ledger), 'volatile'));
+    const timeline = organisedTimelineText(timelineDocs, ledger);
+    if (timeline) sections.push({ ...fitToCap(makeSection('later_plans', `${LATER_PLANS_LEAD}\n\n${timeline}`, 'approved_intent'), OUTLINE_TIMELINE_CAP), required: true });
 
     // The outliner may only cite what the catalog lists, so retrieval gives way to it under budget pressure; the catalog's ceiling is
     // what the other required sections leave, so none of them can be crowded out.
@@ -1333,10 +1396,23 @@ export class ContextAssembler {
     const chapters = storedChapters.map(row => walledOff(row, chatBridges.get(row.number)));
     const drafts = storedDrafts.map(row => walledOff(row, chatBridges.get(row.chapter)));
     const next = nextChapterNumber(chapters, drafts);
-    const [handoffBriefs, pipelineStatus, changed] = await Promise.all([
-      this.db.query.briefs.findMany({ where: and(eq(schema.briefs.projectId, projectId), inArray(schema.briefs.chapter, [next - 1, next])) }),
+    const latest = next - 1;
+    const [handoffBriefs, pipelineStatus, changed, latestChapter, latestDraft] = await Promise.all([
+      this.db.query.briefs.findMany({ where: and(eq(schema.briefs.projectId, projectId), inArray(schema.briefs.chapter, [latest, next])) }),
       this.renderPipelineStatus(projectId, project?.storyCurrentChapter ?? 0),
       this.changedSince(projectId, sessionStartedAt),
+      latest > 0
+        ? this.db.query.chapters.findFirst({
+            columns: { status: true, isolated: true, content: true, summary: true },
+            where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, latest)),
+          })
+        : undefined,
+      latest > 0
+        ? this.db.query.drafts.findFirst({
+            columns: { body: true, summary: true, state: true, isolated: true, staleReason: true },
+            where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, latest)),
+          })
+        : undefined,
     ]);
 
     const caps = NOVEL_CHAT_SECTION_CAPS;
@@ -1367,6 +1443,17 @@ export class ContextAssembler {
     if (chapterIndex) stable.push(section('chapter_index', chapterIndex, 'canonical', caps.chapterIndex, { priority: 3 }));
 
     const volatile = [section('handoff', renderHandoff(chapters, drafts, handoffBriefs), 'working', caps.handoff, { required: true })];
+    const latestEnding = previousEnding({
+      chapter: latest,
+      row: latestChapter,
+      draft: latestDraft,
+      bridge: chatBridges.get(latest),
+      rawIsolated: false,
+      disclosure: WriterDisclosurePolicy.planner(),
+      caps: { ending: caps.latestEnding, state: caps.latestState },
+    });
+    if (latestEnding.ending) volatile.push({ ...latestEnding.ending, priority: 0 });
+    if (latestEnding.state) volatile.push({ ...latestEnding.state, priority: 1 });
     volatile.push(section('pipeline_status', pipelineStatus, 'working', caps.changedSince, { priority: 0 }));
     if (changed.length > 0) volatile.push(section('changed_since', changed.join('\n'), 'working', caps.changedSince, { priority: 1 }));
     if (project) {

@@ -421,6 +421,45 @@ describe('ContextAssembler.forNovelChat', () => {
     expect(section(withOverride, 'progress')).not.toContain('First volume goal');
     expect(withoutOverride.renderedStable).toBe(withOverride.renderedStable);
   });
+
+  it('should give the chat how the latest chapter ends and where it leaves the story, unscrubbed and outside the stable prefix', async () => {
+    const pack = await assembler({
+      chapters: [
+        {
+          number: 1,
+          title: 'Arrival',
+          status: 'done',
+          summary: 'Mira takes the lamp.',
+          isolated: false,
+          content: 'Opening.\n\nMira climbs the stair as the tide turns. The keeper lets the lamp go dark.',
+        },
+      ],
+      drafts: [
+        {
+          chapter: 1,
+          title: 'Arrival',
+          reviewStatus: 'approved',
+          summary: null,
+          isolated: false,
+          staleReason: null,
+          body: 'draft',
+          state: { characterPositions: [{ entityKey: 'mira', location: 'the pier' }] },
+        },
+      ],
+    }).forNovelChat(1n, new Date(0), { promptTokens: PROMPT_TOKENS, requestTokens: 0 });
+
+    expect(section(pack, 'prev_ending')).toContain(STORY.ending);
+    expect(section(pack, 'continuation_state')).toContain('"location":"the pier"');
+    expect(pack.renderedStable).not.toContain('Mira climbs the stair');
+    expect(pack.sections.find(candidate => candidate.key === 'prev_ending')?.tokens).toBeLessThanOrEqual(NOVEL_CHAT_SECTION_CAPS.latestEnding);
+  });
+
+  it('should read no chapter ending before anything is written', async () => {
+    const pack = await assembler({}).forNovelChat(1n, new Date(0), { promptTokens: PROMPT_TOKENS, requestTokens: 0 });
+
+    expect(pack.sections.map(candidate => candidate.key)).not.toContain('prev_ending');
+    expect(pack.sections.map(candidate => candidate.key)).not.toContain('continuation_state');
+  });
 });
 
 describe('ContextAssembler.forNovelChat on a large project', () => {

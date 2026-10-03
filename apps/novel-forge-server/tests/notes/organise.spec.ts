@@ -125,7 +125,9 @@ function storedRecords(plan: OrganisePlan): NonNullable<Stored['entities']> {
 describe('notesOrganisePrompt', () => {
   it('should keep everything the notes place later on the timeline, and anything undecided an open question', () => {
     expect(notesOrganisePrompt.key).toBe('notes-organise');
-    expect(notesOrganisePrompt.version).toBe('1.5.0');
+    expect(notesOrganisePrompt.version).toBe('1.6.0');
+    expect(notesOrganisePrompt.system).toContain('The chapter planner reads the timeline to set its later events up before they happen.');
+    expect(notesOrganisePrompt.system).not.toContain('reveals scheduled');
     expect(notesOrganisePrompt.system).toContain('goes ONLY on the timeline, in its band');
     expect(notesOrganisePrompt.system).toContain('A secret is never a rule.');
     expect(notesOrganisePrompt.system).toContain('is an open question, never a statement on a page, in a record or in a rule');

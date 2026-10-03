@@ -21,6 +21,8 @@ export const NOVEL_CHAT_SECTION_CAPS = {
   inventory: 2_500,
   chapterIndex: 1_500,
   handoff: 3_500,
+  latestEnding: 700,
+  latestState: 800,
   changedSince: 600,
   progress: 500,
 } as const;

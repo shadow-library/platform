@@ -1,7 +1,8 @@
 import { describe, expect, it, mock } from 'bun:test';
+import { textDigest } from '@shadow-library/sdk';
 
 import { CatalogService } from '@modules/ai/context/catalog.service';
-import { ContextAssembler, FULL_CAST_MAX, PREV_ENDING_TAIL } from '@modules/ai/context/context-assembler.service';
+import { ContextAssembler, FULL_CAST_MAX, LATER_PLANS_LEAD, OUTLINE_TIMELINE_CAP, PREV_ENDING_TAIL } from '@modules/ai/context/context-assembler.service';
 import { NO_APPROVED_BRIDGE } from '@modules/ai/isolation-read-policy';
 import { applyBudget, countTokens, truncateAtParagraph, truncateAtParagraphTail } from '@modules/ai/context/token-budget';
 import { DEFAULT_WRITING_INSTRUCTIONS } from '@modules/ai/prompts/authoring-preamble';
@@ -717,6 +718,101 @@ describe('ContextAssembler.forOutline — retrieval absent', () => {
     const sectionKeys = pack.sections.map(s => s.key);
     expect(sectionKeys).not.toContain('lore_retrieved');
     expect(sectionKeys).not.toContain('prose_retrieved');
+  });
+});
+
+describe('ContextAssembler.forOutline — planner inputs', () => {
+  const NOTES = 'A keeper trades memories to keep the lamp lit.';
+  const notes = { kind: 'direction', topic: 'start.brief', statement: NOTES, why: null, rejectedAlternatives: [], writerLine: null, decidedBy: 'author', links: {}, payload: null };
+  const organised = {
+    ...notes,
+    kind: 'decision',
+    topic: 'organise',
+    statement: 'Organised the notes.',
+    links: { bibleDocuments: [{ section: 'project', slug: 'timeline' }] },
+    payload: { notesDigest: textDigest(NOTES) },
+  };
+  const direction = { ...notes, kind: 'direction', topic: 'tone.quiet', statement: 'Keep every chapter quiet and close.' };
+  const backlog = { ...notes, kind: 'backlog', topic: 'plot.flood', statement: 'A flood season some day.' };
+  const timeline = { section: 'project', slug: 'timeline', body: '## Later\n\n- The lamp goes dark for a night.' };
+  const prevChapter = { number: 4, status: 'done', isolated: false, summary: 'Mira bars the gate.', content: 'The first paragraph.\n\nMira bars the gate as the bell stops.' };
+  const prevDraft = {
+    chapter: 4,
+    body: 'draft body',
+    summary: null,
+    state: { characterPositions: [{ entityKey: 'mira', location: 'the gate' }] },
+    isolated: false,
+    staleReason: null,
+  };
+
+  function outlineDb(ledger: Record<string, unknown>[], overrides: { prevChapter?: unknown; select?: unknown } = {}) {
+    return {
+      ...(overrides.select ? { select: overrides.select } : {}),
+      query: {
+        chapters: { findFirst: mock(async () => ('prevChapter' in overrides ? overrides.prevChapter : prevChapter)), findMany: mock(async () => []) },
+        drafts: { findFirst: mock(async () => prevDraft), findMany: mock(async () => []) },
+        decisionLedgerEntries: { findMany: mock(async () => ledger) },
+        bibleDocuments: { findMany: mock(async () => [timeline]) },
+      },
+    };
+  }
+
+  const keys = (pack: { sections: { key: string }[] }): string[] => pack.sections.map(section => section.key);
+  const sectionOf = (pack: { sections: { key: string; rendered: string }[] }, key: string): string => pack.sections.find(section => section.key === key)?.rendered ?? '';
+
+  it("should give the planner the previous chapter's closing prose and continuation state, as the writer reads them", async () => {
+    const pack = await makeAssembler(outlineDb([])).forOutline(1n, 5, { budgetTokens: 100_000, dryRun: true } as never);
+
+    expect(sectionOf(pack, 'prev_ending')).toContain('Mira bars the gate as the bell stops.');
+    expect(sectionOf(pack, 'continuation_state')).toContain('"location":"the gate"');
+    expect(pack.sections.filter(section => ['prev_ending', 'continuation_state'].includes(section.key)).every(section => section.required)).toBe(true);
+  });
+
+  it('should read an isolated previous chapter only through its approved bridge', async () => {
+    const isolated = { ...prevChapter, isolated: true };
+    const select = bridgeSelect(() => ({ drafts: [], reviews: [] }));
+    const pack = await makeAssembler(outlineDb([], { prevChapter: isolated, select })).forOutline(1n, 5, { budgetTokens: 100_000, dryRun: true } as never);
+
+    expect(sectionOf(pack, 'prev_ending')).toContain(NO_APPROVED_BRIDGE);
+    expect(pack.rendered).not.toContain('Mira bars the gate as the bell stops.');
+  });
+
+  it("should give the planner the Notebook's directions and backlog, and the timeline as private plans for later", async () => {
+    const pack = await makeAssembler(outlineDb([notes, organised, direction, backlog])).forOutline(1n, 5, { budgetTokens: 100_000, dryRun: true } as never);
+
+    expect(sectionOf(pack, 'ledger')).toContain('### Author directions\n\n- [tone.quiet] Keep every chapter quiet and close.');
+    expect(sectionOf(pack, 'ledger')).toContain('### Backlog — not yet\n\n- [plot.flood] A flood season some day.');
+    expect(sectionOf(pack, 'ledger')).not.toContain(NOTES);
+    expect(sectionOf(pack, 'later_plans')).toStartWith(`## THE AUTHOR'S PLANS FOR LATER\n\n${LATER_PLANS_LEAD}`);
+    expect(sectionOf(pack, 'later_plans')).toContain('- The lamp goes dark for a night.');
+    expect(pack.sections.filter(section => ['ledger', 'later_plans'].includes(section.key)).every(section => section.required)).toBe(true);
+  });
+
+  it('should leave the timeline out until the author has organised their notes', async () => {
+    const pack = await makeAssembler(outlineDb([notes, direction])).forOutline(1n, 5, { budgetTokens: 100_000, dryRun: true } as never);
+
+    expect(keys(pack)).not.toContain('later_plans');
+    expect(pack.rendered).not.toContain('The lamp goes dark');
+  });
+
+  it('should cap the timeline so a long page cannot crowd out the catalog', async () => {
+    const longTimeline = Array.from({ length: 2_000 }, (_, i) => `- Event ${i} happens in its place.`).join('\n\n');
+    const db = outlineDb([notes, organised]);
+    db.query.bibleDocuments.findMany = mock(async () => [{ ...timeline, body: longTimeline }]);
+    const pack = await makeAssembler(db).forOutline(1n, 5, { budgetTokens: 100_000, dryRun: true } as never);
+
+    const plans = pack.sections.find(section => section.key === 'later_plans');
+    expect(plans?.truncated).toBe(true);
+    expect(plans?.tokens).toBeLessThanOrEqual(OUTLINE_TIMELINE_CAP);
+  });
+
+  it('should read no previous ending when planning the first chapter', async () => {
+    const db = outlineDb([], { prevChapter: null });
+    db.query.drafts.findFirst = mock(async () => null as never);
+    const pack = await makeAssembler(db).forOutline(1n, 1, { budgetTokens: 100_000, dryRun: true } as never);
+
+    expect(keys(pack)).not.toContain('prev_ending');
+    expect(keys(pack)).not.toContain('continuation_state');
   });
 });
 
