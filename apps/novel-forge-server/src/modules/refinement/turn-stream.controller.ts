@@ -26,6 +26,7 @@ export class TurnStreamController {
       justDiscussing: body.justDiscussing ?? false,
       contentMode: body.contentMode,
       costTier: body.costTier,
+      contexts: body.contexts,
     });
     return { runId };
   }

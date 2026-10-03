@@ -95,6 +95,22 @@ export namespace Refinement {
     sources: ChatTraceSource[];
     timing: ChatTraceTiming;
   }
+
+  /** A passage the author commented on, anchored to the draft as it stood when the message was sent; offsets are UTF-16 code units into its body. */
+  export interface ChatPassageContext {
+    kind: 'passage';
+    chapter: number;
+    draftId: string;
+    revision: number;
+    saveSeq: number;
+    start: number;
+    end: number;
+    passageHash: string;
+    quote: string;
+    comment: string;
+    firstParagraph: number;
+    lastParagraph: number;
+  }
 }
 
 export const chatScope = pgEnum('chat_scope', ['project', 'novel', 'bible_document', 'volume', 'brief']);
@@ -166,6 +182,8 @@ export const chatMessages = pgTable(
     // What a settled reply read and how long each step took, so a reload shows the turn as its watcher saw it. Null on user messages and on
     // replies older than the column.
     trace: jsonb('trace').$type<Refinement.ChatTurnTrace>(),
+    // The passages an author's message comments on, frozen when it was sent so the turn renders the same in every later prompt. Null on replies.
+    contexts: jsonb('contexts').$type<Refinement.ChatPassageContext[]>(),
     createdAt: timestamp('created_at').notNull().defaultNow(),
   },
   t => [unique('chat_messages_session_id_ordinal_unique').on(t.sessionId, t.ordinal), index('chat_messages_applied_proposal_id_idx').on(t.appliedProposalId)],

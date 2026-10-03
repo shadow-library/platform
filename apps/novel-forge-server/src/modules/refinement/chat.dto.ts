@@ -6,12 +6,14 @@ import { ChatMode, ChatScope, ChatSessionStatus, ChatTurnOutcome, ContentMode, C
 import { type Project, type Refinement } from '@server/database';
 
 import { CHAT_TRACE_STATUSES, type ChatTraceStatus } from './chat-turn-trace';
+import { MAX_PASSAGE_COMMENT_CHARS, MAX_PASSAGE_CONTEXTS, MAX_PASSAGE_QUOTE_CHARS } from './passage-context';
 import { AppliedArtifactItem, AppliedOpSource, OpResultItem, ProposalResponse } from './refinement.dto';
 import { TURN_HOLD_REASONS, type TurnHoldReason } from './turn-proposals';
 import { type OpSource } from './write-policy';
 
 const TurnHoldReasonEnum = EnumType.create('TurnHoldReason', [...TURN_HOLD_REASONS]);
 const ChatTraceStatusEnum = EnumType.create('ChatTraceStatus', [...CHAT_TRACE_STATUSES]);
+const ChatContextKindEnum = EnumType.create('ChatContextKind', ['passage']);
 
 @Schema()
 export class ChatProjectParams {
@@ -249,6 +251,81 @@ export class ChatTurnTraceResponse {
   timing: ChatTraceTimingResponse;
 }
 
+@Schema({
+  description:
+    'A passage of a chapter draft the author commented on, sent with their message. Offsets are UTF-16 code units into the draft body, the indices a browser selection uses.',
+})
+export class ChatPassageContextBody {
+  @Field(() => ChatContextKindEnum)
+  kind: 'passage';
+
+  @Field(() => Integer, { minimum: 1 })
+  chapter: number;
+
+  @Field({ pattern: '^[0-9]+$', description: "The chapter's draft the passage was selected in." })
+  draftId: string;
+
+  @Field(() => Integer, { minimum: 0, description: 'The draft revision the author read; a passage the draft has since moved is found again by its quote.' })
+  revision: number;
+
+  @Field(() => Integer, { optional: true, minimum: 0, description: 'The save sequence the author read, when the client has it.' })
+  saveSeq?: number;
+
+  @Field(() => Integer, { minimum: 0 })
+  start: number;
+
+  @Field(() => Integer, { minimum: 1, description: 'Exclusive; `end - start` is the length of `quote`.' })
+  end: number;
+
+  @Field({ pattern: '^[0-9a-f]{64}$', description: 'SHA-256 of `quote` as lowercase hex.' })
+  passageHash: string;
+
+  @Field({ minLength: 1, maxLength: MAX_PASSAGE_QUOTE_CHARS, description: 'The selected text exactly as it stands in the draft body.' })
+  quote: string;
+
+  @Field({ maxLength: MAX_PASSAGE_COMMENT_CHARS, description: "The author's comment on the passage; empty points the chat at the passage without one." })
+  comment: string;
+}
+
+@Schema({ description: 'A passage the message commented on, anchored to the draft as it stood when the message was sent.' })
+export class ChatPassageContextResponse {
+  @Field(() => ChatContextKindEnum)
+  kind: 'passage';
+
+  @Field(() => Integer)
+  chapter: number;
+
+  @Field()
+  draftId: string;
+
+  @Field(() => Integer)
+  revision: number;
+
+  @Field(() => Integer)
+  saveSeq: number;
+
+  @Field(() => Integer, { description: "Offset into that revision's body, re-anchored if the draft had moved since the author selected it." })
+  start: number;
+
+  @Field(() => Integer)
+  end: number;
+
+  @Field()
+  passageHash: string;
+
+  @Field()
+  quote: string;
+
+  @Field()
+  comment: string;
+
+  @Field(() => Integer, { description: 'The paragraph the passage starts in, counted from 1 by blank lines as a reader counts them.' })
+  firstParagraph: number;
+
+  @Field(() => Integer, { description: 'The paragraph the passage ends in.' })
+  lastParagraph: number;
+}
+
 @Schema()
 export class ChatMessageResponse {
   @Field(() => String)
@@ -327,6 +404,13 @@ export class ChatMessageResponse {
   })
   trace?: ChatTurnTraceResponse | null;
 
+  @Field(() => [ChatPassageContextResponse], {
+    optional: true,
+    nullable: true,
+    description: 'The passages an author’s message commented on, to show above it; null on replies and on messages that sent none.',
+  })
+  contexts?: ChatPassageContextResponse[] | null;
+
   @Field(() => String, { format: 'date-time' })
   createdAt: Date;
 }
@@ -403,11 +487,18 @@ export class ChatTurnStatusResponse {
 @Schema()
 export class ChatTurnBody {
   @Field({
-    minLength: 1,
     maxLength: 200_000,
-    description: 'Chat content; accepts long premises, chapters, and reference documents up to 200,000 characters.',
+    description: 'Chat content; accepts long premises, chapters, and reference documents up to 200,000 characters. May be empty only when the message carries passage comments.',
   })
   content: string;
+
+  @Field(() => [ChatPassageContextBody], {
+    optional: true,
+    maxItems: MAX_PASSAGE_CONTEXTS,
+    description:
+      'Passages of chapter drafts the author commented on, sent with this message. Each is re-anchored to its draft as it stands; a passage that can no longer be found refuses the turn (`CHT_009`) so the author selects it again.',
+  })
+  contexts?: ChatPassageContextBody[];
 
   @Field({
     optional: true,

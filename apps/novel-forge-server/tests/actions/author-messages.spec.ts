@@ -6,7 +6,7 @@ import { authorMessagesFor } from '@modules/actions/plan-job.service';
 
 const dialect = new PgDialect();
 
-function fakeDb(answered: { sessionId: string } | undefined) {
+function fakeDb(answered: { sessionId: string } | undefined, rows: unknown[] = [{ content: 'Plan chapter 4: the tide turns.', contexts: null }]) {
   const messageReads: SQL[] = [];
   const db = {
     query: {
@@ -14,7 +14,7 @@ function fakeDb(answered: { sessionId: string } | undefined) {
         findFirst: async () => answered,
         findMany: async (query: { where: SQL }) => {
           messageReads.push(query.where);
-          return [{ content: 'Plan chapter 4: the tide turns.' }];
+          return rows;
         },
       },
       refinementProposals: { findFirst: async () => undefined },
@@ -33,6 +33,13 @@ describe('authorMessagesFor', () => {
     const { params } = dialect.sqlToQuery(messageReads[0] as SQL);
     expect(params).toContain('original-chat');
     expect(params).not.toContain('adopting-chat');
+  });
+
+  it('should read a message’s passage comments as the author’s words, never the quoted chapter text', async () => {
+    const contexts = [{ quote: 'The tide turns late tonight.', comment: 'Make the tide turn at dawn instead.' }];
+    const { db } = fakeDb({ sessionId: 'original-chat' }, [{ content: '', contexts }]);
+
+    expect(await authorMessagesFor(db, { sessionId: 'adopting-chat', messageId: 12n, proposalId: 40n })).toEqual(['Make the tide turn at dawn instead.']);
   });
 
   it('should read nothing for a card that answered no message', async () => {

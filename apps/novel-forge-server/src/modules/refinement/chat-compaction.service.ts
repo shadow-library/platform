@@ -18,6 +18,7 @@ import { resolveUnrestrictedRoute } from '../ai/unrestricted-route';
 import { PluginPolicyService } from '../plugins/plugin-policy.service';
 import { type ChatSelection, loadTurnSelections } from './chat-selection';
 import { renderQuestionForHistory } from './chat-question';
+import { renderTurnContent, turnScreens } from './passage-context';
 
 // Compaction thresholds: fold history once the verbatim window outgrows its token
 // budget or trails the watermark by more than MAX_VERBATIM_TURNS messages; the newest
@@ -61,9 +62,9 @@ export class ChatCompactionService {
       history.push(new HumanMessage(`Conversation so far (compacted summary):\n${summary}`));
     }
     for (const message of verbatim) {
-      if (message.role !== 'assistant' && !standard && findHardLine([message.content])) continue;
       if (message.role !== 'assistant') {
-        history.push(new HumanMessage(message.content));
+        if (!standard && refusesAuthored(message)) continue;
+        history.push(new HumanMessage(renderTurnContent(message.content, message.contexts)));
         continue;
       }
       if (unrestricted.has(message.id)) {
@@ -102,8 +103,8 @@ export class ChatCompactionService {
     const toFold = verbatim.slice(0, verbatim.length - KEEP_VERBATIM_TURNS);
     const watermark = toFold[toFold.length - 1]?.ordinal ?? session.summaryThroughOrdinal;
     const transcript = toFold
-      .filter(m => m.role === 'assistant' || !findHardLine([m.content]))
-      .map(m => `${m.role}: ${m.content}`)
+      .filter(m => m.role === 'assistant' || !refusesAuthored(m))
+      .map(m => `${m.role}: ${m.role === 'assistant' ? m.content : renderTurnContent(m.content, m.contexts)}`)
       .join('\n\n');
 
     const fallback = modeOf(project?.contentMode);
@@ -169,6 +170,10 @@ export class ChatCompactionService {
       orderBy: asc(schema.chatMessages.ordinal),
     });
   }
+}
+
+function refusesAuthored(message: Refinement.ChatMessage): boolean {
+  return findHardLine(turnScreens(message.content, message.contexts).map(screen => screen.text)) !== null;
 }
 
 function modeOf(value: string | undefined): Project.ContentMode {

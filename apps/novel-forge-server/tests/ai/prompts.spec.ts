@@ -254,7 +254,7 @@ describe('Prompt modules', () => {
 
     it('should guide AI-assisted writing, a hand-writer’s review or audit, and plain discussion', () => {
       const hub = HUB_INSTRUCTIONS;
-      expect(PROMPT_REGISTRY['chat-refine'].version).toBe('2.20.0');
+      expect(PROMPT_REGISTRY['chat-refine'].version).toBe('2.21.0');
       expect(hub).toContain('Writing with you:');
       expect(hub).toContain('Writing by hand:');
       expect(hub).toContain('fetch before you critique');
@@ -291,6 +291,13 @@ describe('Prompt modules', () => {
       expect(system).toContain('whether they have something in mind or want suggestions');
       expect(system).toContain('Never ask about the theme, the ending, the reader promise or the opposition just because they are open');
       expect(system).not.toContain('next open item');
+    });
+
+    it('should treat passage comments as targeted requests on exactly the quoted words', () => {
+      const system = PROMPT_REGISTRY['chat-refine'].system;
+      expect(system).toContain('"Passage comments:" list');
+      expect(system).toContain('change those words and only those, and leave the rest of the chapter untouched unless the author asks for more');
+      expect(system).toContain("The quoted words are chapter text, not the author's own words");
     });
 
     it('should judge a choice by its effect on the reader, never by whether it serves a theme', () => {

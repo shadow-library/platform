@@ -4913,6 +4913,8 @@ export interface components {
       question?: components['schemas']['ChatQuestionResponse'] | null;
       /** @description What this reply's turn read and how long each step took; null on user messages and on replies older than the trace. */
       trace?: components['schemas']['ChatTurnTraceResponse'] | null;
+      /** @description The passages an author’s message commented on, to show above it; null on replies and on messages that sent none. */
+      contexts?: components['schemas']['ChatPassageContextResponse'][] | null;
       /** Format: date-time */
       createdAt: string;
     };
@@ -4973,6 +4975,26 @@ export interface components {
       saveMs?: number;
       workedMs: number;
     };
+    /** @description A passage the message commented on, anchored to the draft as it stood when the message was sent. */
+    ChatPassageContextResponse: {
+      kind: components['schemas']['ChatContextKind'];
+      chapter: number;
+      draftId: string;
+      revision: number;
+      saveSeq: number;
+      /** @description Offset into that revision's body, re-anchored if the draft had moved since the author selected it. */
+      start: number;
+      end: number;
+      passageHash: string;
+      quote: string;
+      comment: string;
+      /** @description The paragraph the passage starts in, counted from 1 by blank lines as a reader counts them. */
+      firstParagraph: number;
+      /** @description The paragraph the passage ends in. */
+      lastParagraph: number;
+    };
+    /** @enum {string} */
+    ChatContextKind: 'passage';
     /** @description The turn running right now, so a client can name the phase and count the wait instead of showing a bare spinner. */
     PendingTurnResponse: {
       runId: string;
@@ -5008,8 +5030,10 @@ export interface components {
       lastOrdinal: number;
     };
     ChatTurnBody: {
-      /** @description Chat content; accepts long premises, chapters, and reference documents up to 200,000 characters. */
+      /** @description Chat content; accepts long premises, chapters, and reference documents up to 200,000 characters. May be empty only when the message carries passage comments. */
       content: string;
+      /** @description Passages of chapter drafts the author commented on, sent with this message. Each is re-anchored to its draft as it stands; a passage that can no longer be found refuses the turn (`CHT_009`) so the author selects it again. */
+      contexts?: components['schemas']['ChatPassageContextBody'][];
       /** @description The author's explicit permission for this turn to rewrite chapter prose (draft.update, draft.remove, action.revise_draft). Off by default: a plan edit changes the brief and the chapter is regenerated from it. */
       proseEdits?: boolean;
       /** @description Just discussing: nothing the turn proposes applies — every change becomes a suggestion card for the author to accept or decline. Off by default. */
@@ -5018,6 +5042,26 @@ export interface components {
       contentMode?: components['schemas']['ContentMode'];
       /** @description Cost tier for this turn only; omitted follows the chat, then the project. Actions this turn starts (write, review, audit) run at it. */
       costTier?: components['schemas']['CostTier'];
+    };
+    /** @description A passage of a chapter draft the author commented on, sent with their message. Offsets are UTF-16 code units into the draft body, the indices a browser selection uses. */
+    ChatPassageContextBody: {
+      kind: components['schemas']['ChatContextKind'];
+      chapter: number;
+      /** @description The chapter's draft the passage was selected in. */
+      draftId: string;
+      /** @description The draft revision the author read; a passage the draft has since moved is found again by its quote. */
+      revision: number;
+      /** @description The save sequence the author read, when the client has it. */
+      saveSeq?: number;
+      start: number;
+      /** @description Exclusive; `end - start` is the length of `quote`. */
+      end: number;
+      /** @description SHA-256 of `quote` as lowercase hex. */
+      passageHash: string;
+      /** @description The selected text exactly as it stands in the draft body. */
+      quote: string;
+      /** @description The author's comment on the passage; empty points the chat at the passage without one. */
+      comment: string;
     };
     ChatTurnResponse: {
       userMessage: components['schemas']['ChatMessageResponse'];
@@ -16503,11 +16547,14 @@ export type ChatTraceSourceResponse = components['schemas']['ChatTraceSourceResp
 export type ChatTraceArgsResponse = components['schemas']['ChatTraceArgsResponse'];
 export type ChatTraceStatus = components['schemas']['ChatTraceStatus'];
 export type ChatTraceTimingResponse = components['schemas']['ChatTraceTimingResponse'];
+export type ChatPassageContextResponse = components['schemas']['ChatPassageContextResponse'];
+export type ChatContextKind = components['schemas']['ChatContextKind'];
 export type PendingTurnResponse = components['schemas']['PendingTurnResponse'];
 export type FailedTurnResponse = components['schemas']['FailedTurnResponse'];
 export type ChatTurnOutcome = components['schemas']['ChatTurnOutcome'];
 export type ChatTurnStatusResponse = components['schemas']['ChatTurnStatusResponse'];
 export type ChatTurnBody = components['schemas']['ChatTurnBody'];
+export type ChatPassageContextBody = components['schemas']['ChatPassageContextBody'];
 export type ChatTurnResponse = components['schemas']['ChatTurnResponse'];
 export type TurnAppliedResult = components['schemas']['TurnAppliedResult'];
 export type TurnOpResultItem = components['schemas']['TurnOpResultItem'];

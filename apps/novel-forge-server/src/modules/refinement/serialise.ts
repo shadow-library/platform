@@ -2,7 +2,7 @@ import { type Project, type Refinement } from '@server/database';
 
 import { type CallUsageTotals } from '../ai/usage/call-usage';
 import { type NotesOffer, notesOffer } from '../notes/notes-message';
-import { type ChatMessageResponse, type ChatTurnResponse } from './chat.dto';
+import { type ChatMessageResponse, type ChatPassageContextResponse, type ChatTurnResponse } from './chat.dto';
 import { type ChatTurnResult } from './chat.service';
 import { type OpResult } from './proposal-apply.service';
 import { type AppliedActionJobItem, type ProposalResponse } from './refinement.dto';
@@ -34,6 +34,7 @@ interface ChatMessageRow {
   costTier?: Project.CostTier | null;
   question?: unknown;
   trace?: Refinement.ChatTurnTrace | null;
+  contexts?: Refinement.ChatPassageContext[] | null;
   createdAt: Date;
 }
 
@@ -57,8 +58,14 @@ export function serialiseMessage(message: ChatMessageRow, offersNotes: NotesOffe
     offersNotes: offersNotes(message),
     question: (message.question as ChatMessageResponse['question']) ?? null,
     trace: message.trace ?? null,
+    contexts: message.contexts?.map(serialisePassageContext) ?? null,
     createdAt: message.createdAt,
   };
+}
+
+function serialisePassageContext(context: Refinement.ChatPassageContext): ChatPassageContextResponse {
+  const { kind, chapter, draftId, revision, saveSeq, start, end, passageHash, quote, comment, firstParagraph, lastParagraph } = context;
+  return { kind, chapter, draftId, revision, saveSeq, start, end, passageHash, quote, comment, firstParagraph, lastParagraph };
 }
 
 export function serialiseProposal(proposal: Refinement.Proposal): ProposalResponse {

@@ -118,6 +118,13 @@
 - **A written chapter is decided in the chat**: every draft awaiting review (`needs_review` or `contradiction`) shows at the end of the thread to be read in full, approved
   under the approval rules (a contradiction needs the AI review first; blocking findings are overridden only on confirmation), or revised by asking — which turns
   on Edit prose, since a revision is `action.revise_draft`. Chapter writing started anywhere is followed in the thread until the draft lands.
+- **Passage comments ride the message**: an author's message may carry up to ten comments on passages of chapter drafts (`contexts`), each sent with its draft, revision,
+  UTF-16 offsets and a hash of its quote. The server re-anchors each to the draft as it stands — in place; else, when the revision the author read survives, only the copy
+  still between the words that surrounded it there; else the quote's one occurrence — and stores it on the message at that draft's current offsets; a passage it cannot
+  find refuses the turn (`CHT_009`) rather than send a stale quote. The comments render into the author's turn as one deterministic block (chapter, revision, paragraphs
+  counted by blank lines, range, quote, comment, each part on its own lines and never escaped, so the hard line reads them as written), byte-identical in that turn's
+  prompt and in every later turn's history. A comment is the author's own words for the quote rule and planning; the quoted chapter text never is. An isolated chapter's
+  passage is refused on every route (`CHT_011`), as the read policy keeps its prose from every chat call.
 - **The changes panel** lists a turn's or a job's Story Bible changes (each applied value beside its quote, ideas flagged, each undone and redone on its own) and the
   sources it read; an action the turn runs is never counted or listed as a Story Bible change — its job reports itself; the turn's progress lives only on its last line in
   the thread. It opens by itself only when a turn or a job leaves changes waiting for the author's OK, and otherwise only from the

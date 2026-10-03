@@ -227,6 +227,10 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly CHT_006 = AppErrorCode.conflict('CHT_006', 'Another turn wrote to this conversation at the same time — send the message again');
   static readonly CHT_007 = AppErrorCode.notFound('CHT_007', 'Turn stream not found — the run is unknown, belongs to another project, or its buffer has expired');
   static readonly CHT_008 = AppErrorCode.badRequest('CHT_008', 'Invalid job event cursor — Last-Event-ID must be a sequence number this chat’s job stream sent');
+  static readonly CHT_009 = AppErrorCode.conflict('CHT_009', 'That passage in chapter {chapter} changed — select it again');
+  static readonly CHT_010 = AppErrorCode.badRequest('CHT_010', 'A passage comment on chapter {chapter} does not match its quote — select the passage again');
+  static readonly CHT_011 = AppErrorCode.badRequest('CHT_011', 'Chapter {chapter} is isolated, so its passages cannot be sent to the chat — remove the comment');
+  static readonly CHT_012 = AppErrorCode.badRequest('CHT_012', 'Write a message or comment on a passage before sending');
 
   /*!
    * Refinement Proposal Errors

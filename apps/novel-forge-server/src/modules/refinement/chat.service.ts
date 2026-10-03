@@ -38,6 +38,7 @@ import { sanitizeChatQuestion } from './chat-question';
 import { loadRejectedIdeas } from './idea-rejections';
 import { requestedNegations } from './negation-echo';
 import { isNotesOrganiseRequest, ORGANISE_NOTES_OP, type OrganiseRouting, organiseRouting, withLaterPlansRouted } from './later-plans-guard';
+import { authorWords, type PassageContextInput, renderTurnContent, resolvePassageContexts, turnScreens } from './passage-context';
 import { chatTurnWarnings, readsPlannerOnlyPage } from './planner-only-guard';
 import { ProposalApplyService } from './proposal-apply.service';
 import { ProposalService } from './proposal.service';
@@ -61,6 +62,7 @@ export interface ChatTurnOptions extends ChatSelectionOverride {
   proseEdits?: boolean;
   /** Just discussing: nothing the turn proposes applies; every op becomes a card. */
   justDiscussing?: boolean;
+  contexts?: PassageContextInput[];
 }
 
 export interface CreateSessionInput {
@@ -122,6 +124,12 @@ export interface ChatTurnStatus {
   pendingTurn: PendingTurn | null;
   failedTurn: FailedTurn | null;
   lastOrdinal: number;
+}
+
+interface AuthoredMessage {
+  content: string;
+  contexts: Refinement.ChatPassageContext[];
+  rendered: string;
 }
 
 interface StagingContext {
@@ -426,16 +434,19 @@ export class ChatService {
     const session = await this.getSession(projectId, sessionId);
     if (session.status !== 'active') throw AppErrorCode.CHT_002.create();
     await this.validateScopeRef(projectId, session.scopeType, session.scopeRef);
-    this.logger.info('chat turn', { projectId, sessionId, scopeType: session.scopeType, mode: session.mode });
+    const contexts = await resolvePassageContexts(this.db, projectId, options.contexts ?? []);
+    if (!content.trim() && contexts.length === 0) throw AppErrorCode.CHT_012.create();
+    this.logger.info('chat turn', { projectId, sessionId, scopeType: session.scopeType, mode: session.mode, contexts: contexts.length });
     this.logger.debug('chat turn user message', { projectId, sessionId, content });
 
     const project = (await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) })) as ProjectConfig | undefined;
     const turnSelection = chatSelection(options, session, project);
+    const message = renderTurnContent(content, contexts);
     const compactionRunId = await this.compaction.compactIfNeeded(projectId, session, CHAT_HISTORY_BUDGET, project, turnSelection);
 
     const { policy, project: routed, route } = await this.routeChatReply(projectId, session, project, turnSelection);
     // Refused before it is saved: a stored message would ride every later turn's history and refuse the session with it.
-    const refused = route.contentMode === 'unrestricted' ? screenTexts([{ text: content, scope: 'supplied', source: 'Your message' }]) : null;
+    const refused = route.contentMode === 'unrestricted' ? screenTexts(turnScreens(content, contexts)) : null;
     if (refused) {
       this.logger.warn('chat turn refused by the hard line before it was saved', { projectId, sessionId, rule: refused.rule, source: refused.source });
       throw hardLineError(refused);
@@ -452,7 +463,7 @@ export class ChatService {
     const scopeInstructions = chatScopeInstructions(this.toolRegistry.getRaw(CHAT_HUB_NODE, webMode), webMode);
     const promptTokens = chatPromptTokens(scopeInstructions);
     const historyTexts = history.map(message => (typeof message.content === 'string' ? message.content : JSON.stringify(message.content)));
-    const requestTokens = [turnRules, content, ...historyTexts].reduce((sum, part) => sum + countTokens(part), 0);
+    const requestTokens = [turnRules, message, ...historyTexts].reduce((sum, part) => sum + countTokens(part), 0);
     const pack = await this.contextAssembler.forNovelChat(projectId, session.createdAt, { policy, promptTokens, requestTokens });
 
     // Pinned into `config.models.chat` so every round of this turn — lookups and repairs included — lands on the model recorded on the reply.
@@ -474,7 +485,7 @@ export class ChatService {
       // Persist the user's message before the model call: the running chat-turn run plus this
       // as-yet-unanswered message is what lets a refresh or a second tab recover the in-flight turn
       // (design recovery). The reply lands in persistAssistantTurn once the model returns.
-      const userMessage = await this.persistUserMessage(projectId, session, content, runId);
+      const userMessage = await this.persistUserMessage(projectId, session, { content, contexts, rendered: message }, runId);
       relay?.userMessage(userMessage);
       // Not awaited: must overlap the turn, not delay it. Its own workflow run, not this one — this
       // run may already be marked complete by the time it resolves.
@@ -488,7 +499,7 @@ export class ChatService {
           history: turnHistory,
           volatileContext: pack.renderedVolatile || 'nothing',
           turnRules,
-          userMessage: content,
+          userMessage: message,
         };
         const output = streamHandlers
           ? this.modelRouter.streamStructured(prompt, input, ctx, streamHandlers, effectiveProject, policy)
@@ -501,7 +512,7 @@ export class ChatService {
       let output = await invoke();
       const lookupCallCounts = new Map<string, number>();
       const planner = { read: false };
-      const web = webMode === 'brave' ? this.webResearch.forTurn(authorTexts(content, history)) : undefined;
+      const web = webMode === 'brave' ? this.webResearch.forTurn(authorTexts(authorWords(content, contexts), history)) : undefined;
       for (let round = 0; round < MAX_LOOKUP_ROUNDS && (output.lookups?.length ?? 0) > 0; round++) {
         this.logger.debug('chat turn: executing declared lookups', { runId, round, lookups: output.lookups?.map(l => l.tool) });
         const results = await this.executeLookups(projectId, runId, output.lookups ?? [], lookupCallCounts, { round, relay, trace, planner, web, webMode });
@@ -514,7 +525,7 @@ export class ChatService {
       if ((output.lookups?.length ?? 0) > 0) output = { reply: output.reply };
 
       // A removal written as "no X" gets one chance to be rewritten as a deletion; whatever survives is kept and flagged for review.
-      const exempt = requestedNegations(content);
+      const exempt = requestedNegations(authorWords(content, contexts));
       output = guarded(output);
       let warnings = await this.negationWarnings(projectId, output, exempt);
       if (warnings.length > 0) {
@@ -660,11 +671,21 @@ export class ChatService {
     return { policy, project: routed ?? base, route };
   }
 
-  private async persistUserMessage(projectId: bigint, session: Refinement.ChatSession, content: string, runId: string): Promise<Refinement.ChatMessage> {
+  private async persistUserMessage(projectId: bigint, session: Refinement.ChatSession, authored: AuthoredMessage, runId: string): Promise<Refinement.ChatMessage> {
     const lastOrdinal = await this.latestOrdinal(session.id);
+    const { content, contexts, rendered } = authored;
     const [userMessage] = await this.db
       .insert(schema.chatMessages)
-      .values({ sessionId: session.id, projectId, ordinal: lastOrdinal + 1, role: 'user', content, runId, tokens: countTokens(content) })
+      .values({
+        sessionId: session.id,
+        projectId,
+        ordinal: lastOrdinal + 1,
+        role: 'user',
+        content,
+        contexts: contexts.length > 0 ? contexts : null,
+        runId,
+        tokens: countTokens(rendered),
+      })
       .returning()
       .catch(err => this.databaseService.translateError(err));
     if (!userMessage) throw AppErrorCode.CHT_001.create();
@@ -702,7 +723,8 @@ export class ChatService {
       .catch(err => this.databaseService.translateError(err));
     if (!assistantMessage) throw AppErrorCode.CHT_001.create();
 
-    const { replyNote, ...staged } = await this.stageChangeSet(projectId, session, assistantMessage, userMessage.content, output, runId, warnings, staging);
+    const authored = authorWords(userMessage.content, userMessage.contexts);
+    const { replyNote, ...staged } = await this.stageChangeSet(projectId, session, assistantMessage, authored, output, runId, warnings, staging);
     if (staged.cardProposal) await this.linkMessage(assistantMessage, { proposalId: staged.cardProposal.id });
     if (replyNote) await this.appendToReply(assistantMessage, replyNote);
     await this.saveTrace(projectId, assistantMessage, trace.finish());

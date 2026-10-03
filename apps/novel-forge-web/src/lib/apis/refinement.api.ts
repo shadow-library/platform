@@ -21,6 +21,7 @@ import {
   type CancelRunResponse,
   type ChangeOpItem,
   type ChatMessageResponse,
+  type ChatPassageContextBody,
   type ChatSessionResponse,
   type ChatTurnResponse,
   type ChatTurnStatusResponse,
@@ -85,6 +86,8 @@ export interface ChatTurnRequest {
   /** This turn only; omitted follows the chat, then the project. */
   contentMode?: ContentMode;
   costTier?: CostTier;
+  /** Passages the author commented on; the server refuses the turn with `CHT_009` when one has changed since it was selected. */
+  contexts?: ChatPassageContextBody[];
 }
 
 interface ForgeTurnVariables extends ChatTurnRequest {

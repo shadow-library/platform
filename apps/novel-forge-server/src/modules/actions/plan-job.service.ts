@@ -11,6 +11,7 @@ import { type DbExecutor, type Job, type PrimaryDatabase, schema } from '@server
 import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { JobService } from '../jobs/job.service';
 import { type ActionContext } from '../refinement/action-registry';
+import { authorWords } from '../refinement/passage-context';
 import { ProposalService } from '../refinement/proposal.service';
 import { contentTokens, normaliseForQuote, quoteIsTentative, splitSentences } from '../refinement/write-policy';
 import { cardOwner, PLAN_GRAPH, stagedByJob, stageOnce } from './action-jobs';
@@ -57,7 +58,7 @@ export async function authorMessagesFor(db: Pick<DbExecutor, 'query'>, context: 
     orderBy: desc(proposals.id),
   });
   const messages = await db.query.chatMessages.findMany({
-    columns: { content: true },
+    columns: { content: true, contexts: true },
     where: and(
       eq(schema.chatMessages.sessionId, sessionId),
       eq(schema.chatMessages.role, 'user'),
@@ -67,7 +68,7 @@ export async function authorMessagesFor(db: Pick<DbExecutor, 'query'>, context: 
     orderBy: desc(schema.chatMessages.id),
     limit: INTENT_TURNS,
   });
-  return messages.map(message => message.content);
+  return messages.map(message => authorWords(message.content, message.contexts));
 }
 
 function bare(text: string): string {

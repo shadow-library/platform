@@ -81,6 +81,7 @@ export class ChatController {
       justDiscussing: body.justDiscussing ?? false,
       contentMode: body.contentMode,
       costTier: body.costTier,
+      contexts: body.contexts,
     });
     const turn = serialiseTurn(result, notesOffer(await this.chatService.authorNotes(params.projectId)));
     const cost = await this.turnCost.forMessages(params.projectId, [result.assistantMessage]);
