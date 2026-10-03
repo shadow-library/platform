@@ -12,6 +12,7 @@ export * from './PassageCards';
 export * from './PassageReader';
 export * from './UnsavedChangesGuard';
 export * from './use-chapter-editor';
+export * from './use-draft-approval';
 export * from './use-override-confirm';
 export * from './use-passage-ask';
 export * from './use-review-jobs';

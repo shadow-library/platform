@@ -16,6 +16,7 @@ import {
   type ChatMessageResponse,
   type ChatSessionResponse,
   type ChatTurnResponse,
+  invalidateDraft,
   invalidateProgress,
   isTurnFailureRecorded,
   type JobEnqueueResponse,
@@ -36,6 +37,7 @@ import {
   useProjectQuery,
   useProjectStatusQuery,
   useProposalQuery,
+  useReviewQueueQuery,
   useStartNextDraftMutation,
   useUpdateChatSessionMutation,
   useUpdateSessionModelMutation,
@@ -48,6 +50,7 @@ import { PANEL_DOCK_MIN } from '@/lib/sidebar-rail';
 import { takePendingFirstTurn } from '@/lib/pending-first-turn';
 import { useGenerationActivity } from '@/lib/use-generation-activity';
 
+import { ChapterDraftCard } from './ChapterDraftCard';
 import { editQueued, inputCaption, type QueuedTurn, queuedView, queueStep, releaseSettings, restoreFailed, type TurnSettings } from './chat-queue';
 import { ChatComposer } from './ChatComposer';
 import { NotesChip, SaveAsNotesOffer } from './ChatExtras';
@@ -164,6 +167,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
   const updateSession = useUpdateChatSessionMutation(novelId);
   const saveChatChoice = useUpdateSessionModelMutation(novelId);
   const generation = useGenerationActivity(novelId);
+  const reviewQueue = useReviewQueueQuery(novelId);
   const startNextDraft = useStartNextDraftMutation(novelId);
   const unanswered = useUnansweredCount();
 
@@ -256,6 +260,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
   }, [jobStream.jobs, messageIds]);
   const looseJobs = jobsByMessage.get('') ?? NO_JOBS;
   const writing = generation.activity && !jobStream.jobs.some(job => job.id === generation.activity?.jobId) ? generation.activity : undefined;
+  const draftsForYou = (reviewQueue.data?.drafts ?? []).filter(draft => draft.reviewStatus === 'needs_review' || draft.reviewStatus === 'contradiction');
 
   const shownProposals = new Set<string>();
   for (const message of messages) {
@@ -386,6 +391,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
         onSuccess: result => {
           announce(turnAnnouncement(turnOutcome(result)));
           invalidateProgress(queryClient, novelId);
+          invalidateDraft(queryClient, novelId);
           const note = applyNoteToast(result);
           if (note) toast.warning(note);
         },
@@ -544,6 +550,17 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
 
   const onWriting = (job: JobEnqueueResponse): void => {
     if (job.kind === 'plan' || job.kind === 'organise') jobStream.track([{ id: job.jobId, kind: job.kind }]);
+  };
+
+  // A revision rewrites the prose, so the request goes out with Edit prose on; the author finishes the sentence with what to change.
+  const askForChanges = (chapter: number): void => {
+    const draft = `Revise chapter ${chapter}: `;
+    setProseEdits(true);
+    setInput(draft);
+    requestAnimationFrame(() => {
+      inputRef.current?.focus();
+      inputRef.current?.setSelectionRange(draft.length, draft.length);
+    });
   };
 
   const cancelJob = (jobId: string): void => {
@@ -807,6 +824,9 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
                   <JobProgress view={writingView(writing)} stream="live" cancelling={generation.stopping} onCancel={generation.stop} />
                 </div>
               )}
+              {draftsForYou.map(draft => (
+                <ChapterDraftCard key={draft.chapter} novelId={novelId} draft={draft} onAskForChanges={askForChanges} />
+              ))}
               {planStartOpen && (
                 <div ref={planStartBar} className={`${styles.indented} ${styles.planStartBar}`}>
                   <Button size="sm" variant="ghost" prefix={<CloseIcon size={14} />} onClick={() => setPlanStartOpen(false)}>

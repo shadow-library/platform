@@ -125,7 +125,7 @@ export function useReviewQueueQuery(projectId: string, enabled = true): UseQuery
   return useQuery({ ...reviewQueueQueryOptions(projectId), enabled: enabled && Boolean(projectId) });
 }
 
-function invalidateDraft(queryClient: ReturnType<typeof useQueryClient>, projectId: string): void {
+export function invalidateDraft(queryClient: ReturnType<typeof useQueryClient>, projectId: string): void {
   queryClient.invalidateQueries({ queryKey: draftKeys.all(projectId) });
   queryClient.invalidateQueries({ queryKey: draftKeys.reviewQueue(projectId) });
 }

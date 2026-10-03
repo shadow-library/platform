@@ -5,7 +5,7 @@ import { Alert, Button, ConfirmDialog, Dialog, FormField, Kbd, SegmentedControl,
 import { CheckIcon, ProposalsIcon, WarningIcon } from '@/components/icons';
 import { useCollectionJump } from '@/components/Layout';
 import { type ChipIntent, CollectionPage, DetailPage, EmptyState, ItemPager, type ItemPagerJump, Markdown, PaneError, PaneLoader, StatusChip } from '@/components/nf';
-import { useOverrideConfirm } from '@/features/chapter-workspace';
+import { useDraftApproval } from '@/features/chapter-workspace';
 import { ChangeOpBody, PluginSourceChip } from '@/features/proposals';
 import {
   type ApiError,
@@ -16,8 +16,6 @@ import {
   reviewQueueQueryOptions,
   useAiModelsQuery,
   useApplyContinuityProposalMutation,
-  useApproveDraftMutation,
-  useChapterReviewsQuery,
   useDiscardContinuityProposalMutation,
   useDraftFeedbackMutation,
   useListDraftsQuery,
@@ -25,7 +23,6 @@ import {
   useReviewQueueQuery,
   useReviseDraftMutation,
 } from '@/lib/apis';
-import { approvalMessage, approvalRefusal, blockingHold } from '@/lib/chapter-checks';
 import { relativeTime } from '@/lib/format';
 import { modelLabel } from '@/lib/model-defaults';
 import {
@@ -146,17 +143,14 @@ interface ReviewDetailProps {
 }
 
 function ReviewDetail({ novelId, draft, total, ids, jump, onSelect }: ReviewDetailProps): React.JSX.Element {
-  const approveDraft = useApproveDraftMutation(novelId);
   const feedback = useDraftFeedbackMutation(novelId, draft.chapter);
   const revise = useReviseDraftMutation(novelId, draft.chapter);
   const [dialog, setDialog] = useState<'revision_requested' | 'rejected' | null>(null);
 
   const intent = REVIEW_INTENT[draft.reviewStatus] ?? 'neutral';
   const isContradiction = draft.reviewStatus === 'contradiction';
-  const reviews = useChapterReviewsQuery(novelId, draft.chapter);
-  const held = blockingHold(reviews.data);
-  const refusal = approvalRefusal(draft.reviewStatus, held);
-  const overrideConfirm = useOverrideConfirm(draft.chapter, held);
+  const approval = useDraftApproval(novelId, draft);
+  const { refusal, held } = approval;
   const nextId = nextAfterApproval(ids, chapterKey(draft.chapter));
 
   // A revision request actually runs the AI revision pass against the note; a rejection only records
@@ -187,25 +181,11 @@ function ReviewDetail({ novelId, draft, total, ids, jump, onSelect }: ReviewDeta
     );
   };
 
-  const approve = (): void => {
-    if (approveDraft.isPending) return;
-    if (refusal) return void toast.warning(refusal);
-    overrideConfirm.request(() =>
-      approveDraft.mutate(draft, {
-        onSuccess: approved => {
-          const message = approvalMessage(draft.chapter, approved.overriddenFindings);
-          if (approved.overriddenFindings) toast.warning(message);
-          else toast.success(message);
-          onSelect(nextId === undefined ? undefined : Number(nextId));
-        },
-        onError: err => toast.danger(err.message),
-      }),
-    );
-  };
+  const approve = (): void => approval.approve(() => onSelect(nextId === undefined ? undefined : Number(nextId)));
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
-      if (dialog !== null || overrideConfirm.open) return;
+      if (dialog !== null || approval.confirming) return;
       const target = event.target as HTMLElement | null;
       const editableTarget = target != null && isEditableElement(target.tagName, target.isContentEditable);
       const hotkey = reviewHotkey({ key: event.key, ctrlKey: event.ctrlKey, metaKey: event.metaKey, altKey: event.altKey, editableTarget });
@@ -257,7 +237,7 @@ function ReviewDetail({ novelId, draft, total, ids, jump, onSelect }: ReviewDeta
 
             <div className={styles.decision}>
               <Tooltip content={refusal ?? (held > 0 ? 'Approve and record its blocking findings as overridden' : 'Approve this draft')}>
-                <Button variant="primary" fullWidth disabled={Boolean(refusal)} loading={approveDraft.isPending} onClick={approve}>
+                <Button variant="primary" fullWidth disabled={Boolean(refusal)} loading={approval.pending} onClick={approve}>
                   Approve draft
                 </Button>
               </Tooltip>
@@ -280,7 +260,7 @@ function ReviewDetail({ novelId, draft, total, ids, jump, onSelect }: ReviewDeta
         </DetailPage.Prose>
       </DetailPage>
 
-      {overrideConfirm.dialog}
+      {approval.dialog}
       <FeedbackDialog
         open={dialog !== null}
         onOpenChange={o => !o && setDialog(null)}

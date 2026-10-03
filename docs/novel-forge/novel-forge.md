@@ -114,6 +114,9 @@
 - **The mode is the author's choice in the composer**, and its label always names what the next turn will do: Edit freely (session `auto`, the default), Ask first (session
   `manual`) or Just discuss (this turn only; every op is a card, and the session's mode is untouched). Edit prose is a separate per-turn permission, never implied by a mode, and
   prose always arrives as a card. The chat model is told the session's mode, but it never decides what applies.
+- **A written chapter is decided in the chat**: every draft awaiting review (`needs_review` or `contradiction`) shows at the end of the thread to be read in full, approved
+  under the Review Queue's own rules (a contradiction needs the AI review first; blocking findings are overridden only on confirmation), or revised by asking — which turns
+  on Edit prose, since a revision is `action.revise_draft`. Chapter writing started anywhere is followed in the thread until the draft lands.
 - **The changes panel** lists a turn's or a job's Story Bible changes (each applied value beside its quote, ideas flagged, each undone and redone on its own) and the
   sources it read; an action the turn runs is never counted or listed as a Story Bible change — its job reports itself; the turn's progress lives only on its last line in
   the thread. It opens by itself only when a turn or a job leaves changes waiting for the author's OK, and otherwise only from the

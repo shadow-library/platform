@@ -525,6 +525,41 @@ button.turnRow:hover {
   border-color: var(--sh-danger-border);
 }
 
+/* Collapsed to an opening that fades out; reading opens the whole chapter in the thread rather than in a nested scroller. */
+.draftBody {
+  position: relative;
+  max-height: 220px;
+  overflow: hidden;
+  padding: 12px 12px 0;
+  font-size: var(--sh-text-body);
+  line-height: var(--sh-text-body--line-height);
+  color: var(--sh-text-primary);
+}
+
+.draftBody::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0;
+  height: 64px;
+  background: linear-gradient(to bottom, transparent, var(--sh-surface-card));
+}
+
+.draftBody[data-reading] {
+  max-height: none;
+}
+
+.draftBody[data-reading]::after {
+  content: none;
+}
+
+.draftFoot {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--sh-border-subtle);
+}
+
 .cardHead {
   display: flex;
   align-items: center;

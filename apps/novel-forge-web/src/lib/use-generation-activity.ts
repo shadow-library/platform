@@ -2,7 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
 import { toast } from '@shadow-library/ui';
 
-import { type GenerationJobItem, hasActiveJob, useJobStop, useListJobsQuery } from '@/lib/apis';
+import { type GenerationJobItem, hasActiveJob, invalidateDraft, useJobStop, useListJobsQuery } from '@/lib/apis';
 import { activeGenerateJob, type GenerationActivity, generationActivityOf, isRunningJob, jobChapters } from '@/lib/generation-activity';
 
 export interface GenerationActivityState {
@@ -37,7 +37,7 @@ export function useGenerationActivity(novelId: string): GenerationActivityState 
 
   // Each new chapter starting means the previous one just landed.
   useEffect(() => {
-    if (activeJobId) queryClient.invalidateQueries({ queryKey: ['projects', novelId, 'drafts'] });
+    if (activeJobId) invalidateDraft(queryClient, novelId);
   }, [activeJobId, current, novelId, queryClient]);
 
   useEffect(() => {
@@ -48,7 +48,7 @@ export function useGenerationActivity(novelId: string): GenerationActivityState 
     const finished = jobs?.find(job => job.id === watchedRef.current);
     if (!finished || isRunningJob(finished)) return;
     watchedRef.current = undefined;
-    queryClient.invalidateQueries({ queryKey: ['projects', novelId, 'drafts'] });
+    invalidateDraft(queryClient, novelId);
     queryClient.invalidateQueries({ queryKey: ['projects', novelId, 'runs'] });
     announce(finished);
   }, [activeJobId, jobs, novelId, queryClient]);
