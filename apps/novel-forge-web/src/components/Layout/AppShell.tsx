@@ -73,10 +73,6 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
   const status = statusQuery.data;
   const phase = lifecyclePhase(status, project?.kind);
 
-  const badges: Record<string, NavLeaf['badge']> = {
-    chapters: { count: status?.chaptersTotal ?? 0 },
-  };
-
   const options = projects.map(candidate => {
     const ownerTag = sharedOwnerTag(candidate);
     return {
@@ -95,7 +91,6 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
     params: { novelId: novelId ?? '' },
     label: screen.label,
     icon: screen.icon,
-    badge: badges[screen.segment],
   });
 
   const isAdmin = useIsAdmin();
