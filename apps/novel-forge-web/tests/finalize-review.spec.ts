@@ -33,6 +33,7 @@ import {
   receiptLine,
   receiptTitle,
   storyBibleReceipt,
+  storyBibleWritten,
   toggledAutoKeep,
 } from '../src/lib/finalize-review';
 
@@ -307,6 +308,15 @@ describe('storyBibleReceipt', () => {
   it('should mark an update the author edited', () => {
     expect(receiptLine({ claim: 'Mira is at the tower', decision: 'edited' })).toBe('Mira is at the tower · as you edited it');
     expect(receiptLine({ claim: 'Mira is at the tower', decision: 'kept' })).toBe('Mira is at the tower');
+  });
+});
+
+describe('storyBibleWritten', () => {
+  it('should count a chapter as written only once its review applied, never for a bridge', () => {
+    expect(storyBibleWritten(review({ status: 'applied' }))).toBe(true);
+    expect(storyBibleWritten(review({ status: 'ready' }))).toBe(false);
+    expect(storyBibleWritten(review({ status: 'applied', bridgeOnly: true }))).toBe(false);
+    expect(storyBibleWritten(undefined)).toBe(false);
   });
 });
 

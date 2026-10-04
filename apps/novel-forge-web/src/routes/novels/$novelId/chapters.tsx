@@ -86,6 +86,7 @@ import {
   useDraftQuery,
   useDraftSummaryQuery,
   useExtractToBibleMutation,
+  useFinalizeReviewQuery,
   useGenerateMutation,
   useGenerateUnrestrictedMutation,
   useImportDraftMutation,
@@ -135,6 +136,7 @@ import {
   teachingGateRefusal,
   workspaceActions,
 } from '@/lib/chapter-workspace';
+import { storyBibleWritten } from '@/lib/finalize-review';
 import { chapterGeneration, type ChapterGeneration } from '@/lib/generation-activity';
 import { useGenerationActivity } from '@/lib/use-generation-activity';
 
@@ -1356,6 +1358,8 @@ function ChapterWorkspace({ novelId, draft, deleted, onBack, onPick }: ChapterWo
   const reviews = useChapterReviewsQuery(novelId, chapter);
   const reviewJobs = useReviewJobs(novelId, chapter, reviews.data);
   const extract = useExtractToBibleMutation(novelId, chapter);
+  const finalizeReview = useFinalizeReviewQuery(novelId, chapter);
+  const offersAddToBible = !storyBibleWritten(finalizeReview.data);
   const navigate = useNavigate();
   const sceneImagesQuery = useChapterImagesQuery(novelId, chapter);
   const addSceneImage = useAddChapterImageMutation(novelId, chapter);
@@ -1588,7 +1592,7 @@ function ChapterWorkspace({ novelId, draft, deleted, onBack, onPick }: ChapterWo
               <Tooltip content="View or edit this chapter's summary">
                 <IconButton variant="ghost" aria-label="Summary" icon={<DocIcon size={17} />} onClick={() => openSummarize(false)} />
               </Tooltip>
-              <Tooltip content="Add this chapter's new canon to the bible as a proposal">{addToBible}</Tooltip>
+              {offersAddToBible && <Tooltip content="Add this chapter's new canon to the bible as a proposal">{addToBible}</Tooltip>}
               {actions.verify && (
                 <Button variant="secondary" size="sm" loading={runReview.isPending && runReview.variables?.kind === 'judge'} onClick={runJudge}>
                   Verify
@@ -1605,9 +1609,11 @@ function ChapterWorkspace({ novelId, draft, deleted, onBack, onPick }: ChapterWo
                 <DropdownMenu.Content align="end">
                   {actions.edit && <DropdownMenu.Item onSelect={() => setEditing(true)}>Edit prose</DropdownMenu.Item>}
                   <DropdownMenu.Item onSelect={() => openSummarize(false)}>Summary</DropdownMenu.Item>
-                  <DropdownMenu.Item disabled={!draft.body?.trim()} onSelect={runExtract}>
-                    Add to bible
-                  </DropdownMenu.Item>
+                  {offersAddToBible && (
+                    <DropdownMenu.Item disabled={!draft.body?.trim()} onSelect={runExtract}>
+                      Add to bible
+                    </DropdownMenu.Item>
+                  )}
                   {actions.verify && <DropdownMenu.Item onSelect={runJudge}>Verify</DropdownMenu.Item>}
                 </DropdownMenu.Content>
               </DropdownMenu>

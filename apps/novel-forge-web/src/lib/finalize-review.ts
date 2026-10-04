@@ -409,6 +409,11 @@ export function receiptLine(item: Pick<FinalizeReviewItemResponse, 'claim' | 'de
   return item.decision === 'edited' ? `${item.claim} · as you edited it` : item.claim;
 }
 
+/** The review that finalized the chapter already wrote its Story Bible updates, so adding the chapter again would only stage duplicate canon. */
+export function storyBibleWritten(review: Pick<FinalizeReviewResponse, 'status' | 'bridgeOnly'> | undefined): boolean {
+  return review?.status === 'applied' && !review.bridgeOnly;
+}
+
 /** The updates the chat's decisions card asks about one by one: the unsure and the conflicting, open or already answered. */
 export function askedItems(review: Pick<FinalizeReviewResponse, 'consequential'>): FinalizeReviewItemResponse[] {
   return review.consequential.filter(item => !item.autoKept);
