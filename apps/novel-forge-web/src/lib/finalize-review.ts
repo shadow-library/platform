@@ -409,9 +409,26 @@ export function receiptLine(item: Pick<FinalizeReviewItemResponse, 'claim' | 'de
   return item.decision === 'edited' ? `${item.claim} · as you edited it` : item.claim;
 }
 
-/** The updates the chat's decisions card asks about: everything approval did not keep on its own, open or already answered. */
-export function askedItems(review: Pick<FinalizeReviewResponse, 'consequential' | 'routine'>): FinalizeReviewItemResponse[] {
-  return [...review.consequential, ...review.routine].filter(item => !item.autoKept);
+/** The updates the chat's decisions card asks about one by one: the unsure and the conflicting, open or already answered. */
+export function askedItems(review: Pick<FinalizeReviewResponse, 'consequential'>): FinalizeReviewItemResponse[] {
+  return review.consequential.filter(item => !item.autoKept);
+}
+
+/** Confident updates approval left open — a review read before approval kept them, or an auto-keep list that leaves their category out. */
+export function confidentItems(review: Pick<FinalizeReviewResponse, 'routine'>): FinalizeReviewItemResponse[] {
+  return review.routine.filter(item => !item.autoKept);
+}
+
+export function confidentSummary(items: Pick<FinalizeReviewItemResponse, 'decision'>[]): string {
+  const open = items.filter(item => item.decision === null).length;
+  const count = open > 0 ? open : items.length;
+  const noun = `confident addition${count === 1 ? '' : 's'}`;
+  return open > 0 ? `${count} ${noun} — taken from the chapter, none conflicting with canon` : `${count} ${noun}, answered`;
+}
+
+export function pendingCaption(review: Pick<FinalizeReviewResponse, 'open'>): string {
+  if (review.open.consequential > 0) return 'Answer each one; Done then makes the chapter final.';
+  return 'Add them all, or review them one by one; the chapter then becomes final.';
 }
 
 /** The server flags every update where the chapter disagrees with the plan or canon: the author changes the chapter, or lets canon follow it. */
@@ -427,9 +444,10 @@ export function decisionTag(item: Pick<FinalizeReviewItemResponse, 'flag' | 'bas
 }
 
 export function decisionsTitle(review: Pick<FinalizeReviewResponse, 'chapter' | 'open'>): string {
-  const open = review.open.consequential + review.open.routine;
-  if (open === 0) return `Chapter ${review.chapter}: ready for the Story Bible`;
-  return `Chapter ${review.chapter}: ${open} decision${open === 1 ? '' : 's'} for the Story Bible`;
+  const { consequential, routine } = review.open;
+  if (consequential > 0) return `Chapter ${review.chapter}: ${consequential} decision${consequential === 1 ? '' : 's'} for the Story Bible`;
+  if (routine > 0) return `Chapter ${review.chapter}: ${routine} addition${routine === 1 ? '' : 's'} for the Story Bible`;
+  return `Chapter ${review.chapter}: ready for the Story Bible`;
 }
 
 export function decisionsCaption(review: Pick<FinalizeReviewResponse, 'chapter' | 'consequential' | 'routine'>): string {

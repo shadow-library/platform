@@ -5,6 +5,8 @@ import { ApiError } from '../src/lib/apis/transport';
 import {
   askedItems,
   autoKeepChoices,
+  confidentItems,
+  confidentSummary,
   decisionAnnouncement,
   decisionMode,
   decisionsCaption,
@@ -27,6 +29,7 @@ import {
   keptCount,
   latestFinalChapter,
   nextOpenItemId,
+  pendingCaption,
   receiptLine,
   receiptTitle,
   storyBibleReceipt,
@@ -308,15 +311,24 @@ describe('storyBibleReceipt', () => {
 });
 
 describe('the chat decisions card', () => {
-  it('should ask about everything approval did not keep on its own, answered or not', () => {
-    const asked = askedItems(
-      review({
-        consequential: [item({ decision: 'kept' })],
-        routine: [item({ id: '2', triage: 'routine', decision: 'kept', autoKept: true }), item({ id: '3', triage: 'routine' })],
-      }),
-    );
+  it('should ask one by one only about the unsure and the conflicting, and batch the confident updates approval left open', () => {
+    const shown = review({
+      consequential: [item({ decision: 'kept' })],
+      routine: [item({ id: '2', triage: 'routine', decision: 'kept', autoKept: true }), item({ id: '3', triage: 'routine' })],
+    });
 
-    expect(asked.map(entry => entry.id)).toEqual(['1', '3']);
+    expect(askedItems(shown).map(entry => entry.id)).toEqual(['1']);
+    expect(confidentItems(shown).map(entry => entry.id)).toEqual(['3']);
+  });
+
+  it('should sum up the confident batch by what is still open', () => {
+    expect(confidentSummary([item({ decision: null }), item({ decision: 'kept' })])).toBe('1 confident addition — taken from the chapter, none conflicting with canon');
+    expect(confidentSummary([item({ decision: 'kept' }), item({ decision: 'skipped' })])).toBe('2 confident additions, answered');
+  });
+
+  it('should ask to answer each conflict, else to add the confident batch', () => {
+    expect(pendingCaption(review())).toBe('Answer each one; Done then makes the chapter final.');
+    expect(pendingCaption(review({ open: { consequential: 0, routine: 18 } }))).toBe('Add them all, or review them one by one; the chapter then becomes final.');
   });
 
   it('should tell a conflict from an unsure update', () => {
@@ -345,8 +357,9 @@ describe('the chat decisions card', () => {
   });
 
   it('should count what is left to decide, and say when the chapter is ready', () => {
-    expect(decisionsTitle(review())).toBe('Chapter 4: 2 decisions for the Story Bible');
+    expect(decisionsTitle(review({ open: { consequential: 2, routine: 3 } }))).toBe('Chapter 4: 2 decisions for the Story Bible');
     expect(decisionsTitle(review({ open: { consequential: 1, routine: 0 } }))).toBe('Chapter 4: 1 decision for the Story Bible');
+    expect(decisionsTitle(review({ open: { consequential: 0, routine: 18 } }))).toBe('Chapter 4: 18 additions for the Story Bible');
     expect(decisionsTitle(review(ANSWERED))).toBe('Chapter 4: ready for the Story Bible');
   });
 

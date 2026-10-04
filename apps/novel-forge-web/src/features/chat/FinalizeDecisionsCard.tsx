@@ -11,10 +11,13 @@ import {
   useDecideFinalizeReviewItemMutation,
   useFinalizeReadinessQuery,
   useFinalizeReviewedChapterMutation,
+  useKeepRoutineMutation,
   usePrepareFinalizeReviewMutation,
 } from '@/lib/apis';
 import {
   askedItems,
+  confidentItems,
+  confidentSummary,
   decisionLabel,
   decisionsCaption,
   decisionsPhase,
@@ -25,6 +28,7 @@ import {
   fixChapterNote,
   isCanonConflict,
   itemStakes,
+  pendingCaption,
 } from '@/lib/finalize-review';
 
 import styles from './Chat.module.css';
@@ -52,13 +56,17 @@ export function FinalizeDecisionsCard({ novelId, review, settling, onFixChapter 
   const decide = useDecideFinalizeReviewItemMutation(novelId, chapter);
   const finalize = useFinalizeReviewedChapterMutation(novelId, chapter);
   const prepare = usePrepareFinalizeReviewMutation(novelId, chapter);
+  const keepRoutine = useKeepRoutineMutation(novelId, chapter);
   const phase = decisionsPhase(review, settling);
   const answered = phase === 'answered';
   const readiness = useFinalizeReadinessQuery(novelId, chapter, answered);
   const [skipping, setSkipping] = useState<string>();
   const [problem, setProblem] = useState<Problem>();
+  const [reviewingConfident, setReviewingConfident] = useState(false);
   const blockers = answered ? finalizeBlockers(readiness.data) : [];
-  const busy = decide.isPending || finalize.isPending;
+  const busy = decide.isPending || finalize.isPending || keepRoutine.isPending;
+  const confident = confidentItems(review);
+  const openConfident = review.open.routine;
 
   const submit = (item: FinalizeReviewItemResponse, decision: FinalizeReviewDecision, reason?: string): void => {
     setProblem(undefined);
@@ -77,6 +85,16 @@ export function FinalizeDecisionsCard({ novelId, review, settling, onFixChapter 
       onSuccess: result => {
         if (result.status === 'failed') toast.danger(`Chapter ${chapter} could not be finalized — the run is listed under Runs`);
         else toast.success(`Chapter ${chapter} is final`);
+      },
+      onError: error => setProblem({ message: error.message }),
+    });
+  };
+
+  const addConfident = (): void => {
+    setProblem(undefined);
+    keepRoutine.mutate(undefined, {
+      onSuccess: kept => {
+        if (kept.open.consequential === 0) done();
       },
       onError: error => setProblem({ message: error.message }),
     });
@@ -139,6 +157,38 @@ export function FinalizeDecisionsCard({ novelId, review, settling, onFixChapter 
             onFixChapter={() => onFixChapter(chapter, fixChapterNote(item))}
           />
         ))}
+        {confident.length > 0 && (
+          <div className={styles.turnOp}>
+            <div className={styles.turnOpRow}>
+              <StatusChip intent="success">confident</StatusChip>
+              <span>{confidentSummary(confident)}</span>
+            </div>
+            <div className={styles.turnOpActions}>
+              {openConfident > 0 && (
+                <Button size="sm" variant="primary" loading={keepRoutine.isPending} disabled={busy} onClick={addConfident}>
+                  {review.open.consequential === 0 ? `Add all ${openConfident} and finish` : `Add all ${openConfident}`}
+                </Button>
+              )}
+              <Button size="sm" variant="ghost" aria-expanded={reviewingConfident} onClick={() => setReviewingConfident(open => !open)}>
+                {reviewingConfident ? 'Hide them' : 'Review one by one'}
+              </Button>
+            </div>
+          </div>
+        )}
+        {(reviewingConfident ? confident : []).map(item => (
+          <DecisionItem
+            key={item.id}
+            item={item}
+            chapter={chapter}
+            busy={busy}
+            skipping={skipping === item.id}
+            problem={problem?.itemId === item.id ? problem.message : undefined}
+            onKeep={() => submit(item, 'kept')}
+            onSkip={reason => submit(item, 'skipped', reason)}
+            onSkipping={open => setSkipping(open ? item.id : undefined)}
+            onFixChapter={() => onFixChapter(chapter, fixChapterNote(item))}
+          />
+        ))}
       </div>
       {blockers.map(blocker => (
         <div key={blocker} className={styles.turnCardWarning}>
@@ -154,7 +204,7 @@ export function FinalizeDecisionsCard({ novelId, review, settling, onFixChapter 
         <Button size="sm" variant="primary" loading={finalize.isPending} disabled={!answered || busy || blockers.length > 0} onClick={done}>
           Done
         </Button>
-        <span className={`${styles.caption} ${styles.pushEnd}`}>{answered ? decisionsCaption(review) : 'Answer each one; Done then makes the chapter final.'}</span>
+        <span className={`${styles.caption} ${styles.pushEnd}`}>{answered ? decisionsCaption(review) : pendingCaption(review)}</span>
       </div>
     </section>
   );

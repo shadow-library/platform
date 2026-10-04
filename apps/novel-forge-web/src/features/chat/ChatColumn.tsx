@@ -249,7 +249,6 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
   const showStream = !settled && (turn.isPending || stream.status === 'stopped' || streamed);
   // A failed stream keeps what it wrote; the failure card joins it once the transcript has recorded the failure.
   const showTurnStatus = !showStream || (stream.status === 'failed' && state.kind !== 'pending');
-  const view = chatColumnView({ messageCount: messages.length, loading: messagesQuery.isLoading, active: pending || showStream || planStartOpen });
   const locked = session ? session.status !== 'active' : starting;
   const busy = pending || locked;
   const notesOpener = notesOpenerId(messages);
@@ -322,6 +321,8 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
   const waiting = (proposalsQuery.data?.items ?? []).filter(proposal => session && proposal.sessionId === session.id && !shownProposals.has(proposal.id));
   const waitingPlans = waiting.filter(proposal => proposal.kind === PLAN_KIND);
   const waitingCards = waiting.filter(proposal => proposal.kind !== PLAN_KIND);
+  const threadCards = waiting.length + draftsForYou.length + continuityForYou.length + bibleReceipts.length + bibleDecisions.length + (writing ? 1 : 0);
+  const view = chatColumnView({ messageCount: messages.length, loading: messagesQuery.isLoading, active: pending || showStream || planStartOpen || threadCards > 0 });
   const ordinals = new Map(messages.map(message => [message.id, message.ordinal]));
   const panelProposals: PanelProposals[] = [
     ...jobStream.jobs.flatMap(job => jobProposals(job, job.messageId ? ordinals.get(job.messageId) : undefined) ?? []),

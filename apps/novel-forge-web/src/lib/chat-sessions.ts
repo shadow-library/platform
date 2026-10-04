@@ -25,7 +25,10 @@ export interface ChatColumnInput {
   messageCount: number;
   /** The transcript is on its way — hold the conversation layout so the composer never travels twice. */
   loading: boolean;
-  /** A turn in flight or a streamed reply on screen: content exists before the transcript carries it. */
+  /**
+   * Content exists before the transcript carries it: a turn in flight, a streamed reply, or cards the project waits on. The centred state
+   * clips its stack, so anything taller than the composer must take the conversation layout.
+   */
   active: boolean;
 }
 
