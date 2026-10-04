@@ -43,7 +43,7 @@ interface JobEnqueueResponse {
  *
  * Hand saves, imports and deletes as the draft-save path enforces them (`draft-save.ts`), approval binding to the exact revision the
  * author read, and the generation gates that refuse `/generate`, `/chapters/:n/regenerate` and `/chapters/:n/generate-unrestricted`
- * before any model is reached. Every project fail-pins and quota-pins every role, since approving always stages a model job.
+ * before any model is reached. Every project is quota-pinned, since approving always stages a model job.
  */
 
 function draftsPath(projectId: string, chapter: number, suffix = ''): string {
@@ -287,7 +287,7 @@ test.describe('novel-forge approval binding', () => {
     const [reviewJob] = await novelForgeDb()<{ id: string }[]>`SELECT id::text FROM jobs WHERE project_id = ${projectId} AND kind = 'finalize_review' ORDER BY id DESC LIMIT 1`;
     expect(reviewJob, 'approving enqueues a finalize_review job').toBeDefined();
     const settledReview = await pollJobStatus(reviewJob!.id);
-    expect(settledReview.status, 'the finalize_review job fails under the fail-pin').toBe('failed');
+    expect(settledReview.status, 'the finalize_review job fails under the quota pin').toBe('failed');
     const [attempts] = await novelForgeDb()<{ attempts: number }[]>`SELECT attempts FROM jobs WHERE id = ${reviewJob!.id}`;
     expect(attempts?.attempts, 'finalize_review is never retried').toBe(1);
     expect(await listDispatchedModelCalls(projectId), 'no real model call was made').toEqual([]);

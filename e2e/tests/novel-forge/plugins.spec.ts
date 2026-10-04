@@ -49,7 +49,7 @@ test.describe('novel-forge plugins without a plugin directory', () => {
     await expectCode(await anonymous.post(`${base}/${MISSING_PLUGIN}/augment`), 401, 'IAM_001', 'an anonymous augment');
 
     await expectCode(await mutate(owner.ctx, 'put', `${base}/${MISSING_PLUGIN}`, { data: { config: {} } }), 404, 'PLG_001', 'enabling a plugin not on disk');
-    await assertSpendGuarded(projectId, { requireQuota: true });
+    await assertSpendGuarded(projectId);
     await expectCode(await mutate(owner.ctx, 'post', `${base}/${MISSING_PLUGIN}/augment`), 404, 'PLG_001', 'augmenting with a plugin not on disk');
     const malformed = await mutate(owner.ctx, 'put', `${base}/Not_A_Plugin`, { data: {} });
     expect(malformed.status(), `a plugin id outside the id pattern — body ${await malformed.text()}`).toBe(422);

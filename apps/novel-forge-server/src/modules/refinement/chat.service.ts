@@ -487,7 +487,7 @@ export class ChatService {
     const stableContext = conversation.segment?.stableContext ?? pack.renderedStable;
     const turnParts = { volatileContext: context?.text ?? (pack.renderedVolatile || 'nothing'), turnRules, userMessage: message };
 
-    // Pinned into `config.models.chat` so every round of this turn — lookups and repairs included — lands on the model recorded on the reply.
+    // Pinned as the chat model so every round of this turn — lookups and repairs included — lands on the model recorded on the reply.
     const resolvedModel = route.resolved;
     const effectiveProject = withChatModel(routed, resolvedModel);
     const selection: ChatSelection = { contentMode: route.contentMode, costTier: route.costTier };
@@ -696,7 +696,7 @@ export class ChatService {
   }
 
   /**
-   * Routes the reply under the turn's selection: the chat's own model pin, then the project's chat pick, then the tier map. An unrestricted
+   * Routes the reply under the turn's selection: the chat's own model pin, then the tier map. An unrestricted
    * reply goes through the unrestricted route, which refuses rather than fall back to standard.
    */
   private async routeChatReply(projectId: bigint, session: Refinement.ChatSession, project: ProjectConfig | undefined, selection: ChatSelection): Promise<ChatReplyRoute> {

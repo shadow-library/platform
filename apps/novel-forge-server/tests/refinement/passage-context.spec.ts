@@ -262,7 +262,7 @@ function chat(contentMode: 'standard' | 'unrestricted', draftRows: DraftRow[] = 
   };
   const modelRouter = {
     resolveModel: () => UNRESTRICTED_DEFAULTS.chat,
-    routeModel: () => ({ resolved: { provider: 'p', model: 'm' }, source: 'tier', costTier: 'balanced', contentMode }),
+    routeModel: () => ({ resolved: { provider: 'p', model: 'm' }, costTier: 'balanced', contentMode }),
     structured: async (_prompt: unknown, prompt: { userMessage: string }) => {
       prompts.push(prompt);
       return { reply: 'Tightened.' };

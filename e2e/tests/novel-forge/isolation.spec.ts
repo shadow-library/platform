@@ -42,7 +42,7 @@ interface SnapshotView {
  * An isolated chapter's prose is walled off from every standard reader: the next chapter's writer pack, prose search, and the Writer's view
  * of any attempt on it. Only the author's own routes read it as written. Each chapter carries random markers in its prose and summary, and
  * a twin novel with the same chapter left standard shows each read does carry a neighbouring chapter when no wall stands in the way. An
- * isolated chapter routes unrestricted, where a fail-pin does nothing, so every novel is quota-pinned; nothing here reaches a model anyway.
+ * isolated chapter routes unrestricted, and the quota pin every novel carries holds there too; nothing here reaches a model anyway.
  */
 
 const WALLED_OFF = 'Prose: walled off. This is an unrestricted chapter, so the messages it sent are not available here.';
@@ -85,7 +85,7 @@ async function readSnapshot(ctx: APIRequestContext, projectId: string, chapter: 
 }
 
 async function mechanicsReview(ctx: APIRequestContext, projectId: string, chapter: number): Promise<{ isolated: boolean; kind: string }> {
-  await assertSpendGuarded(projectId, { requireQuota: true });
+  await assertSpendGuarded(projectId);
   const response = await mutate(ctx, 'post', `/api/v1/projects/${projectId}/chapters/${chapter}/reviews`, { data: { kind: 'mechanics' } });
   expect(response.status(), await response.text()).toBe(201);
   return (await response.json()) as { isolated: boolean; kind: string };

@@ -22,7 +22,7 @@ interface WireRequest {
 
 const CONFIG_KEYS = ['ai.openrouter.api.key', 'ai.openrouter.api.url', 'ai.model-override', 'ai.structured-output'] as const;
 const LOGICAL_MODEL = 'anthropic/claude-sonnet-5';
-const PINNED: ProjectConfig = { config: { models: { judge: { provider: 'openrouter', model: LOGICAL_MODEL }, chat: { provider: 'openrouter', model: LOGICAL_MODEL } } } };
+const ROUTED: ProjectConfig = { costTier: 'balanced', chatModel: { provider: 'openrouter', model: LOGICAL_MODEL } };
 const JUDGE_CTX = { projectId: BigInt(1), promptKey: 'judge', promptVersion: '1.0.0', role: 'judge' };
 const CHAT_CTX = { projectId: BigInt(1), promptKey: 'chat-refine', promptVersion: '2.13.0', role: 'chat' };
 const JUDGE_ANSWER = JSON.stringify({ verdict: 'consistent', findings: [] });
@@ -195,7 +195,7 @@ describe('ModelRouterService local-model settings', () => {
   it("should send main's exact structured body when neither setting is set", async () => {
     const sent = wire(completion(SUMMARY));
 
-    await router().service.structured(goldenJudge, {}, JUDGE_CTX, PINNED);
+    await router().service.structured(goldenJudge, {}, JUDGE_CTX, ROUTED);
 
     expect(sent[0]?.text).toBe(JSON.stringify(MAIN_STRUCTURED_BODY));
   });
@@ -203,7 +203,7 @@ describe('ModelRouterService local-model settings', () => {
   it("should send main's exact streamed chat-turn body when neither setting is set", async () => {
     const sent = wire(streamed(SUMMARY));
 
-    await router().service.streamStructured(goldenChat, {}, CHAT_CTX, { onDelta: () => undefined }, PINNED);
+    await router().service.streamStructured(goldenChat, {}, CHAT_CTX, { onDelta: () => undefined }, ROUTED);
 
     expect(sent[0]?.text).toBe(JSON.stringify(MAIN_STREAMED_BODY));
   });
@@ -211,17 +211,17 @@ describe('ModelRouterService local-model settings', () => {
   it("should send main's exact judge tool-loop body when neither setting is set, even with an output module passed", async () => {
     const sent = wire(completion(SUMMARY));
 
-    await (await router().service.chatFor('judge', JUDGE_CTX, PINNED, undefined, PROMPT_REGISTRY.judge)).bindTools?.([TOOL]).invoke([new HumanMessage('Judge.')]);
+    await (await router().service.chatFor('judge', JUDGE_CTX, ROUTED, undefined, PROMPT_REGISTRY.judge)).bindTools?.([TOOL]).invoke([new HumanMessage('Judge.')]);
 
     expect(sent[0]?.text).toBe(JSON.stringify(MAIN_TOOL_LOOP_BODY));
   });
 
   it('should send a byte-identical request when structured output is explicitly the default prompt mode', async () => {
     const unset = wire(completion(JUDGE_ANSWER));
-    await router().service.structured<JudgeOutput>(judgePrompt, {}, JUDGE_CTX, PINNED);
+    await router().service.structured<JudgeOutput>(judgePrompt, {}, JUDGE_CTX, ROUTED);
     config('ai.structured-output', 'prompt');
     const promptMode = wire(completion(JUDGE_ANSWER));
-    await router().service.structured<JudgeOutput>(judgePrompt, {}, JUDGE_CTX, PINNED);
+    await router().service.structured<JudgeOutput>(judgePrompt, {}, JUDGE_CTX, ROUTED);
 
     expect(promptMode[0]?.text).toBe(unset[0]?.text as string);
   });
@@ -231,7 +231,7 @@ describe('ModelRouterService local-model settings', () => {
     const sent = wire(completion(JUDGE_ANSWER));
     const { service, rows, cached } = router();
 
-    await service.structured<JudgeOutput>(judgePrompt, {}, JUDGE_CTX, PINNED);
+    await service.structured<JudgeOutput>(judgePrompt, {}, JUDGE_CTX, ROUTED);
     await awaitAllCallbacks();
 
     expect(sent[0]?.body['model']).toBe('nf-e2e');
@@ -256,10 +256,10 @@ describe('ModelRouterService local-model settings', () => {
 
   it('should attach the typed wire schema as response_format in json-schema mode and leave the prompt unchanged', async () => {
     const promptMode = wire(completion(CHAT_ANSWER));
-    await router().service.structured(chatPrompt, {}, CHAT_CTX, PINNED);
+    await router().service.structured(chatPrompt, {}, CHAT_CTX, ROUTED);
     config('ai.structured-output', 'json-schema');
     const constrained = wire(completion(CHAT_ANSWER));
-    await router().service.structured(chatPrompt, {}, CHAT_CTX, PINNED);
+    await router().service.structured(chatPrompt, {}, CHAT_CTX, ROUTED);
 
     const format = constrained[0]?.body['response_format'] as { type: string; json_schema: { name: string; schema: Json } };
     const properties = format.json_schema.schema['properties'] as Record<string, Json>;
@@ -275,7 +275,7 @@ describe('ModelRouterService local-model settings', () => {
     config('ai.structured-output', 'json-schema');
     const sent = wire(completion(CHAT_ANSWER));
 
-    await router().service.structured(chatPrompt, {}, CHAT_CTX, PINNED);
+    await router().service.structured(chatPrompt, {}, CHAT_CTX, ROUTED);
 
     const messages = sent[0]?.body['messages'] as { content: string }[];
     expect(messages.at(-1)?.content).toEndWith(JSON.stringify(toHostedPromptSchema(chatPrompt.schema)));
@@ -303,7 +303,7 @@ describe('ModelRouterService local-model settings', () => {
     const sent = wire(completion(JSON.stringify({ reply: 'x' })));
     const foundation = { ...chatPrompt, key: 'bible:foundation' as const };
 
-    await router().service.structured(foundation, {}, CHAT_CTX, PINNED);
+    await router().service.structured(foundation, {}, CHAT_CTX, ROUTED);
 
     expect((sent[0]?.body['response_format'] as { json_schema: { name: string } }).json_schema.name).toBe('bible_foundation');
   });
@@ -312,7 +312,7 @@ describe('ModelRouterService local-model settings', () => {
     config('ai.structured-output', 'json-schema');
     const sent = wire(completion('{"verdict": "consis', 'length'), completion(JUDGE_ANSWER));
 
-    const output = await router().service.structured<JudgeOutput>(judgePrompt, {}, JUDGE_CTX, PINNED);
+    const output = await router().service.structured<JudgeOutput>(judgePrompt, {}, JUDGE_CTX, ROUTED);
 
     const [first, repair] = sent.map(request => request.body['messages'] as { role: string; content: string }[]);
     expect(output.verdict).toBe('consistent');
@@ -329,7 +329,7 @@ describe('ModelRouterService local-model settings', () => {
     const sent = wire(streamed(CHAT_ANSWER));
     const deltas: string[] = [];
 
-    const output = await router().service.streamStructured(chatPrompt, {}, CHAT_CTX, { onDelta: text => deltas.push(text) }, PINNED);
+    const output = await router().service.streamStructured(chatPrompt, {}, CHAT_CTX, { onDelta: text => deltas.push(text) }, ROUTED);
 
     expect(output.reply).toBe('Agreed.');
     expect(deltas.join('')).toBe('Agreed.');
@@ -339,11 +339,11 @@ describe('ModelRouterService local-model settings', () => {
   it('should constrain a tool-bound judge only when asked, and keep its non-strict tools off the SDK parse path', async () => {
     const tool = { type: 'function', function: { name: 'noop', description: 'Does nothing.', parameters: { type: 'object', properties: {} } } };
     const plain = wire(completion(JUDGE_ANSWER));
-    await (await router().service.chatFor('judge', JUDGE_CTX, PINNED, undefined, PROMPT_REGISTRY.judge)).bindTools?.([tool]).invoke([new HumanMessage('Judge.')]);
+    await (await router().service.chatFor('judge', JUDGE_CTX, ROUTED, undefined, PROMPT_REGISTRY.judge)).bindTools?.([tool]).invoke([new HumanMessage('Judge.')]);
     config('ai.structured-output', 'json-schema');
     const constrained = wire(completion(JUDGE_ANSWER));
 
-    const answer = await (await router().service.chatFor('judge', JUDGE_CTX, PINNED, undefined, PROMPT_REGISTRY.judge)).bindTools?.([tool]).invoke([new HumanMessage('Judge.')]);
+    const answer = await (await router().service.chatFor('judge', JUDGE_CTX, ROUTED, undefined, PROMPT_REGISTRY.judge)).bindTools?.([tool]).invoke([new HumanMessage('Judge.')]);
 
     expect(plain[0]?.body['response_format']).toBeUndefined();
     expect(answer?.content).toBe(JUDGE_ANSWER);

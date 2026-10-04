@@ -6,6 +6,7 @@ import { FakeListChatModel } from '@langchain/core/utils/testing';
 import { ChatOpenAI } from '@langchain/openai';
 
 import {
+  COST_TIER_DEFAULTS,
   PRODUCTION_DEFAULTS,
   REASONING_POLICY,
   resolveReasoningEffort,
@@ -14,7 +15,7 @@ import {
   UNRESTRICTED_GROUP_DEFAULTS,
   UNRESTRICTED_LLM_ALLOWLIST,
 } from '@modules/ai/defaults';
-import { ModelRouterService, resolveProvider, supportsPromptCaching } from '@modules/ai/model-router.service';
+import { type ModelRoute, ModelRouterService, resolveProvider, supportsPromptCaching } from '@modules/ai/model-router.service';
 import { MODEL_MAP, MODEL_REGISTRY } from '@modules/ai/models';
 import { appearanceDescribePrompt } from '@modules/ai/prompts/appearance-describe.prompt';
 import { type AppearanceDescribeOutput } from '@modules/ai/schemas/appearance-describe.schema';
@@ -41,6 +42,12 @@ function setConfig(key: string, value: unknown): void {
   (Config as unknown as { cache: Map<string, unknown> })['cache'].set(key, value);
 }
 
+// A guard behind routing that no tier map reaches today is exercised by routing the call to the model it guards against.
+function routedTo(router: ModelRouterService, model: string): ModelRouterService {
+  router.routeModel = () => ({ resolved: { provider: 'openrouter', model }, costTier: 'balanced', contentMode: 'standard' });
+  return router;
+}
+
 describe('ModelRouterService.resolveModel', () => {
   // Create a minimal stub — we only need resolveModel which has no DB dependency
   const stubTelemetry = {} as never;
@@ -59,13 +66,13 @@ describe('ModelRouterService.resolveModel', () => {
     expect(resolved.model).not.toBe(UNRESTRICTED_GROUP_DEFAULTS.writing.model);
   });
 
-  it('honours per-project config model override', () => {
-    const resolved = router.resolveModel('judge', {
+  it('ignores a per-role pin left on a stored project row', () => {
+    const row = {
       contentMode: 'standard',
-      config: { models: { judge: { provider: 'openrouter', model: 'anthropic/claude-sonnet-5' } } },
-    });
-    expect(resolved.provider).toBe('openrouter');
-    expect(resolved.model).toBe('anthropic/claude-sonnet-5');
+      config: { models: { judge: { provider: 'openrouter', model: 'x-ai/grok-4.6' }, chat: { provider: 'openrouter', model: 'x-ai/grok-4.6' } } },
+    };
+    expect(router.resolveModel('judge', row as never)).toEqual(PRODUCTION_DEFAULTS.judge);
+    expect(router.resolveModel('chat', row as never)).toEqual(PRODUCTION_DEFAULTS.chat);
   });
 
   it('falls through to profile defaults when no override', () => {
@@ -74,42 +81,25 @@ describe('ModelRouterService.resolveModel', () => {
     expect(resolved.model).toBe(PRODUCTION_DEFAULTS.embedding.model);
   });
 
-  it('coerces an Anthropic override on an Unrestricted project back to the group default', () => {
-    const resolved = router.resolveModel('generation', {
-      contentMode: 'unrestricted',
-      config: { models: { generation: { provider: 'openrouter', model: 'anthropic/claude-sonnet-5' } } },
-    });
-    expect(resolved.model).toBe(UNRESTRICTED_DEFAULTS.generation.model);
+  it('coerces an Anthropic chat model on an Unrestricted project back to the group default', () => {
+    const resolved = router.resolveModel('chat', { contentMode: 'unrestricted', chatModel: { provider: 'openrouter', model: 'anthropic/claude-sonnet-5' } });
+    expect(resolved.model).toBe(UNRESTRICTED_DEFAULTS.chat.model);
   });
 
-  it('honours a Kimi writing override on an Unrestricted project', () => {
-    const resolved = router.resolveModel('generation', {
-      contentMode: 'unrestricted',
-      config: { models: { generation: { provider: 'openrouter', model: 'moonshotai/kimi-k3' } } },
-    });
+  it('honours a Kimi chat model on an Unrestricted project', () => {
+    const resolved = router.resolveModel('chat', { contentMode: 'unrestricted', chatModel: { provider: 'openrouter', model: 'moonshotai/kimi-k3' } });
     expect(resolved.model).toBe('moonshotai/kimi-k3');
   });
 
   it('rejects grok-4.3 on an Unrestricted project', () => {
-    const resolved = router.resolveModel('generation', {
-      contentMode: 'unrestricted',
-      config: { models: { generation: { provider: 'openrouter', model: 'x-ai/grok-4.3' } } },
-    });
-    expect(resolved.model).toBe(UNRESTRICTED_DEFAULTS.generation.model);
+    const resolved = router.resolveModel('chat', { contentMode: 'unrestricted', chatModel: { provider: 'openrouter', model: 'x-ai/grok-4.3' } });
+    expect(resolved.model).toBe(UNRESTRICTED_DEFAULTS.chat.model);
   });
 
-  it('refinement chat inherits the planning selection when no chat model is set', () => {
-    const resolved = router.resolveModel('chat', { contentMode: 'standard', config: { models: { plan: { provider: 'openrouter', model: 'anthropic/claude-sonnet-5' } } } });
-    expect(resolved.provider).toBe('openrouter');
-    expect(resolved.model).toBe('anthropic/claude-sonnet-5');
-  });
-
-  it('an explicit chat model overrides the planning inheritance', () => {
-    const resolved = router.resolveModel('chat', {
-      contentMode: 'standard',
-      config: { models: { plan: { provider: 'openrouter', model: 'anthropic/claude-sonnet-5' }, chat: { provider: 'openrouter', model: 'x-ai/grok-4.6' } } },
-    });
-    expect(resolved.model).toBe('x-ai/grok-4.6');
+  it('routes only the chat role to the chat model', () => {
+    const project = { contentMode: 'standard', chatModel: { provider: 'openrouter', model: 'x-ai/grok-4.6' } };
+    expect(router.resolveModel('chat', project).model).toBe('x-ai/grok-4.6');
+    expect(router.resolveModel('plan', project)).toEqual(PRODUCTION_DEFAULTS.plan);
   });
 
   it('maps every fine-grained role to a model group', () => {
@@ -597,11 +587,10 @@ describe('ModelRouterService.images reference validation', () => {
   });
 
   it('should throw AI_010 for a model that accepts no reference images at all', async () => {
-    const router = makeRouter();
-    const project = { contentMode: 'standard', config: { models: { image: { provider: 'openrouter', model: 'anthropic/claude-sonnet-5' } } } };
+    const router = routedTo(makeRouter(), 'anthropic/claude-sonnet-5');
 
     let error: { code: string } | undefined;
-    await router.images({ prompt: 'a lone tower', n: 1, inputReferences: ['data:image/png;base64,x'] }, ctx, project).catch(err => (error = err as { code: string }));
+    await router.images({ prompt: 'a lone tower', n: 1, inputReferences: ['data:image/png;base64,x'] }, ctx).catch(err => (error = err as { code: string }));
     expect(error?.code).toBe('AI_010');
   });
 
@@ -638,12 +627,6 @@ describe('ModelRouterService.referenceCapacity', () => {
     const router = makeRouter();
     const expected = MODEL_MAP[UNRESTRICTED_DEFAULTS.image.model]?.maxInputReferences ?? 0;
     expect(await router.referenceCapacity({ contentMode: 'unrestricted' })).toBe(expected);
-  });
-
-  it('should honour a project-level image override', async () => {
-    const router = makeRouter();
-    const project = { contentMode: 'standard', config: { models: { image: { provider: 'openrouter', model: 'anthropic/claude-sonnet-5' } } } };
-    expect(await router.referenceCapacity(project)).toBe(0);
   });
 
   it('should fall back to zero for a model absent from the registry’s reference metadata', () => {
@@ -705,14 +688,14 @@ describe('ModelRouterService.structuredWithImage', () => {
   it('should throw AI_011 before building a client or fetching when the resolved model accepts no images', async () => {
     const invoke = mock(async () => ({ content: JSON.stringify(DESCRIPTION) }));
     const { router, buildClient } = makeRouter({ invoke });
-    const project = { contentMode: 'standard', config: { models: { vision: { provider: 'openrouter', model: 'z-ai/glm-5.2' } } } };
+    routedTo(router, 'z-ai/glm-5.2');
     const originalFetch = globalThis.fetch;
     const fetchMock = mock(async () => new Response('{}'));
     (globalThis as unknown as { fetch: unknown }).fetch = fetchMock;
 
     let error: AppError | undefined;
     try {
-      await router.structuredWithImage(appearanceDescribePrompt, input, IMAGE, ctx, project).catch(err => (error = err as AppError));
+      await router.structuredWithImage(appearanceDescribePrompt, input, IMAGE, ctx).catch(err => (error = err as AppError));
     } finally {
       globalThis.fetch = originalFetch;
     }
@@ -743,13 +726,7 @@ describe('ModelRouterService.structuredWithImage', () => {
     const invoke = mock<(messages: BaseMessage[]) => Promise<{ content: string }>>(async () => ({ content: JSON.stringify({ verdict: 'consistent', findings: [] }) }));
     const { router } = makeRouter({ invoke }, db);
 
-    await router.structuredWithImage<JudgeOutput>(
-      judge,
-      {},
-      IMAGE,
-      { ...ctx, role: 'judge' },
-      { config: { models: { judge: { provider: 'openrouter', model: 'anthropic/claude-sonnet-5' } } } },
-    );
+    await router.structuredWithImage<JudgeOutput>(judge, {}, IMAGE, { ...ctx, role: 'judge' });
 
     expect(findFirst).not.toHaveBeenCalled();
     const imageOnly = invoke.mock.calls[0]?.[0]?.find(message => Array.isArray(message.content));
@@ -788,14 +765,14 @@ describe('ModelRouterService telemetry reasoning effort', () => {
   };
   const ctx = { projectId: BigInt(1), promptKey: 'judge', promptVersion: '1.0.0', role: 'judge' };
 
-  async function recordedEffort(model: string): Promise<unknown> {
+  async function recordedEffort(costTier: ModelRoute['costTier']): Promise<unknown> {
     const rows: { reasoningEffort?: unknown }[] = [];
     const telemetryDb = { insert: () => ({ values: async (row: { reasoningEffort?: unknown }) => void rows.push(row) }) };
     const telemetry = new TelemetryHandler({ getPostgresClient: () => telemetryDb } as never);
     const router = new ModelRouterService(telemetry, stubDatabaseService(), stubQuotaService());
     (router as unknown as Record<string, unknown>)['buildClient'] = () => new FakeListChatModel({ responses: [JSON.stringify({ verdict: 'consistent', findings: [] })] });
 
-    await router.structured<JudgeOutput>(judgePrompt, {}, ctx, { config: { models: { judge: { provider: 'openrouter', model } } } });
+    await router.structured<JudgeOutput>(judgePrompt, {}, ctx, { costTier });
     await awaitAllCallbacks();
 
     expect(rows).toHaveLength(1);
@@ -803,12 +780,12 @@ describe('ModelRouterService telemetry reasoning effort', () => {
   }
 
   it('should record the effort the reasoning policy resolved for the call', async () => {
-    expect(resolveReasoningEffort('anthropic/claude-sonnet-5', ROLE_GROUP.judge)).toBe('low');
-    expect(await recordedEffort('anthropic/claude-sonnet-5')).toBe('low');
+    expect(resolveReasoningEffort(COST_TIER_DEFAULTS.balanced.standard.review.model, ROLE_GROUP.judge)).toBe('low');
+    expect(await recordedEffort('balanced')).toBe('low');
   });
 
   it('should record null when the call sent no reasoning field', async () => {
-    expect(resolveReasoningEffort('anthropic/claude-haiku-4.5', ROLE_GROUP.judge)).toBeUndefined();
-    expect(await recordedEffort('anthropic/claude-haiku-4.5')).toBeNull();
+    expect(resolveReasoningEffort(COST_TIER_DEFAULTS.economy.standard.review.model, ROLE_GROUP.judge)).toBeUndefined();
+    expect(await recordedEffort('economy')).toBeNull();
   });
 });

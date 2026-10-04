@@ -59,7 +59,7 @@ export const ROLE_GROUP: Record<AiRole, ModelGroup> = {
   // Composing an image prompt from canon is short mechanical structuring, not authoring or review.
   illustration: 'helper',
   image: 'image',
-  // Not author-selectable: account and project picks for a text-only group must never strip image input from a caller that needs it.
+  // Not author-selectable: a chat's pick for a text-only group must never strip image input from a caller that needs it.
   vision: 'vision',
   embedding: 'embedding',
 };
@@ -72,10 +72,8 @@ export const PRODUCTION_GROUP_DEFAULTS: Record<ModelGroup, ResolvedModel> = {
   writing: { provider: 'openrouter', model: 'anthropic/claude-sonnet-5' },
   planning: { provider: 'openrouter', model: 'anthropic/claude-opus-5.5' },
   review: { provider: 'openrouter', model: 'anthropic/claude-sonnet-5' },
-  // Its own group, independent of `planning` — resolveModel's project-override fallback is the one place it inherits `plan`.
   chat: { provider: 'openrouter', model: 'anthropic/claude-opus-5.5' },
   helper: { provider: 'openrouter', model: 'openai/gpt-5.6-luna' },
-  // IllustrationService resolves through resolveModel('image', project), so a project-level override is honoured.
   image: { provider: 'openrouter', model: 'x-ai/grok-imagine-image-2.0' },
   // Cheapest registered model OpenRouter lists with image input.
   vision: { provider: 'openrouter', model: 'openai/gpt-5.6-luna' },
@@ -98,7 +96,7 @@ export const UNRESTRICTED_GROUP_DEFAULTS: Record<ModelGroup, ResolvedModel> = {
 
 export const UNRESTRICTED_DEFAULTS: Record<AiRole, ResolvedModel> = deriveRoleDefaults(UNRESTRICTED_GROUP_DEFAULTS);
 
-// Overrides on an Unrestricted project are honoured only when the model is on the unrestricted allowlist.
+// A chat's model pin on an unrestricted call is honoured only when the model is on the unrestricted allowlist.
 // grok-4.3 is excluded: it refuses the unrestricted writing brief and collapses into summary-like prose.
 export const UNRESTRICTED_LLM_ALLOWLIST = ['x-ai/grok-4.6', 'deepseek/deepseek-v4-pro', 'z-ai/glm-5.2', 'moonshotai/kimi-k3'] as const;
 export const UNRESTRICTED_IMAGE_ALLOWLIST = ['x-ai/grok-imagine-image-2.0'] as const;

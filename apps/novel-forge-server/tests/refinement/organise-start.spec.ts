@@ -128,7 +128,7 @@ function chat({ mode, output, refusal }: ChatSetup) {
     select: () => ({ from: () => ({ where: async () => [{ max: 0 }] }) }),
   };
   const modelRouter = {
-    routeModel: () => ({ resolved: { provider: 'p', model: 'm' }, source: 'tier', costTier: 'balanced', contentMode: 'standard' }),
+    routeModel: () => ({ resolved: { provider: 'p', model: 'm' }, costTier: 'balanced', contentMode: 'standard' }),
     structured: async () => output,
   };
   const workflowRunService = {

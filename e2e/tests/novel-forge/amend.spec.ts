@@ -21,7 +21,7 @@ import { expect, type ForgeActor, test } from './forge-actors';
 import { expectCode } from './forge-arrange';
 import { insertChapterRow } from './forge-bible';
 import { expectImportLanded, startFinalImport } from './forge-bundles';
-import { failPin, listDispatchedModelCalls } from './forge-db';
+import { listDispatchedModelCalls } from './forge-db';
 import { CHAPTER_ONE, readDraft, writeChapterByHand } from './forge-helpers';
 import { readChapterRow } from './forge-review';
 import { createGuardedProject, finalizeChapterNoReview, insertFinalChapters } from './forge-story';
@@ -146,7 +146,6 @@ test.describe('novel-forge chapter amend', () => {
       const started = await startFinalImport(owner.ctx, `E2E ${slug}`);
       projectId = started.projectId;
       await forge.quotaPin(projectId);
-      await failPin(projectId);
       await expectImportLanded(started.jobId);
       await publishForgeNovel(owner.ctx, projectId, slug);
       for (const chapter of [1, 2]) expect((await publishForgeChapter(owner.ctx, projectId, chapter))?.status, `chapter ${chapter} reached the reader`).toBe('done');

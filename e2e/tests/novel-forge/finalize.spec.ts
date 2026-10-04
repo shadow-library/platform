@@ -9,7 +9,7 @@ import { type APIRequestContext } from '@playwright/test';
 import { mutate, novelForgeDb, pollUntil } from '../../lib';
 import { expect, type ForgeActor, test } from './forge-actors';
 import { expectCode } from './forge-arrange';
-import { assertSpendGuarded, FAIL_PIN_MODEL, listDispatchedModelCalls, readProjectRow } from './forge-db';
+import { assertSpendGuarded, listDispatchedModelCalls, readProjectRow } from './forge-db';
 import { CHAPTER_ONE, CHAPTER_TWO, createEntity, type Draft, readDraft, readFinalizeReview, saveChapter, writeChapterByHand } from './forge-helpers';
 import {
   BLOCKING_FINDING,
@@ -70,8 +70,8 @@ interface ThreadRow {
 /**
  * Declaring the constants
  *
- * Finalize as `finalize-refusals.ts` gates it and as the review path commits it, with no model call anywhere: every project is quota-pinned
- * and fail-pinned, each approval's finalize-review job fails under that guard, and the reading it would have produced is arranged as rows
+ * Finalize as `finalize-refusals.ts` gates it and as the review path commits it, with no model call anywhere: every project is quota-pinned,
+ * each approval's finalize-review job fails under that guard, and the reading it would have produced is arranged as rows
  * (`forge-review.ts`). The direct continuity path — a chapter with no review — does reach for the continuity model, which the quota pin
  * refuses before any dispatch, so it half-finalizes exactly as a failed extraction would.
  */
@@ -376,7 +376,7 @@ test.describe('novel-forge finalize through a ready review', () => {
     expect(await readStoryCursor(projectId)).toBe(1);
   });
 
-  test('should merge the auto-keep categories into the project config beside the model pins', async ({ forge }) => {
+  test('should keep each auto-keep category once and refuse an unknown one', async ({ forge }) => {
     const owner = await forge.actor({ label: 'fin-autokeep' });
     const projectId = await createGuardedProject(forge, owner, 'fin-autokeep');
     const path = `/api/v1/projects/${projectId}/finalize-review/settings`;
@@ -386,9 +386,6 @@ test.describe('novel-forge finalize through a ready review', () => {
     expect(await saved.json(), 'a category named twice is kept once').toEqual({ autoKeep: ['promise', 'appearance'] });
     const refused = await mutate(owner.ctx, 'put', path, { data: { autoKeep: ['everything'] } });
     await expectCode(refused, 422, 'VALIDATION_ERROR', 'an unknown category');
-
-    expect((await readProjectRow(projectId))?.config?.models?.['continuity'], 'the model pins survive the merge').toEqual(FAIL_PIN_MODEL);
-    await assertSpendGuarded(projectId);
   });
 
   test('should store the auto-keep categories as the array it answered with', async ({ forge }) => {

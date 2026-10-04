@@ -46,19 +46,17 @@ import { modelCallFailed, ModelCallTimeoutError } from './transient-model-error'
  */
 export const GATEWAY_WEB_TOOLS_HEADER = 'x-gateway-web-tools';
 
+/** `chatModel` is never read from a row: a chat turn sets it on its own copy, so a stored project cannot pin any role. */
 export type ProjectConfig = OwnerFields & {
   contentMode?: string;
   costTier?: Project.CostTier | null;
-  config?: { models?: Partial<Record<AiRole, ResolvedModel>> } | null;
+  chatModel?: ResolvedModel;
   wordTargetMin?: number | null;
   wordTargetMax?: number | null;
 };
 
-export type ModelSource = 'project' | 'tier';
-
 export interface ModelRoute {
   resolved: ResolvedModel;
-  source: ModelSource;
   costTier: Project.CostTier;
   contentMode: Project.ContentMode;
 }
@@ -343,26 +341,22 @@ export class ModelRouterService {
     return this.routeModel(role, project, policy).resolved;
   }
 
-  // Order: a tier carried in by a chat turn's action, then the project's own pin, then the tier map. `call.route`: a plugin may raise this call
-  // to the permissive class, and no policy can lower a project whose own contentMode is already unrestricted — the raise-only rule is structural
-  // at the routing sink.
+  // Order: the chat's model for a chat call, then a tier carried in by a chat turn's action, then the project's tier. `call.route`: a plugin may
+  // raise this call to the permissive class, and no policy can lower a project whose own contentMode is already unrestricted — the raise-only
+  // rule is structural at the routing sink.
   routeModel(role: AiRole, project?: ProjectConfig, policy?: ForgeCallPolicy): ModelRoute {
     const group = ROLE_GROUP[role] ?? 'writing';
     const costTier = scopedCostTier() ?? (isCostTier(project?.costTier) ? project.costTier : DEFAULT_COST_TIER);
     const contentMode: Project.ContentMode = project?.contentMode === 'unrestricted' || policy?.writerClass === 'permissive' ? 'unrestricted' : 'standard';
-    const route = (resolved: ResolvedModel, source: ModelSource): ModelRoute => ({ resolved, source, costTier, contentMode });
-
-    // The settings UI writes one selection across every role in a group, so group members resolve identically.
-    const models = project?.config?.models as Record<string, ResolvedModel> | undefined;
-    const projectModel = models?.[role] ?? (role === 'chat' ? models?.['plan'] : undefined);
+    const route = (resolved: ResolvedModel): ModelRoute => ({ resolved, costTier, contentMode });
+    const chatModel = role === 'chat' ? project?.chatModel : undefined;
     const tierDefault = COST_TIER_DEFAULTS[costTier][contentMode][group];
 
-    if (contentMode === 'unrestricted') return projectModel && isUnrestrictedAllowed(role, projectModel) ? route(projectModel, 'project') : route(tierDefault, 'tier');
-    if (!projectModel) return route(tierDefault, 'tier');
-    // Fail closed at the sink: a persisted override whose model id is not in the registry — including
-    // one written before write-time validation existed — must never reach the platform credential.
-    if (!MODEL_MAP[projectModel.model]) throw AppErrorCode.AI_002.create();
-    return route(projectModel, 'project');
+    if (!chatModel) return route(tierDefault);
+    if (contentMode === 'unrestricted') return route(isUnrestrictedAllowed(role, chatModel) ? chatModel : tierDefault);
+    // Fail closed at the sink: a chat pin whose model id is not in the registry must never reach the platform credential.
+    if (!MODEL_MAP[chatModel.model]) throw AppErrorCode.AI_002.create();
+    return route(chatModel);
   }
 
   // Lets a caller (e.g. the reference resolver) learn how many reference images the image model that

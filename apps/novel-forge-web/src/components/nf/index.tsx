@@ -28,7 +28,6 @@ export { ProseEditsToggle, type ProseEditsToggleProps } from './ProseEditsToggle
 export { RegenerateAppliedBriefs, type RegenerateAppliedBriefsProps, RegenerateChapterButton, type RegenerateChapterButtonProps } from './RegenerateChapter';
 export { SidePanel, type SidePanelProps } from './SidePanel';
 export { Markdown } from './Markdown';
-export { INHERIT_MODEL, type ModelKind, ModelPicker } from './ModelPicker';
 export { PageSkeleton } from './PageSkeleton';
 export { RouteNotFound } from './NotFound';
 export { TurnStatus } from './TurnStatus';

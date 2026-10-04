@@ -319,23 +319,21 @@ Model selection is **code + database**, not environment.
 - Registry of selectable models: `src/modules/ai/models.ts:41-247`. Every LLM id is an OpenRouter `vendor/model`
   slug and its `provider` must be `openrouter`.
 
-Two ways to pick a model, in precedence order (`ModelRouterService.routeModel`):
+How a model is picked (`ModelRouterService.routeModel`):
 
-1. **Per project, per role** — `PATCH /api/v1/projects/:id` with
-   `{"config":{"models":{"bible":{"provider":"openrouter","model":"anthropic/claude-opus-5"}}}}`.
-   Field list: `src/modules/project/project/project.dto.ts:52-...` (`ProjectModelOverrides`, `bible` at `:89-90`).
-   Validated at write time by `isRegisteredModel` (`src/modules/project/project/project.service.ts:80-83`) →
+1. **Per chat, chat replies only** — `PATCH /api/v1/projects/:p/chat/sessions/:s/model` with
+   `{"provider":"openrouter","model":"anthropic/claude-opus-5"}`. Validated at write time by `isRegisteredModel` →
    a wrong provider or unknown id gives `AI_002`.
-2. Otherwise the platform model for the project's cost tier and model type (`COST_TIER_DEFAULTS`). A chat turn's tier
-   outranks the project's. There is no per-account model default; `PUT /api/v1/ai/settings` `{"defaultCostTier":"economy"}`
-   only sets the tier a new project starts on.
+2. Otherwise the platform model for the cost tier and model type (`COST_TIER_DEFAULTS`). A chat turn's tier
+   outranks the chat's, which outranks the project's. No project setting pins a model to a role, and there is no
+   per-account model default; `PUT /api/v1/ai/settings` `{"defaultCostTier":"economy"}` only sets the tier a new
+   project starts on.
 
 `GET /api/v1/ai/models` (`ai.controller.ts:26-54`) returns the whole registry with prices, context windows and both
 default maps — the quickest way to see what is selectable.
 
-`e2e/tests/novel-forge/forge-helpers.ts:67` exports `HAIKU_MODEL = {provider:'openrouter', model:'anthropic/claude-haiku-4.5'}`,
-a registered id with the right provider — the helper that previously pinned an unregistered `anthropic/claude-haiku-4-5` id
-(and would have 400'd with `AI_002`) has since been fixed; it is safe to copy.
+For the cheapest live runs, put the project on the Economy tier (`useEconomyTier` in `e2e/tests/novel-forge/forge-helpers.ts`);
+`HAIKU_MODEL` there is a registered id with the right provider, safe to copy into a chat pin.
 
 ---
 
@@ -1865,25 +1863,25 @@ export default function createPlugin() {
 
 #### 4.1 Default cost tier, precedence and routing
 
-- **Entry:** UI Settings (`/settings`: one "Default cost tier for new projects" control, Economy / Balanced / Performant; "Save changes"; info alert "How models are picked"). API `GET /ai/models`, `GET|PUT /ai/settings`, `POST /projects`, `POST /projects/new-novel`, `POST /import`, `POST /projects/:p/clone`, `PATCH /chat/sessions/:s/model`, `PATCH /projects/:p {"config":{"models":{…}}}`.
+- **Entry:** UI Settings (`/settings`: one "Default cost tier for new projects" control, Economy / Balanced / Performant; "Save changes"; info alert "How models are picked"). API `GET /ai/models`, `GET|PUT /ai/settings`, `POST /projects`, `POST /projects/new-novel`, `POST /import`, `POST /projects/:p/clone`, `PATCH /chat/sessions/:s/model`.
 - **Input:** `PUT /ai/settings {"defaultCostTier":"economy"}`.
 - **Run:**
   1. `GET /ai/settings` on a fresh account → `{"defaultCostTier":"balanced"}`.
   2. PUT as above, then create a project through each creation path without a `costTier`, and once with `"costTier":"performant"`.
   3. Clone a Performant project.
   4. Hub turn on an Economy project (new chat), then check its `model_calls`.
-  5. Project override: `PATCH /projects/$P {"config":{"models":{"chat":{"provider":"openrouter","model":"openai/gpt-5.6-luna"}}}}`, turn.
+  5. Chat pin: `PATCH /projects/$P/chat/sessions/$S/model {"provider":"openrouter","model":"openai/gpt-5.6-luna"}`, turn, then clear it with `{"provider":null,"model":null}`.
   6. Pick Performant in the composer, send two turns, then pick "Use the project default" and send a third.
   7. Set project `contentMode:'unrestricted'` with a standard-only chat pin (e.g. `anthropic/claude-opus-5.5`), turn.
 - **Verify:**
   - Step 2: every project created without a tier is Economy; the one that named Performant is Performant. A bot-owned project starts on Balanced, and `PUT /ai/settings` as a bot is 403 `AI_016`.
   - Step 3: the clone is Performant whatever the account default.
   - Step 4: the chat call's `model` is the Economy chat model from `GET /ai/models` `tiers`, and `chat_messages.model_id` (assistant) matches.
-  - Precedence exactly: the turn's tier > project pin for the role > the tier map. Step 5 uses the pin; step 6 uses the Performant chat model for both turns (the chat session's `costTier` is `performant`) and the third is back on Economy with the session's `costTier` null.
+  - Precedence exactly: the chat's pin > the turn's tier > the chat's tier > the project's tier. Step 5 uses the pin; step 6 uses the Performant chat model for both turns (the chat session's `costTier` is `performant`) and the third is back on Economy with the session's `costTier` null.
   - Step 7: a pin not on the unrestricted allowlist (`x-ai/grok-4.6, deepseek/deepseek-v4-pro, z-ai/glm-5.2, moonshotai/kimi-k3`, image `x-ai/grok-imagine-image-2.0`) is ignored; the project uses the unrestricted model for its tier. `GET /ai/models` `unrestrictedAllowlist` shows the list.
-  - `GET /projects/:p/models` reports each group's `source` as `project` or `tier`, never anything else.
+  - `GET /projects/:p/models` reports each group's tier model for the novel's (or the previewed) type and tier; a `PATCH /projects/:p` carrying `config` stores nothing.
   - Group→role mapping: Illustrations compose runs on the helper group (not Planning); embedding and vision are not configurable.
-- **Fails when:** a project created without a tier ignores the account default, a PUT with a value outside economy/balanced/performant is accepted, or a project override with an unregistered id does not give 400 `AI_002` at call time.
+- **Fails when:** a project created without a tier ignores the account default, a PUT with a value outside economy/balanced/performant is accepted, or a chat pin with an unregistered id is not refused with 400 `AI_002`.
 
 ---
 

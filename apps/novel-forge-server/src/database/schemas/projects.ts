@@ -6,40 +6,11 @@ import { type FinalizeReview } from './finalize-review';
 import { jsonb } from './jsonb';
 import { ownerKind } from './owner';
 
-// Per-role model overrides persisted in `projects.config` (jsonb). Mirrors the wire `ProjectConfig`/
-// `ProjectModelOverrides` in project.dto (enumerated, not an index signature, so it round-trips in both
-// directions: read → response, and write ← create/clone input) — keep the two structurally in sync.
-interface ProjectModelRefData {
-  provider: string;
-  model: string;
-}
-
-interface ProjectModelOverridesData {
-  extraction?: ProjectModelRefData;
-  generation?: ProjectModelRefData;
-  judge?: ProjectModelRefData;
-  fix?: ProjectModelRefData;
-  outline?: ProjectModelRefData;
-  revision?: ProjectModelRefData;
-  title?: ProjectModelRefData;
-  continuity?: ProjectModelRefData;
-  validation?: ProjectModelRefData;
-  review?: ProjectModelRefData;
-  plan?: ProjectModelRefData;
-  bible?: ProjectModelRefData;
-  premise?: ProjectModelRefData;
-  audit?: ProjectModelRefData;
-  chat?: ProjectModelRefData;
-  compact?: ProjectModelRefData;
-  image?: ProjectModelRefData;
-}
-
 export interface ProjectFinalizeReviewData {
   autoKeep?: FinalizeReview.Category[];
 }
 
 export interface ProjectConfigData {
-  models?: ProjectModelOverridesData;
   finalizeReview?: ProjectFinalizeReviewData;
 }
 

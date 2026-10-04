@@ -8,7 +8,7 @@ import { type APIRequestContext, type APIResponse } from '@playwright/test';
  */
 import { mutate } from '../../lib';
 import { expect, type ForgeBot, type ForgeTeam, test } from './forge-actors';
-import { assertSpendGuarded, failPin, insertProject, listDispatchedModelCalls, readProjectRow, updateProjectOwnership } from './forge-db';
+import { assertSpendGuarded, insertProject, listDispatchedModelCalls, readProjectRow, updateProjectOwnership } from './forge-db';
 import { CHAPTER_ONE, errorCode, readDraft, saveChapter, startNextChapter, uniqueSuffix } from './forge-helpers';
 
 /**
@@ -29,7 +29,7 @@ type Method = 'get' | 'post' | 'put' | 'patch' | 'delete';
  *
  * What an organisation bot may do on Novel Forge. A route admits a bot only when it declares a bot permission, and the bot must hold
  * every one the route and its controller declare; the guard decides before the body is validated, so an empty body still proves the
- * decision. Anything that could reach a model runs on a quota-pinned project (429 AI_008 before routing), fail-pinned as a backstop.
+ * decision. Anything that could reach a model runs on a quota-pinned project (429 AI_008 before routing).
  */
 
 /** A well-formed chat session id no session carries. */
@@ -66,10 +66,9 @@ async function listedIds(ctx: APIRequestContext): Promise<string[]> {
   return ((await response.json()) as { items: ProjectBody[] }).items.map(item => item.id);
 }
 
-/** A fail-pinned project with one hand-written chapter, written by a bot that holds projects:write. */
+/** A project with one hand-written chapter, written by a bot that holds projects:write. */
 async function projectWithChapter(writer: ForgeBot): Promise<string> {
   const project = await createOwnProject(writer);
-  await failPin(project.id);
   await saveChapter(writer.ctx, project.id, await startNextChapter(writer.ctx, project.id), CHAPTER_ONE);
   return project.id;
 }
@@ -100,15 +99,13 @@ test.describe('novel-forge bot permission matrix', () => {
     const generator = await forge.bot(team, ['projects:read', 'generation'], 'generator');
     const author = await forge.bot(team, ['projects:write', 'generation'], 'author');
     const generatorProject = await seedOwnProject(generator, team);
-    await failPin(generatorProject);
     await forge.quotaPin(generatorProject);
-    await assertSpendGuarded(generatorProject, { requireQuota: true });
+    await assertSpendGuarded(generatorProject);
 
     await expectDenied(await call(generator.ctx, 'post', `/api/v1/projects/${generatorProject}/generate`, {}), 'generate without projects:write');
     await expectDenied(await call(generator.ctx, 'post', `/api/v1/projects/${generatorProject}/drafts/next`, {}), 'open a chapter without projects:write');
 
     const own = await createOwnProject(author);
-    await failPin(own.id);
     const opened = await author.ctx.post(`/api/v1/projects/${own.id}/drafts/next`, { data: {} });
     expect(opened.status(), `a bot holding both opens a chapter — body ${await opened.text()}`).toBe(201);
   });
@@ -120,7 +117,7 @@ test.describe('novel-forge bot permission matrix', () => {
     await forge.quotaPin(projectId);
     const before = await readDraft(author.ctx, projectId, 1);
 
-    await assertSpendGuarded(projectId, { requireQuota: true });
+    await assertSpendGuarded(projectId);
     const summarized = await author.ctx.post(`/api/v1/projects/${projectId}/chapters/1/summarize`, { data: {} });
     expect(summarized.status(), `the guard admits it and the quota pin refuses the dispatch — body ${await summarized.text()}`).toBe(429);
     expect(await errorCode(summarized)).toBe('AI_008');
@@ -136,7 +133,7 @@ test.describe('novel-forge bot permission matrix', () => {
     const projectId = await projectWithChapter(author);
     await updateProjectOwnership(projectId, { owner: generator.owner });
     await forge.quotaPin(projectId);
-    await assertSpendGuarded(projectId, { requireQuota: true });
+    await assertSpendGuarded(projectId);
 
     await expectDenied(await generator.ctx.post(`/api/v1/projects/${projectId}/chapters/1/summarize`, { data: {} }), 'summarize persists a summary, so it needs projects:write');
     await expectDenied(await call(generator.ctx, 'put', `/api/v1/projects/${projectId}/chapters/1/summary`, { summary: 'Overwritten' }), 'the hand-written summary route agrees');
@@ -160,7 +157,6 @@ test.describe('novel-forge bot permission matrix', () => {
     const team = await forge.team('bot-closed');
     const bot = await forge.bot(team, ['projects:write', 'generation', 'illustrations'], 'everything');
     const project = await createOwnProject(bot);
-    await failPin(project.id);
     const base = `/api/v1/projects/${project.id}`;
 
     const closed: [Method, string, unknown?][] = [
@@ -189,13 +185,12 @@ test.describe('novel-forge bot permission matrix', () => {
     const full = await forge.bot(team, ['projects:write', 'generation'], 'full');
     const writerProject = await createOwnProject(writer);
     const fullProject = await createOwnProject(full);
-    await failPin(fullProject.id);
     await forge.quotaPin(fullProject.id);
 
     const path = (projectId: string): string => `/api/v1/projects/${projectId}/chat/sessions/${UNKNOWN_SESSION}/messages`;
     await expectDenied(await call(writer.ctx, 'post', path(writerProject.id), { content: 'Hello' }), 'a chat turn needs generation on top of write');
 
-    await assertSpendGuarded(fullProject.id, { requireQuota: true });
+    await assertSpendGuarded(fullProject.id);
     const admitted = await full.ctx.post(path(fullProject.id), { data: { content: 'Hello' } });
     expect(admitted.status(), `holding both, the turn reaches the session lookup — body ${await admitted.text()}`).toBe(404);
     expect(await errorCode(admitted)).toBe('CHT_001');

@@ -3301,11 +3301,6 @@ export interface components {
       model: string;
       /** @description The product name to show an author. */
       label: string;
-      /**
-       * @description Why this model: the project's own pick, or the platform's model for the cost tier.
-       * @enum {string}
-       */
-      source: 'project' | 'tier';
       inputPricePerMToken?: number;
       outputPricePerMToken?: number;
     };
@@ -6239,34 +6234,8 @@ export interface components {
     /** @enum {string} */
     OwnerKind: 'user' | 'bot';
     ProjectConfigResponse: {
-      models?: components['schemas']['ProjectModelOverrides'];
-      /** @description Written only by PUT /finalize-review/settings; a project update keeps it. */
+      /** @description Written only by PUT /finalize-review/settings. */
       finalizeReview?: components['schemas']['ProjectFinalizeReviewConfig'];
-    };
-    /** @description Optional provider and model overrides keyed by AI role. */
-    ProjectModelOverrides: {
-      extraction?: components['schemas']['ProjectModelRef'];
-      generation?: components['schemas']['ProjectModelRef'];
-      judge?: components['schemas']['ProjectModelRef'];
-      fix?: components['schemas']['ProjectModelRef'];
-      outline?: components['schemas']['ProjectModelRef'];
-      revision?: components['schemas']['ProjectModelRef'];
-      title?: components['schemas']['ProjectModelRef'];
-      continuity?: components['schemas']['ProjectModelRef'];
-      validation?: components['schemas']['ProjectModelRef'];
-      review?: components['schemas']['ProjectModelRef'];
-      plan?: components['schemas']['ProjectModelRef'];
-      bible?: components['schemas']['ProjectModelRef'];
-      premise?: components['schemas']['ProjectModelRef'];
-      audit?: components['schemas']['ProjectModelRef'];
-      chat?: components['schemas']['ProjectModelRef'];
-      compact?: components['schemas']['ProjectModelRef'];
-      image?: components['schemas']['ProjectModelRef'];
-    };
-    /** @description Provider and model reference used for a project-level AI role override. */
-    ProjectModelRef: {
-      provider: string;
-      model: string;
     };
     ProjectFinalizeReviewConfig: {
       /** @description Categories whose routine finalize-review updates are kept without asking; unset, every routine category is. Consequential updates are always asked one by one. */
@@ -6329,7 +6298,6 @@ export interface components {
     UpdateProjectBody: {
       /** @description The working title. Trimmed; a blank title clears it. */
       title?: string;
-      config?: components['schemas']['ProjectConfig'];
       contentMode?: components['schemas']['ContentMode'];
       costTier?: components['schemas']['CostTier'];
       brief?: string;
@@ -6350,12 +6318,8 @@ export interface components {
       /** @description Chapter word-count target; send `null` to restore the application default (1,800–2,600 words). */
       wordTarget?: components['schemas']['ProjectWordTarget'] | null;
     };
-    ProjectConfig: {
-      models?: components['schemas']['ProjectModelOverrides'];
-    };
     CloneProjectBody: {
       name: string;
-      config?: components['schemas']['ProjectConfig'];
       contentMode?: components['schemas']['ContentMode'];
       /** @description Chapter word-count target; omitted inherits the source project’s target (or the application default). */
       wordTarget?: components['schemas']['ProjectWordTarget'];
@@ -16408,14 +16372,11 @@ export type ProjectWordTarget = components['schemas']['ProjectWordTarget'];
 export type ProjectResponse = components['schemas']['ProjectResponse'];
 export type OwnerKind = components['schemas']['OwnerKind'];
 export type ProjectConfigResponse = components['schemas']['ProjectConfigResponse'];
-export type ProjectModelOverrides = components['schemas']['ProjectModelOverrides'];
-export type ProjectModelRef = components['schemas']['ProjectModelRef'];
 export type ProjectFinalizeReviewConfig = components['schemas']['ProjectFinalizeReviewConfig'];
 export type ListProjectResponse = components['schemas']['ListProjectResponse'];
 export type ProjectDetailResponse = components['schemas']['ProjectDetailResponse'];
 export type ProjectStatusResponse = components['schemas']['ProjectStatusResponse'];
 export type UpdateProjectBody = components['schemas']['UpdateProjectBody'];
-export type ProjectConfig = components['schemas']['ProjectConfig'];
 export type CloneProjectBody = components['schemas']['CloneProjectBody'];
 export type ResetBody = components['schemas']['ResetBody'];
 export type ResetResponse = components['schemas']['ResetResponse'];

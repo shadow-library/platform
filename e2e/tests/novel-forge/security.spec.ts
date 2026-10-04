@@ -7,7 +7,7 @@ import { type APIRequestContext, expect, test } from '@playwright/test';
  * Importing user defined packages
  */
 import { apiContext, mutate, requireProductUrl } from '../../lib';
-import { createProject, deleteProjectQuietly, HAIKU_MODEL, jsonOrUndefined, uniqueSuffix } from './forge-helpers';
+import { createProject, deleteProjectQuietly, jsonOrUndefined, uniqueSuffix } from './forge-helpers';
 
 /**
  * Defining types
@@ -18,9 +18,7 @@ import { createProject, deleteProjectQuietly, HAIKU_MODEL, jsonOrUndefined, uniq
  *
  * Ownership is enforced by `ProjectOwnershipGuard`, which answers another user's project with 404 PRJ_001 — a
  * deliberate BOLA defence that never leaks existence via 403. These tests assert the *code*, not just the
- * status, so a future accidental 403 would fail here. The Unrestricted block records the real server behaviour:
- * `resolveModel` coerces disallowed overrides on Unrestricted projects (model-router.service.ts) and the PATCH itself does not
- * validate the override against contentMode — so an off-allowlist override is coerced rather than refused.
+ * status, so a future accidental 403 would fail here.
  */
 
 test.describe('novel-forge ownership security', () => {
@@ -82,34 +80,5 @@ test.describe('novel-forge ownership security', () => {
     } finally {
       await guest.close();
     }
-  });
-});
-
-test.describe('novel-forge unrestricted enforcement', () => {
-  let ctx: APIRequestContext;
-  let projectId: string;
-
-  test.beforeAll(async () => {
-    ctx = await apiContext('novelForge', 'user1');
-    const { id } = await createProject(ctx, { name: `e2e-forge-unrestricted-${uniqueSuffix()}`, kind: 'new_novel', contentMode: 'unrestricted' });
-    projectId = id;
-  });
-
-  test.afterAll(async () => {
-    await deleteProjectQuietly(ctx, projectId);
-    await ctx.dispose();
-  });
-
-  test('should accept (but not honour) a non-allowlisted override on an Unrestricted project', async () => {
-    // Haiku is registered but not on the unrestricted allowlist. The PATCH only checks the registry, not the
-    // allowlist; enforcement is at resolve time, where Unrestricted coerces disallowed models to the group default.
-    // So the contract here is: 200, and the override round-trips in config.models — inert, not rejected.
-    const patch = await mutate(ctx, 'patch', `/api/v1/projects/${projectId}`, { data: { config: { models: { generation: HAIKU_MODEL } } } });
-    expect(patch.status(), await patch.text()).toBe(200);
-
-    const fetched = await ctx.get(`/api/v1/projects/${projectId}`);
-    const body = (await fetched.json()) as { contentMode: string; config?: { models?: Record<string, { provider: string; model: string }> } };
-    expect(body.contentMode).toBe('unrestricted');
-    expect(body.config?.models?.generation).toEqual(HAIKU_MODEL);
   });
 });

@@ -60,7 +60,7 @@ interface Milestone {
  * Canon facts — the book's secrets — and the reveal ledger that says who in the story knows each one. A fact is written by hand and
  * merges what a write omits; the ledger is written by hand, by an approval (provisionally, bound to the approved revision) and by
  * finalize (committed). A fact change that breaks a plan's reveal never rewrites the plan: it marks the plan and its draft stale. Every
- * approval queues a finalize-review model call, so each project is quota-pinned and fail-pinned and the call fails without spending.
+ * approval queues a finalize-review model call, so each project is quota-pinned and the call fails without spending.
  */
 
 const ORACLE = 'oracle_truth';

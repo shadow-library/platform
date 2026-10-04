@@ -5,7 +5,6 @@ import { ContentMode, CostTier } from '@server/common';
 import { type Project } from '@server/database';
 
 import { CostResponse } from '../project/project/project.dto';
-import { type ModelSource } from './model-router.service';
 
 @Schema()
 export class AiModelOption {
@@ -131,12 +130,6 @@ export class ProjectModelRoute {
 
   @Field({ description: 'The product name to show an author.' })
   label: string;
-
-  @Field(() => String, {
-    enum: ['project', 'tier'],
-    description: "Why this model: the project's own pick, or the platform's model for the cost tier.",
-  })
-  source: ModelSource;
 
   @Field(() => Number, { optional: true })
   inputPricePerMToken?: number;

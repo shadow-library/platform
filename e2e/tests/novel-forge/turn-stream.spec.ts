@@ -10,7 +10,7 @@ import { type APIRequestContext } from '@playwright/test';
  */
 import { mutate, pollUntil } from '../../lib';
 import { type ForgeActor } from './forge-actors';
-import { expectCode, guardedProject, newChatSession, newProject, quotaRefusedChat, SHORT_TURN, startTurn } from './forge-arrange';
+import { expectCode, failPinnedChat, guardedProject, newProject, quotaRefusedChat, SHORT_TURN, startTurn } from './forge-arrange';
 import { listDispatchedModelCalls } from './forge-db';
 import { type ChatTranscript, HAIKU_MODEL } from './forge-helpers';
 import { holdNextChatMessage, listWorkflowRuns } from './forge-rows';
@@ -59,7 +59,7 @@ test.describe('novel-forge chat turn stream', () => {
   test('should refuse a turn before its run exists, and start one once the chat is pinned to a routable model', async ({ forge, sse }) => {
     const owner = await forge.actor({ label: 'turn-refused' });
     const projectId = await guardedProject(forge, owner, 'turn-refused');
-    const sessionId = await newChatSession(owner, projectId);
+    const sessionId = await failPinnedChat(owner, projectId);
 
     await expectCode(await startTurn(owner, projectId, sessionId), 400, 'AI_002', 'a chat whose model cannot be routed');
     expect(await listWorkflowRuns(projectId, 'chat-turn'), 'the refused turn opened no run').toEqual([]);
@@ -76,7 +76,7 @@ test.describe('novel-forge chat turn stream', () => {
     expect(pinned.status(), await pinned.text()).toBe(200);
     const runId = await startedRun(owner, projectId, sessionId);
     expectQuotaRefusedTurn(await watchToTheEnd(sse, owner, projectId, runId));
-    expect(await listDispatchedModelCalls(projectId), "the chat's own pin outranks the project's, and the quota still refused it").toEqual([]);
+    expect(await listDispatchedModelCalls(projectId), "the chat's routable pin starts the turn, and the quota still refused it").toEqual([]);
   });
 
   test('should deliver the same live frames to every subscriber of a running turn', async ({ forge, sse }) => {

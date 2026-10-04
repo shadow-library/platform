@@ -10,7 +10,7 @@ import { type APIRequestContext, type APIResponse, expect } from '@playwright/te
  */
 import { mutate, novelForgeDb, pollUntil } from '../../lib';
 import { type ForgeActor, type ForgeHarness } from './forge-actors';
-import { assertSpendGuarded, failPin } from './forge-db';
+import { assertSpendGuarded } from './forge-db';
 import { approveChapter, type Draft, type EntitySeed, expectStatus, readDraft, uniqueSuffix } from './forge-helpers';
 
 /**
@@ -146,7 +146,7 @@ export interface FinalizeReviewItemSeed {
  *
  * The story model as the chapter writer, the planner and the chat read it: canon facts, plans, entities, pages and volumes are written
  * through the API wherever a route exists, and only the rows no model-free route writes — a plan's cited refs, volumes, threads and
- * mysteries, finalized chapters, world facts — are arranged in the database. Every project here is fail-pinned and its owner quota-pinned,
+ * mysteries, finalized chapters, world facts — are arranged in the database. Every project here has its owner quota-pinned,
  * even where the route only assembles context, and each context read asserts the guard right before it goes out.
  */
 
@@ -159,14 +159,13 @@ function ago(ms: number | undefined): string {
   return `${Math.max(0, Math.round(ms ?? 0))} milliseconds`;
 }
 
-/** A standard project owned by `owner`, fail-pinned on every role and with its owner stood at the AI call ceiling. */
+/** A standard project owned by `owner`, with its owner stood at the AI call ceiling. */
 export async function createGuardedProject(forge: ForgeHarness, owner: ForgeActor, label: string, data: Record<string, unknown> = {}): Promise<string> {
   const created = await mutate(owner.ctx, 'post', '/api/v1/projects', {
     data: { name: `e2e-forge-${label}-${uniqueSuffix()}`, kind: 'new_novel', contentMode: 'standard', ...data },
   });
   expect(created.status(), await created.text()).toBe(201);
   const projectId = ((await created.json()) as { id: string }).id;
-  await failPin(projectId);
   await forge.quotaPin(projectId);
   return projectId;
 }
@@ -253,7 +252,7 @@ export async function approveAsRead(ctx: APIRequestContext, projectId: string, d
 }
 
 /**
- * Finalizes a chapter with no model call: approves the read revision, waits for its finalize-review job to fail under the fail-pin, marks the
+ * Finalizes a chapter with no model call: approves the read revision, waits for its finalize-review job to fail under the quota pin, marks the
  * review ready with no items, and finalizes through it. Real application logic throughout — only the model's finalize-review read is stood in
  * for by {@link readyFinalizeReview}. Callers only need "this chapter is final"; the finalize-review mechanics belong to batch 5.
  */

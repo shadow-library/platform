@@ -9,7 +9,7 @@ import { type APIRequestContext } from '@playwright/test';
 import { mutate } from '../../lib';
 import { expect, test } from './forge-actors';
 import { expectCode, guardedProject, newChatSession, newProject } from './forge-arrange';
-import { assertSpendGuarded, failPin, insertWorkflowRun } from './forge-db';
+import { assertSpendGuarded, failPinChat, insertWorkflowRun } from './forge-db';
 import { insertChatMessage, insertChatSession, settleWorkflowRun } from './forge-bible';
 import { listWorkflowRuns } from './forge-rows';
 import { HAIKU_MODEL } from './forge-helpers';
@@ -72,7 +72,7 @@ test.describe('novel-forge chat sessions', () => {
     expect(archived.status(), await archived.text()).toBe(200);
     expect(((await archived.json()) as ChatSession).status).toBe('archived');
 
-    await assertSpendGuarded(projectId, { requireQuota: true });
+    await assertSpendGuarded(projectId);
     await expectCode(
       await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/chats/${session.id}/turn/stream`, { data: { content: 'Hello' } }),
       400,
@@ -95,7 +95,7 @@ test.describe('novel-forge chat sessions', () => {
     const projectId = await guardedProject(forge, owner, 'chat-scope');
     const sessionId = await insertChatSession(projectId, 'volume', 'volume:does-not-exist');
 
-    await assertSpendGuarded(projectId, { requireQuota: true });
+    await assertSpendGuarded(projectId);
     await expectCode(
       await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/chats/${sessionId}/turn/stream`, { data: { content: 'Hello' } }),
       400,
@@ -176,16 +176,16 @@ test.describe('novel-forge chat sessions', () => {
     const owner = await forge.actor({ label: 'chat-guard' });
     const projectId = await newProject(owner, 'chat-guard');
     await forge.quotaPin(projectId);
-    await failPin(projectId);
     const sessionId = await newChatSession(owner, projectId);
+    await failPinChat(sessionId);
 
     const beforeTitleRuns = await listWorkflowRuns(projectId, 'chat-title');
-    await assertSpendGuarded(projectId, { requireQuota: true });
+    await assertSpendGuarded(projectId);
     await expectCode(
       await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/chats/${sessionId}/turn/stream`, { data: { content: 'Hello there' } }),
       400,
       'AI_002',
-      'a fail-pinned chat role refuses the POST before a run id is minted',
+      'a fail-pinned chat refuses the POST before a run id is minted',
     );
     // Poll briefly rather than checking once immediately after: proves no background `chat-title` run appears even
     // a short moment later, not merely that none had landed yet at the instant of the first read.

@@ -121,10 +121,6 @@
   }
 }
 
-.rolePicker {
-  min-width: 210px;
-}
-
 .saveRow {
   display: flex;
   align-items: center;

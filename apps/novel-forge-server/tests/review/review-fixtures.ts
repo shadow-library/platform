@@ -198,7 +198,6 @@ export function reviewHarness(options: ReviewFakeOptions = {}): ReviewHarness {
     resolveModel: (role: string, project?: { contentMode?: string }) => routed(role, project),
     routeModel: (role: string, project?: { contentMode?: string }) => ({
       resolved: routed(role, project),
-      source: 'tier',
       costTier: scopedCostTier() ?? 'balanced',
       contentMode: project?.contentMode === 'unrestricted' ? 'unrestricted' : 'standard',
     }),

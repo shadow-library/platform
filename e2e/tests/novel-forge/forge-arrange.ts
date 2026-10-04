@@ -8,7 +8,7 @@ import { type APIResponse } from '@playwright/test';
  */
 import { mutate } from '../../lib';
 import { expect, type ForgeActor, type ForgeHarness } from './forge-actors';
-import { AI_ROLES, assertSpendGuarded, failPin } from './forge-db';
+import { assertSpendGuarded, failPinChat } from './forge-db';
 import { errorCode, uniqueSuffix } from './forge-helpers';
 
 /**
@@ -41,12 +41,18 @@ export async function newProject(owner: ForgeActor, label: string): Promise<stri
   return ((await response.json()) as { id: string }).id;
 }
 
-/** A standard novel whose owner stands at the call ceiling and whose every role is fail-pinned. */
+/** A standard novel whose owner stands at the call ceiling. */
 export async function guardedProject(forge: ForgeHarness, owner: ForgeActor, label: string): Promise<string> {
   const projectId = await newProject(owner, label);
   await forge.quotaPin(projectId);
-  await failPin(projectId);
   return projectId;
+}
+
+/** A chat on a guarded novel pinned to a model no route accepts, so a turn is refused AI_002 before its run exists. */
+export async function failPinnedChat(owner: ForgeActor, projectId: string): Promise<string> {
+  const sessionId = await newChatSession(owner, projectId);
+  await failPinChat(sessionId);
+  return sessionId;
 }
 
 export async function newChatSession(owner: ForgeActor, projectId: string): Promise<string> {
@@ -57,19 +63,15 @@ export async function newChatSession(owner: ForgeActor, projectId: string): Prom
 
 /**
  * A chat whose replies route to a real model while its owner stands at the call ceiling: a turn starts and answers with its run id, then
- * fails AI_008 before any dispatch. Every other role stays fail-pinned.
+ * fails AI_008 before any dispatch.
  */
 export async function quotaRefusedChat(forge: ForgeHarness, owner: ForgeActor, label: string): Promise<QuotaRefusedChat> {
   const projectId = await newProject(owner, label);
   await forge.quotaPin(projectId);
-  await failPin(
-    projectId,
-    AI_ROLES.filter(role => role !== 'chat' && role !== 'plan'),
-  );
   return { projectId, sessionId: await newChatSession(owner, projectId) };
 }
 
 export async function startTurn(owner: ForgeActor, projectId: string, sessionId: string): Promise<APIResponse> {
-  await assertSpendGuarded(projectId, { requireQuota: true });
+  await assertSpendGuarded(projectId);
   return mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/chats/${sessionId}/turn/stream`, { data: { content: SHORT_TURN } });
 }

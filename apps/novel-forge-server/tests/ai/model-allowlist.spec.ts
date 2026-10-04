@@ -43,36 +43,22 @@ describe('isRegisteredModel', () => {
 describe('ModelRouterService.resolveModel fail-closed guard', () => {
   const router = new ModelRouterService({} as never, stubDatabaseService(), stubQuotaService());
 
-  it('should return a registry-backed override on a standard project', () => {
-    const resolved = router.resolveModel('generation', {
-      contentMode: 'standard',
-      config: { models: { generation: { provider: 'openrouter', model: 'moonshotai/kimi-k3' } } },
-    });
+  it('should return a registry-backed chat pin on a standard project', () => {
+    const resolved = router.resolveModel('chat', { contentMode: 'standard', chatModel: { provider: 'openrouter', model: 'moonshotai/kimi-k3' } });
     expect(resolved.model).toBe('moonshotai/kimi-k3');
   });
 
-  it('should refuse to dispatch a non-registry override on a standard project', () => {
-    expect(() =>
-      router.resolveModel('generation', {
-        contentMode: 'standard',
-        config: { models: { generation: { provider: 'openrouter', model: 'evil/unbounded-spend' } } },
-      }),
-    ).toThrow();
+  it('should refuse to dispatch a non-registry chat pin on a standard project', () => {
+    expect(() => router.resolveModel('chat', { contentMode: 'standard', chatModel: { provider: 'openrouter', model: 'evil/unbounded-spend' } })).toThrow();
   });
 
-  it('should still coerce a disallowed override back to the default on an unrestricted project', () => {
-    const resolved = router.resolveModel('generation', {
-      contentMode: 'unrestricted',
-      config: { models: { generation: { provider: 'openrouter', model: 'evil/unbounded-spend' } } },
-    });
-    expect(resolved.model).toBe(UNRESTRICTED_DEFAULTS.generation.model);
+  it('should still coerce a disallowed chat pin back to the default on an unrestricted project', () => {
+    const resolved = router.resolveModel('chat', { contentMode: 'unrestricted', chatModel: { provider: 'openrouter', model: 'evil/unbounded-spend' } });
+    expect(resolved.model).toBe(UNRESTRICTED_DEFAULTS.chat.model);
   });
 
-  it('should preserve an allowlisted override on an unrestricted project', () => {
-    const resolved = router.resolveModel('generation', {
-      contentMode: 'unrestricted',
-      config: { models: { generation: { provider: 'openrouter', model: 'x-ai/grok-4.6' } } },
-    });
+  it('should preserve an allowlisted chat pin on an unrestricted project', () => {
+    const resolved = router.resolveModel('chat', { contentMode: 'unrestricted', chatModel: { provider: 'openrouter', model: 'x-ai/grok-4.6' } });
     expect(resolved.model).toBe('x-ai/grok-4.6');
   });
 });

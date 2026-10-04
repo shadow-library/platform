@@ -122,7 +122,7 @@ export interface FinalizeReview {
  *
  * Shared building blocks for the Novel Forge specs. The suite splits in two:
  *   - deterministic specs, which drive the product through hand-written chapters, imports and settings and never wait on a model;
- *   - model-backed specs, tagged `MODEL_TAG` and gated by `aiAvailable()`, which spend real calls on a Haiku-pinned project.
+ *   - model-backed specs, tagged `MODEL_TAG` and gated by `aiAvailable()`, which spend real calls on an Economy-tier project.
  * `bun run test:deterministic` skips the tag; `bun run test:model` runs only it. Model-backed assertions check structure (a job
  * finished, a draft has prose, a review settled), never wording.
  */
@@ -139,29 +139,6 @@ export class ForgeJobTimeoutError extends Error {
 export const MODEL_FLOW_TIMEOUT_MS = 30 * 60_000;
 
 const MODEL_CALL_TIMEOUT_MS = 10 * 60_000;
-
-/**
- * Every text role a project's `config.models` accepts an override for (`ProjectModelOverrides`). A role left on its tier default routes
- * that stage to a larger model and defeats the pin; `image` and `embedding` are not text roles and stay untouched.
- */
-export const HAIKU_TEXT_ROLES = [
-  'generation',
-  'revision',
-  'fix',
-  'premise',
-  'plan',
-  'outline',
-  'bible',
-  'extraction',
-  'judge',
-  'validation',
-  'continuity',
-  'review',
-  'audit',
-  'chat',
-  'title',
-  'compact',
-] as const;
 
 /** Every LLM goes through OpenRouter, so a model is its OpenRouter `vendor/model` slug; anything off `MODEL_REGISTRY` is refused with AI_002. */
 export const HAIKU_MODEL: ModelRef = { provider: 'openrouter', model: 'anthropic/claude-haiku-4.5' };
@@ -192,10 +169,6 @@ export const CHAPTER_TWO: ChapterText = {
   ].join('\n\n'),
   summary: 'Odo Kessling brings a guild writ to stop the survey; Tamsin refuses and keeps working.',
 };
-
-export function haikuModelConfig(): { models: Record<string, ModelRef> } {
-  return { models: Object.fromEntries(HAIKU_TEXT_ROLES.map(role => [role, HAIKU_MODEL])) };
-}
 
 /** A collision-proof suffix for project names and slugs — the seed wipes e2e-owned projects each run, but a run may create several. */
 export function uniqueSuffix(): string {
@@ -232,9 +205,9 @@ export async function createNovel(ctx: APIRequestContext, body: { title: string;
   return (await response.json()) as CreatedNovel;
 }
 
-/** Pins every text role of `projectId` to Haiku. Run it before anything that can reach a model, including an approval. */
-export async function pinHaiku(ctx: APIRequestContext, projectId: string): Promise<APIResponse> {
-  return mutate(ctx, 'patch', `/api/v1/projects/${projectId}`, { data: { config: haikuModelConfig() } });
+/** Puts `projectId` on the Economy tier, the cheapest models. Run it before anything that can reach a model, including an approval. */
+export async function useEconomyTier(ctx: APIRequestContext, projectId: string): Promise<APIResponse> {
+  return mutate(ctx, 'patch', `/api/v1/projects/${projectId}`, { data: { costTier: 'economy' } });
 }
 
 /** Best-effort project delete — cleanup must never mask the assertion that failed. */
@@ -412,7 +385,7 @@ export async function finalizeThroughReview(ctx: APIRequestContext, projectId: s
 
 /**
  * Whether model-backed specs may run. Live calls are metered, so they are opt-in: without `E2E_LIVE_AI=1` this answers false without
- * touching the gateway. With it, a throwaway Haiku-pinned project fires the cheapest AI endpoint (`POST /premise/enhance`) and the
+ * touching the gateway. With it, a throwaway Economy-tier project fires the cheapest AI endpoint (`POST /premise/enhance`) and the
  * verdict is cached to `.auth/ai-probe.json` so every worker and spec in a run reuses one probe. Any non-2xx caches a negative result —
  * model specs then `test.skip` rather than fail.
  */
@@ -442,8 +415,8 @@ async function probeGateway(ctx: APIRequestContext): Promise<boolean> {
     const created = await createProject(ctx, { name: `e2e-forge-aiprobe-${uniqueSuffix()}`, kind: 'new_novel', contentMode: 'standard' });
     projectId = created.id;
     if (!projectId) return false;
-    const pin = await pinHaiku(ctx, projectId);
-    if (!pin.ok()) return false;
+    const economy = await useEconomyTier(ctx, projectId);
+    if (!economy.ok()) return false;
     const response = await mutate(ctx, 'post', `/api/v1/projects/${projectId}/premise/enhance`, {
       data: { overview: 'A lighthouse keeper discovers the light summons sea spirits.' },
     }).catch(() => undefined);
@@ -473,6 +446,6 @@ function writeProbeCache(available: boolean): boolean {
 
 export function aiSkipReason(): string {
   return liveAiEnabled()
-    ? 'AI gateway probe failed (premise/enhance on a Haiku-pinned project did not return 2xx)'
+    ? 'AI gateway probe failed (premise/enhance on an Economy-tier project did not return 2xx)'
     : 'live AI calls are opt-in and metered: set E2E_LIVE_AI=1 to run them';
 }

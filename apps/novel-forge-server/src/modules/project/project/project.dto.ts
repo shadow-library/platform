@@ -60,71 +60,6 @@ export class CreateProjectBody {
   wordTarget?: ProjectWordTarget;
 }
 
-@Schema({ description: 'Provider and model reference used for a project-level AI role override.' })
-export class ProjectModelRef {
-  @Field()
-  provider: string;
-
-  @Field()
-  model: string;
-}
-
-// Enumerated fields avoid an unnormalised additionalProperties ref that breaks client code generation; keep these synchronized with AiRole,
-// less `embedding`, which is deployment-wide (`ai.embedding.model`) and so never a project pin.
-@Schema({ description: 'Optional provider and model overrides keyed by AI role.' })
-export class ProjectModelOverrides {
-  @Field(() => ProjectModelRef, { optional: true })
-  extraction?: ProjectModelRef;
-
-  @Field(() => ProjectModelRef, { optional: true })
-  generation?: ProjectModelRef;
-
-  @Field(() => ProjectModelRef, { optional: true })
-  judge?: ProjectModelRef;
-
-  @Field(() => ProjectModelRef, { optional: true })
-  fix?: ProjectModelRef;
-
-  @Field(() => ProjectModelRef, { optional: true })
-  outline?: ProjectModelRef;
-
-  @Field(() => ProjectModelRef, { optional: true })
-  revision?: ProjectModelRef;
-
-  @Field(() => ProjectModelRef, { optional: true })
-  title?: ProjectModelRef;
-
-  @Field(() => ProjectModelRef, { optional: true })
-  continuity?: ProjectModelRef;
-
-  @Field(() => ProjectModelRef, { optional: true })
-  validation?: ProjectModelRef;
-
-  @Field(() => ProjectModelRef, { optional: true })
-  review?: ProjectModelRef;
-
-  @Field(() => ProjectModelRef, { optional: true })
-  plan?: ProjectModelRef;
-
-  @Field(() => ProjectModelRef, { optional: true })
-  bible?: ProjectModelRef;
-
-  @Field(() => ProjectModelRef, { optional: true })
-  premise?: ProjectModelRef;
-
-  @Field(() => ProjectModelRef, { optional: true })
-  audit?: ProjectModelRef;
-
-  @Field(() => ProjectModelRef, { optional: true })
-  chat?: ProjectModelRef;
-
-  @Field(() => ProjectModelRef, { optional: true })
-  compact?: ProjectModelRef;
-
-  @Field(() => ProjectModelRef, { optional: true })
-  image?: ProjectModelRef;
-}
-
 @Schema()
 export class ProjectFinalizeReviewConfig {
   @Field(() => [FinalizeReviewCategory], {
@@ -135,14 +70,8 @@ export class ProjectFinalizeReviewConfig {
 }
 
 @Schema()
-export class ProjectConfig {
-  @Field(() => ProjectModelOverrides, { optional: true })
-  models?: ProjectModelOverrides;
-}
-
-@Schema()
-export class ProjectConfigResponse extends ProjectConfig {
-  @Field(() => ProjectFinalizeReviewConfig, { optional: true, description: 'Written only by PUT /finalize-review/settings; a project update keeps it.' })
+export class ProjectConfigResponse {
+  @Field(() => ProjectFinalizeReviewConfig, { optional: true, description: 'Written only by PUT /finalize-review/settings.' })
   finalizeReview?: ProjectFinalizeReviewConfig;
 }
 
@@ -255,9 +184,6 @@ export class UpdateProjectBody {
   @Field({ optional: true, maxLength: 500, description: 'The working title. Trimmed; a blank title clears it.' })
   title?: string;
 
-  @Field(() => ProjectConfig, { optional: true })
-  config?: ProjectConfig;
-
   @Field(() => ContentMode, { optional: true })
   contentMode?: Project.ContentMode;
 
@@ -301,9 +227,6 @@ export class UpdateProjectBody {
 export class CloneProjectBody {
   @Field()
   name: string;
-
-  @Field(() => ProjectConfig, { optional: true })
-  config?: ProjectConfig;
 
   @Field(() => ContentMode, { optional: true })
   contentMode?: Project.ContentMode;

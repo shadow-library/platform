@@ -37,32 +37,6 @@ export type JobStatus = 'pending' | 'in_progress' | 'done' | 'failed' | 'cancell
 
 export type ToolCallStatus = 'ok' | 'invalid_args' | 'handler_error' | 'budget_exceeded';
 
-/** Every role the router resolves a model for (`AiRole` in the server's `ai/defaults.ts`). */
-export const AI_ROLES = [
-  'extraction',
-  'generation',
-  'judge',
-  'fix',
-  'outline',
-  'revision',
-  'title',
-  'continuity',
-  'validation',
-  'review',
-  'premise',
-  'plan',
-  'bible',
-  'audit',
-  'chat',
-  'compact',
-  'illustration',
-  'image',
-  'vision',
-  'embedding',
-] as const;
-
-export type AiRole = (typeof AI_ROLES)[number];
-
 export interface ModelRef {
   readonly provider: string;
   readonly model: string;
@@ -87,7 +61,7 @@ export interface ForgeProjectRow {
   readonly sharedWithOrg: boolean;
   readonly contentMode: ForgeContentMode;
   readonly costTier: ForgeCostTier;
-  readonly config: { models?: Record<string, ModelRef> } | null;
+  readonly config: { finalizeReview?: { autoKeep?: unknown } } | null;
 }
 
 export interface ProjectOwnershipPatch {
@@ -213,19 +187,17 @@ export interface QuotaLimits {
  * workflow run would have written, projects a bot owns, and the authoring claim a running job holds. Timestamps are written on the
  * database clock (`timestamp without time zone`, UTC), which is the clock every server-side window compares against.
  *
- * Keeping a model-capable request from spending — later batches use both guards, the quota pin as the belt and the fail-pin as braces:
- *  - `quotaPin` stands the project's owner at the AI_008 call ceiling. Every paid dispatch (`chatFor`, `structured` and its streaming and
- *    image-input variants, `images`) runs `AiQuotaService.enforce` before `routeModel` decides standard or unrestricted, so it holds on
- *    both paths. It pins every project of that owner and lasts one window (an hour in dev); a server that cannot read usage refuses the
- *    call with AI_018 instead. That owner's usage and cost figures then include the pin's zero-cost rows (prompt key `e2e-quota-pin`).
- *  - `failPin` refuses a standard route with AI_002. It does nothing on an unrestricted route — `generate-unrestricted`, an isolated
- *    chapter or one whose plan is written unrestricted, a plugin raised to the permissive writer — which dispatches the tier default, and a
- *    later `PATCH /projects/:id` carrying `config` replaces the pins.
- * Call `assertSpendGuarded` right before any model-capable request.
+ * Keeping a model-capable request from spending: `quotaPin` stands the project's owner at the AI_008 call ceiling. Every paid dispatch
+ * (`chatFor`, `structured` and its streaming and image-input variants, `images`) runs `AiQuotaService.enforce` before `routeModel` decides
+ * standard or unrestricted, so it holds on both paths. It pins every project of that owner and lasts one window (an hour in dev); a server
+ * that cannot read usage refuses the call with AI_018 instead. That owner's usage and cost figures then include the pin's zero-cost rows
+ * (prompt key `e2e-quota-pin`). A seeded persona cannot be quota-pinned — that would block it in every lane — so a spec that needs a
+ * model-capable request runs it as an owner it created. `failPinChat` additionally refuses a standard chat turn with AI_002 before its run
+ * exists. Call `assertSpendGuarded` right before any model-capable request.
  */
 
-/** Not in the model registry, so a standard route refuses it with `AI_002` before any dispatch. */
-export const FAIL_PIN_MODEL: ModelRef = { provider: 'openrouter', model: 'e2e/unregistered' };
+/** Not in the model registry: a standard chat pinned to it is refused with `AI_002` before any dispatch, and seeded rows carry it. */
+export const UNREGISTERED_MODEL: ModelRef = { provider: 'openrouter', model: 'e2e/unregistered' };
 
 /** Prompt key of every row this module seeds; a real dispatch always records a registry prompt key. */
 const SEEDED_PROMPT_KEY = 'e2e-seed';
@@ -268,23 +240,14 @@ function ago(ms: number | undefined): string {
   return `${Math.max(0, Math.round(ms ?? 0))} milliseconds`;
 }
 
-/**
- * Pins `roles` of a standard project to `FAIL_PIN_MODEL`, keeping any other override — a database write, since the PATCH route refuses an
- * unregistered id. Every role by default: a stage's routing role is not always its route's name (summarising routes as `continuity`).
- */
-export async function failPin(projectId: string, roles: readonly AiRole[] = AI_ROLES): Promise<void> {
-  const sql = novelForgeDb();
-  const pins = Object.fromEntries(roles.map(role => [role, FAIL_PIN_MODEL]));
-  const [row] = await sql<{ contentMode: ForgeContentMode; models: Record<string, ModelRef> | null }[]>`
-    UPDATE projects
-    SET config = jsonb_set(coalesce(config, '{}'::jsonb), '{models}', coalesce(config->'models', '{}'::jsonb) || ${sql.json(pins as never)}::jsonb)
-    WHERE id = ${projectId}
-    RETURNING content_mode AS "contentMode", config->'models' AS models
+/** Pins a chat to `UNREGISTERED_MODEL` — a database write, since the model route refuses an unregistered id — so a standard turn on it is refused. */
+export async function failPinChat(sessionId: string): Promise<void> {
+  const [row] = await novelForgeDb()<{ modelId: string | null }[]>`
+    UPDATE chat_sessions SET model_provider = ${UNREGISTERED_MODEL.provider}, model_id = ${UNREGISTERED_MODEL.model}
+    WHERE id = ${sessionId}
+    RETURNING model_id AS "modelId"
   `;
-  if (!row) throw new ForgeDbError(`no project ${projectId} to fail-pin`);
-  if (row.contentMode !== 'standard') throw new SpendGuardError(`project ${projectId} is ${row.contentMode}: an unrestricted router ignores a fail-pin and would spend`);
-  const unpinned = roles.filter(role => row.models?.[role]?.model !== FAIL_PIN_MODEL.model);
-  if (unpinned.length > 0) throw new SpendGuardError(`project ${projectId} did not keep the fail-pin for ${unpinned.join(', ')}`);
+  if (row?.modelId !== UNREGISTERED_MODEL.model) throw new SpendGuardError(`chat ${sessionId} did not keep the fail-pin`);
 }
 
 export async function readProjectRow(projectId: string): Promise<ForgeProjectRow | undefined> {
@@ -374,7 +337,7 @@ export async function insertModelCalls(seeds: readonly ModelCallSeed[]): Promise
         cost_usd, cost_source, tier, content_mode, raw_output, chapter, created_at
       )
       VALUES (
-        ${seed.projectId}, ${seed.runId ?? null}, 'e2e', ${seed.role ?? 'generation'}, ${seed.provider ?? 'openrouter'}, ${seed.model ?? FAIL_PIN_MODEL.model}, ${SEEDED_PROMPT_KEY}, '1.0.0',
+        ${seed.projectId}, ${seed.runId ?? null}, 'e2e', ${seed.role ?? 'generation'}, ${seed.provider ?? 'openrouter'}, ${seed.model ?? UNREGISTERED_MODEL.model}, ${SEEDED_PROMPT_KEY}, '1.0.0',
         ${seed.status ?? 'ok'}::model_call_status, ${seed.inputTokens ?? null}, ${seed.cachedInputTokens ?? null}, ${seed.outputTokens ?? null}, ${seed.latencyMs ?? null},
         ${seed.costUsd ?? null}, ${seed.costSource ?? null}::cost_source, ${seed.tier ?? null}::cost_tier, ${seed.contentMode ?? null}::content_mode, ${seed.rawOutput ?? null},
         ${seed.chapter ?? null}, now() - ${ago(seed.ageMs)}::interval
@@ -392,7 +355,7 @@ export async function insertModelCallBatch(count: number, seed: ModelCallSeed): 
   if (count <= 0) return;
   await novelForgeDb()`
     INSERT INTO model_calls (project_id, run_id, node, role, provider, model, prompt_key, prompt_version, status, input_tokens, output_tokens, cost_usd, cost_source, created_at)
-    SELECT ${seed.projectId}, ${seed.runId ?? null}, 'e2e', ${seed.role ?? 'generation'}, ${seed.provider ?? 'openrouter'}, ${seed.model ?? FAIL_PIN_MODEL.model}, ${SEEDED_PROMPT_KEY}, '1.0.0',
+    SELECT ${seed.projectId}, ${seed.runId ?? null}, 'e2e', ${seed.role ?? 'generation'}, ${seed.provider ?? 'openrouter'}, ${seed.model ?? UNREGISTERED_MODEL.model}, ${SEEDED_PROMPT_KEY}, '1.0.0',
            ${seed.status ?? 'ok'}::model_call_status, ${seed.inputTokens ?? null}, ${seed.outputTokens ?? null}, ${seed.costUsd ?? null}, ${seed.costSource ?? null}::cost_source,
            now() - ${ago(seed.ageMs)}::interval
     FROM generate_series(1, ${count})
@@ -467,7 +430,7 @@ export async function quotaPin(projectId: string, limits: QuotaLimits, scope: Qu
   if (missing > 0) {
     await novelForgeDb()`
       INSERT INTO model_calls (project_id, node, role, provider, model, prompt_key, prompt_version, status, cost_usd, cost_source)
-      SELECT ${projectId}, 'e2e', 'generation', ${FAIL_PIN_MODEL.provider}, ${FAIL_PIN_MODEL.model}, ${QUOTA_PIN_PROMPT_KEY}, '1.0.0', 'ok', 0, 'provider'
+      SELECT ${projectId}, 'e2e', 'generation', ${UNREGISTERED_MODEL.provider}, ${UNREGISTERED_MODEL.model}, ${QUOTA_PIN_PROMPT_KEY}, '1.0.0', 'ok', 0, 'provider'
       FROM generate_series(1, ${missing})
     `;
   }
@@ -477,35 +440,25 @@ export async function quotaPin(projectId: string, limits: QuotaLimits, scope: Qu
 }
 
 /**
- * Throws unless a model-capable request on the project would be refused before dispatch: its owner still stands at the call ceiling
- * (when it was quota-pinned), or, failing that, it is a standard project still fail-pinned on every role. `requireQuota` refuses a
- * fail-pin alone. An unrestricted project is guarded by the quota pin only. A pin is re-checked against the server's limits read afresh
- * and, for a person, against the server's own count of their calls.
+ * Throws unless a model-capable request on the project would be refused before dispatch: its owner was quota-pinned and still stands at
+ * the call ceiling. The pin is re-checked against the server's limits read afresh and, for a person, against the server's own count of
+ * their calls.
  */
-export async function assertSpendGuarded(projectId: string, options: { requireQuota?: boolean } = {}): Promise<void> {
-  const project = await readProjectRow(projectId);
-  if (!project) throw new ForgeDbError(`no project ${projectId} to guard`);
-
+export async function assertSpendGuarded(projectId: string): Promise<void> {
+  if (!(await readProjectRow(projectId))) throw new ForgeDbError(`no project ${projectId} to guard`);
   const pin = quotaPins.get(projectId);
-  const limits = pin?.limits;
-  if (pin) {
-    const counted = await countFreshOwnerCalls(projectId, pin.limits);
-    if (counted < pin.limits.maxCalls) throw new SpendGuardError(`project ${projectId}'s quota pin lapsed: its owner stands at ${counted} of ${pin.limits.maxCalls} calls`);
-    const current = await fetchQuota(await pin.reader());
-    if (current.maxCalls !== pin.limits.maxCalls || current.windowMs !== pin.limits.windowMs) {
-      throw new SpendGuardError(
-        `the server's quota window is now ${current.maxCalls} calls / ${current.windowMs} ms, not the ${pin.limits.maxCalls} / ${pin.limits.windowMs} pinned`,
-      );
-    }
-    const seen = pin.ownerCtx ? await fetchQuota(pin.ownerCtx) : undefined;
-    if (seen && seen.calls < pin.limits.maxCalls) throw new SpendGuardError(`the server counts ${seen.calls} of ${pin.limits.maxCalls} calls for project ${projectId}'s owner`);
-  }
-  if (!limits && options.requireQuota) throw new SpendGuardError(`project ${projectId} is not quota-pinned`);
-  if (limits && project.contentMode === 'unrestricted') return;
-  if (!limits && project.contentMode !== 'standard') throw new SpendGuardError(`project ${projectId} is unrestricted and not quota-pinned: nothing stops a real dispatch`);
+  if (!pin) throw new SpendGuardError(`project ${projectId} is not quota-pinned: nothing stops a real dispatch`);
 
-  const unpinned = AI_ROLES.filter(role => project.config?.models?.[role]?.model !== FAIL_PIN_MODEL.model);
-  if (unpinned.length > 0 && !limits) throw new SpendGuardError(`project ${projectId} is neither quota-pinned nor fail-pinned for ${unpinned.join(', ')}`);
+  const counted = await countFreshOwnerCalls(projectId, pin.limits);
+  if (counted < pin.limits.maxCalls) throw new SpendGuardError(`project ${projectId}'s quota pin lapsed: its owner stands at ${counted} of ${pin.limits.maxCalls} calls`);
+  const current = await fetchQuota(await pin.reader());
+  if (current.maxCalls !== pin.limits.maxCalls || current.windowMs !== pin.limits.windowMs) {
+    throw new SpendGuardError(
+      `the server's quota window is now ${current.maxCalls} calls / ${current.windowMs} ms, not the ${pin.limits.maxCalls} / ${pin.limits.windowMs} pinned`,
+    );
+  }
+  const seen = pin.ownerCtx ? await fetchQuota(pin.ownerCtx) : undefined;
+  if (seen && seen.calls < pin.limits.maxCalls) throw new SpendGuardError(`the server counts ${seen.calls} of ${pin.limits.maxCalls} calls for project ${projectId}'s owner`);
 }
 
 export async function insertWorkflowRun(seed: WorkflowRunSeed): Promise<string> {
@@ -582,13 +535,13 @@ async function writeAuthoringClaim(sql: Sql | TransactionSql, projectId: string,
  * boot. So a live model-capable job is refused unless the project is quota-pinned.
  */
 export async function insertJob(seed: JobSeed): Promise<string> {
-  if (MODEL_CAPABLE_JOB_KINDS.includes(seed.kind) && LIVE_JOB_STATUSES.includes(seed.status ?? 'pending')) await assertSpendGuarded(seed.projectId, { requireQuota: true });
+  if (MODEL_CAPABLE_JOB_KINDS.includes(seed.kind) && LIVE_JOB_STATUSES.includes(seed.status ?? 'pending')) await assertSpendGuarded(seed.projectId);
   return writeJob(novelForgeDb(), seed);
 }
 
 /** A pending authoring job and the reservation enqueueing takes for it, written together as the server writes them; it needs a quota pin. */
 export async function insertReservedJob(seed: Omit<JobSeed, 'status'>): Promise<string> {
-  await assertSpendGuarded(seed.projectId, { requireQuota: true });
+  await assertSpendGuarded(seed.projectId);
   return novelForgeDb().begin(async tx => {
     const jobId = await writeJob(tx, seed);
     await writeAuthoringClaim(tx, seed.projectId, { jobId, kind: seed.kind });
@@ -598,7 +551,7 @@ export async function insertReservedJob(seed: Omit<JobSeed, 'status'>): Promise<
 
 /** Holds the project's one authoring claim, replacing any claim already there — a job-less holder's, or a job's reservation, which needs a quota pin. */
 export async function holdAuthoringClaim(projectId: string, options: AuthoringClaimOptions = {}): Promise<void> {
-  if (options.jobId) await assertSpendGuarded(projectId, { requireQuota: true });
+  if (options.jobId) await assertSpendGuarded(projectId);
   await writeAuthoringClaim(novelForgeDb(), projectId, options);
 }
 

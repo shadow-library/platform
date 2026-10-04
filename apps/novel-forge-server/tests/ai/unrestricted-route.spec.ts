@@ -31,7 +31,7 @@ function deps(model: ResolvedModel) {
 }
 
 describe('resolveUnrestrictedRoute', () => {
-  const project: ProjectConfig = { contentMode: 'standard', config: { models: { revision: { provider: 'openrouter', model: 'moonshotai/kimi-k3' } } } };
+  const project: ProjectConfig = { contentMode: 'standard', costTier: 'economy' };
 
   it('should resolve the policy on the unrestricted baseline and route the project onto the unrestricted map', async () => {
     const run = deps(UNRESTRICTED_DEFAULTS.revision);
@@ -59,7 +59,7 @@ describe('resolveUnrestrictedRoute', () => {
 });
 
 describe('routeRunCall', () => {
-  const projectRow: ProjectConfig = { contentMode: 'standard', config: { models: { judge: { provider: 'openrouter', model: 'anthropic/claude-sonnet-5' } } } };
+  const projectRow: ProjectConfig = { contentMode: 'standard', costTier: 'economy' };
   const runPolicy = { writerClass: 'standard', raised: false };
 
   function runDeps() {

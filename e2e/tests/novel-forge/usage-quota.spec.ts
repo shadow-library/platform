@@ -8,16 +8,7 @@ import { type APIRequestContext, type APIResponse } from '@playwright/test';
  */
 import { mutate } from '../../lib';
 import { expect, type ForgeActor, test } from './forge-actors';
-import {
-  assertSpendGuarded,
-  failPin,
-  insertModelCallBatch,
-  insertModelCalls,
-  listDispatchedModelCalls,
-  listModelCallModels,
-  readAccountDefaultCostTier,
-  readProjectRow,
-} from './forge-db';
+import { assertSpendGuarded, insertModelCallBatch, insertModelCalls, listDispatchedModelCalls, listModelCallModels, readAccountDefaultCostTier, SpendGuardError } from './forge-db';
 import { errorCode, uniqueSuffix } from './forge-helpers';
 
 /**
@@ -76,8 +67,8 @@ interface ProjectBody {
  * Declaring the constants
  *
  * Spend control and the figures behind it. The AI quota is a rolling window per owner over `model_calls`, enforced before the router
- * resolves a model — so on a fail-pinned project a request that passes the quota is refused AI_002 and one that breaches it is refused
- * AI_008/AI_009, and nothing is ever dispatched. Cost figures are asserted over seeded calls whose prices this spec controls; the one
+ * resolves a model. A request is sent only once the owner stands at a ceiling, so it is refused AI_008/AI_009 and nothing is ever
+ * dispatched; below a ceiling the quota's own report is what is asserted. Cost figures are asserted over seeded calls whose prices this spec controls; the one
  * list-price estimate is computed from the registry `GET /ai/models` serves.
  */
 
@@ -94,15 +85,27 @@ async function createProject(owner: ForgeActor, data: Record<string, unknown> = 
   return (await response.json()) as ProjectBody;
 }
 
-async function pinnedProject(owner: ForgeActor): Promise<string> {
-  const { id } = await createProject(owner);
-  await failPin(id);
-  return id;
+async function newProjectId(owner: ForgeActor): Promise<string> {
+  return (await createProject(owner)).id;
+}
+
+function postEnhancePremise(owner: ForgeActor, projectId: string): Promise<APIResponse> {
+  return mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/premise/enhance`, { data: { overview: 'A cartographer maps a district that moves every night.' } });
 }
 
 async function enhancePremise(owner: ForgeActor, projectId: string): Promise<APIResponse> {
   await assertSpendGuarded(projectId);
-  return mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/premise/enhance`, { data: { overview: 'A cartographer maps a district that moves every night.' } });
+  return postEnhancePremise(owner, projectId);
+}
+
+/** For an owner stood at a ceiling by seeded calls rather than `quotaPin`: refuses to send unless the server's own report says a ceiling is reached. */
+async function enhancePremiseAtCeiling(owner: ForgeActor, projectId: string): Promise<APIResponse> {
+  const quota = await readQuota(owner.ctx);
+  const atRate = quota.maxCalls > 0 && quota.calls >= quota.maxCalls;
+  const overSpend = quota.maxCostUsd > 0 && quota.costUsd > quota.maxCostUsd;
+  if (!atRate && !overSpend)
+    throw new SpendGuardError(`project ${projectId}'s owner stands under both ceilings (${quota.calls} calls, $${quota.costUsd}): the request would dispatch`);
+  return postEnhancePremise(owner, projectId);
 }
 
 async function expectOutcome(response: APIResponse, status: number, code: string, what: string): Promise<void> {
@@ -136,17 +139,17 @@ function item(items: BreakdownItem[], key: string): BreakdownItem | undefined {
 }
 
 test.describe('novel-forge AI quota', () => {
-  test('should pass the quota one call below the rate ceiling and refuse at it without dispatching', async ({ forge }) => {
+  test('should count calls up to the rate ceiling and refuse at it without dispatching', async ({ forge }) => {
     const author = await forge.actor({ label: 'quota-rate' });
-    const projectId = await pinnedProject(author);
+    const projectId = await newProjectId(author);
     const limits = await readQuota(author.ctx);
     expect(limits.maxCalls, 'the rate dimension is enabled').toBeGreaterThan(0);
 
     await insertModelCallBatch(limits.maxCalls - 1, { projectId, costUsd: 0, costSource: 'provider' });
-    await expectOutcome(await enhancePremise(author, projectId), 400, 'AI_002', 'one call below the ceiling, the quota passes and the fail-pin refuses');
+    expect((await readQuota(author.ctx)).calls, 'one call below the ceiling').toBe(limits.maxCalls - 1);
 
     await insertModelCallBatch(1, { projectId, costUsd: 0, costSource: 'provider' });
-    await expectOutcome(await enhancePremise(author, projectId), 429, 'AI_008', 'at the ceiling the next dispatch is the one over the line');
+    await expectOutcome(await enhancePremiseAtCeiling(author, projectId), 429, 'AI_008', 'at the ceiling the next dispatch is the one over the line');
 
     const quota = await readQuota(author.ctx);
     expect(quota).toMatchObject({ calls: limits.maxCalls, costUsd: 0, maxCalls: limits.maxCalls, maxCostUsd: limits.maxCostUsd, windowMs: limits.windowMs });
@@ -158,7 +161,7 @@ test.describe('novel-forge AI quota', () => {
 
   test('should price recorded and token-only calls into the spend ceiling and report a rate breach first', async ({ forge }) => {
     const author = await forge.actor({ label: 'quota-spend' });
-    const projectId = await pinnedProject(author);
+    const projectId = await newProjectId(author);
     const limits = await readQuota(author.ctx);
     expect(limits.maxCostUsd, 'the spend dimension is enabled').toBeGreaterThan(0);
     const model = await pricedModel(author.ctx);
@@ -169,40 +172,37 @@ test.describe('novel-forge AI quota', () => {
       { projectId, model: model.id, inputTokens: 1_000_000, outputTokens: 0, costUsd: null, costSource: null },
       { projectId, model: model.id, costUsd: limits.maxCostUsd - estimated - 0.01, costSource: 'provider' },
     ]);
-    expect((await readQuota(author.ctx)).costUsd).toBeCloseTo(limits.maxCostUsd - 0.01, 6);
-    await expectOutcome(await enhancePremise(author, projectId), 400, 'AI_002', 'a cent under the spend ceiling');
+    expect((await readQuota(author.ctx)).costUsd, 'a cent under the spend ceiling').toBeCloseTo(limits.maxCostUsd - 0.01, 6);
 
     await insertModelCalls([{ projectId, model: model.id, costUsd: 0.02, costSource: 'provider' }]);
-    await expectOutcome(await enhancePremise(author, projectId), 429, 'AI_009', 'past the spend ceiling, counting the token-only estimate');
+    await expectOutcome(await enhancePremiseAtCeiling(author, projectId), 429, 'AI_009', 'past the spend ceiling, counting the token-only estimate');
 
     await insertModelCallBatch(limits.maxCalls, { projectId, costUsd: 0, costSource: 'provider' });
-    await expectOutcome(await enhancePremise(author, projectId), 429, 'AI_008', 'with both ceilings breached the rate breach is reported');
+    await expectOutcome(await enhancePremiseAtCeiling(author, projectId), 429, 'AI_008', 'with both ceilings breached the rate breach is reported');
     expect((await listModelCallModels(projectId)).length).toBe(limits.maxCalls + 3);
   });
 
   test('should refuse a quota-pinned project before routing, so no model is ever resolved', async ({ forge }) => {
     const author = await forge.actor({ label: 'quota-pin' });
-    const projectId = await pinnedProject(author);
+    const projectId = await newProjectId(author);
     await forge.quotaPin(projectId);
 
-    await assertSpendGuarded(projectId, { requireQuota: true });
-    await expectOutcome(await enhancePremise(author, projectId), 429, 'AI_008', 'the quota pin answers before the router looks at the fail-pin');
+    await expectOutcome(await enhancePremise(author, projectId), 429, 'AI_008', 'the quota pin answers before the router resolves a model');
     expect(await listDispatchedModelCalls(projectId), 'nothing was dispatched').toEqual([]);
   });
 
   test("should count only the owner's own calls inside the window", async ({ forge }) => {
     const author = await forge.actor({ label: 'quota-own' });
     const neighbour = await forge.actor({ label: 'quota-neighbour' });
-    const projectId = await pinnedProject(author);
-    const neighbourProject = await pinnedProject(neighbour);
+    const projectId = await newProjectId(author);
+    const neighbourProject = await newProjectId(neighbour);
     const limits = await readQuota(author.ctx);
 
     await insertModelCallBatch(limits.maxCalls, { projectId: neighbourProject, costUsd: limits.maxCostUsd, costSource: 'provider' });
     await insertModelCallBatch(limits.maxCalls, { projectId, costUsd: limits.maxCostUsd, costSource: 'provider', ageMs: limits.windowMs + 60_000 });
 
-    await expectOutcome(await enhancePremise(author, projectId), 400, 'AI_002', "another owner's calls and this owner's expired ones do not count");
-    expect(await readQuota(author.ctx)).toMatchObject({ calls: 0, costUsd: 0, resetsAt: null });
-    await expectOutcome(await enhancePremise(neighbour, neighbourProject), 429, 'AI_008', 'the neighbour is at its own ceiling');
+    expect(await readQuota(author.ctx), "another owner's calls and this owner's expired ones do not count").toMatchObject({ calls: 0, costUsd: 0, resetsAt: null });
+    await expectOutcome(await enhancePremiseAtCeiling(neighbour, neighbourProject), 429, 'AI_008', 'the neighbour is at its own ceiling');
   });
 });
 
@@ -334,7 +334,7 @@ test.describe('novel-forge cost figures', () => {
   });
 });
 
-test.describe('novel-forge AI settings and project models', () => {
+test.describe('novel-forge AI settings', () => {
   test('should default a new account to Balanced and start new projects on the saved default tier', async ({ forge }) => {
     const author = await forge.actor({ label: 'settings' });
 
@@ -359,50 +359,5 @@ test.describe('novel-forge AI settings and project models', () => {
     const clone = await mutate(author.ctx, 'post', `/api/v1/projects/${performant.id}/clone`, { data: { name: `e2e-forge-clone-${uniqueSuffix()}` } });
     expect(clone.status(), await clone.text()).toBe(201);
     expect(((await clone.json()) as ProjectBody).costTier, "a clone keeps its source's tier over the account default").toBe('performant');
-  });
-
-  test('should refuse a project model pin outside the registry or on the wrong provider', async ({ forge }) => {
-    const author = await forge.actor({ label: 'models' });
-    const project = await createProject(author);
-    const model = await pricedModel(author.ctx);
-    const patch = (ref: { provider: string; model: string }): Promise<APIResponse> =>
-      mutate(author.ctx, 'patch', `/api/v1/projects/${project.id}`, { data: { config: { models: { generation: ref } } } });
-
-    await expectOutcome(await patch({ provider: 'openrouter', model: 'nope/nope' }), 400, 'AI_002', 'an id the registry does not carry');
-    await expectOutcome(await patch({ provider: 'anthropic', model: model.id }), 400, 'AI_002', 'a registered id on a provider it is not served by');
-
-    const pinned = await patch({ provider: model.provider, model: model.id });
-    expect(pinned.status(), `a registered model on its own provider is accepted — body ${await pinned.text()}`).toBe(200);
-  });
-
-  test('should keep a project model pin it accepted', async ({ forge }) => {
-    const author = await forge.actor({ label: 'models-kept' });
-    const project = await createProject(author);
-    const model = await pricedModel(author.ctx);
-    const ref = { provider: model.provider, model: model.id };
-
-    const pinned = await mutate(author.ctx, 'patch', `/api/v1/projects/${project.id}`, { data: { config: { models: { generation: ref } } } });
-    expect(pinned.status(), await pinned.text()).toBe(200);
-    expect(((await pinned.json()) as { config?: { models?: Record<string, unknown> } }).config?.models?.generation).toEqual(ref);
-    expect((await readProjectRow(project.id))?.config?.models?.generation, 'the router reads the pin from the stored config').toEqual(ref);
-  });
-
-  test('should refuse an image model pinned on a text role', async ({ forge }) => {
-    const author = await forge.actor({ label: 'models-image' });
-    const project = await createProject(author);
-    const response = await author.ctx.get('/api/v1/ai/models');
-    const image = ((await response.json()) as { models: RegistryModel[] }).models.find(model => model.kind === 'image');
-    expect(image, 'the registry lists an image model').toBeDefined();
-    if (!image) return;
-
-    const pinned = await mutate(author.ctx, 'patch', `/api/v1/projects/${project.id}`, {
-      data: { config: { models: { generation: { provider: image.provider, model: image.id } } } },
-    });
-    await expectOutcome(pinned, 400, 'AI_002', 'an image model cannot write prose');
-
-    const onImageRole = await mutate(author.ctx, 'patch', `/api/v1/projects/${project.id}`, {
-      data: { config: { models: { image: { provider: image.provider, model: image.id } } } },
-    });
-    expect(onImageRole.status(), `the same model is accepted on the image role — body ${await onImageRole.text()}`).toBe(200);
   });
 });

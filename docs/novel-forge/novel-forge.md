@@ -54,10 +54,10 @@
   `seq` follows commit order and a cursor never skips a late commit; a failed event insert never undoes the transition, and a transition is published only after it commits. The
   session's job stream (`GET …/chat/sessions/:sessionId/jobs/stream`, SSE id = `seq`) resumes after `Last-Event-ID` or `?after=`; with no cursor it replays the running jobs'
   events and how jobs settled in the last hour. A follower polls so a job another replica starts is still seen; events of jobs settled over a week ago are swept.
-- **Model routing**: roles map to author-selectable groups, overridable per project; an unrestricted alternate map with an allowlist exists. A model type (standard or
-  unrestricted) and a cost tier (economy, balanced, performant) select a platform model per group from `COST_TIER_DEFAULTS`. A call resolves the project's pin for its role, then
-  the tier map; an unrestricted call takes the pin only when the unrestricted allowlist carries it. A chat reply takes its type and tier from the turn, then the chat, then the
-  project, and a chat pin outranks the project's pick. The composer's pick is the chat's own setting and holds until the author changes it. There is no local chat-model path. There are no account-level model defaults: an author's only account setting is the
+- **Model routing**: roles map to groups; an unrestricted alternate map with an allowlist exists. A model type (standard or unrestricted) and a cost tier (economy, balanced,
+  performant) select a platform model per group from `COST_TIER_DEFAULTS`; a project never pins a model to a role. A chat reply takes its type and tier from the turn, then the
+  chat, then the project; a chat's own model pin outranks the tier map for that chat's replies alone, and an unrestricted reply takes it only when the unrestricted allowlist
+  carries it. The composer's pick is the chat's own setting and holds until the author changes it. There is no local chat-model path. There are no account-level model defaults: an author's only account setting is the
   default cost tier a new project starts on when its creation request names none (Balanced until set; a bot holds no settings and always gets Balanced), and a clone keeps its source's tier.
 - **Usage and cost**: every model call records its tokens, its chapter when it has exactly one, and a cost frozen when written, with its source: `provider` (OpenRouter reported
   it), `gateway` (the CLI gateway reported it) or `estimate` (registry list prices). Every source is shown as the real charge. Runs link to their parent run, so a chat turn's

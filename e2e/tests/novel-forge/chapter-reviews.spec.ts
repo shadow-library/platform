@@ -38,7 +38,7 @@ interface ChapterReview {
  * Declaring the constants
  *
  * Chapter reviews as the mechanics/readability checks and the judge gate see them: the deterministic kinds answer synchronously and for
- * free, the judge kind is a model job that fails under the fail-pin, and an open blocking judge finding holds the chapter as a
+ * free, the judge kind is a model job that fails under the quota pin, and an open blocking judge finding holds the chapter as a
  * `contradiction` — which the author answers by dismissing, overriding or promising to fix it by hand — never by spending a model call.
  */
 
@@ -96,7 +96,7 @@ test.describe('novel-forge deterministic reviews', () => {
     expect(listed.latest.map(item => item.kind)).toContain('mechanics');
   });
 
-  test('should queue a judge review as a job that fails under the fail-pin with no model spend', async ({ forge }) => {
+  test('should queue a judge review as a job that fails under the quota pin with no model spend', async ({ forge }) => {
     const owner = await forge.actor({ label: 'review-judge-job' });
     const projectId = await createGuardedProject(forge, owner, 'review-judge-job');
     await writeChapterByHand(owner.ctx, projectId, {

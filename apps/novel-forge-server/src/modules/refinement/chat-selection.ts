@@ -30,8 +30,8 @@ export function chatSelection(turn: ChatSelectionOverride, session: SessionSelec
 }
 
 /**
- * The project a chat reply is routed with: the selection applied, and the chat's own model pin written over the project's chat pick.
- * A pin off the unrestricted allowlist is dropped in unrestricted mode, so the reply falls to the project's pick or the tier map there.
+ * The project a chat reply is routed with: the selection applied, and the chat's own model pin as its chat model. A pin off the
+ * unrestricted allowlist is dropped in unrestricted mode, so the reply falls to the tier map there.
  */
 export function chatRoutedProject(project: ProjectConfig | undefined, session: SessionSelection, selection: ChatSelection): ProjectConfig {
   const pin: ResolvedModel | undefined = session.modelProvider && session.modelId ? { provider: session.modelProvider, model: session.modelId } : undefined;
@@ -59,6 +59,5 @@ function toSelection(row: { costTier: unknown; contentMode: unknown }): Partial<
 }
 
 export function withChatModel(project: ProjectConfig, model: ResolvedModel): ProjectConfig {
-  const config = project.config ?? {};
-  return { ...project, config: { ...config, models: { ...config.models, chat: model } } };
+  return { ...project, chatModel: model };
 }

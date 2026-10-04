@@ -40,13 +40,14 @@ describe('chatSelection', () => {
 });
 
 describe('chatRoutedProject', () => {
-  const project: ProjectConfig = { contentMode: 'standard', costTier: 'balanced', config: { models: { plan: kimi, generation: opus } } };
+  const project: ProjectConfig = { contentMode: 'standard', costTier: 'balanced' };
 
-  it('should write the chat pin over the project chat pick and keep every other pick', () => {
+  it('should route the chat on its pin and every other role on the tier map', () => {
     const routed = chatRoutedProject(project, { ...bare, modelProvider: opus.provider, modelId: opus.model }, { contentMode: 'standard', costTier: 'economy' });
 
-    expect(routed).toEqual({ contentMode: 'standard', costTier: 'economy', config: { models: { plan: kimi, generation: opus, chat: opus } } });
+    expect(routed).toEqual({ contentMode: 'standard', costTier: 'economy', chatModel: opus });
     expect(router().resolveModel('chat', routed)).toEqual(opus);
+    expect(router().resolveModel('plan', routed)).toEqual(COST_TIER_DEFAULTS.economy.standard.planning);
   });
 
   it('should drop a pin off the unrestricted allowlist in unrestricted mode and fall to the tier map, never to standard', () => {
@@ -54,7 +55,7 @@ describe('chatRoutedProject', () => {
 
     const routed = chatRoutedProject({ contentMode: 'standard' }, session, { contentMode: 'unrestricted', costTier: 'economy' });
 
-    expect(routed.config).toBeUndefined();
+    expect(routed.chatModel).toBeUndefined();
     expect(router().resolveModel('chat', routed)).toEqual(COST_TIER_DEFAULTS.economy.unrestricted.chat);
   });
 

@@ -378,7 +378,7 @@ export class FinalizeReviewService {
     return this.get(projectId, chapter);
   }
 
-  /** Stored beside the model overrides in `projects.config`, merged in place so neither setting overwrites the other. */
+  /** Merged into `projects.config` in place, so any other key stored there survives. */
   async setAutoKeep(projectId: bigint, categories: FinalizeReview.Category[]): Promise<FinalizeReview.Category[]> {
     const autoKeep = [...new Set(categories)];
     const [row] = await this.db

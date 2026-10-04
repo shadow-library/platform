@@ -13,7 +13,7 @@ import { csrfHeaders, mutate, novelForgeDb, runAll, webNovelDb } from '../../lib
 import { removeServedNovelsOf, settlePublishJob } from '../web-novel/forge-publication';
 import { arrangeNovel, deleteNovels, uniqueNovelSlug } from '../web-novel/helpers';
 import { expect, type ForgeActor, test as forgeTest } from './forge-actors';
-import { AI_ROLES, deleteForgeProjects, failPin, insertProject, listDispatchedModelCalls, listProjectIdsOwnedBy } from './forge-db';
+import { deleteForgeProjects, insertProject, listDispatchedModelCalls, listProjectIdsOwnedBy } from './forge-db';
 import { pollJobStatus, uniqueSuffix } from './forge-helpers';
 
 /**
@@ -88,7 +88,7 @@ export interface IllustrationRow {
 }
 
 export interface PublishingLane {
-  /** Quota-pins the project's owner and fail-pins every text role; the image role stays unpinned, since a pinned image model fails reference validation. */
+  /** Quota-pins the project's owner. */
   guard(projectId: string): Promise<void>;
   /** A guarded `new_novel` the lane removes, with everything the reader holds for it, after the test. */
   project(owner: ForgeActor, label: string, body?: Record<string, unknown>): Promise<string>;
@@ -372,9 +372,6 @@ export function ladderSlugs(base: string): string[] {
   return [base, ...Array.from({ length: SLUG_LADDER - 1 }, (_, index) => `${base}-${index + 2}`)];
 }
 
-/** Every text role; the image role stays on its tier default so reference validation can read the image model's capacity. */
-const GUARDED_ROLES = AI_ROLES.filter(role => role !== 'image');
-
 export const test = forgeTest.extend<{ lane: PublishingLane }>({
   lane: async ({ forge }, use) => {
     const projects: string[] = [];
@@ -382,7 +379,6 @@ export const test = forgeTest.extend<{ lane: PublishingLane }>({
 
     const guard = async (projectId: string): Promise<void> => {
       await forge.quotaPin(projectId);
-      await failPin(projectId, GUARDED_ROLES);
       if (!projects.includes(projectId)) projects.push(projectId);
     };
 

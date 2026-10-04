@@ -10,8 +10,6 @@ import {
   type ChatSessionResponse,
   type ContentMode,
   type CostTier,
-  type ProjectConfig,
-  type ProjectModelOverrides,
   useAiModelsQuery,
   useProjectModelsQuery,
   useProjectQuery,
@@ -24,23 +22,11 @@ import { inheritedModel, type ModelGroup, modelLabel } from '@/lib/model-default
 import styles from './ChatModel.module.css';
 
 /**
- * Chat-model UI + the model resolution ladder, mirrored from the backend (ChatService / resolveModel):
- *  1. the chat's own override (picked inline in the composer),
- *  2. the project setting for the scope's role,
- *  3. refinement chat with no explicit model follows the Planning selection,
- *  4. the platform's model for that group under the chat's own cost tier and model type, else the project's.
- * New chats always start on the resolved default; an override sticks to that chat alone.
+ * Chat-model UI + the model resolution ladder, mirrored from the backend (ChatService / routeModel):
+ *  1. the chat's own pin (picked inline in the composer),
+ *  2. the platform's model for the scope's group under the chat's own cost tier and model type, else the project's.
+ * New chats always start on the resolved default; a pin sticks to that chat alone.
  */
-
-// The fine-grained role each chat scope maps to (config overrides are stored per role — the settings
-// UI fans a group's choice across its roles, so reading the scope's role reflects the group value).
-const SCOPE_CHAT_ROLE: Record<ChatScope, keyof ProjectModelOverrides> = {
-  project: 'chat',
-  novel: 'chat',
-  volume: 'plan',
-  brief: 'outline',
-  bible_document: 'bible',
-};
 
 // The model group each scope inherits its default from ('planning' for every structural scope).
 const SCOPE_GROUP: Record<ChatScope, ModelGroup> = {
@@ -51,40 +37,22 @@ const SCOPE_GROUP: Record<ChatScope, ModelGroup> = {
   bible_document: 'planning',
 };
 
-const GROUP_LABEL: Record<string, string> = {
-  chat: 'refinement chat',
-  planning: 'planning',
-};
-
 export interface ResolvedDefault {
   provider: string;
   model: string;
   group: string;
-  source: 'project' | 'platform';
 }
 
-const TRIGGER_SOURCE: Record<ResolvedDefault['source'], string> = { project: 'project default', platform: 'platform default' };
-
 export interface DefaultSources {
-  config?: ProjectConfig;
   tiers: readonly AiTierModel[];
   /** The chat's own model type and cost tier, falling back to the project's — `turnChoiceDefaults(session, project).choice`. */
   choice: TurnChoice;
-  allowlist: ReadonlySet<string>;
 }
 
-export function resolveDefault(scopeType: ChatScope, { config, tiers, choice, allowlist: unrestrictedAllowlist }: DefaultSources): ResolvedDefault | undefined {
-  const allowlist = choice.contentMode === 'unrestricted' ? unrestrictedAllowlist : undefined;
-  const scopeRole = SCOPE_CHAT_ROLE[scopeType];
+export function resolveDefault(scopeType: ChatScope, { tiers, choice }: DefaultSources): ResolvedDefault | undefined {
   const group = SCOPE_GROUP[scopeType];
-  const configured = config?.models ?? {};
-  const honour = (ref?: { provider: string; model: string }): ref is { provider: string; model: string } => Boolean(ref && (!allowlist || allowlist.has(ref.model)));
-  const scoped = configured[scopeRole];
-  if (honour(scoped)) return { ...scoped, group, source: 'project' };
-  const plan = configured.plan;
-  if (group === 'chat' && honour(plan)) return { ...plan, group: 'planning', source: 'project' };
   const inherited = inheritedModel(group, tiers, choice.costTier, choice.contentMode);
-  return inherited && { ...inherited, group, source: 'platform' };
+  return inherited && { ...inherited, group };
 }
 
 interface PinnedModelMenuProps {
@@ -124,17 +92,13 @@ function PinnedModelMenu({ novelId, session, scopeType = 'project', disabled }: 
   const allowlist = new Set(modelsQuery.data?.unrestrictedAllowlist ?? []);
   const models = modelsQuery.data?.models ?? [];
   const llmModels = models.filter(m => m.kind === 'llm' && m.enabled && (!unrestricted || allowlist.has(m.id)));
-  const resolvedDefault = resolveDefault(scopeType, { config: project?.config, tiers: modelsQuery.data?.tiers ?? [], choice, allowlist });
+  const resolvedDefault = resolveDefault(scopeType, { tiers: modelsQuery.data?.tiers ?? [], choice });
 
   const overridden = Boolean(session?.modelProvider && session?.modelId);
   const value = overridden ? encodeModelRef(session?.modelProvider ?? '', session?.modelId ?? '') : 'default';
   const triggerLabel =
     (overridden ? modelLabel(models, session?.modelId, session?.modelProvider) : modelLabel(models, resolvedDefault?.model, resolvedDefault?.provider)) ?? 'default';
-  const defaultCaption =
-    resolvedDefault &&
-    `${modelLabel(models, resolvedDefault.model, resolvedDefault.provider)} · ${
-      resolvedDefault.source === 'project' ? `from ${GROUP_LABEL[resolvedDefault.group] ?? resolvedDefault.group} settings` : TRIGGER_SOURCE[resolvedDefault.source]
-    }`;
+  const defaultCaption = resolvedDefault && `${modelLabel(models, resolvedDefault.model, resolvedDefault.provider)} · platform default`;
 
   const onChange = (next: string): void => {
     if (!session || next === value) return;
@@ -153,7 +117,7 @@ function PinnedModelMenu({ novelId, session, scopeType = 'project', disabled }: 
       <DropdownMenu.Trigger asChild>
         <button type="button" disabled={disabled || !session} aria-label="Chat model" className={styles.trigger}>
           {triggerLabel}
-          {!overridden && <span className={styles.triggerDefault}>· {resolvedDefault ? TRIGGER_SOURCE[resolvedDefault.source] : 'default'}</span>}
+          {!overridden && <span className={styles.triggerDefault}>· {resolvedDefault ? 'platform default' : 'default'}</span>}
           <ChevronDownIcon size={12} />
         </button>
       </DropdownMenu.Trigger>

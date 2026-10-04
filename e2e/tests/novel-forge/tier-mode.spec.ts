@@ -16,7 +16,7 @@ import { type ContentMode, type CostTier, type CreatedNovel, createNovel, delete
 interface ProjectModels {
   contentMode: ContentMode;
   costTier: CostTier;
-  models: { group: string; label: string; source: string }[];
+  models: { group: string; label: string }[];
 }
 
 interface ChatSession {

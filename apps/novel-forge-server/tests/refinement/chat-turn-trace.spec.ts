@@ -216,7 +216,7 @@ function chat({ outputs, failTraceUpdate = false, tools = [getNotes], webResearc
     select: () => ({ from: () => ({ where: async () => [{ max: 0 }] }) }),
   };
   const modelRouter = {
-    routeModel: () => ({ resolved: { provider: 'p', model: 'm' }, source: 'tier', costTier: 'balanced', contentMode: 'standard' }),
+    routeModel: () => ({ resolved: { provider: 'p', model: 'm' }, costTier: 'balanced', contentMode: 'standard' }),
     structured: async (_prompt: unknown, input: { rounds: { content: unknown }[] }, ctx: { webTools?: boolean }) => {
       inputs.push(input);
       contexts.push(ctx);

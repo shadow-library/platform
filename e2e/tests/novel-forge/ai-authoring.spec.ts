@@ -20,11 +20,9 @@ import {
   type Draft,
   expectStatus,
   finalizeThroughReview,
-  HAIKU_MODEL,
   MODEL_FLOW_TIMEOUT_MS,
   MODEL_TAG,
   NOVEL_NOTES,
-  pinHaiku,
   pollJobStatus,
   readDraft,
   saveChapter,
@@ -32,6 +30,7 @@ import {
   slowPost,
   startNextChapter,
   uniqueSuffix,
+  useEconomyTier,
   writeChapterByHand,
 } from './forge-helpers';
 
@@ -48,7 +47,7 @@ interface ChapterReview {
 /**
  * Declaring the constants
  *
- * The two authoring paths end to end against a live model, on Haiku-pinned projects:
+ * The two authoring paths end to end against a live model, on Economy-tier projects:
  *   - a new novel: notes → chat opener → organise → plan chapter 1 → write it → approve → finalize review → final;
  *   - a hand-written chapter: write → an AI editorial review → approve → finalize review → final.
  * Assertions read structure only — a job settled `done`, a card was staged and applied, a draft has prose, a review settled — never
@@ -96,7 +95,7 @@ test.describe('novel-forge AI authoring', { tag: MODEL_TAG }, () => {
   test('should take a new novel from notes through chat, organise, plan and write to a final chapter', async () => {
     const novel: CreatedNovel = await createNovel(ctx, { title: `E2E AI Novel ${uniqueSuffix()}`, notes: NOVEL_NOTES });
     created.push(novel.projectId);
-    await pinHaiku(ctx, novel.projectId);
+    await useEconomyTier(ctx, novel.projectId);
 
     await test.step('organise the notes from the chat opener', async () => {
       const transcript = await chatTurn(ctx, novel, OPENER);
@@ -153,7 +152,7 @@ test.describe('novel-forge AI authoring', { tag: MODEL_TAG }, () => {
   test('should review a hand-written chapter with AI and finalize it', async () => {
     const { projectId } = await createNovel(ctx, { title: `E2E AI Review ${uniqueSuffix()}`, notes: NOVEL_NOTES });
     created.push(projectId);
-    await pinHaiku(ctx, projectId);
+    await useEconomyTier(ctx, projectId);
     const draft = await writeChapterByHand(ctx, projectId, CHAPTER_ONE);
 
     await test.step('run an editorial review of the revision written', async () => {
@@ -180,12 +179,14 @@ test.describe('novel-forge AI authoring', { tag: MODEL_TAG }, () => {
     });
   });
 
-  test('should have routed every text model call of these runs to the pinned Haiku model', async () => {
+  test('should have routed every text model call of these runs to an Economy-tier model', async () => {
     expect(created.length, 'the authoring tests above must have run').toBeGreaterThan(0);
+    const catalog = (await (await ctx.get('/api/v1/ai/models')).json()) as { tiers: { costTier: string; contentMode: string; provider: string; model: string }[] };
+    const economy = new Set(catalog.tiers.filter(tier => tier.costTier === 'economy' && tier.contentMode === 'standard').map(tier => `${tier.provider}::${tier.model}`));
     const rows = await novelForgeDb()<{ role: string; provider: string; model: string }[]>`
       SELECT DISTINCT role, provider, model FROM model_calls WHERE project_id = ANY(${created}::bigint[]) AND model NOT ILIKE '%embed%'
     `;
     expect(rows.length, 'expected at least one recorded model call').toBeGreaterThan(0);
-    for (const row of rows) expect({ provider: row.provider, model: row.model }, `role ${row.role}`).toEqual(HAIKU_MODEL);
+    for (const row of rows) expect(economy.has(`${row.provider}::${row.model}`), `role ${row.role} ran on ${row.model}`).toBe(true);
   });
 });

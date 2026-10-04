@@ -169,8 +169,7 @@ export const chatSessions = pgTable(
     // rest as cards; 'manual' stages everything as cards. ChatService.createSession sets 'auto' for a new chat — this column default
     // stays 'manual' only so no migration is needed. Provenance lives on each proposal (autoApplied).
     mode: chatMode('mode').notNull().default('manual'),
-    // Per-session model override (null → the project/profile default). Lets one chat run on a different
-    // provider/model without changing the project defaults; new sessions inherit the default.
+    // Per-session model pin (null → the cost tier's model). Lets one chat run on a different provider/model; new sessions start unpinned.
     modelProvider: varchar('model_provider'),
     modelId: varchar('model_id'),
     contentMode: contentMode('content_mode'),

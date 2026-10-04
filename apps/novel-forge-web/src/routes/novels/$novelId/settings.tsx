@@ -2,24 +2,20 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { Accordion, Alert, Button, Dialog, FormField, Input, SegmentedControl, Spinner, Tabs, Textarea, toast } from '@shadow-library/ui';
 
-import { INHERIT_MODEL, type ModelKind, ModelPicker, PageContainer, PageHeader, QueryState, SectionCard } from '@/components/nf';
+import { PageContainer, PageHeader, QueryState, SectionCard } from '@/components/nf';
 import { PluginsTab } from '@/features/plugins/PluginsTab';
 import {
-  aiModelsQueryOptions,
   type ContentMode,
   type CostTier,
-  type ProjectModelOverrides,
   type ProjectModelRoute,
   type ProjectWordTarget,
-  useAiModelsQuery,
   useDeleteProjectMutation,
   useListPluginsQuery,
   useProjectModelsQuery,
   useProjectQuery,
   useUpdateProjectMutation,
 } from '@/lib/apis';
-import { decodeModelRef, encodeModelRef, projectTitle } from '@/lib/format';
-import { inheritedModel, type ModelGroup, modelLabel, modelSaveBody } from '@/lib/model-defaults';
+import { projectTitle } from '@/lib/format';
 import { contentModeLabel, groupLabel, tierLabel } from '@/lib/usage';
 
 import styles from './settings.module.css';
@@ -38,54 +34,8 @@ function isSettingsTab(value: unknown): value is SettingsTab {
 
 export const Route = createFileRoute('/novels/$novelId/settings')({
   validateSearch: (search: Record<string, unknown>): SettingsSearch => ({ tab: isSettingsTab(search.tab) ? search.tab : undefined }),
-  loader: ({ context }) => context.queryClient.prefetchQuery(aiModelsQueryOptions()),
   component: SettingsScreen,
 });
-
-type AiRole = keyof ProjectModelOverrides;
-
-// The author picks a model per *group*, not per fine-grained role. Selecting a group's model fans that
-// choice out across every role it owns (GROUP_ROLES) so the backend — which still resolves per role —
-// routes them identically.
-const GROUP_ROLES: Record<ModelGroup, AiRole[]> = {
-  writing: ['generation', 'revision', 'fix'],
-  planning: ['premise', 'plan', 'outline', 'bible', 'extraction'],
-  review: ['judge', 'validation', 'continuity', 'review', 'audit'],
-  chat: ['chat'],
-  helper: ['title', 'compact'],
-  image: ['image'],
-};
-
-interface RoleDef {
-  key: ModelGroup;
-  label: string;
-  hint: string;
-  kind: ModelKind;
-}
-
-interface RoleGroup {
-  title: string;
-  roles: RoleDef[];
-}
-
-const ROLE_GROUPS: RoleGroup[] = [
-  {
-    title: 'Text generation',
-    roles: [
-      { key: 'writing', label: 'Writing', hint: 'Chapter prose — drafts, revisions, and repairs', kind: 'llm' },
-      { key: 'planning', label: 'Planning & canon', hint: 'Premise, plan, outlines, bible & extraction', kind: 'llm' },
-      { key: 'review', label: 'Review & QA', hint: 'Continuity judge, validation, editorial review & bible audit', kind: 'llm' },
-      { key: 'chat', label: 'Refinement chat', hint: 'Conversational proposals · defaults to the Planning model', kind: 'llm' },
-      { key: 'helper', label: 'Fast helpers', hint: 'Titles & context compaction — small, cheap calls', kind: 'llm' },
-    ],
-  },
-  {
-    title: 'Media',
-    roles: [{ key: 'image', label: 'Illustrations', hint: 'Cover & scene art', kind: 'image' }],
-  },
-];
-
-const ALL_ROLES = ROLE_GROUPS.flatMap(g => g.roles);
 
 // Mirrors the server's application default (`WORD_TARGET_MIN`/`MAX` in `deterministic-metrics.ts`) —
 // shown as the field placeholder so an unset project visibly states what it inherits.
@@ -191,10 +141,7 @@ function ModelCostDefaults({ novelId, contentMode, costTier, onContentModeChange
               {routes.map(route => (
                 <div key={route.group} className={styles.jobRow}>
                   <dt>{groupLabel(route.group)}</dt>
-                  <dd>
-                    {route.label}
-                    {route.source === 'project' ? ' · your pick' : ''}
-                  </dd>
+                  <dd>{route.label}</dd>
                   <dd className={styles.jobPrice}>{routePrice(route)}</dd>
                 </div>
               ))}
@@ -212,7 +159,6 @@ function SettingsScreen(): React.JSX.Element {
   const goSearch = Route.useNavigate();
   const navigate = useNavigate();
   const projectQuery = useProjectQuery(novelId);
-  const modelsQuery = useAiModelsQuery();
   const pluginsQuery = useListPluginsQuery();
   const updateProject = useUpdateProjectMutation(novelId);
   const deleteProject = useDeleteProjectMutation();
@@ -225,12 +171,10 @@ function SettingsScreen(): React.JSX.Element {
   const [costTier, setCostTier] = useState<CostTier>('balanced');
   const [wordTargetMin, setWordTargetMin] = useState('');
   const [wordTargetMax, setWordTargetMax] = useState('');
-  const [models, setModels] = useState<Partial<Record<ModelGroup, string>>>({});
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  const unrestrictedAllowlist = modelsQuery.data?.unrestrictedAllowlist;
   const generalKey = project ? JSON.stringify([project.id, project.name, project.title, project.brief, project.instructions, project.wordTarget]) : undefined;
-  const modelKey = project ? JSON.stringify([project.id, project.contentMode, project.costTier, project.config?.models, unrestrictedAllowlist]) : undefined;
+  const modelKey = project ? JSON.stringify([project.id, project.contentMode, project.costTier]) : undefined;
   const [syncedGeneral, setSyncedGeneral] = useState<string>();
   const [syncedModels, setSyncedModels] = useState<string>();
   if (project && syncedGeneral !== generalKey) {
@@ -245,19 +189,7 @@ function SettingsScreen(): React.JSX.Element {
     setSyncedModels(modelKey);
     setContentMode(project.contentMode);
     setCostTier(project.costTier);
-    const overrides = project.config?.models ?? {};
-    const next: Partial<Record<ModelGroup, string>> = {};
-    const allowed = new Set(unrestrictedAllowlist ?? []);
-    const unrestrictedMode = project.contentMode === 'unrestricted';
-    for (const group of ALL_ROLES) {
-      const entry = GROUP_ROLES[group.key].map(role => overrides[role]).find(Boolean);
-      const honour = Boolean(entry && (!unrestrictedMode || allowed.has(entry.model)));
-      next[group.key] = honour && entry ? encodeModelRef(entry.provider, entry.model) : INHERIT_MODEL;
-    }
-    setModels(next);
   }
-
-  const setModel = (key: ModelGroup, value: string): void => setModels(prev => ({ ...prev, [key]: value }));
 
   const saveGeneral = (): void => {
     const wordTarget = parseWordTargetInput(wordTargetMin, wordTargetMax);
@@ -272,12 +204,7 @@ function SettingsScreen(): React.JSX.Element {
   };
 
   const saveModels = (): void => {
-    const picks = ALL_ROLES.map(group => {
-      const value = models[group.key];
-      return { roles: GROUP_ROLES[group.key], ref: value && value !== INHERIT_MODEL ? decodeModelRef(value) : null };
-    });
-    const body = modelSaveBody({ contentMode, costTier, unrestrictedAllowlist, picks });
-    updateProject.mutate(body, { onSuccess: () => toast.success('Model & cost settings saved'), onError: err => toast.danger(err.message) });
+    updateProject.mutate({ contentMode, costTier }, { onSuccess: () => toast.success('Model & cost settings saved'), onError: err => toast.danger(err.message) });
   };
 
   const doDelete = (): void => {
@@ -294,16 +221,12 @@ function SettingsScreen(): React.JSX.Element {
   const hasPlugins = (pluginsQuery.data?.length ?? 0) > 0;
   const activeTab = tab === 'plugins' && !hasPlugins ? 'general' : tab;
   const unrestricted = contentMode === 'unrestricted';
-  const allowlist = new Set(modelsQuery.data?.unrestrictedAllowlist ?? []);
-  const registry = modelsQuery.data?.models ?? [];
-  const modelOptions = registry.filter(m => !unrestricted || allowlist.has(m.id) || m.kind === 'embedding');
-  const tiers = modelsQuery.data?.tiers ?? [];
 
   return (
     <PageContainer>
       <QueryState isLoading={projectQuery.isLoading} error={projectQuery.error} isEmpty={!project} emptyTitle="Project not found">
         <>
-          <PageHeader title="Project settings" subtitle={project ? `${projectTitle(project)} · configure defaults and the models each AI operation uses.` : ''} />
+          <PageHeader title="Project settings" subtitle={project ? `${projectTitle(project)} · configure defaults, model type and cost tier.` : ''} />
 
           <Tabs value={activeTab} onValueChange={value => isSettingsTab(value) && void goSearch({ search: { tab: value === 'general' ? undefined : value }, replace: true })}>
             <Tabs.List>
@@ -385,55 +308,11 @@ function SettingsScreen(): React.JSX.Element {
             <Tabs.Panel value="models" className={styles.tabPanel}>
               <div className={styles.alertWrap}>
                 <Alert intent="info" title="Model changes apply to new runs only">
-                  Operations set to “Inherit default” use the platform’s model for this novel’s cost tier{unrestricted ? ' on the Unrestricted map' : ''}. In-flight jobs keep the
-                  model they started with.
-                  {unrestricted ? ' Unrestricted only lists the models cleared for it; the rest are hidden.' : ''}
+                  Every job uses the platform’s model for this novel’s cost tier{unrestricted ? ' on the Unrestricted map' : ''}. In-flight jobs keep the model they started with.
                 </Alert>
               </div>
 
               <ModelCostDefaults novelId={novelId} contentMode={contentMode} costTier={costTier} onContentModeChange={setContentMode} onCostTierChange={setCostTier} />
-              {modelsQuery.error ? (
-                <div className={styles.alertWrap}>
-                  <Alert intent="danger" title="Couldn’t load the model registry">
-                    {modelsQuery.error.message}
-                  </Alert>
-                </div>
-              ) : (
-                <>
-                  {ROLE_GROUPS.map(section => (
-                    <div key={section.title} className={styles.modelGroup}>
-                      <div className={styles.modelGroupHead}>{section.title}</div>
-                      {section.roles.map(role => {
-                        const inherited = inheritedModel(role.key, tiers, costTier, contentMode);
-                        return (
-                          <div key={role.key} className={styles.roleRow}>
-                            <div className={styles.roleInfo}>
-                              <div className={styles.roleLabel}>{role.label}</div>
-                              <div className={styles.roleHint}>
-                                {role.hint}
-                                {models[role.key] === INHERIT_MODEL && inherited
-                                  ? ` · inherits ${modelLabel(registry, inherited.model, inherited.provider)} from the ${tierLabel(costTier)} tier`
-                                  : ''}
-                              </div>
-                            </div>
-                            <div className={styles.rolePicker}>
-                              <ModelPicker
-                                value={models[role.key] ?? INHERIT_MODEL}
-                                onChange={v => setModel(role.key, v)}
-                                kind={role.kind}
-                                models={modelOptions}
-                                loading={modelsQuery.isLoading}
-                                inheritLabel="Inherit default"
-                                aria-label={`${role.label} model`}
-                              />
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ))}
-                </>
-              )}
               <div className={styles.saveRow}>
                 <div className={styles.spacer} />
                 <Button variant="primary" loading={updateProject.isPending} onClick={saveModels}>

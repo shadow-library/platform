@@ -8,7 +8,7 @@ import { type APIRequestContext, expect, test } from '@playwright/test';
  */
 import { apiContext, mutate, requireProductUrl, storageStateFor } from '../../lib';
 import { type ForgeActor, type ForgeHarness, test as forgeTest } from './forge-actors';
-import { assertSpendGuarded, failPin, listDispatchedModelCalls } from './forge-db';
+import { assertSpendGuarded, listDispatchedModelCalls } from './forge-db';
 import {
   aiAvailable,
   aiSkipReason,
@@ -22,9 +22,9 @@ import {
   MODEL_FLOW_TIMEOUT_MS,
   MODEL_TAG,
   pasteChapter,
-  pinHaiku,
   readDraft,
   uniqueSuffix,
+  useEconomyTier,
   writeChapterByHand,
 } from './forge-helpers';
 
@@ -54,7 +54,6 @@ const ISOLATED_CHAPTER = { ...CHAPTER_ONE, title: 'Behind the Locked Door' };
 async function bridgedNovel(forge: ForgeHarness, owner: ForgeActor): Promise<string> {
   const { projectId } = await createNovel(owner.ctx, { title: `E2E Bridge ${uniqueSuffix()}` });
   await forge.quotaPin(projectId);
-  await failPin(projectId);
   return projectId;
 }
 
@@ -76,7 +75,7 @@ forgeTest.describe('novel-forge isolated chapter bridge', () => {
     const projectId = await bridgedNovel(forge, owner);
     await pasteChapter(owner.ctx, projectId, ISOLATED_CHAPTER, { isolated: true });
 
-    await assertSpendGuarded(projectId, { requireQuota: true });
+    await assertSpendGuarded(projectId);
     const prepare = await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/drafts/1/bridge/prepare`);
     expect(prepare.status(), await prepare.text()).toBe(400);
     expect(await errorCode(prepare)).toBe('BRG_002');
@@ -134,7 +133,7 @@ test.describe('novel-forge isolated chapter bridge (model)', { tag: MODEL_TAG },
     ctx = await apiContext('novelForge', 'user1');
     if (!available) return;
     projectId = (await createNovel(ctx, { title: `E2E Bridge Model ${uniqueSuffix()}` })).projectId;
-    await pinHaiku(ctx, projectId);
+    await useEconomyTier(ctx, projectId);
   });
 
   test.afterAll(async () => {

@@ -441,7 +441,7 @@ test.describe('novel-forge proposal cherry-pick, one-way doors, revert and rollb
     const changeSetC = [{ op: 'action.validate', scope: 'novel' }];
     const proposalC = await insertPendingProposal({ projectId, scopeType: 'novel', kind: 'hub', changeSet: changeSetC, baseline: {} });
     await rebaselineProposal(owner.ctx, projectId, proposalC, changeSetC);
-    await assertSpendGuarded(projectId, { requireQuota: true });
+    await assertSpendGuarded(projectId);
     await expectStatus(await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/proposals/${proposalC}/apply`, { data: {} }), 200, 'applying the action-only card');
     expect(await proposalStatus(proposalC)).toBe('applied');
 

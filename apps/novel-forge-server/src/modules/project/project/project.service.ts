@@ -12,7 +12,6 @@ import { type Bible, type Knowledge, type Plan, type PrimaryDatabase, type Prima
 
 import { type Actor, ActorService, projectOwnerColumns } from '@modules/actor';
 
-import { type AiRole, isRegisteredModel } from '../../ai/defaults';
 import { WorkflowRunService } from '../../ai/graphs/workflow-run.service';
 import { DEFAULT_WRITING_INSTRUCTIONS } from '../../ai/prompts/authoring-preamble';
 import { resolveWritingInstructions, writingInstructionAdditions } from '../../ai/prompts/writing-instructions';
@@ -27,7 +26,6 @@ import {
   type CostResponse,
   type CreateProjectBody,
   type ListProjectsQuery,
-  type ProjectConfig,
   type ProjectStatusResponse,
   type ProjectWordTarget,
   type ResetResponse,
@@ -36,12 +34,6 @@ import {
 } from './project.dto';
 
 const BIBLE_SECTIONS: Bible.Section[] = ['project', 'world', 'power', 'plot', 'story_state', 'ai', 'lore'];
-
-/** The embedding model is deployment-wide (`ai.embedding.model`), so a pin stored before that is dropped unvalidated: a retired id must never block a save. */
-function withoutEmbeddingPin(config: ProjectConfig): ProjectConfig {
-  if (!config.models) return config;
-  return { ...config, models: Object.fromEntries(Object.entries(config.models).filter(([role]) => role !== 'embedding')) };
-}
 
 @Injectable()
 export class ProjectService {
@@ -85,16 +77,6 @@ export class ProjectService {
     // A constant, not `eq(sharedWithOrg, true)`: a bound parameter defeats a generic plan's ability to prove
     // the partial index's `WHERE shared_with_org` predicate, degrading this branch (and the whole OR) to a seq scan.
     return or(own, and(sql`${schema.projects.sharedWithOrg}`, eq(schema.projects.organisationId, actor.organisationId))) as SQL;
-  }
-
-  // Every persisted model override must name a registry model with the matching provider, regardless of
-  // contentMode — the raw pick is otherwise dispatched to the platform's OpenRouter credential verbatim.
-  private assertConfigModelsAllowed(config?: ProjectConfig): void {
-    const models = config?.models;
-    if (!models) return;
-    for (const [role, ref] of Object.entries(models)) {
-      if (ref && !isRegisteredModel(role as AiRole, ref)) throw AppErrorCode.AI_002.create();
-    }
   }
 
   // Field-level min/max bounds are declared on `ProjectWordTarget` itself; only the cross-field
@@ -217,28 +199,21 @@ export class ProjectService {
   }
 
   async update(id: bigint, body: UpdateProjectBody): Promise<Project.Presented> {
-    const update = body.config ? { ...body, config: withoutEmbeddingPin(body.config) } : body;
-    this.assertConfigModelsAllowed(update.config);
-    this.assertWordTargetValid(update.wordTarget);
-    const set: Record<string, unknown> = { ...update, updatedAt: new Date() };
-    if (update.title !== undefined) set.title = update.title.trim() || null;
-    if (update.instructions !== undefined) set.instructions = writingInstructionAdditions(update.instructions);
+    this.assertWordTargetValid(body.wordTarget);
+    const set: Record<string, unknown> = { ...body, updatedAt: new Date() };
+    if (body.title !== undefined) set.title = body.title.trim() || null;
+    if (body.instructions !== undefined) set.instructions = writingInstructionAdditions(body.instructions);
     for (const field of STORY_FIELDS) {
-      const value = update[field];
+      const value = body[field];
       if (value !== undefined) set[field] = value?.trim() || null;
     }
     // `wordTarget` is wire shape only — the row stores it as two columns, and `null` clears both back
     // to "use the application default".
-    if (update.wordTarget !== undefined) {
-      set.wordTargetMin = update.wordTarget?.min ?? null;
-      set.wordTargetMax = update.wordTarget?.max ?? null;
+    if (body.wordTarget !== undefined) {
+      set.wordTargetMin = body.wordTarget?.min ?? null;
+      set.wordTargetMax = body.wordTarget?.max ?? null;
     }
     delete set.wordTarget;
-    // `finalizeReview` has its own writer (the finalize-review settings route), so replacing the config keeps it, atomically with the write.
-    if (update.config !== undefined) {
-      const kept = sql`CASE WHEN jsonb_exists(coalesce(${schema.projects.config}, '{}'::jsonb), 'finalizeReview') THEN jsonb_build_object('finalizeReview', ${schema.projects.config} -> 'finalizeReview') ELSE '{}'::jsonb END`;
-      set.config = sql`${JSON.stringify(update.config ?? {})}::text::jsonb || ${kept}`;
-    }
 
     const [result] = await this.db
       .update(schema.projects)
@@ -252,8 +227,6 @@ export class ProjectService {
   }
 
   async clone(id: bigint, body: CloneProjectBody): Promise<Project.Presented> {
-    const config = body.config && withoutEmbeddingPin(body.config);
-    this.assertConfigModelsAllowed(config);
     this.assertWordTargetValid(body.wordTarget);
     const actor = this.actor();
     await assertUnderProjectCap(this.db, actor);
@@ -275,7 +248,7 @@ export class ProjectService {
           instructions: writingInstructionAdditions(source.instructions),
           contentMode: body.contentMode ?? source.contentMode,
           costTier: source.costTier,
-          config: config ? { ...config, ...(source.config?.finalizeReview ? { finalizeReview: source.config.finalizeReview } : {}) } : (source.config ?? null),
+          config: source.config,
           wordTargetMin: body.wordTarget?.min ?? source.wordTargetMin,
           wordTargetMax: body.wordTarget?.max ?? source.wordTargetMax,
         })

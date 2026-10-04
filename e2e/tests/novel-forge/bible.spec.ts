@@ -263,7 +263,7 @@ test.describe('novel-forge bible builder', () => {
       expect(written.status(), await written.text()).toBe(200);
     }
 
-    await assertSpendGuarded(projectId, { requireQuota: true });
+    await assertSpendGuarded(projectId);
     const response = await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/seed-from-brief`, {
       data: { brief: 'A cartographer maps a district that moves one street east every night.', force: false },
     });

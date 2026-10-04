@@ -38,7 +38,6 @@ const GROUP_ROLE: Record<ModelGroup, AiRole> = {
 };
 
 const opus: ResolvedModel = { provider: 'openrouter', model: 'anthropic/claude-opus-5' };
-const kimi: ResolvedModel = { provider: 'openrouter', model: 'moonshotai/kimi-k3' };
 
 function router(): ModelRouterService {
   return new ModelRouterService({} as never, { getPostgresClient: () => ({}) } as never, { enforce: async () => undefined } as never);
@@ -146,22 +145,18 @@ describe('ModelRouterService.routeModel', () => {
     }
   });
 
-  it.each([
-    ['a project pin beats the Economy tier', { costTier: 'economy', config: { models: { generation: opus } } }, opus, 'project'],
-    ['a project pin beats the Balanced tier', { costTier: 'balanced', config: { models: { generation: kimi } } }, kimi, 'project'],
-    ['Economy falls back to its tier map', { costTier: 'economy' }, COST_TIER_DEFAULTS.economy.standard.writing, 'tier'],
-    ['Balanced falls back to its tier map', { costTier: 'balanced' }, COST_TIER_DEFAULTS.balanced.standard.writing, 'tier'],
-    ['Performant falls back to its tier map', { costTier: 'performant' }, COST_TIER_DEFAULTS.performant.standard.writing, 'tier'],
-  ] as const)('should resolve writing in order: %s', (_name, project, expected, source) => {
-    const route = router().routeModel('generation', { contentMode: 'standard', ...project } as ProjectConfig);
+  it.each([...COST_TIERS])('should resolve writing on the %s tier map', costTier => {
+    const route = router().routeModel('generation', { contentMode: 'standard', costTier });
 
-    expect(route).toMatchObject({ resolved: expected, source, costTier: project.costTier, contentMode: 'standard' });
+    expect(route).toMatchObject({ resolved: COST_TIER_DEFAULTS[costTier].standard.writing, costTier, contentMode: 'standard' });
   });
 
-  it('should inherit the planning pin for chat before the tier map', () => {
-    const route = router().routeModel('chat', { contentMode: 'standard', costTier: 'economy', config: { models: { plan: opus } } });
+  it('should route a chat call to the chat model before the tier map, and no other role to it', () => {
+    const project: ProjectConfig = { contentMode: 'standard', costTier: 'economy', chatModel: opus };
 
-    expect(route).toMatchObject({ resolved: opus, source: 'project' });
+    expect(router().routeModel('chat', project)).toMatchObject({ resolved: opus, costTier: 'economy' });
+    expect(router().resolveModel('generation', project)).toEqual(COST_TIER_DEFAULTS.economy.standard.writing);
+    expect(router().resolveModel('plan', project)).toEqual(COST_TIER_DEFAULTS.economy.standard.planning);
   });
 
   it('should let a tier carried by a chat turn outrank the project tier, and never its content mode', () => {
@@ -185,11 +180,10 @@ describe('ModelRouterService.routeModel', () => {
     expect(route).toMatchObject({ resolved: COST_TIER_DEFAULTS.economy.unrestricted.writing, contentMode: 'unrestricted' });
   });
 
-  it('should never resolve an unrestricted call off the allowlist, whatever the tier or the standard pins around it', () => {
-    const pins = Object.fromEntries(ROLES.map(role => [role, opus]));
+  it('should never resolve an unrestricted call off the allowlist, whatever the tier or the chat model', () => {
     for (const costTier of COST_TIERS) {
       for (const role of ROLES) {
-        const resolved = router().resolveModel(role, { contentMode: 'unrestricted', costTier, config: { models: pins } });
+        const resolved = router().resolveModel(role, { contentMode: 'unrestricted', costTier, chatModel: opus });
         expect({ costTier, role, allowed: isUnrestrictedAllowed(role, resolved) }).toMatchObject({ allowed: true });
       }
     }

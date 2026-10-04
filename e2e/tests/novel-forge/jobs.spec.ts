@@ -21,7 +21,7 @@ import { ageAuthoringClaim, readAuthoringClaim, readJobRow, updateJobRow } from 
  * Background jobs and the one authoring claim a novel has. Jobs are arranged as rows: reindex (`backfill`) jobs only run when something
  * dispatches them, so a queued or running one sits still, and `POST /backfill` is the one enqueue that never reaches a model. The authoring
  * claim is held by a job-less holder as a synchronous action would hold it, or reserved for a queued generation job as enqueueing does;
- * either way the novel is quota-pinned and fail-pinned, so a refusal that failed to hold would still spend nothing.
+ * either way the novel is quota-pinned, so a refusal that failed to hold would still spend nothing.
  */
 
 /** `jobs.authoring-claim.ttl-ms`, which the dev deployment leaves at its default. */
@@ -173,11 +173,11 @@ test.describe("novel-forge a novel's authoring claim", () => {
     expect(brief.status(), await brief.text()).toBe(200);
     await holdAuthoringClaim(projectId);
 
-    await assertSpendGuarded(projectId, { requireQuota: true });
+    await assertSpendGuarded(projectId);
     await expectCode(await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/generate`, { data: {} }), 409, 'JOB_002', 'generating while the novel is held');
     expect(await jobKinds(projectId), 'the refused enqueue left no job behind').toEqual([]);
     await expectCode(await insertHandChapter(owner, projectId, 0), 409, 'CHP_004', 'inserting a chapter while the novel is held');
-    await assertSpendGuarded(projectId, { requireQuota: true });
+    await assertSpendGuarded(projectId);
     await expectCode(await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/finalize`, { data: {} }), 409, 'JOB_002', 'finalizing while the novel is held');
     await expectCode(await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/reset`, { data: { stage: 'generate' } }), 409, 'PRJ_011', 'resetting while the novel is held');
     expect((await owner.ctx.get(`/api/v1/projects/${projectId}/briefs/1`)).status(), 'the refused reset kept the plan').toBe(200);
@@ -188,7 +188,7 @@ test.describe("novel-forge a novel's authoring claim", () => {
 
     await ageAuthoringClaim(projectId, CLAIM_TTL_MS + 60_000);
     expect(await readinessBlockers(owner, projectId, 1), 'a holder past its TTL no longer blocks').toEqual(['DRF_004']);
-    await assertSpendGuarded(projectId, { requireQuota: true });
+    await assertSpendGuarded(projectId);
     await expectCode(
       await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/finalize`, { data: { chapter: 1 } }),
       400,
@@ -208,7 +208,7 @@ test.describe("novel-forge a novel's authoring claim", () => {
     const jobId = await insertReservedJob({ projectId, kind: 'generate', target: '1', payload: { chapters: [1] } });
 
     await expectCode(await handSave(owner, projectId, draft), 409, 'DRF_019', 'saving over a chapter an AI job is queued to write');
-    await assertSpendGuarded(projectId, { requireQuota: true });
+    await assertSpendGuarded(projectId);
     const generate = await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/generate`, { data: {} });
     expect(generate.status(), await generate.text()).toBe(202);
     expect(await generate.json(), 'a second generation joins the queued one instead of starting').toMatchObject({ jobId, status: 'pending' });
@@ -225,7 +225,7 @@ test.describe('novel-forge chapter insert', () => {
     const owner = await forge.actor({ label: 'chapter-insert' });
     const projectId = await guardedProject(forge, owner, 'chapter-insert');
 
-    await assertSpendGuarded(projectId, { requireQuota: true });
+    await assertSpendGuarded(projectId);
     const inserted = await insertHandChapter(owner, projectId, 0);
     expect(inserted.status(), `a hand insert into an empty plan — body ${await inserted.text()}`).toBe(200);
     expect(await inserted.json()).toMatchObject({ newChapter: 1, shiftedChapters: 0, brief: { chapter: 1, body: HAND_BRIEF } });

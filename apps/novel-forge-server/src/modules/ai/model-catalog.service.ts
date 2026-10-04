@@ -6,7 +6,7 @@ import { AppErrorCode } from '@server/classes';
 import { type PrimaryDatabase, type Project, schema } from '@server/database';
 
 import { type AiRole, CONTENT_MODES, COST_TIER_DEFAULTS, COST_TIERS, type ResolvedModel, SELECTABLE_MODEL_GROUPS, type SelectableModelGroup } from './defaults';
-import { ModelRouterService, type ModelSource, type ProjectConfig } from './model-router.service';
+import { ModelRouterService } from './model-router.service';
 import { MODEL_MAP } from './models';
 
 export interface PricedModel extends ResolvedModel {
@@ -23,7 +23,6 @@ export interface TierModel extends PricedModel {
 
 export interface ProjectGroupModel extends PricedModel {
   group: SelectableModelGroup;
-  source: ModelSource;
 }
 
 export interface ProjectModels {
@@ -37,7 +36,6 @@ export interface ModelSelectionPreview {
   costTier?: Project.CostTier;
 }
 
-// Every role routes like the rest of its group, except that `chat` also reads the project's planning pick.
 const GROUP_ROLE: Record<SelectableModelGroup, AiRole> = { writing: 'generation', planning: 'plan', review: 'judge', chat: 'chat', helper: 'title', image: 'image' };
 
 export function priced(resolved: ResolvedModel): PricedModel {
@@ -66,15 +64,11 @@ export class ModelCatalogService {
   async projectModels(projectId: bigint, preview: ModelSelectionPreview = {}): Promise<ProjectModels> {
     const row = await this.db.query.projects.findFirst({
       where: eq(schema.projects.id, projectId),
-      columns: { contentMode: true, costTier: true, config: true },
+      columns: { contentMode: true, costTier: true },
     });
     if (!row) throw AppErrorCode.PRJ_001.create();
     const selection = { contentMode: preview.contentMode ?? row.contentMode, costTier: preview.costTier ?? row.costTier };
-    const project: ProjectConfig = { ...(row as ProjectConfig), ...selection };
-    const models = SELECTABLE_MODEL_GROUPS.map(group => {
-      const route = this.modelRouter.routeModel(GROUP_ROLE[group], project);
-      return { group, source: route.source, ...priced(route.resolved) };
-    });
+    const models = SELECTABLE_MODEL_GROUPS.map(group => ({ group, ...priced(this.modelRouter.resolveModel(GROUP_ROLE[group], selection)) }));
     return { ...selection, models };
   }
 }

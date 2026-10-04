@@ -56,7 +56,7 @@ describe('keepsGatewaySession', () => {
 
 describe('ModelRouterService session header', () => {
   const router = new ModelRouterService({} as never, { getPostgresClient: () => ({}) } as never, { enforce: async () => undefined } as never);
-  const project = { config: { models: { chat: { provider: 'openrouter', model: CLAUDE } } } };
+  const project = { chatModel: { provider: 'openrouter', model: CLAUDE } };
   const ctx = { projectId: 1n, promptKey: 'chat-refine', promptVersion: '1', role: 'chat', gatewaySession: 'dev:1:chat-1' };
   const headers = (client: unknown) => (client as ChatOpenAI).clientConfig.defaultHeaders;
 
@@ -78,7 +78,7 @@ describe('ModelRouterService session header', () => {
 
 describe('ModelRouterService schema placement', () => {
   const input = { scopeInstructions: 'playbook', stableContext: 'STABLE', history: [], volatileContext: 'nothing', turnRules: 'RULES', userMessage: 'raise the stakes' };
-  const project = { config: { models: { chat: { provider: 'openrouter', model: CLAUDE } } } };
+  const project = { chatModel: { provider: 'openrouter', model: CLAUDE } };
 
   async function sent(gatewaySession?: string): Promise<BaseMessage[]> {
     setConfig({ 'ai.openrouter.api.url': GATEWAY, 'ai.model-override': undefined });

@@ -60,7 +60,7 @@ function jobStatuses(frames: readonly SseFrame[], jobId: string): string[] {
 }
 
 async function validate(owner: ForgeActor, projectId: string): Promise<string> {
-  await assertSpendGuarded(projectId, { requireQuota: true });
+  await assertSpendGuarded(projectId);
   const response = await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/validate`);
   expect(response.status(), await response.text()).toBe(200);
   const run = (await response.json()) as { runId: string; status: string };
@@ -86,7 +86,7 @@ test.describe('novel-forge project event stream', () => {
       status: 'running',
     });
 
-    await assertSpendGuarded(projectId, { requireQuota: true });
+    await assertSpendGuarded(projectId);
     const backfill = await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/backfill`);
     expect(backfill.status(), await backfill.text()).toBe(202);
     const { jobId } = (await backfill.json()) as { jobId: string };
@@ -113,7 +113,7 @@ test.describe('novel-forge project event stream', () => {
     const firstStream = await openEvents(sse, owner, first);
     const secondStream = await openEvents(sse, owner, second);
 
-    await Promise.all([assertSpendGuarded(first, { requireQuota: true }), assertSpendGuarded(second, { requireQuota: true })]);
+    await Promise.all([assertSpendGuarded(first), assertSpendGuarded(second)]);
     const headers = await csrfHeaders(owner.ctx);
     const [firstRun, secondRun] = await Promise.all(
       [first, second].map(async projectId => {

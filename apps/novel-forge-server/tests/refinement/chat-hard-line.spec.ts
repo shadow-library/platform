@@ -38,7 +38,7 @@ function chat() {
   };
   const modelRouter = {
     resolveModel: () => UNRESTRICTED_DEFAULTS.chat,
-    routeModel: () => ({ resolved: UNRESTRICTED_DEFAULTS.chat, source: 'tier', costTier: 'balanced', contentMode: 'unrestricted' }),
+    routeModel: () => ({ resolved: UNRESTRICTED_DEFAULTS.chat, costTier: 'balanced', contentMode: 'unrestricted' }),
   };
   const workflowRunService = {
     runChain: async (_projectId: bigint, _graph: string, _target: string, input: unknown) => {

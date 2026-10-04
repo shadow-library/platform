@@ -1,12 +1,17 @@
-import { type ProjectModelRef, type ProjectResponse, type ProjectStatusResponse } from '@/lib/apis';
+import { type ProjectResponse, type ProjectStatusResponse } from '@/lib/apis';
 
-// A role's model override is a `{ provider, model }` pair, but a `Select` needs a single string value,
+export interface ModelRef {
+  provider: string;
+  model: string;
+}
+
+// A chat's model pin is a `{ provider, model }` pair, but a menu item needs a single string value,
 // so the two are joined on '::'. A model id never contains '::', so the split back is unambiguous.
 export function encodeModelRef(provider: string, model: string): string {
   return `${provider}::${model}`;
 }
 
-export function decodeModelRef(value: string): ProjectModelRef {
+export function decodeModelRef(value: string): ModelRef {
   const i = value.indexOf('::');
   return { provider: value.slice(0, i), model: value.slice(i + 2) };
 }

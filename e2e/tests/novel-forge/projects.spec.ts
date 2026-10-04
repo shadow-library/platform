@@ -8,7 +8,7 @@
 import { mutate, requireProductUrl } from '../../lib';
 import { expectCode } from './forge-arrange';
 import { buildBundle, expect, readZip, test } from './forge-bundles';
-import { FAIL_PIN_MODEL, readProjectRow } from './forge-db';
+import { readProjectRow, UNREGISTERED_MODEL } from './forge-db';
 import { createNovel, errorCode } from './forge-helpers';
 
 /**
@@ -51,23 +51,15 @@ test.describe('novel-forge project CRUD and settings (API)', () => {
     expect(body.brief).toBe('A brief the planner reads.');
   });
 
-  test('should refuse a model pin off the registry with AI_002 and store nothing', async ({ forge, lane }) => {
-    const owner = await forge.actor({ label: 'models-refused' });
-    const id = await lane.project(owner, 'models-refused');
+  test('should drop a per-role model pin from a project update and store the rest', async ({ forge, lane }) => {
+    const owner = await forge.actor({ label: 'models-dropped' });
+    const id = await lane.project(owner, 'models-dropped');
     const stored = (await readProjectRow(id))?.config;
 
-    await expectCode(
-      await mutate(owner.ctx, 'patch', `/api/v1/projects/${id}`, { data: { title: 'Never stored', config: { models: { generation: FAIL_PIN_MODEL } } } }),
-      400,
-      'AI_002',
-      'an unregistered model pin',
-    );
-    expect((await readProjectRow(id))?.config, 'the refused patch leaves the stored config alone').toEqual(stored);
-    expect(((await (await owner.ctx.get(`/api/v1/projects/${id}`)).json()) as { title?: string | null }).title ?? null, 'nor its title').toBeNull();
-
-    const titled = await mutate(owner.ctx, 'patch', `/api/v1/projects/${id}`, { data: { title: 'Stored' } });
-    expect(titled.status(), await titled.text()).toBe(200);
-    expect(((await titled.json()) as { title: string }).title).toBe('Stored');
+    const patched = await mutate(owner.ctx, 'patch', `/api/v1/projects/${id}`, { data: { title: 'Stored', config: { models: { generation: UNREGISTERED_MODEL } } } });
+    expect(patched.status(), await patched.text()).toBe(200);
+    expect(((await patched.json()) as { title: string }).title).toBe('Stored');
+    expect((await readProjectRow(id))?.config, 'the pin was never stored').toEqual(stored);
   });
 
   test('should clone a project to a new id and then delete the clone into a 404 PRJ_001', async ({ forge, lane }) => {
