@@ -308,7 +308,8 @@ function SettingsScreen(): React.JSX.Element {
             <Tabs.Panel value="models" className={styles.tabPanel}>
               <div className={styles.alertWrap}>
                 <Alert intent="info" title="Model changes apply to new runs only">
-                  Every job uses the platform’s model for this novel’s cost tier{unrestricted ? ' on the Unrestricted map' : ''}. In-flight jobs keep the model they started with.
+                  Every job uses the cost tier’s model{unrestricted ? ' on the Unrestricted map' : ''}; a chat can choose its own model type and cost tier in the composer.
+                  In-flight jobs keep the model they started with.
                 </Alert>
               </div>
 

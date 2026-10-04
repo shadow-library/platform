@@ -324,7 +324,7 @@ export class ChatService {
     if (update.provider !== undefined || update.model !== undefined) {
       const provider = update.provider ?? null;
       const model = update.model ?? null;
-      // Clearing (both null) restores the project/profile default; a pin must name a registry model with
+      // Clearing (both null) restores the cost tier's model; a pin must name a registry model with
       // the matching provider, regardless of contentMode, so a raw pick never reaches the platform key.
       if (provider !== null || model !== null) {
         if (!provider || !model || !isRegisteredModel('chat', { provider, model })) throw AppErrorCode.AI_002.create();

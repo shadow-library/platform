@@ -106,6 +106,7 @@ test.describe('novel-forge bot permission matrix', () => {
     await expectDenied(await call(generator.ctx, 'post', `/api/v1/projects/${generatorProject}/drafts/next`, {}), 'open a chapter without projects:write');
 
     const own = await createOwnProject(author);
+    await forge.quotaPin(own.id);
     const opened = await author.ctx.post(`/api/v1/projects/${own.id}/drafts/next`, { data: {} });
     expect(opened.status(), `a bot holding both opens a chapter — body ${await opened.text()}`).toBe(201);
   });
@@ -157,6 +158,7 @@ test.describe('novel-forge bot permission matrix', () => {
     const team = await forge.team('bot-closed');
     const bot = await forge.bot(team, ['projects:write', 'generation', 'illustrations'], 'everything');
     const project = await createOwnProject(bot);
+    await forge.quotaPin(project.id);
     const base = `/api/v1/projects/${project.id}`;
 
     const closed: [Method, string, unknown?][] = [

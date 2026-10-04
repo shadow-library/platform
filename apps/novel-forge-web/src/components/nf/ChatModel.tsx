@@ -6,7 +6,6 @@ import { ChevronDownIcon } from '@/components/icons';
 import {
   type AiTierModel,
   type ChatMessageResponse,
-  type ChatScope,
   type ChatSessionResponse,
   type ContentMode,
   type CostTier,
@@ -17,31 +16,16 @@ import {
 } from '@/lib/apis';
 import { choiceLabel, choiceScope, defaultNote, modelTagParts, sameChoice, type TurnChoice, type TurnChoiceDefaults, turnChoiceDefaults } from '@/lib/chat-model';
 import { decodeModelRef, encodeModelRef, messageTime } from '@/lib/format';
-import { inheritedModel, type ModelGroup, modelLabel } from '@/lib/model-defaults';
+import { type InheritedModel, inheritedModel, modelLabel } from '@/lib/model-defaults';
 
 import styles from './ChatModel.module.css';
 
 /**
  * Chat-model UI + the model resolution ladder, mirrored from the backend (ChatService / routeModel):
  *  1. the chat's own pin (picked inline in the composer),
- *  2. the platform's model for the scope's group under the chat's own cost tier and model type, else the project's.
+ *  2. the platform's chat model under the chat's own cost tier and model type, else the project's — every scope's turn routes as a chat.
  * New chats always start on the resolved default; a pin sticks to that chat alone.
  */
-
-// The model group each scope inherits its default from ('planning' for every structural scope).
-const SCOPE_GROUP: Record<ChatScope, ModelGroup> = {
-  project: 'chat',
-  novel: 'chat',
-  volume: 'planning',
-  brief: 'planning',
-  bible_document: 'planning',
-};
-
-export interface ResolvedDefault {
-  provider: string;
-  model: string;
-  group: string;
-}
 
 export interface DefaultSources {
   tiers: readonly AiTierModel[];
@@ -49,17 +33,13 @@ export interface DefaultSources {
   choice: TurnChoice;
 }
 
-export function resolveDefault(scopeType: ChatScope, { tiers, choice }: DefaultSources): ResolvedDefault | undefined {
-  const group = SCOPE_GROUP[scopeType];
-  const inherited = inheritedModel(group, tiers, choice.costTier, choice.contentMode);
-  return inherited && { ...inherited, group };
+export function resolveDefault({ tiers, choice }: DefaultSources): InheritedModel | undefined {
+  return inheritedModel('chat', tiers, choice.costTier, choice.contentMode);
 }
 
 interface PinnedModelMenuProps {
   novelId: string;
   session?: ChatSessionResponse;
-  /** The scope whose role and model group the default is resolved from; the refinement chat is always the project hub. */
-  scopeType?: ChatScope;
   disabled?: boolean;
 }
 
@@ -78,7 +58,7 @@ export function ChatModelMenu({ turn, ...props }: ChatModelMenuProps): React.JSX
   return <PinnedModelMenu {...props} />;
 }
 
-function PinnedModelMenu({ novelId, session, scopeType = 'project', disabled }: PinnedModelMenuProps): React.JSX.Element {
+function PinnedModelMenu({ novelId, session, disabled }: PinnedModelMenuProps): React.JSX.Element {
   const modelsQuery = useAiModelsQuery();
   const projectQuery = useProjectQuery(novelId);
   const updateModel = useUpdateSessionModelMutation(novelId);
@@ -92,7 +72,7 @@ function PinnedModelMenu({ novelId, session, scopeType = 'project', disabled }: 
   const allowlist = new Set(modelsQuery.data?.unrestrictedAllowlist ?? []);
   const models = modelsQuery.data?.models ?? [];
   const llmModels = models.filter(m => m.kind === 'llm' && m.enabled && (!unrestricted || allowlist.has(m.id)));
-  const resolvedDefault = resolveDefault(scopeType, { tiers: modelsQuery.data?.tiers ?? [], choice });
+  const resolvedDefault = resolveDefault({ tiers: modelsQuery.data?.tiers ?? [], choice });
 
   const overridden = Boolean(session?.modelProvider && session?.modelId);
   const value = overridden ? encodeModelRef(session?.modelProvider ?? '', session?.modelId ?? '') : 'default';

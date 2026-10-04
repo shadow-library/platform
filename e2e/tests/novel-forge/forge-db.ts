@@ -240,14 +240,19 @@ function ago(ms: number | undefined): string {
   return `${Math.max(0, Math.round(ms ?? 0))} milliseconds`;
 }
 
-/** Pins a chat to `UNREGISTERED_MODEL` — a database write, since the model route refuses an unregistered id — so a standard turn on it is refused. */
+/**
+ * Pins a chat to `UNREGISTERED_MODEL` — a database write, since the model route refuses an unregistered id — so a standard turn on it is
+ * refused. An unrestricted turn drops the pin, so the chat and its project must both be standard.
+ */
 export async function failPinChat(sessionId: string): Promise<void> {
-  const [row] = await novelForgeDb()<{ modelId: string | null }[]>`
-    UPDATE chat_sessions SET model_provider = ${UNREGISTERED_MODEL.provider}, model_id = ${UNREGISTERED_MODEL.model}
-    WHERE id = ${sessionId}
-    RETURNING model_id AS "modelId"
+  const [row] = await novelForgeDb()<{ modelId: string | null; sessionMode: ForgeContentMode | null; projectMode: ForgeContentMode }[]>`
+    UPDATE chat_sessions s SET model_provider = ${UNREGISTERED_MODEL.provider}, model_id = ${UNREGISTERED_MODEL.model}
+    FROM projects p
+    WHERE s.id = ${sessionId} AND p.id = s.project_id
+    RETURNING s.model_id AS "modelId", s.content_mode AS "sessionMode", p.content_mode AS "projectMode"
   `;
   if (row?.modelId !== UNREGISTERED_MODEL.model) throw new SpendGuardError(`chat ${sessionId} did not keep the fail-pin`);
+  if ((row.sessionMode ?? row.projectMode) !== 'standard') throw new SpendGuardError(`chat ${sessionId} turns unrestricted, where a fail-pin is dropped`);
 }
 
 export async function readProjectRow(projectId: string): Promise<ForgeProjectRow | undefined> {

@@ -141,7 +141,7 @@ export function ForgeBar({ novelId, scope, placeholder }: { novelId: string; sco
         <span className="nf-chip" data-intent="neutral">
           scope · {scope.title}
         </span>
-        <ChatModelMenu novelId={novelId} session={session} scopeType={scope.type} />
+        <ChatModelMenu novelId={novelId} session={session} />
         <ProseEditsToggle checked={proseEdits} onCheckedChange={setProseEdits} message={text} disabled={turn.isPending} />
         <span className={styles.hint}>Produces a reviewable proposal — canon isn&apos;t edited directly.</span>
         <div className={styles.spacer} />

@@ -24,22 +24,21 @@ describe('resolveDefault', () => {
   it.each([...COST_TIERS])('should inherit the %s platform model when the chat pins that tier over a Balanced project', costTier => {
     const { choice } = turnChoiceDefaults({ contentMode: null, costTier } as never, PROJECT);
 
-    expect(resolveDefault('project', { tiers: TIERS, choice })).toEqual({
+    expect(resolveDefault({ tiers: TIERS, choice })).toEqual({
       provider: 'openrouter',
       model: modelFor(costTier, 'standard', 'chat'),
-      group: 'chat',
     });
   });
 
   it('should fall back to the project’s tier and model type when the chat pins neither', () => {
     const { choice } = turnChoiceDefaults(undefined, { contentMode: 'standard', costTier: 'economy' });
 
-    expect(resolveDefault('volume', { tiers: TIERS, choice })?.model).toBe(modelFor('economy', 'standard', 'planning'));
+    expect(resolveDefault({ tiers: TIERS, choice })?.model).toBe(modelFor('economy', 'standard', 'chat'));
   });
 
   it('should use the unrestricted map when the chat is unrestricted', () => {
     const { choice } = turnChoiceDefaults({ contentMode: 'unrestricted', costTier: 'performant' } as never, PROJECT);
 
-    expect(resolveDefault('project', { tiers: TIERS, choice })?.model).toBe(modelFor('performant', 'unrestricted', 'chat'));
+    expect(resolveDefault({ tiers: TIERS, choice })?.model).toBe(modelFor('performant', 'unrestricted', 'chat'));
   });
 });
