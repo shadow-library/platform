@@ -61,10 +61,17 @@ const COARSE = '@media (pointer: coarse)';
 
 // "today" is main d40a7951, frozen in tests/fixtures/*.baseline.module.css; "Phone l.N" / "Main l.N" are lines in
 // scratch-pad/novel-forge/design/*.dc.html. Every desktop rule stays as today; the phone adds blocks of its own.
-const SCREENS: { name: string; live: string; today: string; changed?: Record<string, Record<string, string>>; added: string[] }[] = [
+const SCREENS: { name: string; live: string; today: string; changed?: Record<string, Record<string, string>>; removed?: string[]; added: string[] }[] = [
   { name: 'shell', live: '../src/components/Layout/AppShell.module.css', today: './fixtures/app-shell.baseline.module.css', added: [SHELL_PHONE] },
   { name: 'jobs tray', live: '../src/components/Layout/JobsTray.module.css', today: './fixtures/jobs-tray.baseline.module.css', added: [COARSE] },
-  { name: 'overview', live: '../src/routes/novels/$novelId/overview.module.css', today: './fixtures/overview.baseline.module.css', added: [PHONE] },
+  {
+    name: 'overview',
+    live: '../src/routes/novels/$novelId/overview.module.css',
+    today: './fixtures/overview.baseline.module.css',
+    changed: { '.mainGrid': { 'grid-template-columns': 'minmax(0, 1fr)' } },
+    removed: ['.emptyRuns', '.runRow', '.runDot', '.runBody', '.runTitle', '.runMeta'],
+    added: [PHONE],
+  },
   { name: 'publish', live: '../src/routes/novels/$novelId/publish.module.css', today: './fixtures/publish.baseline.module.css', added: [PHONE] },
   {
     name: 'projects home',
@@ -77,11 +84,12 @@ const SCREENS: { name: string; live: string; today: string; changed?: Record<str
 
 describe('Phone layout keeps today’s desktop values', () => {
   for (const screen of SCREENS) {
-    it(`should leave every ${screen.name} rule and existing block as today, changing only what it names`, () => {
+    it(`should leave every ${screen.name} rule and existing block as today, changing or removing only what it names`, () => {
       const live = sheetOf(screen.live);
       const today = sheetOf(screen.today);
       const expected = new Map(today.base);
       for (const [selector, values] of Object.entries(screen.changed ?? {})) expected.set(selector, { ...expected.get(selector), ...values });
+      for (const selector of screen.removed ?? []) expected.delete(selector);
       expect(live.base).toEqual(expected);
       for (const [prelude, rules] of today.blocks) expect({ prelude, rules: live.blocks.get(prelude) }).toEqual({ prelude, rules });
       expect([...live.blocks.keys()].filter(prelude => !today.blocks.has(prelude))).toEqual(screen.added);

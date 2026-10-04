@@ -21,16 +21,13 @@ import {
   useListBriefsQuery,
   useListJobsQuery,
   useListProposalsQuery,
-  useListRunsQuery,
   useProjectCostQuery,
   useProjectQuery,
   useProjectStatusQuery,
   useResetProjectMutation,
-  useRunStop,
   useUploadCoverMutation,
-  type WorkflowRunDetailResponse,
 } from '@/lib/apis';
-import { LIFECYCLE_PHASES, lifecyclePhase, projectKindLabel, projectTitle, relativeTime } from '@/lib/format';
+import { LIFECYCLE_PHASES, lifecyclePhase, projectKindLabel, projectTitle } from '@/lib/format';
 import { computeNextStep, deriveNextStepInput, type NextStepTarget } from '@/lib/next-step';
 import { decisionsWaiting, NEEDS_READ } from '@/lib/pending-items';
 import { barPercent, breakdownRows, formatUsd, type UsageBarItem } from '@/lib/usage';
@@ -77,43 +74,6 @@ function roleBar(usage: CostBreakdownItem, maxTokens: number): UsageBarItem {
   const cost = usage.costUsd > 0 ? ` · ${formatUsd(usage.costUsd)}` : '';
   const tip = `${usage.key} · ${usage.calls} call${usage.calls === 1 ? '' : 's'} · ${usage.inputTokens.toLocaleString()} in / ${usage.outputTokens.toLocaleString()} out${cost}`;
   return { key: usage.key, label: usage.key.replace(/^bible:/, ''), pct: barPercent(tokens, maxTokens), tip };
-}
-
-interface RunIntentMeta {
-  color: string;
-  label: string;
-}
-
-const RUN_INTENT: Record<string, RunIntentMeta> = {
-  running: { color: 'var(--sh-info-solid)', label: 'running' },
-  completed: { color: 'var(--sh-success-solid)', label: 'completed' },
-  awaiting_review: { color: 'var(--sh-warning-solid)', label: 'awaiting review' },
-  failed: { color: 'var(--sh-danger-solid)', label: 'failed' },
-  cancelled: { color: 'var(--sh-text-tertiary)', label: 'cancelled' },
-};
-
-interface RunRowProps {
-  novelId: string;
-  run: WorkflowRunDetailResponse;
-}
-
-function RunRow({ novelId, run }: RunRowProps): React.JSX.Element {
-  const runStop = useRunStop(novelId);
-  const intent = RUN_INTENT[run.status] ?? { color: 'var(--sh-text-tertiary)', label: run.status };
-  return (
-    <div className={styles.runRow}>
-      {run.status === 'running' ? <Spinner size="sm" /> : <span className={styles.runDot} style={{ '--nf-dot': intent.color } as React.CSSProperties} />}
-      <div className={styles.runBody}>
-        <div className={styles.runTitle}>
-          {run.graph} · {run.target}
-        </div>
-        <div className={styles.runMeta}>
-          {intent.label} · {relativeTime(run.endedAt ?? run.startedAt)}
-        </div>
-      </div>
-      {run.status === 'running' && <StopButton onStop={() => runStop.stop(run.id)} stopping={runStop.stopping} />}
-    </div>
-  );
 }
 
 function latestJob(items: GenerationJobItem[], kind: GenerationJobItem['kind']): GenerationJobItem | undefined {
@@ -197,7 +157,6 @@ function OverviewScreen(): React.JSX.Element {
   const projectQuery = useProjectQuery(novelId);
   const statusQuery = useProjectStatusQuery(novelId);
   const costQuery = useProjectCostQuery(novelId);
-  const runsQuery = useListRunsQuery(novelId);
   const continuityQuery = useContinuityProposalsQuery(novelId);
   const finalizeReviewsQuery = useFinalizeReviewsQuery(novelId);
   const proposalsQuery = useListProposalsQuery(novelId, { status: 'pending', limit: 50 });
@@ -223,7 +182,6 @@ function OverviewScreen(): React.JSX.Element {
   const project = projectQuery.data;
   const status = statusQuery.data;
   const cost = costQuery.data;
-  const runs = runsQuery.data?.items ?? [];
   const phase = lifecyclePhase(status, project?.kind);
 
   const volumesTotal = status?.volumesTotal ?? 0;
@@ -465,25 +423,6 @@ function OverviewScreen(): React.JSX.Element {
               </div>
               {cost && cost.byModel.length > 0 && <BreakdownTable heading="Model" rows={breakdownRows(cost.byModel, model => model.label, true)} showTokens />}
               {cost && <EstimateNote estimatedCostUsd={cost.estimatedCostUsd} />}
-            </SectionCard>
-
-            <SectionCard
-              title="Recent runs"
-              action={
-                <Button variant="text" size="sm" onClick={() => navigate({ to: '/novels/$novelId/runs', params: { novelId } })}>
-                  View all
-                </Button>
-              }
-            >
-              {runs.length === 0 ? (
-                <p className={styles.emptyRuns}>No runs yet.</p>
-              ) : (
-                <div>
-                  {runs.slice(0, 5).map(run => (
-                    <RunRow key={run.id} novelId={novelId} run={run} />
-                  ))}
-                </div>
-              )}
             </SectionCard>
           </div>
         </>

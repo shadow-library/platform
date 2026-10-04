@@ -240,7 +240,7 @@
 
 .mainGrid {
   display: grid;
-  grid-template-columns: 1.4fr 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: 20px;
   margin-bottom: 20px;
 }
@@ -292,46 +292,6 @@
   font-size: var(--sh-text-body-lg);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-}
-
-.emptyRuns {
-  margin: 0;
-  font-size: var(--sh-text-body-sm);
-  color: var(--sh-text-tertiary);
-}
-
-.runRow {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 9px 0;
-  border-bottom: 1px solid var(--sh-border-subtle);
-}
-
-.runDot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--nf-dot);
-  flex-shrink: 0;
-}
-
-.runBody {
-  flex: 1;
-  min-width: 0;
-}
-
-.runTitle {
-  font-size: var(--sh-text-body-sm);
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.runMeta {
-  font-size: 10px;
-  color: var(--sh-text-tertiary);
 }
 
 /* Phone: the header's icon buttons and continue button no longer fit beside a 144px cover, and a 1.4:1 grid
