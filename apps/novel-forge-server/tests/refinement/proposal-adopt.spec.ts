@@ -151,7 +151,7 @@ describe('ProposalService.adopt', () => {
   });
 });
 
-describe('ProposalService.create — a card brought into a chat', () => {
+describe('ProposalService.create — superseding the chat’s pending cards', () => {
   const factOp: ChangeOp[] = [{ op: 'fact.upsert', factKey: 'f1', revealChapter: null }];
 
   /** Pending cards of the chat, as a query that honours the kinds it asks for would find them. */
@@ -183,5 +183,31 @@ describe('ProposalService.create — a card brought into a chat', () => {
     await service.create(7n, { sessionId: SESSION, scopeType: 'project', kind: 'hub', changeSet: factOp, warnings: [], baseline: {} }, executor);
 
     expect(superseded).toEqual([40n]);
+  });
+
+  it('should replace the chat’s pending plan when it stages a revised one, though actions touch no records', async () => {
+    const service = new ProposalService(new FakeDatabaseService());
+    const plan: ChangeOp[] = [{ op: 'action.plan_chapter', chapter: 2, direction: 'The café meeting, played straight' }];
+    const revised: ChangeOp[] = [{ op: 'action.plan_chapter', direction: 'The café meeting, with banter and flirting' }];
+    const earlier = { id: 40n, kind: 'chat', sessionId: SESSION, status: 'pending', changeSet: plan };
+    const { executor, superseded } = stagingExecutor([earlier]);
+
+    await service.create(7n, { sessionId: SESSION, scopeType: 'project', kind: 'chat', changeSet: revised, warnings: [], baseline: {} }, executor);
+
+    expect(superseded).toEqual([40n]);
+  });
+
+  it('should keep a pending action on another chapter', async () => {
+    const service = new ProposalService(new FakeDatabaseService());
+    const judgeThree = { id: 40n, kind: 'chat', sessionId: SESSION, status: 'pending', changeSet: [{ op: 'action.judge_draft', chapter: 3 }] };
+    const { executor, superseded } = stagingExecutor([judgeThree]);
+
+    await service.create(
+      7n,
+      { sessionId: SESSION, scopeType: 'project', kind: 'chat', changeSet: [{ op: 'action.judge_draft', chapter: 4 }], warnings: [], baseline: {} },
+      executor,
+    );
+
+    expect(superseded).toEqual([]);
   });
 });

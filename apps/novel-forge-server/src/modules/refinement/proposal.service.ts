@@ -10,7 +10,16 @@ import { type DbExecutor, type PrimaryDatabase, type Refinement, schema } from '
 
 import { ISOLATED_SOURCE_WARNING } from '../ai/isolation-read-policy';
 import { type ArtifactState, loadArtifactStates, MISSING_ARTIFACT } from './artifact-state';
-import { type ChangeOp, changeSetRefs, type ChangeSetValidationOptions, type ContentOp, type OpType, validateChangeSet, validatePluginChangeSet } from './change-set';
+import {
+  actionDecisionKeys,
+  type ChangeOp,
+  changeSetRefs,
+  type ChangeSetValidationOptions,
+  type ContentOp,
+  type OpType,
+  validateChangeSet,
+  validatePluginChangeSet,
+} from './change-set';
 import { planCardDiagnostics, proposalDiagnostics } from './plan-diagnostics';
 import { stampIdeaIds } from './idea-id';
 import { type OpUndoRecord } from './op-undo';
@@ -212,16 +221,21 @@ export class ProposalService {
     }
   }
 
-  /** A card rewriting other passages of the same chapter is not replaced: only one whose passages the new card touches, or that no longer stand. */
+  /**
+   * Replaces the owner's pending cards the new one revises: those touching the same artifacts, or staging the same action decision. A card
+   * rewriting other passages of the same chapter is kept: only one whose passages the new card touches, or that no longer stand, is replaced.
+   */
   private async supersedeOverlapping(projectId: bigint, owner: SQL, newProposalId: bigint, changeSet: ChangeOp[], executor: DbExecutor): Promise<void> {
     const pending = await executor.query.refinementProposals.findMany({
       where: and(eq(schema.refinementProposals.projectId, projectId), owner, eq(schema.refinementProposals.status, 'pending'), ne(schema.refinementProposals.id, newProposalId)),
     });
 
     const refs = changeSetRefs(changeSet);
+    const decisions = actionDecisionKeys(changeSet);
     const drafts = await rewriteDrafts(executor, projectId, changeSet);
     const overlapping = pending.filter(p => {
       const older = p.changeSet as ChangeOp[];
+      if (actionDecisionKeys(older).some(key => decisions.includes(key))) return true;
       const shared = changeSetRefs(older).filter(ref => refs.includes(ref));
       return shared.length > 0 && !rewritesApart(older, changeSet, shared, drafts);
     });

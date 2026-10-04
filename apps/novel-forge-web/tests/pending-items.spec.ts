@@ -102,6 +102,27 @@ describe('pendingItems', () => {
     expect(items.map(item => item.title)).toEqual(['Chapter 4: two stale pages', 'Chapter 6 plan', '1 change']);
   });
 
+  it('should name a chat card that stages one action by the action, not as chat changes', () => {
+    const items = pendingItems(
+      input({
+        proposals: [
+          proposal('plan', { kind: 'chat', sessionId: SESSION, changeSet: [{ op: 'action.plan_chapter', chapter: 2 }] as PendingProposal['changeSet'] }),
+          proposal('mixed', {
+            kind: 'chat',
+            sessionId: SESSION,
+            changeSet: [{ op: 'action.plan_chapter' }, { op: 'fact.upsert' }] as PendingProposal['changeSet'],
+            createdAt: '2026-10-01T11:00:00Z',
+          }),
+        ],
+      }),
+    );
+
+    expect(items.map(item => [item.title, item.short])).toEqual([
+      ['Plan for the next chapter', 'chapter plan'],
+      ['2 changes', 'chat changes'],
+    ]);
+  });
+
   it('should name a plugin’s card by the plugin’s title, and by its id when the title is unknown', () => {
     const plugin = proposal('p1', { kind: 'plugin', scopeRef: 'tide-tables' });
 

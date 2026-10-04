@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 
 import {
   ACTION_TYPES,
+  actionDecisionKeys,
   type ChangeOp,
   changeSetRefs,
   isActionOp,
@@ -325,5 +326,19 @@ describe('removed planning vocabulary', () => {
   it('should keep a plugin from moving a brief to another volume', () => {
     expect(validatePluginChangeSet([{ op: 'brief.update', chapter: 3, volumeKey: 'v2' }])).toContain("changeSet[0]: field 'volumeKey' is not allowed for this scope");
     expect(validatePluginChangeSet([{ op: 'brief.update', chapter: 3, body: 'x' }])).toEqual([]);
+  });
+});
+
+describe('actionDecisionKeys', () => {
+  it('should key a plan once per chat and every other action by its target', () => {
+    const ops: ChangeOp[] = [
+      { op: 'action.plan_chapter', chapter: 2 },
+      { op: 'action.approve_draft', chapter: 3 },
+      { op: 'action.advance_volume', volumeKey: 'v1' },
+      { op: 'action.audit_bible' },
+      { op: 'fact.upsert', factKey: 'f1', revealChapter: null },
+    ];
+
+    expect(actionDecisionKeys(ops)).toEqual(['action.plan_chapter', 'action.approve_draft:3', 'action.advance_volume:v1', 'action.audit_bible']);
   });
 });

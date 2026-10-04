@@ -938,6 +938,20 @@ export function changeSetItemSchema(ops: readonly OpType[], options: OpVocabular
   return { anyOf: ops.map(op => opWireSchema(op, options)) };
 }
 
+/**
+ * The decisions a change-set's actions stage. Actions touch no artifact refs, so without these a restaged plan or approval would sit beside the
+ * card it revises; a plan is one decision per chat whatever chapter it names, any other action is one per action and target.
+ */
+export function actionDecisionKeys(ops: ChangeOp[]): string[] {
+  const keys = ops.filter(isActionOp).map(op => {
+    if (op.op === 'action.plan_chapter') return op.op;
+    if ('chapter' in op && typeof op.chapter === 'number') return `${op.op}:${op.chapter}`;
+    if ('volumeKey' in op) return `${op.op}:${op.volumeKey}`;
+    return op.op;
+  });
+  return [...new Set(keys)];
+}
+
 /** The artifact refs a change-set touches — the keys used for baselines, conflict checks, and supersession. Actions touch none. */
 export function changeSetRefs(ops: ChangeOp[]): string[] {
   const refs = ops.flatMap(op => {

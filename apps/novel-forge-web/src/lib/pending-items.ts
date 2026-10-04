@@ -80,9 +80,25 @@ function planChapter(proposal: PendingProposal): number | undefined {
   return op && typeof op.chapter === 'number' ? op.chapter : undefined;
 }
 
+/** A card that stages one action reads as that action, not as the chat's generic "changes". */
+const ACTION_NAMES: Partial<Record<string, { title: string; short: string }>> = {
+  'action.plan_chapter': { title: 'Plan for the next chapter', short: 'chapter plan' },
+  'action.generate_chapter': { title: 'Write the next chapter', short: 'chapter to write' },
+  'action.revise_draft': { title: 'Revise a chapter', short: 'revision' },
+  'action.approve_draft': { title: 'Approve a chapter', short: 'approval' },
+  'action.finalize': { title: 'Finalize chapters', short: 'finalize' },
+};
+
+function actionName(proposal: PendingProposal): { title: string; short: string } | undefined {
+  const [only] = proposal.changeSet;
+  return proposal.changeSet.length === 1 && only ? ACTION_NAMES[String(only.op)] : undefined;
+}
+
 function proposalTitle(proposal: PendingProposal): string {
   const summary = proposal.summary?.trim().split('\n')[0]?.trim();
   if (summary) return summary;
+  const action = actionName(proposal);
+  if (action) return action.title;
   const chapter = proposal.kind === 'chapter_plan' ? planChapter(proposal) : undefined;
   if (chapter !== undefined) return `Chapter ${chapter} plan`;
   return plural(proposal.changeSet.length, 'change');
@@ -156,7 +172,7 @@ export function pendingItems(input: PendingItemsInput): PendingItem[] {
         kind: 'proposal',
         chip: { label: kind.label, intent: kind.intent },
         title: proposalTitle(proposal),
-        short: kind.short,
+        short: actionName(proposal)?.short ?? kind.short,
         source: inThread && !proposal.sessionId ? 'this chat' : proposalSource(proposal, sessionId, pluginTitles),
         inThread,
         ...(inThread ? {} : { proposalId: proposal.id }),

@@ -182,7 +182,8 @@
   points at, and a card from elsewhere (an audit, a refresh, a plugin, another chat) is brought into this chat: it shows here, and an action it starts reports here. A
   card brought from another chat still shows on the reply that staged it there and may be answered from either; it keeps that reply, so a plan it starts reads the author's
   words where they were written. Only a pending card moves (`RFN_019`), only into an active chat of the same novel, and only a chat's own kinds (chat, plan, organise) are
-  ever superseded by its later cards — never an audit, refresh or plugin card brought in. An audit card keeps the Keep and Skip answered in the audit. The tray is open while
+  ever superseded by its later cards — never an audit, refresh or plugin card brought in. A later card supersedes one touching the same records or staging the same action
+  decision: one plan per chat, any other action per target (`action.approve_draft` on chapter 3), so a revised plan replaces the plan it revises. An audit card keeps the Keep and Skip answered in the audit. The tray is open while
   anything is outside the thread and one line otherwise.
 - **One message may be queued while a turn runs**, and it is sent only after this tab's own turn settles cleanly. A failed or stopped reply, a turn started in another tab or a
   locked chat holds it for the author, who can edit it or send it now. A message released on its own keeps the settings it was queued with.
