@@ -374,7 +374,7 @@ function ChatScreen(): React.JSX.Element {
   // A synchronous latch against a second create, held until the navigation to the new chat actually resolves: `isPending`
   // goes false the instant `onSuccess` runs, before the navigation away from the draft has landed.
   const startingRef = useRef(false);
-  // Which `startDraft` call is still current: `newChat` bumps it so an abandoned create's `onSuccess` skips navigating.
+  // Which `startChat` call is still current: `newChat` bumps it so an abandoned create's `onSuccess` skips navigating.
   const startRequestRef = useRef(0);
   // Bumped whenever the column must start over. It is the only thing that remounts the column, which is how
   // the centred composer survives becoming a conversation: the session it grows into keeps the same key.
@@ -423,30 +423,27 @@ function ChatScreen(): React.JSX.Element {
     void selectSession(DRAFT_SESSION);
   };
 
-  // The first message of a brand-new chat: create the session, then leave the column that typed it mounted
-  // so the same turn-sending path sends it — never sent from here directly.
-  const startDraft = (content: string, mode: SessionMode): void => {
+  // A brand-new chat grows out of the draft column: create the session, then leave that column mounted so the
+  // opening message goes out through the same turn-sending path, and a card it was asked to bring in is adopted there.
+  const startChat = (start: { mode?: SessionMode; content?: string; card?: string }): void => {
     if (startingRef.current) return;
     startingRef.current = true;
     const requestId = (startRequestRef.current += 1);
-    createSession.mutate(
-      { mode },
-      {
-        onSuccess: async session => {
-          if (startRequestRef.current !== requestId) return;
-          setDraftSession(session);
-          setGrownFromDraft(session.id);
-          setPendingFirstTurn({ sessionId: session.id, content });
-          // The chat grows out of the draft it was typed in, so a chapter open beside it stays open.
-          await navigate({ search: previous => ({ session: session.id, chapter: previous.chapter }) });
-          startingRef.current = false;
-        },
-        onError: err => {
-          if (startRequestRef.current === requestId) startingRef.current = false;
-          toast.danger(err.message);
-        },
+    createSession.mutate(start.mode ? { mode: start.mode } : {}, {
+      onSuccess: async session => {
+        if (startRequestRef.current !== requestId) return;
+        setDraftSession(session);
+        setGrownFromDraft(session.id);
+        if (start.content !== undefined) setPendingFirstTurn({ sessionId: session.id, content: start.content });
+        // A chapter open beside the draft stays open.
+        await navigate({ search: previous => ({ session: session.id, chapter: previous.chapter, card: start.card }) });
+        startingRef.current = false;
       },
-    );
+      onError: err => {
+        if (startRequestRef.current === requestId) startingRef.current = false;
+        toast.danger(err.message);
+      },
+    });
   };
 
   // Deleting the open chat drops the author into the next active one, or into a fresh centred composer when
@@ -468,7 +465,8 @@ function ChatScreen(): React.JSX.Element {
         onOpenHistory={() => setHistoryOpen(true)}
         onOpenChanges={() => setChangeHistoryOpen(true)}
         onNewChat={newChat}
-        onStart={startDraft}
+        onStart={(content, mode) => startChat({ content, mode })}
+        onStartForCard={card => startChat({ card })}
         starting={createSession.isPending}
         initialTurn={pendingFirstTurn?.sessionId === selected?.id ? pendingFirstTurn?.content : undefined}
         onInitialTurnSent={() => setPendingFirstTurn(undefined)}

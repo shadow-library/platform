@@ -140,6 +140,8 @@ export interface ChatColumnProps {
   onInitialTurnSent?: () => void;
   /** A pending card another screen sent the author here to answer. */
   revealCard?: string;
+  /** Brings a card into a chat that does not exist yet: the screen creates one, then hands the card back through `revealCard`. */
+  onStartForCard: (proposalId: string) => void;
   onCardRevealed?: () => void;
   /** The chapter open in the panel beside the chat. */
   chapter?: number;
@@ -758,7 +760,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
   };
 
   const adoptPending = (item: PendingItem & { proposalId: string }): void => {
-    if (!session) return;
+    if (!session) return props.onStartForCard(item.proposalId);
     adoptProposal.mutate(
       { proposalId: item.proposalId, sessionId: session.id },
       {
@@ -1108,16 +1110,14 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
             caption={inputCaption({ input, running: pending, queued: Boolean(queued), switching }) ?? passageCaption}
             notices={notices}
             tray={
-              session && (
-                <WaitingTray
-                  items={pendingWork.items}
-                  tray={pendingWork.tray}
-                  canAdopt={!locked}
-                  adopting={adoptProposal.isPending ? adoptProposal.variables?.proposalId : undefined}
-                  onShow={showPending}
-                  onAdopt={adoptPending}
-                />
-              )
+              <WaitingTray
+                items={pendingWork.items}
+                tray={pendingWork.tray}
+                canAdopt={!locked}
+                adopting={adoptProposal.isPending ? adoptProposal.variables?.proposalId : undefined}
+                onShow={showPending}
+                onAdopt={adoptPending}
+              />
             }
             announcement={announcement}
           />
