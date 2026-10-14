@@ -61,6 +61,7 @@
 - Per-user endpoints MUST live under `/api/library` or `/api/me`, the service worker's network-only patterns, or be added to them; anything under `/api/novels` is cached. Sign-out MUST purge account-scoped data (downloads, caches, query persister), namespaced by user id; only an explicit sign-out purges, and session expiry MUST never wipe downloads.
 - Private mode and offline: the service worker installs only after sign-in, because the precache refuses a redirected or non-OK response and fails all-or-nothing, so the login page can never become the offline shell.
   The mode comes from the route gate and its query never expires from the cache, so offline navigation keeps working.
+- Residual risk offline after an explicit sign-out in private mode: the precached shell can still show the catalog titles as of service-worker install time and the signed-out reader's opaque `sub`; downloads, chapters, library, progress and persisted queries are purged, and the shell is not dropped on logout because an active worker would not re-precache it until `sw.js` changes.
 - Theme is platform-wide via a shared cookie; NEVER keep a second copy in app settings. Browser-only APIs and server-only imports need the SSR guards.
 
 ## Non-goals and open work

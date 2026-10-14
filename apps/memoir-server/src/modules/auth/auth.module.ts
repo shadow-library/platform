@@ -7,12 +7,7 @@ import { AccountContext } from './account-context';
 import { AccountContextMiddleware } from './account-context.middleware';
 import { AccountRepository } from './account.repository';
 
-/**
- * The auth SDK's dynamic module carries a live `AuthClient` in a value provider, and `@Module`
- * deep-freezes everything reachable from its metadata. The forwardRef defers construction to module
- * resolution — after the freeze — so the client stays mutable. Mirrors
- * `apps/web-novel-server/src/modules/auth/auth.module.ts` exactly (ARCHITECTURE §3.4).
- */
+/** Deferred so `AuthModule.forRoot` resolves its config at application scan time rather than at import time. */
 const DeferredAuthModule = forwardRef(() => AuthModule.forRoot({ routes: { basePath: '/api/auth' } })) as unknown as Import;
 
 /**
