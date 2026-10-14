@@ -79,18 +79,18 @@ test.describe('novel-forge import and publish pipeline', () => {
   const slug = `e2e-forge-pub-${uniqueSuffix()}`;
   const novelTitle = `E2E Forge Published ${uniqueSuffix()}`;
   let forgeCtx: APIRequestContext;
-  let webGuestCtx: APIRequestContext;
+  let webViewerCtx: APIRequestContext;
   let webUser2Ctx: APIRequestContext;
   let projectId = '';
 
   test.beforeAll(async () => {
     forgeCtx = await apiContext('novelForge', 'user1');
-    webGuestCtx = await apiContext('webNovel');
+    webViewerCtx = await apiContext('webNovel', 'viewer');
     webUser2Ctx = await apiContext('webNovel', 'user2');
   });
 
   test.afterAll(async () => {
-    await runAll([() => removeForgePublication(forgeCtx, projectId, slug), () => forgeCtx.dispose(), () => webGuestCtx.dispose(), () => webUser2Ctx.dispose()]);
+    await runAll([() => removeForgePublication(forgeCtx, projectId, slug), () => forgeCtx.dispose(), () => webViewerCtx.dispose(), () => webUser2Ctx.dispose()]);
   });
 
   test('should import a valid final bundle and land its chapters', async () => {
@@ -170,21 +170,21 @@ test.describe('novel-forge import and publish pipeline', () => {
   });
 
   test('should surface the published novel and its chapters on web-novel', async () => {
-    const detail = await pollWebNovel(webGuestCtx, `/api/novels/${slug}`, 200);
+    const detail = await pollWebNovel(webViewerCtx, `/api/novels/${slug}`, 200);
     expect(detail.status()).toBe(200);
     const detailBody = (await detail.json()) as { title: string; chapterCount: number };
     expect(detailBody.title).toBe(novelTitle);
     expect(detailBody.chapterCount).toBeGreaterThanOrEqual(2);
-    const chapters = await webGuestCtx.get(`/api/novels/${slug}/chapters`);
+    const chapters = await webViewerCtx.get(`/api/novels/${slug}/chapters`);
     expect((await chapters.json()).items.map((c: { ordinal: number }) => c.ordinal)).toEqual(expect.arrayContaining([1, 2]));
   });
 
-  test('should restrict web-novel reads to the granted user and hide from guests', async () => {
+  test('should restrict web-novel reads to the granted user and hide the novel from an ungranted viewer', async () => {
     const access = await mutate(forgeCtx, 'put', `/api/v1/projects/${projectId}/publications/access`, {
       data: { visibility: 'RESTRICTED', grants: [{ email: PERSONAS.user2.email }] },
     });
     expect(access.status(), await access.text()).toBe(200);
-    expect((await pollWebNovel(webGuestCtx, `/api/novels/${slug}`, 404)).status()).toBe(404);
+    expect((await pollWebNovel(webViewerCtx, `/api/novels/${slug}`, 404)).status()).toBe(404);
     expect((await pollWebNovel(webUser2Ctx, `/api/novels/${slug}`, 200)).status()).toBe(200);
   });
 
@@ -267,7 +267,7 @@ test.describe('web-novel novel and chapter ingest through novel-forge', () => {
 
   test("should trim a curator's original author, apply an author-only change, and clear it on a blank or null push", async ({ forge }) => {
     const { ctx, projectId, slug } = await forge.project('pub-author', { ctx: await forge.curator() });
-    const servedAuthor = async (): Promise<string | undefined> => ((await (await forge.guest.get(readerUrl(slug))).json()) as NovelDetail).author;
+    const servedAuthor = async (): Promise<string | undefined> => ((await (await forge.viewer.get(readerUrl(slug))).json()) as NovelDetail).author;
 
     expect((await publishForge(ctx, projectId, { novelSlug: slug, title: 'The Salt Road', originalAuthor: '  Ada Lovelace  ' }))?.status).toBe('done');
     expect(await readServedNovel(slug)).toEqual(expect.objectContaining({ originalAuthor: 'Ada Lovelace', revision: 1 }));
@@ -407,7 +407,7 @@ test.describe('web-novel novel and chapter ingest through novel-forge', () => {
     expect(await publishAuditSince(slug, unpublishing, 'chapter.unpublish')).toEqual([
       expect.objectContaining({ ordinal: 2, outcome: 'applied', contentHash: removed?.contentHash, storedRevision: 1 }),
     ]);
-    expect((await forge.guest.get(`${readerUrl(slug)}/chapters/2`)).status()).toBe(404);
+    expect((await forge.viewer.get(`${readerUrl(slug)}/chapters/2`)).status()).toBe(404);
 
     const repeating = await auditWatermark(slug);
     const repeated = await reconcileSettled(publication);
@@ -436,8 +436,8 @@ test.describe('web-novel novel and chapter ingest through novel-forge', () => {
     expect(await readServedWikiEntry(second, KEEPER.entityKey)).toEqual(wiki);
     expect(await publishAuditSince(second, '0', 'chapter.upsert'), 'moved chapters are not pushed again').toEqual([]);
     expect(await publishAuditSince(second, '0', 'wiki.upsert'), 'a moved wiki entry is not pushed again').toEqual([]);
-    expect((await forge.guest.get(readerUrl(first))).status()).toBe(404);
-    expect((await forge.guest.get(readerUrl(second))).status()).toBe(200);
+    expect((await forge.viewer.get(readerUrl(first))).status()).toBe(404);
+    expect((await forge.viewer.get(readerUrl(second))).status()).toBe(200);
 
     const third = forge.slug('pub-renamed-again');
     await updateServedNovel(second, { revision: 3 });

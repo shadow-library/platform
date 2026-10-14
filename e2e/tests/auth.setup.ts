@@ -39,14 +39,16 @@ import {
  * persona needs is kept untouched, so a re-run does not pile up sessions.
  *
  * Which apps each persona needs a session on: the two ordinary users get the consumer apps (Novel Forge, Web
- * Novel, and Memoir); Pulse is an INTERNAL ops console, so identity denies a non-privileged user a Pulse
- * session (the OIDC hop returns without a session cookie) — only the admin drives it. The admin's identity
- * session is the `__Host-sid` the login flow already established, so Pulse is the only app session it needs
- * minted.
+ * Novel, and Memoir); the viewer is a Web Novel reader with no data of its own, standing in for "a signed-in reader
+ * with no grant" now that no Web Novel request is anonymous. Web Novel is INTERNAL, so every persona that gets a
+ * session there is seeded into the platform organisation. Only the admin drives Pulse, so only the admin is minted
+ * a Pulse session; no other persona is. The admin's identity session is the `__Host-sid` the login flow already
+ * established, so Pulse is the only app session it needs minted.
  */
 const PERSONA_APPS: Record<LoginPersona, ProductKey[]> = {
   user1: ['novelForge', 'webNovel', 'memoir'],
   user2: ['novelForge', 'webNovel', 'memoir'],
+  viewer: ['webNovel'],
   admin: ['pulse'],
 };
 
@@ -79,7 +81,7 @@ async function existingStateIsValid(persona: LoginPersona, apps: { url: string }
  * The assurance level a real sign-in would leave: the admin completes a passkey factor (AAL2), the users sign in with a password
  * alone (AAL1). No elevation window — a reused storage state is long past the ten minutes a fresh MFA login grants.
  */
-const PERSONA_AAL: Record<LoginPersona, SessionAal> = { user1: 'AAL1', user2: 'AAL1', admin: 'AAL2' };
+const PERSONA_AAL: Record<LoginPersona, SessionAal> = { user1: 'AAL1', user2: 'AAL1', viewer: 'AAL1', admin: 'AAL2' };
 
 /**
  * Establishes every app session `persona` needs and saves the storage state, unless a valid one already exists.

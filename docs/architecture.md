@@ -24,6 +24,7 @@ identity ──svc://novel-forge-server/internal/bots/*──> novel-forge   (bo
   the server's in-process scheduler. Pulse never calls other apps.
 - **Novel Forge to Web Novel is one-way.** Web Novel is a serving copy that never writes back and stores no forge internals; Forge pushes with an M2M token and monotonic revisions.
   Content integrity is the hash contract in `@shadow-library/sdk` (`docs/packages.md`).
+- **App admission and route access are separate layers.** See `docs/packages.md` (Auth access mode); Web Novel is private pre-launch through both (`docs/web-novel.md`).
 - **Service-to-service addressing** uses `svc://<service>`. NEVER hard-code hostnames.
 - **Cross-app data access is forbidden.** No app reads another app's database; only the HTTP integrations above exist (the e2e suite seeds and reads databases directly, for tests only). There is no shared
   AI service.

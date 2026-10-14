@@ -9,7 +9,7 @@ import { expect, test } from '@playwright/test';
  * Importing user defined packages
  */
 import { apiContext, readSeedManifest } from '../../lib';
-import { arrangeNovel, deleteNovels, uniqueNovelSlug, updateServedChapter } from './helpers';
+import { arrangeNovel, deleteNovels, readAccessMode, uniqueNovelSlug, updateServedChapter } from './helpers';
 
 /**
  * Defining types
@@ -18,8 +18,9 @@ import { arrangeNovel, deleteNovels, uniqueNovelSlug, updateServedChapter } from
 /**
  * Declaring the constants
  *
- * Request-level coverage of `apps/web-novel-server`'s public catalog/chapter API, as a guest (no session unless
- * a test says otherwise). The public catalog projection is PUBLIC-visibility-only unconditionally — the seeded
+ * Request-level coverage of `apps/web-novel-server`'s catalog/chapter API, as the `viewer` persona — a signed-in
+ * reader with no grants, because Web Novel is private and an anonymous request is refused (`private-access.spec.ts`). The catalog
+ * projection is PUBLIC-visibility-only unconditionally — the seeded
  * `e2e-restricted-novel` must never appear in it regardless of caller — and a handful of validation rules on
  * `GET /api/novels` are enforced server-side even though `apps/web-novel-web`'s own Browse screen never sends
  * the values that would trip them (see the web-novel report: several Browse filters are client-only).
@@ -28,18 +29,18 @@ test.describe('catalog api', () => {
   const { webNovel } = readSeedManifest();
 
   test('should list the seeded public novel and never the restricted one', async () => {
-    const ctx = await apiContext('webNovel');
+    const ctx = await apiContext('webNovel', 'viewer');
     const response = await ctx.get('/api/novels?limit=100');
     expect(response.status()).toBe(200);
 
     const body = (await response.json()) as { items: { slug: string }[] };
     const slugs = body.items.map(item => item.slug);
-    expect(slugs, 'expected the seeded public novel in the guest catalog').toContain(webNovel.publicSlug);
-    expect(slugs, 'a RESTRICTED novel must never surface in the public catalog').not.toContain(webNovel.restrictedSlug);
+    expect(slugs, 'expected the seeded public novel in the catalog').toContain(webNovel.publicSlug);
+    expect(slugs, 'a RESTRICTED novel must never surface in the catalog').not.toContain(webNovel.restrictedSlug);
   });
 
   test('should paginate with limit=1', async () => {
-    const ctx = await apiContext('webNovel');
+    const ctx = await apiContext('webNovel', 'viewer');
     const response = await ctx.get('/api/novels?limit=1');
     expect(response.status()).toBe(200);
 
@@ -49,7 +50,7 @@ test.describe('catalog api', () => {
   });
 
   test('should sort by title ascending', async () => {
-    const ctx = await apiContext('webNovel');
+    const ctx = await apiContext('webNovel', 'viewer');
     const response = await ctx.get('/api/novels?sortBy=title&sortOrder=asc&limit=100');
     expect(response.status()).toBe(200);
 
@@ -73,7 +74,7 @@ test.describe('catalog api', () => {
   ];
   for (const { name, query, field } of invalidQueries) {
     test(`should 422 with VALIDATION_ERROR on ${name}`, async () => {
-      const ctx = await apiContext('webNovel');
+      const ctx = await apiContext('webNovel', 'viewer');
       const response = await ctx.get(`/api/novels${query}`);
       expect(response.status()).toBe(422);
       const body = (await response.json()) as { code?: string; fields?: { field: string }[] };
@@ -83,13 +84,13 @@ test.describe('catalog api', () => {
   }
 
   test('should accept the bounds of the pagination contract', async () => {
-    const ctx = await apiContext('webNovel');
+    const ctx = await apiContext('webNovel', 'viewer');
     for (const query of ['?limit=1', '?limit=100&offset=0', '?sortBy=title']) expect((await ctx.get(`/api/novels${query}`)).status(), query).toBe(200);
   });
 
   /** Path validation answers with the same 422 envelope as the query string. */
   test('should 422 with VALIDATION_ERROR on a slug containing characters outside the allowed pattern', async () => {
-    const ctx = await apiContext('webNovel');
+    const ctx = await apiContext('webNovel', 'viewer');
     const response = await ctx.get('/api/novels/BAD_SLUG!');
     expect(response.status()).toBe(422);
 
@@ -98,7 +99,7 @@ test.describe('catalog api', () => {
   });
 
   test('should 404 with WBN_001 for a well-formed but unknown slug', async () => {
-    const ctx = await apiContext('webNovel');
+    const ctx = await apiContext('webNovel', 'viewer');
     const response = await ctx.get('/api/novels/e2e-does-not-exist');
     expect(response.status()).toBe(404);
 
@@ -107,7 +108,7 @@ test.describe('catalog api', () => {
   });
 
   test('should 404 with WBN_002 for an unknown chapter ordinal', async () => {
-    const ctx = await apiContext('webNovel');
+    const ctx = await apiContext('webNovel', 'viewer');
     const response = await ctx.get(`/api/novels/${webNovel.publicSlug}/chapters/9999`);
     expect(response.status()).toBe(404);
 
@@ -121,7 +122,7 @@ test.describe('catalog api', () => {
    * echo it back and expect a bodyless `304`.
    */
   test('should return a 304 when re-requesting a chapter with its own ETag', async () => {
-    const ctx = await apiContext('webNovel');
+    const ctx = await apiContext('webNovel', 'viewer');
     const first = await ctx.get(`/api/novels/${webNovel.publicSlug}/chapters/1`);
     expect(first.status()).toBe(200);
     const etag = first.headers()['etag'];
@@ -132,24 +133,28 @@ test.describe('catalog api', () => {
   });
 
   /**
-   * The public detail response is safe to share a CDN/browser cache — `cache-control: public, max-age=300` — but
-   * only for a caller who could see it as a guest. An authenticated caller (`user1`, no special relationship to
-   * this PUBLIC novel) still gets a cacheable response per-novel-visibility, not per-caller, per the report's
-   * "PUBLIC → public, max-age=300; else private, no-store" rule read literally against visibility, not auth state.
-   * What must differ for an authenticated caller is that a *private* resource never lands in a shared cache — that
-   * is exercised by the restricted-novel case in `visibility.spec.ts`, which is genuinely per-caller.
+   * `cache-control: public` is reserved for a PUBLIC novel served while the app is in public mode; in private mode a shared cache must
+   * never hold a response only a signed-in reader may fetch, so the same read is `private, no-store`.
    */
-  test('should mark the public novel detail response cacheable for a guest', async () => {
-    const ctx = await apiContext('webNovel');
+  test('should mark the public novel detail response cacheable only when the app is in public mode', async () => {
+    const ctx = await apiContext('webNovel', 'viewer');
+    const mode = await readAccessMode(ctx);
     const response = await ctx.get(`/api/novels/${webNovel.publicSlug}`);
     expect(response.status()).toBe(200);
-    expect(response.headers()['cache-control'] ?? '').toContain('public');
-    expect(response.headers()['cache-control'] ?? '').toContain('max-age');
+    const cacheControl = response.headers()['cache-control'] ?? '';
+    if (mode === 'public') {
+      expect(cacheControl).toContain('public');
+      expect(cacheControl).toContain('max-age');
+      return;
+    }
+    expect(cacheControl).toContain('private');
+    expect(cacheControl).toContain('no-store');
+    expect(cacheControl).not.toContain('public');
   });
 
   /**
    * The contrast case: any authenticated, per-caller endpoint must never be marked shared-cacheable, however
-   * cacheable the anonymous catalog is. `GET /api/library` sets `cache-control: private, no-store` explicitly
+   * cacheable a public-mode catalog is. `GET /api/library` sets `cache-control: private, no-store` explicitly
    * (`reader.controller.ts:106-109`) — a stray `public`/`max-age` here would risk one user's library leaking
    * into a shared cache.
    */
@@ -223,7 +228,7 @@ test.describe('catalog filters, search and serialization', () => {
   });
 
   test('should case-insensitively match the title search', async () => {
-    const ctx = await apiContext('webNovel');
+    const ctx = await apiContext('webNovel', 'viewer');
     // `search` is already the lowercase form of the "CATALOG-" the titles were seeded with — a case mismatch the ilike must tolerate.
     const response = await ctx.get(`/api/novels?search=${search}&limit=100`);
     expect(response.status()).toBe(200);
@@ -232,7 +237,7 @@ test.describe('catalog filters, search and serialization', () => {
   });
 
   test('should filter by genre and 422 VALIDATION_ERROR on an unrecognised genre', async () => {
-    const ctx = await apiContext('webNovel');
+    const ctx = await apiContext('webNovel', 'viewer');
     const matched = await ctx.get(`/api/novels?search=${search}&genre=Fantasy&limit=100`);
     expect(matched.status()).toBe(200);
     const matchedBody = (await matched.json()) as { items: { slug: string }[] };
@@ -244,7 +249,7 @@ test.describe('catalog filters, search and serialization', () => {
   });
 
   test('should filter by tag and 422 VALIDATION_ERROR on an unrecognised tag', async () => {
-    const ctx = await apiContext('webNovel');
+    const ctx = await apiContext('webNovel', 'viewer');
     const matched = await ctx.get(`/api/novels?search=${search}&tag=${encodeURIComponent('Male Protagonist')}&limit=100`);
     expect(matched.status()).toBe(200);
     const matchedBody = (await matched.json()) as { items: { slug: string }[] };
@@ -262,7 +267,7 @@ test.describe('catalog filters, search and serialization', () => {
    * (`extreme`) — either leaking in here would mean the server compared level names as strings, not ranks.
    */
   test('should apply the violence ceiling by rank, not alphabetically, and exclude the unrated row', async () => {
-    const ctx = await apiContext('webNovel');
+    const ctx = await apiContext('webNovel', 'viewer');
     const response = await ctx.get(`/api/novels?search=${search}&maxViolence=mild&limit=100`);
     expect(response.status()).toBe(200);
     const body = (await response.json()) as { items: { slug: string }[] };
@@ -270,7 +275,7 @@ test.describe('catalog filters, search and serialization', () => {
   });
 
   test('should exclude the unrated novel under any ceiling, however loose, while it stays included with no rating filter', async () => {
-    const ctx = await apiContext('webNovel');
+    const ctx = await apiContext('webNovel', 'viewer');
     // gamma has no violence rating at all; even the loosest ceiling must exclude it rather than treat NULL as satisfying it.
     const response = await ctx.get(`/api/novels?search=${search}&maxViolence=extreme&limit=100`);
     expect(response.status()).toBe(200);
@@ -286,7 +291,7 @@ test.describe('catalog filters, search and serialization', () => {
   ] as const;
   for (const { name, query } of ratingBoundaryCases) {
     test(`should 422 VALIDATION_ERROR on an unrecognised ${name} level`, async () => {
-      const ctx = await apiContext('webNovel');
+      const ctx = await apiContext('webNovel', 'viewer');
       const response = await ctx.get(`/api/novels?search=${search}&${query}`);
       expect(response.status()).toBe(422);
       expect(((await response.json()) as { code?: string }).code).toBe('VALIDATION_ERROR');
@@ -294,7 +299,7 @@ test.describe('catalog filters, search and serialization', () => {
   }
 
   test('should filter by status', async () => {
-    const ctx = await apiContext('webNovel');
+    const ctx = await apiContext('webNovel', 'viewer');
     const retired = await ctx.get(`/api/novels?search=${search}&status=retired&limit=100`);
     const retiredBody = (await retired.json()) as { items: { slug: string }[] };
     expect(retiredBody.items.map(item => item.slug)).toEqual([slugs.gamma]);
@@ -305,7 +310,7 @@ test.describe('catalog filters, search and serialization', () => {
   });
 
   test('should keep total stable across limit/offset pages with no overlap or gap', async () => {
-    const ctx = await apiContext('webNovel');
+    const ctx = await apiContext('webNovel', 'viewer');
     const first = await ctx.get(`/api/novels?search=${search}&sortBy=title&sortOrder=asc&limit=2&offset=0`);
     const firstBody = (await first.json()) as { total: number; items: { slug: string }[] };
     const second = await ctx.get(`/api/novels?search=${search}&sortBy=title&sortOrder=asc&limit=2&offset=2`);
@@ -320,7 +325,7 @@ test.describe('catalog filters, search and serialization', () => {
   });
 
   test('should serialize tags/ratings for a rated novel and omit rating fields entirely (not "none") for an unrated one', async () => {
-    const ctx = await apiContext('webNovel');
+    const ctx = await apiContext('webNovel', 'viewer');
     const rated = await ctx.get(`/api/novels/${slugs.alpha}`);
     expect(rated.status()).toBe(200);
     const ratedBody = (await rated.json()) as { tags: string[]; sexualContent?: string; violence?: string; darkContent?: string };
@@ -338,7 +343,7 @@ test.describe('catalog filters, search and serialization', () => {
   });
 
   test('should omit content from chapter metadata rows', async () => {
-    const ctx = await apiContext('webNovel');
+    const ctx = await apiContext('webNovel', 'viewer');
     const response = await ctx.get(`/api/novels/${slugs.alpha}/chapters`);
     expect(response.status()).toBe(200);
     const body = (await response.json()) as { items: Record<string, unknown>[] };
@@ -362,7 +367,7 @@ test.describe('chapter etag/cache correctness beyond a single 304', () => {
     const slug = uniqueNovelSlug('cat-etag-weak');
     slugs.push(slug);
     const novel = await arrangeNovel({ slug, visibility: 'PUBLIC', chapters: 1 });
-    const ctx = await apiContext('webNovel');
+    const ctx = await apiContext('webNovel', 'viewer');
 
     const first = await ctx.get(`/api/novels/${novel.slug}/chapters/1`);
     expect(first.status()).toBe(200);
@@ -376,7 +381,7 @@ test.describe('chapter etag/cache correctness beyond a single 304', () => {
     const slug = uniqueNovelSlug('cat-etag-stale');
     slugs.push(slug);
     const novel = await arrangeNovel({ slug, visibility: 'PUBLIC', chapters: 1 });
-    const ctx = await apiContext('webNovel');
+    const ctx = await apiContext('webNovel', 'viewer');
 
     const first = await ctx.get(`/api/novels/${novel.slug}/chapters/1`);
     expect(first.status()).toBe(200);
@@ -398,7 +403,7 @@ test.describe('chapter etag/cache correctness beyond a single 304', () => {
     const slug = uniqueNovelSlug('cat-etag-samerev');
     slugs.push(slug);
     const novel = await arrangeNovel({ slug, visibility: 'PUBLIC', chapters: 1 });
-    const ctx = await apiContext('webNovel');
+    const ctx = await apiContext('webNovel', 'viewer');
 
     const first = await ctx.get(`/api/novels/${novel.slug}/chapters/1`);
     expect(first.status()).toBe(200);
@@ -428,7 +433,7 @@ test.describe('chapter etag/cache correctness beyond a single 304', () => {
     const slug = uniqueNovelSlug('cat-etag-cache-hit');
     slugs.push(slug);
     const novel = await arrangeNovel({ slug, visibility: 'PUBLIC', chapters: 1 });
-    const ctx = await apiContext('webNovel');
+    const ctx = await apiContext('webNovel', 'viewer');
 
     const first = await ctx.get(`/api/novels/${novel.slug}/chapters/1`);
     expect(first.status()).toBe(200);

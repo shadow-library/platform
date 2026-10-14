@@ -31,6 +31,10 @@
 - `ui`: style only through CSS Modules using `--sh-*` tokens; no Tailwind, no hard-coded hex/px/shadow/duration; add a missing token (light and dark) first.
 - `ui`: components never use the global `utilities.css` layer; overlays wrap Radix (never forked); dist stays SSR-import-safe; do not strip the `'use client'` banners.
 - `web`: keep server-fetch contract types beside browser code; importing them from the server-only file drags server code into the client bundle.
+- `web`: gate a whole app on its auth mode with `requireAccess` in the route's `beforeLoad` (SSR redirects to login); never re-derive the mode in the app. The gate fails closed: anything but an
+  exact `public` answer from `GET {basePath}/access` is treated as private. Mount `useSessionGuard({ enabled })` unconditionally and enable it only when private. A tab keeps the mode it
+  loaded until reload; the backend always enforces.
+- `web`: `precacheUrls` rejects a redirected or non-OK response and is all-or-nothing, so a service worker can never precache a login page as an app shell; a private app's worker therefore installs only after sign-in.
 - `web`: `useBuildUpdate` compares the build id stamped into the client against the app's no-store `buildIdResponse` route; it only reports, so reloading stays the user's
   choice. Stamp both from one `resolveBuildId` in the app's Vite config.
 
@@ -56,3 +60,19 @@
 - The startup role catalog is a destructive full replace: send the complete set. A mint or authorize without `resource` yields an Identity-audience token your API must reject.
 - NEVER log tokens, session handles, cookies, PKCE verifiers, `state`, `nonce` or bot keys. Test with `createTestIdP`, never hand-rolled token fixtures.
 - `identity-server` does not depend on `auth`; elevation (step-up) never crosses a service boundary.
+
+## Auth access mode (`auth`)
+
+- Two independent layers. Identity decides WHO may hold a session for an app (application visibility: admission, enforced at authorize, app-session mint and refresh). The SDK's access mode decides WHETHER
+  a route needs a session at all. Neither substitutes for the other: a `private` app still admits only whom Identity admits, and an app Identity admits to everyone can still run `private`.
+- Mode is `public` or `private`. `AUTH_ACCESS_MODE` wins over the code default `AuthModule.forRoot({ defaultAccessMode })`, which wins over `public`; an app opens or closes by configuration alone, so the
+  code default states posture and is never the only switch. Read the resolved mode through `AuthAccessPolicy`, never from config, so app code (cache policy, context resolvers) agrees with the guard.
+- Route policy: undecorated routes follow the mode (anonymous when public, authenticated when private: deny by default); `@Public()` is anonymous in every mode (health, SDK auth routes);
+  `@OptionalAuth()` is the app's anonymous surface in public mode (a bad or absent credential is anonymous, never 401; bot keys are read as anonymous) and is promoted to required in private mode;
+  `@Authenticated()` and the other requiring decorators mean the same in both.
+- Fail closed: merged metadata that is `public`/`optional` yet carries a requirement (scopes, permission, elevation, bot permissions), or any legacy or unknown access value, throws `CONFIG_INVALID` at route
+  registration. Put the requirement on the methods that need it, never on a class that also hosts a public method.
+- `private` refuses to boot unless the browser sign-in flow (login and callback routes) is reachable: a bearer-only API cannot be private. `GET {basePath}/access` reports the mode and exists only with the
+  browser flow.
+- Only controller routes are guarded. Fastify-plugin routes (OpenAPI docs, the separate health server) sit outside the guard; do not put data behind them.
+- Pulse keeps its own default-deny sentinel and its own `@Public` marker, distinct from the SDK's.

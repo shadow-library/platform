@@ -8,7 +8,7 @@ import { type APIResponse } from '@playwright/test';
 /**
  * Importing user defined packages
  */
-import { findSetCookie, readSessionStatus, requireProductUrl } from '../../lib';
+import { findPlatformOrganisationId, findSetCookie, readSessionStatus, requireProductUrl } from '../../lib';
 import { expect, test } from './fixtures';
 import {
   countActiveAppSessions,
@@ -279,7 +279,8 @@ test.describe('web-novel session: principal', () => {
     const response = await ctx.get('/api/auth/session');
     expect(response.status()).toBe(200);
     const principal = (await response.json()) as Record<string, unknown>;
-    expect(principal).toMatchObject({ sub: reader.user.sub, clientId: WEB_NOVEL_CLIENT_ID, org: reader.user.personalOrgId, aal: 'AAL1' });
+    // Web Novel is INTERNAL, so the platform organisation is the only one granting it and the session is narrowed to it, not to the personal workspace.
+    expect(principal).toMatchObject({ sub: reader.user.sub, clientId: WEB_NOVEL_CLIENT_ID, org: await findPlatformOrganisationId(), aal: 'AAL1' });
     expect(principal.scopes).toEqual(expect.arrayContaining(['openid']));
     expect(principal.scopes, 'the publish scope is service-only, whatever the login asked for').not.toContain(WEB_NOVEL_PUBLISH_SCOPE);
     const keys = Object.keys(principal);

@@ -18,8 +18,8 @@ import { getProductLabel, type ProductKey, requireProductUrl } from '../lib';
  * The one path per product that's known, read-only from each app's route source, to sit behind a session
  * gate: identity's `/`, memoir's `/`, novel-forge's `/`, and pulse's `/` all redirect through `requireSession`
  * unconditionally (identity's root even chains through `/account` first — see
- * `apps/identity-web/src/routes/index.tsx`), while web-novel is a public reader whose only gated route
- * among the ones checked here is `/library` (`apps/web-novel-web/src/routes/_shell/library.tsx`).
+ * `apps/identity-web/src/routes/index.tsx`), and so does web-novel's `/library` (`apps/web-novel-web/src/routes/_shell/library.tsx`), gated in both access modes; while
+ * private, the whole shell is gated the same way and is covered by `web-novel/private-access.spec.ts`.
  *
  * Confirmed against the local k3d ingress: identity's `/`, novel-forge's `/`, and web-novel's `/library`
  * are all server-rendered (TanStack Start SSR) and 307-redirect straight to `/login?returnTo=...` before

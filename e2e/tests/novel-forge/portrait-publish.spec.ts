@@ -49,7 +49,7 @@ test.describe('novel-forge chapter-dated portrait → reader', () => {
   test('should show a portrait dated to chapter 3 only to a reader who has reached chapter 3', async ({ forge, lane }) => {
     test.setTimeout(180_000);
     const owner = await forge.actor({ label: 'portrait' });
-    const webGuestCtx = await apiContext('webNovel');
+    const webViewerCtx = await apiContext('webNovel', 'viewer');
     const webUser1Ctx = await apiContext('webNovel', 'user1');
     try {
       const novelTitle = `E2E Portrait Novel ${uniqueSuffix()}`;
@@ -88,16 +88,16 @@ test.describe('novel-forge chapter-dated portrait → reader', () => {
       expect(result.wiki.failed, JSON.stringify(result.wiki.failed)).toEqual([]);
       expect([...result.wiki.pushed, ...result.wiki.skipped]).toContain(ENTITY_KEY);
 
-      const entry = await pollWebNovel(webGuestCtx, `/api/novels/${slug}/wiki/${ENTITY_KEY}`, 200);
+      const entry = await pollWebNovel(webViewerCtx, `/api/novels/${slug}/wiki/${ENTITY_KEY}`, 200);
       expect(entry.status(), await entry.text()).toBe(200);
-      expect(await readerCaptions(webGuestCtx, slug), 'a guest sees only the portrait dated before the story').toEqual([EARLY_CAPTION]);
+      expect(await readerCaptions(webViewerCtx, slug), 'a viewer sees only the portrait dated before the story').toEqual([EARLY_CAPTION]);
 
       await setFurthestOrdinal(slug, 2);
       expect(await readerCaptions(webUser1Ctx, slug)).toEqual([EARLY_CAPTION]);
       await setFurthestOrdinal(slug, 3);
       expect(await readerCaptions(webUser1Ctx, slug)).toEqual(expect.arrayContaining([EARLY_CAPTION, LATE_CAPTION]));
     } finally {
-      await runAll([() => webGuestCtx.dispose(), () => webUser1Ctx.dispose()]);
+      await runAll([() => webViewerCtx.dispose(), () => webUser1Ctx.dispose()]);
     }
   });
 });

@@ -73,7 +73,7 @@ test.describe('internal api security', () => {
   });
 
   test('should 401 IAM_001 an unauthenticated post to pulse notifications', async () => {
-    // user1 cannot obtain a pulse session (INTERNAL app), so its identity cookies are simply not sent to the pulse
+    // The setup never mints user1 a pulse session, so no pulse session cookie is sent to the pulse
     // origin — this is the no-token path. (The unlisted-service-client → IAM_002 case needs a mintable service
     // token and is documented in the report rather than tested here.)
     const ctx = await apiContext('pulse', 'user1');

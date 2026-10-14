@@ -14,6 +14,8 @@ import { getProductUrl, identityDb, webNovelDb } from '../../lib';
  * Defining types
  */
 
+export type AccessMode = 'public' | 'private';
+
 export type AppSessionStatus = 'ACTIVE' | 'REVOKED' | 'EXPIRED';
 
 export interface AppSessionRow {
@@ -171,6 +173,13 @@ export async function followRedirect(ctx: APIRequestContext, url: string): Promi
   const location = response.headers().location;
   if (response.status() !== 302 || !location) throw new WebNovelSessionError(`expected a redirect from ${url}, got ${response.status()} ${await response.text()}`);
   return new URL(location, response.url());
+}
+
+/** The deployment's access mode, as the SDK's public `GET /api/auth/access` reports it — what a spec branches on when a behaviour differs between the two. */
+export async function readAccessMode(ctx: APIRequestContext): Promise<AccessMode> {
+  const response = await ctx.get('/api/auth/access');
+  if (response.status() !== 200) throw new WebNovelSessionError(`/api/auth/access answered ${response.status()} ${await response.text()}`);
+  return ((await response.json()) as { mode: AccessMode }).mode;
 }
 
 /** Identity's `app_sessions` row behind a web-novel handle; identity stores only the handle's SHA-256. */

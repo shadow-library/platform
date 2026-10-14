@@ -35,13 +35,13 @@ test.describe('security', () => {
 
   /**
    * `user1`'s saved storage state (`.auth/user1.json`) carries sessions for novel-forge and web-novel only —
-   * no `__Host-shadow-session` cookie is scoped to `pulse.shadow-apps.test`, because identity never grants an
-   * ordinary account a pulse app-session in the first place (per `e2e/lib`'s seed manifest notes). A pulse
+   * no `__Host-shadow-session` cookie is scoped to `pulse.shadow-apps.test`, because `auth.setup.ts` never mints `user1`
+   * a Pulse session. A pulse
    * `APIRequestContext` built with the `user1` persona therefore carries no pulse credential at all, and this
    * assertion is the API-level mirror of that: it 401s exactly like a guest, not a 403 for lacking a specific
    * permission — there is no session to check a permission against.
    */
-  test('should 401 IAM_001 for user1 (no pulse session exists for this persona) GET /api/v1/templates', async () => {
+  test('should 401 IAM_001 for user1 (the setup never mints this persona a pulse session) GET /api/v1/templates', async () => {
     const ctx = await apiContext('pulse', 'user1');
     const response = await ctx.get('/api/v1/templates');
     expect(response.status()).toBe(401);

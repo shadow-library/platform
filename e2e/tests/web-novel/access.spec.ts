@@ -98,12 +98,12 @@ test.describe('web-novel access push (forge-fronted)', () => {
       expect.objectContaining({ outcome: 'applied', incomingRevision: initial + 1, storedRevision: initial, callerClientId: FORGE_CLIENT_ID }),
     ]);
 
-    const guest = await webNovel.guest();
+    const viewer = await apiContext('webNovel', 'viewer');
     const { ctx: firstCtx } = await webNovel.signIn(first);
     const { ctx: secondCtx } = await webNovel.signIn(second);
     expect(await detailStatus(firstCtx, slug)).toBe(200);
     expect(await detailStatus(secondCtx, slug)).toBe(200);
-    expect(await detailStatus(guest, slug)).toBe(404);
+    expect(await detailStatus(viewer, slug)).toBe(404);
 
     const narrowing = await auditWatermark(slug);
     const narrowed = await setForgeAccess(publication, 'RESTRICTED', [first.user.email]);

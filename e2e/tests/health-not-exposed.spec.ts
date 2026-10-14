@@ -27,6 +27,10 @@ import { getProductLabel, PRODUCTS, requireProductUrl } from '../lib';
  * `not ready` (see `health.service.ts`), so anything else (any non-2xx, or a 2xx `text/html` app shell)
  * passes.
  *
+ * Web Novel's private mode does not change this: the internal-port health server is the shared plugin outside the auth guard, the app's own
+ * `@Public()` `HealthController` is on the app port, and on the public origin `/health/*` reaches the web app, which redirects an anonymous
+ * probe to its login page. That is `text/html` and so still reads as not exposed.
+ *
  * Always on for every configured product (no opt-in) — this is the platform's own stated design intent
  * ("health is never internet-exposed"), not a soft opt-in check like the old `api-health.spec.ts` this
  * replaces.

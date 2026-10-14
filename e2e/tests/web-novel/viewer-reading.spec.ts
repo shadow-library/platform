@@ -6,7 +6,7 @@ import { expect, test } from '@playwright/test';
 /**
  * Importing user defined packages
  */
-import { readSeedManifest, requireProductUrl } from '../../lib';
+import { readSeedManifest, requireProductUrl, storageStateFor } from '../../lib';
 
 /**
  * Defining types
@@ -15,14 +15,17 @@ import { readSeedManifest, requireProductUrl } from '../../lib';
 /**
  * Declaring the constants
  *
- * The unauthenticated reading path end to end: home → detail → reader, plus the catalog/search surface and the
- * two 404 boundaries (unknown slug, and a real-but-unreadable slug — which must present identically, per
- * `NovelAccessService`'s no-existence-oracle contract exercised at the API level in `visibility.spec.ts`). No
- * storage state is used anywhere in this file — every test here is the guest experience. Selectors favor
- * structural facts (an `<a href="/novels/$slug">` card link, landmark roles) over display copy, matching the
- * rest of this suite (`public-reading.spec.ts`, `ssr-hydration.spec.ts`).
+ * The reading path end to end for a signed-in reader with no grants: home → detail → reader, plus the catalog/search surface and
+ * the two 404 boundaries (unknown slug, and a real-but-unreadable slug — which must present identically, per
+ * `NovelAccessService`'s no-existence-oracle contract exercised at the API level in `visibility.spec.ts`). Every test here runs as the
+ * `viewer` persona, because Web Novel is private and an anonymous visitor never gets past the login redirect
+ * (`private-access.spec.ts`). Opening a chapter records reading progress for the viewer, so no spec may assume the viewer has
+ * none; the seed clears its progress on every run. Selectors favor structural facts (an `<a href="/novels/$slug">` card link,
+ * landmark roles) over display copy, matching the rest of this suite (`reader-home.spec.ts`, `ssr-hydration.spec.ts`).
  */
-test.describe('guest reading', () => {
+test.describe('viewer reading', () => {
+  test.use({ storageState: storageStateFor('viewer') });
+
   const { webNovel } = readSeedManifest();
 
   test('should render the seeded public novel as a card on the home page', async ({ page }) => {
@@ -100,7 +103,7 @@ test.describe('guest reading', () => {
     ['the restricted novel', webNovel.restrictedSlug],
     ['an unknown slug', 'e2e-does-not-exist'],
   ] as const) {
-    test(`should render the 404 boundary for ${label} as a guest`, async ({ page }) => {
+    test(`should render the 404 boundary for ${label} as a viewer`, async ({ page }) => {
       const url = requireProductUrl('webNovel');
       const response = await page.goto(`${url}/novels/${slug}`, { waitUntil: 'domcontentloaded' });
       expect(response?.status()).toBe(404);

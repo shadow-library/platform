@@ -54,6 +54,8 @@ Identity and never stores credentials. This is the only doc that describes the a
 - INTERNAL or inactive apps look identical to an unknown client. The gate runs at authorize, SAML SSO, every app-session mint, refresh and exchange (when the target is app-owned); unassignment is a hard cut at next mint. Token
   `org` is one org that actually grants the app; an app session realigns to another granting org and is revoked only when none does, but a refresh family is revoked as soon as its
   own org stops granting. Switching org rotates the handle. Access grants are cached in Redis under a version key: any visibility, release, assignment or mode write MUST bump it.
+- Admission is only half of an app's access story; whether a route needs a session at all is the consumer's access mode (`docs/packages.md`, Auth access mode). Web Novel is seeded `INTERNAL`; seed visibility applies
+  only at creation, so an existing environment flips it in the admin panel.
 - Service-access rules (app x caller client x method x path) are admin data; `kind=service` callers are denied by default. Org security policies fold per key over platform
   default, client and orgs (MIN for the duration keys): an org may tighten, never loosen.
 - Role catalogs are pushed by each app that opts in (pulse's sync is off; its catalog is seeded in identity) as a full sync scoped to that app; absent roles are deleted with

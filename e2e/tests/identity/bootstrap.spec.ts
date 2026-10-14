@@ -113,7 +113,7 @@ test.describe('identity bootstrap — platform and administrator', () => {
 });
 
 test.describe('identity bootstrap — ecosystem seed', () => {
-  test('should seed exactly the five ecosystem applications, with pulse internal and web-novel public', async () => {
+  test('should seed exactly the five ecosystem applications, with pulse and web-novel internal', async () => {
     const applications = await seededApplications();
     expect(applications.map(application => application.name)).toEqual(SEEDED_APPLICATIONS);
     expect(
@@ -122,7 +122,7 @@ test.describe('identity bootstrap — ecosystem seed', () => {
     ).toBe(true);
 
     const visibility = Object.fromEntries(applications.map(application => [application.name, application.visibility]));
-    expect(visibility).toMatchObject({ pulse: 'INTERNAL', 'web-novel': 'PUBLIC' });
+    expect(visibility).toMatchObject({ pulse: 'INTERNAL', 'web-novel': 'INTERNAL' });
   });
 
   test('should seed pulse with its three roles and the template and layout permissions', async () => {

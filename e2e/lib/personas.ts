@@ -12,11 +12,11 @@ import path from 'node:path';
  * Defining types
  */
 
-/** Every seeded identity persona — the three that receive a saved browser session plus the two negative-path accounts. */
-export type Persona = 'user1' | 'user2' | 'admin' | 'locked' | 'suspended';
+/** Every seeded identity persona — the four that receive a saved browser session plus the two negative-path accounts. */
+export type Persona = 'user1' | 'user2' | 'viewer' | 'admin' | 'locked' | 'suspended';
 
 /** The personas `auth.setup.ts` logs in and saves a `storageState` for; only these are usable as an authenticated context. */
-export type LoginPersona = 'user1' | 'user2' | 'admin';
+export type LoginPersona = 'user1' | 'user2' | 'viewer' | 'admin';
 
 export interface PersonaAccount {
   readonly key: Persona;
@@ -30,6 +30,8 @@ export interface PersonaAccount {
   readonly lastName: string;
   /** True for the personas `auth.setup.ts` establishes a session for; the negative-path accounts never log in. */
   readonly hasStorageState: boolean;
+  /** True for the personas seeded into the platform organisation — the only membership identity admits to an INTERNAL application such as Web Novel. */
+  readonly platformMember: boolean;
 }
 
 /** One entry of `seed-manifest.json` — the identity ids the seed computed, so a spec never has to guess a `sub`. */
@@ -59,7 +61,7 @@ export interface SeedManifest {
  * synthetic and outside any real address space.
  */
 
-/** Shared password for the four seeded `.test` personas — meets identity's ≥12-char upper/lower/number policy. */
+/** Shared password for the five seeded `.test` personas — meets identity's ≥12-char upper/lower/number policy. */
 const E2E_PERSONA_PASSWORD = 'E2eSeed#Passw0rd!';
 
 /** Password the seed forces onto the bootstrap admin (id 1) so the suite has a working admin despite the unknown boot secret. */
@@ -84,6 +86,7 @@ export const PERSONAS: Record<Persona, PersonaAccount> = {
     firstName: 'E2E',
     lastName: 'UserOne',
     hasStorageState: true,
+    platformMember: true,
   },
   user2: {
     key: 'user2',
@@ -94,8 +97,30 @@ export const PERSONAS: Record<Persona, PersonaAccount> = {
     firstName: 'E2E',
     lastName: 'UserTwo',
     hasStorageState: true,
+    platformMember: true,
   },
-  admin: { key: 'admin', email: ADMIN_EMAIL, password: E2E_ADMIN_PASSWORD, status: 'ACTIVE', lockMode: 'NONE', firstName: 'Platform', lastName: 'Admin', hasStorageState: true },
+  viewer: {
+    key: 'viewer',
+    email: 'e2e.viewer@shadow-apps.test',
+    password: E2E_PERSONA_PASSWORD,
+    status: 'ACTIVE',
+    lockMode: 'NONE',
+    firstName: 'E2E',
+    lastName: 'Viewer',
+    hasStorageState: true,
+    platformMember: true,
+  },
+  admin: {
+    key: 'admin',
+    email: ADMIN_EMAIL,
+    password: E2E_ADMIN_PASSWORD,
+    status: 'ACTIVE',
+    lockMode: 'NONE',
+    firstName: 'Platform',
+    lastName: 'Admin',
+    hasStorageState: true,
+    platformMember: true,
+  },
   locked: {
     key: 'locked',
     email: 'e2e.locked@shadow-apps.test',
@@ -105,6 +130,7 @@ export const PERSONAS: Record<Persona, PersonaAccount> = {
     firstName: 'E2E',
     lastName: 'Locked',
     hasStorageState: false,
+    platformMember: false,
   },
   suspended: {
     key: 'suspended',
@@ -115,6 +141,7 @@ export const PERSONAS: Record<Persona, PersonaAccount> = {
     firstName: 'E2E',
     lastName: 'Suspended',
     hasStorageState: false,
+    platformMember: false,
   },
 };
 

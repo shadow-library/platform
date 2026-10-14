@@ -7,12 +7,14 @@ import { type APIRequestContext, test as base, request } from '@playwright/test'
  * Importing user defined packages
  */
 import {
+  addOrganisationMember,
   clearIpState,
   clientIpHeaders,
   createIdentitySession,
   createIdentityUser,
   deleteIdentityUser,
   evictSessionCache,
+  findPlatformOrganisationId,
   findSetCookie,
   freshClientIp,
   type IdentitySession,
@@ -33,6 +35,11 @@ export interface WebNovelReader {
   readonly session: IdentitySession;
 }
 
+export interface ReaderOptions {
+  /** Default true — Web Novel is INTERNAL, so only a platform-organisation member is admitted. False builds the outsider identity refuses. */
+  platformMember?: boolean;
+}
+
 export interface SignedInReader {
   /** A web-novel context carrying the reader's `__Host-shadow-session`, and identity's cookies for another hop. */
   readonly ctx: APIRequestContext;
@@ -42,8 +49,8 @@ export interface SignedInReader {
 export interface WebNovelHarness {
   /** This test's own client address; the identity side of every OIDC hop is charged to it. */
   readonly clientIp: string;
-  /** A factory identity user with a live central session and no web-novel session yet. */
-  reader(label?: string): Promise<WebNovelReader>;
+  /** A factory identity user with a live central session and no web-novel session yet; a platform member unless `platformMember` is false. */
+  reader(label?: string, options?: ReaderOptions): Promise<WebNovelReader>;
   guest(): Promise<APIRequestContext>;
   /** A web-novel context carrying only `reader`'s identity cookies, for driving the login flow by hand. */
   preLogin(reader: WebNovelReader): Promise<APIRequestContext>;
@@ -57,8 +64,9 @@ export interface WebNovelHarness {
  * Readers are built per test rather than taken from the saved personas: logging out revokes the handle a persona's
  * storage state carries, which every other web-novel spec reads. Each reader's central session is written straight into
  * identity, so a test spends no `login/init` budget, and the chain is walked hop by hop so it never renders the SSR page
- * the callback lands on. Deleting the user cascades its central and app sessions; web-novel keys its shelves and progress by the bare
- * subject, so those are removed by hand.
+ * the callback lands on. Web Novel is an INTERNAL identity application, so a factory reader is added to the
+ * platform organisation, the only membership identity admits to it. Deleting the user cascades that membership and its central and app
+ * sessions; web-novel keys its shelves and progress by the bare subject, so those are removed by hand.
  */
 
 export const test = base.extend<{ webNovel: WebNovelHarness }>({
@@ -80,9 +88,10 @@ export const test = base.extend<{ webNovel: WebNovelHarness }>({
 
     await use({
       clientIp,
-      reader: async label => {
+      reader: async (label, options = {}) => {
         const user = await createIdentityUser({ label: `webnovel-${label ?? 'reader'}` });
         users.push(user);
+        if (options.platformMember ?? true) await addOrganisationMember(await findPlatformOrganisationId(), user.userId);
         const reader = { user, session: await createIdentitySession(user.userId) };
         readers.push(reader);
         return reader;

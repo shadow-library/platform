@@ -28,8 +28,8 @@ interface FlowState {
  * (spending one `register/init`), creates an organisation (becoming its OWNER), is denied a Pulse session
  * (Pulse is an INTERNAL identity application no ordinary user may reach), then invites a seeded persona who
  * accepts into the org. The pay-off is web-novel's ORGANISATION-visibility gate, resolved through identity's
- * real internal membership call: an accepted member reads the org novel (200); a non-member and a guest cannot
- * tell it from a novel that does not exist (404 WBN_001). It closes by re-confirming the seeded RESTRICTED novel.
+ * real internal membership call: an accepted member reads the org novel (200); a non-member and a viewer with no
+ * relationship to it cannot tell it from a novel that does not exist (404 WBN_001). It closes by re-confirming the seeded RESTRICTED novel.
  *
  * Serial, because every step feeds the next (register → org → invite → accept → visibility) and the two
  * rate-limited spends (`register/init` 5/hour, `login/init` 20/hour) are guarded with `test.skip` on 429 so a
@@ -214,7 +214,7 @@ test.describe('organisation access and ORGANISATION-visibility', () => {
 
   // Seeds the ORGANISATION-visibility novel (normally a forge-owned tier) bound to the org just created, with one
   // published chapter, which the member-read step below then reads.
-  test('should hide the ORGANISATION novel from non-members, guests, and the public catalog', async () => {
+  test('should hide the ORGANISATION novel from non-members, unrelated viewers, and the public catalog', async () => {
     const [novel] = await webNovelDb()<{ id: string }[]>`
       INSERT INTO novels (slug, source_client_id, source_ref, title, genres, status, visibility, organisation_id, revision)
       VALUES (${orgNovelSlug}, ${'e2e-seed'}, ${orgNovelSlug}, ${'E2E Org Novel'}, ${['Fantasy']}, 'live', 'ORGANISATION'::novel_visibility, ${orgId}, 1)
@@ -235,14 +235,14 @@ test.describe('organisation access and ORGANISATION-visibility', () => {
     expect((JSON.parse(nonMemberBody) as { code?: string }).code).toBe('WBN_001');
     expect(nonMemberBody, 'the non-member 404 must be byte-identical to an unknown-slug 404').toBe(await unknown.text());
 
-    // A guest is denied the same way (guests never even trigger a membership lookup — canRead short-circuits).
-    const guestCtx = await apiContext('webNovel');
-    const guestRead = await guestCtx.get(`/api/novels/${orgNovelSlug}`);
-    expect(guestRead.status(), 'a guest must get a 404 for the org novel').toBe(404);
-    expect(((await guestRead.json()) as { code?: string }).code).toBe('WBN_001');
+    // The viewer is a platform member but belongs to neither this organisation nor the novel's grants, so it is denied the same way.
+    const viewerCtx = await apiContext('webNovel', 'viewer');
+    const viewerRead = await viewerCtx.get(`/api/novels/${orgNovelSlug}`);
+    expect(viewerRead.status(), 'a viewer outside the organisation must get a 404 for the org novel').toBe(404);
+    expect(((await viewerRead.json()) as { code?: string }).code).toBe('WBN_001');
 
     // The public catalog is PUBLIC-only: the org novel must never appear in it.
-    const catalog = await guestCtx.get('/api/novels?limit=100');
+    const catalog = await viewerCtx.get('/api/novels?limit=100');
     const catalogSlugs = ((await catalog.json()) as { items: { slug: string }[] }).items.map(item => item.slug);
     expect(catalogSlugs, 'an ORGANISATION novel must be absent from the PUBLIC catalog').not.toContain(orgNovelSlug);
   });
@@ -262,7 +262,7 @@ test.describe('organisation access and ORGANISATION-visibility', () => {
     expect(((await memberRead.json()) as { title?: string }).title, 'the member response carries the novel title').toBe('E2E Org Novel');
   });
 
-  test('should re-confirm the seeded RESTRICTED novel gate (user1 granted, user2 and guest denied)', async () => {
+  test('should re-confirm the seeded RESTRICTED novel gate (user1 granted, user2 and viewer denied)', async () => {
     const grantedCtx = await apiContext('webNovel', 'user1');
     const granted = await grantedCtx.get(`/api/novels/${webNovel.restrictedSlug}`);
     expect(granted.status(), 'user1 holds the seeded restricted grant').toBe(200);
@@ -272,8 +272,8 @@ test.describe('organisation access and ORGANISATION-visibility', () => {
     expect(ungranted.status(), 'user2 has no grant').toBe(404);
     expect(((await ungranted.json()) as { code?: string }).code).toBe('WBN_001');
 
-    const guestCtx = await apiContext('webNovel');
-    const guest = await guestCtx.get(`/api/novels/${webNovel.restrictedSlug}`);
-    expect(guest.status(), 'a guest has no grant').toBe(404);
+    const viewerCtx = await apiContext('webNovel', 'viewer');
+    const viewer = await viewerCtx.get(`/api/novels/${webNovel.restrictedSlug}`);
+    expect(viewer.status(), 'the viewer has no grant').toBe(404);
   });
 });

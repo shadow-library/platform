@@ -145,6 +145,7 @@ async function seedPersona(sql: Sql, persona: Persona): Promise<SeedManifestUser
   `;
 
   await ensurePersonalOrg(sql, userId, `${account.firstName} ${account.lastName} Workspace`);
+  if (account.platformMember) await ensurePlatformMembership(sql, userId);
 
   return { userId, sub: userId, email };
 }
@@ -171,7 +172,21 @@ async function ensurePersonalOrg(sql: Sql, userId: string, name: string): Promis
   await sql`UPDATE users SET personal_organisation_id = ${first(created).id} WHERE id = ${userId}`;
 }
 
-/** Seeds all five personas (the bootstrap admin is one of them, so this also performs the admin password reset). */
+/**
+ * Makes the user an active member of the platform organisation, the only membership identity admits to an INTERNAL application such as
+ * Web Novel. Not the default organisation, so a persona's active workspace stays its personal one.
+ */
+async function ensurePlatformMembership(sql: Sql, userId: string): Promise<void> {
+  const platform = await sql<{ id: string }[]>`SELECT id FROM organisations WHERE is_platform`;
+  if (platform.length === 0) throw new Error('no organisation is marked is_platform; run identity bootstrap before the e2e seed');
+  await sql`
+    INSERT INTO organisation_members (organisation_id, user_id, role, status, is_default)
+    VALUES (${first(platform).id}, ${userId}, 'MEMBER'::organisation_member_role, 'ACTIVE'::organisation_member_status, false)
+    ON CONFLICT (organisation_id, user_id) DO UPDATE SET status = 'ACTIVE'::organisation_member_status, status_until = NULL
+  `;
+}
+
+/** Seeds all six personas (the bootstrap admin is one of them, so this also performs the admin password reset). */
 async function seedIdentity(url: string): Promise<Record<Persona, SeedManifestUser>> {
   const sql = connect(url);
   try {
@@ -186,7 +201,7 @@ async function seedIdentity(url: string): Promise<Record<Persona, SeedManifestUs
 }
 
 /** Seeds the two readable novels, their chapters, a restricted grant for user1, wiki entries, and user1's library/progress. */
-async function seedWebNovel(url: string, user1Sub: string): Promise<void> {
+async function seedWebNovel(url: string, user1Sub: string, viewerSub: string): Promise<void> {
   const sql = connect(url);
   try {
     const publicId = await upsertNovel(sql, {
@@ -219,6 +234,9 @@ async function seedWebNovel(url: string, user1Sub: string): Promise<void> {
       VALUES (${user1Sub}, ${publicId}, 2, 0, 2)
       ON CONFLICT (user_id, novel_id) DO UPDATE SET ordinal = excluded.ordinal, furthest_ordinal = excluded.furthest_ordinal, updated_at = now()
     `;
+
+    await sql`DELETE FROM reading_progress WHERE user_id = ${viewerSub}`;
+    await sql`DELETE FROM library WHERE user_id = ${viewerSub}`;
 
     summary.push(
       `web_novel: ${PUBLIC_NOVEL_SLUG} (PUBLIC, 3 chapters, 2 wiki entries) + ${RESTRICTED_NOVEL_SLUG} (RESTRICTED, 2 chapters, grant → user1); user1 library + progress`,
@@ -360,7 +378,7 @@ async function main(): Promise<void> {
   else summary.push(`novel_forge: skipped (${novelForgeUrl ? 'no identity subs' : 'E2E_PG_URL_NOVEL_FORGE blank'})`);
 
   const webNovelUrl = resolveUrl('webNovel');
-  if (webNovelUrl && users) await seedWebNovel(webNovelUrl, users.user1.sub);
+  if (webNovelUrl && users) await seedWebNovel(webNovelUrl, users.user1.sub, users.viewer.sub);
   else summary.push(`web_novel: skipped (${webNovelUrl ? 'no identity subs' : 'E2E_PG_URL_WEB_NOVEL blank'})`);
 
   const pulseUrl = resolveUrl('pulse');

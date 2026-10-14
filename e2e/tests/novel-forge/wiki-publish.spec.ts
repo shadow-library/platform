@@ -56,10 +56,10 @@ interface WikiEntry {
  * Gating design used here (both derived from published ordinals, no `firstSeenChapter` needed — the create DTO
  * does not even expose it):
  *   - `e2e-hero`  — has a `body`, so it projects a `profile` facet at ordinal 0 (its `firstSeenChapter` is
- *                   null → pre-story). Visible to a guest (gate 0).
+ *                   null → pre-story). Visible to a viewer (gate 0).
  *   - `e2e-order` — has NO body/motivation/aliases, so it projects ONLY a fact facet. Its single canon fact is
  *                   revealed in chapter 2, so the facet — and thus the whole entry — is gated to ordinal 2.
- *                   Hidden from a guest (gate 0); visible once a reader's furthestOrdinal reaches 2.
+ *                   Hidden from a viewer (gate 0); visible once a reader's furthestOrdinal reaches 2.
  *
  * Serial: every step builds on the previous project's state.
  *
@@ -104,18 +104,18 @@ test.describe('novel-forge wiki publish → reader', () => {
   const slug = `e2e-wiki-${uniqueSuffix()}`;
   const novelTitle = `E2E Wiki Novel ${uniqueSuffix()}`;
   let forgeCtx: APIRequestContext;
-  let webGuestCtx: APIRequestContext;
+  let webViewerCtx: APIRequestContext;
   let webUser1Ctx: APIRequestContext;
   let projectId = '';
 
   test.beforeAll(async () => {
     forgeCtx = await apiContext('novelForge', 'user1');
-    webGuestCtx = await apiContext('webNovel');
+    webViewerCtx = await apiContext('webNovel', 'viewer');
     webUser1Ctx = await apiContext('webNovel', 'user1');
   });
 
   test.afterAll(async () => {
-    await runAll([() => removeForgePublication(forgeCtx, projectId, slug), () => forgeCtx.dispose(), () => webGuestCtx.dispose(), () => webUser1Ctx.dispose()]);
+    await runAll([() => removeForgePublication(forgeCtx, projectId, slug), () => forgeCtx.dispose(), () => webViewerCtx.dispose(), () => webUser1Ctx.dispose()]);
   });
 
   test('should import a final bundle with three chapters', async () => {
@@ -131,7 +131,7 @@ test.describe('novel-forge wiki publish → reader', () => {
   });
 
   test('should author wiki content: a visible entity and a chapter-2-gated entity via a canon fact', async () => {
-    // Visible entity — a `body` gives it a `profile` facet at ordinal 0 (pre-story), so a guest can read it.
+    // Visible entity — a `body` gives it a `profile` facet at ordinal 0 (pre-story), so a viewer can read it.
     const hero = await mutate(forgeCtx, 'post', `/api/v1/projects/${projectId}/entities`, {
       data: {
         entityKey: VISIBLE_KEY,
@@ -188,7 +188,7 @@ test.describe('novel-forge wiki publish → reader', () => {
   });
 
   test('should surface the published novel and its chapters on the reader', async () => {
-    const detail = await pollWebNovel(webGuestCtx, `/api/novels/${slug}`, 200);
+    const detail = await pollWebNovel(webViewerCtx, `/api/novels/${slug}`, 200);
     expect(detail.status(), await detail.text()).toBe(200);
     const body = (await detail.json()) as { title: string; chapterCount: number; visibility: string };
     expect(body.title).toBe(novelTitle);
@@ -196,8 +196,8 @@ test.describe('novel-forge wiki publish → reader', () => {
     expect(body.visibility).toBe('PUBLIC');
   });
 
-  test('should list the visible entry for a guest and exclude the gated one', async () => {
-    const response = await pollWebNovel(webGuestCtx, `/api/novels/${slug}/wiki`, 200);
+  test('should list the visible entry for a viewer and exclude the gated one', async () => {
+    const response = await pollWebNovel(webViewerCtx, `/api/novels/${slug}/wiki`, 200);
     expect(response.status()).toBe(200);
     const body = (await response.json()) as WikiIndex;
     const keys = body.items.map(i => i.entryKey);
@@ -206,13 +206,13 @@ test.describe('novel-forge wiki publish → reader', () => {
     expect(body.lockedCount).toBeGreaterThanOrEqual(1);
   });
 
-  test('should return the visible entry with facets and 404 WBN_009 the gated one for a guest', async () => {
-    const visible = await webGuestCtx.get(`/api/novels/${slug}/wiki/${VISIBLE_KEY}`);
+  test('should return the visible entry with facets and 404 WBN_009 the gated one for a viewer', async () => {
+    const visible = await webViewerCtx.get(`/api/novels/${slug}/wiki/${VISIBLE_KEY}`);
     expect(visible.status(), await visible.text()).toBe(200);
     const visibleBody = (await visible.json()) as WikiEntry;
     expect(visibleBody.facets.length).toBeGreaterThanOrEqual(1);
 
-    const gated = await webGuestCtx.get(`/api/novels/${slug}/wiki/${GATED_KEY}`);
+    const gated = await webViewerCtx.get(`/api/novels/${slug}/wiki/${GATED_KEY}`);
     expect(gated.status()).toBe(404);
     expect((await gated.json()).code).toBe('WBN_009');
   });
@@ -252,7 +252,7 @@ test.describe('novel-forge wiki publish → reader', () => {
     // The reader is a downstream projection with its own lifecycle: deleting the forge project does not
     // retract the published novel (there is no delete-novel push). It remains readable — an orphan the author
     // would retire explicitly. Observed, not asserted as desired behaviour.
-    const stillThere = await webGuestCtx.get(`/api/novels/${slug}`);
+    const stillThere = await webViewerCtx.get(`/api/novels/${slug}`);
     test.info().annotations.push({ type: 'reader after forge delete', description: `GET /api/novels/${slug} → ${stillThere.status()} (200 = orphaned, not cascaded)` });
   });
 });
@@ -359,14 +359,14 @@ test.describe('web-novel wiki ingest through novel-forge', () => {
       [RIVAL.entityKey, 'pushed'],
     ]);
     const hashOf = (entryKey: string): string | undefined => pushed.find(row => row.entryKey === entryKey)?.contentHash;
-    const servedKeys = async (): Promise<string[]> => ((await (await forge.guest.get(`/api/novels/${slug}/wiki`)).json()) as WikiIndex).items.map(item => item.entryKey);
+    const servedKeys = async (): Promise<string[]> => ((await (await forge.viewer.get(`/api/novels/${slug}/wiki`)).json()) as WikiIndex).items.map(item => item.entryKey);
 
     const deleting = await auditWatermark(slug);
     expect((await mutate(ctx, 'delete', `/api/v1/projects/${projectId}/entities/${KEEPER.entityKey}`)).status()).toBe(204);
     expect((await reconcileSettled(publication)).wiki).toEqual(expect.objectContaining({ deleted: [KEEPER.entityKey], failed: [] }));
     expect(await readServedWikiEntry(slug, KEEPER.entityKey)).toBeUndefined();
     expect(await servedKeys()).toEqual([RIVAL.entityKey]);
-    expect((await forge.guest.get(`/api/novels/${slug}/wiki/${KEEPER.entityKey}`)).status()).toBe(404);
+    expect((await forge.viewer.get(`/api/novels/${slug}/wiki/${KEEPER.entityKey}`)).status()).toBe(404);
     expect(await publishAuditSince(slug, deleting, 'wiki.delete')).toEqual([
       expect.objectContaining({ outcome: 'applied', contentHash: hashOf(KEEPER.entityKey), storedRevision: 1 }),
     ]);

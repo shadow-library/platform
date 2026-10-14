@@ -29,7 +29,7 @@ export interface ForgeLane {
   curator(): Promise<APIRequestContext>;
   /** A further slug a test publishes under, so its reader rows and audit trail are removed too. */
   slug(label: string): string;
-  readonly guest: APIRequestContext;
+  readonly viewer: APIRequestContext;
 }
 
 /**
@@ -45,7 +45,7 @@ export const test = base.extend<{ forge: ForgeLane }>({
   // eslint-disable-next-line no-empty-pattern
   forge: async ({}, use) => {
     const author = await apiContext('novelForge', 'user1');
-    const guest = await apiContext('webNovel');
+    const viewer = await apiContext('webNovel', 'viewer');
     const projects: ForgePublication[] = [];
     const slugs: string[] = [];
     let clientIp: string | undefined;
@@ -59,7 +59,7 @@ export const test = base.extend<{ forge: ForgeLane }>({
 
     try {
       await use({
-        guest,
+        viewer,
         slug,
         project: async (label, options = {}) => {
           const ctx = options.ctx ?? author;
@@ -90,7 +90,7 @@ export const test = base.extend<{ forge: ForgeLane }>({
         ...(session ? [() => session.close()] : []),
         ...(ip ? [() => clearIpState(ip)] : []),
         () => author.dispose(),
-        () => guest.dispose(),
+        () => viewer.dispose(),
       ]);
     }
   },

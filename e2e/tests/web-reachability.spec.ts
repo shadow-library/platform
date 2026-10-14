@@ -16,7 +16,7 @@ import { getProductLabel, PRODUCTS, requireProductUrl } from '../lib';
  * Declaring the constants
  *
  * The baseline "does it load" check for every configured product: navigate to the root, follow any
- * redirects (identity and novel-forge both 307 unauthenticated visitors onward server-side — see
+ * redirects (identity, novel-forge and the private web-novel all 307 unauthenticated visitors onward server-side — see
  * `auth-gate.spec.ts`), and assert the page that's actually left on screen is a genuine 2xx response with
  * a real rendered document (non-empty `<title>`). Deliberately just that — no body-text scanning for
  * "error-page" copy, which risks a false positive against a fiction-reading site's own content — so a

@@ -6,7 +6,7 @@ import { expect, test } from '@playwright/test';
 /**
  * Importing user defined packages
  */
-import { requireProductUrl } from '../../lib';
+import { requireProductUrl, storageStateFor } from '../../lib';
 
 /**
  * Defining types
@@ -16,8 +16,9 @@ import { requireProductUrl } from '../../lib';
  * Declaring the constants
  *
  * Two pieces of shell polish: `/login`'s `returnTo` open-redirect guard (only a same-origin path is honored —
- * `startsWith('/') && !startsWith('//')`, per the web-novel report), and two device-local drawers the shared
- * `Shell`/reader chrome exposes by `aria-label`. These are read-only UI checks; nothing here touches seeded data.
+ * `startsWith('/') && !startsWith('//')`, per the web-novel report), and two bits of reader chrome (a settings drawer and a theme toggle) the shared `Shell`/reader exposes by
+ * `aria-label`. The chrome checks run signed in as the `viewer` persona, because Web Novel is private. These are read-only UI checks; nothing
+ * here touches seeded data.
  */
 test.describe('login returnTo sanitization', () => {
   /**
@@ -52,6 +53,8 @@ test.describe('login returnTo sanitization', () => {
 });
 
 test.describe('reader chrome', () => {
+  test.use({ storageState: storageStateFor('viewer') });
+
   test('should open the reading settings drawer', async ({ page }) => {
     const url = requireProductUrl('webNovel');
     await page.goto(`${url}/read/e2e-public-novel/1`, { waitUntil: 'domcontentloaded' });
@@ -70,7 +73,7 @@ test.describe('reader chrome', () => {
     const url = requireProductUrl('webNovel');
     await page.goto(url, { waitUntil: 'load' });
     // A click that lands before the client bundle hydrates can land on inert SSR markup — no listener yet — and
-    // silently do nothing (the same race documented on the "Chapters" tab in `guest-reading.spec.ts`). Waiting
+    // silently do nothing (the same race documented on the "Chapters" tab in `viewer-reading.spec.ts`). Waiting
     // for `networkidle` avoids it.
     await page.waitForLoadState('networkidle');
 

@@ -16,16 +16,16 @@ import { apiContext, readSeedManifest } from '../../lib';
  * Declaring the constants
  *
  * The security-critical contract of `NovelAccessService`: a RESTRICTED novel must be indistinguishable from a
- * novel that doesn't exist to anyone without a grant — same status code, same error code, same *bytes* — so an
+ * novel that doesn't exist to any reader without a grant — same status code, same error code, same *bytes* — so an
  * attacker probing slugs can never learn "this exists but I can't read it" from "this doesn't exist" (an
- * enumeration/existence-oracle defense). `e2e-restricted-novel` is granted to `user1` only (seeded), so `user2`
- * is the negative authenticated case and guest is the negative anonymous case.
+ * enumeration/existence-oracle defense). `e2e-restricted-novel` is granted to `user1` only (seeded), so `user2` and `viewer`
+ * are the negative cases: signed-in readers without a grant. An anonymous caller never reaches this layer — private mode refuses it first.
  */
 test.describe('visibility security', () => {
   const { webNovel } = readSeedManifest();
 
-  test('should 404 WBN_001 for a guest reading the restricted novel', async () => {
-    const ctx = await apiContext('webNovel');
+  test('should 404 WBN_001 for a viewer (no grant) reading the restricted novel', async () => {
+    const ctx = await apiContext('webNovel', 'viewer');
     const response = await ctx.get(`/api/novels/${webNovel.restrictedSlug}`);
     expect(response.status()).toBe(404);
     const body = (await response.json()) as { code?: string };
@@ -42,11 +42,11 @@ test.describe('visibility security', () => {
 
   /**
    * The enumeration-safety property itself: the ungranted-but-real slug and a genuinely nonexistent slug must
-   * produce byte-identical response bodies. This is asserted for both the guest and the ungranted-authenticated
-   * caller, since either is a plausible attacker vantage point.
+   * produce byte-identical response bodies. This is asserted for two ungranted signed-in readers, since either is a plausible
+   * attacker vantage point.
    */
-  for (const persona of [undefined, 'user2'] as const) {
-    test(`should return a body identical to the unknown-slug 404 for ${persona ?? 'guest'}`, async () => {
+  for (const persona of ['viewer', 'user2'] as const) {
+    test(`should return a body identical to the unknown-slug 404 for ${persona}`, async () => {
       const ctx = await apiContext('webNovel', persona);
       const [restricted, unknown] = await Promise.all([ctx.get(`/api/novels/${webNovel.restrictedSlug}`), ctx.get('/api/novels/e2e-does-not-exist')]);
       expect(restricted.status()).toBe(404);
@@ -76,11 +76,11 @@ test.describe('visibility security', () => {
   });
 
   test('should gate the restricted novel chapters the same way as the novel itself', async () => {
-    const guestCtx = await apiContext('webNovel');
-    const guestChapter = await guestCtx.get(`/api/novels/${webNovel.restrictedSlug}/chapters/1`);
-    expect(guestChapter.status()).toBe(404);
-    const guestBody = (await guestChapter.json()) as { code?: string };
-    expect(guestBody.code).toBe('WBN_001');
+    const viewerCtx = await apiContext('webNovel', 'viewer');
+    const viewerChapter = await viewerCtx.get(`/api/novels/${webNovel.restrictedSlug}/chapters/1`);
+    expect(viewerChapter.status()).toBe(404);
+    const viewerBody = (await viewerChapter.json()) as { code?: string };
+    expect(viewerBody.code).toBe('WBN_001');
 
     const grantedCtx = await apiContext('webNovel', 'user1');
     const grantedChapter = await grantedCtx.get(`/api/novels/${webNovel.restrictedSlug}/chapters/1`);

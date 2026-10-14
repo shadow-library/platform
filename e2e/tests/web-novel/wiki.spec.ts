@@ -7,7 +7,7 @@
  */
 import { apiContext, readSeedManifest } from '../../lib';
 import { expect, test } from './fixtures';
-import { arrangeNovel, arrangeWikiEntry, deleteNovels, fakeImageRef, grantNovel, setFurthestOrdinal, uniqueNovelSlug, UNKNOWN_SLUG } from './helpers';
+import { arrangeNovel, arrangeWikiEntry, deleteNovels, fakeImageRef, grantNovel, readAccessMode, setFurthestOrdinal, uniqueNovelSlug, UNKNOWN_SLUG } from './helpers';
 
 /**
  * Defining types
@@ -18,8 +18,9 @@ import { arrangeNovel, arrangeWikiEntry, deleteNovels, fakeImageRef, grantNovel,
  *
  * The wiki spoiler gate on `e2e-public-novel`: `the-protagonist` is visible from ordinal 0 (pre-reading), and
  * `the-ancient-order` unlocks at ordinal 2 with a facet (`secret-origin`) that stays hidden until ordinal 3 even
- * once the entry itself is visible (`hiddenFacetCount`). A guest's gate is 0, so only the pre-reading entry is
- * ever visible to them; `user1`'s seeded `furthestOrdinal` is 2 (read, never mutated, by this spec — see
+ * once the entry itself is visible (`hiddenFacetCount`). A fresh reader has no reading progress, so its gate is 0 and only the pre-reading entry is
+ * ever visible to it (the shared `viewer` persona is not used: opening a chapter records progress);
+ * `user1`'s seeded `furthestOrdinal` is 2 (read, never mutated, by this spec — see
  * `reader.spec.ts`'s note on why progress mutations run against `user2` instead), which is exactly the unlock
  * ordinal for the locked entry, so this doubles as a boundary check (`>=`, not `>`).
  */
@@ -28,8 +29,8 @@ test.describe('wiki gating', () => {
   const visibleKey = 'the-protagonist';
   const lockedKey = 'the-ancient-order';
 
-  test('should list only the pre-reading entry for a guest, with lockedCount >= 1', async () => {
-    const ctx = await apiContext('webNovel');
+  test('should list only the pre-reading entry for a reader with no progress, with lockedCount >= 1', async ({ webNovel: harness }) => {
+    const { ctx } = await harness.signIn(await harness.reader('wiki-fresh-list'));
     const response = await ctx.get(`/api/novels/${webNovel.publicSlug}/wiki`);
     expect(response.status()).toBe(200);
     const body = (await response.json()) as { items: { entryKey: string }[]; lockedCount: number };
@@ -40,8 +41,8 @@ test.describe('wiki gating', () => {
     expect(body.lockedCount).toBeGreaterThanOrEqual(1);
   });
 
-  test('should 404 WBN_009 for a guest fetching the locked entry directly', async () => {
-    const ctx = await apiContext('webNovel');
+  test('should 404 WBN_009 for a reader with no progress fetching the locked entry directly', async ({ webNovel: harness }) => {
+    const { ctx } = await harness.signIn(await harness.reader('wiki-fresh-locked'));
     const response = await ctx.get(`/api/novels/${webNovel.publicSlug}/wiki/${lockedKey}`);
     expect(response.status()).toBe(404);
     const body = (await response.json()) as { code?: string };
@@ -62,8 +63,8 @@ test.describe('wiki gating', () => {
     expect(entryBody.hiddenFacetCount).toBeGreaterThanOrEqual(1);
   });
 
-  test('should 404 with the same shape as a locked entry for a nonexistent entryKey', async () => {
-    const ctx = await apiContext('webNovel');
+  test('should 404 with the same shape as a locked entry for a nonexistent entryKey', async ({ webNovel: harness }) => {
+    const { ctx } = await harness.signIn(await harness.reader('wiki-fresh-missing'));
     const [locked, missing] = await Promise.all([
       ctx.get(`/api/novels/${webNovel.publicSlug}/wiki/${lockedKey}`),
       ctx.get(`/api/novels/${webNovel.publicSlug}/wiki/no-such-entry`),
@@ -198,9 +199,10 @@ test.describe('wiki progressive reveal', () => {
 
 /**
  * The wiki's own caching contract, independent of the novel/chapter routes': CDN-cacheable with a revalidating
- * ETag for an anonymous read of a public novel, and `private, no-store` + `Vary` the moment the read becomes
- * reader-specific — `WikiController.applyCachePolicy`'s `personalized` branch fires even for a PUBLIC novel, since
- * a signed-in reader's gate makes the response a function of who's asking.
+ * ETag for an anonymous read of a public novel — which only exists while the app is in public mode, since private mode refuses an
+ * anonymous read outright — and `private, no-store` + `Vary` the moment the read becomes reader-specific:
+ * `WikiController.applyCachePolicy`'s `personalized` branch fires even for a PUBLIC novel, since a signed-in reader's gate makes the
+ * response a function of who's asking.
  */
 test.describe('wiki caching contract', () => {
   const slugs: string[] = [];
@@ -209,25 +211,31 @@ test.describe('wiki caching contract', () => {
     await deleteNovels(slugs.splice(0));
   });
 
-  test('should mark an anonymous public wiki read CDN-cacheable with a matching-ETag 304, and a signed-in read private, no-store', async ({ webNovel }) => {
+  test('should mark a signed-in wiki read private, no-store, and serve an anonymous one CDN-cacheable only in public mode', async ({ webNovel }) => {
     const slug = uniqueNovelSlug('wiki-cache');
     slugs.push(slug);
     const novel = await arrangeNovel({ slug, visibility: 'PUBLIC', chapters: 1 });
     await arrangeWikiEntry(novel, { entryKey: 'entry', firstVisibleOrdinal: 0 });
 
     const guest = await webNovel.guest();
-    const first = await guest.get(`/api/novels/${slug}/wiki`);
-    expect(first.status()).toBe(200);
-    const cacheControl = first.headers()['cache-control'] ?? '';
-    expect(cacheControl).toContain('public');
-    expect(cacheControl).toContain('max-age');
-    const etag = first.headers()['etag'];
-    expect(etag).toBeTruthy();
-
-    const revalidated = await guest.get(`/api/novels/${slug}/wiki`, { headers: { 'if-none-match': etag as string } });
-    expect(revalidated.status()).toBe(304);
-
     const { ctx } = await webNovel.signIn(await webNovel.reader('wiki-cache-reader'));
+    const mode = await readAccessMode(ctx);
+
+    const first = await guest.get(`/api/novels/${slug}/wiki`);
+    if (mode === 'private') {
+      expect(first.status(), 'private mode refuses an anonymous wiki read').toBe(401);
+    } else {
+      expect(first.status()).toBe(200);
+      const cacheControl = first.headers()['cache-control'] ?? '';
+      expect(cacheControl).toContain('public');
+      expect(cacheControl).toContain('max-age');
+      const etag = first.headers()['etag'];
+      expect(etag).toBeTruthy();
+
+      const revalidated = await guest.get(`/api/novels/${slug}/wiki`, { headers: { 'if-none-match': etag as string } });
+      expect(revalidated.status()).toBe(304);
+    }
+
     const personalized = await ctx.get(`/api/novels/${slug}/wiki`);
     expect(personalized.status()).toBe(200);
     const personalizedCacheControl = personalized.headers()['cache-control'] ?? '';
@@ -241,8 +249,8 @@ test.describe('wiki caching contract', () => {
 
 /**
  * The wiki route runs its own access check rather than trusting an upstream one: a RESTRICTED novel's wiki (list
- * and per-entry) must 404 with the same `WBN_001` the novel/chapter routes give, for both a guest and an
- * ungranted reader, and a grant must unlock it — proving `WikiService.listEntries`/`getEntry` call
+ * and per-entry) must 404 with the same `WBN_001` the novel/chapter routes give, for both a seeded ungranted viewer and a
+ * fresh ungranted reader, and a grant must unlock it — proving `WikiService.listEntries`/`getEntry` call
  * `catalogService.getReadableNovel` themselves.
  */
 test.describe('wiki restricted-novel gate', () => {
@@ -258,23 +266,25 @@ test.describe('wiki restricted-novel gate', () => {
     const novel = await arrangeNovel({ slug, visibility: 'RESTRICTED', chapters: 1 });
     await arrangeWikiEntry(novel, { entryKey: 'entry', firstVisibleOrdinal: 0 });
 
-    const guest = await webNovel.guest();
-    const guestList = await guest.get(`/api/novels/${slug}/wiki`);
-    expect(guestList.status()).toBe(404);
-    expect(((await guestList.json()) as { code?: string }).code).toBe('WBN_001');
-    const guestEntry = await guest.get(`/api/novels/${slug}/wiki/entry`);
-    expect(guestEntry.status()).toBe(404);
-    expect(((await guestEntry.json()) as { code?: string }).code).toBe('WBN_001');
+    const viewer = await apiContext('webNovel', 'viewer');
+    const viewerList = await viewer.get(`/api/novels/${slug}/wiki`);
+    expect(viewerList.status()).toBe(404);
+    expect(((await viewerList.json()) as { code?: string }).code).toBe('WBN_001');
+    const viewerEntry = await viewer.get(`/api/novels/${slug}/wiki/entry`);
+    expect(viewerEntry.status()).toBe(404);
+    expect(((await viewerEntry.json()) as { code?: string }).code).toBe('WBN_001');
 
-    // Enumeration safety: a real novel the guest can't read must be byte-identical to one that doesn't exist at all, on both wiki routes — not just same-code.
-    const [restrictedList, unknownList] = await Promise.all([guest.get(`/api/novels/${slug}/wiki`), guest.get(`/api/novels/${UNKNOWN_SLUG}/wiki`)]);
+    // Enumeration safety: a real novel the viewer can't read must be byte-identical to one that doesn't exist at all, on both wiki routes — not just same-code.
+    const [restrictedList, unknownList] = await Promise.all([viewer.get(`/api/novels/${slug}/wiki`), viewer.get(`/api/novels/${UNKNOWN_SLUG}/wiki`)]);
     expect(restrictedList.status()).toBe(404);
     expect(unknownList.status()).toBe(404);
     expect(await restrictedList.text()).toBe(await unknownList.text());
-    const [restrictedEntry, unknownEntry] = await Promise.all([guest.get(`/api/novels/${slug}/wiki/entry`), guest.get(`/api/novels/${UNKNOWN_SLUG}/wiki/entry`)]);
+    const [restrictedEntry, unknownEntry] = await Promise.all([viewer.get(`/api/novels/${slug}/wiki/entry`), viewer.get(`/api/novels/${UNKNOWN_SLUG}/wiki/entry`)]);
     expect(restrictedEntry.status()).toBe(404);
     expect(unknownEntry.status()).toBe(404);
     expect(await restrictedEntry.text()).toBe(await unknownEntry.text());
+
+    await viewer.dispose();
 
     const probe = await webNovel.reader('wiki-restricted-probe');
     const { ctx: probeCtx } = await webNovel.signIn(probe);
