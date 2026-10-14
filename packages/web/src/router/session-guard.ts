@@ -22,6 +22,12 @@ export interface UseSessionGuardOptions<TQueryFnData = unknown, TError = unknown
   loginTo?: string;
   /** Reads a query error as an expired session. @default a 401 `ApiError` */
   isExpired?: (error: TError | null) => boolean;
+  /**
+   * Turns the guard off without unmounting it, for a shell whose access mode is only known at runtime (hooks
+   * cannot be called conditionally). While disabled it neither fetches the session nor redirects. Overrides `query.enabled`.
+   * @default true
+   */
+  enabled?: boolean;
 }
 
 /**
@@ -48,11 +54,11 @@ function isSessionExpired(error: unknown): boolean {
 export function useSessionGuard<TQueryFnData = unknown, TError = unknown, TData = TQueryFnData, TQueryKey extends QueryKey = QueryKey>(
   options: UseSessionGuardOptions<TQueryFnData, TError, TData, TQueryKey>,
 ): SessionGuardStatus {
-  const { query, loginTo = '/login', isExpired = isSessionExpired } = options;
+  const { query, loginTo = '/login', isExpired = isSessionExpired, enabled = true } = options;
   const navigate = useNavigate();
   const location = useLocation();
   /** `refetchOnMount` is off because the gate already fetched on entry; navigation and focus drive every later check. */
-  const { error, refetch } = useQuery({ ...query, refetchOnMount: false, refetchOnWindowFocus: 'always' });
+  const { error, refetch } = useQuery({ ...query, enabled, refetchOnMount: false, refetchOnWindowFocus: 'always' });
 
   const isInitialRender = useRef(true);
   useEffect(() => {
@@ -60,10 +66,10 @@ export function useSessionGuard<TQueryFnData = unknown, TError = unknown, TData 
       isInitialRender.current = false;
       return;
     }
-    void refetch();
-  }, [location.pathname, refetch]);
+    if (enabled) void refetch();
+  }, [location.pathname, refetch, enabled]);
 
-  const isUnauthenticated = isExpired(error);
+  const isUnauthenticated = enabled && isExpired(error);
   /**
    * Fire the bounce exactly once. The redirect moves through `loginTo`, which changes `location` and would
    * otherwise re-run this effect and nest `loginTo` into its own `returnTo`; the ref also pins `returnTo` to

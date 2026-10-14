@@ -46,3 +46,10 @@ export interface AuthLogoutResult {
 export interface AuthSwitchOrganisationResult {
   organisationId: string;
 }
+
+export type AuthAccessMode = 'public' | 'private';
+
+export interface AuthAccess {
+  /** `private` requires a session on every route that is not explicitly public; `public` lets a guest browse. */
+  mode: AuthAccessMode;
+}

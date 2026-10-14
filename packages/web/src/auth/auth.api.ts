@@ -8,7 +8,7 @@ import { queryOptions, type UseQueryOptions } from '@tanstack/react-query';
  */
 import { type ApiSurface } from '../lib/api-client';
 import { ApiError } from '../lib/api-error';
-import { type AuthLogoutResult, type AuthOrganisation, type AuthPrincipal, type AuthSwitchOrganisationResult } from './auth.types';
+import { type AuthAccess, type AuthLogoutResult, type AuthOrganisation, type AuthPrincipal, type AuthSwitchOrganisationResult } from './auth.types';
 
 /**
  * Defining types
@@ -34,6 +34,7 @@ export interface AuthApi {
     session: readonly string[];
     optionalSession: readonly string[];
     organisations: readonly string[];
+    access: readonly string[];
   };
   /** The signed-in principal. A 401 throws, which is what a route gate reads to bounce to login. */
   sessionQueryOptions(): UseQueryOptions<AuthPrincipal, ApiError>;
@@ -51,6 +52,12 @@ export interface AuthApi {
   optionalSessionQueryOptions(): UseQueryOptions<AuthPrincipal | null, ApiError>;
   /** The organisations this session may act in; one entry means there is nothing to switch to. */
   organisationsQueryOptions(): UseQueryOptions<AuthOrganisation[], ApiError>;
+  /**
+   * Whether the backend lets a guest browse (`public`) or demands a session everywhere (`private`). The mode is
+   * fixed at deploy time, so it is fetched once per page load and never re-validated; it is also deliberately
+   * not retried, so a gate that fails closed on an error does so promptly instead of after a backoff.
+   */
+  accessQueryOptions(): UseQueryOptions<AuthAccess, ApiError>;
   /** Ends this application's session. The central identity session survives it unless the backend answers with `redirectTo`. */
   logout(): Promise<AuthLogoutResult>;
   /** Switches the organisation this session acts in. Identity rotates the session handle, so the reply carries a replacement cookie. */
@@ -78,6 +85,7 @@ export function createAuthApi(surface: ApiSurface, options: AuthApiOptions = {})
     session: [...prefix, 'session'] as const,
     optionalSession: [...prefix, 'session', 'optional'] as const,
     organisations: [...prefix, 'organisations'] as const,
+    access: [...prefix, 'access'] as const,
   };
 
   return {
@@ -116,6 +124,14 @@ export function createAuthApi(surface: ApiSurface, options: AuthApiOptions = {})
             .execute<{ organisations: AuthOrganisation[] }>()
             .then(body => body.organisations),
         retry: false,
+      }),
+
+    accessQueryOptions: () =>
+      queryOptions<AuthAccess, ApiError>({
+        queryKey: keys.access,
+        queryFn: ({ signal }) => surface.get('/access').signal(signal).execute<AuthAccess>(),
+        retry: false,
+        staleTime: Infinity,
       }),
 
     logout: () => surface.post('/logout').execute<AuthLogoutResult>(),
