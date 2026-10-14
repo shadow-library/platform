@@ -177,6 +177,7 @@ export const ECOSYSTEM_SEED: EcosystemSeed = {
       description: 'Reader-facing web novel catalogue for the Shadow ecosystem',
       resourceName: 'Web Novel Reader API',
       publicHost: 'webnovel',
+      visibility: 'INTERNAL',
       scopes: [
         {
           name: 'web-novel:publish',
