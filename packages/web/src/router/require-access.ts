@@ -6,7 +6,7 @@ import { type EnsureQueryDataOptions, type QueryClient, type QueryKey } from '@t
 /**
  * Importing user defined packages
  */
-import { type AuthAccess } from '../auth';
+import { type AuthAccess, type AuthAccessMode } from '../auth';
 import { requireAuth, type RequireAuthOptions } from './require-auth';
 
 /**
@@ -34,8 +34,20 @@ export type AccessGate<TSession> = { mode: 'public' } | { mode: 'private'; sessi
 
 /**
  * Fails closed: anything other than an exact `public` answer — a failed read (network, 5xx, endpoint missing) or an
- * unrecognised body — gates as `private`, because guessing `public` would expose a private deployment to guests.
+ * unrecognised body — reads as `private`, because guessing `public` would expose a private deployment to guests.
+ * Never rejects, so it is safe on routes that must render either way (a login page, a document-wide `noindex`).
  */
+export async function resolveAccessMode<TAccessError = unknown, TAccessKey extends QueryKey = QueryKey>(
+  queryClient: QueryClient,
+  access: EnsureQueryDataOptions<AuthAccess, TAccessError, AuthAccess, TAccessKey>,
+): Promise<AuthAccessMode> {
+  return queryClient.ensureQueryData(access).then(
+    result => (result?.mode === 'public' ? 'public' : 'private'),
+    () => 'private',
+  );
+}
+
+/** Gates on the session only when {@link resolveAccessMode} reads the deployment as `private`. */
 export async function requireAccess<
   TQueryFnData = unknown,
   TError = unknown,
@@ -45,10 +57,6 @@ export async function requireAccess<
   TAccessKey extends QueryKey = QueryKey,
 >(queryClient: QueryClient, options: RequireAccessOptions<TQueryFnData, TError, TData, TQueryKey, TAccessError, TAccessKey>): Promise<AccessGate<TData>> {
   const { access, session, loginTo, returnTo } = options;
-  const isPublic = await queryClient.ensureQueryData(access).then(
-    result => result?.mode === 'public',
-    () => false,
-  );
-  if (isPublic) return { mode: 'public' };
+  if ((await resolveAccessMode(queryClient, access)) === 'public') return { mode: 'public' };
   return { mode: 'private', session: await requireAuth(queryClient, session, { loginTo, returnTo }) };
 }

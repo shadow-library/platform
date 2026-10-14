@@ -20,10 +20,11 @@ describe('createAuthApi accessQueryOptions', () => {
     expect(api.accessQueryOptions().queryKey).toEqual(api.keys.access);
   });
 
-  it('should never go stale or retry, because the mode only changes on deploy', () => {
+  it('should never go stale, be collected or retry, because the mode only changes on deploy', () => {
     const options = api.accessQueryOptions();
 
     expect(options.staleTime).toBe(Infinity);
+    expect(options.gcTime).toBe(Infinity);
     expect(options.retry).toBe(false);
   });
 });

@@ -6,6 +6,7 @@
  * Importing user defined packages
  */
 import { SW_PROTOCOL, type SwEnvelope, type SwRequest, type SwResponse } from '../pwa/protocol';
+import { precacheUrls } from './precache';
 import { runStrategy } from './strategies';
 import { type RuntimeCachingRule, type ServiceWorkerConfig, type ServiceWorkerScope } from './types';
 
@@ -53,10 +54,7 @@ export function createServiceWorker(config: ServiceWorkerConfig = {}): void {
   scope.addEventListener('install', event => {
     event.waitUntil(
       (async () => {
-        if (config.precache?.length) {
-          const cache = await caches.open(precacheName);
-          await cache.addAll(config.precache);
-        }
+        if (config.precache?.length) await precacheUrls(await caches.open(precacheName), config.precache);
         if (config.skipWaiting) await scope.skipWaiting();
       })(),
     );

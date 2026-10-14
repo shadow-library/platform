@@ -3,10 +3,12 @@ import { createServiceWorker } from '@shadow-library/web/service-worker';
 /**
  * The runtime-configured caching worker (emitted as `/sw.js` by vite.sw.config.ts). Chapter content is
  * immutable per `contentHash`, so it is cache-first — anything previously read stays readable offline;
- * public catalog reads are network-first with a cached fallback; hashed client assets are cache-first.
+ * catalog reads are network-first with a cached fallback; hashed client assets are cache-first.
  * Per-user endpoints (`/api/library`, `/api/me/*`) are network-only — their responses carry PII keyed only
  * by URL, so they must never land in the on-disk Cache API. Offline navigations fall back to the precached
- * shell and the client router + persisted query cache take over.
+ * shell and the client router + persisted query cache take over. On a private deployment `/` redirects a
+ * signed-out visitor, so the worker only installs once the reader has signed in: the shell's SSR state carries the
+ * access gate's answer and session, which is what lets the gate pass with no network.
  */
 createServiceWorker({
   cachePrefix: 'webnovel',

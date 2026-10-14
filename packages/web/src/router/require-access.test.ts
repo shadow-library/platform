@@ -10,7 +10,7 @@ import { describe, expect, it } from 'bun:test';
  */
 import { type AuthAccess, type AuthPrincipal } from '../auth';
 import { ApiError } from '../lib/api-error';
-import { requireAccess } from './require-access';
+import { requireAccess, resolveAccessMode } from './require-access';
 
 /**
  * Declaring the constants
@@ -112,5 +112,18 @@ describe('requireAccess', () => {
     await requireAccess(queryClient, options);
 
     expect(accessCalls).toBe(1);
+  });
+});
+
+describe('resolveAccessMode', () => {
+  const resolve = (access: () => Promise<AuthAccess>) => resolveAccessMode(new QueryClient(), queryOptions({ queryKey: ['access'], queryFn: access, retry: false }));
+
+  it('should read an exact public answer as public', async () => {
+    expect(await resolve(() => Promise.resolve({ mode: 'public' }))).toBe('public');
+  });
+
+  it('should read a failed or unrecognised answer as private without rejecting', async () => {
+    expect(await resolve(() => Promise.reject(new TypeError('fetch failed')))).toBe('private');
+    expect(await resolve(() => Promise.resolve({ mode: 'PUBLIC' } as unknown as AuthAccess))).toBe('private');
   });
 });

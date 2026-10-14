@@ -54,8 +54,10 @@ export interface AuthApi {
   organisationsQueryOptions(): UseQueryOptions<AuthOrganisation[], ApiError>;
   /**
    * Whether the backend lets a guest browse (`public`) or demands a session everywhere (`private`). The mode is
-   * fixed at deploy time, so it is fetched once per page load and never re-validated; it is also deliberately
-   * not retried, so a gate that fails closed on an error does so promptly instead of after a backoff.
+   * fixed at deploy time, so it is fetched once per page load and never re-validated or garbage-collected — a
+   * gate that re-reads it offline after the default five-minute GC would fail closed and demand a session it
+   * cannot fetch. It is also deliberately not retried, so a gate that fails closed on an error does so promptly
+   * instead of after a backoff.
    */
   accessQueryOptions(): UseQueryOptions<AuthAccess, ApiError>;
   /** Ends this application's session. The central identity session survives it unless the backend answers with `redirectTo`. */
@@ -132,6 +134,7 @@ export function createAuthApi(surface: ApiSurface, options: AuthApiOptions = {})
         queryFn: ({ signal }) => surface.get('/access').signal(signal).execute<AuthAccess>(),
         retry: false,
         staleTime: Infinity,
+        gcTime: Infinity,
       }),
 
     logout: () => surface.post('/logout').execute<AuthLogoutResult>(),

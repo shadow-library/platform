@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { persistQueryClient } from '@tanstack/react-query-persist-client';
-import { Link } from '@tanstack/react-router';
+import { getRouteApi, Link } from '@tanstack/react-router';
 import { useEffect, useRef } from 'react';
 import { Banner, toast } from '@shadow-library/ui';
 import { purgeIfAccountChanged } from '@shadow-library/web/offline';
@@ -8,10 +8,12 @@ import { useOnlineStatus, useServiceWorker } from '@shadow-library/web/pwa';
 
 import { sessionKeys, sessionQueryOptions, syncPendingProgress } from '@/lib/apis';
 import { type SessionUser } from '@/lib/apis/types';
-import { OFFLINE_DB_NAME, PERSIST_BUSTER, PERSIST_MAX_AGE, PURGE_CACHE_PREFIXES, queryPersister, shouldPersistQueryKey } from '@/lib/offline';
+import { OFFLINE_DB_NAME, PERSIST_BUSTER, PERSIST_MAX_AGE, PURGE_CACHE_PREFIXES, queryPersister, shouldPersistQueryKey, shouldReconcileAccount } from '@/lib/offline';
 
 /** localStorage marker for the account whose on-device caches this browser holds — see {@link purgeIfAccountChanged}. */
 const LAST_ACCOUNT_KEY = 'webnovel:last-account';
+
+const rootRoute = getRouteApi('__root__');
 
 /**
  * The PWA plumbing, mounted once at the root:
@@ -26,17 +28,19 @@ const LAST_ACCOUNT_KEY = 'webnovel:last-account';
  * Closes the account-bleed gap on a shared device: when the signed-in reader differs from the one this
  * browser last held, the downloaded-content database and the cache-first chapter cache are purged before the
  * next reader can open them. The first account seen is adopted (its downloads are its own), so a returning
- * reader keeps their offline library; every later change — to a guest or a different account — purges. Gated
- * on a settled session read so a transient boot-time fetch failure is never read as a sign-out that purges.
+ * reader keeps their offline library; every later change — to a guest or a different account — purges. Decided
+ * only on a session this page fetched successfully: a transient fetch failure is never read as a sign-out, and a
+ * session hydrated from the precached shell (a previous reader's, offline) never wipes the current reader's downloads.
  */
 function AccountScopeGuard(): null {
-  const session = useQuery(sessionQueryOptions());
+  const accessMode = rootRoute.useRouteContext({ select: context => context.accessMode });
+  const session = useQuery({ ...sessionQueryOptions(), refetchOnMount: 'always' });
   const accountId = session.data?.userId ?? null;
-  const settled = session.isSuccess;
+  const reconcile = shouldReconcileAccount({ fetchedThisPage: session.isSuccess && session.isFetchedAfterMount, accountId, accessMode });
   useEffect(() => {
-    if (!settled) return;
+    if (!reconcile) return;
     void purgeIfAccountChanged({ storageKey: LAST_ACCOUNT_KEY, accountId, databases: [OFFLINE_DB_NAME], cachePrefixes: [...PURGE_CACHE_PREFIXES] });
-  }, [settled, accountId]);
+  }, [reconcile, accountId]);
   return null;
 }
 

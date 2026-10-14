@@ -11,6 +11,7 @@ import { pwaHeadLinks, pwaHeadMeta } from '@shadow-library/web/pwa';
 import AppProvider from '@/components/AppProvider';
 import { DefaultCatchBoundary } from '@/components/DefaultCatchBoundary';
 import { NotFound } from '@/components/NotFound';
+import { readAccessMode } from '@/lib/apis';
 import { getPublicRuntimeConfig, type PublicRuntimeConfig } from '@/lib/runtime-config';
 import '@/styles.css';
 
@@ -19,15 +20,23 @@ interface RouterContext {
 }
 
 const PWA_HEAD = { manifestUrl: '/manifest.webmanifest', themeColor: '#4f46e5', appleTouchIcon: '/icons/icon.svg', appleTitle: 'Shadow Webnovel' };
+const NOINDEX = { name: 'robots', content: 'noindex' };
 
 export const Route = createRootRouteWithContext<RouterContext>()({
-  head: () => ({
+  /**
+   * Resolved here rather than by the reader gate because a crawler never sees a gated page — it is 302'd to
+   * `/login` — so `noindex` has to ride on the documents outside the gate (login, not-found, errors) too. The
+   * gated routes refine `accessMode` with the answer their gate acted on.
+   */
+  beforeLoad: async ({ context }) => ({ accessMode: await readAccessMode(context.queryClient) }),
+  head: ({ match }) => ({
     meta: [
       { charSet: 'utf-8' },
       { name: 'viewport', content: 'width=device-width, initial-scale=1.0, viewport-fit=cover' },
       { title: 'Shadow Webnovel' },
       { name: 'description', content: 'Shadow Webnovel — a dedicated client for discovering and reading webnovels, online or offline.' },
       ...pwaHeadMeta(PWA_HEAD),
+      ...(match.context.accessMode === 'private' ? [NOINDEX] : []),
     ],
     links: [{ rel: 'icon', href: '/favicon.svg' }, ...pwaHeadLinks(PWA_HEAD)],
   }),

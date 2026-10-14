@@ -30,7 +30,11 @@ export interface ServiceWorkerConfig {
   cachePrefix?: string;
   /** Bump to invalidate versioned caches on deploy — old ones are dropped on `activate`. @default 'v1' */
   version?: string;
-  /** URLs cached on install (the app shell). Include your `navigationFallback` here so offline navigation works. */
+  /**
+   * URLs cached on install (the app shell). Include your `navigationFallback` here so offline navigation works. A URL
+   * that redirects (a signed-out visitor bounced to login) fails the install: a first install is retried on the next
+   * registration, while an update leaves the active worker serving its shell and is retried on the next update check.
+   */
   precache?: string[];
   /** URL served for navigations when the network is unavailable (e.g. an `/offline` route or `/index.html`). */
   navigationFallback?: string;

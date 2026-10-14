@@ -1,8 +1,8 @@
 import { type QueryClient, queryOptions } from '@tanstack/react-query';
 import { type UserInfo, userInfoQueryOptions } from '@shadow-library/web';
-import { type AuthPrincipal, createAuthApi } from '@shadow-library/web/auth';
+import { type AuthAccessMode, type AuthPrincipal, createAuthApi } from '@shadow-library/web/auth';
 import { purgeOfflineData } from '@shadow-library/web/offline';
-import { requireAuth } from '@shadow-library/web/router';
+import { requireAccess, requireAuth, resolveAccessMode, type SessionGuardStatus, useSessionGuard } from '@shadow-library/web/router';
 
 import { OFFLINE_DB_NAME, offlineStore, PURGE_CACHE_PREFIXES, queryPersister } from '@/lib/offline';
 
@@ -14,19 +14,21 @@ import { type SessionUser } from './types';
 
 /**
  * `/api/auth/*` is `@shadow-library/auth`'s surface, not the reader's: webnovel-server mounts the SDK, so
- * `GET /api/auth/session`, `GET /api/auth/login?return_to=` and `POST /api/auth/logout` are the SDK's
- * contract. `createAuthApi` is the client half of it, so the principal shape and the login/logout routes come
- * from there instead of being restated here.
+ * `GET /api/auth/session`, `GET /api/auth/access`, `GET /api/auth/login?return_to=` and `POST /api/auth/logout`
+ * are the SDK's contract. `createAuthApi` is the client half of it, so the principal shape and the
+ * login/logout routes come from there instead of being restated here.
  *
- * The session read is isomorphic now: in the browser it is a same-origin call, and during SSR the shared
- * transport forwards the caller's cookie — which is what still lets `requireSession` gate the library route
- * server-side with a real 302 rather than a client-side flash. The signed-out 401 is folded into a `null`
- * session: a guest browsing the public catalog is a valid state for the reader, not a failure.
+ * The session read is isomorphic: in the browser it is a same-origin call, and during SSR the shared transport
+ * forwards the caller's cookie — which is what lets the gates below redirect server-side with a real 302 rather
+ * than a client-side flash. The signed-out 401 is folded into a `null` session: on a public deployment a guest
+ * browsing the catalog is a valid state for the reader, not a failure. A private deployment never lets one past
+ * {@link requireReaderAccess}.
  */
 const authApi = createAuthApi(apiClient.auth);
 
 export const sessionKeys = {
   session: ['auth', 'session'] as const,
+  required: ['auth', 'session', 'required'] as const,
 };
 
 /** The reader's `sub` is the identity subject; it maps onto the device-namespacing `userId` the UI keys everything off. */
@@ -51,9 +53,9 @@ export const meQuery = userInfoQueryOptions(fetchUserInfo);
 export const sessionQueryOptions = () =>
   queryOptions<SessionUser | null, ApiError>({
     queryKey: sessionKeys.session,
-    // Public reader app: a hydrated session must not refetch the instant a screen mounts. 30s matches the
-    // router's query default so post-hydration navigations reuse the cached principal. The signed-out 401 is
-    // folded into a `null` value rather than thrown, so a retry buys nothing — keep it off.
+    // A hydrated session must not refetch the instant a screen mounts. 30s matches the router's query default so
+    // post-hydration navigations reuse the cached principal. The signed-out 401 is folded into a `null` value
+    // rather than thrown, so a retry buys nothing — keep it off.
     staleTime: 30_000,
     retry: false,
     queryFn: fetchSession,
@@ -61,7 +63,7 @@ export const sessionQueryOptions = () =>
 
 const requiredSessionQueryOptions = () =>
   queryOptions<SessionUser, ApiError>({
-    queryKey: [...sessionKeys.session, 'required'],
+    queryKey: sessionKeys.required,
     staleTime: 30_000,
     retry: false,
     queryFn: async () => {
@@ -77,6 +79,33 @@ export function requireSession(queryClient: QueryClient, returnTo: string): Prom
   // options are widened to the parameter's own type and the (runtime-correct) result narrowed back.
   const query = requiredSessionQueryOptions() as Parameters<typeof requireAuth>[1];
   return requireAuth(queryClient, query, { loginTo: '/login', returnTo }) as Promise<SessionUser>;
+}
+
+/** The deployment's access mode, failing closed to `private` and never rejecting — for routes outside the gate. */
+export function readAccessMode(queryClient: QueryClient): Promise<AuthAccessMode> {
+  return resolveAccessMode(queryClient, authApi.accessQueryOptions());
+}
+
+/**
+ * The gate for every reader screen: on a private deployment it demands a session exactly as {@link requireSession}
+ * does, on a public one it lets guests through. The resolved mode is what the route hands its children, so the
+ * screens and the session guard read the same answer the gate acted on.
+ */
+export async function requireReaderAccess(queryClient: QueryClient, returnTo: string): Promise<AuthAccessMode> {
+  const session = requiredSessionQueryOptions() as Parameters<typeof requireAuth>[1];
+  const gate = await requireAccess(queryClient, { access: authApi.accessQueryOptions(), session, loginTo: '/login', returnTo });
+  if (gate.mode === 'public') return gate.mode;
+  // Seeds the nullable read the chrome renders from, so a signed-in reader's SSR document never shows "Sign in".
+  if (queryClient.getQueryData(sessionKeys.session) == null) queryClient.setQueryData(sessionKeys.session, gate.session as SessionUser);
+  return gate.mode;
+}
+
+/**
+ * Keeps a private deployment's session live after the gate let the reader in, bouncing to `/login` the moment it
+ * ends. Disarmed on a public deployment, where an expired session simply reads as a guest.
+ */
+export function useReaderSessionGuard(accessMode: AuthAccessMode): SessionGuardStatus {
+  return useSessionGuard({ query: requiredSessionQueryOptions(), loginTo: '/login', enabled: accessMode === 'private' });
 }
 
 /** The SDK's login route reads the RFC-spelled `return_to`; the web's own `/login` route keeps `returnTo`. */

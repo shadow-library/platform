@@ -10,6 +10,7 @@ const route = getRouteApi('/login');
 
 export function LoginScreen(): React.JSX.Element {
   const search = route.useSearch();
+  const isPrivate = route.useRouteContext({ select: context => context.accessMode === 'private' });
   const router = useRouter();
   const returnTo = search.returnTo ?? '/';
 
@@ -20,7 +21,11 @@ export function LoginScreen(): React.JSX.Element {
           <LockIcon size={24} />
         </div>
         <h1 className={styles.title}>Sign in to Shadow</h1>
-        <p className={styles.text}>Sync your library, reading progress and downloads across every device. Reading always stays free — no account required.</p>
+        <p className={styles.text}>
+          {isPrivate
+            ? 'Sign in to start reading. Your library, reading progress and downloads sync across every device.'
+            : 'Sync your library, reading progress and downloads across every device. Reading always stays free — no account required.'}
+        </p>
         <div className={styles.issuerNote}>
           <LockIcon size={14} />
           <span>
@@ -31,9 +36,11 @@ export function LoginScreen(): React.JSX.Element {
           <Button variant="primary" size="lg" fullWidth asChild>
             <a href={loginUrl(returnTo)}>Continue to sign in →</a>
           </Button>
-          <Button variant="ghost" fullWidth onClick={() => router.history.back()}>
-            Not now — keep reading as guest
-          </Button>
+          {!isPrivate && (
+            <Button variant="ghost" fullWidth onClick={() => router.history.back()}>
+              Not now — keep reading as guest
+            </Button>
+          )}
         </div>
       </div>
     </div>
