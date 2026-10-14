@@ -1,4 +1,5 @@
 import { sql } from 'drizzle-orm';
+import { Public } from '@shadow-library/auth/module';
 import { tryCatch } from '@shadow-library/common';
 import { Get, HttpController, type HttpResponse, Res, RespondFor } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
@@ -8,6 +9,7 @@ import { type PrimaryDatabase } from '@server/modules/datastore';
 import { HealthResponse, ReadyResponse } from './health.dto';
 
 @HttpController('/health')
+@Public()
 export class HealthController {
   private readonly db: PrimaryDatabase;
 

@@ -1,20 +1,18 @@
+import { AuthModule } from '@shadow-library/auth/module';
 import { Config } from '@shadow-library/common';
 import { FastifyModule } from '@shadow-library/fastify';
 import { HttpCoreModule } from '@shadow-library/modules';
 
-import { WebNovelAuthModule } from '@server/modules/auth';
-import { CatalogModule } from '@server/modules/catalog';
-import { HealthModule } from '@server/modules/health';
-import { PublishModule } from '@server/modules/publish';
-import { ReaderModule } from '@server/modules/reader';
-import { WikiModule } from '@server/modules/wiki';
+import { FEATURE_MODULES } from './feature-modules';
 
 const AppHttpCoreModule = HttpCoreModule.forRoot({
   openapi: { normalizeSchemaIds: true },
 });
 
+const AppAuthModule = AuthModule.forRoot({ routes: { basePath: '/api/auth' }, defaultAccessMode: 'private' });
+
 export const HttpRouteModule = FastifyModule.forRoot({
-  imports: [AppHttpCoreModule, WebNovelAuthModule, HealthModule, PublishModule, CatalogModule, ReaderModule, WikiModule],
+  imports: [AppHttpCoreModule, AppAuthModule, ...FEATURE_MODULES],
 
   host: Config.get('server.host'),
   port: Config.get('server.port'),
