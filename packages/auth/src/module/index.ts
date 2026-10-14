@@ -1,3 +1,4 @@
+export * from './access-policy';
 export * from './app-session.service';
 export * from './auth-guard';
 export * from './auth.controller';

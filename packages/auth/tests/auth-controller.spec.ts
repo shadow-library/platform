@@ -10,7 +10,7 @@ import { type ContextService } from '@shadow-library/fastify';
  * Importing user defined packages
  */
 import { AuthClient, type FetchLike } from '@shadow-library/auth';
-import { AppSessionService, AuthController, resolveAuthRoutes, resolveBrowserAuthConfig } from '@shadow-library/auth/module';
+import { AppSessionService, AuthAccessPolicy, AuthController, resolveAuthRoutes, resolveBrowserAuthConfig } from '@shadow-library/auth/module';
 import { createTestIdP, TestIdP } from '@shadow-library/auth/testing';
 
 /**
@@ -32,7 +32,7 @@ describe('AuthController.callback', () => {
     idp = await createTestIdP({ clientId: CLIENT.id, clientSecret: CLIENT.secret });
     auth = new AuthClient({ issuer: idp.issuer, audience: 'api://reports', client: CLIENT });
     const config = resolveBrowserAuthConfig({ issuer: idp.issuer, client: CLIENT }, resolveAuthRoutes(), { enabled: true, redirectUri: 'https://reports.test/auth/callback' });
-    controller = new AuthController(new AppSessionService(auth, config), {} as ContextService);
+    controller = new AuthController(new AppSessionService(auth, config), {} as ContextService, new AuthAccessPolicy('public'));
   });
   afterAll(() => {
     auth.stop();
@@ -98,7 +98,7 @@ describe('AuthController under an identity throttle', () => {
     let location: string | undefined;
     const response = { header: (name: string, value: string) => (headers[name] = value), redirect: (url: string) => (location = url) };
     const context = { getRequest: () => ({ headers: { cookie }, protocol: 'https', hostname: 'reports.test' }), getResponse: () => response } as unknown as ContextService;
-    return { controller: new AuthController(sessions, context), headers, redirectedTo: () => location };
+    return { controller: new AuthController(sessions, context, new AuthAccessPolicy('public')), headers, redirectedTo: () => location };
   };
 
   it('should carry retry-after on a callback whose session create was throttled', async () => {

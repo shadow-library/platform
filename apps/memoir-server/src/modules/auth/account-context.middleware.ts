@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { Handler, type HandlerMetadata } from '@shadow-library/app';
-import { AUTH_ROUTE_METADATA, AuthGuardErrorCode, type AuthRouteMetadata } from '@shadow-library/auth/module';
+import { AuthAccessPolicy, AuthGuardErrorCode } from '@shadow-library/auth/module';
 import { Logger } from '@shadow-library/common';
 import { type AsyncRouteHandler, ContextService, Middleware } from '@shadow-library/fastify';
 
@@ -48,6 +48,7 @@ export class AccountContextMiddleware {
   constructor(
     private readonly context: ContextService,
     private readonly accountContext: AccountContext,
+    private readonly accessPolicy: AuthAccessPolicy,
   ) {}
 
   cacheKey(metadata: HandlerMetadata): string {
@@ -55,8 +56,7 @@ export class AccountContextMiddleware {
   }
 
   generate(metadata: HandlerMetadata): AsyncRouteHandler | undefined {
-    const auth = metadata[AUTH_ROUTE_METADATA] as AuthRouteMetadata | undefined;
-    if (!auth?.authenticated) return undefined;
+    if (this.accessPolicy.resolve(metadata).access === 'public') return undefined;
 
     const allowDuringDeletion = metadata[ALLOW_DURING_DELETION] === true;
     return async (): Promise<void> => {

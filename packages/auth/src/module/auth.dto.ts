@@ -6,6 +6,7 @@ import { Field, Schema } from '@shadow-library/class-schema';
 /**
  * Importing user defined packages
  */
+import { type AuthAccessMode } from '../interfaces';
 
 /**
  * Defining types
@@ -172,4 +173,14 @@ export class SwitchOrganisationBody {
 export class SwitchOrganisationResponse {
   @Field()
   organisationId: string;
+}
+
+@Schema()
+export class AuthAccessResponse {
+  @Field(() => String, {
+    enum: ['public', 'private'],
+    description:
+      "Whether this application serves anyone without a session. 'private' means every page needs a signed-in user, so a client sends an anonymous visitor to login before rendering.",
+  })
+  mode: AuthAccessMode;
 }

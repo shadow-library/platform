@@ -10,16 +10,16 @@ import { ContextService, Middleware, ServerErrorCode } from '@shadow-library/fas
  */
 import { NAMESPACE } from '../constants';
 import { AuthErrorCode } from '../errors';
-import { AuthPrincipal, BotPrincipal } from '../interfaces';
+import { AuthPrincipal, BotPrincipal, ServicePrincipal, UserPrincipal } from '../interfaces';
 import { AuthClient } from '../lib/auth-client';
 import { BOT_KEY_PREFIX, parseBotKey } from '../lib/bot-key';
 import { BotRateLimiter } from '../lib/bot-rate-limiter';
 import { isThrottled, retryAfterHint } from '../lib/transport';
+import { AuthAccessPolicy } from './access-policy';
 import { AppSessionService } from './app-session.service';
-import { AUTH_ROUTE_METADATA } from './constants';
 import { AUTH_PRINCIPAL } from './context';
 import { parseCookies } from './cookie';
-import { AuthRouteMetadata } from './decorators';
+import { type RequiredAuthRoute } from './decorators';
 import { AuthGuardErrorCode } from './errors';
 
 /**
@@ -45,8 +45,8 @@ export type AuthGuardHandler = (request: GuardedRequest, response?: GuardedRespo
 /**
  * Declaring the constants
  *
- * The guard only attaches to routes that carry auth metadata, so unguarded routes pay no cost. A
- * caller may present either an `Authorization: Bearer` token or the application's session cookie, and
+ * The guard attaches to every route the access policy does not resolve to `public`, so public routes
+ * pay no cost. A caller may present either an `Authorization: Bearer` token or the application's session cookie, and
  * both land in the same principal — a route handler never learns which was used. Every failure is
  * mapped to the same generic 401/403 pair; the response never explains which check failed, only the
  * audit-friendly error code differs. The single exception is `IAM_003`, because "step up" is
@@ -85,6 +85,7 @@ export class AuthGuard {
   constructor(
     private readonly client: AuthClient,
     private readonly context: ContextService,
+    private readonly accessPolicy: AuthAccessPolicy,
     private readonly sessions?: AppSessionService,
   ) {}
 
@@ -93,12 +94,14 @@ export class AuthGuard {
     return `shadow-auth:${String(metadata.method)}:${String(metadata.path)}`;
   }
 
+  /** Throws `CONFIG_INVALID` for contradictory route metadata, which fails the boot while routes register rather than serving the route either way */
   generate(metadata: HandlerMetadata): AuthGuardHandler | undefined {
-    const auth = metadata[AUTH_ROUTE_METADATA] as AuthRouteMetadata | undefined;
-    if (!auth?.authenticated) return undefined;
+    const auth = this.accessPolicy.resolve(metadata);
+    if (auth.access === 'public') return undefined;
 
     const method = String(metadata.method ?? '*');
     const path = String(metadata.path ?? '/');
+    if (auth.access === 'optional') return request => this.resolveOptional(request, method, path);
     return async (request: GuardedRequest, response?: GuardedResponse): Promise<unknown> => {
       try {
         const principal = await this.authenticate(request, auth, method, path);
@@ -113,7 +116,48 @@ export class AuthGuard {
     };
   }
 
-  private async authenticate(request: GuardedRequest, auth: AuthRouteMetadata, method: string, path: string): Promise<AuthPrincipal> {
+  /**
+   * An optional route grants nothing; it only supplies an identity for the handler to judge. So every
+   * failure — no credential, a lapsed cookie, a token for another audience, identity unreachable —
+   * reads as anonymous rather than a 401, which would break browsing for anyone whose session expired.
+   * The response is never touched either, not even to clear a dead cookie: optional routes are the
+   * ones a shared cache may store, and a `set-cookie` riding a cached response reaches every reader.
+   */
+  private async resolveOptional(request: GuardedRequest, method: string, path: string): Promise<undefined> {
+    const principal = await this.identify(request, method, path).catch((error: unknown) => {
+      this.logger.debug('optional auth could not resolve a principal; continuing anonymously', { reason: error instanceof Error ? error.message : String(error), method, path });
+      return undefined;
+    });
+    if (principal) this.context.set(AUTH_PRINCIPAL, principal);
+    return undefined;
+  }
+
+  /**
+   * A bot key is never exchanged here: the route grants a bot nothing, so the identity round trip would
+   * only hand a leaked key a way to load identity. A service caller stays deny-by-default — identified
+   * only where a service-access rule covers the route, exactly as on a guarded one.
+   */
+  private async identify(request: GuardedRequest, method: string, path: string): Promise<AuthPrincipal | undefined> {
+    const token = bearerToken(request);
+    if (token?.startsWith(BOT_KEY_PREFIX)) {
+      this.logger.debug('bot key presented on an optional route; continuing anonymously', { method, path });
+      return undefined;
+    }
+
+    if (token) return this.identifiedCaller(await this.client.verify(token), method, path);
+
+    const sessions = this.sessions;
+    const handle = sessions?.readHandle(parseCookies(request.headers.cookie));
+    return sessions && handle ? sessions.resolvePrincipal(handle) : undefined;
+  }
+
+  private identifiedCaller(principal: UserPrincipal | ServicePrincipal, method: string, path: string): AuthPrincipal | undefined {
+    if (principal.kind === 'user' || (principal.clientId && this.client.isServiceCallerAllowed(principal.clientId, method, path))) return principal;
+    this.logger.debug('service caller not allowed for this route; continuing anonymously', { clientId: principal.clientId, method, path });
+    return undefined;
+  }
+
+  private async authenticate(request: GuardedRequest, auth: RequiredAuthRoute, method: string, path: string): Promise<AuthPrincipal> {
     const token = bearerToken(request);
     if (token?.startsWith(BOT_KEY_PREFIX)) return this.authenticateBot(token, request.ip, auth, method, path);
     if (token) return this.client.verify(token).catch((error: Error) => throwError(this.unauthenticated(error)));
@@ -135,7 +179,7 @@ export class AuthGuard {
    * answered 503 rather than collapsed into 401, so a bot can tell an outage from a revoked key. It still
    * fails closed.
    */
-  private async authenticateBot(botKey: string, clientIp: string | undefined, auth: AuthRouteMetadata, method: string, path: string): Promise<BotPrincipal> {
+  private async authenticateBot(botKey: string, clientIp: string | undefined, auth: RequiredAuthRoute, method: string, path: string): Promise<BotPrincipal> {
     if (!parseBotKey(botKey)) throw this.unauthenticated(AuthErrorCode.BOT_KEY_INVALID.create({ reason: 'the key is malformed or fails its checksum' }));
     if (!auth.botPermissions?.length) throw this.denied('bot refused on a route that declares no bot permission', { method, path });
     if (auth.elevated) throw this.denied('bot refused on a route that requires elevation', { method, path });
@@ -153,7 +197,7 @@ export class AuthGuard {
    * authorize fixes that, which is where `CONSENT_REQUIRED` sends the browser; any other missing scope
    * stays the generic denial.
    */
-  private async assertConsented(principal: AuthPrincipal, auth: AuthRouteMetadata): Promise<void> {
+  private async assertConsented(principal: AuthPrincipal, auth: RequiredAuthRoute): Promise<void> {
     if (!this.sessions || principal.kind !== 'user' || principal.aal !== 'AAL2') return;
     const missing = auth.scopes?.filter(scope => !principal.scopes.includes(scope)) ?? [];
     if (missing.length === 0) return;
@@ -162,13 +206,13 @@ export class AuthGuard {
     if (missing.every(scope => sensitive.includes(scope))) throw AuthErrorCode.CONSENT_REQUIRED.create({ reason: `the session grant lacks ${missing.join(', ')}` });
   }
 
-  private async admit(principal: AuthPrincipal, auth: AuthRouteMetadata, method: string, path: string, response: GuardedResponse | undefined): Promise<void> {
+  private async admit(principal: AuthPrincipal, auth: RequiredAuthRoute, method: string, path: string, response: GuardedResponse | undefined): Promise<void> {
     if (principal.kind === 'bot') return this.admitBot(principal, auth, response);
     this.authorize(principal, auth, method, path);
     if (auth.permission) await this.checkPermission(principal, auth);
   }
 
-  private authorize(principal: AuthPrincipal, auth: AuthRouteMetadata, method: string, path: string): void {
+  private authorize(principal: AuthPrincipal, auth: RequiredAuthRoute, method: string, path: string): void {
     if (principal.kind === 'service' && (!principal.clientId || !this.client.isServiceCallerAllowed(principal.clientId, method, path))) {
       throw this.denied('service caller not allowed for this route', { clientId: principal.clientId, method, path });
     }
@@ -182,7 +226,7 @@ export class AuthGuard {
    * `@RequirePermission`, all evaluated in the bot's organisation. Every decision uses the high-risk TTL
    * so a revoked grant stops the bot within a minute, and `failOpen` never applies.
    */
-  private async admitBot(principal: BotPrincipal, auth: AuthRouteMetadata, response: GuardedResponse | undefined): Promise<void> {
+  private async admitBot(principal: BotPrincipal, auth: RequiredAuthRoute, response: GuardedResponse | undefined): Promise<void> {
     if (!auth.botPermissions?.length || auth.elevated) throw this.denied('bot refused on a route that is not open to bots', { botId: principal.botId });
 
     const permissions = [...new Set([...(auth.botPermissions ?? []), ...(auth.permission ? [auth.permission] : [])])];
@@ -209,7 +253,7 @@ export class AuthGuard {
    * would turn every `failOpen` route into an unguarded one for exactly the callers least entitled to
    * it.
    */
-  private async checkPermission(principal: AuthPrincipal, auth: AuthRouteMetadata): Promise<void> {
+  private async checkPermission(principal: AuthPrincipal, auth: RequiredAuthRoute): Promise<void> {
     const permission = auth.permission as string;
     if (!principal.org) throw this.denied('permission denied: the credential names no organisation to evaluate it in', { sub: principal.sub, permission });
 

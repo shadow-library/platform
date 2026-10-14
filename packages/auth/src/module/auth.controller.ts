@@ -11,8 +11,10 @@ import { Body, ContextService, Get, HttpController, type HttpResponse, Post, Que
 import { NAMESPACE } from '../constants';
 import { AuthErrorCode } from '../errors';
 import { isThrottled, retryAfterHint } from '../lib/transport';
+import { AuthAccessPolicy } from './access-policy';
 import { AppSessionService } from './app-session.service';
 import {
+  AuthAccessResponse,
   AuthCallbackQuery,
   AuthLoginQuery,
   AuthLogoutResponse,
@@ -27,6 +29,7 @@ import {
 } from './auth.dto';
 import { AuthRoutePaths } from './config';
 import { parseCookies } from './cookie';
+import { Public } from './decorators';
 import { AuthGuardErrorCode } from './errors';
 
 /**
@@ -44,6 +47,10 @@ type RouteName = keyof Omit<AuthRoutePaths, 'basePath'>;
  * decorators declared. That is why the registry is module-scoped mutable state — route metadata is
  * settled at class-definition time, long before a provider could be injected to supply it.
  *
+ * Every route is `@Public()`: this is how a caller gets a session, so in a `private` application
+ * guarding it would leave nobody able to sign in. The routes that need a session check for one
+ * themselves and answer a plain 401 rather than a login bounce.
+ *
  * Cookies are read off the raw request rather than through `@Cookie()` on purpose: that decorator
  * pulls in the optional `@fastify/cookie` peer, and needing an extra install would break the promise
  * that `AuthModule.forRoot()` plus environment variables is the entire integration.
@@ -58,6 +65,7 @@ const ROUTE_HANDLERS: [RouteName, string][] = [
   ['stepUp', 'stepUp'],
   ['organisations', 'organisations'],
   ['organisation', 'switchOrganisation'],
+  ['access', 'access'],
 ];
 
 let routes: AuthRoutePaths | null = null;
@@ -82,6 +90,7 @@ export function configureAuthRoutes(resolved: AuthRoutePaths): void {
   }
 }
 
+@Public()
 @HttpController('/auth')
 export class AuthController {
   private readonly logger = Logger.getLogger(NAMESPACE, AuthController.name);
@@ -89,7 +98,16 @@ export class AuthController {
   constructor(
     private readonly sessions: AppSessionService,
     private readonly context: ContextService,
+    private readonly accessPolicy: AuthAccessPolicy,
   ) {}
+
+  /** Lets a browser client decide whether to send an anonymous visitor to login before it renders, without probing a guarded route to find out */
+  @Get('/access')
+  @EnableIf(() => isEnabled('access'))
+  @RespondFor(200, AuthAccessResponse)
+  access(): AuthAccessResponse {
+    return { mode: this.accessPolicy.mode };
+  }
 
   /** Starts the login: PKCE, `state`, `nonce` and `resource` out, the transient state into its own cookie */
   @Get('/login')

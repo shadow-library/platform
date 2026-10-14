@@ -78,6 +78,12 @@ export type AuthPrincipal = UserPrincipal | ServicePrincipal | BotPrincipal;
 
 export type PrincipalKind = AuthPrincipal['kind'];
 
+/**
+ * Whether an application serves anyone at all without a session. `public` leaves an undecorated route
+ * anonymous; `private` requires a session on it, and on every `@OptionalAuth()` route besides.
+ */
+export type AuthAccessMode = 'public' | 'private';
+
 /** Transport used for every network call; injectable so consumers can test without sockets */
 export type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;
 

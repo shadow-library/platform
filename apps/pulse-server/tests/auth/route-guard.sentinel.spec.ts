@@ -10,9 +10,9 @@ import { AUTH_ROUTES_BASE_PATH, PUBLIC_ROUTE_METADATA, RouteGuardSentinel } from
 import { AppErrorCode } from '@server/classes';
 
 /**
- * The sentinel is pulse's default-deny layer over the SDK's opt-in guard. It must let three kinds of
- * route through — SDK-guarded (`AUTH_ROUTE_METADATA`), explicitly `@Public()`, and the SDK's own
- * first-party auth routes under `AUTH_ROUTES_BASE_PATH` — and fail every undeclared route closed.
+ * The sentinel is pulse's default-deny layer over the SDK's guard. It must let every route that
+ * declares an access through the SDK (`AUTH_ROUTE_METADATA`, the SDK's own sign-in routes included)
+ * or pulse's `@Public()` through, and fail every undeclared route closed.
  * Pulse exposes nothing to bots, so a bot principal is refused on every guarded route as well.
  */
 const context = new ContextService();
@@ -35,15 +35,17 @@ function runAs(principal: AuthPrincipal, handler: () => Promise<void>): Promise<
 const metadata = (path: string, extra: Record<string | symbol, unknown> = {}): HandlerMetadata => ({ path, ...extra });
 
 describe('RouteGuardSentinel', () => {
-  it('should let a non-bot principal through a route that carries the shared auth metadata', async () => {
-    const handler = sentinel.generate(metadata('/api/v1/templates', { [AUTH_ROUTE_METADATA]: { authenticated: true } }));
+  it('should let a non-bot principal through a route the SDK guards', async () => {
+    for (const access of ['required', 'optional']) {
+      const handler = sentinel.generate(metadata('/api/v1/templates', { [AUTH_ROUTE_METADATA]: { access } }));
 
-    expect(handler).toBeDefined();
-    expect(await runAs(USER, handler as () => Promise<void>)).toBeUndefined();
+      expect(handler).toBeDefined();
+      expect(await runAs(USER, handler as () => Promise<void>)).toBeUndefined();
+    }
   });
 
   it('should refuse a bot principal on a guarded route, even one declaring a bot permission', async () => {
-    for (const auth of [{ authenticated: true }, { authenticated: true, botPermissions: ['pulse:notifications:send'] }]) {
+    for (const auth of [{ access: 'required' }, { access: 'required', botPermissions: ['pulse:notifications:send'] }]) {
       const handler = sentinel.generate(metadata('/api/v1/notifications', { [AUTH_ROUTE_METADATA]: auth }));
       expect(AppError.is(await runAs(BOT, handler as () => Promise<void>), AppErrorCode.SEC_003)).toBe(true);
     }
@@ -55,10 +57,14 @@ describe('RouteGuardSentinel', () => {
     expect(handler).toBeUndefined();
   });
 
-  it('should treat the SDK first-party auth routes as declared-public', () => {
-    for (const path of ['/login', '/callback', '/session', '/logout', '/step-up']) {
-      expect(sentinel.generate(metadata(`${AUTH_ROUTES_BASE_PATH}${path}`))).toBeUndefined();
+  it('should not guard a route the SDK declares public, as it does its own sign-in routes', () => {
+    for (const path of ['/login', '/callback', '/session', '/logout', '/step-up', '/access']) {
+      expect(sentinel.generate(metadata(`${AUTH_ROUTES_BASE_PATH}${path}`, { [AUTH_ROUTE_METADATA]: { access: 'public' } }))).toBeUndefined();
     }
+  });
+
+  it('should default-deny an undeclared route even under the SDK auth base path', () => {
+    expect(sentinel.generate(metadata(`${AUTH_ROUTES_BASE_PATH}/undeclared`))).toBeDefined();
   });
 
   it('should default-deny a route that declares no access policy', async () => {

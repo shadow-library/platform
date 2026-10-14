@@ -12,6 +12,7 @@ import { type HandlerMetadata } from '@shadow-library/app';
 import { AuthClient, type FetchLike } from '@shadow-library/auth';
 import {
   AppSessionService,
+  AuthAccessPolicy,
   Authenticated,
   AuthGuard,
   AuthModule,
@@ -67,9 +68,9 @@ describe('auth decorators', () => {
   }
 
   it('should write auth metadata onto the route', () => {
-    expect(getRouteMetadata(Controller.prototype.plain)).toEqual({ authenticated: true });
-    expect(getRouteMetadata(Controller.prototype.scoped)).toEqual({ authenticated: true, scopes: ['posts:admin', 'posts:write'] });
-    expect(getRouteMetadata(Controller.prototype.guarded)).toEqual({ authenticated: true, permission: 'posts:write', failOpen: true });
+    expect(getRouteMetadata(Controller.prototype.plain)).toEqual({ access: 'required' });
+    expect(getRouteMetadata(Controller.prototype.scoped)).toEqual({ access: 'required', scopes: ['posts:admin', 'posts:write'] });
+    expect(getRouteMetadata(Controller.prototype.guarded)).toEqual({ access: 'required', permission: 'posts:write', failOpen: true });
   });
 });
 
@@ -84,7 +85,7 @@ describe('AuthGuard', () => {
     auth = new AuthClient({ issuer: idp.issuer, audience: AUDIENCE, client: { id: 'svc-pulse', secret: 's3cr3t' } });
     context = new ContextService();
     extendContextWithAuth(context);
-    guard = new AuthGuard(auth, context);
+    guard = new AuthGuard(auth, context, new AuthAccessPolicy('public'));
   });
   afterAll(() => idp.stop());
 
@@ -122,7 +123,7 @@ describe('AuthGuard', () => {
   });
 
   it('should reject missing, malformed, and invalid tokens with 401', async () => {
-    const handler = generate({ shadowAuth: { authenticated: true } });
+    const handler = generate({ shadowAuth: { access: 'required' } });
     await expectStatus(handler, request(), 401);
     await expectStatus(handler, { headers: { authorization: 'Basic abc' } }, 401);
     await expectStatus(handler, request('garbage'), 401);
@@ -130,7 +131,7 @@ describe('AuthGuard', () => {
   });
 
   it('should expose the principal through the context for a valid token', async () => {
-    const handler = generate({ shadowAuth: { authenticated: true } });
+    const handler = generate({ shadowAuth: { access: 'required' } });
     const req = request(await idp.issueToken({ sub: '42', audience: AUDIENCE, org: ORG }));
     await runGuarded(handler, req, () => {
       expect(context.getAuthPrincipal()).toMatchObject({ kind: 'user', sub: '42', org: ORG });
@@ -139,13 +140,13 @@ describe('AuthGuard', () => {
   });
 
   it('should enforce required scopes with 403', async () => {
-    const handler = generate({ shadowAuth: { authenticated: true, scopes: ['posts:admin'] } });
+    const handler = generate({ shadowAuth: { access: 'required', scopes: ['posts:admin'] } });
     await expectStatus(handler, request(await idp.issueToken({ sub: '42', audience: AUDIENCE, scopes: ['posts:read'] })), 403);
     await runGuarded(handler, request(await idp.issueToken({ sub: '42', audience: AUDIENCE, scopes: ['posts:admin', 'posts:read'] })));
   });
 
   it('should deny service callers until identity-configured access rules allow them', async () => {
-    const metadata: HandlerMetadata = { shadowAuth: { authenticated: true }, method: 'POST' as never, path: '/api/v1/index' };
+    const metadata: HandlerMetadata = { shadowAuth: { access: 'required' }, method: 'POST' as never, path: '/api/v1/index' };
     const handler = generate(metadata);
     const serviceRequest = async () => request(await idp.issueToken({ sub: 'svc-indexer', kind: 'service', clientId: 'svc-indexer', audience: AUDIENCE }));
 
@@ -158,7 +159,7 @@ describe('AuthGuard', () => {
     });
 
     /** A rule for another route or caller must not leak access */
-    await expectStatus(generate({ shadowAuth: { authenticated: true }, method: 'DELETE' as never, path: '/api/v1/index' }), await serviceRequest(), 403);
+    await expectStatus(generate({ shadowAuth: { access: 'required' }, method: 'DELETE' as never, path: '/api/v1/index' }), await serviceRequest(), 403);
     await expectStatus(handler, request(await idp.issueToken({ sub: 'svc-other', kind: 'service', clientId: 'svc-other', audience: AUDIENCE })), 403);
   });
 
@@ -171,7 +172,7 @@ describe('AuthGuard', () => {
   });
 
   it('should enforce pdp permissions in the principal organisation', async () => {
-    const handler = generate({ shadowAuth: { authenticated: true, permission: 'posts:write' } });
+    const handler = generate({ shadowAuth: { access: 'required', permission: 'posts:write' } });
     const denied = request(await idp.issueToken({ sub: 'writer', audience: AUDIENCE, org: ORG }));
     await expectStatus(handler, denied, 403);
 
@@ -183,7 +184,7 @@ describe('AuthGuard', () => {
   });
 
   it('should deny permission routes for tokens without an organisation', async () => {
-    const handler = generate({ shadowAuth: { authenticated: true, permission: 'posts:write' } });
+    const handler = generate({ shadowAuth: { access: 'required', permission: 'posts:write' } });
     await expectStatus(handler, request(await idp.issueToken({ sub: '42', audience: AUDIENCE })), 403);
   });
 
@@ -193,7 +194,7 @@ describe('AuthGuard', () => {
    * `failOpen` route for exactly the credentials least entitled to pass it.
    */
   it('should deny an organisation-less token on a fail-open permission route', async () => {
-    const handler = generate({ shadowAuth: { authenticated: true, permission: 'posts:write', failOpen: true } });
+    const handler = generate({ shadowAuth: { access: 'required', permission: 'posts:write', failOpen: true } });
     await expectStatus(handler, request(await idp.issueToken({ sub: 'orgless', audience: AUDIENCE })), 403);
 
     /** The same route does fail open once the token names an organisation — which is what the flag is actually for. */
@@ -223,7 +224,7 @@ describe('AuthGuard', () => {
 
     it('should answer a throttled permission check with a retryable 503, not a 403', async () => {
       const throttled = new AuthClient({ issuer: idp.issuer, audience: AUDIENCE, client: CLIENT, fetch: throttling('/api/v1/authz/check') });
-      const handler = new AuthGuard(throttled, context).generate({ shadowAuth: { authenticated: true, permission: 'posts:write' } });
+      const handler = new AuthGuard(throttled, context, new AuthAccessPolicy('public')).generate({ shadowAuth: { access: 'required', permission: 'posts:write' } });
       idp.grantPermission({ kind: 'user', sub: 'entitled' }, ORG, 'posts:write');
       const { response, headers } = capture();
 
@@ -237,7 +238,7 @@ describe('AuthGuard', () => {
       const throttled = new AuthClient({ issuer: idp.issuer, audience: AUDIENCE, client: CLIENT, fetch: throttling('/api/v1/app-sessions/token') });
       const config = resolveBrowserAuthConfig({ issuer: idp.issuer, client: CLIENT }, resolveAuthRoutes(), { enabled: true, redirectUri: 'https://pulse.test/auth/callback' });
       const sessions = new AppSessionService(throttled, config);
-      const handler = new AuthGuard(throttled, context, sessions).generate({ shadowAuth: { authenticated: true } });
+      const handler = new AuthGuard(throttled, context, new AuthAccessPolicy('public'), sessions).generate({ shadowAuth: { access: 'required' } });
       const { response, headers } = capture();
 
       const failure = await handler?.({ headers: { cookie: `${config.cookieName}=some-handle` } }, response).catch((error: unknown) => error);
@@ -275,7 +276,7 @@ describe('AuthGuard re-consent for a sensitive scope', () => {
   const CLIENT = { id: 'svc-memo', secret: 's3cr3t' };
   const SENSITIVE = 'memo:destroy';
   const NAVIGATION = { accept: 'text/html' };
-  const ROUTE: HandlerMetadata = { shadowAuth: { authenticated: true, elevated: true, scopes: [SENSITIVE] }, method: 'POST' as never, path: '/deletion' };
+  const ROUTE: HandlerMetadata = { shadowAuth: { access: 'required', elevated: true, scopes: [SENSITIVE] }, method: 'POST' as never, path: '/deletion' };
   let idp: TestIdP;
   let auth: AuthClient;
   let context: ContextService;
@@ -325,7 +326,7 @@ describe('AuthGuard re-consent for a sensitive scope', () => {
     new Promise((resolve, reject) => {
       const hook = context.init() as unknown as (request: unknown, response: unknown, done: () => void) => void;
       hook({ id: `rid-${counter}` }, {}, () => {
-        const handler = new AuthGuard(auth, context, sessions).generate(metadata);
+        const handler = new AuthGuard(auth, context, new AuthAccessPolicy('public'), sessions).generate(metadata);
         if (!handler) return reject(new Error('expected a handler'));
         handler(request, response).then(resolve, reject);
       });
@@ -372,7 +373,7 @@ describe('AuthGuard re-consent for a sensitive scope', () => {
     const handle = await elevatedSession(true);
     const { response, headers } = capture();
 
-    const metadata: HandlerMetadata = { ...ROUTE, shadowAuth: { authenticated: true, elevated: true, scopes: ['memo:admin'] } };
+    const metadata: HandlerMetadata = { ...ROUTE, shadowAuth: { access: 'required', elevated: true, scopes: ['memo:admin'] } };
     const failure = await run({ url: '/deletion', headers: { cookie: `${config().cookieName}=${handle}` } }, response, metadata).catch((error: unknown) => error);
     expect(failure).toMatchObject({ code: 'IAM_002', status: 403 });
     expect(headers['set-cookie']).toBeUndefined();

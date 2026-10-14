@@ -14,6 +14,7 @@ import { ContextService, FastifyModule, Get, HttpController, Post } from '@shado
  */
 import { AuthClient } from '@shadow-library/auth';
 import {
+  AuthAccessPolicy,
   Authenticated,
   AuthGuard,
   type AuthGuardHandler,
@@ -66,8 +67,8 @@ describe('BotPermission decorator', () => {
   }
 
   it('should compose with @Authenticated in either order on one method', () => {
-    expect(getRouteMetadata(Controller.prototype.write)).toEqual({ authenticated: true, botPermissions: ['projects:write'] });
-    expect(getRouteMetadata(Controller.prototype.read)).toEqual({ authenticated: true, botPermissions: ['projects:read'] });
+    expect(getRouteMetadata(Controller.prototype.write)).toEqual({ access: 'required', botPermissions: ['projects:write'] });
+    expect(getRouteMetadata(Controller.prototype.read)).toEqual({ access: 'required', botPermissions: ['projects:read'] });
   });
 
   it('should refuse an empty permission', () => {
@@ -195,7 +196,7 @@ describe('AuthGuard with bot principals', () => {
     auth = new AuthClient({ issuer: idp.issuer, audience: AUDIENCE, client: CLIENT });
     context = new ContextService();
     extendContextWithAuth(context);
-    guard = new AuthGuard(auth, context);
+    guard = new AuthGuard(auth, context, new AuthAccessPolicy('public'));
     await auth.check({ action: 'warm-up', organisationId: ORG, principal: { kind: 'user', sub: 'warm-up' } });
   });
   afterAll(() => idp.stop());
@@ -230,7 +231,7 @@ describe('AuthGuard with bot principals', () => {
     const botId = nextBotId();
     const key = idp.issueBotKey({ botId, org: ORG, rateLimitPerMinute: 100 });
     idp.grantPermission({ kind: 'bot', sub: `bot_${botId}` }, ORG, 'projects:write');
-    const handler = generate({ authenticated: true, botPermissions: ['projects:write'] });
+    const handler = generate({ access: 'required', botPermissions: ['projects:write'] });
 
     const before = idp.getBotKeyExchangeCount();
     await Promise.all(Array.from({ length: 4 }, () => runGuarded(handler, request(key))));
@@ -255,10 +256,10 @@ describe('AuthGuard with bot principals', () => {
     const pdpBefore = idp.getRequestCount(PDP_PATH);
     const tokenBefore = idp.getRequestCount(TOKEN_PATH);
     const routes = [
-      { authenticated: true },
-      { authenticated: true, scopes: ['projects:write'] },
-      { authenticated: true, permission: 'projects:write' },
-      { authenticated: true, elevated: true, botPermissions: ['projects:write'] },
+      { access: 'required' },
+      { access: 'required', scopes: ['projects:write'] },
+      { access: 'required', permission: 'projects:write' },
+      { access: 'required', elevated: true, botPermissions: ['projects:write'] },
     ];
 
     for (const metadata of routes) expect((await failure(generate(metadata), request(key))).code).toBe('IAM_002');
@@ -271,7 +272,7 @@ describe('AuthGuard with bot principals', () => {
     idp.grantPermission({ kind: 'bot', sub: `bot_${botId}` }, ORG, 'projects:write');
     const token = await idp.mintBotToken({ botId, org: ORG });
 
-    expect((await failure(generate({ authenticated: true, botPermissions: ['projects:write'] }), request(token))).code).toBe('IAM_001');
+    expect((await failure(generate({ access: 'required', botPermissions: ['projects:write'] }), request(token))).code).toBe('IAM_001');
     await expect(auth.verify(token)).rejects.toMatchObject({ code: 'TOKEN_INVALID' });
   });
 
@@ -279,12 +280,12 @@ describe('AuthGuard with bot principals', () => {
     const botId = nextBotId();
     const key = idp.issueBotKey({ botId, org: ORG });
     idp.grantPermission({ kind: 'bot', sub: `bot_${botId}` }, ORG, 'projects:read');
-    expect((await failure(generate({ authenticated: true, permission: 'projects:delete', botPermissions: ['projects:read'] }), request(key))).code).toBe('IAM_002');
+    expect((await failure(generate({ access: 'required', permission: 'projects:delete', botPermissions: ['projects:read'] }), request(key))).code).toBe('IAM_002');
   });
 
   it('should deny a bot on a @BotPermission route without a PDP permit', async () => {
     const botId = nextBotId();
-    const handler = generate({ authenticated: true, botPermissions: ['projects:write'] });
+    const handler = generate({ access: 'required', botPermissions: ['projects:write'] });
     expect((await failure(handler, request(idp.issueBotKey({ botId, org: ORG })))).code).toBe('IAM_002');
   });
 
@@ -292,7 +293,7 @@ describe('AuthGuard with bot principals', () => {
     const botId = nextBotId();
     const key = idp.issueBotKey({ botId, org: ORG });
     idp.grantPermission({ kind: 'bot', sub: `bot_${botId}` }, ORG, 'projects:write');
-    const handler = generate({ authenticated: true, botPermissions: ['projects:write', 'generation:run', 'projects:write'] });
+    const handler = generate({ access: 'required', botPermissions: ['projects:write', 'generation:run', 'projects:write'] });
     expect((await failure(handler, request(key))).code).toBe('IAM_002');
 
     const fullyGranted = nextBotId();
@@ -305,16 +306,16 @@ describe('AuthGuard with bot principals', () => {
     const botId = nextBotId();
     const key = idp.issueBotKey({ botId, org: ORG });
     idp.grantPermission({ kind: 'bot', sub: `bot_${botId}` }, ORG, 'projects:read');
-    await runGuarded(generate({ authenticated: true, scopes: ['projects:admin'], botPermissions: ['projects:read'] }), request(key));
+    await runGuarded(generate({ access: 'required', scopes: ['projects:admin'], botPermissions: ['projects:read'] }), request(key));
 
     const unknownBot = idp.issueBotKey({ botId: nextBotId(), org: ORG });
     idp.setEndpointFailure(PDP_PATH, true);
-    expect((await failure(generate({ authenticated: true, failOpen: true, botPermissions: ['projects:read'] }), request(unknownBot))).code).toBe('IAM_002');
+    expect((await failure(generate({ access: 'required', failOpen: true, botPermissions: ['projects:read'] }), request(unknownBot))).code).toBe('IAM_002');
     idp.setEndpointFailure(PDP_PATH, false);
   });
 
   it('should not call the PDP for users or services on @BotPermission routes', async () => {
-    const handler = generate({ authenticated: true, botPermissions: ['projects:write'] });
+    const handler = generate({ access: 'required', botPermissions: ['projects:write'] });
     const before = idp.getRequestCount(PDP_PATH);
     await runGuarded(handler, request(await idp.issueToken({ sub: 'user-1', audience: AUDIENCE, org: ORG })), undefined, () => {
       expect(context.getAuthPrincipal().kind).toBe('user');
@@ -326,7 +327,7 @@ describe('AuthGuard with bot principals', () => {
     const botId = nextBotId();
     const key = idp.issueBotKey({ botId, org: ORG, rateLimitPerMinute: 2 });
     idp.grantPermission({ kind: 'bot', sub: `bot_${botId}` }, ORG, 'projects:read');
-    const handler = generate({ authenticated: true, botPermissions: ['projects:read'] });
+    const handler = generate({ access: 'required', botPermissions: ['projects:read'] });
     await runGuarded(handler, request(key));
     await runGuarded(handler, request(key));
 
@@ -342,7 +343,7 @@ describe('AuthGuard with bot principals', () => {
     const key = idp.issueBotKey({ botId: nextBotId(), org: ORG });
     const tampered = `${key.slice(0, -1)}${key.endsWith('0') ? '1' : '0'}`;
     const tokenBefore = idp.getRequestCount(TOKEN_PATH);
-    const handler = generate({ authenticated: true, botPermissions: ['projects:read'] });
+    const handler = generate({ access: 'required', botPermissions: ['projects:read'] });
 
     expect((await failure(handler, request(tampered))).code).toBe('IAM_001');
     expect((await failure(handler, request('sl_bot_not-a-key'))).code).toBe('IAM_001');
@@ -352,7 +353,7 @@ describe('AuthGuard with bot principals', () => {
   it('should reject a revoked key with 401 and negative-cache the refusal', async () => {
     const key = idp.issueBotKey({ botId: nextBotId(), org: ORG });
     idp.revokeBotKey(key);
-    const handler = generate({ authenticated: true, botPermissions: ['projects:read'] });
+    const handler = generate({ access: 'required', botPermissions: ['projects:read'] });
     const before = idp.getBotKeyExchangeCount();
 
     expect((await failure(handler, request(key))).code).toBe('IAM_001');
@@ -364,7 +365,7 @@ describe('AuthGuard with bot principals', () => {
     const botId = nextBotId();
     const key = idp.issueBotKey({ botId, org: ORG });
     idp.grantPermission({ kind: 'bot', sub: `bot_${botId}` }, ORG, 'projects:read');
-    const handler = generate({ authenticated: true, botPermissions: ['projects:read'] });
+    const handler = generate({ access: 'required', botPermissions: ['projects:read'] });
 
     idp.setEndpointFailure(TOKEN_PATH, true);
     const outage = await failure(handler, request(key));
@@ -409,14 +410,14 @@ describe('AuthGuard with bot principals', () => {
     const spy = spyOn(Logger, 'getLogger').mockImplementation(() => capture as ReturnType<typeof Logger.getLogger>);
     try {
       const loggedAuth = new AuthClient({ issuer: idp.issuer, audience: AUDIENCE, client: CLIENT });
-      const loggedGuard = new AuthGuard(loggedAuth, context);
+      const loggedGuard = new AuthGuard(loggedAuth, context, new AuthAccessPolicy('public'));
       const botId = nextBotId();
       const key = idp.issueBotKey({ botId, org: ORG, rateLimitPerMinute: 1 });
       const revoked = idp.issueBotKey({ botId: nextBotId(), org: ORG });
       idp.revokeBotKey(revoked);
       idp.grantPermission({ kind: 'bot', sub: `bot_${botId}` }, ORG, 'projects:read');
       const handler = loggedGuard.generate({
-        shadowAuth: { authenticated: true, botPermissions: ['projects:read'] },
+        shadowAuth: { access: 'required', botPermissions: ['projects:read'] },
         method: 'GET',
         path: '/',
       } as HandlerMetadata) as AuthGuardHandler;
@@ -424,7 +425,7 @@ describe('AuthGuard with bot principals', () => {
       await runGuarded(handler, request(key));
       await runGuarded(handler, request(key)).catch(() => undefined);
       await runGuarded(handler, request(revoked)).catch(() => undefined);
-      await runGuarded(loggedGuard.generate({ shadowAuth: { authenticated: true }, method: 'GET', path: '/' } as HandlerMetadata) as AuthGuardHandler, request(key)).catch(
+      await runGuarded(loggedGuard.generate({ shadowAuth: { access: 'required' }, method: 'GET', path: '/' } as HandlerMetadata) as AuthGuardHandler, request(key)).catch(
         () => undefined,
       );
 

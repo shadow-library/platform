@@ -1,7 +1,7 @@
 import { describe, expect, it, mock } from 'bun:test';
 
 import { type AuthPrincipal } from '@shadow-library/auth';
-import { AUTH_PRINCIPAL, AuthGuardErrorCode, extendContextWithAuth } from '@shadow-library/auth/module';
+import { AUTH_PRINCIPAL, AuthAccessPolicy, AuthGuardErrorCode, extendContextWithAuth } from '@shadow-library/auth/module';
 import { AppError } from '@shadow-library/common';
 import { ContextService } from '@shadow-library/fastify';
 
@@ -19,8 +19,8 @@ const BOT: AuthPrincipal = { kind: 'bot', sub: 'bot_42', clientId: 'bot_42', sco
 const context = new ContextService();
 extendContextWithAuth(context);
 const resolveAccount = mock(async () => undefined);
-const middleware = new AccountContextMiddleware(context, { resolve: resolveAccount } as unknown as AccountContext);
-const handler = middleware.generate({ shadowAuth: { authenticated: true, botPermissions: ['memoir:sync'] } }) as () => Promise<void>;
+const middleware = new AccountContextMiddleware(context, { resolve: resolveAccount } as unknown as AccountContext, new AuthAccessPolicy('public'));
+const handler = middleware.generate({ shadowAuth: { access: 'required', botPermissions: ['memoir:sync'] } }) as () => Promise<void>;
 
 function runAs(principal: AuthPrincipal): Promise<unknown> {
   return new Promise(resolve => {
@@ -47,5 +47,15 @@ describe('AccountContextMiddleware', () => {
     expect(await runAs(USER)).toBeUndefined();
     expect(await runAs(SERVICE)).toBeUndefined();
     expect(resolveAccount).toHaveBeenCalledTimes(1);
+  });
+
+  it('should not attach to a route the access policy leaves public', () => {
+    expect(middleware.generate({})).toBeUndefined();
+    expect(middleware.generate({ shadowAuth: { access: 'public' } })).toBeUndefined();
+  });
+
+  it('should attach to an undecorated route once the application is private', () => {
+    const privateMiddleware = new AccountContextMiddleware(context, { resolve: resolveAccount } as unknown as AccountContext, new AuthAccessPolicy('private'));
+    expect(privateMiddleware.generate({})).toBeFunction();
   });
 });

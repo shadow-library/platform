@@ -9,12 +9,14 @@ import { ContextService, FASTIFY_INSTANCE, FastifyModule } from '@shadow-library
  * Importing user defined packages
  */
 import { NAMESPACE } from '../constants';
+import { AuthErrorCode } from '../errors';
 import { type AuthClientConfig } from '../interfaces';
 import { AuthClient } from '../lib/auth-client';
+import { AuthAccessPolicy } from './access-policy';
 import { AppSessionService } from './app-session.service';
 import { AuthGuard } from './auth-guard';
 import { AuthController, configureAuthRoutes } from './auth.controller';
-import { AuthModuleOptions, resolveAuthClientConfig, resolveAuthRoutes, resolveBrowserAuthConfig, type ResolvedBrowserAuthConfig } from './config';
+import { AuthModuleOptions, resolveAccessMode, resolveAuthClientConfig, resolveAuthRoutes, resolveBrowserAuthConfig, type ResolvedBrowserAuthConfig } from './config';
 import { extendContextWithAuth } from './context';
 
 /**
@@ -50,6 +52,17 @@ const BROWSER_CONFIG: unique symbol = Symbol('shadow-library:auth-browser-config
 /** OIDC Back-Channel Logout posts form-encoded, which Fastify does not parse out of the box */
 const FORM_CONTENT_TYPE = 'application/x-www-form-urlencoded';
 
+/** A private application nobody can sign into would answer every request with a 401, so it is refused at boot instead */
+function assertSignInReachable(browser: ResolvedBrowserAuthConfig): void {
+  const fail = (cause: string): never => {
+    throw AuthErrorCode.CONFIG_INVALID.create({ reason: `access mode is private but ${cause}, so nobody could ever sign in` });
+  };
+
+  if (!browser.enabled) fail('the browser sign-in flow is off (it needs a client credential and browser login enabled)');
+  const disabled = (['login', 'callback'] as const).filter(route => !browser.routes[route]);
+  if (disabled.length > 0) fail(`the ${disabled.join(' and ')} route${disabled.length > 1 ? 's are' : ' is'} disabled`);
+}
+
 @Injectable()
 class AuthInitializer implements OnModuleInit, OnModuleDestroy {
   private readonly logger = Logger.getLogger(NAMESPACE, AuthInitializer.name);
@@ -58,6 +71,7 @@ class AuthInitializer implements OnModuleInit, OnModuleDestroy {
     private readonly client: AuthClient,
     private readonly sessions: AppSessionService,
     private readonly context: ContextService,
+    private readonly accessPolicy: AuthAccessPolicy,
     @Inject(AUTH_CONFIG) private readonly config: AuthClientConfig,
     @Inject(BROWSER_CONFIG) private readonly browser: ResolvedBrowserAuthConfig,
     @Inject(FASTIFY_INSTANCE) private readonly fastify: ContentTypeParserHost,
@@ -82,6 +96,7 @@ class AuthInitializer implements OnModuleInit, OnModuleDestroy {
       rolesDeclared: Boolean(this.config.roles),
       serviceAccessLoaded: Boolean(this.config.client),
       browserFlow: this.browser.enabled,
+      accessMode: this.accessPolicy.mode,
     });
   }
 
@@ -104,6 +119,9 @@ export class AuthModule {
     const config = resolveAuthClientConfig(options);
     const routes = resolveAuthRoutes(options.routes);
     const browser = resolveBrowserAuthConfig(config, routes, options.browser);
+    const accessPolicy = new AuthAccessPolicy(resolveAccessMode(options));
+    if (accessPolicy.isPrivate()) assertSignInReachable(browser);
+
     const client = new AuthClient(config);
     const sessions = new AppSessionService(client, browser);
 
@@ -124,9 +142,10 @@ export class AuthModule {
         { token: AppSessionService, useFactory: () => sessions },
         { token: AUTH_CONFIG, useFactory: () => config },
         { token: BROWSER_CONFIG, useFactory: () => browser },
+        { token: AuthAccessPolicy, useFactory: () => accessPolicy },
         { token: AuthInitializer, useClass: AuthInitializer },
       ],
-      exports: [AuthClient, AppSessionService],
+      exports: [AuthClient, AppSessionService, AuthAccessPolicy],
     };
   }
 }

@@ -9,7 +9,7 @@ function botPermissionsOf(handler: object): string[] {
   for (const key of Reflect.getMetadataKeys(handler)) {
     const metadata = Reflect.getMetadata(key, handler) as Record<string, AuthRouteMetadata | undefined> | undefined;
     const auth = metadata?.[AUTH_ROUTE_METADATA];
-    if (auth) return auth.botPermissions ?? [];
+    if (auth) return auth.access === 'required' ? (auth.botPermissions ?? []) : [];
   }
   return [];
 }

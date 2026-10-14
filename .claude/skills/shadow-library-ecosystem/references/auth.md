@@ -162,8 +162,10 @@ create() {}
 remove() {}
 ```
 
-- Protection is **opt-in**: routes without auth metadata are not guarded. There is no `@Public()` in the
-  SDK; an app wanting default-deny builds that in its own auth module.
+- An undecorated route follows the app's access mode — anonymous in `public` (the default), session-required
+  in `private` (`AUTH_ACCESS_MODE` beats `forRoot({ defaultAccessMode })`). `@Public()` is anonymous in both;
+  `@OptionalAuth()` resolves a presented credential best-effort in `public` (never a 401, bot keys never
+  exchanged) and requires a session in `private`. `GET {basePath}/access` tells a browser client the mode.
 - `getAuthPrincipal()` throws 401 when the guard did not run; `getAuthPrincipalOrNull()` does not.
 - Service (`kind: 'service'`) principals are deny-by-default and need a matching service-access rule.
 - Bot (`kind: 'bot'`) principals are deny-by-default too: refused on every route without `@BotPermission('<permission>')` and on

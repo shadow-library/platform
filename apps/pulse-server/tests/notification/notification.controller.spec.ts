@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 
 import { type HandlerMetadata } from '@shadow-library/app';
 import { type AuthClient, type AuthPrincipal } from '@shadow-library/auth';
-import { AUTH_ROUTE_METADATA, AuthGuard, type AuthGuardHandler, extendContextWithAuth } from '@shadow-library/auth/module';
+import { AUTH_ROUTE_METADATA, AuthAccessPolicy, AuthGuard, type AuthGuardHandler, extendContextWithAuth } from '@shadow-library/auth/module';
 import { AppError } from '@shadow-library/common';
 import { ContextService } from '@shadow-library/fastify';
 
@@ -34,7 +34,7 @@ const client = {
 
 const context = new ContextService();
 extendContextWithAuth(context);
-const guard = new AuthGuard(client, context);
+const guard = new AuthGuard(client, context, new AuthAccessPolicy('public'));
 
 function handlerMetadata(method: keyof NotificationController): HandlerMetadata {
   const handler = NotificationController.prototype[method];

@@ -10,7 +10,7 @@ import { ContextService } from '@shadow-library/fastify';
  * Importing user defined packages
  */
 import { AuthClient, type FetchLike } from '@shadow-library/auth';
-import { AuthGuard, type AuthGuardHandler, extendContextWithAuth, type GuardedRequest, type GuardedResponse } from '@shadow-library/auth/module';
+import { AuthAccessPolicy, AuthGuard, type AuthGuardHandler, extendContextWithAuth, type GuardedRequest, type GuardedResponse } from '@shadow-library/auth/module';
 import { createTestIdP, type TestIdP } from '@shadow-library/auth/testing';
 
 /**
@@ -57,7 +57,7 @@ describe('Bot key exchange failures', () => {
     auth = new AuthClient({ issuer: idp.issuer, audience: AUDIENCE, client: CLIENT, fetch: transport });
     context = new ContextService();
     extendContextWithAuth(context);
-    guard = new AuthGuard(auth, context);
+    guard = new AuthGuard(auth, context, new AuthAccessPolicy('public'));
   });
   afterAll(() => idp.stop());
   afterEach(() => {
@@ -136,7 +136,7 @@ describe('Bot key exchange failures', () => {
   it('should hand a throttled bot identity retry-after instead of a 401 it cannot act on', async () => {
     const key = nextKey();
     intercept = { status: 429, headers: { 'retry-after': '12' } };
-    const handler = guard.generate({ shadowAuth: { authenticated: true, botPermissions: ['projects:read'] }, method: 'GET', path: '/projects' } as HandlerMetadata);
+    const handler = guard.generate({ shadowAuth: { access: 'required', botPermissions: ['projects:read'] }, method: 'GET', path: '/projects' } as HandlerMetadata);
     if (!handler) throw new Error('expected a handler');
 
     const headers = new Map<string, string | string[]>();

@@ -507,6 +507,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/auth/access': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Access */
+    get: operations['get_api_auth_access'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/auth/login': {
     parameters: {
       query?: never;
@@ -1101,6 +1118,13 @@ export interface components {
       pending: number;
       /** Format: date */
       date: string;
+    };
+    AuthAccessResponse: {
+      /**
+       * @description Whether this application serves anyone without a session. 'private' means every page needs a signed-in user, so a client sends an anonymous visitor to login before rendering.
+       * @enum {string}
+       */
+      mode: 'public' | 'private';
     };
     AuthLogoutResponse: {
       success: boolean;
@@ -2982,6 +3006,44 @@ export interface operations {
       };
     };
   };
+  get_api_auth_access: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AuthAccessResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   get_api_auth_login: {
     parameters: {
       query?: {
@@ -3342,6 +3404,7 @@ export type NotificationDeliveryStats = components['schemas']['NotificationDeliv
 export type NotificationChannelStats = components['schemas']['NotificationChannelStats'];
 export type NotificationStatsTrend = components['schemas']['NotificationStatsTrend'];
 export type NotificationStatsWithDate = components['schemas']['NotificationStatsWithDate'];
+export type AuthAccessResponse = components['schemas']['AuthAccessResponse'];
 export type AuthLogoutResponse = components['schemas']['AuthLogoutResponse'];
 export type AuthSessionResponse = components['schemas']['AuthSessionResponse'];
 export type AuthUserInfoResponse = components['schemas']['AuthUserInfoResponse'];

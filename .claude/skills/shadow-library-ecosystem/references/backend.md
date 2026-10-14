@@ -155,10 +155,13 @@ return the result. All business logic lives in the service.
    deep-merges into every handler. Set the controller's dominant policy at class level and override
    exceptions per method; the merge is per-key (`deepmerge`), so a method only cleanly overrides on the
    SAME axis — a controller mixing axes keeps method-level decorators.
-   The SDK's `AuthGuard` is **opt-in** (routes without auth metadata are skipped — there is no `@Auth`
-   or `@Public` in the SDK). Apps wanting default-deny build it in their own auth module with a local
-   `@Public()` escape hatch — follow the workspace's existing auth module (e.g. `pulse-server`'s
-   `RouteGuardSentinel` + `@Public()`, or `novel-forge-server`'s `ProjectOwnershipGuard`/BOLA middleware).
+   What an undecorated route means is the app's **access mode**: anonymous in `public` (the default),
+   session-required in `private` (`AUTH_ACCESS_MODE`, else `forRoot({ defaultAccessMode })`). The SDK's
+   `@Public()` opens a route in both modes and `@OptionalAuth()` serves anonymous callers while resolving
+   a presented credential best-effort (required in `private`). A method-level `@Public()` under a
+   class-level requirement that carries scopes/permissions refuses to boot. Apps wanting default-deny
+   in `public` mode still layer their own guard — follow the workspace's existing auth module (e.g.
+   `pulse-server`'s `RouteGuardSentinel` + local `@Public()`, or `novel-forge-server`'s `ProjectOwnershipGuard`/BOLA middleware).
 
 5. **Status codes: `@HttpStatus(n)` (or `@RespondFor(status, Dto)`), never `reply.status(n)`.**
    204 delete included — the router auto-sends the empty body. Without `@HttpStatus` a route answers its

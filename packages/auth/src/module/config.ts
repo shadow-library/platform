@@ -7,7 +7,7 @@ import { Config, Logger, utils } from '@shadow-library/common';
  * Importing user defined packages
  */
 import { NAMESPACE } from '../constants';
-import { type AuthClientConfig } from '../interfaces';
+import { type AuthAccessMode, type AuthClientConfig } from '../interfaces';
 import { assertValidCookieName, type CookieAttributes, type SameSitePolicy } from './cookie';
 import { LOGIN_STATE_TTL_SECONDS } from './login-state';
 
@@ -28,6 +28,7 @@ declare module '@shadow-library/common' {
     'auth.app.refresh-seconds': number;
     'auth.service-access.refresh-seconds': number;
     'auth.strict-scopes': boolean;
+    'auth.access-mode': AuthAccessMode;
 
     /** First-party browser flow configs (consumed by `AuthModule.forRoot`) */
     'auth.browser-login': boolean;
@@ -56,6 +57,8 @@ export interface AuthRoutePaths {
   organisations: string | false;
   /** Switches the active organisation, rotating the session cookie as it goes */
   organisation: string | false;
+  /** Tells a browser client whether this application serves anyone without a session, before it renders anything */
+  access: string | false;
 }
 
 export interface BrowserAuthOptions {
@@ -104,6 +107,12 @@ export interface BrowserAuthOptions {
 export interface AuthModuleOptions extends Partial<AuthClientConfig> {
   browser?: BrowserAuthOptions;
   routes?: Partial<AuthRoutePaths>;
+
+  /**
+   * The access posture the application declares in code; `AUTH_ACCESS_MODE` overrides it, so a deploy
+   * can take an application public or private without a release. Unset in both places, `public`.
+   */
+  defaultAccessMode?: AuthAccessMode;
 }
 
 /**
@@ -166,6 +175,10 @@ Config.load('auth.timeout', { validateType: 'number' });
 Config.load('auth.app.refresh-seconds', { validateType: 'number', defaultValue: '300' });
 Config.load('auth.service-access.refresh-seconds', { validateType: 'number', defaultValue: '300' });
 Config.load('auth.strict-scopes', { validateType: 'boolean', defaultValue: 'false' });
+
+/** Deliberately without a default: an unset value has to fall through to the mode the application declared in code */
+Config.load('auth.access-mode', { allowedValues: ['public', 'private'] });
+
 Config.load('auth.browser-login', { validateType: 'boolean', defaultValue: 'true' });
 Config.load('auth.session.cookie-name', { defaultValue: '__Host-shadow-session' });
 Config.load('auth.session.cookie-secure', { validateType: 'boolean', defaultValue: 'true' });
@@ -202,6 +215,7 @@ const DEFAULT_ROUTES: AuthRoutePaths = {
   stepUp: '/step-up',
   organisations: '/organisations',
   organisation: '/organisation',
+  access: '/access',
 };
 
 /** Fills any option not supplied in code from the corresponding `AUTH_*` environment config */
@@ -222,7 +236,11 @@ export function resolveAuthClientConfig(options: AuthModuleOptions = {}): AuthCl
   const serviceAccess = { refreshSeconds: options.serviceAccess?.refreshSeconds ?? Config.get('auth.service-access.refresh-seconds') };
   const strictScopes = options.strictScopes ?? Config.get('auth.strict-scopes');
 
-  return { ...utils.object.omitKeys(options, ['browser', 'routes']), issuer, identityUrl, appId, client, timeout, app, serviceAccess, strictScopes };
+  return { ...utils.object.omitKeys(options, ['browser', 'routes', 'defaultAccessMode']), issuer, identityUrl, appId, client, timeout, app, serviceAccess, strictScopes };
+}
+
+export function resolveAccessMode(options: AuthModuleOptions = {}): AuthAccessMode {
+  return Config.get('auth.access-mode') ?? options.defaultAccessMode ?? 'public';
 }
 
 export function resolveAuthRoutes(overrides: Partial<AuthRoutePaths> = {}): AuthRoutePaths {
