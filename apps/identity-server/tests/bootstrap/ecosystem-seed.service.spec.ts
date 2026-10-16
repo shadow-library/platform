@@ -115,5 +115,20 @@ describe('EcosystemSeedService', () => {
       const created = seed.applications.get('pulse')?.roles.find(role => role.roleName === 'PulseAdmin');
       expect(seed.assignRole).toHaveBeenCalledWith({ type: 'USER', id: '1' }, created?.id, '1');
     });
+
+    it('should add the synapse admin role to an existing synapse application missing it and assign it to the bootstrap administrator', async () => {
+      const seed = seedOver({
+        synapse: [
+          { id: 1, roleName: 'SynapseViewer' },
+          { id: 2, roleName: 'SynapseOperator' },
+        ],
+      });
+
+      await seed.service.seed(OPERATOR);
+
+      expect(seed.addRole).toHaveBeenCalledWith('synapse', expect.objectContaining({ roleName: 'SynapseAdmin' }));
+      const created = seed.applications.get('synapse')?.roles.find(role => role.roleName === 'SynapseAdmin');
+      expect(seed.assignRole).toHaveBeenCalledWith({ type: 'USER', id: '1' }, created?.id, '1');
+    });
   });
 });

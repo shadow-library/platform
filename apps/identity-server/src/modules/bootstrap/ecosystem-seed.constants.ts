@@ -93,6 +93,14 @@ const PULSE_VIEWER_PERMISSIONS = ['pulse:templates:read', 'pulse:senders:read', 
 const PULSE_OPERATOR_PERMISSIONS = [...PULSE_VIEWER_PERMISSIONS, 'pulse:templates:write', 'pulse:templates:publish', 'pulse:layouts:write'] as const;
 const PULSE_ADMIN_PERMISSIONS = [...PULSE_OPERATOR_PERMISSIONS, 'pulse:senders:write', 'pulse:messages:read', 'pulse:notifications:send'] as const;
 
+/** Mirrors `apps/synapse-server/src/modules/auth/rbac.constants.ts`. */
+const SYNAPSE_VIEWER_PERMISSIONS = ['synapse:catalog:read', 'synapse:usage:read'] as const;
+const SYNAPSE_OPERATOR_PERMISSIONS = [...SYNAPSE_VIEWER_PERMISSIONS, 'synapse:catalog:write'] as const;
+const SYNAPSE_ADMIN_PERMISSIONS = [...SYNAPSE_OPERATOR_PERMISSIONS, 'synapse:catalog:publish', 'synapse:providers:write', 'synapse:budgets:write'] as const;
+
+const SYNAPSE_INFER = { resource: 'api://synapse', scope: 'synapse:infer' } as const;
+const SYNAPSE_CATALOG_READ = { resource: 'api://synapse', scope: 'synapse:catalog:read' } as const;
+
 /**
  * The first-party ecosystem reconciled on boot. Each application gets one client whose id equals
  * its name and one `api://<name>` resource; existing records are never overwritten.
@@ -137,6 +145,41 @@ export const ECOSYSTEM_SEED: EcosystemSeed = {
       ],
     },
     {
+      name: 'synapse',
+      displayName: 'Synapse',
+      description: 'Platform AI service: model catalog, routing and metering for Shadow apps',
+      resourceName: 'Synapse AI API',
+      visibility: 'INTERNAL',
+      scopes: [
+        { name: 'synapse:infer', description: 'Call Synapse inference endpoints', principalType: 'SERVICE' },
+        { name: 'synapse:catalog:read', description: 'Read the Synapse model catalog for a calling app', principalType: 'SERVICE' },
+      ],
+      permissions: [
+        { name: 'synapse:catalog:read', description: 'Read the model catalog, its drafts and version history' },
+        { name: 'synapse:catalog:write', description: 'Create and edit model catalog drafts' },
+        { name: 'synapse:catalog:publish', description: 'Publish and roll back model catalog versions' },
+        { name: 'synapse:providers:write', description: 'Manage inference providers and their endpoints' },
+        { name: 'synapse:budgets:write', description: 'Manage per-app and per-subject usage budgets' },
+        { name: 'synapse:usage:read', description: 'Read usage, cost and ledger reports' },
+      ],
+      roles: [
+        { name: 'SynapseViewer', description: 'Read-only access to the synapse catalog and usage', permissions: SYNAPSE_VIEWER_PERMISSIONS },
+        { name: 'SynapseOperator', description: 'Day-to-day operator: reads everything and edits catalog drafts', permissions: SYNAPSE_OPERATOR_PERMISSIONS },
+        { name: 'SynapseAdmin', description: 'Full control over the synapse catalog, providers and budgets', permissions: SYNAPSE_ADMIN_PERMISSIONS, grantToBootstrapAdmin: true },
+      ],
+      grants: [AUTHZ_CHECK, APP_SESSION],
+      serviceAccess: [
+        { callerClientId: 'novel-forge', method: 'POST', pathPattern: '/api/v1/chat/completions' },
+        { callerClientId: 'novel-forge', method: 'POST', pathPattern: '/api/v1/embeddings' },
+        { callerClientId: 'novel-forge', method: 'POST', pathPattern: '/api/v1/images/generations' },
+        { callerClientId: 'novel-forge', method: 'GET', pathPattern: '/api/v1/catalog' },
+        { callerClientId: 'memoir', method: 'POST', pathPattern: '/api/v1/chat/completions' },
+        { callerClientId: 'memoir', method: 'POST', pathPattern: '/api/v1/embeddings' },
+        { callerClientId: 'memoir', method: 'POST', pathPattern: '/api/v1/images/generations' },
+        { callerClientId: 'memoir', method: 'GET', pathPattern: '/api/v1/catalog' },
+      ],
+    },
+    {
       name: 'novel-forge',
       displayName: 'Novel Forge',
       description: 'Long-form fiction authoring platform for the Shadow ecosystem',
@@ -168,7 +211,7 @@ export const ECOSYSTEM_SEED: EcosystemSeed = {
           grantToBootstrapAdmin: true,
         },
       ],
-      grants: [AUTHZ_CHECK, AUTHZ_ROLES_SYNC, APP_SESSION, USERS_RESOLVE, { resource: 'api://web-novel', scope: 'web-novel:publish' }],
+      grants: [AUTHZ_CHECK, AUTHZ_ROLES_SYNC, APP_SESSION, USERS_RESOLVE, { resource: 'api://web-novel', scope: 'web-novel:publish' }, SYNAPSE_INFER, SYNAPSE_CATALOG_READ],
       serviceAccess: [{ callerClientId: 'identity-server', method: '*', pathPattern: '/internal/bots/*' }],
     },
     {
@@ -199,7 +242,7 @@ export const ECOSYSTEM_SEED: EcosystemSeed = {
         { name: 'memoir:account', description: 'Manage profile, settings, consents and data export', principalType: 'USER' },
         { name: 'memoir:destructive', description: 'Delete the account and its data', isSensitive: true, principalType: 'USER' },
       ],
-      grants: [AUTHZ_CHECK, APP_SESSION, USERS_RESOLVE, { resource: 'api://pulse', scope: 'notifications:send' }],
+      grants: [AUTHZ_CHECK, APP_SESSION, USERS_RESOLVE, { resource: 'api://pulse', scope: 'notifications:send' }, SYNAPSE_INFER, SYNAPSE_CATALOG_READ],
     },
   ],
   serviceClients: [
