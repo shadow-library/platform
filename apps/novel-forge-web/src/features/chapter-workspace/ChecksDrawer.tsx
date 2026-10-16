@@ -9,12 +9,14 @@ import {
   type DraftResponse,
   type ListChapterReviewsResponse,
   remedyBody,
+  useAiModelsQuery,
   useClearRemedyMutation,
   useRegenerateChapterMutation,
   useRemedyMutation,
   useReviseDraftMutation,
 } from '@/lib/apis';
 import { buildRepairNote, type OpenFindingForm, repairSource, type ReviewJobState, versionLabel, visibleForm } from '@/lib/chapter-checks';
+import { modelLabel } from '@/lib/model-defaults';
 
 import { ChecksPanel } from './ChecksPanel';
 import styles from './ChecksDrawer.module.css';
@@ -34,6 +36,7 @@ export interface ChecksDrawerProps {
 }
 
 export function ChecksDrawer({ open, onOpenChange, novelId, draft, reviews, ...panel }: ChecksDrawerProps): React.JSX.Element {
+  const models = useAiModelsQuery();
   const remedy = useRemedyMutation(novelId, draft.chapter);
   const clear = useClearRemedyMutation(novelId, draft.chapter);
   const [form, setForm] = useState<OpenFindingForm | undefined>();
@@ -60,6 +63,7 @@ export function ChecksDrawer({ open, onOpenChange, novelId, draft, reviews, ...p
       <Drawer.Body>
         <ChecksPanel
           {...panel}
+          modelName={model => modelLabel(models.data, model) ?? model}
           list={reviews.data}
           loading={reviews.isLoading}
           error={reviews.error}

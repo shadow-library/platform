@@ -64,6 +64,8 @@ export interface ChecksPanelProps {
   onRemedy: (review: ChapterReviewRecordResponse, finding: ReviewFindingResponse, action: ReviewRemedyAction, reason: string | undefined, onFailed: () => void) => void;
   onClearRemedy: (review: ChapterReviewRecordResponse, finding: ReviewFindingResponse, onFailed: () => void) => void;
   heldActions?: ReactNode;
+  /** The name to show for a review's recorded model key; the key itself when none is given. */
+  modelName?: (model: string) => string;
 }
 
 export function ChecksPanel(props: ChecksPanelProps): React.JSX.Element {
@@ -136,7 +138,7 @@ function ChecksContent({ list, kind, onKindChange, jobs, ...rest }: ChecksPanelP
 type KindDetailProps = Omit<ChecksPanelProps, 'loading' | 'error' | 'onRetry' | 'onKindChange'>;
 
 function KindDetail(props: KindDetailProps): React.JSX.Element {
-  const { kind, list, jobs, runBlockedReason, starting, onRun, busyFinding, form, onFormChange, approvedRevision, onRemedy, onClearRemedy, heldActions } = props;
+  const { kind, list, jobs, runBlockedReason, starting, onRun, busyFinding, form, onFormChange, approvedRevision, onRemedy, onClearRemedy, heldActions, modelName } = props;
   const review = latestOf(list, kind);
   const [tier, setTier] = useState<TierChoice>(DEFAULT_TIER);
   const job = jobs.active[kind];
@@ -197,7 +199,7 @@ function KindDetail(props: KindDetailProps): React.JSX.Element {
         </span>
         <StatusChip intent={disposition.intent}>{disposition.label}</StatusChip>
       </div>
-      <span className={styles.meta}>{reviewMeta(review)}</span>
+      <span className={styles.meta}>{reviewMeta(review, modelName)}</span>
       {failure}
       {stale && (
         <div role="status" className={styles.notice} data-tone="warning">
@@ -261,9 +263,9 @@ function KindDetail(props: KindDetailProps): React.JSX.Element {
   );
 }
 
-function reviewMeta(review: ChapterReviewRecordResponse): string {
+function reviewMeta(review: ChapterReviewRecordResponse, modelName: (model: string) => string = model => model): string {
   const parts = ['Saved with the chapter'];
-  if (review.model) parts.push(`read by ${review.model}`);
+  if (review.model) parts.push(`read by ${modelName(review.model)}`);
   else if (!isModelKind(review.kind)) parts.push('measured, no model call');
   if (review.costTier) parts.push(tierLabel(review.costTier));
   if (review.isolated) parts.push('isolated chapter');

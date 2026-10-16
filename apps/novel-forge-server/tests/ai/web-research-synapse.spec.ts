@@ -8,11 +8,21 @@ import { FakeSynapse, json, synapseError } from './synapse-fakes';
 
 const SELECTORS = { tier: 'balanced', content_mode: 'standard' };
 
-const catalog = (nativeWebSearch: boolean): Record<string, unknown> => ({
+const alias = (key: string, nativeWebSearch: boolean): Record<string, unknown> => ({
+  key,
+  label: key,
+  model: key,
+  price: { input: 1, output: 1 },
+  capabilities: {},
+  state: 'active',
+  native_web_search: nativeWebSearch,
+});
+
+const catalog = (nativeWebSearch: boolean, aliases: Record<string, unknown>[] = []): Record<string, unknown> => ({
   catalog_version: 3,
   task: 'novel-forge.chat',
   default: { model: 'claude-opus-5.5', label: 'Opus', price: { input: 5, output: 25 }, capabilities: {} },
-  aliases: [],
+  aliases,
   native_web_search: nativeWebSearch,
 });
 
@@ -44,5 +54,16 @@ describe('WebResearchService.modeFor on the synapse backend', () => {
     expect(await service(new FakeSynapse().reply(synapseError(503, 'SYN_NO_ACTIVE_CATALOG'))).modeFor('m', SELECTORS)).toBe('brave');
     setConfig({ 'ai.web-search.brave.api.key': undefined });
     expect(await service(new FakeSynapse().reply(json(catalog(false)))).modeFor('m', SELECTORS)).toBe('off');
+  });
+
+  it("should judge a pinned chat by its alias's own native web search, whatever the task default says", async () => {
+    const aliases = [alias('opus', true), alias('kimi', false)];
+
+    expect(await service(new FakeSynapse().reply(json(catalog(false, aliases)))).modeFor('m', SELECTORS, 'opus')).toBe('native');
+    expect(await service(new FakeSynapse().reply(json(catalog(true, aliases)))).modeFor('m', SELECTORS, 'kimi')).toBe('brave');
+  });
+
+  it("should fall back to the task default's answer for a pin the catalog does not offer", async () => {
+    expect(await service(new FakeSynapse().reply(json(catalog(true, [alias('kimi', false)])))).modeFor('m', SELECTORS, 'retired')).toBe('native');
   });
 });

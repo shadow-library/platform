@@ -5,6 +5,7 @@ import { and, asc, desc, eq, gt, inArray, isNull, lt, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger, OffsetPaginationResult, utils } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
+import { LEGACY_SLUG_ALIAS } from '@shadow-library/synapse';
 
 import { AppErrorCode } from '@server/classes';
 import { PROGRESS_ITEM_KEYS } from '@server/common';
@@ -13,7 +14,8 @@ import { type PrimaryDatabase, type PrimaryTransaction, type Project, type Refin
 
 import { CHAT_HISTORY_BUDGET, ContextAssembler } from '../ai/context/context-assembler.service';
 import { countTokens } from '../ai/context/token-budget';
-import { isRegisteredModel } from '../ai/defaults';
+import { isSynapseBackend } from '../ai/ai-backend';
+import { isRegisteredModel, type ResolvedModel } from '../ai/defaults';
 import { gatewaySessionKey, keepsGatewaySession } from '../ai/gateway-session';
 import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { hardLineError, screenTexts } from '../ai/hard-line';
@@ -21,7 +23,8 @@ import { type ModelRoute, ModelRouterService, type ProjectConfig } from '../ai/m
 import { buildChatRefinePrompt, chatPromptTokens, chatScopeInstructions, HUB_ALLOWED_OPS, PROMPT_REGISTRY, renderTurnMessage, renderTurnRules } from '../ai/prompts';
 import { RetrievalService } from '../ai/retrieval';
 import { type ChatRefineOutput, type ChatTitleOutput } from '../ai/schemas';
-import { synapseSelectors } from '../ai/synapse-request';
+import { NovelForgeCatalogService } from '../ai/novel-forge-catalog.service';
+import { SYNAPSE_CHAT_TASK, SYNAPSE_PROVIDER, synapseAlias, synapseSelectors } from '../ai/synapse-request';
 import { type ToolContext, ToolRegistryService } from '../ai/tools';
 import { resolveUnrestrictedRoute } from '../ai/unrestricted-route';
 import { type WebLookups, type WebMode, WebResearchService } from '../ai/web';
@@ -36,7 +39,16 @@ import { ChatCompactionService, type ChatConversation } from './chat-compaction.
 import { contextUpdate, playbookDigest, toExchangeMessage } from './chat-exchange';
 import { type ChatTurnEmitter, EmitterRelay } from './chat-turn-emitter';
 import { TurnTraceCollector } from './chat-turn-trace';
-import { CHAT_TURN_GRAPH, chatRoutedProject, type ChatSelection, chatSelection, type ChatSelectionOverride, loadTurnSelections, withChatModel } from './chat-selection';
+import {
+  aliasRoutedProject,
+  CHAT_TURN_GRAPH,
+  chatRoutedProject,
+  type ChatSelection,
+  chatSelection,
+  type ChatSelectionOverride,
+  loadTurnSelections,
+  withChatModel,
+} from './chat-selection';
 import { sanitizeChatQuestion } from './chat-question';
 import { loadRejectedIdeas } from './idea-rejections';
 import { requestedNegations } from './negation-echo';
@@ -79,6 +91,14 @@ export interface SessionModelUpdate {
   model?: string | null;
   contentMode?: Project.ContentMode | null;
   costTier?: Project.CostTier | null;
+}
+
+/** What a Synapse reply records when no response named its model, as a call that never answered records itself: never the registry's slug. */
+const UNANSWERED_CHAT: ResolvedModel = { provider: SYNAPSE_PROVIDER, model: SYNAPSE_CHAT_TASK };
+
+interface SessionPin {
+  provider: string | null;
+  model: string | null;
 }
 
 /** The selection is absent on user messages and on turns older than selections. */
@@ -218,6 +238,7 @@ export class ChatService {
     private readonly notesStore: NotesStoreService,
     private readonly webResearch: WebResearchService,
     private readonly actionRegistry: ActionExecutorRegistry,
+    private readonly catalog?: NovelForgeCatalogService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
@@ -322,22 +343,33 @@ export class ChatService {
   async updateSessionModel(projectId: bigint, sessionId: string, update: SessionModelUpdate): Promise<Refinement.ChatSession> {
     const session = await this.getSession(projectId, sessionId);
     const set: Partial<typeof schema.chatSessions.$inferInsert> = { updatedAt: new Date() };
-    if (update.provider !== undefined || update.model !== undefined) {
-      const provider = update.provider ?? null;
-      const model = update.model ?? null;
-      // Clearing (both null) restores the cost tier's model; a pin must name a registry model with
-      // the matching provider, regardless of contentMode, so a raw pick never reaches the platform key.
-      if (provider !== null || model !== null) {
-        if (!provider || !model || !isRegisteredModel('chat', { provider, model })) throw AppErrorCode.AI_002.create();
-      }
-      set.modelProvider = provider;
-      set.modelId = model;
-    }
     if (update.contentMode !== undefined) set.contentMode = update.contentMode;
     if (update.costTier !== undefined) set.costTier = update.costTier;
+    if (update.provider !== undefined || update.model !== undefined) {
+      const pin = { provider: update.provider ?? null, model: update.model ?? null };
+      // Clearing (both null) restores the cost tier's model and clears both backends' pins, so the alias backfill cannot bring the old slug back.
+      if (pin.provider === null && pin.model === null) Object.assign(set, { modelProvider: null, modelId: null, aliasKey: null });
+      else if (isSynapseBackend()) Object.assign(set, { modelProvider: null, modelId: null, aliasKey: await this.offeredAlias(projectId, { ...session, ...set }, pin) });
+      else Object.assign(set, this.registryPin(pin));
+    }
     const [updated] = await this.db.update(schema.chatSessions).set(set).where(eq(schema.chatSessions.id, session.id)).returning();
     if (!updated) throw AppErrorCode.CHT_001.create();
     return updated;
+  }
+
+  // A pin must name a registry model with the matching provider, regardless of contentMode, so a raw pick never reaches the platform key. Its
+  // alias is kept in step, so the chat stays pinned to the same family if the backend moves to Synapse.
+  private registryPin({ provider, model }: SessionPin): Pick<Refinement.ChatSession, 'modelProvider' | 'modelId' | 'aliasKey'> {
+    if (!provider || !model || !isRegisteredModel('chat', { provider, model })) throw AppErrorCode.AI_002.create();
+    return { modelProvider: provider, modelId: model, aliasKey: LEGACY_SLUG_ALIAS[model] ?? null };
+  }
+
+  /** An alias pin must be one the catalog offers this chat's chat task under the model type and cost tier the chat will have after this update. */
+  private async offeredAlias(projectId: bigint, session: Pick<Refinement.ChatSession, 'contentMode' | 'costTier'>, pin: SessionPin): Promise<string> {
+    if (pin.provider !== SYNAPSE_PROVIDER || !pin.model) throw AppErrorCode.AI_002.create();
+    if (!this.catalog) throw AppErrorCode.AI_007.create({ transient: true });
+    const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId), columns: { contentMode: true, costTier: true } });
+    return (await this.catalog.requireChatAlias(pin.model, chatSelection({}, session, project))).key;
   }
 
   async listMessages(projectId: bigint, sessionId: string, opts: { before?: number; limit?: number }): Promise<ChatMessageView[]> {
@@ -473,7 +505,7 @@ export class ChatService {
     const prompt = buildChatRefinePrompt(session.scopeType, { proseEdits, organiseNotes: organiseRequest });
     const guarded = (output: ChatRefineOutput): ChatRefineOutput => withLaterPlansRouted(withheldProse(output, proseEdits), organise);
     const turnRules = renderTurnRules({ proseEdits, justDiscussing, organiseNotes: organiseRequest, mode: session.mode });
-    const webMode = await this.webResearch.modeFor(route.resolved.model, synapseSelectors(route));
+    const webMode = await this.webResearch.modeFor(route.resolved.model, synapseSelectors(route), synapseAlias('chat', routed));
     const scopeInstructions = chatScopeInstructions(this.toolRegistry.getRaw(CHAT_HUB_NODE, webMode), webMode);
     const playbook = playbookDigest(scopeInstructions);
     const keyed = route.contentMode === 'standard' && keepsGatewaySession(route.resolved.model);
@@ -488,7 +520,8 @@ export class ChatService {
     const stableContext = conversation.segment?.stableContext ?? pack.renderedStable;
     const turnParts = { volatileContext: context?.text ?? (pack.renderedVolatile || 'nothing'), turnRules, userMessage: message };
 
-    // Pinned as the chat model so every round of this turn — lookups and repairs included — lands on the model recorded on the reply.
+    // Pinned as the chat model so every round of this turn — lookups and repairs included — lands on the model recorded on the reply. On Synapse
+    // the reply records the model its last answered call names instead, since the routes and the alias pick it there.
     const resolvedModel = route.resolved;
     const effectiveProject = withChatModel(routed, resolvedModel);
     const selection: ChatSelection = { contentMode: route.contentMode, costTier: route.costTier };
@@ -517,6 +550,7 @@ export class ChatService {
       const rounds: BaseMessage[] = [];
       let settled = 0;
       const gatewaySession = keyed ? gatewaySessionKey(projectId, sessionId) : undefined;
+      let answered: ResolvedModel | undefined;
       const ctx = {
         projectId,
         runId,
@@ -525,6 +559,7 @@ export class ChatService {
         promptVersion: prompt.version,
         role: 'chat',
         webTools: webMode === 'native',
+        onAnswered: (model: ResolvedModel) => void (answered = model),
         ...(gatewaySession ? { gatewaySession, onRepair: (reply: string, request: string) => void rounds.push(new AIMessage(reply), new HumanMessage(request)) } : {}),
       };
       const invoke = async (): Promise<ChatRefineOutput> => {
@@ -582,7 +617,8 @@ export class ChatService {
         sections: context.sections,
         messages: [{ role: 'user', content: renderTurnMessage(turnParts) }, ...rounds.slice(0, settled).map(toExchangeMessage)],
       };
-      const persisted = await this.persistAssistantTurn(projectId, session, userMessage, output, runId, { model: resolvedModel, exchange }, turnWarnings, staging, trace);
+      const model = answered ?? (isSynapseBackend() ? UNANSWERED_CHAT : resolvedModel);
+      const persisted = await this.persistAssistantTurn(projectId, session, userMessage, output, runId, { model, exchange }, turnWarnings, staging, trace);
       return { ...persisted, assistantMessage: { ...persisted.assistantMessage, ...selection } };
     });
 
@@ -702,7 +738,9 @@ export class ChatService {
    */
   private async routeChatReply(projectId: bigint, session: Refinement.ChatSession, project: ProjectConfig | undefined, selection: ChatSelection): Promise<ChatReplyRoute> {
     const call = { role: 'chat' as const };
-    const base = chatRoutedProject(project, session, selection);
+    const base = isSynapseBackend()
+      ? aliasRoutedProject(project, session, selection, await this.catalog?.offeredChatAliases(selection))
+      : chatRoutedProject(project, session, selection);
     const { policy, project: routed } =
       selection.contentMode === 'unrestricted'
         ? await resolveUnrestrictedRoute({ pluginPolicy: this.pluginPolicy, modelRouter: this.modelRouter }, projectId, call, base)

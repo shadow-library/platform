@@ -22,6 +22,11 @@ describe('matchesWhere', () => {
     expect(chapters(ne(briefs.volumeKey, 'volume_1'))).toEqual([3]);
   });
 
+  it('should read is distinct from a value as a null-safe inequality', () => {
+    expect(chapters(sql`${briefs.volumeKey} is distinct from ${'volume_1'}`)).toEqual([2, 3]);
+    expect(chapters(sql`${briefs.volumeKey} is not distinct from ${'volume_1'}`)).toEqual([1, 4]);
+  });
+
   it('should read or as or, nested inside and', () => {
     expect(chapters(and(eq(briefs.projectId, 7n), or(eq(briefs.chapter, 1), gt(briefs.chapter, 2))))).toEqual([1, 3]);
   });

@@ -27,6 +27,7 @@ describe('resolveDefault', () => {
     expect(resolveDefault({ tiers: TIERS, choice })).toEqual({
       provider: 'openrouter',
       model: modelFor(costTier, 'standard', 'chat'),
+      label: modelFor(costTier, 'standard', 'chat'),
     });
   });
 

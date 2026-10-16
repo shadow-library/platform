@@ -3193,17 +3193,23 @@ export interface components {
     AiModelsResponse: {
       /** @description The active server profile. Roles without an override inherit this profile's defaults. */
       profile: string;
+      /** @description Every model a chat can be pinned to under any model type and cost tier. */
       models: components['schemas']['AiModelOption'][];
       defaults: components['schemas']['AiRoleDefault'][];
       /** @description Group defaults used when a project is in Unrestricted content mode. */
       unrestrictedDefaults: components['schemas']['AiRoleDefault'][];
-      /** @description Model ids that Unrestricted projects may select. Others are coerced to the Unrestricted group default. */
+      /** @description Option ids that Unrestricted projects may select. Others are coerced to the Unrestricted group default. */
       unrestrictedAllowlist: string[];
       /** @description The platform model for every cost tier × model type × author-selectable group. Balanced equals `defaults` / `unrestrictedDefaults`. */
       tiers: components['schemas']['AiTierModel'][];
+      /** @description Names for the model keys calls, replies and reviews record, which `models` does not list on the Synapse backend. */
+      modelLabels: components['schemas']['AiModelLabel'][];
     };
+    /** @description A model an author can pin a chat to: a registry model on the legacy backend, a Synapse alias (provider `synapse`) on the Synapse backend. */
     AiModelOption: {
+      /** @description The registry model id, or the Synapse alias key; a chat pin sends it as `model` with this `provider`. */
       id: string;
+      /** @description `synapse` for a Synapse alias. */
       provider: string;
       /** @description The name to show an author — a product name on its own, never a gateway or a slug. The embedding entry, which is never offered, carries its id. */
       label: string;
@@ -3219,6 +3225,7 @@ export interface components {
     };
     AiRoleDefault: {
       role: string;
+      /** @description `synapse` on the Synapse backend, where `model` is the catalog model its routes pick. */
       provider: string;
       model: string;
     };
@@ -3227,6 +3234,7 @@ export interface components {
       contentMode: components['schemas']['ContentMode'];
       /** @description Model group: writing, planning, review, chat, helper or image. */
       group: string;
+      /** @description `synapse` on the Synapse backend, where `model` is the catalog model its routes pick. */
       provider: string;
       model: string;
       /** @description The product name to show an author. */
@@ -3238,6 +3246,16 @@ export interface components {
     };
     /** @enum {string} */
     ContentMode: 'standard' | 'unrestricted';
+    AiModelLabel: {
+      /** @description A model key as calls, replies and reviews record it: a Synapse catalog model, or a registry slug on rows written before Synapse. */
+      model: string;
+      /** @description The name to show an author. */
+      label: string;
+      /** @description USD per million input tokens, for estimating an old call that recorded no cost; absent for image models. */
+      inputPricePerMToken?: number;
+      /** @description USD per million output tokens, for estimating an old call that recorded no cost; absent for image models. */
+      outputPricePerMToken?: number;
+    };
     /** @description Cost, tokens and calls across every novel the signed-in author owns — the same shaping as a single project's cost, plus a per-novel breakdown. */
     AccountUsageResponse: {
       totalCostUsd: number;
@@ -3317,15 +3335,20 @@ export interface components {
       contentMode: components['schemas']['ContentMode'];
       costTier: components['schemas']['CostTier'];
       models: components['schemas']['ProjectModelRoute'][];
+      /** @description The `GET /ai/models` option ids a chat may pin under exactly this model type and cost tier: Synapse alias keys, or registry models on the legacy backend. */
+      chatAliases: string[];
     };
     ProjectModelRoute: {
       /** @description Model group: writing, planning, review, chat, helper or image. */
       group: string;
+      /** @description `synapse` on the Synapse backend, where `model` is the catalog model its routes pick. */
       provider: string;
       model: string;
       /** @description The product name to show an author. */
       label: string;
+      /** @description USD per million input tokens; absent for image models. */
       inputPricePerMToken?: number;
+      /** @description USD per million output tokens; absent for image models. */
       outputPricePerMToken?: number;
     };
     PluginManifestResponse: components['schemas']['PluginManifestResponse1'][];
@@ -4092,6 +4115,7 @@ export interface components {
       node?: string | null;
       role: string;
       provider: string;
+      /** @description The model that answered, as recorded: a catalog model on the Synapse backend, its task when no model answered. Named by `GET /ai/models` `modelLabels`. */
       model: string;
       promptKey: string;
       promptVersion: string;
@@ -4200,6 +4224,7 @@ export interface components {
       node?: string | null;
       role: string;
       provider: string;
+      /** @description The model that answered, as recorded: a catalog model on the Synapse backend, its task when no model answered. Named by `GET /ai/models` `modelLabels`. */
       model: string;
       promptKey: string;
       promptVersion: string;
@@ -4756,7 +4781,9 @@ export interface components {
       title?: string | null;
       status: components['schemas']['ChatSessionStatus'];
       mode: components['schemas']['ChatMode'];
+      /** @description The pinned option's provider: `synapse` for an alias pin. Null when the chat is unpinned. */
       modelProvider?: string | null;
+      /** @description The pinned option's id: a registry model on the legacy backend, an alias key on the Synapse backend. */
       modelId?: string | null;
       /** @description The chat's own model type; null follows the project's content mode. */
       contentMode?: components['schemas']['ContentMode'] | null;
@@ -4797,7 +4824,9 @@ export interface components {
       /** @description The turn's changes taken from the author's own words, applied in the turn and undone by reverting this proposal. */
       appliedProposalId?: string | null;
       runId?: string | null;
+      /** @description Who served the reply; null on user messages. */
       modelProvider?: string | null;
+      /** @description The model that wrote the reply: its catalog model on the Synapse backend, named by `GET /ai/models` `modelLabels`; null on user messages. */
       modelId?: string | null;
       /** @description The model type the reply was written under; null on user messages and on replies older than the selection. */
       contentMode?: components['schemas']['ContentMode'] | null;
@@ -5010,9 +5039,9 @@ export interface components {
     };
     /** @description Every field is optional: an omitted field is left as it is, `null` clears it back to the project default. */
     UpdateSessionModelBody: {
-      /** @description Model provider override; clear both override fields to use the project or profile default. */
+      /** @description The picked option's provider from `GET /ai/models`: `synapse` for a Synapse alias. Clear both pin fields to use the cost tier's model. */
       provider?: string | null;
-      /** @description Model name override; clear both override fields to use the project or profile default. */
+      /** @description The picked option's id: a registry model on the legacy backend, an alias key on the Synapse backend, which must be offered for the chat's model type and cost tier after this update (`AI_022` otherwise). */
       model?: string | null;
       /** @description This chat's default model type for its replies; chapters keep their own content mode. */
       contentMode?: components['schemas']['ContentMode'] | null;
@@ -5525,6 +5554,7 @@ export interface components {
       costTier?: components['schemas']['CostTier'] | null;
       contentMode?: components['schemas']['ContentMode'] | null;
       modelProvider?: string | null;
+      /** @description The model that read the chapter, as its call recorded it; named by `GET /ai/models` `modelLabels`. Null when no model ran or the review came from cache. */
       model?: string | null;
       /** Format: date-time */
       createdAt: string;
@@ -16075,6 +16105,7 @@ export type AiModelOption = components['schemas']['AiModelOption'];
 export type AiRoleDefault = components['schemas']['AiRoleDefault'];
 export type AiTierModel = components['schemas']['AiTierModel'];
 export type ContentMode = components['schemas']['ContentMode'];
+export type AiModelLabel = components['schemas']['AiModelLabel'];
 export type AccountUsageResponse = components['schemas']['AccountUsageResponse'];
 export type CostBreakdownItem = components['schemas']['CostBreakdownItem'];
 export type DayCostItem = components['schemas']['DayCostItem'];

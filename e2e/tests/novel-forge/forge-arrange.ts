@@ -8,7 +8,7 @@ import { type APIResponse } from '@playwright/test';
  */
 import { mutate } from '../../lib';
 import { expect, type ForgeActor, type ForgeHarness } from './forge-actors';
-import { assertSpendGuarded, failPinChat } from './forge-db';
+import { assertSpendGuarded } from './forge-db';
 import { errorCode, uniqueSuffix } from './forge-helpers';
 
 /**
@@ -46,13 +46,6 @@ export async function guardedProject(forge: ForgeHarness, owner: ForgeActor, lab
   const projectId = await newProject(owner, label);
   await forge.quotaPin(projectId);
   return projectId;
-}
-
-/** A chat on a guarded novel pinned to a model no route accepts, so a turn is refused AI_002 before its run exists. */
-export async function failPinnedChat(owner: ForgeActor, projectId: string): Promise<string> {
-  const sessionId = await newChatSession(owner, projectId);
-  await failPinChat(sessionId);
-  return sessionId;
 }
 
 export async function newChatSession(owner: ForgeActor, projectId: string): Promise<string> {

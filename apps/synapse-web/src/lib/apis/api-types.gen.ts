@@ -629,10 +629,14 @@ export interface components {
       /** @description Includes the model version only when the alias opts in to showing it */
       label: string;
       description?: string;
+      /** @description The catalog model the alias targets, as the `model` of a response it serves */
+      model: string;
       price: components['schemas']['CatalogPriceView'];
       capabilities: components['schemas']['CatalogCapabilitiesView'];
       /** @enum {string} */
       state: 'active' | 'hidden' | 'retired';
+      /** @description Whether the first eligible deployment of the alias's model is served by a provider with native web search */
+      native_web_search: boolean;
     };
     CatalogVersionListResponse: {
       /** @description Published and archived versions, newest first */

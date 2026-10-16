@@ -22,6 +22,10 @@ const PREDICATES: { pattern: RegExp; build: (match: RegExpExecArray, params: unk
     },
   },
   {
+    pattern: new RegExp(`^${COLUMN} is (not )?distinct from \\$(\\d+)`),
+    build: (match, params) => row => (String(row[camel(match[1])] ?? null) !== String(params[Number(match[3]) - 1] ?? null)) !== Boolean(match[2]),
+  },
+  {
     pattern: new RegExp(`^${COLUMN} is (not )?distinct from ${COLUMN}`),
     build: match => row => (String(row[camel(match[1])] ?? null) !== String(row[camel(match[3])] ?? null)) !== Boolean(match[2]),
   },

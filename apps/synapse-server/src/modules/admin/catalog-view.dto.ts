@@ -90,6 +90,9 @@ export class CatalogAliasView {
   @Field({ optional: true })
   description?: string;
 
+  @Field({ description: 'The catalog model the alias targets, as the `model` of a response it serves' })
+  model: string;
+
   @Field(() => CatalogPriceView)
   price: CatalogPriceView;
 
@@ -98,6 +101,9 @@ export class CatalogAliasView {
 
   @Field(() => String, { enum: ['active', 'hidden', 'retired'] })
   state: 'active' | 'hidden' | 'retired';
+
+  @Field({ description: "Whether the first eligible deployment of the alias's model is served by a provider with native web search" })
+  native_web_search: boolean;
 }
 
 @Schema()

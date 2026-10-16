@@ -7,6 +7,7 @@ import { type Ai, type PrimaryDatabase, schema } from '@server/database';
 
 import { type CostWindow, type DayCostRow, summarizeByDay, summarizeCost } from '../project/project/project-cost';
 import { type AccountUsageResponse, type ProjectCostItem } from './ai.dto';
+import { NovelForgeCatalogService } from './novel-forge-catalog.service';
 import { classifyRowCost } from './quota';
 
 export interface ProjectCostGroupRow {
@@ -37,7 +38,10 @@ export function summarizeByProject(rows: readonly ProjectCostGroupRow[]): Projec
 export class AiUsageService {
   private readonly db: PrimaryDatabase;
 
-  constructor(databaseService: DatabaseService) {
+  constructor(
+    databaseService: DatabaseService,
+    private readonly catalog?: NovelForgeCatalogService,
+  ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
 
@@ -48,7 +52,7 @@ export class AiUsageService {
     const ownerFilter = ownedBy(projects, owner);
     const window = sql<CostWindow>`case when ${calls.createdAt} >= now() - interval '7 days' then 'last7Days' when ${calls.createdAt} >= now() - interval '30 days' then 'last30Days' else 'older' end`;
 
-    const [rows, dayRows, projectRows] = await Promise.all([
+    const [rows, dayRows, projectRows, labels] = await Promise.all([
       this.db
         .select({
           role: calls.role,
@@ -100,8 +104,9 @@ export class AiUsageService {
         .innerJoin(projects, eq(calls.projectId, projects.id))
         .where(ownerFilter)
         .groupBy(calls.projectId, projects.title, calls.model, calls.status, calls.costSource),
+      this.catalog?.modelLabels(),
     ]);
 
-    return { ...summarizeCost(rows), byDay: summarizeByDay(dayRows as DayCostRow[]), byProject: summarizeByProject(projectRows) };
+    return { ...summarizeCost(rows, labels), byDay: summarizeByDay(dayRows as DayCostRow[]), byProject: summarizeByProject(projectRows) };
   }
 }

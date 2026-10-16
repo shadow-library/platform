@@ -54,10 +54,19 @@ export class UpdateChatSessionBody {
 
 @Schema({ minProperties: 1, description: 'Every field is optional: an omitted field is left as it is, `null` clears it back to the project default.' })
 export class UpdateSessionModelBody {
-  @Field({ optional: true, nullable: true, description: 'Model provider override; clear both override fields to use the project or profile default.' })
+  @Field({
+    optional: true,
+    nullable: true,
+    description: "The picked option's provider from `GET /ai/models`: `synapse` for a Synapse alias. Clear both pin fields to use the cost tier's model.",
+  })
   provider?: string | null;
 
-  @Field({ optional: true, nullable: true, description: 'Model name override; clear both override fields to use the project or profile default.' })
+  @Field({
+    optional: true,
+    nullable: true,
+    description:
+      "The picked option's id: a registry model on the legacy backend, an alias key on the Synapse backend, which must be offered for the chat's model type and cost tier after this update (`AI_022` otherwise).",
+  })
   model?: string | null;
 
   @Field(() => ContentMode, { optional: true, nullable: true, description: "This chat's default model type for its replies; chapters keep their own content mode." })
@@ -99,10 +108,10 @@ export class ChatSessionResponse {
   @Field(() => ChatMode)
   mode: Refinement.ChatMode;
 
-  @Field({ optional: true, nullable: true })
+  @Field({ optional: true, nullable: true, description: "The pinned option's provider: `synapse` for an alias pin. Null when the chat is unpinned." })
   modelProvider?: string | null;
 
-  @Field({ optional: true, nullable: true })
+  @Field({ optional: true, nullable: true, description: "The pinned option's id: a registry model on the legacy backend, an alias key on the Synapse backend." })
   modelId?: string | null;
 
   @Field(() => ContentMode, { optional: true, nullable: true, description: "The chat's own model type; null follows the project's content mode." })
@@ -359,10 +368,14 @@ export class ChatMessageResponse {
   @Field({ optional: true, nullable: true })
   runId?: string | null;
 
-  @Field({ optional: true, nullable: true })
+  @Field({ optional: true, nullable: true, description: 'Who served the reply; null on user messages.' })
   modelProvider?: string | null;
 
-  @Field({ optional: true, nullable: true })
+  @Field({
+    optional: true,
+    nullable: true,
+    description: 'The model that wrote the reply: its catalog model on the Synapse backend, named by `GET /ai/models` `modelLabels`; null on user messages.',
+  })
   modelId?: string | null;
 
   @Field(() => ContentMode, {

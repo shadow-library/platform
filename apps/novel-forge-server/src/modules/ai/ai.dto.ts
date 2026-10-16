@@ -6,12 +6,12 @@ import { type Project } from '@server/database';
 
 import { CostResponse } from '../project/project/project.dto';
 
-@Schema()
+@Schema({ description: 'A model an author can pin a chat to: a registry model on the legacy backend, a Synapse alias (provider `synapse`) on the Synapse backend.' })
 export class AiModelOption {
-  @Field()
+  @Field({ description: 'The registry model id, or the Synapse alias key; a chat pin sends it as `model` with this `provider`.' })
   id: string;
 
-  @Field()
+  @Field({ description: '`synapse` for a Synapse alias.' })
   provider: string;
 
   @Field({ description: 'The name to show an author — a product name on its own, never a gateway or a slug. The embedding entry, which is never offered, carries its id.' })
@@ -44,11 +44,26 @@ export class AiRoleDefault {
   @Field()
   role: string;
 
-  @Field()
+  @Field({ description: '`synapse` on the Synapse backend, where `model` is the catalog model its routes pick.' })
   provider: string;
 
   @Field()
   model: string;
+}
+
+@Schema()
+export class AiModelLabel {
+  @Field({ description: 'A model key as calls, replies and reviews record it: a Synapse catalog model, or a registry slug on rows written before Synapse.' })
+  model: string;
+
+  @Field({ description: 'The name to show an author.' })
+  label: string;
+
+  @Field(() => Number, { optional: true, description: 'USD per million input tokens, for estimating an old call that recorded no cost; absent for image models.' })
+  inputPricePerMToken?: number;
+
+  @Field(() => Number, { optional: true, description: 'USD per million output tokens, for estimating an old call that recorded no cost; absent for image models.' })
+  outputPricePerMToken?: number;
 }
 
 @Schema()
@@ -62,7 +77,7 @@ export class AiTierModel {
   @Field({ description: 'Model group: writing, planning, review, chat, helper or image.' })
   group: string;
 
-  @Field()
+  @Field({ description: '`synapse` on the Synapse backend, where `model` is the catalog model its routes pick.' })
   provider: string;
 
   @Field()
@@ -83,7 +98,7 @@ export class AiModelsResponse {
   @Field({ description: "The active server profile. Roles without an override inherit this profile's defaults." })
   profile: string;
 
-  @Field(() => [AiModelOption])
+  @Field(() => [AiModelOption], { description: 'Every model a chat can be pinned to under any model type and cost tier.' })
   models: AiModelOption[];
 
   @Field(() => [AiRoleDefault])
@@ -92,13 +107,16 @@ export class AiModelsResponse {
   @Field(() => [AiRoleDefault], { description: 'Group defaults used when a project is in Unrestricted content mode.' })
   unrestrictedDefaults: AiRoleDefault[];
 
-  @Field(() => [String], { description: 'Model ids that Unrestricted projects may select. Others are coerced to the Unrestricted group default.' })
+  @Field(() => [String], { description: 'Option ids that Unrestricted projects may select. Others are coerced to the Unrestricted group default.' })
   unrestrictedAllowlist: string[];
 
   @Field(() => [AiTierModel], {
     description: 'The platform model for every cost tier × model type × author-selectable group. Balanced equals `defaults` / `unrestrictedDefaults`.',
   })
   tiers: AiTierModel[];
+
+  @Field(() => [AiModelLabel], { description: 'Names for the model keys calls, replies and reviews record, which `models` does not list on the Synapse backend.' })
+  modelLabels: AiModelLabel[];
 }
 
 @Schema()
@@ -122,7 +140,7 @@ export class ProjectModelRoute {
   @Field({ description: 'Model group: writing, planning, review, chat, helper or image.' })
   group: string;
 
-  @Field()
+  @Field({ description: '`synapse` on the Synapse backend, where `model` is the catalog model its routes pick.' })
   provider: string;
 
   @Field()
@@ -131,10 +149,10 @@ export class ProjectModelRoute {
   @Field({ description: 'The product name to show an author.' })
   label: string;
 
-  @Field(() => Number, { optional: true })
+  @Field(() => Number, { optional: true, description: 'USD per million input tokens; absent for image models.' })
   inputPricePerMToken?: number;
 
-  @Field(() => Number, { optional: true })
+  @Field(() => Number, { optional: true, description: 'USD per million output tokens; absent for image models.' })
   outputPricePerMToken?: number;
 }
 
@@ -148,6 +166,11 @@ export class ProjectModelsResponse {
 
   @Field(() => [ProjectModelRoute])
   models: ProjectModelRoute[];
+
+  @Field(() => [String], {
+    description: 'The `GET /ai/models` option ids a chat may pin under exactly this model type and cost tier: Synapse alias keys, or registry models on the legacy backend.',
+  })
+  chatAliases: string[];
 }
 
 @Schema({ description: 'The signed-in author’s own settings.' })

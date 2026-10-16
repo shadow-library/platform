@@ -104,6 +104,14 @@ describe('ChecksPanel', () => {
     expect(html).toContain('read by Claude Sonnet 5 · Balanced');
   });
 
+  it("should name the review's recorded model by the label it is given, not its catalog key", () => {
+    const list = { chapter: 4, currentRevision: 2, latest: [review({ model: 'claude-sonnet-5' })], history: [] };
+    const html = panel({ list, modelName: model => (model === 'claude-sonnet-5' ? 'Claude Sonnet 5' : model) });
+
+    expect(html).toContain('read by Claude Sonnet 5 · Balanced');
+    expect(html).not.toContain('claude-sonnet-5');
+  });
+
   it('should say no issue was detected, for which version, and what was checked', () => {
     const clean = review({ disposition: 'clear', findings: [], openFindings: 0, openBlocking: 0 });
     const html = panel({ list: { chapter: 4, currentRevision: 2, latest: [clean], history: [clean] } });

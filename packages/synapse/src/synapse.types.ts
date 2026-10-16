@@ -113,9 +113,13 @@ export interface CatalogAliasView {
   key: string;
   label: string;
   description?: string;
+  /** The catalog model the alias targets, as the `model` of a response it serves */
+  model: string;
   price: CatalogPrice;
   capabilities: CatalogCapabilities;
   state: SynapseAliasState;
+  /** Whether the first eligible deployment of the alias's model is served by a provider with native web search */
+  native_web_search: boolean;
 }
 
 export interface CatalogTaskView {

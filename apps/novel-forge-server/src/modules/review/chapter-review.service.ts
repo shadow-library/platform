@@ -9,6 +9,7 @@ import { parseKnowledgeContract, revokeProvisionalReveals } from '@server/common
 import { APP_NAME } from '@server/constants';
 import { type ChapterReviewFinding, type Generation, type Job, type PrimaryDatabase, type PrimaryTransaction, type Project, type Review, schema } from '@server/database';
 
+import { isSynapseBackend } from '../ai/ai-backend';
 import { chapterContentMode, routeChapterCall } from '../ai/chapter-route';
 import { ContextAssembler } from '../ai/context/context-assembler.service';
 import { loadWriterBrief } from '../ai/context/writer-brief';
@@ -306,9 +307,12 @@ export class ChapterReviewService {
     );
   }
 
+  // Only a review served from llm_cache recorded no call. On Synapse the routes, not the registry, pick the model, so none is named rather than a guess.
   private routedModel(role: 'judge' | 'review', route: CallRoute): UsedModel {
     const routed = this.modelRouter.routeModel(role, route.project, route.policy);
-    return { modelProvider: routed.resolved.provider, model: routed.resolved.model, costTier: routed.costTier, contentMode: routed.contentMode };
+    const { costTier, contentMode } = routed;
+    if (isSynapseBackend()) return { modelProvider: null, model: null, costTier, contentMode };
+    return { modelProvider: routed.resolved.provider, model: routed.resolved.model, costTier, contentMode };
   }
 
   private async judge({ projectId, chapter, source, brief, route, settled, runId }: ModelKindContext): Promise<ReviewOutcome> {

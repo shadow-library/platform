@@ -6,6 +6,7 @@ import { Config, Logger } from '@shadow-library/common';
 import { createMigrationClient, toMigrationConnectionString } from '@shadow-library/modules/bootstrap';
 
 import { APP_NAME } from '@server/constants';
+import { backfillChatAliasKeys } from '@server/database/chat-alias-backfill';
 
 /**
  * Applies the Drizzle SQL migrations shipped alongside the bundle and provisions
@@ -26,6 +27,8 @@ try {
   await db.execute(sql`CREATE EXTENSION IF NOT EXISTS vector`);
   await migrate(db, { migrationsFolder });
   logger.info('Drizzle migrations applied');
+  const pinned = await backfillChatAliasKeys(db);
+  logger.info('Chat model pins given their Synapse aliases', { chats: pinned });
   const checkPointer = PostgresSaver.fromConnString(toMigrationConnectionString(url));
   await checkPointer.setup();
   logger.info('LangGraph checkpointer tables created');

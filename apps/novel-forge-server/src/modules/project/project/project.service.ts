@@ -13,6 +13,7 @@ import { type Bible, type Knowledge, type Plan, type PrimaryDatabase, type Prima
 import { type Actor, ActorService, projectOwnerColumns } from '@modules/actor';
 
 import { WorkflowRunService } from '../../ai/graphs/workflow-run.service';
+import { NovelForgeCatalogService } from '../../ai/novel-forge-catalog.service';
 import { DEFAULT_WRITING_INSTRUCTIONS } from '../../ai/prompts/authoring-preamble';
 import { resolveWritingInstructions, writingInstructionAdditions } from '../../ai/prompts/writing-instructions';
 import { setProjectCover } from '../../illustration/uploaded-cover';
@@ -48,6 +49,7 @@ export class ProjectService {
     private readonly context: ContextService,
     private readonly claims: AuthoringClaimService,
     private readonly workflowRuns: WorkflowRunService,
+    private readonly catalog?: NovelForgeCatalogService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
@@ -425,7 +427,7 @@ export class ProjectService {
   async cost(projectId: bigint): Promise<CostResponse> {
     const calls = schema.modelCalls;
     const window = sql<CostWindow>`case when ${calls.createdAt} >= now() - interval '7 days' then 'last7Days' when ${calls.createdAt} >= now() - interval '30 days' then 'last30Days' else 'older' end`;
-    const [rows, dayRows] = await Promise.all([
+    const [rows, dayRows, labels] = await Promise.all([
       this.db
         .select({
           role: calls.role,
@@ -459,7 +461,8 @@ export class ProjectService {
         .from(calls)
         .where(and(eq(calls.projectId, projectId), gte(calls.createdAt, sql`date_trunc('day', now() - interval '30 days')`)))
         .groupBy(sql`1`, calls.model, calls.status, calls.costSource),
+      this.catalog?.modelLabels(),
     ]);
-    return { ...summarizeCost(rows), byDay: summarizeByDay(dayRows) };
+    return { ...summarizeCost(rows, labels), byDay: summarizeByDay(dayRows) };
   }
 }

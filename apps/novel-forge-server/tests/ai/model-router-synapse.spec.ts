@@ -5,6 +5,8 @@ import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { type RestoreConfig, setConfig } from '@shadow-library/common/testing';
 import { SynapseChatModel } from '@shadow-library/synapse/langchain';
 
+import { schema } from '@server/database';
+
 import { type AiRole } from '@modules/ai/defaults';
 import { GatewayChatOpenAI } from '@modules/ai/gateway-chat-openai';
 import { HARD_LINE_SYSTEM_LINE } from '@modules/ai/hard-line';
@@ -36,22 +38,29 @@ interface Harness {
   router: ModelRouterService;
   synapse: FakeSynapse;
   rows: Row[];
+  cacheReads: number;
   quotaChecks: bigint[];
 }
 
-function harness(owner?: { ownerKind: string; ownerId: bigint | null }): Harness {
+const catalogAt = (version: number) => json({ catalog_version: version, task: 'novel-forge.review', default: SYNAPSE_BLOCK, aliases: [], native_web_search: false });
+
+function harness(owner?: { ownerKind: string; ownerId: bigint | null }, catalog = catalogAt(3)): Harness {
   const rows: Row[] = [];
   const quotaChecks: bigint[] = [];
   const db = {
-    query: { llmCache: { findFirst: async () => undefined }, projects: { findFirst: async () => owner } },
-    insert: () => ({ values: (row: Row) => Object.assign(Promise.resolve(void rows.push(row)), { onConflictDoNothing: async () => undefined }) }),
+    query: { llmCache: { findFirst: async () => void h.cacheReads++ }, projects: { findFirst: async () => owner } },
+    insert: (table: unknown) => ({
+      values: (row: Row) =>
+        Object.assign(Promise.resolve(void rows.push(table === schema.llmCache ? { ...row, cached: true } : row)), { onConflictDoNothing: async () => undefined }),
+    }),
   };
   const databaseService = { getPostgresClient: () => db } as never;
-  const synapse = new FakeSynapse();
+  const synapse = new FakeSynapse().answerCatalog(catalog);
   const quota = { enforce: async (projectId: bigint) => void quotaChecks.push(projectId) } as never;
   const router = new ModelRouterService(new TelemetryHandler(databaseService), databaseService, quota, synapse.client);
   (router as unknown as Record<string, unknown>)['logger'] = { debug: () => undefined, warn: () => undefined, error: () => undefined };
-  return { router, synapse, rows, quotaChecks };
+  const h: Harness = { router, synapse, rows, cacheReads: 0, quotaChecks };
+  return h;
 }
 
 const envelopeOf = (h: Harness, index = 0): Record<string, unknown> => h.synapse.requests[index]?.body?.synapse as Record<string, unknown>;
@@ -161,22 +170,22 @@ describe('ModelRouterService on the synapse backend', () => {
       return envelopeOf(h).alias;
     }
 
-    it('should send a legacy slug pin as its Synapse alias', async () => {
-      expect(await aliasFor({ ...OWNED, chatModel: { provider: 'openrouter', model: 'anthropic/claude-opus-5' }, chatPinned: true })).toBe('opus');
-      expect(await aliasFor({ ...OWNED, chatModel: { provider: 'openrouter', model: 'openai/gpt-5.6-sol' }, chatPinned: true })).toBe('gpt-sol');
+    it("should send the chat's alias pin as it is, whatever model the tier map holds", async () => {
+      expect(await aliasFor({ ...OWNED, chatModel: { provider: 'openrouter', model: 'anthropic/claude-sonnet-5' }, chatAlias: 'gpt-mini', chatPinned: true })).toBe('gpt-mini');
+      expect(await aliasFor({ ...UNRESTRICTED, chatAlias: 'grok', chatPinned: true })).toBe('grok');
+    });
+
+    it('should send no alias that is not the author pin, nor an alias pin on another role', async () => {
+      expect(await aliasFor({ ...OWNED, chatAlias: 'opus' })).toBeUndefined();
+      expect(await aliasFor({ ...OWNED, chatAlias: 'opus', chatPinned: true }, 'plan')).toBeUndefined();
     });
 
     it("should send no alias for the tier default a turn holds as an unpinned chat's model, leaving the task's routes to pick", async () => {
       expect(await aliasFor({ ...OWNED, chatModel: { provider: 'openrouter', model: 'anthropic/claude-sonnet-5' } })).toBeUndefined();
     });
 
-    it('should send no alias for another role, an unpinned chat, or a pin an unrestricted call does not honour', async () => {
-      const pinned = { ...OWNED, chatModel: { provider: 'openrouter', model: 'anthropic/claude-opus-5' }, chatPinned: true };
-
-      expect(await aliasFor(pinned, 'plan')).toBeUndefined();
-      expect(await aliasFor(OWNED)).toBeUndefined();
-      expect(await aliasFor({ ...pinned, contentMode: 'unrestricted' })).toBeUndefined();
-      expect(await aliasFor({ ...UNRESTRICTED, chatModel: { provider: 'openrouter', model: 'moonshotai/kimi-k3' }, chatPinned: true })).toBe('kimi');
+    it('should send no alias for a registry slug pin, which only the legacy backend routes', async () => {
+      expect(await aliasFor({ ...OWNED, chatModel: { provider: 'openrouter', model: 'anthropic/claude-opus-5' }, chatPinned: true })).toBeUndefined();
     });
   });
 
@@ -241,6 +250,20 @@ describe('ModelRouterService on the synapse backend', () => {
       expect(h.rows[0]).toMatchObject({ provider: 'subscription', model: 'claude-opus-5.5', costUsd: '0.02', costSource: 'gateway' });
     });
 
+    it('should name the model that answered each call to the caller, for an invoke and a stream alike', async () => {
+      const answered: unknown[] = [];
+      const onAnswered = (model: unknown) => void answered.push(model);
+      const h = harness();
+      h.synapse.reply(json(completion(ANSWER)), stream([ANSWER], { ...SYNAPSE_BLOCK, provider: 'subscription', model: 'claude-opus-5.5' }));
+      await h.router.structured(titlePrompt(), {}, { ...CTX, onAnswered }, OWNED);
+      await h.router.streamStructured(titlePrompt('chat'), {}, { ...CTX, role: 'chat', onAnswered }, { onDelta: () => undefined }, OWNED);
+
+      expect(answered).toEqual([
+        { provider: 'openrouter', model: 'gpt-5.6-luna' },
+        { provider: 'subscription', model: 'claude-opus-5.5' },
+      ]);
+    });
+
     it("should record a failed call against Synapse and the role's task, with no effort", async () => {
       const h = harness();
       h.synapse.reply(synapseError(422, 'SYN_NO_ELIGIBLE_MODEL'));
@@ -266,9 +289,9 @@ describe('ModelRouterService on the synapse backend', () => {
     const promptId = { key: 'chat-title', version: '1.0.0' };
     const hashOf = (h: Harness): HashRequest => (h.router as unknown as { hashRequest: HashRequest })['hashRequest'].bind(h.router);
 
-    async function keyFor(project: ProjectConfig): Promise<string | undefined> {
+    async function keyFor(project: ProjectConfig, catalog = catalogAt(3)): Promise<string | undefined> {
       const keys: string[] = [];
-      const h = harness();
+      const h = harness(undefined, catalog);
       const hash = hashOf(h);
       (h.router as unknown as Record<string, unknown>)['hashRequest'] = (...args: Parameters<HashRequest>) => {
         const key = hash(...args);
@@ -288,15 +311,44 @@ describe('ModelRouterService on the synapse backend', () => {
       expect(hashOf(h)(resolved, promptId, {})).toBe(legacy);
     });
 
-    it('should key a Synapse call on its backend, task and selectors too, so a tier change misses the old answer', async () => {
+    it('should key a Synapse call on its backend, task, selectors and catalog version, so a tier change or a retarget misses the old answer', async () => {
       const h = harness();
       const resolved = h.router.routeModel('judge', OWNED).resolved;
       const synapseKey = await keyFor(OWNED);
-      const routing = (tier: string) => ({ backend: 'synapse', task: 'novel-forge.review', selectors: { tier, content_mode: 'standard' } });
+      const routing = (tier: string, catalogVersion = 3) => ({ backend: 'synapse', task: 'novel-forge.review', selectors: { tier, content_mode: 'standard' }, catalogVersion });
 
       expect(synapseKey).toBe(hashOf(h)(resolved, promptId, {}, undefined, routing('economy')));
       expect(synapseKey).not.toBe(hashOf(h)(resolved, promptId, {}));
       expect(hashOf(h)(resolved, promptId, {}, undefined, routing('performant'))).not.toBe(synapseKey);
+      expect(await keyFor(OWNED, catalogAt(4))).not.toBe(synapseKey);
+    });
+
+    it("should read the version from the call's own task and selectors", async () => {
+      const h = harness();
+      h.synapse.reply(json(completion(JSON.stringify({ title: 'x' }))));
+      await h.router.structured(titlePrompt('judge'), {}, CTX, OWNED);
+
+      expect(h.synapse.catalogRequests[0]?.url).toBe('http://synapse-server/api/v1/catalog?task=novel-forge.review&selectors=content_mode%3Astandard%2Ctier%3Aeconomy');
+    });
+
+    it('should neither read nor write the cache when the catalog version cannot be read', async () => {
+      const h = harness(undefined, synapseError(503, 'SYN_NO_ACTIVE_CATALOG'));
+      h.synapse.reply(json(completion(JSON.stringify({ title: 'x' }))));
+      await h.router.structured(titlePrompt('judge'), {}, CTX, OWNED);
+      await awaitAllCallbacks();
+
+      expect(h.cacheReads).toBe(0);
+      expect(h.rows.filter(row => row['cached'])).toEqual([]);
+      expect(h.synapse.requests).toHaveLength(1);
+    });
+
+    it('should cache an answer under a readable version', async () => {
+      const h = harness();
+      h.synapse.reply(json(completion(JSON.stringify({ title: 'x' }))));
+      await h.router.structured(titlePrompt('judge'), {}, CTX, OWNED);
+
+      expect(h.cacheReads).toBe(1);
+      expect(h.rows.filter(row => row['cached'])).toHaveLength(1);
     });
   });
 

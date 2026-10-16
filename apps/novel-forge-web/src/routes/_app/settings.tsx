@@ -61,9 +61,9 @@ function SettingsScreen(): React.JSX.Element {
           </section>
 
           <Alert intent="info" title="How models are picked">
-            Each project runs on its cost tier; a project can pin a model per role in its settings, a chat can pin a tier or a model, and a single reply can override it. A chat’s
-            pinned model outranks the project’s pin. Unrestricted projects use the platform’s unrestricted models for their tier, and any pinned model that the unrestricted list
-            allows.
+            Each project runs on its model type and cost tier, which pick the platform’s model for every job. A chat can keep its own model type and cost tier, and a single reply
+            can override them. A chat can also be pinned to one model, which then writes that chat’s replies whatever the tier; an Unrestricted reply uses the pin only when that
+            model is offered for Unrestricted writing, and the tier’s Unrestricted model otherwise.
           </Alert>
 
           <div className={styles.saveRow}>

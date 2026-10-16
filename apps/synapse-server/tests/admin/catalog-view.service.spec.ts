@@ -52,6 +52,29 @@ describe('CatalogViewService', () => {
     expect(taskView('novel-forge.chat', 'tier:economy').native_web_search).toBe(false);
   });
 
+  it("should report each alias's target model and native web search from its own model's first eligible deployment", () => {
+    const aliases = taskView('novel-forge.chat', 'tier:economy,content_mode:standard').aliases;
+
+    expect(aliases.map(({ key, model, native_web_search }) => ({ key, model, native_web_search }))).toEqual([
+      { key: 'opus', model: 'claude-opus-5.5', native_web_search: true },
+      { key: 'grok', model: 'grok-4.6', native_web_search: false },
+    ]);
+  });
+
+  it("should judge an alias's native web search after the data policy filters its deployments", () => {
+    const document = catalogDocument(draft => {
+      draft.tasks['novel-forge.chat']!.dataPolicy = 'in_cluster_only';
+      draft.models['claude-opus-5.5']!.deployments = [
+        { provider: 'subscription', id: 'a' },
+        { provider: 'local', id: 'b' },
+      ];
+    });
+
+    const view = new CatalogViewService(fakeCache(document)).view('novel-forge', 'novel-forge.chat', {}).body as CatalogTaskResponse;
+
+    expect(view.aliases[0]).toMatchObject({ key: 'opus', native_web_search: false });
+  });
+
   it('should skip a deployment the data policy rules out when judging native web search', () => {
     const document = catalogDocument(draft => {
       draft.tasks['novel-forge.chat']!.dataPolicy = 'in_cluster_only';

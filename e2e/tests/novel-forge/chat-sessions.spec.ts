@@ -9,10 +9,10 @@ import { type APIRequestContext } from '@playwright/test';
 import { mutate } from '../../lib';
 import { expect, test } from './forge-actors';
 import { expectCode, guardedProject, newChatSession, newProject } from './forge-arrange';
-import { assertSpendGuarded, failPinChat, insertWorkflowRun } from './forge-db';
+import { assertSpendGuarded, insertWorkflowRun, listDispatchedModelCalls } from './forge-db';
 import { insertChatMessage, insertChatSession, settleWorkflowRun } from './forge-bible';
 import { listWorkflowRuns } from './forge-rows';
-import { HAIKU_MODEL } from './forge-helpers';
+import { HAIKU_ALIAS } from './forge-helpers';
 
 /**
  * Defining types
@@ -26,6 +26,7 @@ interface ChatSession {
   title: string | null;
   modelProvider: string | null;
   modelId: string | null;
+  contentMode: string | null;
 }
 
 interface ChatTurnStatus {
@@ -48,10 +49,6 @@ async function turnStatus(ctx: APIRequestContext, projectId: string, sessionId: 
   const response = await ctx.get(`/api/v1/projects/${projectId}/chat/sessions/${sessionId}/turn`);
   expect(response.status(), await response.text()).toBe(200);
   return (await response.json()) as ChatTurnStatus;
-}
-
-function delay(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 test.describe('novel-forge chat sessions', () => {
@@ -104,7 +101,7 @@ test.describe('novel-forge chat sessions', () => {
     );
   });
 
-  test('should validate a model pin, and clear it back to the default with both fields null', async ({ forge }) => {
+  test('should pin a chat to an alias, refuse a registry slug, and clear the pin back to the default with both fields null', async ({ forge }) => {
     const owner = await forge.actor({ label: 'chat-model' });
     const projectId = await newProject(owner, 'chat-model');
     const sessionId = await newChatSession(owner, projectId);
@@ -113,16 +110,14 @@ test.describe('novel-forge chat sessions', () => {
       await mutate(owner.ctx, 'patch', `/api/v1/projects/${projectId}/chat/sessions/${sessionId}/model`, { data: { provider: 'openrouter', model: 'e2e/unregistered' } }),
       400,
       'AI_002',
-      'pinning an unregistered model',
+      'pinning a registry slug, which only the legacy backend accepts',
     );
 
-    const pinned = await mutate(owner.ctx, 'patch', `/api/v1/projects/${projectId}/chat/sessions/${sessionId}/model`, {
-      data: { provider: HAIKU_MODEL.provider, model: HAIKU_MODEL.model },
-    });
+    const pinned = await mutate(owner.ctx, 'patch', `/api/v1/projects/${projectId}/chat/sessions/${sessionId}/model`, { data: HAIKU_ALIAS });
     expect(pinned.status(), await pinned.text()).toBe(200);
     const pinnedSession = (await pinned.json()) as ChatSession;
-    expect(pinnedSession.modelProvider).toBe(HAIKU_MODEL.provider);
-    expect(pinnedSession.modelId).toBe(HAIKU_MODEL.model);
+    expect(pinnedSession.modelProvider).toBe('synapse');
+    expect(pinnedSession.modelId).toBe('haiku');
 
     const cleared = await mutate(owner.ctx, 'patch', `/api/v1/projects/${projectId}/chat/sessions/${sessionId}/model`, { data: { provider: null, model: null } });
     expect(cleared.status(), await cleared.text()).toBe(200);
@@ -172,29 +167,27 @@ test.describe('novel-forge chat sessions', () => {
     expect(afterNewerMessage.lastOrdinal).toBeGreaterThan(0);
   });
 
-  test('should refuse a turn and a premise enhancement before any model dispatch, on a fully guarded project', async ({ forge }) => {
+  test('should refuse a pin to an alias the catalog does not offer, so no turn runs on it, and a premise enhancement before any model dispatch', async ({ forge }) => {
     const owner = await forge.actor({ label: 'chat-guard' });
     const projectId = await newProject(owner, 'chat-guard');
     await forge.quotaPin(projectId);
     const sessionId = await newChatSession(owner, projectId);
-    await failPinChat(sessionId);
+    const pinPath = `/api/v1/projects/${projectId}/chat/sessions/${sessionId}/model`;
 
-    const beforeTitleRuns = await listWorkflowRuns(projectId, 'chat-title');
-    await assertSpendGuarded(projectId);
+    await expectCode(await mutate(owner.ctx, 'patch', pinPath, { data: { provider: 'synapse', model: 'e2e-unoffered' } }), 400, 'AI_022', 'pinning an alias the catalog lacks');
     await expectCode(
-      await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/chats/${sessionId}/turn/stream`, { data: { content: 'Hello there' } }),
+      await mutate(owner.ctx, 'patch', pinPath, { data: { ...HAIKU_ALIAS, contentMode: 'unrestricted' } }),
       400,
-      'AI_002',
-      'a fail-pinned chat refuses the POST before a run id is minted',
+      'AI_022',
+      'pinning a standard-only alias on a chat turned unrestricted in the same update',
     );
-    // Poll briefly rather than checking once immediately after: proves no background `chat-title` run appears even
-    // a short moment later, not merely that none had landed yet at the instant of the first read.
-    for (let attempt = 0; attempt < 3; attempt++) {
-      await delay(150);
-      const afterTitleRuns = await listWorkflowRuns(projectId, 'chat-title');
-      expect(afterTitleRuns.length, 'no background chat-title run starts on a refused turn').toBe(beforeTitleRuns.length);
-    }
+    const session = await owner.ctx.get(`/api/v1/projects/${projectId}/chat/sessions/${sessionId}`);
+    expect(session.status(), await session.text()).toBe(200);
+    expect((await session.json()) as ChatSession, 'a refused pin writes nothing, the model type included').toMatchObject({ modelProvider: null, modelId: null, contentMode: null });
+    expect(await listWorkflowRuns(projectId, 'chat-turn'), 'no turn was dispatched for the refused pin').toEqual([]);
+    expect(await listDispatchedModelCalls(projectId)).toEqual([]);
 
+    await assertSpendGuarded(projectId);
     await expectCode(
       await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/premise/enhance`, { data: {} }),
       400,

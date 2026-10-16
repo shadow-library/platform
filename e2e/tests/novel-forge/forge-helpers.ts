@@ -140,8 +140,11 @@ export const MODEL_FLOW_TIMEOUT_MS = 30 * 60_000;
 
 const MODEL_CALL_TIMEOUT_MS = 10 * 60_000;
 
-/** Every LLM goes through OpenRouter, so a model is its OpenRouter `vendor/model` slug; anything off `MODEL_REGISTRY` is refused with AI_002. */
-export const HAIKU_MODEL: ModelRef = { provider: 'openrouter', model: 'anthropic/claude-haiku-4.5' };
+/**
+ * A chat pin is a Synapse alias, sent as the `synapse` option from `GET /ai/models` with its key as the model. Haiku is offered to standard
+ * chats only, so an unrestricted chat cannot pin it.
+ */
+export const HAIKU_ALIAS: ModelRef = { provider: 'synapse', model: 'haiku' };
 
 export const NOVEL_NOTES = [
   'Working idea: a cartographer in a river city is hired to map a district that is not on any chart.',

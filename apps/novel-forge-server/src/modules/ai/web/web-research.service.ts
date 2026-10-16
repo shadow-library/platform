@@ -71,19 +71,21 @@ export class WebResearchService {
 
   /**
    * Asks whoever serves the chat whether it searches the web itself, since only it knows where a model runs. Synapse answers for the chat task
-   * and the turn's `selectors` from its catalog, which its client caches by version; the legacy path asks the AI gateway about `model`. Any
-   * failure to answer means no.
+   * and the turn's `selectors` from its catalog, which its client caches by version: for the pinned `alias` when the catalog offers it, else for
+   * the task's default. The legacy path asks the AI gateway about `model`. Any failure to answer means no.
    */
-  async modeFor(model: string, selectors: Record<string, string> = {}): Promise<WebMode> {
-    const native = isSynapseBackend() ? await this.isCatalogNative(selectors) : await this.isNative(Config.get('ai.model-override') || model);
+  async modeFor(model: string, selectors: Record<string, string> = {}, alias?: string): Promise<WebMode> {
+    const native = isSynapseBackend() ? await this.isCatalogNative(selectors, alias) : await this.isNative(Config.get('ai.model-override') || model);
     if (native) return 'native';
     return Config.get('ai.web-search.brave.api.key') ? 'brave' : 'off';
   }
 
-  private async isCatalogNative(selectors: Record<string, string>): Promise<boolean> {
+  private async isCatalogNative(selectors: Record<string, string>, alias?: string): Promise<boolean> {
     if (!this.synapse) return false;
     try {
-      return (await this.synapse.catalog({ task: SYNAPSE_CHAT_TASK, selectors })).native_web_search === true;
+      const view = await this.synapse.catalog({ task: SYNAPSE_CHAT_TASK, selectors });
+      const pinned = alias === undefined ? undefined : view.aliases.find(entry => entry.key === alias);
+      return (pinned ?? view).native_web_search === true;
     } catch (err) {
       this.logger.warn('Synapse catalog unreadable, so the chat gets no native web search', { selectors, err });
       return false;

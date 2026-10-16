@@ -67,13 +67,21 @@ export const refuseConnection: Reply = () => {
 
 export class FakeSynapse {
   readonly requests: SentRequest[] = [];
+  readonly catalogRequests: SentRequest[] = [];
   private readonly replies: Reply[] = [];
+  private catalogReply?: Reply;
   private notify?: () => void;
 
   readonly client = new SynapseClient({ authClient: { getServiceToken: async () => 'm2m-token' }, fetch: (input, init) => this.fetch(input, init) });
 
   reply(...replies: Reply[]): this {
     this.replies.push(...replies);
+    return this;
+  }
+
+  /** Answers every `GET /catalog` with `reply`, kept apart from the queued inference replies and their recorded requests. */
+  answerCatalog(reply: Reply): this {
+    this.catalogReply = reply;
     return this;
   }
 
@@ -85,6 +93,10 @@ export class FakeSynapse {
   private readonly fetch: SynapseFetch = async (input, init = {}) => {
     const body = typeof init.body === 'string' ? (JSON.parse(init.body) as Record<string, unknown>) : undefined;
     const request = { url: input instanceof Request ? input.url : String(input), body, signal: init.signal ?? undefined };
+    if (this.catalogReply && new URL(request.url).pathname.endsWith('/catalog')) {
+      this.catalogRequests.push(request);
+      return this.catalogReply(request);
+    }
     this.requests.push(request);
     this.notify?.();
     const next = this.replies.shift();

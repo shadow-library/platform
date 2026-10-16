@@ -862,7 +862,7 @@ export class RunModelCallResponse {
   @Field()
   provider: string;
 
-  @Field()
+  @Field({ description: 'The model that answered, as recorded: a catalog model on the Synapse backend, its task when no model answered. Named by `GET /ai/models` `modelLabels`.' })
   model: string;
 
   @Field()

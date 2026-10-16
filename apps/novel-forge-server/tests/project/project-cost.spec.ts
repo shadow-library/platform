@@ -22,6 +22,20 @@ function row(overrides: Partial<CostUsageRow> = {}): CostUsageRow {
 }
 
 describe('summarizeCost', () => {
+  it('should name each model by the catalog label it is given, then the registry, then its own key', () => {
+    const labels = new Map([['claude-opus-5.5', 'Claude Opus 5.5']]);
+    const summary = summarizeCost(
+      [row({ model: 'claude-opus-5.5' }), row({ model: 'anthropic/claude-sonnet-5' }), row({ model: 'novel-forge.chat', status: 'transport_error' })],
+      labels,
+    );
+
+    expect(Object.fromEntries(summary.byModel.map(item => [item.key, item.label]))).toEqual({
+      'claude-opus-5.5': 'Claude Opus 5.5',
+      'anthropic/claude-sonnet-5': 'Claude Sonnet 5',
+      'novel-forge.chat': 'novel-forge.chat',
+    });
+  });
+
   it('should sum a provider-priced row as real money with no estimated share', () => {
     const summary = summarizeCost([row({ costSource: 'provider', recordedCostUsd: 0.01 })]);
 

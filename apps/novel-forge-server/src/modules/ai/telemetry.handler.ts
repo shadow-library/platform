@@ -16,6 +16,8 @@ import { isHardLineRefusal } from './hard-line';
 import { type ReasoningEffort } from './models';
 import { classifyCostSource, classifySynapseCostSource, estimateCallCostUsd, type GatewayInfo } from './quota';
 
+export type AnsweredHook = (answered: { provider: string; model: string }) => void;
+
 export interface TelemetryContext {
   projectId: bigint;
   runId?: string;
@@ -31,6 +33,8 @@ export interface TelemetryContext {
   gatewaySession?: string;
   /** Fired before a repair re-ask with the rejected reply and the request that follows it, the two messages the re-ask adds to the conversation. */
   onRepair?: (reply: string, request: string) => void;
+  /** Fired with the provider and catalog model that answered, after each Synapse call that answered; the legacy path never fires it. */
+  onAnswered?: AnsweredHook;
   /**
    * Fired once, synchronously, with the exact messages `buildMessages` produced for this call and the provider/model it
    * resolved to — before the request is sent. Only a writer-attempt call site sets it, to snapshot what the router received

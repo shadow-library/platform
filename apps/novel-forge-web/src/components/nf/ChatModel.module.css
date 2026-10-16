@@ -24,12 +24,6 @@
   color: var(--sh-text-tertiary);
 }
 
-.caption {
-  display: block;
-  font-size: 11px;
-  color: var(--sh-text-tertiary);
-}
-
 .messageTag {
   margin-top: 4px;
   font-size: 10px;

@@ -21,6 +21,7 @@ import { RunControlRepository } from './graphs/run-control.repository';
 import { WorkflowRunService } from './graphs/workflow-run.service';
 import { ModelCatalogService } from './model-catalog.service';
 import { ModelRouterService } from './model-router.service';
+import { NovelForgeCatalogService } from './novel-forge-catalog.service';
 import { ProjectAiController } from './project-ai.controller';
 import { EmbeddingService } from './retrieval/embedding.service';
 import { IndexingService } from './retrieval/indexing.service';
@@ -40,6 +41,7 @@ import { WriterSnapshotService } from './writer-snapshot.service';
     TelemetryHandler,
     ModelRouterService,
     ModelCatalogService,
+    NovelForgeCatalogService,
     AiQuotaService,
     AiUsageService,
     AppearanceDescriberService,
@@ -58,6 +60,7 @@ import { WriterSnapshotService } from './writer-snapshot.service';
   exports: [
     AccountSettingsService,
     ModelRouterService,
+    NovelForgeCatalogService,
     AiQuotaService,
     AiUsageService,
     AppearanceDescriberService,

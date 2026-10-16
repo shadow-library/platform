@@ -32,6 +32,11 @@ function requireModel(document: CatalogDocument, modelKey: string): ModelSpec {
   return model;
 }
 
+function searchesNatively(document: CatalogDocument, task: TaskSpec, model: ModelSpec): boolean {
+  const [first] = eligibleDeployments(document, task, model);
+  return first?.provider.features?.includes('native_web_search') ?? false;
+}
+
 /** The app prefix is checked before the task is looked up, so a caller cannot probe which tasks of another app exist. */
 @Injectable()
 export class CatalogViewService {
@@ -55,11 +60,10 @@ export class CatalogViewService {
   private taskView(document: CatalogDocument, taskKey: string, task: TaskSpec, selectors: Selectors): CatalogTaskView {
     const route = selectRoute(task, selectors) ?? AppErrorCode.SYN_NO_ELIGIBLE_MODEL.throw({ task: taskKey });
     const model = requireModel(document, route.model);
-    const [first] = eligibleDeployments(document, task, model);
     return {
       default: { model: route.model, label: labelFor(undefined, model), ...priceOf(model) },
       aliases: this.aliasViews(document, task, selectors),
-      native_web_search: first?.provider.features?.includes('native_web_search') ?? false,
+      native_web_search: searchesNatively(document, task, model),
     };
   }
 
@@ -69,7 +73,15 @@ export class CatalogViewService {
       const alias = ownEntry(document.aliases, key);
       if (!alias || alias.state !== 'active' || !isAliasAvailable(alias, selectors)) continue;
       const model = requireModel(document, alias.model);
-      views.push({ key, label: labelFor(alias, model), ...(alias.description !== undefined && { description: alias.description }), ...priceOf(model), state: alias.state });
+      views.push({
+        key,
+        label: labelFor(alias, model),
+        ...(alias.description !== undefined && { description: alias.description }),
+        model: alias.model,
+        ...priceOf(model),
+        state: alias.state,
+        native_web_search: searchesNatively(document, task, model),
+      });
     }
     return views;
   }

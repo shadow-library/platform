@@ -311,9 +311,11 @@ Two flows are never exercised in json-schema mode, so an e2e spec must not depen
 
 Model selection is **Synapse's catalog**, not environment. Each call names the task `novel-forge.<group>` and sends the
 selectors `tier` and `content_mode`; Synapse's routes for that task pick the model, and its effort range the reasoning effort
-(no effort is sent). A chat's pin is sent as its Synapse alias (`LEGACY_SLUG_ALIAS`, e.g. `anthropic/claude-opus-5` → `opus`)
-when the router honours it. Novel-forge still resolves the same model locally (`defaults.ts`), but only for the registry checks,
-`llm_cache` keys and what it expects to be served; `model_calls` records what Synapse reports actually answered. The Synapse
+(no effort is sent). A chat's pin is a Synapse alias key (`chat_sessions.alias_key`), sent as the envelope's `alias` while the
+catalog offers it for the reply's selectors; pins stored as registry slugs were mapped by `LEGACY_SLUG_ALIAS` at migration
+(e.g. `anthropic/claude-opus-5` → `opus`). Novel-forge still resolves a registry model locally (`defaults.ts`), but on Synapse only
+for the hard-line and session checks; `model_calls` and the reply's `chat_messages.model_id` record the catalog model Synapse
+reports actually answered, and the `llm_cache` key carries the task, selectors, alias and catalog version. The Synapse
 seed (`apps/synapse-server/src/database/seed/seed-catalog.data.ts`) was generated from the maps below, so they agree until an
 admin publishes a change. What follows is the legacy path, and the local view of the same choice.
 
@@ -332,21 +334,26 @@ admin publishes a change. What follows is the legacy path, and the local view of
 - Registry of selectable models: `src/modules/ai/models.ts:41-247`. Every LLM id is an OpenRouter `vendor/model`
   slug and its `provider` must be `openrouter`.
 
-How a model is picked (`ModelRouterService.routeModel`):
+How a model is picked:
 
 1. **Per chat, chat replies only** — `PATCH /api/v1/projects/:p/chat/sessions/:s/model` with
-   `{"provider":"openrouter","model":"anthropic/claude-opus-5"}`. Validated at write time by `isRegisteredModel` →
-   a wrong provider or unknown id gives `AI_002`.
-2. Otherwise the platform model for the cost tier and model type (`COST_TIER_DEFAULTS`). A chat turn's tier
+   `{"provider":"synapse","model":"opus"}`: an option from `GET /ai/models` `models`, whose `provider` is `synapse` and whose
+   `id` is the alias key. It must be one the catalog offers the chat task for the chat's model type and cost tier after the
+   update — `GET /projects/:p/ai/models` `chatAliases` lists them — or the PATCH is `AI_022`; a registry slug or a half-named
+   pin is `AI_002`. The session then reads back `modelProvider: "synapse"`, `modelId: "opus"`. Legacy backend only: the pin is a
+   registry model, `{"provider":"openrouter","model":"anthropic/claude-opus-5"}`, checked by `isRegisteredModel` (`AI_002`).
+2. Otherwise the platform model for the cost tier and model type (Synapse's routes; `COST_TIER_DEFAULTS` on legacy). A chat turn's tier
    outranks the chat's, which outranks the project's. No project setting pins a model to a role, and there is no
    per-account model default; `PUT /api/v1/ai/settings` `{"defaultCostTier":"economy"}` only sets the tier a new
    project starts on.
 
-`GET /api/v1/ai/models` (`ai.controller.ts:26-54`) returns the whole registry with prices, context windows and both
-default maps — the quickest way to see what is selectable.
+`GET /api/v1/ai/models` is built from the catalog on Synapse: `models` holds every chat alias as a `synapse` option,
+`unrestrictedAllowlist` the alias keys offered to an unrestricted chat, `tiers` each tier × type × group's default model, label and
+price, and `modelLabels` the label for every model key a call, reply or review records (catalog models, then registry slugs for
+older rows). On legacy it returns the registry and its default maps.
 
 For the cheapest live runs, put the project on the Economy tier (`useEconomyTier` in `e2e/tests/novel-forge/forge-helpers.ts`);
-`HAIKU_MODEL` there is a registered id with the right provider, safe to copy into a chat pin.
+`HAIKU_ALIAS` there is the `{"provider":"synapse","model":"haiku"}` pin, offered to standard chats.
 
 ---
 
@@ -1885,18 +1892,19 @@ export default function createPlugin() {
   2. PUT as above, then create a project through each creation path without a `costTier`, and once with `"costTier":"performant"`.
   3. Clone a Performant project.
   4. Hub turn on an Economy project (new chat), then check its `model_calls`.
-  5. Chat pin: `PATCH /projects/$P/chat/sessions/$S/model {"provider":"openrouter","model":"openai/gpt-5.6-luna"}`, turn, then clear it with `{"provider":null,"model":null}`.
+  5. Chat pin: `PATCH /projects/$P/chat/sessions/$S/model {"provider":"synapse","model":"gpt-luna"}`, turn, then clear it with `{"provider":null,"model":null}`. Then try `{"provider":"synapse","model":"e2e-unoffered"}`.
   6. Pick Performant in the composer, send two turns, then pick "Use the project default" and send a third.
-  7. Set project `contentMode:'unrestricted'` with a standard-only chat pin (e.g. `anthropic/claude-opus-5.5`), turn.
+  7. Pin a standard-only alias (e.g. `opus`), then set project `contentMode:'unrestricted'`, turn.
 - **Verify:**
   - Step 2: every project created without a tier is Economy; the one that named Performant is Performant. A bot-owned project starts on Balanced, and `PUT /ai/settings` as a bot is 403 `AI_016`.
   - Step 3: the clone is Performant whatever the account default.
-  - Step 4: the chat call's `model` is the Economy chat model from `GET /ai/models` `tiers`, and `chat_messages.model_id` (assistant) matches.
+  - Step 4: the chat call's `model` is the Economy chat model from `GET /ai/models` `tiers`, and `chat_messages.model_id` (assistant) matches: the catalog model Synapse reports, shown by its `modelLabels` label.
   - Precedence exactly: the chat's pin > the turn's tier > the chat's tier > the project's tier. Step 5 uses the pin; step 6 uses the Performant chat model for both turns (the chat session's `costTier` is `performant`) and the third is back on Economy with the session's `costTier` null.
-  - Step 7: a pin not on the unrestricted allowlist (`x-ai/grok-4.6, deepseek/deepseek-v4-pro, z-ai/glm-5.2, moonshotai/kimi-k3`, image `x-ai/grok-imagine-image-2.0`) is ignored; the project uses the unrestricted model for its tier. `GET /ai/models` `unrestrictedAllowlist` shows the list.
+  - Step 5: the pinned turn's envelope carries `alias: "gpt-luna"`; the unoffered alias is 400 `AI_022` and changes nothing.
+  - Step 7: an alias the catalog does not offer unrestricted chats is not sent (no `alias` in the envelope); the reply uses the unrestricted route for its tier. `GET /ai/models` `unrestrictedAllowlist` lists the alias keys offered there (`grok`, `deepseek`, `glm`, `kimi` in the seed); on legacy it lists the registry allowlist.
   - `GET /projects/:p/models` reports each group's tier model for the novel's (or the previewed) type and tier; a `PATCH /projects/:p` carrying `config` stores nothing.
   - Group→role mapping: Illustrations compose runs on the helper group (not Planning); embedding and vision are not configurable.
-- **Fails when:** a project created without a tier ignores the account default, a PUT with a value outside economy/balanced/performant is accepted, or a chat pin with an unregistered id is not refused with 400 `AI_002`.
+- **Fails when:** a project created without a tier ignores the account default, a PUT with a value outside economy/balanced/performant is accepted, a chat pin to an alias the catalog does not offer is not refused with 400 `AI_022`, or a registry slug pin is not refused with 400 `AI_002` (on legacy, an unregistered id).
 
 ---
 

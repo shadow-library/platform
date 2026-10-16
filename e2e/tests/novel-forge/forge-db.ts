@@ -192,11 +192,14 @@ export interface QuotaLimits {
  * standard or unrestricted, so it holds on both paths. It pins every project of that owner and lasts one window (an hour in dev); a server
  * that cannot read usage refuses the call with AI_018 instead. That owner's usage and cost figures then include the pin's zero-cost rows
  * (prompt key `e2e-quota-pin`). A seeded persona cannot be quota-pinned — that would block it in every lane — so a spec that needs a
- * model-capable request runs it as an owner it created. `failPinChat` additionally refuses a standard chat turn with AI_002 before its run
- * exists. Call `assertSpendGuarded` right before any model-capable request.
+ * model-capable request runs it as an owner it created. Call `assertSpendGuarded` right before any model-capable request.
+ *
+ * There is no fail-pin any more: a chat pin is a Synapse alias the catalog must offer, so a pin that would refuse every turn cannot be stored
+ * (`AI_022`), and nothing needs one, because the test environment's Synapse runs the `local-only` seed profile, where every deployment is local
+ * Ollama and no call is paid.
  */
 
-/** Not in the model registry: a standard chat pinned to it is refused with `AI_002` before any dispatch, and seeded rows carry it. */
+/** Not a model Synapse or the registry knows: seeded rows carry it, so a seeded call is never mistaken for a dispatched one. */
 export const UNREGISTERED_MODEL: ModelRef = { provider: 'openrouter', model: 'e2e/unregistered' };
 
 /** Prompt key of every row this module seeds; a real dispatch always records a registry prompt key. */
@@ -238,21 +241,6 @@ let quotaLimits: Promise<QuotaLimits> | undefined;
 
 function ago(ms: number | undefined): string {
   return `${Math.max(0, Math.round(ms ?? 0))} milliseconds`;
-}
-
-/**
- * Pins a chat to `UNREGISTERED_MODEL` — a database write, since the model route refuses an unregistered id — so a standard turn on it is
- * refused. An unrestricted turn drops the pin, so the chat and its project must both be standard.
- */
-export async function failPinChat(sessionId: string): Promise<void> {
-  const [row] = await novelForgeDb()<{ modelId: string | null; sessionMode: ForgeContentMode | null; projectMode: ForgeContentMode }[]>`
-    UPDATE chat_sessions s SET model_provider = ${UNREGISTERED_MODEL.provider}, model_id = ${UNREGISTERED_MODEL.model}
-    FROM projects p
-    WHERE s.id = ${sessionId} AND p.id = s.project_id
-    RETURNING s.model_id AS "modelId", s.content_mode AS "sessionMode", p.content_mode AS "projectMode"
-  `;
-  if (row?.modelId !== UNREGISTERED_MODEL.model) throw new SpendGuardError(`chat ${sessionId} did not keep the fail-pin`);
-  if ((row.sessionMode ?? row.projectMode) !== 'standard') throw new SpendGuardError(`chat ${sessionId} turns unrestricted, where a fail-pin is dropped`);
 }
 
 export async function readProjectRow(projectId: string): Promise<ForgeProjectRow | undefined> {

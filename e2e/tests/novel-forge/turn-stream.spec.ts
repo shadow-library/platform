@@ -10,9 +10,9 @@ import { type APIRequestContext } from '@playwright/test';
  */
 import { mutate, pollUntil } from '../../lib';
 import { type ForgeActor } from './forge-actors';
-import { expectCode, failPinnedChat, guardedProject, newProject, quotaRefusedChat, SHORT_TURN, startTurn } from './forge-arrange';
+import { expectCode, guardedProject, newChatSession, newProject, quotaRefusedChat, SHORT_TURN, startTurn } from './forge-arrange';
 import { listDispatchedModelCalls } from './forge-db';
-import { type ChatTranscript, HAIKU_MODEL } from './forge-helpers';
+import { type ChatTranscript, HAIKU_ALIAS } from './forge-helpers';
 import { holdNextChatMessage, listWorkflowRuns } from './forge-rows';
 import { expect, expectRefusedStream, framesOf, type SseClient, type SseFrame, type SseStream, test } from './forge-sse';
 
@@ -56,13 +56,14 @@ function expectQuotaRefusedTurn(frames: readonly SseFrame[]): void {
 }
 
 test.describe('novel-forge chat turn stream', () => {
-  test('should refuse a turn before its run exists, and start one once the chat is pinned to a routable model', async ({ forge, sse }) => {
+  test('should refuse a turn before its run exists, and start one once the chat is pinned to an offered alias', async ({ forge, sse }) => {
     const owner = await forge.actor({ label: 'turn-refused' });
     const projectId = await guardedProject(forge, owner, 'turn-refused');
-    const sessionId = await failPinnedChat(owner, projectId);
+    const sessionId = await newChatSession(owner, projectId);
+    const pinPath = `/api/v1/projects/${projectId}/chat/sessions/${sessionId}/model`;
 
-    await expectCode(await startTurn(owner, projectId, sessionId), 400, 'AI_002', 'a chat whose model cannot be routed');
-    expect(await listWorkflowRuns(projectId, 'chat-turn'), 'the refused turn opened no run').toEqual([]);
+    await expectCode(await mutate(owner.ctx, 'patch', pinPath, { data: { provider: 'synapse', model: 'e2e-unoffered' } }), 400, 'AI_022', 'an alias the catalog lacks');
+    expect(await listWorkflowRuns(projectId, 'chat-turn'), 'the refused pin opened no run').toEqual([]);
     expect((await transcript(owner.ctx, projectId, sessionId)).messages, 'and stored no message').toEqual([]);
 
     const archive = await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/chat/sessions/${sessionId}/archive`);
@@ -72,11 +73,11 @@ test.describe('novel-forge chat turn stream', () => {
     expect(unarchive.status(), await unarchive.text()).toBe(200);
     await expectCode(await startTurn(owner, projectId, randomUUID()), 404, 'CHT_001', 'a chat that does not exist');
 
-    const pinned = await mutate(owner.ctx, 'patch', `/api/v1/projects/${projectId}/chat/sessions/${sessionId}/model`, { data: HAIKU_MODEL });
+    const pinned = await mutate(owner.ctx, 'patch', pinPath, { data: HAIKU_ALIAS });
     expect(pinned.status(), await pinned.text()).toBe(200);
     const runId = await startedRun(owner, projectId, sessionId);
     expectQuotaRefusedTurn(await watchToTheEnd(sse, owner, projectId, runId));
-    expect(await listDispatchedModelCalls(projectId), "the chat's routable pin starts the turn, and the quota still refused it").toEqual([]);
+    expect(await listDispatchedModelCalls(projectId), "the chat's offered pin starts the turn, and the quota still refused it").toEqual([]);
   });
 
   test('should deliver the same live frames to every subscriber of a running turn', async ({ forge, sse }) => {

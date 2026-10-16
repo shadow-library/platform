@@ -5,7 +5,7 @@ import { Alert, Button, Spinner } from '@shadow-library/ui';
 import { PaneError, PaneLoader, RunStatusChip } from '@/components/nf';
 import { type RunModelCallResponse, useAiModelsQuery, useRunChargesQuery, useRunUsageQuery, useSettledRunRefresh, type WorkflowRunListItemResponse } from '@/lib/apis';
 import { messageTime } from '@/lib/format';
-import { modelLabel } from '@/lib/model-defaults';
+import { modelLabel, modelPrice } from '@/lib/model-defaults';
 import { formatSeconds } from '@/lib/runs';
 import { useIsAdmin } from '@/lib/session';
 import { callCharge, callRoleLabel, formatCompactTokens, formatUsd, pageRange, runLabel } from '@/lib/usage';
@@ -21,8 +21,7 @@ interface RunCallLineProps {
 
 function RunCallLine({ call }: RunCallLineProps): ReactElement {
   const modelsQuery = useAiModelsQuery();
-  const registry = modelsQuery.data?.models ?? [];
-  const charge = callCharge(call, modelsQuery.data ? (registry.find(model => model.id === call.model) ?? null) : undefined);
+  const charge = callCharge(call, modelPrice(modelsQuery.data, call.model));
   const tokens =
     call.inputTokens == null && call.outputTokens == null ? '—' : `${formatCompactTokens(call.inputTokens ?? 0)} in · ${formatCompactTokens(call.outputTokens ?? 0)} out`;
   return (
@@ -31,7 +30,7 @@ function RunCallLine({ call }: RunCallLineProps): ReactElement {
         {callRoleLabel(call.role)}
         {call.status !== 'ok' && <span className={styles.callMuted}> · {call.status}</span>}
       </span>
-      <span className={styles.callMuted}>{modelLabel(registry, call.model, call.provider)}</span>
+      <span className={styles.callMuted}>{modelLabel(modelsQuery.data, call.model)}</span>
       <span className={styles.callMuted}>{tokens}</span>
       <span className={styles.callMuted}>{formatSeconds(call.latencyMs)}</span>
       <span className={styles.callCost}>

@@ -15,8 +15,8 @@ import {
   useUpdateSessionModelMutation,
 } from '@/lib/apis';
 import { choiceLabel, choiceScope, defaultNote, modelTagParts, sameChoice, type TurnChoice, type TurnChoiceDefaults, turnChoiceDefaults } from '@/lib/chat-model';
-import { decodeModelRef, encodeModelRef, messageTime } from '@/lib/format';
-import { type InheritedModel, inheritedModel, modelLabel } from '@/lib/model-defaults';
+import { messageTime } from '@/lib/format';
+import { DEFAULT_PIN, type InheritedModel, inheritedModel, modelLabel, pinMenu, pinUpdate } from '@/lib/model-defaults';
 
 import styles from './ChatModel.module.css';
 
@@ -68,25 +68,18 @@ function PinnedModelMenu({ novelId, session, disabled }: PinnedModelMenuProps): 
 
   const project = projectQuery.data;
   const { choice } = turnChoiceDefaults(session, { contentMode: project?.contentMode ?? 'standard', costTier: project?.costTier ?? 'balanced' });
-  const unrestricted = choice.contentMode === 'unrestricted';
-  const allowlist = new Set(modelsQuery.data?.unrestrictedAllowlist ?? []);
-  const models = modelsQuery.data?.models ?? [];
-  const llmModels = models.filter(m => m.kind === 'llm' && m.enabled && (!unrestricted || allowlist.has(m.id)));
+  const offer = useProjectModelsQuery(novelId, choice);
   const resolvedDefault = resolveDefault({ tiers: modelsQuery.data?.tiers ?? [], choice });
-
-  const overridden = Boolean(session?.modelProvider && session?.modelId);
-  const value = overridden ? encodeModelRef(session?.modelProvider ?? '', session?.modelId ?? '') : 'default';
-  const triggerLabel =
-    (overridden ? modelLabel(models, session?.modelId, session?.modelProvider) : modelLabel(models, resolvedDefault?.model, resolvedDefault?.provider)) ?? 'default';
-  const defaultCaption = resolvedDefault && `${modelLabel(models, resolvedDefault.model, resolvedDefault.provider)} · platform default`;
+  const menu = pinMenu(modelsQuery.data, session, offer.data?.chatAliases, resolvedDefault);
 
   const onChange = (next: string): void => {
-    if (!session || next === value) return;
-    const ref = next === 'default' ? null : decodeModelRef(next);
+    if (!session || next === menu.value) return;
+    const pin = pinUpdate(next);
+    const picked = menu.choices.find(entry => entry.value === next)?.label;
     updateModel.mutate(
-      { sessionId: session.id, provider: ref?.provider ?? null, model: ref?.model ?? null },
+      { sessionId: session.id, ...pin },
       {
-        onSuccess: () => toast.success(ref ? `This chat now uses ${modelLabel(models, ref.model, ref.provider)}` : 'This chat is back on the default model'),
+        onSuccess: () => toast.success(picked ? `This chat now uses ${picked}` : 'This chat is back on the default model'),
         onError: e => toast.danger(e.message),
       },
     );
@@ -96,24 +89,20 @@ function PinnedModelMenu({ novelId, session, disabled }: PinnedModelMenuProps): 
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenu.Trigger asChild>
         <button type="button" disabled={disabled || !session} aria-label="Chat model" className={styles.trigger}>
-          {triggerLabel}
-          {!overridden && <span className={styles.triggerDefault}>· {resolvedDefault ? 'platform default' : 'default'}</span>}
+          {menu.triggerLabel}
           <ChevronDownIcon size={12} />
         </button>
       </DropdownMenu.Trigger>
       <DropdownMenu.Content align="start">
         <DropdownMenu.Label>Model for this chat</DropdownMenu.Label>
-        <DropdownMenu.RadioGroup value={value} onValueChange={onChange}>
-          <DropdownMenu.RadioItem value="default" onSelect={() => setOpen(false)}>
-            <span>
-              Default
-              {defaultCaption && <span className={styles.caption}>{defaultCaption}</span>}
-            </span>
+        <DropdownMenu.RadioGroup value={menu.value} onValueChange={onChange}>
+          <DropdownMenu.RadioItem value={DEFAULT_PIN} onSelect={() => setOpen(false)}>
+            {menu.defaultLabel}
           </DropdownMenu.RadioItem>
           <DropdownMenu.Separator />
-          {llmModels.map(m => (
-            <DropdownMenu.RadioItem key={encodeModelRef(m.provider, m.id)} value={encodeModelRef(m.provider, m.id)} onSelect={() => setOpen(false)}>
-              {m.label}
+          {menu.choices.map(entry => (
+            <DropdownMenu.RadioItem key={entry.value} value={entry.value} onSelect={() => setOpen(false)}>
+              {entry.label}
             </DropdownMenu.RadioItem>
           ))}
         </DropdownMenu.RadioGroup>
@@ -244,7 +233,7 @@ function TurnModelMenu({ novelId, session, disabled, control }: TurnModelMenuPro
   const choice = control.choice ?? defaults.choice;
   const routes = useProjectModelsQuery(novelId, choice, open);
   const chat = routes.data?.models.find(route => route.group === 'chat');
-  const pinnedModel = session?.modelId ? modelLabel(modelsQuery.data?.models ?? [], session.modelId, session.modelProvider) : undefined;
+  const pinnedModel = session?.modelId ? modelLabel(modelsQuery.data, session.modelId, session.modelProvider) : undefined;
   const scope = choiceScope(control.choice, defaults);
 
   const clearPin = (): void => {
@@ -293,7 +282,7 @@ interface MessageModelTagProps {
 export function MessageModelTag({ message, worked }: MessageModelTagProps): React.JSX.Element | null {
   const modelsQuery = useAiModelsQuery();
   if (message.role !== 'assistant') return null;
-  const model = modelLabel(modelsQuery.data?.models ?? [], message.modelId, message.modelProvider);
+  const model = modelLabel(modelsQuery.data, message.modelId, message.modelProvider);
   const parts = modelTagParts({ model, contentMode: message.contentMode, costTier: message.costTier, costUsd: message.costUsd });
   const tail = worked ? [worked.charAt(0).toLowerCase() + worked.slice(1)] : [];
   return <MessageModelTagView parts={[...parts, ...tail]} createdAt={message.createdAt} />;

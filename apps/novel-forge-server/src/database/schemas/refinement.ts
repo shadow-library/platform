@@ -170,8 +170,10 @@ export const chatSessions = pgTable(
     // stays 'manual' only so no migration is needed. Provenance lives on each proposal (autoApplied).
     mode: chatMode('mode').notNull().default('manual'),
     // Per-session model pin (null → the cost tier's model). Lets one chat run on a different provider/model; new sessions start unpinned.
+    // `model_*` is the legacy backend's registry pin; `alias_key` is the Synapse backend's, kept in step when the legacy pin is written.
     modelProvider: varchar('model_provider'),
     modelId: varchar('model_id'),
+    aliasKey: varchar('alias_key'),
     contentMode: contentMode('content_mode'),
     costTier: costTier('cost_tier'),
     /** The last `job_events.seq` handed out in this session; taken under the row lock, so the cursor follows commit order. */

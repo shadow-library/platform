@@ -67,8 +67,11 @@
   `stopping` means the cancel is recorded and a live replica holds the run; `not_delivered` means it is recorded but the run's replica has stopped heartbeating.
 - **Model routing**: roles map to groups. A model type (standard or unrestricted) and a cost tier (economy, balanced,
   performant) select a platform model per group: the server sends both as the `tier` and `content_mode` selectors and Synapse's routes, which encode tier by content mode per task, pick the model; a project never pins a model to a role. A chat reply takes its type and tier from the turn, then the
-  chat, then the project; a chat's own model pin, which stores a Synapse alias key, outranks the tier map for that chat's replies alone, and an unrestricted reply takes it only when the alias's `available.content_mode` includes `unrestricted`. The composer's pick is the chat's own setting and holds until the author changes it. There is no local chat-model path. There are no account-level model defaults: an author's only account setting is the
+  chat, then the project; a chat's own model pin, which stores a Synapse alias key, outranks the tier map for that chat's replies alone. A pin is accepted only for an alias the catalog offers the chat task under the chat's model type and cost tier (`AI_022` otherwise), and a reply takes it only while the catalog still offers it for that reply's selectors, so an unrestricted reply takes it only when the alias's `available.content_mode` includes `unrestricted`; otherwise the reply falls to the routes. A pin stored as a registry slug is reconciled with its `LEGACY_SLUG_ALIAS` alias on every migrate, and a slug the map lacks stays a legacy-only pin; a pin an older pod cleared during a rollout keeps its alias. The composer's pick is the chat's own setting and holds until the author changes it. There is no local chat-model path. There are no account-level model defaults: an author's only account setting is the
   default cost tier a new project starts on when its creation request names none (Balanced until set; a bot holds no settings and always gets Balanced), and a clone keeps its source's tier.
+- **Model names**: on the Synapse backend every model list, label, price and pinnable alias comes from `GET /api/v1/catalog`; the registry (`models.ts`, `defaults.ts`)
+  serves only the legacy backend and names rows written before Synapse. Records keep catalog model keys (a call, a chat reply and a review record the model that
+  answered, never the router's slug), and every name an author sees is the catalog's label for that key, the key itself when the catalog no longer names it.
 - **Usage and cost**: every model call records the model that answered, its tokens, its chapter when it has exactly one, and a cost frozen when written: the response's
   `synapse.cost.list_usd`, with its source read from `billed_usd`: `provider` (a metered provider billed it), `gateway` (nothing was billed, as on the CLI gateway, so the
   figure is the list price) or `estimate` (no list price; older rows estimated from registry prices). Every source is shown as the real charge.
@@ -108,7 +111,8 @@
 - Detail comes through declared lookups (never native tool binding): Story Bible pages, entities, canon facts, threads and promises, chapter summaries, a plan, a draft, a
   character timeline, a volume, lore and prose search, the author's notes, usage and a chapter's reviews. A turn that reads the notes or a planner-only page holds for review
   every change the chapter writer or a reader can see; only planner-side records (milestones) still apply (see the write policy).
-- **Web research** needs no switch. Each turn reads `native_web_search` from `GET /api/v1/catalog` for the chat task and selectors; if true the chat call asks
+- **Web research** needs no switch. Each turn reads `native_web_search` from `GET /api/v1/catalog` for the chat task and selectors, from the pinned alias when a pin applies
+  and from the task's default otherwise; if true the chat call asks
   for it, and otherwise the chat gets two more lookups through Brave Search (titles, URLs and snippets, and a page read as plain text), or no web at all
   without a Brave key. It is for real-world facts and research, never the author's story. Web text reaches the model
   marked untrusted, never justifies a change on its own and is never copied into the book; the reply names its sources. Through Brave a page may be read only if
@@ -534,7 +538,9 @@
 - Context MUST be assembled once per run, token-budgeted, tier-labelled and persisted as a pack; graph state holds the pack id, NEVER canon text. The stable segment MUST stay
   byte-identical while canon is unchanged; chapter prose travels as a template variable, NEVER inside the pack.
 - Prompt text MUST live in versioned code and the version MUST bump on any wording change; every call logs `promptKey@promptVersion`. The plugin policy digest MUST be in any
-  `llm_cache` key; only deterministic roles are cacheable. `runId` MUST correlate runs, model calls, tool calls, packs and messages. Prefer deterministic code over AI wherever
+  `llm_cache` key, and on Synapse so are the task, selectors, pinned alias and active catalog version, so a retarget misses old answers; a call that cannot
+  read the catalog version neither reads nor writes the cache. The version is read through the client's 60-second catalog cache, so for up to
+  60 seconds after a publish the `llm_cache` may still serve answers keyed to the previous version. Only deterministic roles are cacheable. `runId` MUST correlate runs, model calls, tool calls, packs and messages. Prefer deterministic code over AI wherever
   code can decide.
 - A cost tier selects models through Synapse routes, and MUST never get cheaper from Economy to Performant. Every unrestricted route MUST target a model that unrestricted aliases and routes are allowed to reach.
 - Entity canon MUST exist as entity records, not cast narrated in a document.

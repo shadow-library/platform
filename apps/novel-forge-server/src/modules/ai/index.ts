@@ -14,6 +14,7 @@ export * from './isolation-read-policy';
 export * from './model-catalog.service';
 export * from './model-router.service';
 export * from './models';
+export * from './novel-forge-catalog.service';
 export * from './quota';
 export * from './retrieval';
 export * from './synapse-failure';

@@ -1,9 +1,14 @@
 import { describe, expect, it } from 'bun:test';
 
+import { setConfig } from '@shadow-library/common/testing';
+
+import { type Refinement } from '@server/database';
+
 import { runWithCostTier } from '@modules/ai/cost-tier-scope';
 import { COST_TIER_DEFAULTS, type ResolvedModel } from '@modules/ai/defaults';
 import { ModelRouterService, type ProjectConfig } from '@modules/ai/model-router.service';
-import { chatRoutedProject, chatSelection } from '@modules/refinement/chat-selection';
+import { synapseAlias } from '@modules/ai/synapse-request';
+import { aliasRoutedProject, chatRoutedProject, chatSelection, presentChatSession } from '@modules/refinement/chat-selection';
 
 const opus: ResolvedModel = { provider: 'openrouter', model: 'anthropic/claude-opus-5' };
 const kimi: ResolvedModel = { provider: 'openrouter', model: 'moonshotai/kimi-k3' };
@@ -78,5 +83,58 @@ describe('chatRoutedProject', () => {
     const writer = runWithCostTier(unrestrictedTurn.costTier, () => router().routeModel('generation', novel));
 
     expect(writer).toMatchObject({ resolved: COST_TIER_DEFAULTS.economy.standard.writing, costTier: 'economy', contentMode: 'standard' });
+  });
+});
+
+describe('aliasRoutedProject', () => {
+  const project: ProjectConfig = { contentMode: 'standard', costTier: 'balanced' };
+  const selection = { contentMode: 'standard', costTier: 'economy' } as const;
+
+  it('should pin the chat to its alias while the catalog offers it, and route every role on the tier map', () => {
+    const routed = aliasRoutedProject(project, { aliasKey: 'opus' }, selection, ['opus', 'grok']);
+    const route = router().routeModel('chat', routed);
+
+    expect(routed).toEqual({ contentMode: 'standard', costTier: 'economy', chatAlias: 'opus', chatPinned: true });
+    expect(route.resolved).toEqual(COST_TIER_DEFAULTS.economy.standard.chat);
+    expect(synapseAlias('chat', routed)).toBe('opus');
+    expect(synapseAlias('plan', routed)).toBeUndefined();
+  });
+
+  it('should drop an alias the catalog does not offer for the selection, so the reply falls to the routes', () => {
+    const routed = aliasRoutedProject(project, { aliasKey: 'opus' }, { contentMode: 'unrestricted', costTier: 'economy' }, ['grok']);
+
+    expect(routed).toEqual({ contentMode: 'unrestricted', costTier: 'economy' });
+    expect(synapseAlias('chat', routed)).toBeUndefined();
+  });
+
+  it('should send the stored alias for Synapse to judge when the catalog could not be read', () => {
+    expect(aliasRoutedProject(project, { aliasKey: 'opus' }, selection, undefined)).toMatchObject({ chatAlias: 'opus', chatPinned: true });
+  });
+
+  it('should leave an unpinned chat unpinned', () => {
+    expect(aliasRoutedProject(project, { aliasKey: null }, selection, ['opus'])).toEqual({ contentMode: 'standard', costTier: 'economy' });
+  });
+});
+
+describe('presentChatSession', () => {
+  const row = { id: 's1', modelProvider: 'openrouter', modelId: 'anthropic/claude-opus-5', aliasKey: 'opus' } as Refinement.ChatSession;
+
+  it('should show an alias pin as its Synapse option on the Synapse backend', () => {
+    const restore = setConfig({ 'ai.backend': 'synapse' });
+    try {
+      expect(presentChatSession(row)).toMatchObject({ modelProvider: 'synapse', modelId: 'opus', aliasKey: 'opus' });
+      expect(presentChatSession({ ...row, aliasKey: null })).toMatchObject({ modelProvider: null, modelId: null });
+    } finally {
+      restore();
+    }
+  });
+
+  it('should leave the registry pin as stored on the legacy backend', () => {
+    const restore = setConfig({ 'ai.backend': 'legacy' });
+    try {
+      expect(presentChatSession(row)).toBe(row);
+    } finally {
+      restore();
+    }
   });
 });
