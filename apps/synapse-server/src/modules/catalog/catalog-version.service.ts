@@ -23,8 +23,25 @@ export interface SavedDraft extends DraftView {
   issues: CatalogIssue[];
 }
 
+/** What the saver last saw: the draft's fingerprint, or that no draft existed. A save made against anything else is refused. */
+export interface DraftExpectation {
+  fingerprint?: string;
+  noDraft?: boolean;
+}
+
+export interface DraftDiff extends CatalogDiff {
+  /** Fingerprint of the draft this diff was computed from; publishing it proves the diff was seen. */
+  fingerprint: string;
+}
+
 /** Throws to refuse the save, e.g. when the caller lacks the permission a changed section needs */
 export type DraftAuthorizer = (changed: Set<CatalogSection>) => void | Promise<void>;
+
+function assertExpected(existing: Catalog.Version | undefined, expected: DraftExpectation): void {
+  if (expected.noDraft && existing) throw AppErrorCode.SYN_CATALOG_CONFLICT.create();
+  if (expected.fingerprint === undefined) return;
+  if (!existing || catalogFingerprint(existing.document) !== expected.fingerprint) throw AppErrorCode.SYN_CATALOG_CONFLICT.create();
+}
 
 function viewOf(draft: Catalog.Version): DraftView {
   return { draft, fingerprint: catalogFingerprint(draft.document) };
@@ -71,11 +88,12 @@ export class CatalogVersionService {
    * Saves whatever object the admin sent, so work in progress survives; the issues say what would block publishing it. `authorize` sees the sections
    * changed against what the admin edited, the current draft or else the active document, re-read under the lock so no concurrent save slips between.
    */
-  async saveDraft(document: unknown, note: string | undefined, actor: string, authorize: DraftAuthorizer): Promise<SavedDraft> {
+  async saveDraft(document: unknown, note: string | undefined, actor: string, authorize: DraftAuthorizer, expected: DraftExpectation = {}): Promise<SavedDraft> {
     if (!isRecord(document)) throw AppErrorCode.SYN_CATALOG_INVALID.create({ issues: [{ path: '', code: 'invalid_type', message: 'Expected an object' }] });
     const values = { document, note: note ?? null, createdBy: actor };
     const saved = await this.repository.exclusive(async store => {
       const existing = await store.findDraft();
+      assertExpected(existing, expected);
       const activeRow = await store.findActive();
       await authorize(changedSections(document, existing?.document ?? activeRow?.document ?? null));
       const active = activeRow ? this.parseActive(activeRow) : null;
@@ -95,10 +113,10 @@ export class CatalogVersionService {
     return check.valid ? [] : check.issues;
   }
 
-  async diff(): Promise<CatalogDiff> {
+  async diff(): Promise<DraftDiff> {
     const draft = await this.requireDraft();
     const active = await this.repository.findActive();
-    return diffCatalog(draft.document, active?.document ?? {});
+    return { ...diffCatalog(draft.document, active?.document ?? {}), fingerprint: catalogFingerprint(draft.document) };
   }
 
   /** The fingerprint proves the caller saw the draft it publishes: an overwrite keeps the row id, so only the content tells a stale publish apart. */

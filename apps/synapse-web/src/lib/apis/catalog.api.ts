@@ -1,0 +1,123 @@
+import { queryOptions, useMutation, type UseMutationResult, useQueryClient, type UseQueryOptions } from '@tanstack/react-query';
+import { type ApiResult } from '@shadow-library/web';
+
+import {
+  type AliasImpactResponse,
+  type CatalogInvalidResponse,
+  type CatalogVersionDetailResponse,
+  type CatalogVersionListResponse,
+  type CatalogVersionSummaryResponse,
+  type DraftDiffResponse,
+  type DraftResponse,
+  type SaveDraftBody,
+  type SaveDraftResponse,
+  type ValidateDraftResponse,
+} from './api-types.gen';
+import { catalogWriteOutcome, type CatalogWriteOutcome, UNPROCESSABLE } from './catalog-outcome';
+import { providerKeys } from './providers.api';
+import { ApiError, APIRequest, isApiError } from './transport';
+
+const NOT_FOUND = 404;
+const CONFLICT = 409;
+
+export const catalogKeys = {
+  all: ['catalog'],
+  versions: () => [...catalogKeys.all, 'versions'],
+  version: (version: number) => [...catalogKeys.versions(), version],
+  draft: () => [...catalogKeys.all, 'draft'],
+  diff: () => [...catalogKeys.draft(), 'diff'],
+  impact: (alias: string, model?: string) => [...catalogKeys.all, 'aliases', alias, 'impact', model ?? null],
+} as const;
+
+export function isCatalogConflict(error: unknown): boolean {
+  return isApiError(error) && error.status === CONFLICT;
+}
+
+interface ResultRequest {
+  result<T>(): Promise<ApiResult<T>>;
+}
+
+async function orNullWhenAbsent<T>(request: ResultRequest): Promise<T | null> {
+  const result = await request.result<T>();
+  if (result.ok) return result.data;
+  if (result.failure.status === NOT_FOUND) return null;
+  throw new ApiError(result.failure.status, result.failure, result.failure.retryAfterSeconds);
+}
+
+export const versionsQueryOptions = (): UseQueryOptions<CatalogVersionListResponse, ApiError> =>
+  queryOptions<CatalogVersionListResponse, ApiError>({
+    queryKey: catalogKeys.versions(),
+    queryFn: ({ signal }) => APIRequest.get('/admin/catalog/versions').signal(signal).execute(),
+  });
+
+export const versionQueryOptions = (version: number): UseQueryOptions<CatalogVersionDetailResponse, ApiError> =>
+  queryOptions<CatalogVersionDetailResponse, ApiError>({
+    queryKey: catalogKeys.version(version),
+    queryFn: ({ signal }) => APIRequest.get(`/admin/catalog/versions/${version}`).signal(signal).execute(),
+    staleTime: Infinity,
+  });
+
+/** No draft is a state, not a failure: the draft disappears every time it is published. */
+export const draftQueryOptions = (): UseQueryOptions<DraftResponse | null, ApiError> =>
+  queryOptions<DraftResponse | null, ApiError>({
+    queryKey: catalogKeys.draft(),
+    queryFn: ({ signal }) => orNullWhenAbsent<DraftResponse>(APIRequest.get('/admin/catalog/draft').signal(signal)),
+  });
+
+export const diffQueryOptions = (): UseQueryOptions<DraftDiffResponse | null, ApiError> =>
+  queryOptions<DraftDiffResponse | null, ApiError>({
+    queryKey: catalogKeys.diff(),
+    queryFn: ({ signal }) => orNullWhenAbsent<DraftDiffResponse>(APIRequest.get('/admin/catalog/draft/diff').signal(signal)),
+    staleTime: 0,
+  });
+
+export const aliasImpactQueryOptions = (alias: string, model?: string): UseQueryOptions<AliasImpactResponse, ApiError> =>
+  queryOptions<AliasImpactResponse, ApiError>({
+    queryKey: catalogKeys.impact(alias, model),
+    queryFn: ({ signal }) =>
+      APIRequest.get(`/admin/catalog/aliases/${encodeURIComponent(alias)}/impact`)
+        .query(model ? { model } : {})
+        .signal(signal)
+        .execute(),
+  });
+
+export function useSaveDraftMutation(): UseMutationResult<CatalogWriteOutcome<SaveDraftResponse>, ApiError, SaveDraftBody> {
+  const queryClient = useQueryClient();
+  return useMutation<CatalogWriteOutcome<SaveDraftResponse>, ApiError, SaveDraftBody>({
+    mutationFn: async body =>
+      catalogWriteOutcome(await APIRequest.put('/admin/catalog/draft').body(body).modeled(UNPROCESSABLE).execute<SaveDraftResponse | CatalogInvalidResponse>()),
+    onSuccess: outcome => {
+      if (outcome.kind !== 'done') return;
+      const draft: DraftResponse = { draft: outcome.value.draft, fingerprint: outcome.value.fingerprint };
+      queryClient.setQueryData(draftQueryOptions().queryKey, draft);
+      return queryClient.invalidateQueries({ queryKey: catalogKeys.diff() });
+    },
+    onError: async error => {
+      if (isCatalogConflict(error)) await queryClient.invalidateQueries({ queryKey: catalogKeys.draft() });
+    },
+  });
+}
+
+export function useValidateDraftMutation(): UseMutationResult<ValidateDraftResponse, ApiError, undefined> {
+  return useMutation<ValidateDraftResponse, ApiError, undefined>({ mutationFn: () => APIRequest.post('/admin/catalog/draft/validate').execute() });
+}
+
+type VersionOutcome = CatalogWriteOutcome<CatalogVersionSummaryResponse>;
+
+function useCatalogWrite<TVariables>(
+  write: (variables: TVariables) => Promise<CatalogVersionSummaryResponse | CatalogInvalidResponse>,
+): UseMutationResult<VersionOutcome, ApiError, TVariables> {
+  const queryClient = useQueryClient();
+  return useMutation<VersionOutcome, ApiError, TVariables>({
+    mutationFn: async variables => catalogWriteOutcome(await write(variables)),
+    onSettled: () => Promise.all([queryClient.invalidateQueries({ queryKey: catalogKeys.all }), queryClient.invalidateQueries({ queryKey: providerKeys.all })]),
+  });
+}
+
+export function usePublishDraftMutation(): UseMutationResult<VersionOutcome, ApiError, string> {
+  return useCatalogWrite<string>(fingerprint => APIRequest.post('/admin/catalog/draft/publish').body({ fingerprint }).modeled(UNPROCESSABLE).execute());
+}
+
+export function useRollbackMutation(): UseMutationResult<VersionOutcome, ApiError, number> {
+  return useCatalogWrite<number>(version => APIRequest.post(`/admin/catalog/versions/${version}/rollback`).modeled(UNPROCESSABLE).execute());
+}

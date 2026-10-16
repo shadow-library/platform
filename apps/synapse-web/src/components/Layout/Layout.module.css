@@ -1,0 +1,46 @@
+.accessNotice {
+  margin-bottom: 20px;
+}
+
+.orgSwitcher {
+  min-width: 180px;
+  max-width: 260px;
+}
+
+.envPill {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 12px;
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: var(--sh-radius-full);
+  background: var(--sh-surface-well);
+}
+
+.envDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--sh-success-solid);
+}
+
+.envLabel {
+  font-size: 0.75rem;
+  color: var(--sh-text-secondary);
+}
+
+.envValue {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  font-family: var(--sh-font-mono);
+}
+
+@media (max-width: 639px) {
+  .envPill {
+    display: none;
+  }
+
+  .orgSwitcher {
+    min-width: 0;
+  }
+}

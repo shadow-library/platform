@@ -29,6 +29,7 @@ COPY apps/memoir-web/package.json apps/memoir-web/package.json
 COPY apps/web-novel-server/package.json apps/web-novel-server/package.json
 COPY apps/web-novel-web/package.json apps/web-novel-web/package.json
 COPY apps/synapse-server/package.json apps/synapse-server/package.json
+COPY apps/synapse-web/package.json apps/synapse-web/package.json
 COPY e2e/package.json e2e/package.json
 RUN --mount=type=cache,target=/root/.bun/install/cache bun install --frozen-lockfile --filter ./apps/identity-server --filter ./
 

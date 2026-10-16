@@ -12,7 +12,7 @@ Authentication is Identity's job (`docs/identity.md`).
 - Task: the app's contract, keyed `<app>.<name>` and callable only by that app. Declares kind (chat, embedding, image), required capabilities, an effort range (default, min, max), a data policy (`any` or `in_cluster_only`), the aliases it accepts, and its routes. An embedding task is pinned: its route models cannot change across catalog versions, because stored vectors depend on them.
 - Route: a model chosen by selectors the caller sends (`tier`, `content_mode`, `plan`, ...). The route with the most matching selector keys wins, ties go to the earliest; exactly one route has no selectors and is the default.
 - Budget: a limit on calls and/or list-price cost for an app, per subject or for the whole app, over a fixed window (`1h`, `1d`, `30d`). Cost is counted at list price, never at what a provider billed.
-- Catalog: one JSON document holding providers, models, aliases, tasks and budgets. Versions are `DRAFT` (at most one), `PUBLISHED` (the active one is the highest) or `ARCHIVED`. Publish replaces the whole document atomically after validation; rollback copies an older document into a NEW published version, so history is append-only. Replicas poll the published version and keep the previous one if a reload fails.
+- Catalog: one JSON document holding providers, models, aliases, tasks and budgets. Versions are `DRAFT` (at most one), `PUBLISHED` (the active one is the highest) or `ARCHIVED`. Publish replaces the whole document atomically after validation and must present the fingerprint of the draft it saw; a draft save may present the fingerprint it replaces, or that no draft exists, and is refused on a mismatch; rollback copies an older document into a NEW published version, so history is append-only. Replicas poll the published version and keep the previous one if a reload fails.
 - A baseline seed writes catalog v1 only when no version exists. The `local-only` seed profile replaces every deployment with local Ollama, so the test environment makes no paid call.
 
 ## Architecture
@@ -25,7 +25,7 @@ Authentication is Identity's job (`docs/identity.md`).
 - Dispatch: budgets are admitted first, then effort is clamped to the task's range and snapped to what the model supports, then deployments are tried in order. A duplicate `request_id` is refused with `SYN_DUPLICATE_REQUEST` before dispatch. Settlement after the response writes the usage ledger row and adds list cost to every admitted budget.
 - Provider translation is Synapse's job alone: model id substitution, effort encoding per provider kind, session and web-search switches for the host gateway, structured output native or injected into the prompt, cache-control kept or stripped, sampling parameters dropped for models that reject them, Ollama's OpenAI-compatible endpoints, image generation endpoints, and usage parsing including cached and reasoning tokens. Apps never see a provider dialect.
 - Own PostgreSQL database: `catalog_versions`, the `ledger` and `budget_counters`. A daily retention sweep prunes the ledger.
-- `synapse-web` calls same-origin `/api/*` in the browser and `synapse-server` directly during SSR, and authenticates via Identity; its `api-types.gen.ts` is generated from `synapse-server`.
+- `synapse-web` calls same-origin `/api/*` in the browser and `synapse-server` directly during SSR, and authenticates via Identity; its `api-types.gen.ts` is generated from `synapse-server`. It hides the controls a user lacks the permission for, read from `GET /api/v1/admin/access`; the server enforces every permission regardless.
 
 ## Integrations
 
@@ -46,7 +46,7 @@ Authentication is Identity's job (`docs/identity.md`).
 - A budget counts list price, so a free subscription call still spends budget.
 - The `data_policy` of a task is enforced at resolution; no seeded task uses `in_cluster_only`.
 - No app other than Synapse may hold a provider key, URL or vendor model slug, and apps MUST NOT read Synapse's database.
-- Every route needs an auth decorator; inference routes need the service scope and the admin routes a user permission. Bots are refused.
+- Every route needs an auth decorator; inference routes need the service scope and the admin routes a user permission, except `GET /api/v1/admin/access`, which needs only a user session and reports which Synapse permissions the user holds. Bots are refused.
 - A server contract change requires regenerating `synapse-web`'s `api-types.gen.ts` and fixing its callers.
 
 ## Non-goals

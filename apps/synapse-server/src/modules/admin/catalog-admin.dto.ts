@@ -93,6 +93,12 @@ export class SaveDraftBody {
 
   @Field({ optional: true, maxLength: 500, description: 'Free-text note stored with the draft' })
   note?: string;
+
+  @Field({ optional: true, minLength: 1, description: 'Fingerprint of the draft this save replaces; the save is refused with 409 when the draft has changed since' })
+  expectedFingerprint?: string;
+
+  @Field({ optional: true, description: 'The save starts a new draft; it is refused with 409 when a draft already exists' })
+  expectNoDraft?: boolean;
 }
 
 @Schema()
@@ -112,6 +118,9 @@ export class ValidateDraftResponse {
 
 @Schema()
 export class DraftDiffResponse {
+  @Field({ description: 'Fingerprint of the draft this diff was computed from; publish with it' })
+  fingerprint: string;
+
   @Field(() => [String], { description: 'Paths present in the draft only' })
   added: string[];
 

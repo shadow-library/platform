@@ -142,6 +142,54 @@ describe('CatalogVersionService.saveDraft', () => {
   });
 });
 
+describe('CatalogVersionService.saveDraft expectation', () => {
+  it('should save over the draft whose fingerprint the saver presents', async () => {
+    const first = await service.saveDraft(catalogDocument(), undefined, 'admin-1', allowAll);
+
+    const second = await service.saveDraft(catalogDocument(withOpusMax), undefined, 'admin-2', allowAll, { fingerprint: first.fingerprint });
+
+    expect(second.fingerprint).toBe(catalogFingerprint(catalogDocument(withOpusMax)));
+  });
+
+  it('should refuse a save presenting the fingerprint of a draft that has since changed, and keep the newer draft', async () => {
+    const first = await service.saveDraft(catalogDocument(), undefined, 'admin-1', allowAll);
+    const newer = await service.saveDraft(catalogDocument(withoutPreview), undefined, 'admin-2', allowAll);
+
+    await expectFailure(service.saveDraft(catalogDocument(withOpusMax), undefined, 'admin-1', allowAll, { fingerprint: first.fingerprint }), AppErrorCode.SYN_CATALOG_CONFLICT);
+
+    expect(catalogFingerprint(repository.rows.find(row => row.state === 'DRAFT')!.document)).toBe(newer.fingerprint);
+  });
+
+  it('should refuse a save presenting a fingerprint when the draft is gone', async () => {
+    await expectFailure(service.saveDraft(catalogDocument(), undefined, 'admin-1', allowAll, { fingerprint: 'f'.repeat(64) }), AppErrorCode.SYN_CATALOG_CONFLICT);
+
+    expect(repository.rows).toHaveLength(0);
+  });
+
+  it('should start a draft when the saver expects none and none exists', async () => {
+    const saved = await service.saveDraft(catalogDocument(), undefined, 'admin-1', allowAll, { noDraft: true });
+
+    expect(saved.draft.state).toBe('DRAFT');
+  });
+
+  it('should refuse a save expecting no draft when one exists', async () => {
+    await service.saveDraft(catalogDocument(), undefined, 'admin-1', allowAll);
+
+    await expectFailure(service.saveDraft(catalogDocument(withOpusMax), undefined, 'admin-2', allowAll, { noDraft: true }), AppErrorCode.SYN_CATALOG_CONFLICT);
+  });
+
+  it('should refuse a stale save before asking the authorizer', async () => {
+    await service.saveDraft(catalogDocument(), undefined, 'admin-1', allowAll);
+    let authorized = false;
+
+    await expectFailure(
+      service.saveDraft(catalogDocument(withOpusMax), undefined, 'admin-2', () => void (authorized = true), { noDraft: true }),
+      AppErrorCode.SYN_CATALOG_CONFLICT,
+    );
+    expect(authorized).toBe(false);
+  });
+});
+
 describe('CatalogVersionService.validateDraft and diff', () => {
   it('should report the draft issues against the active document', async () => {
     repository.seed(catalogDocument(), 1);
@@ -152,7 +200,22 @@ describe('CatalogVersionService.validateDraft and diff', () => {
   it('should diff the draft against the active document', async () => {
     repository.seed(catalogDocument(), 1);
     repository.seed(catalogDocument(withoutPreview), DRAFT_VERSION, 'DRAFT');
-    expect(await service.diff()).toEqual({ added: [], removed: ['aliases.preview', 'tasks.novel-forge.chat.aliases[3]'], changed: [] });
+    expect(await service.diff()).toEqual({
+      added: [],
+      removed: ['aliases.preview', 'tasks.novel-forge.chat.aliases[3]'],
+      changed: [],
+      fingerprint: catalogFingerprint(catalogDocument(withoutPreview)),
+    });
+  });
+
+  it('should name the draft a diff was computed from, so a later save makes it stale', async () => {
+    repository.seed(catalogDocument(), 1);
+    const first = await service.saveDraft(catalogDocument(withoutPreview), undefined, 'admin-1', allowAll);
+    const diffed = await service.diff();
+    await service.saveDraft(catalogDocument(withOpusMax), undefined, 'admin-2', allowAll);
+
+    expect(diffed.fingerprint).toBe(first.fingerprint);
+    expect((await service.diff()).fingerprint).not.toBe(first.fingerprint);
   });
 
   it('should answer not found when there is no draft', async () => {

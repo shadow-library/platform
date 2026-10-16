@@ -35,6 +35,7 @@ function seedOver(existingRoles: Record<string, RoleRow[]>) {
   const ensurePermission = mock((applicationId: number, name: string) => Promise.resolve(permissionId(applicationId, name)));
   const grantPermissionToRole = mock<(roleId: number, permissionId: string) => Promise<void>>(() => Promise.resolve());
   const assignRole = mock(() => Promise.resolve());
+  const ensureRedirectUris = mock<(clientId: string, uris: string[]) => Promise<void>>(() => Promise.resolve());
 
   const applicationService = { getApplication: (name: string) => applications.get(name), getApplicationOrThrow: (name: string) => applications.get(name) };
   const oauthClientService = {
@@ -43,7 +44,7 @@ function seedOver(existingRoles: Record<string, RoleRow[]>) {
     ensureResource: () => Promise.resolve({ id: 1 }),
     createScope: (_resource: number, name: string) => Promise.resolve(`scope:${name}`),
     grantScope: () => Promise.resolve(),
-    ensureRedirectUris: () => Promise.resolve(),
+    ensureRedirectUris,
     removeRedirectUri: () => Promise.resolve(),
     updateClient: () => Promise.resolve(),
     requireWorkloadIdentity: () => Promise.resolve(false),
@@ -55,7 +56,7 @@ function seedOver(existingRoles: Record<string, RoleRow[]>) {
     { ensurePermission, grantPermissionToRole, assignRole } as never,
     { create: () => Promise.resolve() } as never,
   );
-  return { service, applications, addRole, ensurePermission, grantPermissionToRole, assignRole };
+  return { service, applications, addRole, ensurePermission, grantPermissionToRole, assignRole, ensureRedirectUris };
 }
 
 describe('EcosystemSeedService', () => {
@@ -114,6 +115,16 @@ describe('EcosystemSeedService', () => {
       expect(seed.addRole).toHaveBeenCalledWith('pulse', expect.objectContaining({ roleName: 'PulseAdmin' }));
       const created = seed.applications.get('pulse')?.roles.find(role => role.roleName === 'PulseAdmin');
       expect(seed.assignRole).toHaveBeenCalledWith({ type: 'USER', id: '1' }, created?.id, '1');
+    });
+
+    it('should register the synapse console callback on the synapse origin, as every first-party web app is', async () => {
+      const seed = seedOver({});
+
+      await seed.service.seed(OPERATOR);
+
+      const registered = new Map(seed.ensureRedirectUris.mock.calls);
+      expect(registered.get('synapse')).toEqual(['https://synapse.shadow.test/api/auth/callback', 'http://localhost:8080/api/auth/callback']);
+      expect(registered.get('pulse')).toEqual(['https://pulse.shadow.test/api/auth/callback', 'http://localhost:8080/api/auth/callback']);
     });
 
     it('should add the synapse admin role to an existing synapse application missing it and assign it to the bootstrap administrator', async () => {

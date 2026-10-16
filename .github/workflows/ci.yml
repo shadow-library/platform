@@ -143,7 +143,7 @@ jobs:
             "apps/novel-forge-server": { "checkMigrations": true },
             "apps/pulse-server": { "checkMigrations": false },
             "apps/memoir-server": { "checkMigrations": true },
-            "apps/synapse-server": { "checkMigrations": true, "checkApiTypes": false },
+            "apps/synapse-server": { "checkMigrations": true },
             "apps/web-novel-server": { "checkMigrations": true }
           }
           JSON

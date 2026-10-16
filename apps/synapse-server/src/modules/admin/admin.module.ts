@@ -5,6 +5,7 @@ import { DatabaseModule } from '@shadow-library/modules';
 
 import { CatalogModule } from '@modules/catalog';
 
+import { AccessController } from './access.controller';
 import { AliasImpactService } from './alias-impact.service';
 import { CallerService } from './caller.service';
 import { CatalogAdminController } from './catalog-admin.controller';
@@ -18,7 +19,7 @@ import { UsageService } from './usage.service';
 
 @Module({
   imports: [AuthModule, CatalogModule, DatabaseModule, FastifyModule],
-  controllers: [CatalogController, CatalogAdminController, UsageController, ProvidersController],
+  controllers: [AccessController, CatalogController, CatalogAdminController, UsageController, ProvidersController],
   providers: [CallerService, CatalogViewService, LedgerReportRepository, AliasImpactService, UsageService, ProvidersViewService],
 })
 export class AdminModule {}

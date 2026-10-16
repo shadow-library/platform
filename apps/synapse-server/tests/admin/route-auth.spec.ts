@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 
 import { AUTH_ROUTE_METADATA, type RequiredAuthRoute } from '@shadow-library/auth/module';
 
+import { AccessController } from '@modules/admin/access.controller';
 import { CatalogAdminController } from '@modules/admin/catalog-admin.controller';
 import { CatalogController } from '@modules/admin/catalog.controller';
 import { ProvidersController } from '@modules/admin/providers.controller';
@@ -12,7 +13,7 @@ interface DeclaredRoute {
   auth: RequiredAuthRoute | undefined;
 }
 
-const CONTROLLERS = [CatalogController, CatalogAdminController, UsageController, ProvidersController];
+const CONTROLLERS = [AccessController, CatalogController, CatalogAdminController, UsageController, ProvidersController];
 
 function basePath(controller: object): string {
   for (const key of Reflect.getMetadataKeys(controller)) {
@@ -57,7 +58,7 @@ describe('admin route auth metadata', () => {
   const routes = declaredRoutes();
 
   it('should discover every route', () => {
-    expect(routes).toHaveLength(Object.keys(PERMISSIONS).length + 1);
+    expect(routes).toHaveLength(Object.keys(PERMISSIONS).length + 2);
   });
 
   it('should require exactly the documented permission on each admin route', () => {
@@ -73,6 +74,14 @@ describe('admin route auth metadata', () => {
 
     expect(declared?.auth).toMatchObject({ access: 'required', scopes: ['synapse:catalog:read'] });
     expect(declared?.auth?.permission).toBeUndefined();
+  });
+
+  it('should require a session, and no permission, on the route that reports what the user may do', () => {
+    const declared = routes.find(candidate => candidate.route === 'GET /api/v1/admin/access');
+
+    expect(declared?.auth).toMatchObject({ access: 'required' });
+    expect(declared?.auth?.permission).toBeUndefined();
+    expect(declared?.auth?.scopes).toBeUndefined();
   });
 
   it('should leave no route without a declared access policy', () => {

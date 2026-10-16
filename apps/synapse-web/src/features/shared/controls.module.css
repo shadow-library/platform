@@ -1,0 +1,16 @@
+.rowActions {
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 0;
+}

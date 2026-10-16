@@ -1,0 +1,33 @@
+@import '@shadow-library/ui/styles.css';
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--sh-surface-app);
+}
+
+#app {
+  height: 100%;
+}
+
+a {
+  color: var(--sh-accent);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--sh-accent-hover);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--sh-border-default);
+  border-radius: 8px;
+  border: 2px solid var(--sh-surface-app);
+}

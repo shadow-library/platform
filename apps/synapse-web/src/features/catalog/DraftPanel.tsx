@@ -1,0 +1,171 @@
+import { type ReactElement, useId } from 'react';
+import { Alert, Button, Card, FormField, Input, Textarea } from '@shadow-library/ui';
+
+import { type Capabilities, type CatalogIssueResponse, isApiError, isCatalogConflict, useSaveDraftMutation, useValidateDraftMutation } from '@/lib';
+
+import { draftExpectation, type EditorSource, formatCatalog, type ParsedCatalog } from './catalog-document';
+import { type IssueReport, type Notice } from './catalog-editor.types';
+import styles from './Catalog.module.css';
+import { IssueList } from './IssueList';
+
+const NOTE_MAX_LENGTH = 500;
+
+interface DraftPanelProps {
+  capabilities: Capabilities;
+  text: string;
+  note: string;
+  parsed: ParsedCatalog;
+  source: EditorSource;
+  dirty: boolean;
+  report: IssueReport | null;
+  onTextChange: (text: string) => void;
+  onNoteChange: (note: string) => void;
+  onRevert: () => void;
+  onSaved: (saved: EditorSource, issues: CatalogIssueResponse[]) => void;
+  onReport: (report: IssueReport) => void;
+  onNotice: (notice: Notice | null) => void;
+  onConflict: () => Promise<void>;
+}
+
+function errorNotice(title: string, error: unknown): Notice {
+  return { intent: 'danger', title, body: isApiError(error) || error instanceof Error ? error.message : undefined };
+}
+
+function sectionHint(capabilities: Capabilities): string | null {
+  const locked = [!capabilities.writeProviders && '`providers`', !capabilities.writeBudgets && '`budgets`'].filter(Boolean);
+  if (locked.length === 0) return null;
+  return `Your role cannot change ${locked.join(' or ')}: a save that changes them is refused.`;
+}
+
+export function DraftPanel({
+  capabilities,
+  text,
+  note,
+  parsed,
+  source,
+  dirty,
+  report,
+  onTextChange,
+  onNoteChange,
+  onRevert,
+  onSaved,
+  onReport,
+  onNotice,
+  onConflict,
+}: DraftPanelProps): ReactElement {
+  const errorId = useId();
+  const save = useSaveDraftMutation();
+  const validate = useValidateDraftMutation();
+  const readOnly = !capabilities.writeDraft;
+  const hasDraft = source.fingerprint !== null;
+
+  const handleSave = (): void => {
+    if (!parsed.ok) return;
+    const sentText = text;
+    const trimmed = note.trim();
+    onNotice(null);
+    save.mutate(
+      { document: parsed.document, ...(trimmed && { note: trimmed }), ...draftExpectation(source.fingerprint) },
+      {
+        onSuccess: outcome => {
+          if (outcome.kind === 'invalid') {
+            onReport({ source: 'save', issues: outcome.issues });
+            onNotice({ intent: 'danger', title: 'The draft was not saved', body: 'The document was refused; the issues are listed under the editor.' });
+            return;
+          }
+          onSaved({ text: sentText, note: trimmed, fingerprint: outcome.value.fingerprint }, outcome.value.issues);
+          onNotice(
+            outcome.value.issues.length === 0
+              ? { intent: 'success', title: 'Draft saved', body: 'It passes validation. Review the diff and publish it when ready.' }
+              : { intent: 'warning', title: 'Draft saved with issues', body: `${outcome.value.issues.length} issue(s) would block publishing; they are listed under the editor.` },
+          );
+        },
+        onError: error => {
+          if (isCatalogConflict(error)) return void onConflict();
+          onNotice(errorNotice("Couldn't save the draft", error));
+        },
+      },
+    );
+  };
+
+  const handleValidate = (): void => {
+    onNotice(null);
+    validate.mutate(undefined, {
+      onSuccess: result => {
+        onReport({ source: 'validate', issues: result.issues });
+        onNotice(result.valid ? { intent: 'success', title: 'The saved draft is publishable' } : { intent: 'warning', title: `${result.issues.length} issue(s) block publishing` });
+      },
+      onError: error => onNotice(errorNotice("Couldn't validate the draft", error)),
+    });
+  };
+
+  const handleFormat = (): void => {
+    if (parsed.ok) onTextChange(formatCatalog(parsed.document));
+  };
+
+  const hint = capabilities.writeDraft ? sectionHint(capabilities) : 'Your role can read the catalog but not edit it.';
+  const shownIssues = report && (report.source === 'save' || report.source === 'validate') ? report : null;
+
+  return (
+    <Card padding="md">
+      <Card.Body>
+        <div className={styles.status}>
+          <span>{hasDraft ? 'Editing the saved draft.' : 'No draft exists: the editor starts from the active version, and saving creates the draft.'}</span>
+          {dirty ? <strong>Unsaved edits</strong> : null}
+        </div>
+        <Textarea
+          className={styles.editor}
+          value={text}
+          onValueChange={onTextChange}
+          autoGrow={false}
+          minRows={28}
+          spellCheck={false}
+          autoCapitalize="off"
+          autoCorrect="off"
+          readOnly={readOnly}
+          invalid={!parsed.ok}
+          aria-label="Catalog draft document (JSON)"
+          aria-describedby={parsed.ok ? undefined : errorId}
+        />
+        {parsed.ok ? null : (
+          <p id={errorId} className={styles.hint} role="alert">
+            Not valid: {parsed.error}
+          </p>
+        )}
+        {hint ? <p className={styles.hint}>{hint}</p> : null}
+        {readOnly ? null : (
+          <div className={styles.toolbar}>
+            <FormField label="Note" optional className={styles.note}>
+              <Input value={note} onValueChange={onNoteChange} maxLength={NOTE_MAX_LENGTH} placeholder="What this change is for" />
+            </FormField>
+            <span className={styles.spacer} />
+            <Button variant="ghost" onClick={handleFormat} disabled={!parsed.ok}>
+              Format
+            </Button>
+            <Button variant="ghost" onClick={onRevert} disabled={!dirty}>
+              Revert
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={handleValidate}
+              loading={validate.isPending}
+              disabled={!hasDraft || dirty}
+              title={dirty ? 'Save first: validation checks the saved draft' : undefined}
+            >
+              Validate
+            </Button>
+            <Button variant="primary" onClick={handleSave} loading={save.isPending} disabled={!parsed.ok || (hasDraft && !dirty)}>
+              Save draft
+            </Button>
+          </div>
+        )}
+        {shownIssues && shownIssues.issues.length > 0 ? (
+          <Alert intent="warning" title={`${shownIssues.issues.length} issue(s) block publishing`} className={styles.confirm}>
+            Each issue names the JSON path it was found at.
+          </Alert>
+        ) : null}
+        {shownIssues ? <IssueList issues={shownIssues.issues} label="Issues in the saved draft" /> : null}
+      </Card.Body>
+    </Card>
+  );
+}

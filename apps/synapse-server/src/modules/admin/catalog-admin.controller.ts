@@ -1,6 +1,6 @@
 import { RequirePermission } from '@shadow-library/auth/module';
 import { AppError } from '@shadow-library/common';
-import { Body, Get, HttpController, type HttpResponse, Params, Post, Put, Query, Res, RespondFor, ServerErrorCode } from '@shadow-library/fastify';
+import { Body, ErrorResponseDto, Get, HttpController, type HttpResponse, Params, Post, Put, Query, Res, RespondFor, ServerErrorCode } from '@shadow-library/fastify';
 
 import { AppErrorCode } from '@server/classes';
 import { type Catalog } from '@server/database';
@@ -29,6 +29,7 @@ import { CallerService } from './caller.service';
 import { DRAFT_PERMISSIONS, DRAFT_SENSITIVE_PERMISSIONS, draftAuthorizer } from './draft-authorizer';
 
 const UNPROCESSABLE = 422;
+const CONFLICT = 409;
 
 function summaryOf(row: CatalogVersionSummary): CatalogVersionSummaryResponse {
   return {
@@ -84,12 +85,17 @@ export class CatalogAdminController {
   @Put('/draft')
   @RequirePermission(SYNAPSE_PERMISSIONS.catalogWrite)
   @RespondFor(200, SaveDraftResponse)
+  @RespondFor(CONFLICT, ErrorResponseDto)
   @RespondFor(UNPROCESSABLE, CatalogInvalidResponse)
   async saveDraft(@Body() body: SaveDraftBody, @Res() response: HttpResponse): Promise<SaveDraftResponse | HttpResponse> {
     const user = this.caller.user();
+    if (body.expectedFingerprint !== undefined && body.expectNoDraft) {
+      throw AppErrorCode.SYN_INVALID_REQUEST.create({ param: 'expectNoDraft', reason: 'a save expects either an existing draft or none, not both' });
+    }
+    const expected = { ...(body.expectedFingerprint !== undefined && { fingerprint: body.expectedFingerprint }), ...(body.expectNoDraft && { noDraft: true }) };
     const granted = await this.caller.permissions(user, DRAFT_PERMISSIONS, DRAFT_SENSITIVE_PERMISSIONS);
     return this.withIssues(response, async () => {
-      const saved = await this.catalog.saveDraft(body.document, body.note, user.sub, draftAuthorizer(granted));
+      const saved = await this.catalog.saveDraft(body.document, body.note, user.sub, draftAuthorizer(granted), expected);
       return { draft: detailOf(saved.draft), fingerprint: saved.fingerprint, issues: saved.issues };
     });
   }
@@ -114,6 +120,7 @@ export class CatalogAdminController {
   @Post('/draft/publish')
   @RequirePermission(SYNAPSE_PERMISSIONS.catalogPublish)
   @RespondFor(200, CatalogVersionSummaryResponse)
+  @RespondFor(CONFLICT, ErrorResponseDto)
   @RespondFor(UNPROCESSABLE, CatalogInvalidResponse)
   async publish(@Body() body: PublishBody, @Res() response: HttpResponse): Promise<CatalogVersionSummaryResponse | HttpResponse> {
     const user = this.caller.user();

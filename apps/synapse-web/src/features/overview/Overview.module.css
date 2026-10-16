@@ -1,0 +1,40 @@
+.cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.totals {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.cardLink {
+  margin-top: 12px;
+  font-size: 0.8125rem;
+}
+
+.features {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.url {
+  font-family: var(--sh-font-mono);
+  font-size: 0.75rem;
+  color: var(--sh-text-tertiary);
+  word-break: break-all;
+}
+
+.section {
+  margin-bottom: 28px;
+}
+
+@media (max-width: 1023px) {
+  .cards {
+    grid-template-columns: 1fr;
+  }
+}

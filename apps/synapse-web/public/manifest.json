@@ -1,0 +1,15 @@
+{
+  "short_name": "Shadow Synapse",
+  "name": "Shadow Synapse",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#36156e",
+  "background_color": "#ffffff"
+}

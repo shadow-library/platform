@@ -109,6 +109,36 @@ describe('CatalogAdminController', () => {
       );
     });
 
+    it('should pass the expected fingerprint through and refuse a stale save with a conflict', async () => {
+      const first = (await save('admin', withLabel)) as { fingerprint: string };
+      await save('admin', withBudgets);
+
+      const error = await expectFailure(
+        asPrincipal(userWith('admin'), () => controller.saveDraft({ document: catalogDocument() as never, expectedFingerprint: first.fingerprint }, new FakeReply().asResponse())),
+        AppErrorCode.SYN_CATALOG_CONFLICT,
+      );
+      expect(error.status).toBe(409);
+    });
+
+    it('should refuse a save that expects no draft when one exists', async () => {
+      await save('admin', withLabel);
+
+      await expectFailure(
+        asPrincipal(userWith('admin'), () => controller.saveDraft({ document: catalogDocument() as never, expectNoDraft: true }, new FakeReply().asResponse())),
+        AppErrorCode.SYN_CATALOG_CONFLICT,
+      );
+    });
+
+    it('should refuse a save that expects both a draft and none', async () => {
+      await expectFailure(
+        asPrincipal(userWith('admin'), () =>
+          controller.saveDraft({ document: catalogDocument() as never, expectedFingerprint: 'x', expectNoDraft: true }, new FakeReply().asResponse()),
+        ),
+        AppErrorCode.SYN_INVALID_REQUEST,
+      );
+      expect(repository.rows.filter(row => row.state === 'DRAFT')).toHaveLength(0);
+    });
+
     it('should save an invalid document and report its issues instead of failing', async () => {
       const reply = new FakeReply();
       const saved = (await save('operator', withUnknownModel, reply)) as { issues: { code: string; path: string }[] };
@@ -233,6 +263,7 @@ describe('CatalogAdminController', () => {
       expect(validation.valid).toBe(false);
       expect(validation.issues).toContainEqual(expect.objectContaining({ code: 'unknown_model' }));
       expect(diff.changed).toEqual(['models.grok-4.6.label', 'aliases.opus.model']);
+      expect(diff.fingerprint).toBe(draft.fingerprint);
     });
   });
 });
