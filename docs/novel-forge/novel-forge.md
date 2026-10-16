@@ -5,8 +5,8 @@
 - AI-assisted authoring workbench for long serialized web novels, built around one conversation. An author starts a novel from a title and optional notes, lands in a chat that
   designs the Story Bible with them, plans each chapter just before it is written, has AI draft it (or writes it by hand), reviews it, finalizes it into canon and publishes it to
   the reader app `web-novel` (`docs/web-novel.md`). A project has one owner; bot-owned projects are shared with the owning organisation.
-- `novel-forge-server`: Bun/Fastify, Postgres + pgvector, LangGraph/LangChain. Every LLM call goes to an OpenRouter-compatible endpoint (OpenRouter or the host's AI CLI gateway);
-  Ollama serves embeddings only.
+- `novel-forge-server`: Bun/Fastify, Postgres + pgvector, LangGraph/LangChain. Every model call goes to Synapse (`docs/synapse.md`) as a task
+  `novel-forge.{writing,planning,review,chat,helper,vision,image,embedding}`; the server holds no provider key, URL or vendor model slug.
 - `novel-forge-web`: TanStack Start SSR workspace. Authenticates via Identity. The chat is every novel's home; Story Bible, Chapters, Illustrations, Publish, Usage
   and Settings sit beside it, from one screen list. A link to a retired screen opens the novel's home.
 
@@ -54,16 +54,15 @@
   `seq` follows commit order and a cursor never skips a late commit; a failed event insert never undoes the transition, and a transition is published only after it commits. The
   session's job stream (`GET …/chat/sessions/:sessionId/jobs/stream`, SSE id = `seq`) resumes after `Last-Event-ID` or `?after=`; with no cursor it replays the running jobs'
   events and how jobs settled in the last hour. A follower polls so a job another replica starts is still seen; events of jobs settled over a week ago are swept.
-- **Model routing**: roles map to groups; an unrestricted alternate map with an allowlist exists. A model type (standard or unrestricted) and a cost tier (economy, balanced,
-  performant) select a platform model per group from `COST_TIER_DEFAULTS`; a project never pins a model to a role. A chat reply takes its type and tier from the turn, then the
-  chat, then the project; a chat's own model pin outranks the tier map for that chat's replies alone, and an unrestricted reply takes it only when the unrestricted allowlist
-  carries it. The composer's pick is the chat's own setting and holds until the author changes it. There is no local chat-model path. There are no account-level model defaults: an author's only account setting is the
+- **Model routing**: roles map to groups. A model type (standard or unrestricted) and a cost tier (economy, balanced,
+  performant) select a platform model per group: the server sends both as the `tier` and `content_mode` selectors and Synapse's routes, which encode tier by content mode per task, pick the model; a project never pins a model to a role. A chat reply takes its type and tier from the turn, then the
+  chat, then the project; a chat's own model pin, which stores a Synapse alias key, outranks the tier map for that chat's replies alone, and an unrestricted reply takes it only when the alias's `available.content_mode` includes `unrestricted`. The composer's pick is the chat's own setting and holds until the author changes it. There is no local chat-model path. There are no account-level model defaults: an author's only account setting is the
   default cost tier a new project starts on when its creation request names none (Balanced until set; a bot holds no settings and always gets Balanced), and a clone keeps its source's tier.
-- **Usage and cost**: every model call records its tokens, its chapter when it has exactly one, and a cost frozen when written, with its source: `provider` (OpenRouter reported
-  it), `gateway` (the CLI gateway reported it) or `estimate` (registry list prices). Every source is shown as the real charge. Runs link to their parent run, so a chat turn's
+- **Usage and cost**: every model call records its tokens, its chapter when it has exactly one, and a cost frozen when written, taken from the response's `synapse.cost.{list_usd, billed_usd}`, with its source: `provider` (the upstream reported
+  it), `gateway` (the CLI gateway reported it) or `estimate` (Synapse's list prices). Every source is shown as the real charge. Runs link to their parent run, so a chat turn's
   figure includes its title and compaction calls; costs roll up per turn, chapter, run, job, project and account through one pricing path, so a legacy row is priced the same
-  everywhere and a call is never counted twice. The AI quota is a rolling window per owner, enforced before dispatch for requests and jobs alike;
-  projects with no owner share one window, and a read error refuses the call (fails closed).
+  everywhere and a call is never counted twice. Spend limits are Synapse budgets per owner (list price, fixed windows), enforced before dispatch for requests and jobs alike;
+  projects with no owner share one subject, and Synapse refusing admission fails the call closed. Reasoning effort comes from each task's effort range in Synapse, which applies it.
 - Retrieval: pgvector indexes of finalized, non-isolated prose and lore, filtered by project; derived data, rebuildable. Realtime: SSE; a dropped client never aborts a chat turn.
 - The web never renders a containment badge from `generator` (it reads `isolated`; `generator` only drives a provenance chip). `novel-forge:admin` (role `NovelForgeAdmin`, never
   default or bot-grantable) gates run inspection; it is an RBAC permission evaluated per organisation, so the web reads it from `GET /api/v1/access`, never the session, and each
@@ -80,7 +79,7 @@
   history ceiling can run past the budget. The author's own words render before, and outrank, any AI summary.
 - **The chat's prompt only grows at its end while the AI gateway keeps a session for it**, so the gateway resumes one Claude session per chat and the
   earlier turns are a cached prefix. That holds for a standard turn on a Claude model the gateway runs on its CLI, with or without its own web
-  tools (never with tools bound by the caller); only then do the turn's calls send `X-Gateway-Session: <app stage>:<projectId>:<chatSessionId>`, and no other call (compaction, titles, jobs) ever does.
+  tools (never with tools bound by the caller); only then do the turn's calls send the Synapse `session` `<app stage>:<projectId>:<chatSessionId>`, and no other call (compaction, titles, jobs) ever does.
   The system prompt carries the reply's JSON schema on these calls (every other call still ends with it) and nothing per turn; lookup results, the
   negation fix and the router's repair re-asks follow the turn's own message; and every call — the next turn's first included — repeats what the call
   before sent, then its reply, then only new messages. When the turn keeps a reply other than the last call's (a negation fix answered with lookups),
@@ -95,7 +94,7 @@
 - Detail comes through declared lookups (never native tool binding): Story Bible pages, entities, canon facts, threads and promises, chapter summaries, a plan, a draft, a
   character timeline, a volume, lore and prose search, the author's notes, usage and a chapter's reviews. A turn that reads the notes or a planner-only page holds for review
   every change the chapter writer or a reader can see; only planner-side records (milestones) still apply (see the write policy).
-- **Web research** needs no switch. Each turn asks the AI gateway whether it runs the turn's model on a CLI with its own web search; if so the chat call asks
+- **Web research** needs no switch. Each turn reads `native_web_search` from `GET /api/v1/catalog` for the chat task and selectors; if true the chat call asks
   for it, and otherwise the chat gets two more lookups through Brave Search (titles, URLs and snippets, and a page read as plain text), or no web at all
   without a Brave key. It is for real-world facts and research, never the author's story. Web text reaches the model
   marked untrusted, never justifies a change on its own and is never copied into the book; the reply names its sources. Through Brave a page may be read only if
@@ -474,7 +473,7 @@
 - A chapter's content mode is its plan's, copied from the project's when the plan is created (a plan with none routes standard; an isolated draft counts as unrestricted), so
   changing the project's mode never re-routes an existing chapter. It MUST route every call on that chapter's prose — draft, title, judge, repair, revise, review, summary,
   continuity, extraction — through the one role table in `chapter-route.ts`. An unrestricted chapter runs the normal writer -> judge -> repair graph on the unrestricted route, is
-  written isolated, and NEVER falls back to a standard model: an off-allowlist resolution refuses (`AI_003`).
+  written isolated, and NEVER falls back to a standard model: a resolution Synapse refuses (`SYN_ALIAS_UNAVAILABLE` or `SYN_NO_ELIGIBLE_MODEL`, mapped to `AI_003`) fails the call.
 - Containment MUST key on `isolated`, NEVER on `generator` or `contentMode`. A call whose writer class a plugin raised (or an unrestricted fill) writes `generator: unrestricted`
   and `isolated: true`, sticky for the run. Draft and isolated content MUST NEVER be indexed, retrieved or searched.
 - **Read policy**: raw isolated prose is readable only by the author, the unrestricted route and the Amend editor. Author HTTP routes (the draft, its versions and compare) read it raw; every model-bound, chat, plugin, publish and search read goes through `isolation-read-policy.ts` and sees only what the author approved in the
@@ -523,8 +522,7 @@
 - Prompt text MUST live in versioned code and the version MUST bump on any wording change; every call logs `promptKey@promptVersion`. The plugin policy digest MUST be in any
   `llm_cache` key; only deterministic roles are cacheable. `runId` MUST correlate runs, model calls, tool calls, packs and messages. Prefer deterministic code over AI wherever
   code can decide.
-- A cost tier MUST change models, not reasoning effort (the gateway ignores per-request effort), and MUST never get cheaper from Economy to Performant. Every unrestricted tier
-  entry MUST sit on the allowlist.
+- A cost tier selects models through Synapse routes, and MUST never get cheaper from Economy to Performant. Every unrestricted route MUST target a model that unrestricted aliases and routes are allowed to reach.
 - Entity canon MUST exist as entity records, not cast narrated in a document.
 - **Plugins** are operator-loaded (off unless `plugins.dir` is set), per project, answering only fixed decision points (canon augment, brief policy, call routing, context/prompt
   contribution). They MUST NEVER register routes, hold the database client, write domain tables, change a plan's volume, content mode, claimed milestones or ending flag, or issue

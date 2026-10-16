@@ -11,7 +11,7 @@ Every record is one person's private data; nothing is shared, public or social. 
   (cold/steady/warm) gates Comeback arming and capacity drives the plan-lock advisory. Misses cost HP and lost XP, never negative XP or shame.
 - Finance: multi-currency expenses with FX capture, subscriptions, receipt images, receipt OCR structuring, monthly budget.
 - Quick logs: journal, meals, weight, side quests, health metrics with threshold offers.
-- AI insights: ad-hoc and scheduled queries answered asynchronously by a batch drain inside a server-time window (default 02:00-06:00; failed tasks retry around the clock) on in-cluster inference;
+- AI insights: ad-hoc and scheduled queries answered asynchronously by a batch drain inside a server-time window (default 02:00-06:00; failed tasks retry around the clock) through Synapse;
   results are suggestions the owner applies by hand. A lapsed account's task holds (`held_upgrade`) until the tier returns.
 - Billing (free/paid, one trial, hosted checkout), email via `pulse` (AI ready, weekly digest, billing reminder), async data export, self-service deletion.
 
@@ -36,7 +36,7 @@ Every record is one person's private data; nothing is shared, public or social. 
   `deleted_records` tombstone; snapshot domains propagate removals by replacing the set.
 - Rollover runs lazily before every command and delta pull, one transaction per day; a failed day stops the walk, never fails the caller. Days beyond the 90-day catch-up
   bound are skipped, never closed.
-- Integrations: `identity` (login, sessions, scopes seeded in its bootstrap); `pulse` (server-to-server send, templates seeded there); object storage; in-cluster inference; FX API.
+- Integrations: `identity` (login, sessions, scopes seeded in its bootstrap); `pulse` (server-to-server send, templates seeded there); object storage; `synapse` (server-to-server AI inference, tasks `memoir.*`, each needing a service-access rule in Identity); FX API.
 
 ## Hard rules
 
@@ -58,7 +58,7 @@ Every record is one person's private data; nothing is shared, public or social. 
 - AI output MUST pass seven guardrails: quotes of the owner's text, identity or clinical labels, shame copy and mechanic claims reject the task; off-set or foreign-quest
   suggestions are dropped; crisis input replaces the answer with a fixed supportive response that ships as an ordinary result.
 - AI suggestions are a closed set of fields the owner can already edit by hand; AI never mutates mechanics.
-- User data NEVER reaches a third-party endpoint: inference must be in-cluster; production boot refuses otherwise (off-production any host is allowed; an unset inference URL disables AI silently). FX calls carry currency pairs only.
+- AI runs through Synapse, which may use third-party model providers chosen in Synapse's catalog; memoir holds no provider key or URL. memoir MUST send a task no more personal data than it needs. The free/paid entitlement reaches Synapse as the `plan` selector. FX calls carry currency pairs only.
 - Sensitive columns live in one manifest driving log redaction and export labelling; the AI no-quote check uses a separate hand-listed set. Telemetry is closed and pseudonymous.
   NEVER log journal, notes, health values or emails. There is no metrics backend: counters are `metric`-tagged log lines and alerts are occurrence-based.
 - Notifications are off unless the owner's pref is true, limited to three categories, sent through an outbox so a `pulse` failure never fails the triggering operation.
@@ -68,7 +68,7 @@ Every record is one person's private data; nothing is shared, public or social. 
 
 ## Non-goals
 
-- No social, sharing, public profiles or organisation-owned principals. No third-party AI. No server read model for History, Insights or Review. No meal macros (calories only).
+- No social, sharing, public profiles or organisation-owned principals. No server read model for History, Insights or Review. No meal macros (calories only).
 
 ## Open work
 

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-- A Bun-workspaces monorepo of five products, each a server + web app pair, plus the shared packages they build on. Built by one person with AI-assisted development.
+- A Bun-workspaces monorepo of six products, each a server + web app pair, plus the shared packages they build on. Built by one person with AI-assisted development.
 - Products are independently built and deployed; the monorepo changes how they are developed, not their runtime architecture. Docs hold intent and invariants; code answers the
   rest.
 
@@ -14,17 +14,18 @@
 - **Pulse** — notification service and operator console. Apps send by template key; Pulse renders, routes to a sender and logs the outcome (email via Resend is the only real provider today).
 - **Web Novel** — reading platform, private until launch (`docs/web-novel.md`; catalog, reader, library, spoiler-gated wikis, PWA). A serving copy of content pushed from Novel Forge; owns no identities but does own reader state (library, progress) and app sessions.
 - **Memoir** — personal gamified life-tracking (quests, hero progression, finance, AI insights). Offline-first PWA with client sync; notifies through Pulse.
+- **Synapse** — the platform's internal AI service: every model call goes through it. Owns the model catalog, task contracts, routing, budgets and a usage ledger; no other app holds a provider key.
 
 ## Shared packages
 
-- `common`, `class-schema`, `app`, `fastify`, `modules`, `auth`, `ui`, `web` and `sdk` under `packages/`. `e2e/` is the cross-app Playwright suite; `scripts/` is root tooling.
+- `common`, `class-schema`, `app`, `fastify`, `modules`, `auth`, `ui`, `web`, `sdk` and `synapse` under `packages/`. `e2e/` is the cross-app Playwright suite; `scripts/` is root tooling.
 
 ## Doc map
 
 - `AGENTS.md` is the entry point that points here; the `shadow-library-ecosystem` skill owns the package API catalog.
 - `docs/architecture.md` — topology, integrations, contract-first API types, monorepo rules.
 - `docs/packages.md` — shared package roles and hard rules.
-- `docs/identity.md`, `docs/pulse.md`, `docs/web-novel.md`, `docs/memoir.md` — one per product (server and web).
+- `docs/identity.md`, `docs/pulse.md`, `docs/web-novel.md`, `docs/memoir.md`, `docs/synapse.md` — one per product (server and web).
 - `docs/novel-forge/` — Novel Forge: `novel-forge.md` (the product doc) and `ai-testing.md` (manual test recipes for every AI feature).
 
 ## Reading rule

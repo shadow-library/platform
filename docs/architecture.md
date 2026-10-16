@@ -2,7 +2,7 @@
 
 ## Topology
 
-- Five products (`identity`, `novel-forge`, `pulse`, `web-novel`, `memoir`), each a server + web pair: ten independently built and deployed apps.
+- Six products (`identity`, `novel-forge`, `pulse`, `web-novel`, `memoir`, `synapse`), each a server + web pair: twelve independently built and deployed apps.
 - Server: Bun + Fastify over the in-house DI kernel, PostgreSQL via Drizzle; JSON/REST, except identity-server which also speaks OAuth2, SAML2 and SCIM. Web: React + TanStack
   Start SSR; `web-novel-web` and `memoir-web` are also PWAs.
 - The browser calls the paired server same-origin: `/api/*` plus `/auth/*` (and `/oauth2`, `/saml2` on identity); SSR calls the server directly. Web apps hold no auth logic and,
@@ -14,6 +14,7 @@
 ```text
 every server but identity ──auth SDK──> identity   (login, PDP checks, M2M tokens; identity registers every app)
 identity, memoir ──M2M──> pulse                    (notifications sink)
+novel-forge, memoir ──M2M──> synapse                (AI inference and model catalog)
 novel-forge ──M2M, one-way──> web-novel            (publish)
 identity ──svc://novel-forge-server/internal/bots/*──> novel-forge   (bot ownership; the only app that opts in today)
 ```
@@ -26,8 +27,8 @@ identity ──svc://novel-forge-server/internal/bots/*──> novel-forge   (bo
   Content integrity is the hash contract in `@shadow-library/sdk` (`docs/packages.md`).
 - **App admission and route access are separate layers.** See `docs/packages.md` (Auth access mode); Web Novel is private pre-launch through both (`docs/web-novel.md`).
 - **Service-to-service addressing** uses `svc://<service>`. NEVER hard-code hostnames.
-- **Cross-app data access is forbidden.** No app reads another app's database; only the HTTP integrations above exist (the e2e suite seeds and reads databases directly, for tests only). There is no shared
-  AI service.
+- **Cross-app data access is forbidden.** No app reads another app's database; only the HTTP integrations above exist (the e2e suite seeds and reads databases directly, for tests only).
+- **Every model call goes through Synapse.** No app other than Synapse holds a provider key, a provider URL or a vendor model slug; apps address tasks (`<app>.<name>`) and user-facing aliases. Synapse is internal like Pulse and owns its own database (`docs/synapse.md`).
 
 ## Contract-first API types
 
@@ -48,7 +49,7 @@ identity ──svc://novel-forge-server/internal/bots/*──> novel-forge   (bo
 
 ## Deploy shape
 
-- Each app's hand-maintained Dockerfile copies every workspace's `package.json`: adding or removing a workspace means editing all ten. Deployment lives in the `devops` repo.
+- Each app's hand-maintained Dockerfile copies every workspace's `package.json`: adding or removing a workspace means editing all twelve. Deployment lives in the `devops` repo.
 
 ## Monorepo hard rules
 

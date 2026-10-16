@@ -9,8 +9,8 @@
 
 ## Layering (dependencies point down only)
 
-- `common` -> `class-schema`, `app` -> `fastify` -> `modules`; `auth` sits beside `modules`. Web side: `ui` and `web`. `sdk` and `ui` depend on no first-party package.
-- Backends use the backend chain plus `auth` (all but identity) and `sdk` (novel-forge, web-novel); web apps use `ui` + `web` (+ `common` in identity-web, + `sdk` in novel-forge-web and web-novel-web).
+- `common` -> `class-schema`, `app` -> `fastify` -> `modules`; `auth` sits beside `modules`. Web side: `ui` and `web`. `sdk` and `ui` depend on no first-party package; `synapse` depends on `common` and `auth`.
+- Backends use the backend chain plus `auth` (all but identity), `sdk` (novel-forge, web-novel) and `synapse` (novel-forge, memoir); web apps use `ui` + `web` (+ `common` in identity-web, + `sdk` in novel-forge-web and web-novel-web).
 - Put code in the lowest package that can own it. Product logic stays in the app; a package never imports from `apps/*`.
 
 ## Roles
@@ -19,6 +19,7 @@
 - `modules` reusable modules (http-core, database, cache, storage, bootstrap); `auth` Identity consumer SDK, no business logic; `ui` React components and `--sh-*` tokens; `web`
   shared frontend wiring.
 - `sdk` novel vocabulary, the Novel Forge to Web Novel content-hash contract, and the one prose paragraph count Novel Forge's server and web app share.
+- `synapse` Synapse client: wire types, typed calls, LangChain chat model (subpath `/langchain`); consumed by `novel-forge-server` and `memoir-server`.
 - `common`, `modules` and `auth` each also publish a `testing` subpath (`@shadow-library/<pkg>/testing`) of fakes and stand-ins for `apps/*`'s unit tests — e.g. `FakeDatabaseService`,
   `FakeStorageService`, `InMemoryRedis`, `withoutStartupHooks`, `createTestIdP`/`createOfflineAuth`. Apps reach for these instead of hand-rolling a fake or booting real infrastructure.
 
