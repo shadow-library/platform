@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { type BaseMessage } from '@langchain/core/messages';
 import { Config } from '@shadow-library/common';
+import { type RestoreConfig, setConfig } from '@shadow-library/common/testing';
 import { z } from 'zod';
 
 import { schema } from '@server/database';
@@ -22,7 +23,14 @@ interface Call {
   role?: string;
   session?: string;
   webTools?: boolean;
+  chatPin?: unknown;
   messages: BaseMessage[];
+}
+
+interface ClientOptions {
+  session?: string;
+  webTools?: boolean;
+  chatPin?: unknown;
 }
 
 interface Wire {
@@ -115,12 +123,14 @@ function harness(outputs: Record<string, unknown[]>, webMode = 'off') {
   };
   const calls: Call[] = [];
   const modelRouter = new ModelRouterService({} as never, databaseService, { enforce: async () => undefined } as never);
-  (modelRouter as unknown as Record<string, unknown>)['buildClient'] = (_resolved: unknown, opts: { role?: string; session?: string; webTools?: boolean }) => ({
+  const client = (role: string | undefined, opts: ClientOptions) => ({
     invoke: async (messages: BaseMessage[]) => {
-      calls.push({ role: opts.role, session: opts.session, webTools: opts.webTools, messages });
-      return { content: JSON.stringify(outputs[opts.role ?? '']?.shift()) };
+      calls.push({ role, session: opts.session, webTools: opts.webTools, chatPin: opts.chatPin, messages });
+      return { content: JSON.stringify(outputs[role ?? '']?.shift()) };
     },
   });
+  (modelRouter as unknown as Record<string, unknown>)['buildClient'] = (_resolved: unknown, opts: ClientOptions & { role?: string }) => client(opts.role, opts);
+  (modelRouter as unknown as Record<string, unknown>)['buildSynapseClient'] = (role: string, _route: unknown, opts: ClientOptions) => client(role, opts);
   const pluginPolicy = { resolve: async () => ({ writerClass: 'standard', raised: false, plugins: [], systemMessages: [] }) };
   const compaction = new ChatCompactionService(databaseService, modelRouter, workflowRunService as never, pluginPolicy as never);
   const contextAssembler = {
@@ -285,5 +295,36 @@ describe('ChatService.turn — gateway session', () => {
       ['dev:1:session-1', true],
     ]);
     expect(resumes(wire((first as Call).messages), wire((next as Call).messages))).toBe(true);
+  });
+});
+
+describe('ChatService.turn — Synapse session', () => {
+  let restore: RestoreConfig;
+
+  beforeAll(() => {
+    restore = setConfig({ 'ai.backend': 'synapse' });
+  });
+
+  afterAll(() => restore());
+
+  it('should key a standard chat pinned to another vendor too, replaying the conversation and sending the pin as the chat model', async () => {
+    const run = harness({ chat: [{ reply: 'Under the stairs.' }, { reply: 'At dawn.' }], title: [{ title: 'The ledger' }] });
+    Object.assign(run.session, { modelProvider: 'openrouter', modelId: 'openai/gpt-5.6-sol' });
+
+    await run.service.turn(1n, 'session-1', 'Where does Mara hide the ledger?');
+    await run.service.turn(1n, 'session-1', 'When does she move it?');
+
+    const [first, next] = run.chatCalls();
+    expect(first?.session).toBe('dev:1:session-1');
+    expect(first?.chatPin).toEqual({ provider: 'openrouter', model: 'openai/gpt-5.6-sol' });
+    expect(resumes(wire((first as Call).messages), wire((next as Call).messages))).toBe(true);
+  });
+
+  it('should leave an unpinned chat to Synapse’s routes, though the turn holds the tier default as its chat model', async () => {
+    const run = harness({ chat: [{ reply: 'Noted.' }], title: [{ title: 'Noted' }] });
+
+    await run.service.turn(1n, 'session-1', 'Mara keeps the lighthouse.');
+
+    expect(run.chatCalls()[0]?.chatPin).toBeUndefined();
   });
 });

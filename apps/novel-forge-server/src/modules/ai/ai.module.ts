@@ -1,6 +1,9 @@
 import { Module } from '@shadow-library/app';
+import { AuthClient } from '@shadow-library/auth';
+import { resolveAuthClientConfig } from '@shadow-library/auth/module';
 import { FastifyModule } from '@shadow-library/fastify';
 import { DatabaseModule } from '@shadow-library/modules';
+import { SynapseClient } from '@shadow-library/synapse';
 
 import { ActorModule } from '@modules/actor';
 
@@ -31,6 +34,8 @@ import { WriterSnapshotService } from './writer-snapshot.service';
   imports: [ActorModule, DatabaseModule, EventsModule, FastifyModule, PluginsModule],
   controllers: [AiController, ProjectAiController],
   providers: [
+    { token: AuthClient, useFactory: () => new AuthClient(resolveAuthClientConfig()) },
+    { token: SynapseClient, useFactory: (authClient: AuthClient) => new SynapseClient({ authClient }), inject: [AuthClient] },
     AccountSettingsService,
     TelemetryHandler,
     ModelRouterService,

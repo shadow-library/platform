@@ -1,9 +1,12 @@
 import { Config } from '@shadow-library/common';
 
+import { isSynapseBackend } from './ai-backend';
+
 /**
  * Names the conversation a request belongs to, so the AI gateway resumes its own Claude session for it and sends only the new messages. The
  * gateway honours it only for a model it runs on the claude CLI with no tools of the caller's — its own web tools are fine; anywhere else the
- * call goes out exactly as without it. Only `structured` calls carry it, and those never bind tools.
+ * call goes out exactly as without it. Only `structured` calls carry it, and those never bind tools. Legacy backend only: on Synapse the same
+ * key travels as the envelope's `session`, and Synapse forwards it only to a provider that keeps sessions.
  */
 export const GATEWAY_SESSION_HEADER = 'x-gateway-session';
 
@@ -15,8 +18,9 @@ export function gatewaySessionKey(projectId: bigint, chatSessionId: string): str
   return `${Config.get('app.stage')}:${projectId}:${chatSessionId}`;
 }
 
-/** Whether a call on `model` reaches the gateway's claude CLI, the one backend that keeps a session. */
+/** Whether a call on `model` reaches the gateway's claude CLI, the one backend that keeps a session. Synapse decides that itself, per deployment. */
 export function keepsGatewaySession(model: string): boolean {
+  if (isSynapseBackend()) return true;
   if (Config.get('ai.model-override')) return false;
   if (!model.startsWith(CLAUDE_VENDOR)) return false;
   const url = Config.get('ai.openrouter.api.url');

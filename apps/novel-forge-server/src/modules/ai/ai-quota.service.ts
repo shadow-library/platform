@@ -1,4 +1,4 @@
-import { and, eq, gte, isNull, type SQL, sql } from 'drizzle-orm';
+import { and, eq, gte, isNull, ne, type SQL, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Config, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
@@ -14,6 +14,9 @@ import { computeWindowUsage, quotaBreach, type WindowUsageRow } from './quota';
 const DEFAULT_WINDOW_MS = 60 * 60 * 1000;
 const DEFAULT_MAX_CALLS = 1000;
 const DEFAULT_MAX_COST_USD = 50;
+
+/** A refused row (the hard line, a Synapse budget) records a call no model ran, so the window never counts it. */
+const dispatched = ne(schema.modelCalls.status, 'refused');
 
 interface QuotaLimits {
   maxCalls: number;
@@ -73,7 +76,7 @@ export class AiQuotaService {
         .select({ createdAt: schema.modelCalls.createdAt })
         .from(schema.modelCalls)
         .innerJoin(schema.projects, eq(schema.modelCalls.projectId, schema.projects.id))
-        .where(and(ownedBy(schema.projects, owner), gte(schema.modelCalls.createdAt, windowStart)))
+        .where(and(ownedBy(schema.projects, owner), gte(schema.modelCalls.createdAt, windowStart), dispatched))
         .orderBy(schema.modelCalls.createdAt)
         .limit(1),
     ]);
@@ -107,7 +110,7 @@ export class AiQuotaService {
       })
       .from(schema.modelCalls)
       .innerJoin(schema.projects, eq(schema.modelCalls.projectId, schema.projects.id))
-      .where(and(owner, gte(schema.modelCalls.createdAt, windowStart)))
+      .where(and(owner, gte(schema.modelCalls.createdAt, windowStart), dispatched))
       .groupBy(schema.modelCalls.model);
 
     return rows.map(row => ({

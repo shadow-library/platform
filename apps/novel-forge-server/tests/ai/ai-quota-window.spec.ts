@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'bun:test';
 
+import { type SQL } from 'drizzle-orm';
+
 import { AiQuotaService } from '@modules/ai/ai-quota.service';
+
+import { matchesWhere } from '../sql-filter';
 
 interface Chain {
   from: () => Chain;
   innerJoin: () => Chain;
-  where: () => Chain;
+  where: (where?: SQL) => Chain;
   groupBy: () => Promise<unknown[]>;
   orderBy: () => Chain;
   limit: () => Promise<unknown[]>;
@@ -85,5 +89,32 @@ describe('AiQuotaService.enforce', () => {
     const service = new AiQuotaService({ getPostgresClient: () => enforcingDb(Promise.resolve({ ownerKind: 'user', ownerId: null }), AT_CALL_LIMIT) } as never);
 
     await expect(service.enforce(7n)).rejects.toMatchObject({ code: 'AI_008' });
+  });
+});
+
+describe('AiQuotaService window', () => {
+  it('should leave refused rows out, since no model ran for a hard-line or Synapse budget refusal', async () => {
+    const wheres: SQL[] = [];
+    const capturing = (): Chain => {
+      const self: Chain = {
+        from: () => self,
+        innerJoin: () => self,
+        where: (where?: SQL) => (where && wheres.push(where), self),
+        groupBy: async () => [],
+        orderBy: () => self,
+        limit: async () => [],
+      };
+      return self;
+    };
+    const db = { select: capturing };
+    await new AiQuotaService({ getPostgresClient: () => db } as never).currentWindowStatus({ kind: 'user', id: 1n });
+    const row = { ownerKind: 'user', ownerId: 1n, createdAt: new Date() };
+
+    for (const where of wheres) {
+      expect(matchesWhere({ ...row, status: 'ok' }, where)).toBe(true);
+      expect(matchesWhere({ ...row, status: 'transport_error' }, where)).toBe(true);
+      expect(matchesWhere({ ...row, status: 'refused' }, where)).toBe(false);
+    }
+    expect(wheres).toHaveLength(2);
   });
 });

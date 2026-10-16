@@ -45,7 +45,7 @@ describe('chatRoutedProject', () => {
   it('should route the chat on its pin and every other role on the tier map', () => {
     const routed = chatRoutedProject(project, { ...bare, modelProvider: opus.provider, modelId: opus.model }, { contentMode: 'standard', costTier: 'economy' });
 
-    expect(routed).toEqual({ contentMode: 'standard', costTier: 'economy', chatModel: opus });
+    expect(routed).toEqual({ contentMode: 'standard', costTier: 'economy', chatModel: opus, chatPinned: true });
     expect(router().resolveModel('chat', routed)).toEqual(opus);
     expect(router().resolveModel('plan', routed)).toEqual(COST_TIER_DEFAULTS.economy.standard.planning);
   });

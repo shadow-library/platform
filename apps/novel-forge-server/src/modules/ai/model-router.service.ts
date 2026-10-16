@@ -5,8 +5,10 @@ import { AIMessage, type BaseMessage, HumanMessage, type MessageContent, SystemM
 import { eq } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { type SchemaClass } from '@shadow-library/class-schema';
-import { Config, Logger } from '@shadow-library/common';
+import { AppError, Config, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
+import { SynapseClient, type SynapseSubject } from '@shadow-library/synapse';
+import { SynapseChatModel } from '@shadow-library/synapse/langchain';
 
 import { AppErrorCode } from '@server/classes';
 import { type OwnerFields } from '@server/common';
@@ -14,9 +16,10 @@ import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, type Project, schema } from '@server/database';
 
 import { type ForgeCallPolicy } from '../plugins/plugin-policy.service';
-import { GatewayChatOpenAI, type RequestGuard } from './gateway-chat-openai';
+import { GatewayChatOpenAI } from './gateway-chat-openai';
 import { GATEWAY_SESSION_HEADER, keepsGatewaySession } from './gateway-session';
 import { type AiRole, COST_TIER_DEFAULTS, DEFAULT_COST_TIER, isCostTier, isUnrestrictedAllowed, type ResolvedModel, resolveReasoningEffort, ROLE_GROUP } from './defaults';
+import { isSynapseBackend } from './ai-backend';
 import { AiQuotaService } from './ai-quota.service';
 import { scopedCostTier } from './cost-tier-scope';
 import {
@@ -27,6 +30,7 @@ import {
   isHardLineRefusal,
   outputScope,
   outputScreens,
+  type RequestGuard,
   type ScreenedText,
   screenTexts,
   wireMessageTexts,
@@ -37,6 +41,8 @@ import { applyAnthropicCacheControl } from './prompt-caching';
 import { type PromptModule } from './prompts/types';
 import { type ChangeSetElement, ReplyStreamScanner } from './reply-stream-scanner';
 import { parseSchema, renderSchemaIssues, type SchemaIssue, type SchemaParseResult, toConstrainedSchema, toHostedPromptSchema } from './schemas/validate';
+import { synapseCallFailed } from './synapse-failure';
+import { chatPinOf, guardRequestHook, ownerSubject, synapseAlias, synapseChatTask, synapseSelectors, UNOWNED_SUBJECT } from './synapse-request';
 import { type TelemetryContext, TelemetryHandler } from './telemetry.handler';
 import { modelCallFailed, ModelCallTimeoutError } from './transient-model-error';
 
@@ -51,6 +57,8 @@ export type ProjectConfig = OwnerFields & {
   contentMode?: string;
   costTier?: Project.CostTier | null;
   chatModel?: ResolvedModel;
+  /** `chatModel` is the author's own pin on the chat, not the tier default a turn holds for its rounds; only a pin reaches Synapse as an alias. */
+  chatPinned?: boolean;
   wordTargetMin?: number | null;
   wordTargetMax?: number | null;
 };
@@ -66,7 +74,20 @@ interface TelemetryConfig {
   metadata: Record<string, unknown>;
 }
 
-/** A structured call's output schema, sent as a grammar-constrained `response_format` under `ai.structured-output=json-schema`. */
+export interface SynapseModelOptions {
+  subject: SynapseSubject;
+  /** The author's own pin on the chat, sent as its alias when the router honoured it. */
+  chatPin?: ResolvedModel;
+  telemetry?: TelemetryConfig;
+  responseSchema?: ResponseSchema;
+  webTools?: boolean;
+  session?: string;
+}
+
+/** `model_calls.provider` of a Synapse call that never answered, so no served model is known. */
+const SYNAPSE_PROVIDER = 'synapse';
+
+/** A structured call's output schema, sent as a `response_format` to Synapse always, and on the legacy path under `ai.structured-output=json-schema`. */
 export interface ResponseSchema {
   /** `^[A-Za-z0-9_-]+$`, the OpenAI rule for a schema name. */
   name: string;
@@ -176,6 +197,10 @@ export interface ReplyStreamHandlers {
   onChange?: (change: StreamedChange) => void;
   /** Everything emitted so far, deltas and changes alike, is void: a transport retry restarted the response, or repair replaced it. */
   onReset?: () => void;
+}
+
+function messageText(content: MessageContent): string {
+  return typeof content === 'string' ? content : JSON.stringify(content);
 }
 
 // `invoke` stringifies a whole non-string content block; a stream must concatenate the text parts instead,
@@ -310,6 +335,7 @@ export class ModelRouterService {
     private readonly telemetry: TelemetryHandler,
     private readonly databaseService: DatabaseService,
     private readonly quota: AiQuotaService,
+    private readonly synapse?: SynapseClient,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
@@ -416,19 +442,57 @@ export class ModelRouterService {
 
   // `ctx` is optional only for the smoke harness, which has no project. Telemetry is bound into the client rather than
   // passed per invoke so every tool-loop round, the `bindTools` copy included, writes its own `model_calls` row. `output` is the module whose
-  // schema the final answer must match, constrained only under `ai.structured-output=json-schema`.
+  // schema the final answer must match, sent as its `response_format` (see `responseSchemaFor`).
   async chatFor(role: AiRole, ctx?: TelemetryContext, project?: ProjectConfig, policy?: ForgeCallPolicy, output?: ConstrainableOutput): Promise<BaseChatModel> {
-    if (ctx) await this.quota.enforce(ctx.projectId);
+    const synapse = isSynapseBackend();
+    if (ctx && !synapse) await this.quota.enforce(ctx.projectId);
     const route = this.routeModel(role, project, policy);
     const { resolved } = route;
     this.logger.debug(`Routing role=${role} to provider=${resolved.provider} model=${resolved.model}`);
     const responseSchema = output ? this.responseSchemaFor(output) : undefined;
-    return this.buildClient(resolved, {
-      role,
-      guard: this.hardLineGuard(route),
-      ...(ctx ? { telemetry: this.invokeConfig(ctx, route, role, 0, policy) } : {}),
-      ...(responseSchema ? { responseSchema } : {}),
+    const options = { ...(ctx ? { telemetry: this.invokeConfig(ctx, route, role, 0, policy) } : {}), ...(responseSchema ? { responseSchema } : {}) };
+    if (!synapse) return this.buildClient(resolved, { role, guard: this.hardLineGuard(route), ...options });
+
+    const llm = this.buildSynapseClient(role, route, { ...options, subject: await this.subjectFor(ctx?.projectId, project), chatPin: chatPinOf(project) });
+    const runSignal = this.runSignalFor(ctx);
+    // `withConfig` answers a ChatOpenAI that keeps the signal through `bindTools`, though it is typed as a plain Runnable.
+    return runSignal ? (llm.withConfig({ signal: runSignal }) as unknown as BaseChatModel) : llm;
+  }
+
+  /**
+   * A Synapse chat model for `role` on `route`: the role's group is the task, the route's tier and content mode its selectors. Reasoning
+   * effort, structured-output mode and prompt-cache handling are the task's and the served model's business, so none of them is chosen here.
+   */
+  buildSynapseClient(role: AiRole, route: ModelRoute, opts: SynapseModelOptions): SynapseChatModel {
+    if (!this.synapse) throw AppError.internal('ai.backend is synapse but no SynapseClient was provided');
+    const alias = synapseAlias(role, route, opts.chatPin);
+    const guard = this.hardLineGuard(route);
+    return new SynapseChatModel({
+      client: this.synapse,
+      task: synapseChatTask(role),
+      envelope: {
+        subject: opts.subject,
+        selectors: synapseSelectors(route),
+        ...(alias ? { alias } : {}),
+        ...(opts.session ? { session: opts.session } : {}),
+        ...(opts.webTools ? { web_search: true } : {}),
+      },
+      ...(guard ? { requestHook: guardRequestHook(guard) } : {}),
+      ...(opts.responseSchema ? { modelKwargs: { response_format: { type: 'json_schema', json_schema: opts.responseSchema } } } : {}),
+      ...opts.telemetry,
     });
+  }
+
+  /** The owner whose Synapse budget a call spends, as the legacy quota window counted it. */
+  private async subjectFor(projectId: bigint | undefined, project?: ProjectConfig): Promise<SynapseSubject> {
+    if (project?.ownerKind !== undefined) return ownerSubject({ ownerKind: project.ownerKind, ownerId: project.ownerId });
+    if (projectId === undefined) return UNOWNED_SUBJECT;
+    const owner = await this.db.query.projects.findFirst({ columns: { ownerKind: true, ownerId: true }, where: eq(schema.projects.id, projectId) });
+    return ownerSubject(owner);
+  }
+
+  private runSignalFor(ctx: TelemetryContext | undefined): AbortSignal | undefined {
+    return ctx?.runId ? this.runAborts.get(ctx.runId)?.signal : undefined;
   }
 
   async structured<T>(promptModule: PromptModule<T>, input: Record<string, unknown>, ctx: TelemetryContext, project?: ProjectConfig, policy?: ForgeCallPolicy): Promise<T> {
@@ -475,7 +539,8 @@ export class ModelRouterService {
     image?: string,
     stream?: ReplyStreamHandlers,
   ): Promise<T> {
-    await this.quota.enforce(ctx.projectId);
+    const synapse = isSynapseBackend();
+    if (!synapse) await this.quota.enforce(ctx.projectId);
     const role = promptModule.role ?? (promptModule.key as AiRole);
     const route = this.routeModel(role, project, policy);
     const { resolved } = route;
@@ -483,13 +548,10 @@ export class ModelRouterService {
     await this.refuseHardLine(route, [...inputScreens(input), ...pluginScreens(policy)], ctx);
     const responseSchema = this.responseSchemaFor(promptModule);
     const session = ctx.gatewaySession && keepsGatewaySession(resolved.model) ? ctx.gatewaySession : undefined;
-    const llm = this.buildClient(resolved, {
-      role,
-      guard: this.hardLineGuard(route),
-      webTools: ctx.webTools === true,
-      ...(session ? { session } : {}),
-      ...(responseSchema ? { responseSchema } : {}),
-    });
+    const options = { webTools: ctx.webTools === true, ...(session ? { session } : {}), ...(responseSchema ? { responseSchema } : {}) };
+    const llm = synapse
+      ? this.buildSynapseClient(role, route, { ...options, subject: await this.subjectFor(ctx.projectId, project), chatPin: chatPinOf(project) })
+      : this.buildClient(resolved, { role, guard: this.hardLineGuard(route), ...options });
     const messages = await this.buildMessages(promptModule, input, resolved, { policy, image, schemaInSystem: session !== undefined });
     if (ctx.onMessages) {
       try {
@@ -515,7 +577,8 @@ export class ModelRouterService {
       withImage: image !== undefined,
     });
 
-    const requestHash = image === undefined && CACHEABLE_ROLES.has(role) ? this.hashRequest(resolved, promptModule, input, policy) : null;
+    const cacheRouting = synapse ? this.synapseCacheRouting(role, route, project) : undefined;
+    const requestHash = image === undefined && CACHEABLE_ROLES.has(role) ? this.hashRequest(resolved, promptModule, input, policy, cacheRouting) : null;
     if (requestHash) {
       const cached = await this.db.query.llmCache.findFirst({ where: eq(schema.llmCache.requestHash, requestHash) });
       if (cached) {
@@ -531,7 +594,7 @@ export class ModelRouterService {
       }
     }
 
-    const runSignal = ctx.runId ? this.runAborts.get(ctx.runId)?.signal : undefined;
+    const runSignal = this.runSignalFor(ctx);
     const firstConfig = this.invokeConfig(ctx, route, role, 0, policy);
     const rawOutput1 = relay
       ? await this.streamResilient(llm, messages, firstConfig, role, relay, runSignal)
@@ -749,13 +812,14 @@ export class ModelRouterService {
     const formatted = await promptModule.template.formatMessages(input);
     let messages = withPluginSystemMessages(schemaInSystem ? afterLeadingSystemMessages(formatted, [new SystemMessage(schemaInstruction)]) : formatted, policy);
     if (image !== undefined) messages = withImageAttached(messages, image);
-    if (promptModule.cacheStrategy && supportsPromptCaching(resolved)) messages = applyAnthropicCacheControl(messages);
+    if (promptModule.cacheStrategy && (isSynapseBackend() || supportsPromptCaching(resolved))) messages = applyAnthropicCacheControl(messages);
     return schemaInSystem ? messages : [...messages, new HumanMessage(schemaInstruction)];
   }
 
-  // Default `prompt` mode returns nothing, so a deployment that never sets the key sends exactly the request it always did.
+  // Synapse always gets the schema and decides per model whether it is native or prompted. On the legacy path the default `prompt` mode returns
+  // nothing, so a deployment that never sets the key sends exactly the request it always did.
   private responseSchemaFor(output: ConstrainableOutput): ResponseSchema | undefined {
-    if (Config.get('ai.structured-output') !== 'json-schema') return undefined;
+    if (!isSynapseBackend() && Config.get('ai.structured-output') !== 'json-schema') return undefined;
     return { name: output.key.replace(/[^A-Za-z0-9_-]/g, '_'), schema: toConstrainedSchema(output.schema, output.constrainedProperties) };
   }
 
@@ -844,15 +908,17 @@ export class ModelRouterService {
   private invokeConfig(ctx: TelemetryContext, route: ModelRoute, role: AiRole, attempt: number, policy?: ForgeCallPolicy): TelemetryConfig {
     const { resolved, costTier, contentMode } = route;
     const stamps = policy?.plugins.length ? { plugins: policy.plugins, policyDigest: policy.digest } : {};
-    const reasoningEffort = resolveReasoningEffort(resolved.model, ROLE_GROUP[role]);
+    // A Synapse call's served model and effort are only known from its response, which `TelemetryHandler` reads them from.
+    const synapse = isSynapseBackend();
+    const reasoningEffort = synapse ? undefined : resolveReasoningEffort(resolved.model, ROLE_GROUP[role]);
     return {
       callbacks: [this.telemetry],
       metadata: {
         nfTelemetry: {
           ...ctx,
           projectId: String(ctx.projectId),
-          provider: resolved.provider,
-          model: resolved.model,
+          provider: synapse ? SYNAPSE_PROVIDER : resolved.provider,
+          model: synapse ? synapseChatTask(role) : resolved.model,
           attempt,
           ...(reasoningEffort ? { reasoningEffort } : {}),
           ...stamps,
@@ -867,13 +933,14 @@ export class ModelRouterService {
   // transport/timeout failures; a returned (parseable-or-not) response is never retried here, and a
   // cancelled run leaves the ladder at once rather than being mistaken for a transport error.
   private async invokeResilient(llm: BaseChatModel, messages: BaseMessage[], config: object, role: string, runSignal?: AbortSignal): Promise<string> {
+    if (isSynapseBackend()) return this.callSynapse(role, runSignal, async signal => messageText((await llm.invoke(messages, { ...config, signal })).content));
     let lastErr: unknown;
     for (let attempt = 0; attempt <= this.llmMaxRetries; attempt++) {
       if (runSignal?.aborted) throw AppErrorCode.AI_013.create();
       try {
         const result = await this.withTimeout(llm.invoke(messages, { ...config, signal: runSignal }), this.llmTimeoutMs);
         if (runSignal?.aborted) throw AppErrorCode.AI_013.create();
-        return typeof result.content === 'string' ? result.content : JSON.stringify(result.content);
+        return messageText(result.content);
       } catch (err) {
         if (runSignal?.aborted) throw AppErrorCode.AI_013.create();
         if (isHardLineRefusal(err)) throw err;
@@ -894,6 +961,10 @@ export class ModelRouterService {
   // taken before the backoff sleep rather than after it, so an abandoned attempt cannot go on feeding the
   // relay for the whole backoff window, and it reaches the provider so the losing HTTP leg is not leaked.
   private async streamResilient(llm: BaseChatModel, messages: BaseMessage[], config: object, role: string, relay: ReplyStreamRelay, runSignal?: AbortSignal): Promise<string> {
+    if (isSynapseBackend()) {
+      relay.restart();
+      return this.callSynapse(role, runSignal, signal => this.consumeStream(llm, messages, config, signal, chunk => relay.push(chunk)));
+    }
     let lastErr: unknown;
     for (let attempt = 0; attempt <= this.llmMaxRetries; attempt++) {
       if (runSignal?.aborted) throw AppErrorCode.AI_013.create();
@@ -925,6 +996,26 @@ export class ModelRouterService {
     throw modelCallFailed(lastErr);
   }
 
+  // Synapse fails over between deployments and the client retries a refused connection once, so a call here is made exactly once. The deadline
+  // and a cancelled run both abort the HTTP request itself; `consumeStream` returns its partial text on abort, which the signal check discards.
+  private async callSynapse<R>(role: string, runSignal: AbortSignal | undefined, call: (signal: AbortSignal) => Promise<R>): Promise<R> {
+    if (runSignal?.aborted) throw AppErrorCode.AI_013.create();
+    const deadline = AbortSignal.timeout(this.llmTimeoutMs);
+    const signal = runSignal ? AbortSignal.any([deadline, runSignal]) : deadline;
+    let err: unknown;
+    try {
+      const result = await call(signal);
+      if (!signal.aborted) return result;
+    } catch (caught) {
+      err = caught;
+    }
+    if (runSignal?.aborted) throw AppErrorCode.AI_013.create();
+    if (isHardLineRefusal(err)) throw err;
+    const failure = deadline.aborted ? modelCallFailed(new ModelCallTimeoutError(this.llmTimeoutMs)) : synapseCallFailed(err);
+    this.logger.error('Synapse call failed', { role, code: failure.code, err });
+    throw failure;
+  }
+
   // The `aborted` check is what makes abandonment provider-independent: it drops the chunk before the sink
   // sees it, and breaking the `for await` closes the iterator even where the signal was ignored.
   private async consumeStream(llm: BaseChatModel, messages: BaseMessage[], config: object, signal: AbortSignal, onChunk: (text: string) => void): Promise<string> {
@@ -948,11 +1039,32 @@ export class ModelRouterService {
   }
 
   // `llm_cache.requestHash` is global, not project-scoped, so without the digest a plugin-shaped result is
-  // served verbatim to another novel; a plugin-free policy contributes no key and keeps its existing entries.
-  private hashRequest(resolved: ResolvedModel, promptModule: { key: string; version: string }, input: Record<string, unknown>, policy?: ForgeCallPolicy): string {
+  // served verbatim to another novel; a plugin-free policy contributes no key and keeps its existing entries. `routing` adds a Synapse call's
+  // backend, task, selectors and pinned alias; a legacy call carries none and keeps its keys. A catalog retarget keeps all four, so it does not
+  // change the key.
+  private hashRequest(
+    resolved: ResolvedModel,
+    promptModule: { key: string; version: string },
+    input: Record<string, unknown>,
+    policy?: ForgeCallPolicy,
+    routing?: Record<string, unknown>,
+  ): string {
     const policyKey = policy?.digest ? { policy: policy.digest } : {};
-    const payload = JSON.stringify({ provider: resolved.provider, model: resolved.model, promptKey: promptModule.key, promptVersion: promptModule.version, input, ...policyKey });
+    const payload = JSON.stringify({
+      provider: resolved.provider,
+      model: resolved.model,
+      promptKey: promptModule.key,
+      promptVersion: promptModule.version,
+      input,
+      ...policyKey,
+      ...routing,
+    });
     return createHash('sha256').update(payload).digest('hex');
+  }
+
+  private synapseCacheRouting(role: AiRole, route: ModelRoute, project?: ProjectConfig): Record<string, unknown> {
+    const alias = synapseAlias(role, route, chatPinOf(project));
+    return { backend: 'synapse', task: synapseChatTask(role), selectors: synapseSelectors(route), ...(alias ? { alias } : {}) };
   }
 
   private async cacheResponse(

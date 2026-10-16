@@ -5,15 +5,16 @@ import { type LLMResult } from '@langchain/core/outputs';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
+import { isSynapseError, type SynapseErrorCode, type SynapseResponseBlock } from '@shadow-library/synapse';
 
 import { APP_NAME } from '@server/constants';
-import { type PrimaryDatabase, type Project, schema } from '@server/database';
+import { type Ai, type PrimaryDatabase, type Project, schema } from '@server/database';
 
 import { type PluginStamp } from '../plugins/plugin-policy.service';
 import { countTokens } from './context/token-budget';
 import { isHardLineRefusal } from './hard-line';
 import { type ReasoningEffort } from './models';
-import { classifyCostSource, estimateCallCostUsd, type GatewayInfo } from './quota';
+import { classifyCostSource, classifySynapseCostSource, estimateCallCostUsd, type GatewayInfo } from './quota';
 
 export interface TelemetryContext {
   projectId: bigint;
@@ -46,7 +47,7 @@ interface PendingCall {
   model: string;
   attempt: number;
   promptTokensEstimate: number;
-  reasoningEffort?: ReasoningEffort;
+  reasoningEffort?: string;
   plugins?: PluginStamp[];
   policyDigest?: string;
   tier?: Project.CostTier;
@@ -60,6 +61,16 @@ export interface TokenUsage {
 }
 
 type UsageBag = Record<string, unknown> | undefined;
+
+/** What a finished call is recorded as: who served it, what it cost and where that figure came from. */
+interface CallBilling {
+  provider: string;
+  model: string;
+  costUsd: number;
+  costSource: Ai.CostSource;
+  reasoningEffort?: string;
+  servedBy?: string;
+}
 
 const INPUT_KEYS = ['input_tokens', 'prompt_tokens', 'promptTokens'];
 const OUTPUT_KEYS = ['output_tokens', 'completion_tokens', 'completionTokens'];
@@ -144,6 +155,51 @@ export function extractGatewayInfo(output: LLMResult): GatewayInfo | undefined {
   const rawResponse = generation?.message?.additional_kwargs?.['__raw_response'] as { gateway?: UsageBag } | undefined;
   const responseMetadataGateway = generation?.message?.response_metadata?.['gateway'] as UsageBag;
   return parseGatewayInfo(rawResponse?.gateway ?? responseMetadataGateway);
+}
+
+/** Synapse turned these away before any model ran, so they are no more a dispatched call than a hard-line refusal is. */
+const ADMISSION_REFUSALS: ReadonlySet<string> = new Set<SynapseErrorCode>(['SYN_BUDGET_CALLS', 'SYN_BUDGET_COST']);
+
+function failureStatus(err: Error): Ai.ModelCallStatus {
+  if (isHardLineRefusal(err)) return 'refused';
+  return isSynapseError(err) && ADMISSION_REFUSALS.has(err.code) ? 'refused' : 'transport_error';
+}
+
+const finiteOr = (value: unknown, fallback: number): number => (typeof value === 'number' && Number.isFinite(value) ? value : fallback);
+
+/** `SynapseChatModel` puts the block on `response_metadata` and `generationInfo` alike, for an invoke and for the chunks a stream concatenates. */
+export function extractSynapseBlock(output: LLMResult): SynapseResponseBlock | undefined {
+  const generation = output.generations?.[0]?.[0] as { message?: { response_metadata?: Record<string, unknown> }; generationInfo?: Record<string, unknown> } | undefined;
+  const block = (generation?.message?.response_metadata?.['synapse'] ?? generation?.generationInfo?.['synapse']) as UsageBag;
+  if (typeof block?.['model'] !== 'string' || typeof block['provider'] !== 'string') return undefined;
+  return block as unknown as SynapseResponseBlock;
+}
+
+/** The model that actually answered, at its list price; `billed_usd` only decides where the figure came from. */
+export function synapseBilling(synapse: SynapseResponseBlock): CallBilling {
+  const cost = { list_usd: finiteOr(synapse.cost?.list_usd, 0), billed_usd: finiteOr(synapse.cost?.billed_usd, 0) };
+  return {
+    provider: synapse.provider,
+    model: synapse.model,
+    costUsd: cost.list_usd,
+    costSource: classifySynapseCostSource(cost),
+    ...(synapse.effort ? { reasoningEffort: synapse.effort } : {}),
+  };
+}
+
+function legacyBilling(output: LLMResult, call: PendingCall, inputTokens: number, outputTokens: number): CallBilling {
+  const providerCostUsd = extractProviderCost(output);
+  const gateway = extractGatewayInfo(output);
+  // The provider figure is authoritative when it reported one; otherwise fall back to the same
+  // per-million-token price table the AI-quota spend guard already estimates from.
+  return {
+    provider: call.provider,
+    model: call.model,
+    costUsd: providerCostUsd ?? estimateCallCostUsd(call.model, inputTokens, outputTokens),
+    costSource: classifyCostSource(providerCostUsd, gateway),
+    ...(call.reasoningEffort ? { reasoningEffort: call.reasoningEffort } : {}),
+    ...(gateway?.servedBy ? { servedBy: gateway.servedBy } : {}),
+  };
 }
 
 @Injectable()
@@ -246,24 +302,21 @@ export class TelemetryHandler extends BaseCallbackHandler {
     const generation = output.generations?.[0]?.[0];
     const rawOutput = generation ? (typeof generation.text === 'string' ? generation.text : JSON.stringify(generation)) : '';
     const { inputTokens, cachedInputTokens, outputTokens } = extractTokenUsage(output, call.promptTokensEstimate, rawOutput);
-    const providerCostUsd = extractProviderCost(output);
-    const gateway = extractGatewayInfo(output);
-    const costSource = classifyCostSource(providerCostUsd, gateway);
-    // The provider figure is authoritative when it reported one; otherwise fall back to the same
-    // per-million-token price table the AI-quota spend guard already estimates from.
-    const costUsd = providerCostUsd ?? estimateCallCostUsd(call.model, inputTokens, outputTokens);
+    const synapse = extractSynapseBlock(output);
+    const { provider, model, costUsd, costSource, reasoningEffort, servedBy } = synapse ? synapseBilling(synapse) : legacyBilling(output, call, inputTokens, outputTokens);
 
     this.logger.debug('LLM call completed', {
       runId,
       role: call.ctx.role,
-      model: call.model,
+      provider,
+      model,
       latencyMs,
       inputTokens,
       cachedInputTokens,
       outputTokens,
       costUsd,
       costSource,
-      servedBy: gateway?.servedBy,
+      servedBy,
       attempt: call.attempt,
     });
 
@@ -273,14 +326,14 @@ export class TelemetryHandler extends BaseCallbackHandler {
         runId: call.ctx.runId ?? null,
         node: call.ctx.node ?? null,
         role: call.ctx.role,
-        provider: call.provider,
-        model: call.model,
+        provider,
+        model,
         promptKey: call.ctx.promptKey,
         promptVersion: call.ctx.promptVersion,
         status: 'ok',
         plugins: call.plugins ?? null,
         policyDigest: call.policyDigest ?? null,
-        reasoningEffort: call.reasoningEffort ?? null,
+        reasoningEffort: reasoningEffort ?? null,
         inputTokens,
         cachedInputTokens,
         outputTokens,
@@ -315,7 +368,7 @@ export class TelemetryHandler extends BaseCallbackHandler {
         model: call.model,
         promptKey: call.ctx.promptKey,
         promptVersion: call.ctx.promptVersion,
-        status: isHardLineRefusal(err) ? 'refused' : 'transport_error',
+        status: failureStatus(err),
         plugins: call.plugins ?? null,
         policyDigest: call.policyDigest ?? null,
         reasoningEffort: call.reasoningEffort ?? null,
@@ -325,7 +378,12 @@ export class TelemetryHandler extends BaseCallbackHandler {
         latencyMs: Date.now() - call.startedAt,
         attempt: call.attempt,
         rawOutput: '',
-        error: { class: err.constructor.name, message: err.message, ...(isHardLineRefusal(err) ? err.data : {}) },
+        error: {
+          class: err.constructor.name,
+          message: err.message,
+          ...(isSynapseError(err) ? { code: err.code } : {}),
+          ...(isHardLineRefusal(err) ? err.data : {}),
+        },
       });
     } catch (writeErr) {
       this.logger.error('Failed to write model_call error telemetry row', { writeErr });

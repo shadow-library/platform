@@ -41,6 +41,7 @@ COPY packages/common/ packages/common/
 COPY packages/fastify/ packages/fastify/
 COPY packages/modules/ packages/modules/
 COPY packages/sdk/ packages/sdk/
+COPY packages/synapse/ packages/synapse/
 RUN bun scripts/build.ts apps/novel-forge-server --deps
 COPY apps/novel-forge-server/ apps/novel-forge-server/
 RUN bun scripts/build.ts apps/novel-forge-server

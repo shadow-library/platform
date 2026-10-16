@@ -9,7 +9,7 @@ import { ModelRouterService } from '@modules/ai/model-router.service';
 import { chatRefinePrompt } from '@modules/ai/prompts/chat-refine.prompt';
 
 const cache = (Config as unknown as { cache: Map<string, unknown> })['cache'];
-const KEYS = ['app.stage', 'ai.openrouter.api.url', 'ai.openrouter.api.key', 'ai.model-override'];
+const KEYS = ['app.stage', 'ai.openrouter.api.url', 'ai.openrouter.api.key', 'ai.model-override', 'ai.backend'];
 const saved = new Map(KEYS.map(key => [key, cache.get(key)]));
 
 function setConfig(values: Record<string, unknown>): void {
@@ -51,6 +51,13 @@ describe('keepsGatewaySession', () => {
 
     setConfig({ 'ai.openrouter.api.url': GATEWAY, 'ai.model-override': 'qwen3:8b' });
     expect(keepsGatewaySession(CLAUDE)).toBe(false);
+  });
+
+  it('should hold for every model under Synapse, which decides per deployment whether the session is kept', () => {
+    setConfig({ 'ai.backend': 'synapse', 'ai.openrouter.api.url': 'https://openrouter.ai/api/v1', 'ai.model-override': 'qwen3:8b' });
+
+    expect(keepsGatewaySession('x-ai/grok-4.6')).toBe(true);
+    expect(keepsGatewaySession(CLAUDE)).toBe(true);
   });
 });
 

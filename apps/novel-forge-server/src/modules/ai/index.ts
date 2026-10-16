@@ -1,4 +1,5 @@
 export * from './account-settings.service';
+export * from './ai-backend';
 export * from './ai.module';
 export * from './ai-quota.service';
 export * from './appearance-describer.service';
@@ -15,6 +16,8 @@ export * from './model-router.service';
 export * from './models';
 export * from './quota';
 export * from './retrieval';
+export * from './synapse-failure';
+export * from './synapse-request';
 export * from './telemetry.handler';
 export * from './tools';
 export * from './unrestricted-route';

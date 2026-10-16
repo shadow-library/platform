@@ -56,8 +56,9 @@ export interface PromptModule<TOut> {
   // Rules worth one repair but never a failure: issues found on the first attempt join the repair request, and whatever
   // the repair or tolerant extraction returns is accepted. The caller re-runs the rule on the result to surface what remains.
   advise?: (data: TOut) => string[];
-  // Only under `ai.structured-output=json-schema`: merged over the property each path addresses in the `response_format` schema (see
-  // `toConstrainedSchema`), to type what the in-band schema leaves loose (change-set ops, the question card). Never shown in-band.
+  // Sent whenever the call carries a `response_format` schema (always on Synapse, under `ai.structured-output=json-schema` on legacy): merged
+  // over the property each path addresses in that schema (see `toConstrainedSchema`), to type what the in-band schema leaves loose (change-set
+  // ops, the question card). Never shown in-band.
   constrainedProperties?: Readonly<Record<string, Record<string, unknown>>>;
   fewShots?: BaseMessage[];
 }

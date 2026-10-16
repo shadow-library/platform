@@ -37,7 +37,7 @@ export function chatRoutedProject(project: ProjectConfig | undefined, session: S
   const pin: ResolvedModel | undefined = session.modelProvider && session.modelId ? { provider: session.modelProvider, model: session.modelId } : undefined;
   const usable = pin && (selection.contentMode === 'standard' || isUnrestrictedAllowed('chat', pin));
   const routed: ProjectConfig = { ...project, contentMode: selection.contentMode, costTier: selection.costTier };
-  return usable ? withChatModel(routed, pin) : routed;
+  return usable ? { ...withChatModel(routed, pin), chatPinned: true } : routed;
 }
 
 /** A run recorded before selections existed has none. */

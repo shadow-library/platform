@@ -1,3 +1,5 @@
+import { type SynapseCost } from '@shadow-library/synapse';
+
 import { type Ai } from '@server/database';
 
 import { MODEL_MAP } from './models';
@@ -51,6 +53,13 @@ export function classifyCostSource(providerCostUsd: number | undefined, gateway:
   if (providerCostUsd === undefined) return 'estimate';
   if (!gateway || gateway.openrouter) return 'provider';
   return 'gateway';
+}
+
+/** A Synapse call's list price is its cost; something billed means the provider charged it, a free call at a list price was the CLI gateway's. */
+export function classifySynapseCostSource(cost: SynapseCost): Ai.CostSource {
+  if (cost.billed_usd > 0) return 'provider';
+  if (cost.list_usd > 0) return 'gateway';
+  return 'estimate';
 }
 
 export interface CostClassifiableRow {

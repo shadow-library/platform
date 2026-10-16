@@ -3,6 +3,8 @@ import { type BaseMessage } from '@langchain/core/messages';
 import { type ChatGenerationChunk } from '@langchain/core/outputs';
 import { ChatOpenAI, ChatOpenAICompletions, type ChatOpenAIFields, ChatOpenAIResponses, type OpenAIClient, wrapOpenAIClientError } from '@langchain/openai';
 
+import { type RequestGuard } from './hard-line';
+
 export interface RawGatewayInfo {
   served_by?: string;
   served_model?: string;
@@ -13,13 +15,6 @@ export type GatewayFrame = Record<string, unknown> & { gateway?: RawGatewayInfo 
 
 interface GatewayBox {
   gateway?: RawGatewayInfo;
-}
-
-export interface RequestGuard {
-  /** Runs on the outgoing wire messages immediately before the request is sent, and throws to stop it being sent at all. */
-  screen: (messages: readonly { content?: unknown }[]) => void;
-  /** Sent as the first system message of every request. */
-  systemLine: string;
 }
 
 const GATEWAY_BOX = Symbol('gatewayBox');

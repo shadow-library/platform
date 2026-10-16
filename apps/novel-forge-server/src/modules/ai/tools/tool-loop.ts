@@ -9,6 +9,7 @@ import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
 
+import { fromSynapseFailure } from '../synapse-failure';
 import { type RegisteredTool, type ToolContext } from './types';
 
 export interface ToolLoopOptions {
@@ -24,6 +25,10 @@ export interface ToolLoopResult {
 type ToolCapableModel = BaseChatModel & Required<Pick<BaseChatModel, 'bindTools'>>;
 
 const logger = Logger.getLogger(APP_NAME, 'runToolLoop');
+
+const rethrowModelFailure = (err: unknown): never => {
+  throw fromSynapseFailure(err);
+};
 
 // Bounded tool loop for verification nodes.
 // Binds tools to model, runs up to maxRounds, writes audit rows per tool call.
@@ -44,7 +49,7 @@ export async function runToolLoop(
   // narrows the model to ToolCapableModel below.
   if (typeof model.bindTools !== 'function') {
     logger.debug('runToolLoop: model has no bindTools — running tool-free', { node: ctx.node, runId: ctx.runId });
-    const response = await model.invoke(messages);
+    const response = await model.invoke(messages).catch(rethrowModelFailure);
     return { messages: [...messages, response], toolCallCount: 0 };
   }
 
@@ -55,7 +60,7 @@ export async function runToolLoop(
   let exhaustedBudget = false;
 
   for (let round = 0; round < maxRounds; round++) {
-    const response = (await boundModel.invoke(resultMessages)) as AIMessage;
+    const response = (await boundModel.invoke(resultMessages).catch(rethrowModelFailure)) as AIMessage;
     resultMessages.push(response);
 
     if (!response.tool_calls || response.tool_calls.length === 0) break;
@@ -121,7 +126,7 @@ export async function runToolLoop(
   if (exhaustedBudget) {
     logger.debug('runToolLoop: tool budget exhausted — forcing a final answer', { node: ctx.node, runId: ctx.runId, maxRounds, toolCallCount });
     resultMessages.push(new HumanMessage('Tool budget exhausted — answer with what you have.'));
-    const finalResponse = (await model.invoke(resultMessages)) as BaseMessage;
+    const finalResponse = (await model.invoke(resultMessages).catch(rethrowModelFailure)) as BaseMessage;
     resultMessages.push(finalResponse);
   }
 

@@ -1,5 +1,6 @@
 import { Config } from '@shadow-library/common';
 
+import { AI_BACKENDS, isSynapseBackend } from './modules/ai/ai-backend';
 import { PRODUCTION_GROUP_DEFAULTS } from './modules/ai/defaults';
 import { assertModelOverrideTarget } from './modules/ai/model-override';
 
@@ -8,7 +9,10 @@ declare module '@shadow-library/common' {
     'server.port': number;
     'server.host': string;
 
-    /** Credential for every chat and image model — they all route through OpenRouter. */
+    /** `synapse` sends every chat, structured, streamed and tool-loop call to Synapse; `legacy` keeps the OpenRouter-compatible path for one release. */
+    'ai.backend': 'synapse' | 'legacy';
+
+    /** Credential for image generation, and under `ai.backend=legacy` for every chat model too. */
     'ai.openrouter.api.key': string | undefined;
     /** Points the OpenRouter leg at an in-cluster gateway speaking the same OpenAI-compatible protocol. */
     'ai.openrouter.api.url': string;
@@ -17,12 +21,16 @@ declare module '@shadow-library/common' {
     'ai.ollama.host': string;
     'ai.embedding.model': string;
 
-    /** Local-model test environments only: every chat call is sent as this one model id, while routing, quota, telemetry and cache keep the resolved id. Unset sends the resolved id. */
+    /**
+     * Legacy backend only. Local-model test environments: every chat call is sent as this one model id, while routing, quota, telemetry and
+     * cache keep the resolved id. Unset sends the resolved id.
+     */
     'ai.model-override': string | undefined;
-    /** `json-schema` also sends each structured call's schema as a constrained `response_format`; `prompt` keeps it in-band only. */
+    /** Legacy backend only: `json-schema` also sends each structured call's schema as a constrained `response_format`; `prompt` keeps it in-band only. */
     'ai.structured-output': 'prompt' | 'json-schema';
 
     'ai.llm.timeout-ms': number;
+    /** Transport retries of the legacy backend and of image generation; Synapse fails over itself. */
     'ai.llm.max-retries': number;
     'ai.llm.backoff-ms': number;
 
@@ -58,13 +66,14 @@ declare module '@shadow-library/common' {
 Config.load('server.port', { defaultValue: '8080', validateType: 'number' });
 Config.load('server.host', { defaultValue: '0.0.0.0' });
 
+Config.load('ai.backend', { allowedValues: [...AI_BACKENDS], defaultValue: 'synapse' });
 Config.load('ai.openrouter.api.key');
 Config.load('ai.openrouter.api.url', { defaultValue: 'https://openrouter.ai/api/v1' });
 Config.load('ai.ollama.host', { defaultValue: 'http://localhost:11434' });
 Config.load('ai.embedding.model', { defaultValue: PRODUCTION_GROUP_DEFAULTS.embedding.model });
 Config.load('ai.model-override');
 Config.load('ai.structured-output', { allowedValues: ['prompt', 'json-schema'], defaultValue: 'prompt' });
-assertModelOverrideTarget(Config.get('ai.model-override'), Config.get('ai.openrouter.api.url'));
+if (!isSynapseBackend()) assertModelOverrideTarget(Config.get('ai.model-override'), Config.get('ai.openrouter.api.url'));
 Config.load('ai.llm.timeout-ms', { defaultValue: '300000', validateType: 'number' });
 Config.load('ai.llm.max-retries', { defaultValue: '2', validateType: 'number' });
 Config.load('ai.llm.backoff-ms', { defaultValue: '500', validateType: 'number' });

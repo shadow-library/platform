@@ -1,15 +1,19 @@
 import { Injectable } from '@shadow-library/app';
-import { Config } from '@shadow-library/common';
+import { Config, Logger } from '@shadow-library/common';
+import { SynapseClient } from '@shadow-library/synapse';
 
 import { AppErrorCode } from '@server/classes';
+import { APP_NAME } from '@server/constants';
 
+import { isSynapseBackend } from '../ai-backend';
+import { SYNAPSE_CHAT_TASK } from '../synapse-request';
 import { braveSearch, type WebResult } from './brave-search';
 import { fetchPage, type WebPage } from './page-fetch';
 import { type AddressLookup, type Fetcher, resolveAddresses } from './web-address';
 
 /**
- * How one chat turn reaches the web: `native` when the AI gateway runs the turn's model on a CLI with its own web search, `brave` through
- * this server's Brave lookups otherwise, `off` when neither is available.
+ * How one chat turn reaches the web: `native` when the turn's model is served with its own web search (Synapse's catalog says so for the chat
+ * task, or on the legacy path the AI gateway does), `brave` through this server's Brave lookups otherwise, `off` when neither is available.
  */
 export type WebMode = 'native' | 'brave' | 'off';
 
@@ -53,6 +57,8 @@ export function linksIn(text: string): string[] {
 
 @Injectable()
 export class WebResearchService {
+  private readonly logger = Logger.getLogger(APP_NAME, WebResearchService.name);
+
   fetcher: Fetcher = (input, init) => fetch(input, init);
 
   resolve: AddressLookup = resolveAddresses;
@@ -61,14 +67,27 @@ export class WebResearchService {
 
   private readonly native = new Map<string, { native: boolean; until: number }>();
 
+  constructor(private readonly synapse?: SynapseClient) {}
+
   /**
-   * Asks the AI gateway whether it answers `model` on a CLI with its own web search. Only the gateway knows how it routes a model — a local
-   * CLI or a pass-through, which its own settings decide — so the answer is asked, not inferred. Any endpoint that does not answer, real
-   * OpenRouter included, means no.
+   * Asks whoever serves the chat whether it searches the web itself, since only it knows where a model runs. Synapse answers for the chat task
+   * and the turn's `selectors` from its catalog, which its client caches by version; the legacy path asks the AI gateway about `model`. Any
+   * failure to answer means no.
    */
-  async modeFor(model: string): Promise<WebMode> {
-    if (await this.isNative(Config.get('ai.model-override') || model)) return 'native';
+  async modeFor(model: string, selectors: Record<string, string> = {}): Promise<WebMode> {
+    const native = isSynapseBackend() ? await this.isCatalogNative(selectors) : await this.isNative(Config.get('ai.model-override') || model);
+    if (native) return 'native';
     return Config.get('ai.web-search.brave.api.key') ? 'brave' : 'off';
+  }
+
+  private async isCatalogNative(selectors: Record<string, string>): Promise<boolean> {
+    if (!this.synapse) return false;
+    try {
+      return (await this.synapse.catalog({ task: SYNAPSE_CHAT_TASK, selectors })).native_web_search === true;
+    } catch (err) {
+      this.logger.warn('Synapse catalog unreadable, so the chat gets no native web search', { selectors, err });
+      return false;
+    }
   }
 
   private async isNative(model: string): Promise<boolean> {

@@ -26,6 +26,14 @@ export interface ScreenedText {
   sourceRefs?: string[];
 }
 
+/** The hard line applied to one unrestricted request on the wire. */
+export interface RequestGuard {
+  /** Runs on the outgoing wire messages immediately before the request is sent, and throws to stop it being sent at all. */
+  screen: (messages: readonly { content?: unknown }[]) => void;
+  /** Sent as the first system message of every request. */
+  systemLine: string;
+}
+
 export interface HardLineHit {
   rule: HardLineRule;
   source: string;

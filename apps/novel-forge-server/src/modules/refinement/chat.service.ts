@@ -21,6 +21,7 @@ import { type ModelRoute, ModelRouterService, type ProjectConfig } from '../ai/m
 import { buildChatRefinePrompt, chatPromptTokens, chatScopeInstructions, HUB_ALLOWED_OPS, PROMPT_REGISTRY, renderTurnMessage, renderTurnRules } from '../ai/prompts';
 import { RetrievalService } from '../ai/retrieval';
 import { type ChatRefineOutput, type ChatTitleOutput } from '../ai/schemas';
+import { synapseSelectors } from '../ai/synapse-request';
 import { type ToolContext, ToolRegistryService } from '../ai/tools';
 import { resolveUnrestrictedRoute } from '../ai/unrestricted-route';
 import { type WebLookups, type WebMode, WebResearchService } from '../ai/web';
@@ -472,7 +473,7 @@ export class ChatService {
     const prompt = buildChatRefinePrompt(session.scopeType, { proseEdits, organiseNotes: organiseRequest });
     const guarded = (output: ChatRefineOutput): ChatRefineOutput => withLaterPlansRouted(withheldProse(output, proseEdits), organise);
     const turnRules = renderTurnRules({ proseEdits, justDiscussing, organiseNotes: organiseRequest, mode: session.mode });
-    const webMode = await this.webResearch.modeFor(route.resolved.model);
+    const webMode = await this.webResearch.modeFor(route.resolved.model, synapseSelectors(route));
     const scopeInstructions = chatScopeInstructions(this.toolRegistry.getRaw(CHAT_HUB_NODE, webMode), webMode);
     const playbook = playbookDigest(scopeInstructions);
     const keyed = route.contentMode === 'standard' && keepsGatewaySession(route.resolved.model);
