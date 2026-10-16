@@ -1,5 +1,7 @@
 import { Config } from '@shadow-library/common';
 
+import { PROVIDER_CREDENTIAL_KEYS } from './constants';
+
 export type SeedProfile = 'standard' | 'local-only';
 
 declare module '@shadow-library/common' {
@@ -37,7 +39,7 @@ Config.load('synapse.seed.profile', { defaultValue: 'standard', allowedValues: S
 
 Config.load('synapse.provider.subscription.url', { defaultValue: 'http://host.docker.internal:7431/v1' });
 Config.load('synapse.provider.openrouter.url', { defaultValue: 'https://openrouter.ai/api/v1' });
-Config.load('synapse.provider.openrouter.api-key');
+for (const key of PROVIDER_CREDENTIAL_KEYS) Config.load(key);
 Config.load('synapse.provider.local.url', { defaultValue: 'http://host.docker.internal:11434' });
 
 Config.load('synapse.ledger.retention-days', { defaultValue: '400', validateType: 'integer' });
