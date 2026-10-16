@@ -1,4 +1,4 @@
-import { type InferEnum, type InferInsertModel, type InferSelectModel } from 'drizzle-orm';
+import { type InferEnum, type InferInsertModel, type InferSelectModel, sql } from 'drizzle-orm';
 import { boolean, index, integer, numeric, pgEnum, pgTable, smallint, text, timestamp } from 'drizzle-orm/pg-core';
 
 export namespace Ledger {
@@ -46,5 +46,8 @@ export const ledger = pgTable(
     index('ledger_created_at_idx').on(t.createdAt),
     index('ledger_app_task_created_at_idx').on(t.app, t.task, t.createdAt),
     index('ledger_alias_created_at_idx').on(t.alias, t.createdAt),
+    index('ledger_pending_created_at_idx')
+      .on(t.createdAt)
+      .where(sql`status = 'pending'`),
   ],
 );

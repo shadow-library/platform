@@ -10,7 +10,7 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly SYN_BUDGET_COST = AppErrorCode.badRequest('SYN_BUDGET_COST', 'The cost budget for the current window is exhausted', 429);
   static readonly SYN_POLICY_DENIED = AppErrorCode.forbidden('SYN_POLICY_DENIED', 'The request is denied by policy');
   static readonly SYN_PROVIDERS_EXHAUSTED = AppErrorCode.unavailable('SYN_PROVIDERS_EXHAUSTED', 'Every provider deployment failed: {reason}');
-  static readonly SYN_UPSTREAM_ERROR = AppErrorCode.unavailable('SYN_UPSTREAM_ERROR', 'The upstream provider returned an error', 502);
+  static readonly SYN_UPSTREAM_ERROR = AppErrorCode.unavailable('SYN_UPSTREAM_ERROR', 'The upstream provider returned an error: {reason}', 502);
   static readonly SYN_INVALID_REQUEST = AppErrorCode.badRequest('SYN_INVALID_REQUEST', 'Invalid request');
   static readonly SYN_CATALOG_INVALID = AppErrorCode.validation('SYN_CATALOG_INVALID', 'The catalog document is invalid');
   static readonly SYN_CATALOG_CONFLICT = AppErrorCode.conflict('SYN_CATALOG_CONFLICT', 'The catalog changed concurrently; reload it and retry');

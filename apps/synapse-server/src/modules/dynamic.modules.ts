@@ -1,14 +1,15 @@
 import { forwardRef, type Import, Module } from '@shadow-library/app';
-import { Config } from '@shadow-library/common';
 import { FastifyModule } from '@shadow-library/fastify';
 import { HttpCoreModule } from '@shadow-library/modules';
 
 import { AdminModule } from '@modules/admin';
 import { SessionModule } from '@modules/auth';
 import { CatalogModule } from '@modules/catalog';
-import { InferenceModule } from '@modules/inference';
+import { InferenceController, InferenceModule } from '@modules/inference';
 import { MeteringModule } from '@modules/metering';
 import { ProvidersModule } from '@modules/providers';
+
+import { httpServerConfig } from './http-server.config';
 
 const AppHttpCoreModule = HttpCoreModule.forRoot({
   openapi: {
@@ -27,8 +28,9 @@ const DeferredSessionModule = forwardRef(() => SessionModule.forRoot()) as unkno
 class PlatformModule {}
 
 export const HttpRouteModule = FastifyModule.forRoot({
-  host: Config.get('server.host'),
-  port: Config.get('server.port'),
+  ...httpServerConfig(),
+
+  controllers: [InferenceController],
 
   imports: [PlatformModule, CatalogModule, ProvidersModule, InferenceModule, MeteringModule, AdminModule],
 });

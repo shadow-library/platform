@@ -12,5 +12,7 @@ setConfig({ ...OPENAPI_DUMP_CONFIG, 'auth.issuer': auth.idp.issuer, 'auth.app-id
 
 const { AppModule } = await import('./app.module');
 const { ActiveCatalogCache } = await import('@modules/catalog');
-await dumpOpenApiDocument(AppModule, { outputPath: process.argv[2], overrides: [fakeDatabaseProvider(), withoutStartupHooks(ActiveCatalogCache), ...auth.providers] });
+const { LedgerRetentionService } = await import('@modules/metering');
+const overrides = [fakeDatabaseProvider(), withoutStartupHooks(ActiveCatalogCache), withoutStartupHooks(LedgerRetentionService), ...auth.providers];
+await dumpOpenApiDocument(AppModule, { outputPath: process.argv[2], overrides });
 process.exit(0);
