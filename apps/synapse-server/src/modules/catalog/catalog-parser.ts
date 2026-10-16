@@ -237,8 +237,9 @@ class CatalogParser {
   private readonly url: Reader<string> = (value, path) => {
     const url = this.text(value, path);
     if (url === '') return url;
-    const protocol = URL.canParse(url) ? new URL(url).protocol : undefined;
-    if (!protocol || !URL_PROTOCOLS.includes(protocol)) this.report(path, 'invalid_value', 'Expected an http or https URL');
+    const parsed = URL.canParse(url) ? new URL(url) : undefined;
+    if (!parsed || !URL_PROTOCOLS.includes(parsed.protocol)) this.report(path, 'invalid_value', 'Expected an http or https URL');
+    else if (parsed.username || parsed.password) this.report(path, 'invalid_value', 'A URL must not embed credentials; name a Config key in apiKeyConfig instead');
     return url;
   };
 

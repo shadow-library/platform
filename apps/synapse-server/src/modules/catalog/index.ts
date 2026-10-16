@@ -8,3 +8,4 @@ export * from './catalog-version.repository';
 export * from './catalog-version.service';
 export * from './catalog.module';
 export * from './catalog.types';
+export * from './list-price';

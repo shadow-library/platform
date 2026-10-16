@@ -125,6 +125,15 @@ describe('parseCatalogDocument', () => {
     }
   });
 
+  it('should reject a provider url that embeds credentials', () => {
+    for (const url of ['https://user:pass@openrouter.ai/api/v1', 'http://token@host.internal:11434']) {
+      const result = parseWith(document => {
+        document.providers.local.url = url;
+      });
+      expect(issuesOf(result)).toEqual([{ path: 'providers.local.url', code: 'invalid_value' }]);
+    }
+  });
+
   it('should reject an empty string and an empty efforts list', () => {
     const result = parseWith(document => {
       document.aliases.opus.label = '  ';
