@@ -2,7 +2,8 @@
   "extends": "../tsconfig.lib.json",
   "compilerOptions": {
     "paths": {
-      "@shadow-library/synapse": ["./src/index.ts"]
+      "@shadow-library/synapse": ["./src/index.ts"],
+      "@shadow-library/synapse/langchain": ["./src/langchain/index.ts"]
     }
   }
 }

@@ -10,9 +10,13 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./langchain": {
+      "types": "./dist/langchain/index.d.ts",
+      "default": "./dist/langchain/index.js"
     }
   },
-  "description": "The Synapse wire contract shared by synapse-server and the apps that call it",
+  "description": "The Synapse wire contract and client: typed calls for the apps that call it, and a LangChain chat model",
   "repository": {
     "type": "git",
     "url": "git+ssh://git@github.com/shadow-library/platform.git",
@@ -24,8 +28,28 @@
     "url": "https://github.com/shadow-library/platform/issues"
   },
   "homepage": "https://github.com/shadow-library/platform#readme",
+  "peerDependencies": {
+    "@langchain/core": "^1.2.1",
+    "@langchain/openai": "~1.5.5",
+    "@shadow-library/auth": "workspace:*",
+    "@shadow-library/common": "workspace:*"
+  },
+  "peerDependenciesMeta": {
+    "@langchain/core": {
+      "optional": true
+    },
+    "@langchain/openai": {
+      "optional": true
+    }
+  },
   "devDependencies": {
+    "@langchain/core": "^1.2.1",
+    "@langchain/openai": "~1.5.5",
     "@types/bun": "catalog:",
     "typescript": "catalog:"
+  },
+  "dependencies": {
+    "@shadow-library/auth": "workspace:*",
+    "@shadow-library/common": "workspace:*"
   }
 }

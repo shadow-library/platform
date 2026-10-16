@@ -510,10 +510,26 @@
     "packages/synapse": {
       "name": "@shadow-library/synapse",
       "version": "0.0.0",
+      "dependencies": {
+        "@shadow-library/auth": "workspace:*",
+        "@shadow-library/common": "workspace:*",
+      },
       "devDependencies": {
+        "@langchain/core": "^1.2.1",
+        "@langchain/openai": "~1.5.5",
         "@types/bun": "catalog:",
         "typescript": "catalog:",
       },
+      "peerDependencies": {
+        "@langchain/core": "^1.2.1",
+        "@langchain/openai": "~1.5.5",
+        "@shadow-library/auth": "workspace:*",
+        "@shadow-library/common": "workspace:*",
+      },
+      "optionalPeers": [
+        "@langchain/core",
+        "@langchain/openai",
+      ],
     },
     "packages/ui": {
       "name": "@shadow-library/ui",
