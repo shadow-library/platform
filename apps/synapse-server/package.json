@@ -1,0 +1,45 @@
+{
+  "name": "@shadow-library/synapse-server",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "description": "Synapse: the platform AI service that routes every app's model calls through one versioned catalog, with budgets and a usage ledger",
+  "scripts": {
+    "dev": "bun run --watch src/main.ts"
+  },
+  "shadow": {
+    "entries": [
+      "src/migrate.ts"
+    ],
+    "assets": [
+      "generated/drizzle"
+    ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/shadow-library/platform.git",
+    "directory": "apps/synapse-server"
+  },
+  "author": "Leander Paul <leanderpaul97@outlook.com>",
+  "license": "UNLICENSED",
+  "bugs": {
+    "url": "https://github.com/shadow-library/platform/issues"
+  },
+  "homepage": "https://github.com/shadow-library/platform#readme",
+  "devDependencies": {
+    "@types/bun": "catalog:",
+    "drizzle-kit": "catalog:",
+    "typescript": "catalog:"
+  },
+  "dependencies": {
+    "@shadow-library/app": "workspace:*",
+    "@shadow-library/auth": "workspace:*",
+    "@shadow-library/class-schema": "workspace:*",
+    "@shadow-library/common": "workspace:*",
+    "@shadow-library/fastify": "workspace:*",
+    "@shadow-library/modules": "workspace:*",
+    "@shadow-library/synapse": "workspace:*",
+    "drizzle-orm": "catalog:",
+    "reflect-metadata": "catalog:"
+  }
+}

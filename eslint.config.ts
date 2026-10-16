@@ -186,6 +186,7 @@ export default defineConfig([
       'apps/pulse-server/**/*.{ts,tsx}',
       'apps/web-novel-server/**/*.{ts,tsx}',
       'apps/memoir-server/**/*.{ts,tsx}',
+      'apps/synapse-server/**/*.{ts,tsx}',
     ],
     rules: { '@typescript-eslint/no-namespace': 'off' },
   },

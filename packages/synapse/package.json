@@ -1,0 +1,31 @@
+{
+  "name": "@shadow-library/synapse",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "description": "The Synapse wire contract shared by synapse-server and the apps that call it",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/shadow-library/platform.git",
+    "directory": "packages/synapse"
+  },
+  "author": "Leander Paul <leanderpaul97@outlook.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/shadow-library/platform/issues"
+  },
+  "homepage": "https://github.com/shadow-library/platform#readme",
+  "devDependencies": {
+    "@types/bun": "catalog:",
+    "typescript": "catalog:"
+  }
+}

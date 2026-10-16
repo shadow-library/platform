@@ -255,6 +255,26 @@
         "vite": "catalog:",
       },
     },
+    "apps/synapse-server": {
+      "name": "@shadow-library/synapse-server",
+      "version": "0.0.0",
+      "dependencies": {
+        "@shadow-library/app": "workspace:*",
+        "@shadow-library/auth": "workspace:*",
+        "@shadow-library/class-schema": "workspace:*",
+        "@shadow-library/common": "workspace:*",
+        "@shadow-library/fastify": "workspace:*",
+        "@shadow-library/modules": "workspace:*",
+        "@shadow-library/synapse": "workspace:*",
+        "drizzle-orm": "catalog:",
+        "reflect-metadata": "catalog:",
+      },
+      "devDependencies": {
+        "@types/bun": "catalog:",
+        "drizzle-kit": "catalog:",
+        "typescript": "catalog:",
+      },
+    },
     "apps/web-novel-server": {
       "name": "@shadow-library/web-novel-server",
       "version": "0.0.0",
@@ -482,6 +502,14 @@
     "packages/sdk": {
       "name": "@shadow-library/sdk",
       "version": "0.1.0",
+      "devDependencies": {
+        "@types/bun": "catalog:",
+        "typescript": "catalog:",
+      },
+    },
+    "packages/synapse": {
+      "name": "@shadow-library/synapse",
+      "version": "0.0.0",
       "devDependencies": {
         "@types/bun": "catalog:",
         "typescript": "catalog:",
@@ -1207,6 +1235,10 @@
     "@shadow-library/pulse-server": ["@shadow-library/pulse-server@workspace:apps/pulse-server"],
 
     "@shadow-library/sdk": ["@shadow-library/sdk@workspace:packages/sdk"],
+
+    "@shadow-library/synapse": ["@shadow-library/synapse@workspace:packages/synapse"],
+
+    "@shadow-library/synapse-server": ["@shadow-library/synapse-server@workspace:apps/synapse-server"],
 
     "@shadow-library/ui": ["@shadow-library/ui@workspace:packages/ui"],
 

@@ -16,6 +16,7 @@ COPY packages/modules/package.json packages/modules/package.json
 COPY packages/ui/package.json packages/ui/package.json
 COPY packages/web/package.json packages/web/package.json
 COPY packages/sdk/package.json packages/sdk/package.json
+COPY packages/synapse/package.json packages/synapse/package.json
 COPY apps/identity-server/package.json apps/identity-server/package.json
 COPY apps/identity-web/package.json apps/identity-web/package.json
 COPY apps/novel-forge-server/package.json apps/novel-forge-server/package.json
@@ -26,6 +27,7 @@ COPY apps/memoir-server/package.json apps/memoir-server/package.json
 COPY apps/memoir-web/package.json apps/memoir-web/package.json
 COPY apps/web-novel-server/package.json apps/web-novel-server/package.json
 COPY apps/web-novel-web/package.json apps/web-novel-web/package.json
+COPY apps/synapse-server/package.json apps/synapse-server/package.json
 COPY e2e/package.json e2e/package.json
 RUN --mount=type=cache,target=/root/.bun/install/cache bun install --frozen-lockfile --filter ./apps/memoir-web --filter ./
 

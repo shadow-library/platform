@@ -134,6 +134,8 @@ jobs:
           #    migrations are hand-managed via src/migrate.ts rather than
           #    `drizzle-kit generate` (check-migrations.ts requires a
           #    "db:generate" script and errors without one).
+          #    It also holds the opt-out from checkApiTypes (step 5) for a
+          #    server whose paired web app does not exist yet.
           # ---------------------------------------------------------------
           cat > /tmp/workspace-metadata.json <<'JSON'
           {
@@ -141,6 +143,7 @@ jobs:
             "apps/novel-forge-server": { "checkMigrations": true },
             "apps/pulse-server": { "checkMigrations": false },
             "apps/memoir-server": { "checkMigrations": true },
+            "apps/synapse-server": { "checkMigrations": true, "checkApiTypes": false },
             "apps/web-novel-server": { "checkMigrations": true }
           }
           JSON
@@ -162,6 +165,8 @@ jobs:
           #    checks its own paired web app, a web leg checks itself. That
           #    also covers a web-only hand edit of the committed
           #    api-types.gen.ts, which a server-legs-only check would miss.
+          #    A workspace whose pair does not exist yet opts out with
+          #    "checkApiTypes": false in the metadata above.
           # ---------------------------------------------------------------
           MATRIX="$(jq -cn --argjson meta "$(cat /tmp/workspace-metadata.json)" --argjson selected "$SELECTED_JSON" '
             $selected | map(
@@ -170,7 +175,7 @@ jobs:
               | {
                   workspace: $w,
                   checkMigrations: ($m.checkMigrations // false),
-                  checkApiTypes: ($w | test("^apps/.*-(server|web)$"))
+                  checkApiTypes: (($w | test("^apps/.*-(server|web)$")) and ($m.checkApiTypes != false))
                 }
             )
           ')"
