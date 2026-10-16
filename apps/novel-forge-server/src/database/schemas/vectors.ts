@@ -1,9 +1,10 @@
 import { relations } from 'drizzle-orm';
-import { bigint, bigserial, customType, index, integer, pgTable, text } from 'drizzle-orm/pg-core';
+import { bigint, bigserial, customType, index, integer, pgTable, text, varchar } from 'drizzle-orm/pg-core';
 
 import { projects } from './projects';
 
-const EMBEDDING_DIM = 1024;
+/** Every stored vector's width, fixed by the model the pinned embedding task serves. */
+export const EMBEDDING_DIM = 1024;
 
 function vectorType(dimensions: number) {
   return customType<{ data: number[]; driverData: string }>({
@@ -30,6 +31,7 @@ export const chapterChunks = pgTable(
     chunkIdx: integer('chunk_idx').notNull(),
     text: text('text').notNull(),
     embedding: vectorType(EMBEDDING_DIM)('embedding'),
+    embeddingTask: varchar('embedding_task'),
   },
   t => [index('chapter_chunks_project_id_chapter_idx').on(t.projectId, t.chapter), index('chapter_chunks_embedding_idx').using('hnsw', t.embedding.op('vector_cosine_ops'))],
 );

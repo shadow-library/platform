@@ -11,8 +11,8 @@ import postgres, { type Sql } from 'postgres';
  * Defining types
  */
 
-/** The five platform databases, keyed by the logical name that maps to both an env override and a physical db name. */
-type DatabaseKey = 'identity' | 'memoir' | 'pulse' | 'webNovel' | 'novelForge';
+/** The platform databases, keyed by the logical name that maps to both an env override and a physical db name. */
+type DatabaseKey = 'identity' | 'memoir' | 'pulse' | 'webNovel' | 'novelForge' | 'synapse';
 
 /**
  * Declaring the constants
@@ -35,6 +35,7 @@ const DATABASE_NAMES: Record<DatabaseKey, string> = {
   pulse: 'pulse',
   webNovel: 'web_novel',
   novelForge: 'novel_forge',
+  synapse: 'synapse',
 };
 
 /** The env var each database's connection string is read from — matches the seed's overrides so one `.env` drives both. */
@@ -44,6 +45,7 @@ const DATABASE_ENV_VARS: Record<DatabaseKey, string> = {
   pulse: 'E2E_PG_URL_PULSE',
   webNovel: 'E2E_PG_URL_WEB_NOVEL',
   novelForge: 'E2E_PG_URL_NOVEL_FORGE',
+  synapse: 'E2E_PG_URL_SYNAPSE',
 };
 
 const clients = new Map<DatabaseKey, Sql>();
@@ -89,6 +91,11 @@ export function webNovelDb(): Sql {
 /** The novel-forge database — projects and their cascade of authoring state. */
 export function novelForgeDb(): Sql {
   return db('novelForge');
+}
+
+/** The synapse database — the catalog, the usage ledger and the budget counters a spec pins. */
+export function synapseDb(): Sql {
+  return db('synapse');
 }
 
 /**

@@ -1,9 +1,9 @@
+import './legacy-backend';
 import '@server/bootstrap';
 
 import { BaseCallbackHandler } from '@langchain/core/callbacks/base';
 import { HumanMessage } from '@langchain/core/messages';
 import { Config, Logger } from '@shadow-library/common';
-import { setConfig } from '@shadow-library/common/testing';
 
 import { type AiRole, PRODUCTION_DEFAULTS } from '@modules/ai/defaults';
 import { ModelRouterService } from '@modules/ai/model-router.service';
@@ -14,8 +14,6 @@ import { titlePrompt } from '@modules/ai/prompts/title.prompt';
 
 const SPEND_VAR = 'AI_SMOKE_SPEND';
 
-// It measures the OpenRouter leg it spends on, which only the legacy backend calls directly.
-setConfig({ 'ai.backend': 'legacy' });
 const ROLES: AiRole[] = ['bible', 'title', 'judge', 'generation'];
 
 // Every rung sends a short pack and asks for a short answer; these bound one call generously.

@@ -159,6 +159,7 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly AI_020 = new AppErrorCode('AI_020', 'Web search failed: {reason}', 502);
   static readonly AI_021 = AppErrorCode.badRequest('AI_021', 'That page was not fetched: {reason}');
   static readonly AI_022 = AppErrorCode.badRequest('AI_022', "Model '{alias}' is not offered for this chat's model type and cost tier");
+  static readonly AI_023 = new AppErrorCode('AI_023', 'Embeddings of {dimensions} dimensions do not fit the {expected}-dimension vector columns', 500);
 
   /*!
    * Illustration Errors

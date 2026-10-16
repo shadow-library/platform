@@ -9,17 +9,17 @@ declare module '@shadow-library/common' {
     'server.port': number;
     'server.host': string;
 
-    /** `synapse` sends every chat, structured, streamed and tool-loop call to Synapse; `legacy` keeps the OpenRouter-compatible path for one release. */
+    /** `synapse` sends every model call (chat, structured, streamed, tool-loop, image, embedding) to Synapse; `legacy` keeps the direct paths for one release. */
     'ai.backend': 'synapse' | 'legacy';
 
-    /** Credential for image generation, and under `ai.backend=legacy` for every chat model too. */
+    /** Legacy backend only, never loaded on Synapse: the credential for every chat model and image generation. */
     'ai.openrouter.api.key': string | undefined;
-    /** Points the OpenRouter leg at an in-cluster gateway speaking the same OpenAI-compatible protocol. */
-    'ai.openrouter.api.url': string;
+    /** Legacy backend only: points the OpenRouter leg at an in-cluster gateway speaking the same OpenAI-compatible protocol. */
+    'ai.openrouter.api.url': string | undefined;
 
-    /** Host of the local Ollama used for embeddings only; no chat call routes there. */
-    'ai.ollama.host': string;
-    'ai.embedding.model': string;
+    /** Legacy backend only: the local Ollama embeddings are made on; Synapse embeds through its pinned `novel-forge.embedding` task. */
+    'ai.ollama.host': string | undefined;
+    'ai.embedding.model': string | undefined;
 
     /**
      * Legacy backend only. Local-model test environments: every chat call is sent as this one model id, while routing, quota, telemetry and
@@ -30,11 +30,11 @@ declare module '@shadow-library/common' {
     'ai.structured-output': 'prompt' | 'json-schema';
 
     'ai.llm.timeout-ms': number;
-    /** Transport retries of the legacy backend and of image generation; Synapse fails over itself. */
+    /** Transport retries of the legacy backend; Synapse fails over itself. */
     'ai.llm.max-retries': number;
     'ai.llm.backoff-ms': number;
 
-    /** Per-owner rolling window for the AI dispatch/spend guard, in milliseconds. */
+    /** Per-owner rolling window for the legacy backend's dispatch/spend guard, in milliseconds; Synapse budgets apply otherwise, and `GET /ai/quota` reports it on both. */
     'ai.quota.window-ms': number;
     /** Max model dispatches one owner may make within the window; 0 disables the count limit. */
     'ai.quota.max-calls': number;
@@ -67,13 +67,15 @@ Config.load('server.port', { defaultValue: '8080', validateType: 'number' });
 Config.load('server.host', { defaultValue: '0.0.0.0' });
 
 Config.load('ai.backend', { allowedValues: [...AI_BACKENDS], defaultValue: 'synapse' });
-Config.load('ai.openrouter.api.key');
-Config.load('ai.openrouter.api.url', { defaultValue: 'https://openrouter.ai/api/v1' });
-Config.load('ai.ollama.host', { defaultValue: 'http://localhost:11434' });
-Config.load('ai.embedding.model', { defaultValue: PRODUCTION_GROUP_DEFAULTS.embedding.model });
 Config.load('ai.model-override');
 Config.load('ai.structured-output', { allowedValues: ['prompt', 'json-schema'], defaultValue: 'prompt' });
-if (!isSynapseBackend()) assertModelOverrideTarget(Config.get('ai.model-override'), Config.get('ai.openrouter.api.url'));
+if (!isSynapseBackend()) {
+  Config.load('ai.openrouter.api.key');
+  Config.load('ai.openrouter.api.url', { defaultValue: 'https://openrouter.ai/api/v1' });
+  Config.load('ai.ollama.host', { defaultValue: 'http://localhost:11434' });
+  Config.load('ai.embedding.model', { defaultValue: PRODUCTION_GROUP_DEFAULTS.embedding.model });
+  assertModelOverrideTarget(Config.get('ai.model-override'), Config.get('ai.openrouter.api.url'));
+}
 Config.load('ai.llm.timeout-ms', { defaultValue: '300000', validateType: 'number' });
 Config.load('ai.llm.max-retries', { defaultValue: '2', validateType: 'number' });
 Config.load('ai.llm.backoff-ms', { defaultValue: '500', validateType: 'number' });

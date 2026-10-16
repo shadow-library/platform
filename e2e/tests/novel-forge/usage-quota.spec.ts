@@ -66,13 +66,17 @@ interface ProjectBody {
 /**
  * Declaring the constants
  *
- * Spend control and the figures behind it. The AI quota is a rolling window per owner over `model_calls`, enforced before the router
- * resolves a model. A request is sent only once the owner stands at a ceiling, so it is refused AI_008/AI_009 and nothing is ever
- * dispatched; below a ceiling the quota's own report is what is asserted. Cost figures are asserted over seeded calls whose prices this spec controls; the one
- * list-price estimate is computed from the registry `GET /ai/models` serves.
+ * Spend control and the figures behind it. The AI quota is a rolling window per owner over `model_calls`, reported by `GET /ai/quota` on
+ * both backends but enforced before the router resolves a model only on the legacy one: on Synapse the spend limits are Synapse budgets,
+ * so a request at novel-forge's own ceiling would be dispatched, not refused AI_008/AI_009. The specs that refuse at that ceiling are
+ * therefore legacy-scoped and skip on Synapse; the quota pin still refuses on both, through the owner's Synapse budget there. A request is
+ * sent only once the owner stands at a ceiling. Below a ceiling the quota's own report is what is asserted. Cost figures are asserted
+ * over seeded calls whose prices this spec controls; the one list-price estimate is computed from the registry `GET /ai/models` serves.
  */
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+const LEGACY_QUOTA_ONLY = 'novel-forge enforces its own quota only on the legacy backend; on Synapse its budgets refuse instead';
 
 /** Not in the registry, so its calls are labelled by id and never estimated. */
 const UNKNOWN_MODEL = 'e2e/unknown-model';
@@ -98,7 +102,7 @@ async function enhancePremise(owner: ForgeActor, projectId: string): Promise<API
   return postEnhancePremise(owner, projectId);
 }
 
-/** For an owner stood at a ceiling by seeded calls rather than `quotaPin`: refuses to send unless the server's own report says a ceiling is reached. */
+/** For an owner stood at a ceiling by seeded calls rather than a quota pin: refuses to send unless the server's own report says a ceiling is reached. */
 async function enhancePremiseAtCeiling(owner: ForgeActor, projectId: string): Promise<APIResponse> {
   const quota = await readQuota(owner.ctx);
   const atRate = quota.maxCalls > 0 && quota.calls >= quota.maxCalls;
@@ -140,6 +144,7 @@ function item(items: BreakdownItem[], key: string): BreakdownItem | undefined {
 
 test.describe('novel-forge AI quota', () => {
   test('should count calls up to the rate ceiling and refuse at it without dispatching', async ({ forge }) => {
+    test.skip((await forge.aiBackend()) === 'synapse', LEGACY_QUOTA_ONLY);
     const author = await forge.actor({ label: 'quota-rate' });
     const projectId = await newProjectId(author);
     const limits = await readQuota(author.ctx);
@@ -160,6 +165,7 @@ test.describe('novel-forge AI quota', () => {
   });
 
   test('should price recorded and token-only calls into the spend ceiling and report a rate breach first', async ({ forge }) => {
+    test.skip((await forge.aiBackend()) === 'synapse', LEGACY_QUOTA_ONLY);
     const author = await forge.actor({ label: 'quota-spend' });
     const projectId = await newProjectId(author);
     const limits = await readQuota(author.ctx);
@@ -202,7 +208,9 @@ test.describe('novel-forge AI quota', () => {
     await insertModelCallBatch(limits.maxCalls, { projectId, costUsd: limits.maxCostUsd, costSource: 'provider', ageMs: limits.windowMs + 60_000 });
 
     expect(await readQuota(author.ctx), "another owner's calls and this owner's expired ones do not count").toMatchObject({ calls: 0, costUsd: 0, resetsAt: null });
-    await expectOutcome(await enhancePremiseAtCeiling(neighbour, neighbourProject), 429, 'AI_008', 'the neighbour is at its own ceiling');
+    expect((await readQuota(neighbour.ctx)).calls, 'the neighbour is at its own ceiling').toBe(limits.maxCalls);
+    if ((await forge.aiBackend()) === 'synapse') return;
+    await expectOutcome(await enhancePremiseAtCeiling(neighbour, neighbourProject), 429, 'AI_008', 'which refuses its next dispatch where novel-forge enforces it');
   });
 });
 

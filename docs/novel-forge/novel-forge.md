@@ -6,7 +6,7 @@
   designs the Story Bible with them, plans each chapter just before it is written, has AI draft it (or writes it by hand), reviews it, finalizes it into canon and publishes it to
   the reader app `web-novel` (`docs/web-novel.md`). A project has one owner; bot-owned projects are shared with the owning organisation.
 - `novel-forge-server`: Bun/Fastify, Postgres + pgvector, LangGraph/LangChain. Every model call goes to Synapse (`docs/synapse.md`) as a task
-  `novel-forge.{writing,planning,review,chat,helper,vision,image,embedding}`; the server holds no provider key, URL or vendor model slug.
+  `novel-forge.{writing,planning,review,chat,helper,vision,image,embedding}`; the server loads no provider key or URL and sends no vendor model slug.
 - `novel-forge-web`: TanStack Start SSR workspace. Authenticates via Identity. The chat is every novel's home; Story Bible, Chapters, Illustrations, Publish, Usage
   and Settings sit beside it, from one screen list. A link to a retired screen opens the novel's home.
 
@@ -78,8 +78,13 @@
   Runs link to their parent run, so a chat turn's figure includes its title and compaction calls; costs roll up per turn, chapter, run, job, project and account through one pricing path, so a legacy row is priced the same
   everywhere and a call is never counted twice. Spend limits are Synapse budgets per owner (list price, fixed windows), enforced before dispatch for requests and jobs alike;
   projects with no owner share one subject, and Synapse refusing admission fails the call closed (`SYN_BUDGET_CALLS` is `AI_008`, `SYN_BUDGET_COST` `AI_009`). The quota the
-  author is shown is counted from `model_calls`, so it only approximates Synapse's counters. Reasoning effort comes from each task's effort range in Synapse, which applies it.
-- Retrieval: pgvector indexes of finalized, non-isolated prose and lore, filtered by project; derived data, rebuildable. Realtime: SSE; a dropped client never aborts a chat turn.
+  author is shown is counted from `model_calls`, so it only approximates Synapse's counters: an embedding spends a budget call but writes no row, Synapse's ledger being
+  its only record. Reasoning effort comes from each task's effort range in Synapse, which applies it.
+- Retrieval: pgvector indexes of finalized, non-isolated prose and lore, filtered by project; derived data, rebuildable. Every vector records the embedding task that built it
+  (`embedding_task`; a row from before the column is the first pinned task, `novel-forge.embedding`), and a query is compared only with vectors of its own task, since two tasks'
+  vectors share no space. A new embedding task is a new task id and means re-indexing (the backfill job, `POST …/backfill`, re-embeds stale prose; the bible builder and finalize
+  re-embed lore), never mixing. An embedding that fails, a budget refusal included, leaves its text stored unembedded for the next backfill and the search empty; vectors whose
+  width is not the columns' are never stored. Realtime: SSE; a dropped client never aborts a chat turn.
 - The web never renders a containment badge from `generator` (it reads `isolated`; `generator` only drives a provenance chip). `novel-forge:admin` (role `NovelForgeAdmin`, never
   default or bot-grantable) gates run inspection; it is an RBAC permission evaluated per organisation, so the web reads it from `GET /api/v1/access`, never the session, and each
   admin route gates itself in `beforeLoad`. Bots reach almost every project route but cannot publish.

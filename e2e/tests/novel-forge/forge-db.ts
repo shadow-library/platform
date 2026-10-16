@@ -7,13 +7,15 @@ import { type Sql, type TransactionSql } from 'postgres';
 /**
  * Importing user defined packages
  */
-import { novelForgeDb } from '../../lib';
+import { novelForgeDb, synapseDb } from '../../lib';
 
 /**
  * Defining types
  */
 
 export type ForgeOwnerKind = 'user' | 'bot';
+
+export type AiBackend = 'synapse' | 'legacy';
 
 /** The `(owner_kind, owner_id)` pair every ownership check compares; a bot and a user routinely share a numeric id. */
 export interface ForgeOwner {
@@ -187,16 +189,23 @@ export interface QuotaLimits {
  * workflow run would have written, projects a bot owns, and the authoring claim a running job holds. Timestamps are written on the
  * database clock (`timestamp without time zone`, UTC), which is the clock every server-side window compares against.
  *
- * Keeping a model-capable request from spending: `quotaPin` stands the project's owner at the AI_008 call ceiling. Every paid dispatch
- * (`chatFor`, `structured` and its streaming and image-input variants, `images`) runs `AiQuotaService.enforce` before `routeModel` decides
- * standard or unrestricted, so it holds on both paths. It pins every project of that owner and lasts one window (an hour in dev); a server
- * that cannot read usage refuses the call with AI_018 instead. That owner's usage and cost figures then include the pin's zero-cost rows
- * (prompt key `e2e-quota-pin`). A seeded persona cannot be quota-pinned — that would block it in every lane — so a spec that needs a
- * model-capable request runs it as an owner it created. Call `assertSpendGuarded` right before any model-capable request.
+ * Keeping a model-capable request from spending: `quotaPin` stands the project's owner at the AI_008 call ceiling, so the request is
+ * refused before any model is reached. Where that ceiling lives depends on the server's AI backend (`readAiBackend`):
+ *   - Synapse (the test environment): novel-forge enforces no quota of its own; spend limits are Synapse budgets, admitted before
+ *     dispatch. So the pin is in Synapse's database (`budgetPin`): the owner's `1h` budget counters for the current and the next hour
+ *     stand at the most calls a counter holds, whatever cap the catalog sets, and Synapse answers `SYN_BUDGET_CALLS`, which novel-forge
+ *     reports as AI_008 and records as a `refused` call that ran no model. It holds for every project of that owner until the next hour
+ *     ends, and teardown deletes the counters. The `local-only` catalog would make a dispatch free anyway, but a refusal keeps the
+ *     deterministic specs off the model, and its image deployments are the `mock` provider, whose images still count list cost.
+ *   - Legacy: the pin is zero-cost `model_calls` rows (prompt key `e2e-quota-pin`) filling the owner's rolling window. Every dispatch runs
+ *     `AiQuotaService.enforce` before `routeModel` decides standard or unrestricted, so it holds on both paths. It lasts one window (an hour
+ *     in dev); a server that cannot read usage refuses the call with AI_018 instead, and that owner's usage and cost figures include the rows.
+ * A seeded persona cannot be quota-pinned — that would block it in every lane — and neither can a project without an owner, whose Synapse
+ * subject every unowned project shares, so a spec that needs a model-capable request runs it as an owner it created. Call
+ * `assertSpendGuarded` right before any model-capable request.
  *
  * There is no fail-pin any more: a chat pin is a Synapse alias the catalog must offer, so a pin that would refuse every turn cannot be stored
- * (`AI_022`), and nothing needs one, because the test environment's Synapse runs the `local-only` seed profile, where every deployment is local
- * Ollama and no call is paid.
+ * (`AI_022`).
  */
 
 /** Not a model Synapse or the registry knows: seeded rows carry it, so a seeded call is never mistaken for a dispatched one. */
@@ -206,6 +215,19 @@ export const UNREGISTERED_MODEL: ModelRef = { provider: 'openrouter', model: 'e2
 const SEEDED_PROMPT_KEY = 'e2e-seed';
 
 const QUOTA_PIN_PROMPT_KEY = 'e2e-quota-pin';
+
+/** How novel-forge names Synapse on every catalog route `GET /ai/models` lists. */
+const SYNAPSE_PROVIDER = 'synapse';
+
+/** Synapse's per-owner budget for novel-forge: its counters are keyed by app, subject type and id, window and hour bucket. */
+const BUDGET_APP = 'novel-forge';
+
+const BUDGET_SUBJECT_TYPE = 'owner';
+
+const BUDGET_WINDOW = '1h';
+
+/** The most a counter's `integer` holds, so the pin outlasts any call cap the catalog is changed to. */
+const BUDGET_PIN_CALLS = 2_147_483_647;
 
 /** A quota pin must outlive the request it guards by at least this much of its window. */
 const QUOTA_PIN_MARGIN_MS = 10 * 60 * 1000;
@@ -235,9 +257,13 @@ interface QuotaPinRecord {
   readonly ownerCtx?: APIRequestContext;
 }
 
-const quotaPins = new Map<string, QuotaPinRecord>();
+type SpendGuard = { readonly kind: 'quota-pin'; readonly pin: QuotaPinRecord } | { readonly kind: 'budget-pin'; readonly subjectId: string };
+
+const spendGuards = new Map<string, SpendGuard>();
 
 let quotaLimits: Promise<QuotaLimits> | undefined;
+
+let aiBackend: Promise<AiBackend> | undefined;
 
 function ago(ms: number | undefined): string {
   return `${Math.max(0, Math.round(ms ?? 0))} milliseconds`;
@@ -365,10 +391,12 @@ export async function listModelCallModels(projectId: string): Promise<string[]> 
   return rows.map(row => row.model);
 }
 
-/** The model calls the server itself recorded on the project — how a spec proves nothing was dispatched past a quota pin. */
+/** The model calls the server itself recorded on the project — how a spec proves nothing was dispatched past a quota pin; a refused call ran no model. */
 export async function listDispatchedModelCalls(projectId: string): Promise<string[]> {
   const rows = await novelForgeDb()<{ model: string }[]>`
-    SELECT model FROM model_calls WHERE project_id = ${projectId} AND prompt_key NOT IN (${SEEDED_PROMPT_KEY}, ${QUOTA_PIN_PROMPT_KEY}) ORDER BY id
+    SELECT model FROM model_calls
+    WHERE project_id = ${projectId} AND prompt_key NOT IN (${SEEDED_PROMPT_KEY}, ${QUOTA_PIN_PROMPT_KEY}) AND status <> 'refused'
+    ORDER BY id
   `;
   return rows.map(row => row.model);
 }
@@ -395,6 +423,20 @@ export function readQuotaLimits(reader: () => Promise<APIRequestContext>): Promi
   return quotaLimits;
 }
 
+/** The server's AI backend, read once per worker: on Synapse every tier route `GET /ai/models` lists names provider `synapse`. */
+export function readAiBackend(reader: () => Promise<APIRequestContext>): Promise<AiBackend> {
+  aiBackend ??= (async () => {
+    const response = await (await reader()).get('/api/v1/ai/models');
+    if (!response.ok()) throw new SpendGuardError(`reading the AI models answered ${response.status()}: ${await response.text()}`);
+    const { tiers } = (await response.json()) as { tiers: { provider: string }[] };
+    return tiers.length > 0 && tiers.every(tier => tier.provider === SYNAPSE_PROVIDER) ? 'synapse' : 'legacy';
+  })().catch(error => {
+    aiBackend = undefined;
+    throw error;
+  });
+  return aiBackend;
+}
+
 /** Calls counted against the project owner that stay inside the window for at least the pin margin. */
 async function countFreshOwnerCalls(projectId: string, limits: QuotaLimits): Promise<number> {
   const [row] = await novelForgeDb()<{ calls: number }[]>`
@@ -412,12 +454,7 @@ async function countFreshOwnerCalls(projectId: string, limits: QuotaLimits): Pro
  * one the caller created and tears down — may be pinned: a pin on anyone else would block their AI for a whole window, in every lane.
  */
 export async function quotaPin(projectId: string, limits: QuotaLimits, scope: QuotaPinScope): Promise<void> {
-  const project = await readProjectRow(projectId);
-  if (!project) throw new ForgeDbError(`no project ${projectId} to quota-pin`);
-  const owner = scope.owners.find(candidate => candidate.kind === project.ownerKind && candidate.id === project.ownerId);
-  if (!owner)
-    throw new SpendGuardError(`project ${projectId} belongs to ${project.ownerKind} ${project.ownerId ?? '(none)'}, whom this test did not create: refusing to pin their quota`);
-
+  const owner = await pinnableOwner(projectId, scope.owners);
   const counted = await countFreshOwnerCalls(projectId, limits);
   const missing = limits.maxCalls - counted;
   if (missing > 0) {
@@ -429,18 +466,79 @@ export async function quotaPin(projectId: string, limits: QuotaLimits, scope: Qu
   }
   const pinned = await countFreshOwnerCalls(projectId, limits);
   if (pinned < limits.maxCalls) throw new SpendGuardError(`project ${projectId}'s owner stands at ${pinned} of ${limits.maxCalls} calls after the quota pin`);
-  quotaPins.set(projectId, { limits, reader: scope.reader, ownerCtx: scope.ownerCtx?.(owner) });
+  spendGuards.set(projectId, { kind: 'quota-pin', pin: { limits, reader: scope.reader, ownerCtx: scope.ownerCtx?.(owner) } });
+}
+
+/** The project's owner, when it is one the caller created: a pin on anyone else, or on the subject unowned projects share, blocks them too. */
+async function pinnableOwner(projectId: string, owners: readonly ForgeOwner[]): Promise<ForgeOwner> {
+  const project = await readProjectRow(projectId);
+  if (!project) throw new ForgeDbError(`no project ${projectId} to quota-pin`);
+  const owner = owners.find(candidate => candidate.kind === project.ownerKind && candidate.id === project.ownerId);
+  if (!owner)
+    throw new SpendGuardError(`project ${projectId} belongs to ${project.ownerKind} ${project.ownerId ?? '(none)'}, whom this test did not create: refusing to pin their quota`);
+  return owner;
+}
+
+/** The calls the owner's Synapse counter holds for the hour now running, on the database clock Synapse's epoch-aligned buckets share. */
+async function currentBudgetCalls(subjectId: string): Promise<number> {
+  const [row] = await synapseDb()<{ calls: number }[]>`
+    SELECT calls FROM budget_counters
+    WHERE app = ${BUDGET_APP} AND subject_type = ${BUDGET_SUBJECT_TYPE} AND subject_id = ${subjectId} AND "window" = ${BUDGET_WINDOW}
+      AND window_start = to_timestamp(floor(extract(epoch FROM now()) / 3600) * 3600)
+  `;
+  return row?.calls ?? 0;
+}
+
+/**
+ * The Synapse quota pin: stands the owner's novel-forge budget counters for this hour and the next at `BUDGET_PIN_CALLS`, so Synapse refuses
+ * every model-capable request of that owner with `SYN_BUDGET_CALLS` before dispatch. The same owner rule as `quotaPin` applies.
+ */
+export async function budgetPin(projectId: string, owners: readonly ForgeOwner[]): Promise<void> {
+  const owner = await pinnableOwner(projectId, owners);
+  const subjectId = `${owner.kind}:${owner.id}`;
+  await synapseDb()`
+    INSERT INTO budget_counters (app, subject_type, subject_id, "window", window_start, calls, list_cost_usd)
+    SELECT ${BUDGET_APP}, ${BUDGET_SUBJECT_TYPE}, ${subjectId}, ${BUDGET_WINDOW}, to_timestamp((floor(extract(epoch FROM now()) / 3600) + bucket) * 3600), ${BUDGET_PIN_CALLS}, 0
+    FROM generate_series(0, 1) AS bucket
+    ON CONFLICT (app, subject_type, subject_id, "window", window_start) DO UPDATE SET calls = GREATEST(budget_counters.calls, EXCLUDED.calls)
+  `;
+  const pinned = await currentBudgetCalls(subjectId);
+  if (pinned < BUDGET_PIN_CALLS) throw new SpendGuardError(`project ${projectId}'s owner stands at ${pinned} Synapse budget calls after the quota pin`);
+  spendGuards.set(projectId, { kind: 'budget-pin', subjectId });
+}
+
+/** Deletes the Synapse counters `budgetPin` stood at the cap for these projects' owners, so a pin never outlives its test. */
+export async function releaseBudgetPins(projectIds: readonly string[]): Promise<void> {
+  const subjectIds = new Set<string>();
+  for (const projectId of projectIds) {
+    const guard = spendGuards.get(projectId);
+    if (guard?.kind !== 'budget-pin') continue;
+    subjectIds.add(guard.subjectId);
+    spendGuards.delete(projectId);
+  }
+  if (subjectIds.size === 0) return;
+  const sql = synapseDb();
+  await sql`
+    DELETE FROM budget_counters
+    WHERE app = ${BUDGET_APP} AND subject_type = ${BUDGET_SUBJECT_TYPE} AND subject_id IN ${sql([...subjectIds])} AND "window" = ${BUDGET_WINDOW}
+  `;
 }
 
 /**
  * Throws unless a model-capable request on the project would be refused before dispatch: its owner was quota-pinned and still stands at
- * the call ceiling. The pin is re-checked against the server's limits read afresh and, for a person, against the server's own count of
- * their calls.
+ * the call ceiling. A Synapse pin is re-checked on the counter of the hour now running; a legacy pin against the server's limits read afresh
+ * and, for a person, against the server's own count of their calls.
  */
 export async function assertSpendGuarded(projectId: string): Promise<void> {
   if (!(await readProjectRow(projectId))) throw new ForgeDbError(`no project ${projectId} to guard`);
-  const pin = quotaPins.get(projectId);
-  if (!pin) throw new SpendGuardError(`project ${projectId} is not quota-pinned: nothing stops a real dispatch`);
+  const guard = spendGuards.get(projectId);
+  if (!guard) throw new SpendGuardError(`project ${projectId} is not spend-guarded: nothing stops a real dispatch`);
+  if (guard.kind === 'budget-pin') {
+    const calls = await currentBudgetCalls(guard.subjectId);
+    if (calls < BUDGET_PIN_CALLS) throw new SpendGuardError(`project ${projectId}'s Synapse budget pin lapsed: its owner's counter for this hour stands at ${calls} calls`);
+    return;
+  }
+  const { pin } = guard;
 
   const counted = await countFreshOwnerCalls(projectId, pin.limits);
   if (counted < pin.limits.maxCalls) throw new SpendGuardError(`project ${projectId}'s quota pin lapsed: its owner stands at ${counted} of ${pin.limits.maxCalls} calls`);

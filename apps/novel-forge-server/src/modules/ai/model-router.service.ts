@@ -7,13 +7,13 @@ import { Injectable } from '@shadow-library/app';
 import { type SchemaClass } from '@shadow-library/class-schema';
 import { AppError, Config, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
-import { SynapseClient, type SynapseResponseBlock, type SynapseSubject } from '@shadow-library/synapse';
+import { SynapseClient, type SynapseImageRequest, type SynapseImageResponse, type SynapseResponseBlock, type SynapseSubject } from '@shadow-library/synapse';
 import { SynapseChatModel } from '@shadow-library/synapse/langchain';
 
 import { AppErrorCode } from '@server/classes';
 import { type OwnerFields } from '@server/common';
 import { APP_NAME } from '@server/constants';
-import { type PrimaryDatabase, type Project, schema } from '@server/database';
+import { type Ai, type PrimaryDatabase, type Project, schema } from '@server/database';
 
 import { type ForgeCallPolicy } from '../plugins/plugin-policy.service';
 import { GatewayChatOpenAI } from './gateway-chat-openai';
@@ -42,8 +42,18 @@ import { type PromptModule } from './prompts/types';
 import { type ChangeSetElement, ReplyStreamScanner } from './reply-stream-scanner';
 import { parseSchema, renderSchemaIssues, type SchemaIssue, type SchemaParseResult, toConstrainedSchema, toHostedPromptSchema } from './schemas/validate';
 import { synapseCallFailed } from './synapse-failure';
-import { guardRequestHook, ownerSubject, SYNAPSE_PROVIDER, synapseAlias, synapseChatTask, synapseSelectors, UNOWNED_SUBJECT } from './synapse-request';
-import { type AnsweredHook, type TelemetryContext, TelemetryHandler } from './telemetry.handler';
+import {
+  guardRequestHook,
+  ownerSubject,
+  projectSubject,
+  SYNAPSE_IMAGE_TASK,
+  SYNAPSE_PROVIDER,
+  synapseAlias,
+  synapseChatTask,
+  synapseSelectors,
+  UNOWNED_SUBJECT,
+} from './synapse-request';
+import { type AnsweredHook, failureDetail, failureStatus, synapseBilling, type TelemetryContext, TelemetryHandler } from './telemetry.handler';
 import { modelCallFailed, ModelCallTimeoutError } from './transient-model-error';
 
 /**
@@ -110,9 +120,29 @@ export interface GeneratedImage {
   contentType: string;
 }
 
+interface ImageData {
+  b64_json?: string;
+  media_type?: string;
+}
+
 interface OpenRouterImageResponse {
-  data?: { b64_json?: string; media_type?: string }[];
+  data?: ImageData[];
   usage?: { cost?: number };
+}
+
+interface ImageCallRecord {
+  provider: string;
+  model: string;
+  status: Ai.ModelCallStatus;
+  attempt: number;
+  latencyMs: number;
+  costUsd?: number;
+  costSource?: Ai.CostSource;
+  error?: Record<string, unknown>;
+}
+
+function decodeImages(data: readonly ImageData[] = []): GeneratedImage[] {
+  return data.flatMap(item => (item.b64_json ? [{ bytes: new Uint8Array(Buffer.from(item.b64_json, 'base64')), contentType: item.media_type || 'image/png' }] : []));
 }
 
 function pluginScreens(policy: ForgeCallPolicy | undefined): ScreenedText[] {
@@ -487,12 +517,10 @@ export class ModelRouterService {
     });
   }
 
-  /** The owner whose Synapse budget a call spends, as the legacy quota window counted it. */
   private async subjectFor(projectId: bigint | undefined, project?: ProjectConfig): Promise<SynapseSubject> {
     if (project?.ownerKind !== undefined) return ownerSubject({ ownerKind: project.ownerKind, ownerId: project.ownerId });
     if (projectId === undefined) return UNOWNED_SUBJECT;
-    const owner = await this.db.query.projects.findFirst({ columns: { ownerKind: true, ownerId: true }, where: eq(schema.projects.id, projectId) });
-    return ownerSubject(owner);
+    return projectSubject(this.db, projectId);
   }
 
   private runSignalFor(ctx: TelemetryContext | undefined): AbortSignal | undefined {
@@ -689,20 +717,22 @@ export class ModelRouterService {
   }
 
   /**
-   * Image generation through OpenRouter's dedicated images endpoint, which speaks its own wire format
-   * rather than chat completions — so it cannot ride LangChain's callback telemetry and writes its own
-   * `model_calls` row instead. It gets the same timeout budget and transient-error backoff as a chat
-   * call. `inputReferences` is the endpoint's image-to-image channel; models that ignore it degrade to
-   * plain text-to-image rather than failing.
+   * Image generation: Synapse's images endpoint, or on the legacy backend OpenRouter's, which speaks its own wire format rather than chat
+   * completions — so it cannot ride LangChain's callback telemetry and writes its own `model_calls` row instead. Legacy gets the same
+   * timeout budget and transient-error backoff as a chat call; a Synapse call is made once, as Synapse fails over itself. Reference
+   * capacity comes from the registry on both backends, since the catalog does not carry it.
    */
   async images(request: ImageRequest, ctx: TelemetryContext, project?: ProjectConfig): Promise<GeneratedImage[]> {
-    await this.quota.enforce(ctx.projectId);
+    const synapse = isSynapseBackend();
+    if (!synapse) await this.quota.enforce(ctx.projectId);
     const route = this.routeModel('image', project);
     const { resolved } = route;
     await this.refuseHardLine(route, [{ text: request.prompt, scope: 'supplied', source: 'The image prompt' }], ctx);
     const maxInputReferences = MODEL_MAP[resolved.model]?.maxInputReferences ?? 0;
     const referenceCount = request.inputReferences?.length ?? 0;
     if (referenceCount > maxInputReferences) throw AppErrorCode.AI_010.create({ model: resolved.model, max: maxInputReferences, count: referenceCount });
+    if (synapse) return this.synapseImages(request, ctx, route, project);
+
     const apiKey = Config.get('ai.openrouter.api.key');
     if (!apiKey) throw AppErrorCode.AI_004.create();
     const url = `${Config.get('ai.openrouter.api.url')}/images`;
@@ -721,6 +751,7 @@ export class ModelRouterService {
       prompt: request.prompt,
     });
 
+    const provider = resolveProvider(resolved);
     const startedAt = Date.now();
     let lastErr: unknown;
     for (let attempt = 0; attempt <= this.llmMaxRetries; attempt++) {
@@ -732,12 +763,10 @@ export class ModelRouterService {
         if (!res.ok) throw new Error(await res.text().catch(() => res.statusText));
 
         const payload = (await res.json()) as OpenRouterImageResponse;
-        const images = (payload.data ?? [])
-          .filter(item => item.b64_json)
-          .map(item => ({ bytes: new Uint8Array(Buffer.from(item.b64_json as string, 'base64')), contentType: item.media_type ?? 'image/png' }));
+        const images = decodeImages(payload.data);
         if (images.length === 0) throw new Error('provider returned no image data');
 
-        await this.recordImageCall(ctx, route, 'ok', attempt, Date.now() - startedAt, payload.usage?.cost);
+        await this.recordImageCall(ctx, route, { provider, model: resolved.model, status: 'ok', attempt, latencyMs: Date.now() - startedAt, costUsd: payload.usage?.cost });
         return images;
       } catch (err) {
         lastErr = err;
@@ -746,19 +775,54 @@ export class ModelRouterService {
     }
 
     this.logger.error('Image call failed after retries', { projectId: ctx.projectId, model: resolved.model, err: lastErr });
-    await this.recordImageCall(ctx, route, 'transport_error', this.llmMaxRetries, Date.now() - startedAt, undefined, lastErr);
+    const error = { message: lastErr instanceof Error ? lastErr.message : String(lastErr) };
+    await this.recordImageCall(ctx, route, { provider, model: resolved.model, status: 'transport_error', attempt: this.llmMaxRetries, latencyMs: Date.now() - startedAt, error });
     throw AppErrorCode.AI_005.create();
   }
 
-  private async recordImageCall(
-    ctx: TelemetryContext,
-    { resolved, costTier, contentMode }: ModelRoute,
-    status: 'ok' | 'transport_error',
-    attempt: number,
-    latencyMs: number,
-    costUsd?: number,
-    err?: unknown,
-  ): Promise<void> {
+  // A refusal keeps its own `AI_*` code; any other failure is the image give-up `AI_005`.
+  private async synapseImages(request: ImageRequest, ctx: TelemetryContext, route: ModelRoute, project?: ProjectConfig): Promise<GeneratedImage[]> {
+    const client = this.synapse;
+    if (!client) throw AppError.internal('ai.backend is synapse but no SynapseClient was provided');
+    const references = request.inputReferences ?? [];
+    const body: SynapseImageRequest = {
+      model: SYNAPSE_IMAGE_TASK,
+      prompt: request.prompt,
+      n: request.n,
+      ...(references.length > 0 ? { reference_images: references } : {}),
+      synapse: { subject: await this.subjectFor(ctx.projectId, project), selectors: synapseSelectors(route) },
+    };
+    this.logger.debug('images: requesting through Synapse', { projectId: ctx.projectId, task: SYNAPSE_IMAGE_TASK, n: request.n, references: references.length });
+
+    const startedAt = Date.now();
+    const failed = { provider: SYNAPSE_PROVIDER, model: SYNAPSE_IMAGE_TASK, attempt: 0 };
+    let response: SynapseImageResponse;
+    try {
+      response = await this.callSynapse('image', this.runSignalFor(ctx), async signal => {
+        try {
+          return await client.images(body, { signal });
+        } catch (err) {
+          await this.recordImageCall(ctx, route, { ...failed, status: failureStatus(err), latencyMs: Date.now() - startedAt, error: failureDetail(err) });
+          throw err;
+        }
+      });
+    } catch (err) {
+      throw AppError.is(err, AppErrorCode.AI_007) ? AppErrorCode.AI_005.create(undefined, err) : err;
+    }
+
+    const { provider, model, costUsd, costSource } = synapseBilling(response.synapse);
+    const served = { provider, model, attempt: 0, latencyMs: Date.now() - startedAt, costUsd, costSource };
+    const images = decodeImages(response.data);
+    if (images.length > 0) {
+      await this.recordImageCall(ctx, route, { ...served, status: 'ok' });
+      return images;
+    }
+    this.logger.error('Synapse answered an image call with no image data', { projectId: ctx.projectId, model });
+    await this.recordImageCall(ctx, route, { ...served, status: 'transport_error', error: { message: 'synapse returned no image data' } });
+    throw AppErrorCode.AI_005.create();
+  }
+
+  private async recordImageCall(ctx: TelemetryContext, { costTier, contentMode }: ModelRoute, call: ImageCallRecord): Promise<void> {
     await this.db
       .insert(schema.modelCalls)
       .values({
@@ -766,17 +830,18 @@ export class ModelRouterService {
         runId: ctx.runId,
         node: ctx.node,
         role: ctx.role,
-        provider: resolveProvider(resolved),
-        model: resolved.model,
+        provider: call.provider,
+        model: call.model,
         tier: costTier,
         contentMode,
         promptKey: ctx.promptKey,
         promptVersion: ctx.promptVersion,
-        status,
-        latencyMs,
-        costUsd: costUsd === undefined ? null : String(costUsd),
-        attempt,
-        error: err ? { message: err instanceof Error ? err.message : String(err) } : null,
+        status: call.status,
+        latencyMs: call.latencyMs,
+        costUsd: call.costUsd === undefined ? null : String(call.costUsd),
+        ...(call.costSource ? { costSource: call.costSource } : {}),
+        attempt: call.attempt,
+        error: call.error ?? null,
       })
       .catch(insertErr => this.logger.warn('Failed to write model_calls row for an image call', { err: insertErr }));
   }

@@ -164,9 +164,20 @@ export function extractGatewayInfo(output: LLMResult): GatewayInfo | undefined {
 /** Synapse turned these away before any model ran, so they are no more a dispatched call than a hard-line refusal is. */
 const ADMISSION_REFUSALS: ReadonlySet<string> = new Set<SynapseErrorCode>(['SYN_BUDGET_CALLS', 'SYN_BUDGET_COST']);
 
-function failureStatus(err: Error): Ai.ModelCallStatus {
+export function failureStatus(err: unknown): Ai.ModelCallStatus {
   if (isHardLineRefusal(err)) return 'refused';
   return isSynapseError(err) && ADMISSION_REFUSALS.has(err.code) ? 'refused' : 'transport_error';
+}
+
+/** What a failed call's row keeps of its error: the class, the message, the `SYN_*` code and a hard-line refusal's details. */
+export function failureDetail(err: unknown): Record<string, unknown> {
+  if (!(err instanceof Error)) return { message: String(err) };
+  return {
+    class: err.constructor.name,
+    message: err.message,
+    ...(isSynapseError(err) ? { code: err.code } : {}),
+    ...(isHardLineRefusal(err) ? err.data : {}),
+  };
 }
 
 const finiteOr = (value: unknown, fallback: number): number => (typeof value === 'number' && Number.isFinite(value) ? value : fallback);
@@ -382,12 +393,7 @@ export class TelemetryHandler extends BaseCallbackHandler {
         latencyMs: Date.now() - call.startedAt,
         attempt: call.attempt,
         rawOutput: '',
-        error: {
-          class: err.constructor.name,
-          message: err.message,
-          ...(isSynapseError(err) ? { code: err.code } : {}),
-          ...(isHardLineRefusal(err) ? err.data : {}),
-        },
+        error: failureDetail(err),
       });
     } catch (writeErr) {
       this.logger.error('Failed to write model_call error telemetry row', { writeErr });

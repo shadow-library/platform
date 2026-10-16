@@ -2,7 +2,7 @@ import { describe, expect, it, mock } from 'bun:test';
 import { type SQL } from 'drizzle-orm';
 import { PgDialect } from 'drizzle-orm/pg-core';
 
-import { type EmbeddingService } from '@modules/ai/retrieval/embedding.service';
+import { type EmbeddingService, UNTAGGED_EMBEDDING_TASK } from '@modules/ai/retrieval/embedding.service';
 import { IndexingService } from '@modules/ai/retrieval/indexing.service';
 import { RetrievalService } from '@modules/ai/retrieval/retrieval.service';
 
@@ -27,7 +27,10 @@ function makeIndexing(chapters: ChapterRow[] = []): { indexing: IndexingService;
     })),
   };
   const databaseService = { getPostgresClient: () => db } as never;
-  const embeddingService = { embedBatch: mock(async (texts: string[]) => texts.map(() => [0.1, 0.2])) } as unknown as EmbeddingService;
+  const embeddingService = {
+    task: 'novel-forge.embedding',
+    embedBatch: mock(async (_projectId: bigint, texts: string[]) => texts.map(() => [0.1, 0.2])),
+  } as unknown as EmbeddingService;
   return { indexing: new IndexingService(databaseService, embeddingService), insertedChapters };
 }
 
@@ -86,5 +89,34 @@ describe('RetrievalService.searchProse', () => {
     expect(rendered).toContain('cc.chapter NOT IN');
     expect(rendered).toContain('isolated = true');
     expect(rendered).not.toContain('generator');
+  });
+});
+
+describe('RetrievalService embedding task', () => {
+  async function rendered(search: (retrieval: RetrievalService) => Promise<unknown>): Promise<{ sql: string; params: unknown[] }> {
+    let captured: SQL | undefined;
+    const db = {
+      execute: mock(async (query: SQL) => {
+        captured = query;
+        return [];
+      }),
+    };
+    const embeddingService = { task: 'novel-forge.embedding-v2', embed: mock(async () => [0.1, 0.2]) } as unknown as EmbeddingService;
+    await search(new RetrievalService({ getPostgresClient: () => db } as never, embeddingService));
+    return new PgDialect().sqlToQuery(captured as SQL);
+  }
+
+  it('should compare a prose query only with chunks its own task built', async () => {
+    const query = await rendered(retrieval => retrieval.searchProse(1n, 'query'));
+
+    expect(query.sql).toMatch(/AND coalesce\(cc\.embedding_task, \$(\d+)\) = \$(\d+)/);
+    expect(query.params).toEqual(expect.arrayContaining([UNTAGGED_EMBEDDING_TASK, 'novel-forge.embedding-v2']));
+  });
+
+  it('should compare a lore query only with chunks its own task built', async () => {
+    const query = await rendered(retrieval => retrieval.searchLore(1n, 'query'));
+
+    expect(query.sql).toMatch(/AND coalesce\(lc\.embedding_task, \$(\d+)\) = \$(\d+)/);
+    expect(query.params).toEqual(expect.arrayContaining([UNTAGGED_EMBEDDING_TASK, 'novel-forge.embedding-v2']));
   });
 });

@@ -24,5 +24,5 @@ export function keepsGatewaySession(model: string): boolean {
   if (Config.get('ai.model-override')) return false;
   if (!model.startsWith(CLAUDE_VENDOR)) return false;
   const url = Config.get('ai.openrouter.api.url');
-  return URL.canParse(url) && new URL(url).hostname !== OPENROUTER_HOST;
+  return url !== undefined && URL.canParse(url) && new URL(url).hostname !== OPENROUTER_HOST;
 }

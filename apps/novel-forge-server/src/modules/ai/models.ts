@@ -257,8 +257,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     supportsImageInput: true,
     reasoning: { mode: 'mandatory', efforts: ['high', 'medium', 'low'] },
   },
-  // The only local model left: `EmbeddingService` calls Ollama directly, and the pgvector columns are
-  // sized to this model's 1024 dimensions. No chat call ever routes to `ollama`. The 8b sibling emits 4096 and can never fit.
+  // The only local model left: `EmbeddingService` calls Ollama directly on the legacy backend (Synapse's pinned embedding task serves it
+  // otherwise), and the pgvector columns are sized to its 1024 dimensions. No chat call ever routes to `ollama`. The 8b sibling emits 4096.
   { id: 'qwen3-embedding:0.6b', provider: 'ollama', kind: 'embedding', dimensions: 1024 },
 ];
 

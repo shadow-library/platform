@@ -58,9 +58,10 @@ is **stale in three places** — see "Where the old README is wrong" at the end.
 | `novel-forge-server` on :8080  | every API call                | yes                                                                                                                                                 |
 | `novel-forge-web` on :3000     | UI recipes only               | no — every recipe has an API path                                                                                                                   |
 | An **identity** deployment     | booting the server at all     | **yes** (see §3)                                                                                                                                    |
-| A **synapse** deployment       | every chat model call         | yes — every chat, structured, streamed and tool-loop call goes to `svc://synapse-server` (`SERVICE_URL_SYNAPSE_SERVER` off-cluster); unreachable → `AI_007` |
-| `AI_OPENROUTER_API_KEY`        | image generation              | yes — `AI_004` (and `AI_006` for every chat call under `AI_BACKEND=legacy`)                                                                        |
-| Ollama on :11434               | lore/prose vector search only | **no — it degrades silently** (§6)                                                                                                                  |
+| A **synapse** deployment       | every model call              | yes — every chat, structured, streamed, tool-loop and image call goes to `svc://synapse-server` (`SERVICE_URL_SYNAPSE_SERVER` off-cluster); unreachable → `AI_007` (`AI_005` for an image); embeddings go there too, but degrade silently (§6) |
+| Synapse's `local` provider     | lore/prose vector search only | **no — it degrades silently** (§6): host Ollama on :11434, dialled by `synapse-server`, serves the pinned `novel-forge.embedding` task                |
+| `AI_OPENROUTER_API_KEY`        | `AI_BACKEND=legacy` only      | yes there — `AI_006` for every chat call, `AI_004` for an image; never loaded on Synapse                                                             |
+| Ollama on :11434 (legacy)      | legacy vector search only     | **no — it degrades silently** (§6); under `AI_BACKEND=legacy` the server dials it directly                                                        |
 
 There is **no docker-compose, Tiltfile or skaffold in this repo** (`AGENTS.md:25`, `AGENTS.md:71`: "there is no
 local compose deployment"). Only per-app `Dockerfile`s exist. The provided local stack is a k3d cluster driven by
@@ -255,18 +256,18 @@ key upper-snaked (`ai.openrouter.api.key` → `AI_OPENROUTER_API_KEY`). The rows
 | `LOG_LEVEL`                   | `debug` when `NODE_ENV=development`, else `info` | `config.service.ts:107`                     | **keep it `debug`** — the full prompt input and raw output only ride on debug (§7)                                                                 |
 | `SERVER_PORT` / `SERVER_HOST` | `8080` / `0.0.0.0`                               | `bootstrap.ts:40-41`                        |                                                                                                                                                    |
 | `DATABASE_POSTGRES_URL`       | `…@localhost:7070/novel_forge` in the example    | `.env.example:14`                           | pgvector required; `src/migrate.ts:15` falls back to the same DSN without the port                                                                 |
-| `AI_BACKEND`                  | `synapse`                                        | `bootstrap.ts`                              | `synapse` \| `legacy` — `legacy` restores the OpenRouter-compatible chat path for one release; every `AI_*` row marked legacy applies only there |
+| `AI_BACKEND`                  | `synapse`                                        | `bootstrap.ts`                              | `synapse` \| `legacy` — `legacy` restores the direct OpenRouter and Ollama paths for one release; every `AI_*` row marked legacy applies only there |
 | `SERVICE_URL_SYNAPSE_SERVER`  | — (`svc://synapse-server`)                       | `packages/common` service discovery         | where Synapse is reached off-cluster; the cluster resolves it by DNS                                                                               |
-| `AI_OPENROUTER_API_KEY`       | —                                                | `bootstrap.ts`                              | image generation; under legacy also **every** chat model, absent → `AI_006`                                                                        |
-| `AI_OPENROUTER_API_URL`       | `https://openrouter.ai/api/v1`                   | `bootstrap.ts`                              | image generation, and under legacy every chat call; point at any OpenAI-compatible gateway                                                         |
-| `AI_OLLAMA_HOST`              | `http://localhost:11434`                         | `bootstrap.ts:45`                           | embeddings only                                                                                                                                    |
-| `AI_EMBEDDING_MODEL`          | `qwen3-embedding:0.6b`                           | `bootstrap.ts:46`                           | **pinned to 1024 dims** by the `vector(1024)` columns — do not swap (`qwen3-embedding:8b` emits 4096 and fails every insert)                       |
+| `AI_OPENROUTER_API_KEY`       | —                                                | `bootstrap.ts`                              | legacy only, not even loaded on Synapse: **every** chat model (absent → `AI_006`) and image generation (absent → `AI_004`)                          |
+| `AI_OPENROUTER_API_URL`       | `https://openrouter.ai/api/v1`                   | `bootstrap.ts`                              | legacy only: every chat and image call; point at any OpenAI-compatible gateway                                                                     |
+| `AI_OLLAMA_HOST`              | `http://localhost:11434`                         | `bootstrap.ts`                              | legacy only: embeddings; on Synapse the pinned `novel-forge.embedding` task embeds                                                                 |
+| `AI_EMBEDDING_MODEL`          | `qwen3-embedding:0.6b`                           | `bootstrap.ts`                              | legacy only, **pinned to 1024 dims** by the `vector(1024)` columns — do not swap (`qwen3-embedding:8b` emits 4096 and fails every insert)          |
 | `AI_MODEL_OVERRIDE`           | —                                                | `bootstrap.ts`                              | legacy only, local-model test environments — see below; unset is inert                                                                             |
 | `AI_STRUCTURED_OUTPUT`        | `prompt`                                         | `bootstrap.ts`                              | legacy only, `prompt` \| `json-schema` — see below; Synapse always gets the schema                                                                 |
 | `AI_LLM_TIMEOUT_MS`           | `300000`                                         | `bootstrap.ts`                              | per-call budget; on Synapse it aborts the request                                                                                                  |
-| `AI_LLM_MAX_RETRIES`          | `2`                                              | `bootstrap.ts`                              | **transport** retries of image calls and of legacy chat calls → 3 attempts; a Synapse call is made once (Synapse fails over itself)               |
+| `AI_LLM_MAX_RETRIES`          | `2`                                              | `bootstrap.ts`                              | legacy only: **transport** retries of chat and image calls → 3 attempts; a Synapse call is made once (Synapse fails over itself)                  |
 | `AI_LLM_BACKOFF_MS`           | `500`                                            | `bootstrap.ts`                              | exponential, wherever the retries above apply                                                                                                      |
-| `AI_QUOTA_WINDOW_MS`          | `3600000`                                        | `bootstrap.ts`                              | rolling window, per project owner — enforced on image calls and legacy chat calls; `GET /ai/quota` reports it always                              |
+| `AI_QUOTA_WINDOW_MS`          | `3600000`                                        | `bootstrap.ts`                              | rolling window, per project owner — enforced only under legacy (Synapse budgets gate every call otherwise); `GET /ai/quota` reports it always      |
 | `AI_QUOTA_MAX_CALLS`          | `1000`                                           | `bootstrap.ts`                              | **set `0`** locally                                                                                                                                |
 | `AI_QUOTA_MAX_COST_USD`       | `50`                                             | `bootstrap.ts`                              | **set `0`** locally                                                                                                                                |
 | `AI_LANGSMITH_API_KEY`        | —                                                | `bootstrap.ts:53`                           | **does nothing** — loaded but read nowhere in `apps/` or `packages/`, and LangChain ignores the `AI_` prefix (§7)                                  |
@@ -280,7 +281,8 @@ key upper-snaked (`ai.openrouter.api.key` → `AI_OPENROUTER_API_KEY`). The rows
 
 #### Local-model test environments
 
-On Synapse a test environment is local by Synapse's own `local-only` seed profile: every deployment is replaced by local Ollama, so
+On Synapse a test environment is local by Synapse's own `local-only` seed profile: every chat and embedding deployment is replaced by
+local Ollama and every image deployment by Synapse's `mock` provider, so
 novel-forge needs no setting of its own and every structured call already carries its `json_schema` `response_format` (Synapse
 decides per model whether it is native or prompted). The two settings below apply only under `AI_BACKEND=legacy`.
 
@@ -294,7 +296,8 @@ that leaves them alone sends exactly the requests it always did.
   learns which model a role routed to from `model_calls`, never from behaviour. The server refuses to boot (`AI_017`) when the
   override is set and `AI_OPENROUTER_API_URL` is unset or points at OpenRouter, so it can never re-route paid traffic. Image generation
   and vision are not local: images keep the logical image model and fail closed with `AI_005`, and an image-attached call reaches the
-  text-only local model and fails closed with `AI_007`.
+  text-only local model and fails closed with `AI_007`. On Synapse's `local-only` profile an image call succeeds instead: the `mock`
+  provider answers every requested image with a 1×1 transparent PNG, at no billed cost but at the image model's list price ($0.04 each).
 - `AI_STRUCTURED_OUTPUT=json-schema` also sends each structured call's schema as a grammar-constrained
   `response_format: { type: 'json_schema' }`, with change-set ops, the chat question card and `readerValue` typed there
   (`PromptModule.constrainedProperties`) — a small model cannot write them from the loose in-band schema. The in-band schema and every
@@ -398,21 +401,31 @@ exist but do not want to pay for generation.
 
 ---
 
-### 6. Ollama / embeddings — read this before you conclude retrieval is broken
+### 6. Embeddings — read this before you conclude retrieval is broken
 
-- Client: `src/modules/ai/retrieval/embedding.service.ts:14` — `new Ollama({ host: Config.get('ai.ollama.host') })`.
-- **`embed()` catches every error, logs a `warn`, and returns `null`** (`embedding.service.ts:19-27`).
-  `embedBatch` returns nulls (`:31-37`).
-- Indexing writes the chunk anyway with `embedding: null` (`src/modules/ai/retrieval/indexing.service.ts:27-49` for
-  prose, `:58-68` for lore).
-- Retrieval returns `[]` on a null embedding or any error (`src/modules/ai/retrieval/retrieval.service.ts:36-72,102-103`).
+- Client: `src/modules/ai/retrieval/embedding.service.ts`. On Synapse every embedding is `POST /api/v1/embeddings` with task
+  `novel-forge.embedding` (pinned), the owner's subject and no selectors: a chapter's chunks travel as one batch, so indexing a
+  chapter spends **one** Synapse budget call, and every `search_lore` / `search_prose` query spends another. Synapse's `local`
+  provider (host Ollama, `qwen3-embedding:0.6b`) serves it in every environment. Under `AI_BACKEND=legacy` the server calls
+  `new Ollama({ host: AI_OLLAMA_HOST })` itself, one text at a time.
+- **`embed()` / `embedBatch()` never throw: any failure logs and returns `null`** per text — Synapse unreachable, a timeout, a
+  budget refusal (`SYN_BUDGET_*`, logged at `warn` with its code), or a vector whose width is not the columns' 1024 (`AI_023`,
+  logged at `error`; `synapse.dimensions` and each vector's length are both checked, and nothing of the batch is stored).
+- Embeddings write **no `model_calls` row**: Synapse's ledger is their only record, so `GET /ai/quota`, `/cost` and the Runs view
+  leave them out although they spend Synapse budget calls.
+- Indexing writes the chunk anyway with `embedding: null` and `embedding_task: null` (`indexing.service.ts` `addProse` for prose,
+  `addLore` for lore); an embedded chunk stores the task that built it in `embedding_task`.
+- Retrieval returns `[]` on a null embedding or any error, and compares a query only with chunks of its own task:
+  `coalesce(embedding_task, 'novel-forge.embedding') = <task>` (`retrieval.service.ts`, `embedding.service.ts` `sameTask`). A row
+  from before the column existed counts as the first pinned task, which is the same model the legacy Ollama embedder ran.
 - The bible builder's final node wraps `addLore` in its own try/catch and calls the failure non-fatal
-  (`src/modules/ai/graphs/bible-builder.graph.ts:247-258`).
+  (`src/modules/ai/graphs/bible-builder.graph.ts`).
 
-**Consequence:** with Ollama down, every AI workflow still reports success, the outline pack's
-`## LORE REFERENCES` / `## PROSE REFERENCES` sections are simply absent
-(`src/modules/ai/context/context-assembler.service.ts:704-719`), and `search_lore` answers "No lore found.".
-Nothing in the UI tells you. If you are testing anything retrieval-shaped, **start Ollama first**:
+**Consequence:** with Synapse's embedder (or, under legacy, Ollama) down, every AI workflow still reports success, the outline
+pack's `## LORE REFERENCES` / `## PROSE REFERENCES` sections are simply absent
+(`src/modules/ai/context/context-assembler.service.ts`), and `search_lore` answers "No lore found.". Nothing in the UI tells you
+— look for `Embedding through Synapse failed` in the server log. If you are testing anything retrieval-shaped, make sure the host
+Ollama Synapse dials is up with the model pulled:
 
 ```bash
 ollama pull qwen3-embedding:0.6b && ollama serve   # must stay on :11434
@@ -421,12 +434,17 @@ ollama pull qwen3-embedding:0.6b && ollama serve   # must stay on :11434
 and re-run the bible builder afterwards (indexing only happens during a run), or the previously written docs stay
 unindexed. The repair rules differ by kind:
 
-- **Lore** self-heals. `addLore` upserts on `(projectId, kind, refKey)` and writes `embedding` in the `set` clause
-  (`indexing.service.ts:58-68`), so re-running the bible builder overwrites a null embedding in place.
-- **Prose** heals on `POST /backfill`: it re-indexes every finalized, non-isolated chapter with no `chapter_chunks`
-  row or with any chunk whose `embedding` is null (`addProse` deletes the chapter's chunks first). A chapter the
-  embedder still cannot reach counts as `skipped`, and an amend or backfill reports a chapter indexed only when
-  every chunk was embedded.
+- **Lore** self-heals. `addLore` upserts on `(projectId, kind, refKey)` and writes `embedding` and `embedding_task` in the `set`
+  clause, so re-running the bible builder (or finalizing, for character lore) overwrites a null or stale embedding in place.
+- **Prose** heals on `POST /backfill`: it re-indexes every finalized, non-isolated chapter with no `chapter_chunks` row or with any
+  chunk whose `embedding` is null or was built by another task (`addProse` deletes the chapter's chunks first). A chapter the
+  embedder still cannot reach counts as `skipped`, and an amend or backfill reports a chapter indexed only when every chunk was
+  embedded.
+
+**Re-index rule.** The embedding task is pinned in Synapse: its model cannot change across catalog versions. A different embedder
+is a **new task id**, and adopting it is a code change to `SYNAPSE_EMBEDDING_TASK` followed by a re-index — `POST /backfill` per
+project for prose, a bible-builder run for lore. Until then searches see only the rows the new task built; vectors of two tasks are
+never compared.
 
 ---
 
@@ -526,18 +544,18 @@ model-call rows comparable.
 cp apps/novel-forge-server/.env.example apps/novel-forge-server/.env
 ```
 
-The example already ships `NODE_ENV=development`, `APP_STAGE=dev`, `LOG_LEVEL=debug`, `AI_OLLAMA_HOST`,
-`AI_EMBEDDING_MODEL` and `DATABASE_POSTGRES_URL=postgresql://postgres:postgres@localhost:7070/novel_forge` — the
-cluster's Postgres port. Leave those alone unless your Postgres is elsewhere. What you must change:
+The example already ships `NODE_ENV=development`, `APP_STAGE=dev`, `LOG_LEVEL=debug`, `AI_BACKEND=synapse` and
+`DATABASE_POSTGRES_URL=postgresql://postgres:postgres@localhost:7070/novel_forge` — the cluster's Postgres port. Leave
+those alone unless your Postgres is elsewhere; the legacy-only `AI_OPENROUTER_*`, `AI_OLLAMA_HOST` and `AI_EMBEDDING_MODEL`
+stay commented out, as Synapse never reads them. What you must change:
 
 ```
-SERVICE_URL_SYNAPSE_SERVER=<synapse>   # every chat call goes there; AI_BACKEND=legacy plus AI_OPENROUTER_API_KEY is the old path
-AI_OPENROUTER_API_KEY=<key>            # image generation only
+SERVICE_URL_SYNAPSE_SERVER=<synapse>   # every model call goes there; AI_BACKEND=legacy plus AI_OPENROUTER_API_KEY is the old path
 AUTH_ISSUER=<reachable identity>       # the example points at prod identity
 AUTH_CLIENT_SECRET=<secret>            # blank breaks the boot, it does not disable login
 AUTH_SESSION_COOKIE_SECURE=false       # plain http — must be set with the next line
 AUTH_SESSION_COOKIE_NAME=shadow-session
-AI_QUOTA_MAX_CALLS=0                   # images and legacy only; Synapse budgets gate chat calls
+AI_QUOTA_MAX_CALLS=0                   # legacy only; Synapse budgets gate every call
 AI_QUOTA_MAX_COST_USD=0
 STORAGE_DRIVER=local                   # the example ships s3 (Garage)
 PUBLISHING_AUTO_PUSH=false             # no reader service on the host
@@ -548,7 +566,7 @@ PUBLISHING_AUTO_PUSH=false             # no reader service on the host
 # 3. migrate (from the repo root — the workspace has no db script of its own)
 bun run db apps/novel-forge-server migrate
 
-# 4. optional but recommended — without it retrieval degrades silently (§6)
+# 4. optional but recommended — without it retrieval degrades silently (§6): the host Ollama Synapse's local provider dials
 ollama pull qwen3-embedding:0.6b   # then keep ollama running on :11434
 
 # 5. run — two terminals, each starting from the repo root (the cds are not chainable)
@@ -644,7 +662,8 @@ for this workspace — a change in coverage behavior worth confirming is intenti
 
 Gated on `AI_SMOKE_SPEND` (`:14,30-39`): a bare `bun run ai:smoke` prints the model list and estimated cost and
 exits 0 without spending. With the var set it exits 1 if `ai.openrouter.api.key` is missing (`:41-44`). It always runs the legacy
-backend (`AI_BACKEND=legacy`, set by the script), so it proves the OpenRouter leg, not Synapse.
+backend (`AI_BACKEND=legacy`, set by `tests/ai/legacy-backend.ts` before bootstrap loads, since bootstrap loads the OpenRouter keys
+only under legacy), so it proves the OpenRouter leg, not Synapse.
 
 It builds a real `ModelRouterService` with stub telemetry/DB/quota (`:53-62`) and makes **4 live calls** —
 `ROLES` at `:15` is `['bible','title','judge','generation']`, so on the production
@@ -1499,7 +1518,7 @@ Cost basis: per-model prices are in `ai/models.ts` and the default model per gro
 #### 0.5 Tokens and cost per call
 
 - `input_tokens = max(provider-reported, tiktoken o200k_base estimate of the prompt)` (`ai/telemetry.handler.ts:84`). It is a floor and can be slightly high. `output_tokens` is provider-reported, else estimated. Reasoning tokens bill as output on the provider side but are not split out.
-- A text call's `provider` and `model` are what Synapse reports answered (`synapse.provider`, `synapse.model`, a catalog model key such as `claude-opus-5.5`), and its `cost_usd` is `synapse.cost.list_usd`, with `cost_source` `provider` when `billed_usd > 0`, `gateway` when nothing was billed but the list price is above zero (the subscription gateway), else `estimate` (`ai/telemetry.handler.ts` `synapseBilling`). A call that failed records provider `synapse`, the task id as its model and the `SYN_*` code in `error.code`; a budget refusal (`SYN_BUDGET_*`) is status `refused`, since no model ran. Legacy: the provider's `usage.cost` when reported, otherwise the list-price estimate `input_tokens/1e6 × inputPrice + output_tokens/1e6 × outputPrice` frozen at write time (`ai/quota.ts` `estimateCallCostUsd`). An image call's is the provider figure or null. A transport-error row carries no tokens and no cost.
+- A text call's `provider` and `model` are what Synapse reports answered (`synapse.provider`, `synapse.model`, a catalog model key such as `claude-opus-5.5`), and its `cost_usd` is `synapse.cost.list_usd`, with `cost_source` `provider` when `billed_usd > 0`, `gateway` when nothing was billed but the list price is above zero (the subscription gateway), else `estimate` (`ai/telemetry.handler.ts` `synapseBilling`). A call that failed records provider `synapse`, the task id as its model and the `SYN_*` code in `error.code`; a budget refusal (`SYN_BUDGET_*`) is status `refused`, since no model ran. Legacy: the provider's `usage.cost` when reported, otherwise the list-price estimate `input_tokens/1e6 × inputPrice + output_tokens/1e6 × outputPrice` frozen at write time (`ai/quota.ts` `estimateCallCostUsd`). An image call is recorded by the router itself, the same way on Synapse (served `provider` and `model`, `cost_usd` = `list_usd`, the same `cost_source` rule; a failure is provider `synapse`, model `novel-forge.image`, with the `SYN_*` code); on legacy its cost is the provider figure or null and its `cost_source` null. A transport-error row carries no tokens and no cost, except a Synapse image call that answered with no image, which keeps what it cost.
 - `GET /cost` sums `cost_usd` and prices only the rows where it is null (older rows, silent image providers) at query time, reporting that part as `estimatedCostUsd`. Cached tokens are billed at full price, so estimates are an upper bound.
 - `reasoning_effort` records the effort Synapse applied (`synapse.effort`; legacy: the effort the reasoning policy sent, `ai/defaults.ts` `resolveReasoningEffort`); null when none was applied, and on every row written before the column existed.
 
@@ -1574,7 +1593,7 @@ Ordinary hub turns run `chat-refine@2.13.0`, role `chat` (planning-group model),
 - **Fails when:**
   - `tool_calls.status='invalid_args'`: the model used a wrong arg name.
   - A `volume.upsert` with no `get_volume` row: blind overwrite (prompt-following defect).
-  - `search_lore` and `search_prose` return "No lore found" or fail: they need Ollama embeddings (`AI_OLLAMA_HOST`) and indexed content. Draft and isolated content is never indexed.
+  - `search_lore` and `search_prose` return "No lore found" or fail: they need embeddings (Synapse's `novel-forge.embedding`, served by host Ollama; legacy: `AI_OLLAMA_HOST`) and content indexed under the current embedding task (§6). Draft and isolated content is never indexed.
 
 #### 1.3 Hub pushback quality (harness-vs-baseline comparison)
 
@@ -1709,19 +1728,19 @@ Graph is `illustration` (in `GET /runs`). UI: "Illustrations" → "Start an illu
 #### 2.1 Entity portrait (compose + render + derived appearance)
 
 - **Entry:** UI "Illustrations" → Start → An entity. API `POST /illustrations {"subjectType":"entity","subjectKey":"<wren key>","instruction":"..."}`.
-- **Preconditions:** entity Wren exists (1.1) with EMPTY `appearance` (`GET /entities/<key>`); `AI_OPENROUTER_API_KEY` set; storage configured.
+- **Preconditions:** entity Wren exists (1.1) with EMPTY `appearance` (`GET /entities/<key>`); Synapse's `novel-forge.image` routes reach an image-capable provider (on the `local-only` profile that is the `mock` provider, so every candidate is a 1×1 transparent PNG and only the structure, not the picture, can be judged); storage configured. Legacy: `AI_OPENROUTER_API_KEY` set.
 - **Input:** `subjectType:entity`, `instruction`: `three-quarter view, harbour fog at dawn, cold blue key light, weathered apprentice coat`.
 - **Verify:**
   - 201 with `status:'active'`, `revision:1`, `candidates` of 2 (each `ref`, `imageUrl` that loads with 200, `references`), `prompt` (the exact rendered image prompt), `instructions:[<your text>]`, and `suggestedAppearance` set. The composer invented an appearance, and the UI shows "Forge invented this appearance" with a save-to-entity action.
   - `illustrations.prompt_spec` JSON: `basePrompt`, `subjectFraming`, `styleNotes`, `negativePrompt?`, `appearanceAnchor` = derived, `appearanceDerived:true`, `promptKey:'illustration-compose'`.
-  - Run: `model_calls` has one compose row and one image row (`role=image`; `attempt` is the retry index, so 0 when the provider answered first try). Cost is visible only on the image row.
+  - Run: `model_calls` has one compose row and one image row (`role=image`; on Synapse `attempt` is always 0 and `provider`/`model` are what Synapse reports served, e.g. `openrouter` / `grok-imagine-image-2.0`; legacy: `attempt` is the retry index, so 0 when the provider answered first try). Cost is visible only on the image row.
   - Run context is not linked: `GET /runs/<id>/context` returns 404 `CTX_001`. Use `context_packs where purpose='illustration'` for the input (sections `premise`, `subject_card`, `world_facts`, `art_style` if present).
   - **Quality:**
     - The prompt is comma-separated descriptive phrases (no sentences addressed to the model). It says none of "novel", "chapter", "illustration".
     - It is framed as a portrait or half-body study that reads at thumbnail size, includes your instruction, and is consistent with Wren's canon (age, apprentice, no invented scars). It reveals nothing from the SECRET fact.
     - The two candidates differ but show the same character. The character matches the derived appearance across candidates.
 - **Fails when:**
-  - 500 `AI_004`: `AI_OPENROUTER_API_KEY` missing — the compose call goes to Synapse and succeeds, then the image call has no key (legacy: compose fails first with `AI_006`, so `AI_004` is unreachable there). `AI_005`: provider failure after retries (see the error row in `model_calls.error`). `AI_010`: more references attached than the image model accepts.
+  - 500 `AI_005`: the image call failed — on Synapse after one call (Synapse fails over between deployments itself; `model_calls.error.code` holds the `SYN_*` code), on legacy after its retries. A Synapse budget refusal is 429 `AI_008`/`AI_009` instead. `AI_010`: more references attached than the image model accepts — the capacity is the registry's `maxInputReferences` for the tier's image model, on both backends, since the Synapse catalog carries none. Legacy only: 500 `AI_004` when `AI_OPENROUTER_API_KEY` is missing, unreachable in practice because compose fails first with `AI_006`.
   - 400 `ILL_006`: subject key missing (chapter key must be digits).
   - The composer output ignores the appearance or instruction (inspect the compose call's `rawOutput`).
 
@@ -1910,12 +1929,16 @@ export default function createPlugin() {
 
 ### 5. AI quota and spend limits
 
-On Synapse, chat calls are gated by Synapse's budgets, not by novel-forge: the seeded budget is per owner (`subject` `owner`,
-`<ownerKind>:<ownerId>`, or `unowned` for every project without one), `1h`, 1000 calls and $50 at list price, changed by publishing
-the Synapse catalog, not by env. A refused call is `SYN_BUDGET_CALLS` → 429 `AI_008` or `SYN_BUDGET_COST` → 429 `AI_009`, with the
-same copy and the same failed-turn shape as below; Synapse's window is fixed, not rolling. Novel-forge's own window below still
-gates image calls, and every call under `AI_BACKEND=legacy`, and `GET /api/v1/ai/quota` reports it from `model_calls` either way,
-which only approximates Synapse's counters. The recipe below is the legacy guard.
+On Synapse, every call — chat, image and embedding — is gated by Synapse's budgets, not by novel-forge: the seeded budget is per
+owner (`subject` `owner`, `<ownerKind>:<ownerId>`, or `unowned` for every project without one), `1h`, 1000 calls and $50 at list
+price, changed by publishing the Synapse catalog, not by env. A refused call is `SYN_BUDGET_CALLS` → 429 `AI_008` or
+`SYN_BUDGET_COST` → 429 `AI_009`, with the same copy and the same failed-turn shape as below; Synapse's window is fixed, not
+rolling. An embedding refused this way is not an error at all: it degrades to an unembedded chunk or an empty search (Part 1 §6).
+Novel-forge's own window below gates only `AI_BACKEND=legacy`, and `GET /api/v1/ai/quota` reports it from `model_calls` either
+way, which only approximates Synapse's counters (embeddings spend Synapse calls but write no row). The recipe below is the legacy
+guard. In the `local-only` test environment the e2e suite trips a Synapse budget on purpose: its quota pin stands a test owner's
+counters at the cap so model-capable requests are refused before dispatch. Otherwise only images count there: each `mock` image adds
+its $0.04 list price to the owner's $50 budget although nothing is billed.
 
 #### 5.1 Rate and spend ceilings (per owner, rolling window)
 

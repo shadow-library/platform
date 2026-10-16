@@ -22,6 +22,7 @@ import {
 import { drafts } from './generation';
 import { jsonb } from './jsonb';
 import { contentMode, costTier, projects } from './projects';
+import { EMBEDDING_DIM } from './vectors';
 
 /** One message as the model router sent it — the exact role and content of a `BaseMessage`, never re-derived. */
 export interface WriterSnapshotMessage {
@@ -54,8 +55,6 @@ export namespace Ai {
   export type CostSource = InferEnum<typeof costSource>;
   export type WriterAttemptRole = InferEnum<typeof writerAttemptRole>;
 }
-
-const EMBEDDING_DIM = 1024;
 
 function vectorType(dimensions: number) {
   return customType<{ data: number[]; driverData: string }>({
@@ -345,6 +344,7 @@ export const loreChunks = pgTable(
     sourceUpdatedAt: timestamp('source_updated_at').notNull(),
     text: text('text').notNull(),
     embedding: vectorType(EMBEDDING_DIM)('embedding'),
+    embeddingTask: varchar('embedding_task'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
   },
   t => [

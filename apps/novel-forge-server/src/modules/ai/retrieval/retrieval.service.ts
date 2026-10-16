@@ -7,7 +7,7 @@ import { isolatedChapterNumbers } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase } from '@server/database';
 
-import { EmbeddingService } from './embedding.service';
+import { EmbeddingService, sameTask } from './embedding.service';
 
 export interface RetrievalHit {
   text: string;
@@ -43,7 +43,7 @@ export class RetrievalService {
   // Search prose index. Excludes isolated chapters, whatever their provenance. Returns [] on embed failure.
   async searchProse(projectId: bigint, query: string, k = DEFAULT_PROSE_K): Promise<RetrievalHit[]> {
     try {
-      const embedding = await this.embeddingService.embed(query);
+      const embedding = await this.embeddingService.embed(projectId, query);
       if (!embedding) return [];
 
       // Raw-interpolated, not bound: numeric and non-attacker-controlled; pgvector needs a text '[...]'::vector literal and a bound $n needs a text-to-vector cast it lacks.
@@ -55,6 +55,7 @@ export class RetrievalService {
         FROM chapter_chunks cc
         WHERE cc.project_id = ${projectId}
           AND cc.embedding IS NOT NULL
+          AND ${sameTask(sql`cc.embedding_task`, this.embeddingService.task)}
           AND cc.chapter NOT IN ${isolatedChapterNumbers(projectId)}
         ORDER BY cc.embedding <=> ${sql.raw(`'${vecLiteral}'`)}::vector
         LIMIT ${k}
@@ -75,7 +76,7 @@ export class RetrievalService {
   // Search lore index. Filter by kinds[] if provided. Returns [] on embed failure.
   async searchLore(projectId: bigint, query: string, k = DEFAULT_LORE_K, opts?: { kinds?: string[] }): Promise<RetrievalHit[]> {
     try {
-      const embedding = await this.embeddingService.embed(query);
+      const embedding = await this.embeddingService.embed(projectId, query);
       if (!embedding) return [];
 
       // Raw-interpolated, not bound: numeric and non-attacker-controlled; pgvector needs a text '[...]'::vector literal and a bound $n needs a text-to-vector cast it lacks.
@@ -88,6 +89,7 @@ export class RetrievalService {
         FROM lore_chunks lc
         WHERE lc.project_id = ${projectId}
           AND lc.embedding IS NOT NULL
+          AND ${sameTask(sql`lc.embedding_task`, this.embeddingService.task)}
           ${kindFilter}
         ORDER BY lc.embedding <=> ${sql.raw(`'${vecLiteral}'`)}::vector
         LIMIT ${k}

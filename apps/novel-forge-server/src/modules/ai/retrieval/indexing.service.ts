@@ -8,7 +8,7 @@ import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
 
 import { chunkText } from './chunker';
-import { EmbeddingService } from './embedding.service';
+import { EmbeddingService, sameTask } from './embedding.service';
 
 @Injectable()
 export class IndexingService {
@@ -35,7 +35,8 @@ export class IndexingService {
 
     const chunks = chunkText(content);
     const texts = chunks.map(c => c.text);
-    const embeddings = await this.embeddingService.embedBatch(texts);
+    const embeddings = await this.embeddingService.embedBatch(projectId, texts);
+    const task = this.embeddingService.task;
     const embedded = embeddings.filter(Boolean).length;
     this.logger.debug('addProse: embedded chapter', { projectId, chapter, chunks: chunks.length, embedded, failed: chunks.length - embedded });
 
@@ -46,6 +47,7 @@ export class IndexingService {
         chunkIdx: i,
         text: c.text,
         embedding: embeddings[i] ?? null,
+        embeddingTask: embeddings[i] ? task : null,
       })),
     );
     if (embedded < chunks.length) this.logger.warn('addProse: chapter left partly unembedded for the next backfill', { projectId, chapter, chunks: chunks.length, embedded });
@@ -59,19 +61,20 @@ export class IndexingService {
   // Upsert a single lore chunk by (projectId, kind, refKey).
   // Best-effort: if embed fails, inserts row with null embedding.
   async addLore(projectId: bigint, kind: string, refKey: string, text: string, sourceUpdatedAt: Date): Promise<void> {
-    const embedding = await this.embeddingService.embed(text);
+    const embedding = await this.embeddingService.embed(projectId, text);
+    const vector = { embedding, embeddingTask: embedding ? this.embeddingService.task : null };
 
     await this.db
       .insert(schema.loreChunks)
-      .values({ projectId, kind, refKey, text, sourceUpdatedAt, embedding: embedding ?? null })
+      .values({ projectId, kind, refKey, text, sourceUpdatedAt, ...vector })
       .onConflictDoUpdate({
         target: [schema.loreChunks.projectId, schema.loreChunks.kind, schema.loreChunks.refKey],
-        set: { text, embedding: embedding ?? null, sourceUpdatedAt },
+        set: { text, sourceUpdatedAt, ...vector },
       });
   }
 
-  // Backfill: find all non-isolated chapters for projectId with status='done'
-  // that have no chapter_chunks rows or a chunk without an embedding, then addProse for each.
+  // Backfill: find all non-isolated chapters for projectId with status='done' that have no chapter_chunks rows, or a chunk without an
+  // embedding or embedded by another task than the current one, then addProse for each. A new embedding task is adopted by this re-index.
   async backfill(projectId: bigint): Promise<{ indexed: number; skipped: number }> {
     const doneChapters = await this.db.query.chapters.findMany({
       where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.status, 'done'), isNotNull(schema.chapters.content)),
@@ -81,7 +84,8 @@ export class IndexingService {
     this.logger.info('backfill: reindexing prose', { projectId, doneChapters: doneChapters.length, indexableChapters: indexableChapters.length });
 
     const indexedCounts = await this.db.execute<{ chapter: number; cnt: number; unembedded: number }>(sql`
-      SELECT chapter, COUNT(*)::int AS cnt, COUNT(*) FILTER (WHERE embedding IS NULL)::int AS unembedded
+      SELECT chapter, COUNT(*)::int AS cnt,
+             COUNT(*) FILTER (WHERE embedding IS NULL OR NOT ${sameTask(sql`embedding_task`, this.embeddingService.task)})::int AS unembedded
       FROM chapter_chunks
       WHERE project_id = ${projectId}
       GROUP BY chapter
