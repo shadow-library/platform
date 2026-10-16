@@ -225,12 +225,15 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly CHT_004 = AppErrorCode.badRequest('CHT_004', 'Lookup budget exhausted — the turn hit its declared-lookup round cap');
   static readonly CHT_005 = AppErrorCode.badRequest('CHT_005', 'Invalid chat session mode');
   static readonly CHT_006 = AppErrorCode.conflict('CHT_006', 'Another turn wrote to this conversation at the same time — send the message again');
-  static readonly CHT_007 = AppErrorCode.notFound('CHT_007', 'Turn stream not found — the run is unknown, belongs to another project, or its buffer has expired');
+  static readonly CHT_007 = AppErrorCode.notFound('CHT_007', 'Turn stream not found — the run is unknown, belongs to another project, or its frames have expired');
   static readonly CHT_008 = AppErrorCode.badRequest('CHT_008', 'Invalid job event cursor — Last-Event-ID must be a sequence number this chat’s job stream sent');
   static readonly CHT_009 = AppErrorCode.conflict('CHT_009', 'That passage in chapter {chapter} changed — select it again');
   static readonly CHT_010 = AppErrorCode.badRequest('CHT_010', 'A passage comment on chapter {chapter} does not match its quote — select the passage again');
   static readonly CHT_011 = AppErrorCode.badRequest('CHT_011', 'Chapter {chapter} is isolated, so its passages cannot be sent to the chat — remove the comment');
   static readonly CHT_012 = AppErrorCode.badRequest('CHT_012', 'Write a message or comment on a passage before sending');
+  static readonly CHT_013 = AppErrorCode.unavailable('CHT_013', 'The turn stopped responding — the server running it may have restarted');
+  static readonly CHT_014 = AppErrorCode.unavailable('CHT_014', 'The turn finished, but its live stream lost the reply — the conversation has it');
+  static readonly CHT_015 = AppErrorCode.unavailable('CHT_015', 'The turn failed, and its live stream lost the reason — the conversation shows what was kept');
 
   /*!
    * Refinement Proposal Errors

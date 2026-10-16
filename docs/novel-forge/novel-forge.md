@@ -54,6 +54,17 @@
   `seq` follows commit order and a cursor never skips a late commit; a failed event insert never undoes the transition, and a transition is published only after it commits. The
   session's job stream (`GET …/chat/sessions/:sessionId/jobs/stream`, SSE id = `seq`) resumes after `Last-Event-ID` or `?after=`; with no cursor it replays the running jobs'
   events and how jobs settled in the last hour. A follower polls so a job another replica starts is still seen; events of jobs settled over a week ago are swept.
+- **Turn streams cross replicas**: the replica that takes a turn's POST runs the turn and is the only writer of its frames, stored in `turn_events` under the run and
+  numbered by `seq` (consecutive deltas merged per ~100 ms, a terminal frame at once). Any replica serves `GET …/turns/:runId/stream` (SSE id = `seq`): it resumes after
+  `Last-Event-ID`, and without one replays the turn behind a leading `reset`. Readers poll, as Bun's SQL client has no `LISTEN`. A stream whose run has no terminal frame and
+  whose replica has stopped heartbeating for 30 s ends with its own `CHT_013` error frame; one whose run settled 30 s ago without it (the writer retries a terminal frame
+  for about 16 s) ends with an error naming how the run settled. A turn that settled in the last minute is found before its first frame. A turn's frames are swept ten minutes
+  after its terminal frame; a turn that never wrote one is swept once its newest frame and its run have both been silent for an hour, so a live turn never is. One replica
+  sweeps at a time, under an advisory lock.
+- **Cancellation crosses replicas**: a cancel is recorded on the run's row (`cancel_requested_at`) by whichever replica takes it. The replica running a run checks its runs'
+  rows every second while it has any, heartbeats them, and aborts each whose row was cancelled, settled elsewhere or deleted; a graph also stops at its next node boundary,
+  and a run that finishes with a cancel on record settles as cancelled.
+  `stopping` means the cancel is recorded and a live replica holds the run; `not_delivered` means it is recorded but the run's replica has stopped heartbeating.
 - **Model routing**: roles map to groups. A model type (standard or unrestricted) and a cost tier (economy, balanced,
   performant) select a platform model per group: the server sends both as the `tier` and `content_mode` selectors and Synapse's routes, which encode tier by content mode per task, pick the model; a project never pins a model to a role. A chat reply takes its type and tier from the turn, then the
   chat, then the project; a chat's own model pin, which stores a Synapse alias key, outranks the tier map for that chat's replies alone, and an unrestricted reply takes it only when the alias's `available.content_mode` includes `unrestricted`. The composer's pick is the chat's own setting and holds until the author changes it. There is no local chat-model path. There are no account-level model defaults: an author's only account setting is the
@@ -555,7 +566,7 @@
 
 - The disclosure policy and the audit's secret check are lexical: a paraphrase of a secret in other words passes both, and the audit does not flag spoiler prose already on a page
   outside `canon_facts`.
-- Cancellation is process-local: a cancel reaches only the replica running the work.
+- A turn whose replica dies stays `running` until `pendingTurn`'s cutoff: its stream ends with `CHT_013`, but nothing settles the run.
 - The stale cascade locks later drafts in whatever order its update visits them, so two saves cascading over overlapping chapters can deadlock; the loser is answered `DRF_013`
   until the cascade locks them in chapter order.
 - The hard line is a lexical screen, so it refuses conservatively and can be evaded by wording. By a standing conservative policy, "sex" and "molest" paired with a minor on the

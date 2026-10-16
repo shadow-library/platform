@@ -10,6 +10,7 @@ import {
   numeric,
   pgEnum,
   pgTable,
+  primaryKey,
   smallint,
   text,
   timestamp,
@@ -35,6 +36,7 @@ export interface WriterSnapshotModelRoute {
 
 export namespace Ai {
   export type WorkflowRun = InferSelectModel<typeof workflowRuns>;
+  export type TurnEvent = InferSelectModel<typeof turnEvents>;
   export type ModelCall = InferSelectModel<typeof modelCalls>;
   export type ToolCall = InferSelectModel<typeof toolCalls>;
   export type ContextPack = InferSelectModel<typeof contextPacks>;
@@ -116,12 +118,34 @@ export const workflowRuns = pgTable(
     parentRunId: uuid('parent_run_id').references((): AnyPgColumn => workflowRuns.id, { onDelete: 'set null' }),
     startedAt: timestamp('started_at').notNull().defaultNow(),
     endedAt: timestamp('ended_at'),
+    /** Set by whichever replica took the cancel; the replica running the run aborts it once it sees this. */
+    cancelRequestedAt: timestamp('cancel_requested_at', { withTimezone: true }),
+    /** Written by the replica running the run while it runs, so another replica can tell a quiet run from one whose process died. */
+    heartbeatAt: timestamp('heartbeat_at', { withTimezone: true }),
   },
   t => [
     index('workflow_runs_project_id_graph_status_idx').on(t.projectId, t.graph, t.status),
     index('workflow_runs_job_id_idx').on(t.jobId),
     index('workflow_runs_parent_run_id_idx').on(t.parentRunId),
   ],
+);
+
+/** A chat turn's stream frames in order, so any replica can serve the stream of a turn another replica is running. */
+export const turnEvents = pgTable(
+  'turn_events',
+  {
+    runId: uuid('run_id')
+      .notNull()
+      .references(() => workflowRuns.id, { onDelete: 'cascade' }),
+    projectId: bigint('project_id', { mode: 'bigint' })
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    seq: integer('seq').notNull(),
+    event: text('event').notNull(),
+    data: jsonb('data').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  t => [primaryKey({ columns: [t.runId, t.seq] }), index('turn_events_created_at_idx').on(t.createdAt)],
 );
 
 export const modelCalls = pgTable(

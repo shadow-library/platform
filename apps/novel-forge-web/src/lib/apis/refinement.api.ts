@@ -561,6 +561,20 @@ export function reduceChatTurnStream(state: ChatTurnStreamState, event: ChatTurn
   return { ...progress, status: 'failed', failure: event.failure, timing: ended };
 }
 
+/**
+ * What one stream event does to the stream. `lost`: the turn finished but the server's stream lost its reply (`CHT_014`), so it is a
+ * dropped stream rather than a failed turn — the transcript carries the reply, and nothing the author sent needs sending again.
+ */
+export type ChatTurnStreamEnding = 'open' | 'done' | 'failed' | 'lost';
+
+const LOST_REPLY_CODE = 'CHT_014';
+
+export function chatTurnStreamEnding(event: ChatTurnStreamEvent): ChatTurnStreamEnding {
+  if (event.type === 'done') return 'done';
+  if (event.type !== 'error') return 'open';
+  return event.failure.code === LOST_REPLY_CODE ? 'lost' : 'failed';
+}
+
 export function stopChatTurnStream(state: ChatTurnStreamState, at: number): ChatTurnStreamState {
   if (state.status !== 'idle' && state.status !== 'streaming') return state;
   return { ...state, status: 'stopped', timing: { ...beganAt(state.timing, at), endedAt: at, writingSince: null } };
@@ -667,16 +681,28 @@ export function useChatTurnStream(projectId: string, sessionId: string): ChatTur
       source.close();
       if (sourceRef.current === source) sourceRef.current = undefined;
     };
+    // The turn itself is not known to have failed — only this stream — so `TurnState.pending.runId`
+    // (read off the transcript's own poll, which is still authoritative) is what a Stop press falls
+    // back to once this tab's own runId goes null.
+    const lose = (): void => {
+      close();
+      if (current()) {
+        setStreaming(false);
+        setRunId(null);
+      }
+      invalidateChat(queryClient, projectId, sessionId);
+    };
 
     for (const name of CHAT_TURN_EVENTS) {
       source.addEventListener(name, message => {
         const event = parseChatTurnEvent(name, message.data);
         if (!event) return;
-        const terminal = event.type === 'done' || event.type === 'error';
-        if (terminal) close();
+        const ending = chatTurnStreamEnding(event);
+        if (ending === 'lost') return lose();
+        if (ending !== 'open') close();
         const arrivedAt = Date.now();
         if (current()) setStream(state => reduceChatTurnStream(state, event, arrivedAt));
-        if (!terminal) return;
+        if (ending === 'open') return;
         if (current()) {
           setStreaming(false);
           setRunId(null);
@@ -685,23 +711,14 @@ export function useChatTurnStream(projectId: string, sessionId: string): ChatTur
         if (event.type === 'done') handlers?.onSuccess?.(event.turn);
         // The turn recorded its own failure, so the transcript's failed-turn card is the authority and the
         // optimistic message stands; the caller is told only so it can speak for a failure nothing shows.
-        else handlers?.onError?.(turnFailureError(event.failure), context);
+        else if (event.type === 'error') handlers?.onError?.(turnFailureError(event.failure), context);
       });
     }
 
-    // EventSource reconnects a dropped stream itself and the replay resynchronises it; a stream left closed
-    // (an expired or unknown run answers 404) means the events are gone, not the turn.
+    // EventSource reconnects a dropped stream itself, and its `Last-Event-ID` resumes the turn where it left off; a stream
+    // left closed (an expired or unknown run answers 404) means the events are gone, not the turn.
     source.onerror = () => {
-      if (source.readyState !== EventSource.CLOSED) return;
-      close();
-      // The turn itself is not known to have ended — only this stream — so `TurnState.pending.runId`
-      // (read off the transcript's own poll, which is still authoritative) is what a Stop press falls
-      // back to once this tab's own runId goes null.
-      if (current()) {
-        setStreaming(false);
-        setRunId(null);
-      }
-      invalidateChat(queryClient, projectId, sessionId);
+      if (source.readyState === EventSource.CLOSED) lose();
     };
   };
 

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 
 import { type ChatMessageResponse, type ChatTurnResponse } from '../src/lib/apis/api-types.gen';
 import {
+  chatTurnStreamEnding,
   type ChatTurnStreamEvent,
   type ChatTurnStreamState,
   idleChatTurnStream,
@@ -211,5 +212,21 @@ describe('reduceChatTurnStream', () => {
     expect(stopped.status).toBe('stopped');
     expect(stopped.timing.endedAt).toBe(700);
     expect(stopChatTurnStream(done, 9000)).toBe(done);
+  });
+});
+
+describe('chatTurnStreamEnding', () => {
+  it('should keep the stream open for every frame of a running turn', () => {
+    expect([delta('Vex '), change(0), lookup(1, 'get_entity', 'ok'), { type: 'reset' } as const].map(chatTurnStreamEnding)).toEqual(['open', 'open', 'open', 'open']);
+  });
+
+  it('should end it as done, or as failed for an error the turn recorded', () => {
+    expect(chatTurnStreamEnding({ type: 'done', turn })).toBe('done');
+    expect(chatTurnStreamEnding({ type: 'error', failure: { code: 'AI_013', message: 'Workflow run was cancelled' } })).toBe('failed');
+    expect(chatTurnStreamEnding({ type: 'error', failure: { code: 'CHT_013', message: 'The turn stopped responding' } })).toBe('failed');
+  });
+
+  it('should treat a turn that finished but lost its reply as a lost stream, never a failed send', () => {
+    expect(chatTurnStreamEnding({ type: 'error', failure: { code: 'CHT_014', message: 'The turn finished, but its live stream lost the reply' } })).toBe('lost');
   });
 });

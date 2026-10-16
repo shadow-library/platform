@@ -1229,19 +1229,24 @@ export class GenerationService {
     return result;
   }
 
-  // Reports 'not_delivered' instead of writing 'cancelled': cancellation is process-local,
-  // so a running row with no controller here is owned by another replica that never saw the request and is
-  // still working. The abort is what was undeliverable, not the status.
+  // Never writes 'cancelled' itself: the replica running the run does, as it unwinds. A run that settled between the read and the cancel
+  // is read again, so the status answered is the one it settled with.
   async cancelRun(projectId: bigint, runId: string): Promise<CancelRunResponse> {
+    const status = await this.runStatus(projectId, runId);
+    if (status !== 'running') return { runId, status, outcome: 'already_settled' };
+
+    const outcome = await this.workflowRunService.cancel(runId);
+    if (outcome !== 'already_settled') return { runId, status: 'running', outcome };
+    return { runId, status: await this.runStatus(projectId, runId), outcome };
+  }
+
+  private async runStatus(projectId: bigint, runId: string): Promise<Ai.WorkflowRunStatus> {
     const run = await this.db.query.workflowRuns.findFirst({
       where: and(eq(schema.workflowRuns.projectId, projectId), eq(schema.workflowRuns.id, runId)),
       columns: { status: true },
     });
     if (!run) throw AppErrorCode.PRJ_001.create();
-    if (run.status !== 'running') return { runId, status: run.status, outcome: 'already_settled' };
-
-    const live = this.workflowRunService.cancel(runId);
-    return { runId, status: 'running', outcome: live ? 'stopping' : 'not_delivered' };
+    return run.status;
   }
 
   // The state transition itself is JobService.cancel's atomic conditional update; this only

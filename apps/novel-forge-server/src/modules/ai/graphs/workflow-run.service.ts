@@ -1,5 +1,5 @@
 import { PostgresSaver } from '@langchain/langgraph-checkpoint-postgres';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
@@ -23,6 +23,7 @@ import { type BibleBuilderServices, createBibleBuilderGraph } from './bible-buil
 import { createChapterFinalizationGraph, type FinalizationServices } from './chapter-finalization.graph';
 import { createChapterGenerationGraph, type GraphServices } from './chapter-generation.graph';
 import { createNovelValidationGraph, type ValidationServices } from './novel-validation.graph';
+import { RunCancellationService, type RunCancelOutcome } from './run-cancellation.service';
 
 export interface ChapterGenerationInput {
   projectId: bigint;
@@ -123,6 +124,7 @@ export class WorkflowRunService {
     private readonly pluginPolicy: PluginPolicyService,
     private readonly events: ProjectEventService,
     private readonly writerSnapshots: WriterSnapshotService,
+    private readonly cancellation: RunCancellationService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
     this.checkpointer = PostgresSaver.fromConnString(DB_URL);
@@ -181,8 +183,9 @@ export class WorkflowRunService {
     return runId;
   }
 
+  /** Local only: the executor calling this runs the job, so its runs are on this replica. */
   cancelJobRuns(jobId: string): void {
-    for (const runId of this.jobRuns.get(jobId) ?? []) this.cancel(runId);
+    for (const runId of this.jobRuns.get(jobId) ?? []) this.modelRouter.abortRun(runId);
   }
 
   forgetJobRuns(jobId: string): void {
@@ -196,16 +199,20 @@ export class WorkflowRunService {
 
   // Every settle carries the `running` predicate: a run is written once, by whichever path reaches it
   // first, so a late finish cannot reopen a cancelled row and leave the audit trail lying about it.
-  private async completeRun(runId: string, outcome: string | null, status: 'completed' | 'awaiting_review', nodeTrace: string[], skippedStages?: string[]): Promise<void> {
+  // Completing also needs no cancel on record: one taken by another replica after this replica's last
+  // check would otherwise lose to a finish its author had asked to stop. Answers false when that cancel won.
+  private async completeRun(runId: string, outcome: string | null, status: 'completed' | 'awaiting_review', nodeTrace: string[], skippedStages?: string[]): Promise<boolean> {
     this.logger.info('workflow run finished', { runId, status, outcome });
     const persistedTrace = skippedStages?.length ? [...nodeTrace, ...skippedStages.map(stage => `${SKIPPED_STAGE_MARKER}${stage}`)] : nodeTrace;
     this.logger.debug('workflow run node trace', { runId, nodeTrace: persistedTrace });
     const [run] = await this.db
       .update(schema.workflowRuns)
       .set({ status, outcome: outcome ?? undefined, endedAt: new Date(), nodeTrace: persistedTrace as never })
-      .where(and(eq(schema.workflowRuns.id, runId), eq(schema.workflowRuns.status, 'running')))
+      .where(and(eq(schema.workflowRuns.id, runId), eq(schema.workflowRuns.status, 'running'), isNull(schema.workflowRuns.cancelRequestedAt)))
       .returning({ projectId: schema.workflowRuns.projectId, graph: schema.workflowRuns.graph, target: schema.workflowRuns.target });
-    if (run) this.events.publish(run.projectId, { type: 'run', runId, graph: run.graph, target: run.target, status });
+    if (!run) return !(await this.cancelRun(runId, persistedTrace));
+    this.events.publish(run.projectId, { type: 'run', runId, graph: run.graph, target: run.target, status });
+    return true;
   }
 
   private async failRun(runId: string, err: unknown, node?: string): Promise<void> {
@@ -234,41 +241,41 @@ export class WorkflowRunService {
     }
   }
 
-  // Terminal and non-retrying: the run keeps whatever it already persisted.
-  private async cancelRun(runId: string, nodeTrace?: string[]): Promise<void> {
+  // Terminal and non-retrying: the run keeps whatever it already persisted. Answers whether this call settled it.
+  private async cancelRun(runId: string, nodeTrace?: string[]): Promise<boolean> {
     this.logger.info('workflow run cancelled', { runId });
     const [run] = await this.db
       .update(schema.workflowRuns)
       .set({ status: 'cancelled', outcome: 'cancelled', endedAt: new Date(), ...(nodeTrace?.length ? { nodeTrace: nodeTrace as never } : {}) })
       .where(and(eq(schema.workflowRuns.id, runId), eq(schema.workflowRuns.status, 'running')))
       .returning({ projectId: schema.workflowRuns.projectId, graph: schema.workflowRuns.graph, target: schema.workflowRuns.target });
-    if (run) this.events.publish(run.projectId, { type: 'run', runId, graph: run.graph, target: run.target, status: 'cancelled' });
+    if (!run) return false;
+    this.events.publish(run.projectId, { type: 'run', runId, graph: run.graph, target: run.target, status: 'cancelled' });
+    return true;
   }
 
   /**
-   * Aborts a run in flight, returning whether one was live on this replica — an unknown or already
-   * settled run answers `false` rather than throwing. The run itself writes the `cancelled` row as it
-   * unwinds, so this never races a concurrent settle. Cancellation is process-local: a
-   * run owned by another replica is invisible here.
+   * Cancels a run wherever it runs — an unknown or already settled run answers `already_settled` rather than throwing. The run itself
+   * writes the `cancelled` row as it unwinds, so this never races a concurrent settle.
    */
-  cancel(runId: string): boolean {
-    const live = this.modelRouter.abortRun(runId);
-    this.logger.info('workflow run cancellation requested', { runId, live });
-    return live;
+  cancel(runId: string): Promise<RunCancelOutcome> {
+    return this.cancellation.request(runId);
   }
 
   // The one place a run's abort controller is registered and released, so no exit path can leak one.
   // A run aborted between model calls has nothing left to interrupt, so a graph that still finishes
-  // settles as cancelled rather than completed — the author asked for it to stop.
-  private async runGraph(runId: string, graph: string, invoke: () => Promise<GraphOutcome>): Promise<WorkflowRunResult> {
+  // settles as cancelled rather than completed — the author asked for it to stop. The graph is handed
+  // the signal too, so an abort also stops it at its next node boundary.
+  private async runGraph(runId: string, graph: string, invoke: (signal: AbortSignal) => Promise<GraphOutcome>): Promise<WorkflowRunResult> {
     const signal = this.modelRouter.bindRunSignal(runId);
+    this.cancellation.watch(runId);
     try {
-      const { outcome, status, nodeTrace, skippedStages } = await invoke();
+      const { outcome, status, nodeTrace, skippedStages } = await invoke(signal);
       if (signal.aborted) {
         await this.cancelRun(runId, nodeTrace);
         return { runId, outcome: 'cancelled', status: 'cancelled' };
       }
-      await this.completeRun(runId, outcome, status, nodeTrace, skippedStages);
+      if (!(await this.completeRun(runId, outcome, status, nodeTrace, skippedStages))) return { runId, outcome: 'cancelled', status: 'cancelled' };
       return { runId, outcome, status, ...(skippedStages ? { skippedStages } : {}) };
     } catch (err) {
       if (signal.aborted) {
@@ -279,6 +286,7 @@ export class WorkflowRunService {
       await this.failRun(runId, err);
       return { runId, outcome: 'failed', status: 'failed' };
     } finally {
+      this.cancellation.unwatch(runId);
       this.modelRouter.releaseRunSignal(runId);
     }
   }
@@ -310,16 +318,19 @@ export class WorkflowRunService {
   ): Promise<{ runId: string; result: T }> {
     const runId = await this.createRun(projectId, graph, target, input, jobId, parentRunId);
     const signal = this.modelRouter.bindRunSignal(runId);
+    this.cancellation.watch(runId);
     try {
       const result = await fn(runId);
       if (signal.aborted) throw AppErrorCode.AI_013.create();
-      await this.completeRun(runId, 'completed', 'completed', [graph]);
-      return { runId, result };
+      if (await this.completeRun(runId, 'completed', 'completed', [graph])) return { runId, result };
+      this.modelRouter.abortRun(runId);
+      throw AppErrorCode.AI_013.create();
     } catch (err) {
       if (signal.aborted) await this.cancelRun(runId, [graph]);
       else await this.failRun(runId, err, graph);
       throw err;
     } finally {
+      this.cancellation.unwatch(runId);
       this.modelRouter.releaseRunSignal(runId);
     }
   }
@@ -327,7 +338,7 @@ export class WorkflowRunService {
   async runChapterGeneration(input: ChapterGenerationInput): Promise<WorkflowRunResult> {
     const runId = await this.createRun(input.projectId, 'chapter-generation', `chapter-${input.chapter}`, input, input.jobId);
 
-    return this.runGraph(runId, 'runChapterGeneration', async () => {
+    return this.runGraph(runId, 'runChapterGeneration', async signal => {
       const graph = createChapterGenerationGraph(this.graphServices);
       const rawState = await graph.invoke(
         {
@@ -339,7 +350,7 @@ export class WorkflowRunService {
           maxFixes: input.maxFixes ?? 3,
           runId,
         },
-        { configurable: { thread_id: runId } },
+        { configurable: { thread_id: runId }, signal },
       );
       const finalState = rawState as unknown as { outcome: string | null; nodeTrace?: string[] };
       const outcome = finalState.outcome ?? 'completed';
@@ -351,7 +362,7 @@ export class WorkflowRunService {
   async runChapterFinalization(input: ChapterFinalizationInput): Promise<WorkflowRunResult> {
     const runId = await this.createRun(input.projectId, 'chapter-finalization', `chapter-${input.chapter}`, input, input.jobId);
 
-    return this.runGraph(runId, 'runChapterFinalization', async () => {
+    return this.runGraph(runId, 'runChapterFinalization', async signal => {
       const graph = createChapterFinalizationGraph(this.graphServices as FinalizationServices);
       const rawState = await graph.invoke(
         {
@@ -367,7 +378,7 @@ export class WorkflowRunService {
           isolated: input.isolated ?? false,
           runId,
         },
-        { configurable: { thread_id: runId } },
+        { configurable: { thread_id: runId }, signal },
       );
 
       const finalState = rawState as unknown as { nodeTrace?: string[] };
@@ -378,9 +389,12 @@ export class WorkflowRunService {
   async runBibleBuilder(input: BibleBuilderInput): Promise<WorkflowRunResult> {
     const runId = await this.createRun(input.projectId, 'bible-builder', 'all-stages', input, input.jobId);
 
-    return this.runGraph(runId, 'runBibleBuilder', async () => {
+    return this.runGraph(runId, 'runBibleBuilder', async signal => {
       const graph = createBibleBuilderGraph(this.graphServices as BibleBuilderServices);
-      const rawState = await graph.invoke({ projectId: String(input.projectId), brief: input.brief, force: input.force ?? false, runId }, { configurable: { thread_id: runId } });
+      const rawState = await graph.invoke(
+        { projectId: String(input.projectId), brief: input.brief, force: input.force ?? false, runId },
+        { configurable: { thread_id: runId }, signal },
+      );
 
       const finalState = rawState as unknown as { nodeTrace?: string[]; skippedStages?: string[] };
       return { outcome: 'completed', status: 'completed', nodeTrace: finalState.nodeTrace ?? [], skippedStages: finalState.skippedStages ?? [] };
@@ -390,9 +404,9 @@ export class WorkflowRunService {
   async runNovelValidation(input: NovelValidationInput): Promise<WorkflowRunResult> {
     const runId = await this.createRun(input.projectId, 'novel-validation', 'full-novel', input, input.jobId);
 
-    return this.runGraph(runId, 'runNovelValidation', async () => {
+    return this.runGraph(runId, 'runNovelValidation', async signal => {
       const graph = createNovelValidationGraph(this.graphServices as ValidationServices);
-      const rawState = await graph.invoke({ projectId: String(input.projectId), runId }, { configurable: { thread_id: runId } });
+      const rawState = await graph.invoke({ projectId: String(input.projectId), runId }, { configurable: { thread_id: runId }, signal });
       const finalState = rawState as unknown as { outcome?: string | null; nodeTrace?: string[] };
 
       return { outcome: finalState.outcome ?? 'completed', status: 'completed', nodeTrace: finalState.nodeTrace ?? [] };

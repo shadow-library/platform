@@ -13,6 +13,8 @@ import { AiQuotaService } from './ai-quota.service';
 import { AiUsageService } from './ai-usage.service';
 import { CatalogService } from './context/catalog.service';
 import { ContextAssembler } from './context/context-assembler.service';
+import { RunCancellationService } from './graphs/run-cancellation.service';
+import { RunControlRepository } from './graphs/run-control.repository';
 import { WorkflowRunService } from './graphs/workflow-run.service';
 import { ModelCatalogService } from './model-catalog.service';
 import { ModelRouterService } from './model-router.service';
@@ -43,6 +45,8 @@ import { WriterSnapshotService } from './writer-snapshot.service';
     ContextAssembler,
     ToolRegistryService,
     WebResearchService,
+    RunControlRepository,
+    RunCancellationService,
     WorkflowRunService,
     WriterSnapshotService,
   ],

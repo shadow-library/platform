@@ -291,7 +291,7 @@ export class JobExecutor {
       .select({ id: schema.workflowRuns.id })
       .from(schema.workflowRuns)
       .where(and(eq(schema.workflowRuns.jobId, jobId), eq(schema.workflowRuns.status, 'running')));
-    for (const run of live) this.workflowRunService.cancel(run.id);
+    await Promise.all(live.map(run => this.workflowRunService.cancel(run.id)));
   }
 
   private async runJob(job: Job.Row): Promise<void> {

@@ -433,7 +433,7 @@ export class CancelRunResponse {
   @Field(() => String, {
     enum: ['stopping', 'already_settled', 'not_delivered'],
     description:
-      "'stopping': a live run on this replica was just signalled to abort. 'already_settled': the run had already reached a terminal status, so nothing was done. 'not_delivered': the run is still `running` in the database but not live on this replica — cancellation is process-local, so the signal could not be delivered; the run may be owned by another replica or may have crashed.",
+      "'stopping': the cancel is recorded and the replica running the run — whichever it is — aborts it within about a second. 'already_settled': the run had already reached a terminal status, so nothing was done. 'not_delivered': the cancel is recorded, but the replica that was running the run has stopped responding, so nothing may be left to act on it; the run may have crashed.",
   })
   outcome: 'stopping' | 'already_settled' | 'not_delivered';
 }

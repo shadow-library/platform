@@ -8,72 +8,37 @@ import { ChatService, type ChatTurnOptions } from './chat.service';
 import { type ChatTurnEmitter } from './chat-turn-emitter';
 import { serialiseMessage, serialiseTurn, withTurnCost } from './serialise';
 import { TurnCostService } from './turn-cost.service';
+import { TurnEventFollower } from './turn-event-follower';
+import { TurnEventLog } from './turn-event-log';
+import { TurnEventRepository } from './turn-event.repository';
+import { type TurnStreamListener } from './turn-stream.types';
 
-/**
- * `delta` (`{ text }`) and `change` (a `ChatChangeEvent`) belong to the reply being written; `reset` voids both, as the reply they built
- * was replaced, and a `change` index restarts after it. Both are provisional: `done` alone says what the turn applied and carded.
- */
-export type TurnStreamEventName = 'user' | 'lookup' | 'delta' | 'change' | 'reset' | 'done' | 'error';
+const CURSOR = /^[0-9]{1,9}$/;
 
-export interface TurnStreamFrame {
-  event: TurnStreamEventName;
-  /** Already-serialised JSON: the transport writes it verbatim, so a `bigint` in a turn result cannot reach `JSON.stringify` unguarded. */
-  data: string;
-}
-
-/** Returns `false` once its transport has closed, so the run drops a subscriber that outlived its client. */
-export type TurnStreamListener = (frame: TurnStreamFrame) => boolean;
-
-interface TurnStreamRun {
-  runId: string;
-  projectId: bigint;
-  backlog: TurnStreamFrame[];
-  backlogChars: number;
-  truncated: boolean;
-  terminal: TurnStreamFrame | null;
-  listeners: Set<TurnStreamListener>;
-  expiry: ReturnType<typeof setTimeout>;
-}
-
-// A reply runs to a few tens of kilobytes; this is an order of magnitude of headroom, so the cap is
-// reached only by a model that has stopped producing a reply and started producing a flood.
-const MAX_BACKLOG_CHARS = 512 * 1024;
-
-// How long a finished run's backlog outlives it. A stream watched to the end takes its run with it when
-// it closes; this window covers the client that never connected and the one whose SSE connection dropped
-// mid-turn and is reconnecting to the same run. The reply is durable in the transcript either way.
-const TERMINAL_TTL_MS = 60_000;
-
-// A turn that outlives this is already past the cutoff at which `pendingTurn` stops reporting it, so its
-// buffer is leaked state rather than a stream anybody is still waiting on.
-const RUN_MAX_TTL_MS = 20 * 60_000;
-
-const RESET_FRAME: TurnStreamFrame = { event: 'reset', data: '{}' };
-
-function encode(data: unknown): string {
-  return JSON.stringify(data, (_key, value: unknown) => (typeof value === 'bigint' ? value.toString() : value));
+/** A `Last-Event-ID` this stream did not send is read as none: replaying from the start behind a `reset` is always safe for the client. */
+export function resumeCursorOf(lastEventId: unknown): number | null {
+  return typeof lastEventId === 'string' && CURSOR.test(lastEventId) ? Number(lastEventId) : null;
 }
 
 /**
- * The turn stream's server half: the POST starts a turn and answers with its run id, the GET
- * subscribes to that run. Because the two are separate requests, every event a turn emits is buffered
- * under its run id and replayed on connect — otherwise a turn that opens faster than the client connects
- * loses its first deltas. The turn itself is owned here, not by either request, so neither a client that
- * never connects nor one that closes its tab mid-reply can abort it.
+ * The turn stream's server half: the POST starts a turn and answers with its run id, the GET follows that run. The two are separate
+ * requests that may reach different replicas, so every frame a turn emits is stored under its run and read back from there. The turn
+ * itself is owned by the replica that took the POST, not by either request, so neither a client that never connects nor one that closes
+ * its tab mid-reply can abort it.
  */
 @Injectable()
 export class TurnStreamService {
   private readonly logger = Logger.getLogger(APP_NAME, TurnStreamService.name);
-  private readonly runs = new Map<string, TurnStreamRun>();
 
   constructor(
     private readonly chatService: ChatService,
     private readonly turnCost: TurnCostService,
+    private readonly turnEvents: TurnEventRepository,
   ) {}
 
   /** Starts a turn and resolves with its run id as soon as the run exists — the turn goes on running behind the answer. */
   async start(projectId: bigint, sessionId: string, content: string, options: ChatTurnOptions = {}): Promise<string> {
-    const sink: { run: TurnStreamRun | null } = { run: null };
+    const sink: { log: TurnEventLog | null } = { log: null };
     let settle: (runId: string) => void = () => undefined;
     let fail: (err: unknown) => void = () => undefined;
     const started = new Promise<string>((resolve, reject) => {
@@ -83,14 +48,14 @@ export class TurnStreamService {
 
     const emitter: ChatTurnEmitter = {
       onRunId: runId => {
-        sink.run = this.open(projectId, runId);
+        sink.log = new TurnEventLog(this.turnEvents, projectId, runId);
         settle(runId);
       },
-      onUserMessage: message => this.emit(sink.run, 'user', serialiseMessage(message)),
-      onLookup: event => this.emit(sink.run, 'lookup', event),
-      onDelta: text => this.emit(sink.run, 'delta', { text }),
-      onChange: event => this.emit(sink.run, 'change', event),
-      onReset: () => this.emit(sink.run, 'reset', {}),
+      onUserMessage: message => sink.log?.append('user', serialiseMessage(message)),
+      onLookup: event => sink.log?.append('lookup', event),
+      onDelta: text => sink.log?.delta(text),
+      onChange: event => sink.log?.append('change', event),
+      onReset: () => sink.log?.append('reset', {}),
     };
 
     this.chatService.turn(projectId, sessionId, content, emitter, options).then(
@@ -98,125 +63,37 @@ export class TurnStreamService {
         // `onRunId` is the only thing that answers the POST, and `EmitterRelay` swallows a throw from it —
         // without this a turn that succeeded anyway would leave the request hanging forever.
         settle(result.runId);
+        const log = (sink.log ??= new TurnEventLog(this.turnEvents, projectId, result.runId));
         const turn = serialiseTurn(result);
-        const cost = await this.turnCost.forMessages(projectId, [result.assistantMessage]);
-        this.finish(sink.run, 'done', { ...turn, assistantMessage: withTurnCost(turn.assistantMessage, cost.get(result.assistantMessage.id)) });
+        const cost = await this.turnCost.forMessages(projectId, [result.assistantMessage]).catch((err: unknown) => {
+          this.logger.warn('chat turn cost lookup failed — the done frame goes without it', { projectId, runId: result.runId, err });
+          return undefined;
+        });
+        await log.finish('done', { ...turn, assistantMessage: withTurnCost(turn.assistantMessage, cost?.get(result.assistantMessage.id)) });
       },
-      (err: unknown) => {
-        this.logger.warn('chat turn stream failed', { projectId, sessionId, runId: sink.run?.runId, err });
-        this.finish(sink.run, 'error', AppError.is(err) ? err.toResponse() : { code: ErrorCode.UNKNOWN.code, message: ErrorCode.UNKNOWN.message });
+      async (err: unknown) => {
+        this.logger.warn('chat turn stream failed', { projectId, sessionId, runId: sink.log?.runId, err });
         // A turn that dies before its run exists never answered the POST; once it exists the caller is
         // long gone and the failure rides the stream instead.
         fail(err);
+        await sink.log?.finish('error', AppError.is(err) ? err.toResponse() : { code: ErrorCode.UNKNOWN.code, message: ErrorCode.UNKNOWN.message });
       },
     );
 
     return started;
   }
 
-  /** Throws before the route hijacks its response, so an unknown run answers 404 rather than an empty stream. */
-  assertRun(projectId: bigint, runId: string): void {
-    this.require(projectId, runId);
-  }
-
-  /** Replays the run's backlog to `listener`, then feeds it live until the returned unsubscribe runs. */
-  subscribe(projectId: bigint, runId: string, listener: TurnStreamListener): () => void {
-    const run = this.require(projectId, runId);
-    const unsubscribe = (): void => {
-      run.listeners.delete(listener);
-      if (run.terminal && run.listeners.size === 0) this.drop(run);
-    };
-
-    // Every replay opens with a reset, because a subscriber is not necessarily a new one: `EventStream`
-    // tells clients to reconnect after 3s, and the frames have no ids, so a reconnecting client would
-    // otherwise append the whole backlog a second time on top of what it has already rendered.
-    if (!this.deliver(run, listener, RESET_FRAME)) return unsubscribe;
-    for (const frame of run.backlog) if (!this.deliver(run, listener, frame)) return unsubscribe;
-    if (run.terminal && !this.deliver(run, listener, run.terminal)) return unsubscribe;
-
-    // Registered even once the run has ended, so that a second client replayed the same finished run
-    // holds it open until it too has gone.
-    run.listeners.add(listener);
-    return unsubscribe;
-  }
-
-  private require(projectId: bigint, runId: string): TurnStreamRun {
-    const run = this.runs.get(runId);
+  /** Throws before the route hijacks its response, so an unknown, foreign or expired run answers 404 rather than an empty stream. */
+  async assertRun(projectId: bigint, runId: string): Promise<void> {
+    const run = await this.turnEvents.findRun(projectId, runId);
     // Another project's run answers as missing: that an author elsewhere is mid-turn is not ours to confirm.
-    if (!run || run.projectId !== projectId) throw AppErrorCode.CHT_007.create();
-    return run;
+    if (!run || !(run.running || run.hasEvents || run.recentlyEnded)) throw AppErrorCode.CHT_007.create();
   }
 
-  private open(projectId: bigint, runId: string): TurnStreamRun {
-    const run: TurnStreamRun = {
-      runId,
-      projectId,
-      backlog: [],
-      backlogChars: 0,
-      truncated: false,
-      terminal: null,
-      listeners: new Set(),
-      expiry: this.schedule(runId, RUN_MAX_TTL_MS),
-    };
-    this.runs.set(runId, run);
-    return run;
-  }
-
-  private emit(run: TurnStreamRun | null, event: TurnStreamEventName, data: unknown): void {
-    if (!run || run.terminal) return;
-    const frame: TurnStreamFrame = { event, data: encode(data) };
-    this.buffer(run, frame);
-    this.dispatch(run, frame);
-  }
-
-  private finish(run: TurnStreamRun | null, event: 'done' | 'error', data: unknown): void {
-    if (!run || run.terminal) return;
-    run.terminal = { event, data: encode(data) };
-    this.dispatch(run, run.terminal);
-    clearTimeout(run.expiry);
-    run.expiry = this.schedule(run.runId, TERMINAL_TTL_MS);
-  }
-
-  // Past the cap the backlog is discarded whole rather than replayed with a hole in the middle of the
-  // reply; the replay's leading reset already tells a subscriber to render nothing until the live events.
-  private buffer(run: TurnStreamRun, frame: TurnStreamFrame): void {
-    if (run.truncated) return;
-    run.backlog.push(frame);
-    run.backlogChars += frame.data.length;
-    if (run.backlogChars <= MAX_BACKLOG_CHARS) return;
-    this.logger.warn('turn stream backlog exceeded its cap — replay for this run is dropped', { runId: run.runId, chars: run.backlogChars });
-    run.backlog = [];
-    run.backlogChars = 0;
-    run.truncated = true;
-  }
-
-  private dispatch(run: TurnStreamRun, frame: TurnStreamFrame): void {
-    // A copy: a subscriber that closes on the terminal frame unsubscribes itself from inside this loop.
-    for (const listener of [...run.listeners]) if (!this.deliver(run, listener, frame)) run.listeners.delete(listener);
-  }
-
-  /** One client's socket is never allowed to fail the others, nor to escape into the turn's emitter or the floating turn promise. */
-  private deliver(run: TurnStreamRun, listener: TurnStreamListener, frame: TurnStreamFrame): boolean {
-    try {
-      return listener(frame);
-    } catch (err) {
-      this.logger.warn('turn stream subscriber threw — dropping it', { runId: run.runId, err });
-      return false;
-    }
-  }
-
-  private schedule(runId: string, delay: number): ReturnType<typeof setTimeout> {
-    const timer = setTimeout(() => {
-      const run = this.runs.get(runId);
-      if (run) this.drop(run);
-    }, delay);
-    timer.unref();
-    return timer;
-  }
-
-  private drop(run: TurnStreamRun): void {
-    clearTimeout(run.expiry);
-    run.listeners.clear();
-    this.runs.delete(run.runId);
+  /** Feeds `listener` the run's frames after `after` (from the start when null) until the returned stop runs or the run ends. */
+  follow(projectId: bigint, runId: string, after: number | null, listener: TurnStreamListener): () => void {
+    const follower = new TurnEventFollower(this.turnEvents, projectId, runId, after, listener);
+    follower.start();
+    return () => follower.stop();
   }
 }

@@ -302,8 +302,8 @@ export class ModelRouterService {
   private readonly llmTimeoutMs = Config.get('ai.llm.timeout-ms') ?? 300_000;
   private readonly llmMaxRetries = Config.get('ai.llm.max-retries') ?? 2;
   private readonly llmBackoffMs = Config.get('ai.llm.backoff-ms') ?? 500;
-  // Process-local by design: a cancel only reaches a run owned by the replica
-  // that received it, exactly like ProjectEventService's in-process fan-out.
+  // An AbortController lives only in the process running the run; a cancel taken by another replica reaches it through
+  // `workflow_runs.cancel_requested_at`, which RunCancellationService watches and turns into `abortRun` here.
   private readonly runAborts = new Map<string, AbortController>();
 
   constructor(
@@ -329,7 +329,7 @@ export class ModelRouterService {
     this.runAborts.delete(runId);
   }
 
-  /** Returns whether a run was registered on this replica; aborting an already-aborted run is a no-op. */
+  /** Returns whether this replica holds the run, the one place its abort can land; aborting an already-aborted run is a no-op. */
   abortRun(runId: string): boolean {
     const controller = this.runAborts.get(runId);
     if (!controller) return false;

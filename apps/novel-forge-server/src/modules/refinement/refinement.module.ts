@@ -21,6 +21,8 @@ import { RefineService } from './refine.service';
 import { BibleTidyController } from './tidy/bible-tidy.controller';
 import { BibleTidyService } from './tidy/bible-tidy.service';
 import { TurnCostService } from './turn-cost.service';
+import { TurnEventJanitor } from './turn-event.janitor';
+import { TurnEventRepository } from './turn-event.repository';
 import { TurnStreamController } from './turn-stream.controller';
 import { TurnStreamService } from './turn-stream.service';
 import { WriterPreviewService } from './writer-preview.service';
@@ -37,6 +39,8 @@ import { WriterPreviewService } from './writer-preview.service';
     IdeaRejectionService,
     RefineService,
     TurnStreamService,
+    TurnEventRepository,
+    TurnEventJanitor,
     BibleTidyService,
     TurnCostService,
     WriterPreviewService,

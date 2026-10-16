@@ -19,6 +19,7 @@ function runService() {
     {} as never,
     { publish: () => undefined } as never,
     {} as never,
+    {} as never,
   );
   return { service, aborted };
 }

@@ -294,7 +294,7 @@ export class ProjectService {
   /**
    * The claim goes first because its job reference is ON DELETE RESTRICT. The row lock keeps a concurrent acquire from recreating it
    * and blocks a new run, whose insert locks the project row for its foreign key, so the running runs read under it are complete. The
-   * abort waits for the commit and is process-local: a run on another replica finishes its current call.
+   * abort waits for the commit; a run on another replica is aborted there once its watcher finds the row gone.
    */
   async delete(id: bigint): Promise<void> {
     this.logger.info('deleting project (cascades to all child tables)', { projectId: id });
@@ -309,7 +309,7 @@ export class ProjectService {
       return { deleted, running };
     });
     if (deleted.length === 0) throw AppErrorCode.PRJ_001.create();
-    for (const run of running) this.workflowRuns.cancel(run.id);
+    await Promise.all(running.map(run => this.workflowRuns.cancel(run.id)));
   }
 
   async reset(id: bigint, stage: string): Promise<ResetResponse> {
