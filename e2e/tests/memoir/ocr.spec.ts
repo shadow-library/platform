@@ -6,7 +6,7 @@ import { type APIRequestContext, type APIResponse } from '@playwright/test';
 /**
  * Importing user defined packages
  */
-import { memoirDb, probeMemoirConfigKeys } from '../../lib';
+import { memoirDb } from '../../lib';
 import { expect, test } from './fixtures';
 import { errorCodeOf, memoirCsrfHeaders, memoirMutate } from './helpers';
 
@@ -24,15 +24,10 @@ interface OcrQuotaView {
 /**
  * Declaring the constants
  *
- * `POST /ocr/parse` and `GET /ocr/quota` (ARCHITECTURE §14.3). The structuring client (`InClusterOcrStructuringClient`)
- * shares memoir-server's one inference seam (`ai.inference-url`) with the AI worker, and that key is unset in this
- * dev cluster today — every real parse attempt fails at the inference hop and the endpoint surfaces that as
- * `503 OCR_002`, never a fabricated result (§14.3's own safety property). The quota guard runs *before* the
- * structuring call (ARCHITECTURE §14.3, `ocr.service.ts:41-56`), so that failure still costs an attempt — proven
- * here directly rather than assumed. A future environment that configures `ai.inference-url` (the dedicated AI
- * test environment being built separately) makes real parses succeed, so the OCR_002-specific assertions guard
- * on a live probe of that key exactly as `billing.spec.ts` does for the billing secrets, rather than assuming
- * today's unconfigured shape forever.
+ * `POST /ocr/parse` and `GET /ocr/quota` (ARCHITECTURE §14.3). Structuring goes through Synapse (task `memoir.receipt-structuring`),
+ * which the test environment routes to local Ollama. A parse therefore either succeeds or, when Synapse or the model is unavailable,
+ * surfaces `503 OCR_002` — never a fabricated result. The quota guard runs *before* the structuring call (ARCHITECTURE §14.3), so
+ * either outcome costs an attempt; the assertions below hold for both.
  */
 
 async function getOcrQuota(ctx: APIRequestContext): Promise<OcrQuotaView> {
@@ -46,6 +41,11 @@ async function expectRefusal(response: APIResponse, status: number, code: string
   expect(await errorCodeOf(response)).toBe(code);
 }
 
+async function expectParseOutcome(response: APIResponse): Promise<void> {
+  if (response.ok()) return;
+  await expectRefusal(response, 503, 'OCR_002');
+}
+
 /** Today (and offsets from it) in UTC — every persona here onboards with `timezone: 'UTC'`, so this matches the account's own local day exactly. */
 function utcDateString(offsetDays = 0): string {
   const date = new Date();
@@ -54,31 +54,19 @@ function utcDateString(offsetDays = 0): string {
 }
 
 test.describe('memoir ocr', () => {
-  let aiConfigured: boolean;
-  let probeFailed: boolean;
-
-  test.beforeAll(async () => {
-    ({ configured: aiConfigured, probeFailed } = await probeMemoirConfigKeys(['AI_INFERENCE_URL']));
-  });
-
-  test('should 503 OCR_002 on every parse call while structuring is unconfigured, still consuming quota, and reject once the daily cap is reached with 429 OCR_001', async ({
-    memoir,
-  }) => {
-    test.skip(probeFailed, 'could not read memoir config from the cluster');
-    test.skip(aiConfigured, 'ai.inference-url is configured in this environment; the unconfigured-structuring contract does not apply here');
-
-    const persona = await memoir.persona({ label: 'ocr-unconfigured', onboard: true });
+  test('should count every parse attempt whether structuring succeeds or answers 503 OCR_002, and reject once the daily cap is reached with 429 OCR_001', async ({ memoir }) => {
+    const persona = await memoir.persona({ label: 'ocr-cap', onboard: true });
 
     const first = await memoirMutate(persona.ctx, 'post', '/api/v1/ocr/parse', { data: { extractedText: 'Coffee Shop $4.50' } });
-    await expectRefusal(first, 503, 'OCR_002');
+    await expectParseOutcome(first);
 
     const afterFirst = await getOcrQuota(persona.ctx);
-    expect(afterFirst.used, 'a failed parse still consumed an attempt — never a free retry').toBe(1);
+    expect(afterFirst.used, 'every parse attempt consumed quota, failed or not').toBe(1);
 
     const cap = afterFirst.cap;
     for (let attempt = afterFirst.used; attempt < cap; attempt++) {
       const response = await memoirMutate(persona.ctx, 'post', '/api/v1/ocr/parse', { data: { extractedText: `receipt text ${attempt}` } });
-      await expectRefusal(response, 503, 'OCR_002');
+      await expectParseOutcome(response);
     }
 
     const exhausted = await getOcrQuota(persona.ctx);

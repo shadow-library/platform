@@ -19,6 +19,7 @@ import { type ConsentSnapshot } from './ai-worker.types';
 
 export interface ExecutionAccount {
   id: bigint;
+  identitySub: string;
   timezone: string;
   intensityMode: string;
   deletionState: string;
@@ -78,6 +79,7 @@ export class AiWorkerRepository {
     const [row] = await this.db
       .select({
         id: schema.accounts.id,
+        identitySub: schema.accounts.identitySub,
         timezone: schema.accounts.timezone,
         intensityMode: schema.accounts.intensityMode,
         deletionState: schema.accounts.deletionState,

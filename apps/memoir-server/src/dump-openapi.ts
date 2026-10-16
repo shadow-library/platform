@@ -15,7 +15,6 @@ setConfig({
   'auth.client.secret': 'openapi-dump',
   'scheduler.enabled': false,
   'telemetry.pseudo-id-secret': 'openapi-dump',
-  'ai.inference-url': '',
 });
 
 const { AppModule } = await import('./app.module');

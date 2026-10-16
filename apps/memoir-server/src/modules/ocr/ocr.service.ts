@@ -8,6 +8,7 @@ import { AppError, Config } from '@shadow-library/common';
  * Importing user defined packages
  */
 import { AccountContext, AccountRepository } from '@modules/auth';
+import { EntitlementService } from '@modules/billing';
 import { ProgressionService } from '@modules/progression';
 import { addDays, formatLocalDate, localDateAt, startOfLocalDay } from '@modules/rules';
 import { AppErrorCode } from '@server/classes';
@@ -31,6 +32,7 @@ export class OcrService {
     private readonly accountRepository: AccountRepository,
     private readonly structuringClient: OcrStructuringClient,
     private readonly progressionService: ProgressionService,
+    private readonly entitlements: EntitlementService,
   ) {}
 
   async getQuota(): Promise<OcrQuotaResponseDto> {
@@ -38,20 +40,17 @@ export class OcrService {
     return this.quotaView(account);
   }
 
-  /**
-   * Guard order per ARCHITECTURE §14.3: authenticate (controller) → atomically consume quota → run
-   * structuring. Quota is consumed before the structuring call so a failed parse — including an
-   * unconfigured structuring client — still costs an attempt [PRD §2.5/§4.14: "counted per attempt"].
-   */
+  /** Quota is consumed before structuring so a failed parse still costs an attempt [PRD §2.5/§4.14: "counted per attempt"]. */
   async parse(body: OcrParseDto): Promise<OcrStructuringResult> {
     const account = await this.requireAccount();
     const cap = Config.get('quotas.ocr-daily');
     const today = formatLocalDate(localDateAt(Date.now(), account.timezone));
 
+    const plan = await this.entitlements.getTier(account.id);
     const updated = await this.accountRepository.consumeOcrQuota(account.id, today, cap);
     if (!updated) AppErrorCode.OCR_001.throw({ resetAt: this.nextResetAt(account.timezone) });
 
-    const result = await this.structuringClient.parse(body.extractedText);
+    const result = await this.structuringClient.parse({ extractedText: body.extractedText, subjectId: account.identitySub, plan });
     await this.progressionService.onReceiptScanned(account.id, today);
     return result;
   }

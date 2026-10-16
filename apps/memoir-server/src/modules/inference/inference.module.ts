@@ -1,10 +1,17 @@
 import { Module } from '@shadow-library/app';
+import { AuthClient } from '@shadow-library/auth';
+import { AuthModule } from '@shadow-library/auth/module';
+import { SynapseClient } from '@shadow-library/synapse';
 
-import { InferenceClient, OllamaInferenceClient } from './inference.client';
+import { InferenceClient, SynapseInferenceClient } from './inference.client';
 
-/** The in-cluster model boundary, shared by the AI batch executor (§15.6) and receipt-OCR structuring (§14.3) so there is exactly one place a non-cluster endpoint could ever be configured. */
+/** The model boundary, shared by the AI batch executor (§15.6) and receipt-OCR structuring (§14.3): every call goes to Synapse, which owns provider choice. */
 @Module({
-  providers: [{ token: InferenceClient, useClass: OllamaInferenceClient }],
+  imports: [AuthModule],
+  providers: [
+    { token: SynapseClient, useFactory: (authClient: AuthClient) => new SynapseClient({ authClient }), inject: [AuthClient] },
+    { token: InferenceClient, useClass: SynapseInferenceClient },
+  ],
   exports: [InferenceClient],
 })
 export class InferenceModule {}

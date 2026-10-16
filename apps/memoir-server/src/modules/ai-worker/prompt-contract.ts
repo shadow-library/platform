@@ -5,7 +5,7 @@
 /**
  * Importing user defined packages
  */
-import { type InferenceRequest } from '@modules/inference';
+import { type InferencePrompt } from '@modules/inference';
 import { AppErrorCode } from '@server/classes';
 
 import { type AssembledContext, type InferenceDraft } from './ai-worker.types';
@@ -26,7 +26,7 @@ import { ALLOWED_SUGGESTION_KINDS } from './guardrails';
  */
 const SYSTEM_PROMPT = [
   "You analyse one person's own life and habit-tracking data and answer the question they asked about it.",
-  'The data is theirs; it was assembled under their explicit consent and never leaves this cluster.',
+  'The data is theirs; it was assembled under their explicit consent, and you are given only what the question needs.',
   '',
   'Rules, all mandatory:',
   '1. Never quote their journal entries, reflections, or reason notes. Paraphrase, always.',
@@ -41,7 +41,7 @@ const SYSTEM_PROMPT = [
   'Give one or two suggestions, each naming a quest id present in the data — they become one-tap offers the person confirms themselves.',
 ].join('\n');
 
-export function buildPrompt(queryText: string, context: AssembledContext): InferenceRequest {
+export function buildPrompt(queryText: string, context: AssembledContext): InferencePrompt {
   return {
     systemPrompt: SYSTEM_PROMPT,
     userPrompt: [`Question: ${queryText}`, '', 'Data:', JSON.stringify(context)].join('\n'),

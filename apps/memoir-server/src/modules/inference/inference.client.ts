@@ -1,134 +1,109 @@
 /**
  * Importing npm packages
  */
-import { Injectable, type OnModuleInit } from '@shadow-library/app';
-import { AppError, Config, ServiceDiscovery } from '@shadow-library/common';
+import { Injectable } from '@shadow-library/app';
+import { AppError, Config, Logger } from '@shadow-library/common';
+import { isSynapseError, type SynapseChatResponse, SynapseClient, type SynapseErrorCode } from '@shadow-library/synapse';
 
 /**
  * Importing user defined packages
  */
 import { AppErrorCode } from '@server/classes';
+import { APP_NAME } from '@server/constants';
 
 /**
  * Defining types
  */
 
-export interface InferenceRequest {
+export type InferenceTask = 'memoir.insight' | 'memoir.receipt-structuring';
+
+export type InferencePlan = 'free' | 'paid';
+
+export interface InferencePrompt {
   systemPrompt: string;
   userPrompt: string;
+}
+
+export interface InferenceRequest extends InferencePrompt {
+  task: InferenceTask;
+  subjectId: string;
+  plan: InferencePlan;
+}
+
+export interface InferenceResult {
+  content: unknown;
+  model: string;
 }
 
 /**
  * Declaring the constants
  */
 
-/** A Kubernetes service name resolves as `<service>.<namespace>.svc[.cluster.local]`; nothing outside the cluster can hold that suffix. */
-const IN_CLUSTER_HOST = /\.svc(\.cluster\.local)?$/;
-/** A single-label `svc://` name reaches only a Service in the pod's own namespace through cluster DNS; a dotted one cannot be told apart from a public domain. */
-const BARE_SERVICE_NAME = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
-const SERVICE_SCHEME = 'svc://';
+const TEMPERATURE = 0.2;
+
+const TERMINAL_CODES: ReadonlySet<string> = new Set<SynapseErrorCode>(['SYN_INVALID_REQUEST', 'SYN_POLICY_DENIED']);
 
 /**
- * The single model seam for the whole service (ARCHITECTURE §15.6 and §14.3 step 2 — receipt text is
- * user data, so D6 covers OCR structuring exactly as it covers the AI worker). A class token rather than
- * a TS interface for the same reason `OcrStructuringClient` is one: DI binds against something that
- * survives to runtime. It returns parsed JSON and nothing more — each caller owns its own response
- * contract, and neither shape leaks into the transport.
+ * The single model seam for the whole service (ARCHITECTURE §15.6 and §14.3 step 2). A class token rather
+ * than a TS interface for the same reason `OcrStructuringClient` is one: DI binds against something that
+ * survives to runtime. It returns parsed JSON and the model that answered — each caller owns its own
+ * response contract, and neither shape leaks into the transport.
  */
 export abstract class InferenceClient {
-  abstract completeJson(request: InferenceRequest): Promise<unknown>;
+  abstract completeJson(request: InferenceRequest): Promise<InferenceResult>;
 }
 
-/**
- * [Requirement D6] User data never reaches a third-party endpoint. Any host is allowed off a production
- * deployment so a developer can run Ollama on their own machine; on a real deployment the host must be
- * in-cluster, and the process refuses to boot otherwise rather than degrading quietly into a
- * configuration that would exfiltrate journal text.
- */
-export function assertInClusterInference(url: string): void {
-  if (!url) return;
-  if (!Config.isProductionDeployment()) return;
-
-  const service = url.startsWith(SERVICE_SCHEME) ? url.slice(SERVICE_SCHEME.length).split('/')[0] : null;
-  if (service?.includes(':')) {
-    const name = service.slice(0, service.indexOf(':'));
-    const override = `SERVICE_URL_${name.toUpperCase().replace(/[-.]/g, '_')}`;
-    throw AppError.internal(`ai.inference-url '${url}' names '${service}': svc:// takes a bare service name; a port or address belongs in ${override}`);
-  }
-
-  const resolved = resolveInferenceUrl(url);
-  if (!resolved) throw AppError.internal(`ai.inference-url '${url}' is not a valid URL`);
-
-  const host = new URL(resolved).hostname;
-  if (IN_CLUSTER_HOST.test(host)) return;
-  if (service !== null && BARE_SERVICE_NAME.test(host) && host !== 'localhost') return;
-  if (service?.includes('.')) {
-    throw AppError.internal(
-      `ai.inference-url '${url}' is not in-cluster: a dotted svc:// name cannot be told apart from a public domain; use svc://<service> for a Service in this namespace or a *.svc host (D6)`,
-    );
-  }
-  throw AppError.internal(
-    `ai.inference-url host '${host}' is not in-cluster; a production deployment may only reach inference over a bare svc://<service> name or a *.svc host (D6)`,
-  );
-}
-
-/** The address actually dialled, so the D6 check and the call can never disagree: `svc://` goes through the platform's service discovery, overrides and scheme included. */
-function resolveInferenceUrl(url: string): string | null {
-  try {
-    const resolved = ServiceDiscovery.resolve(url);
-    return URL.canParse(resolved) ? resolved.replace(/\/$/, '') : null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * The ChatOllama call shape novel-forge already runs against the platform's local inference
- * (`ModelRouterService.buildClient`), reduced to the one non-streaming JSON completion this service
- * needs — the LangChain dependency buys nothing here and would drag a third-party-capable router into a
- * service that must never have one. An unset `ai.inference-url` is "no inference configured", which
- * every caller surfaces as an unavailability rather than a fabricated answer.
- */
+/** Transient failures (budget, outage, timeout, off-contract output) are `AI_009` and retried; a request Synapse or the model refuses outright is `AI_013` and is not. */
 @Injectable()
-export class OllamaInferenceClient extends InferenceClient implements OnModuleInit {
-  onModuleInit(): void {
-    assertInClusterInference(Config.get('ai.inference-url'));
+export class SynapseInferenceClient extends InferenceClient {
+  private readonly logger = Logger.getLogger(APP_NAME, SynapseInferenceClient.name);
+
+  constructor(private readonly synapse: SynapseClient) {
+    super();
   }
 
-  async completeJson(request: InferenceRequest): Promise<unknown> {
-    const configured = Config.get('ai.inference-url');
-    if (!configured) throw AppErrorCode.AI_009.create();
+  async completeJson(request: InferenceRequest): Promise<InferenceResult> {
+    const response = await this.synapse
+      .chat(
+        {
+          model: request.task,
+          temperature: TEMPERATURE,
+          response_format: { type: 'json_object' },
+          messages: [
+            { role: 'system', content: request.systemPrompt },
+            { role: 'user', content: request.userPrompt },
+          ],
+          synapse: { subject: { type: 'user', id: request.subjectId }, selectors: { plan: request.plan } },
+        },
+        { signal: AbortSignal.timeout(Config.get('ai.inference-timeout-ms')) },
+      )
+      .catch((error: unknown) => {
+        throw this.toAppError(request.task, error);
+      });
 
-    const baseUrl = resolveInferenceUrl(configured);
-    if (!baseUrl) throw AppErrorCode.AI_009.create();
+    return { content: this.parseContent(response), model: response.synapse?.model ?? response.model };
+  }
 
-    const response = await fetch(`${baseUrl}/api/chat`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      signal: AbortSignal.timeout(Config.get('ai.inference-timeout-ms')),
-      body: JSON.stringify({
-        model: Config.get('ai.model'),
-        stream: false,
-        format: 'json',
-        options: { temperature: 0.2 },
-        messages: [
-          { role: 'system', content: request.systemPrompt },
-          { role: 'user', content: request.userPrompt },
-        ],
-      }),
-    }).catch(() => {
-      throw AppErrorCode.AI_009.create();
-    });
-
-    if (!response.ok) throw AppErrorCode.AI_009.create();
-    const body = (await response.json()) as { message?: { content?: string } };
-    const content = body.message?.content;
-    if (!content) throw AppErrorCode.AI_009.create();
+  private parseContent(response: SynapseChatResponse): unknown {
+    const message = response.choices?.[0]?.message;
+    if (message?.refusal || response.choices[0]?.finish_reason === 'content_filter') throw AppErrorCode.AI_013.create();
+    if (!message?.content) throw AppErrorCode.AI_009.create();
 
     try {
-      return JSON.parse(content);
+      return JSON.parse(message.content);
     } catch {
       throw AppErrorCode.AI_009.create();
     }
+  }
+
+  private toAppError(task: InferenceTask, error: unknown): AppError {
+    const terminal = isSynapseError(error) && TERMINAL_CODES.has(error.code);
+    this.logger.warn('Synapse inference call failed', {
+      task,
+      terminal,
+      code: isSynapseError(error) ? error.code : undefined,
+      status: isSynapseError(error) ? error.status : undefined,
+    });
+    return terminal ? AppErrorCode.AI_013.create() : AppErrorCode.AI_009.create();
   }
 }

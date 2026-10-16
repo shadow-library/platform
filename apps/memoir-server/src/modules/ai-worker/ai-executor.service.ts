@@ -4,7 +4,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { Injectable, type OnModuleInit } from '@shadow-library/app';
-import { Config, Logger } from '@shadow-library/common';
+import { AppError, Config, Logger } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
@@ -13,11 +13,13 @@ import { EntitlementService } from '@modules/billing';
 import { InferenceClient } from '@modules/inference';
 import { NotificationClient } from '@modules/notifications';
 import { SchedulerService } from '@modules/scheduler';
+import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type AiTask } from '@server/database';
 import { logMetric } from '@server/telemetry';
 
 import { AiWorkerRepository } from './ai-worker.repository';
+import { type InferenceDraft } from './ai-worker.types';
 import { applyGuardrails } from './guardrails';
 import { buildPrompt, parseDraft } from './prompt-contract';
 import { ReadAssemblyService } from './read-assembly.service';
@@ -79,10 +81,7 @@ export class AiExecutorService implements OnModuleInit {
     private readonly notifications: NotificationClient,
   ) {}
 
-  /** No inference endpoint means every claimed task would fail and burn its attempts, so the sweeps stay unregistered rather than draining the backlog into `failed`. */
   onModuleInit(): void {
-    if (!Config.get('ai.inference-url')) return;
-
     this.scheduler.registerSweep(BATCH_SWEEP, Config.get('ai.batch-poll-interval-minutes') * MS_PER_MINUTE, () => this.runBatchWindow());
     this.scheduler.registerSweep(RETRY_SWEEP, Config.get('ai.retry-poll-interval-minutes') * MS_PER_MINUTE, () => this.runRetryPoll());
     this.scheduler.registerSweep(STUCK_SWEEP, Config.get('ai.stuck-sweep-interval-minutes') * MS_PER_MINUTE, async () => void (await this.recoverStuck()));
@@ -152,14 +151,18 @@ export class AiExecutorService implements OnModuleInit {
     const assembly = await this.readAssembly.assemble({ account, tier, consents, now }, windowStart);
     await this.repository.recordAudit(task.accountId, task.id, 'read_scope', assembly.dataClasses, assembly.rowCounts);
 
-    const draft = await this.inference
-      .completeJson(buildPrompt(task.queryText, assembly.context))
-      .then(parseDraft)
-      .catch(error => {
-        this.logger.warn('AI inference attempt failed', { taskId: task.id, error });
-        return null;
-      });
-    if (!draft) return this.retryOrFail(task, 'inference_unavailable');
+    let draft: InferenceDraft;
+    let model: string;
+    try {
+      const answer = await this.inference.completeJson({ ...buildPrompt(task.queryText, assembly.context), task: 'memoir.insight', subjectId: account.identitySub, plan: tier });
+      draft = parseDraft(answer.content);
+      model = answer.model;
+    } catch (error) {
+      this.logger.warn('AI inference attempt failed', { taskId: task.id, error });
+      if (!AppError.is(error, AppErrorCode.AI_013)) return this.retryOrFail(task, 'inference_unavailable');
+      await this.repository.fail(task, 'inference_refused');
+      return 'failed';
+    }
 
     const outcome = applyGuardrails({ queryText: task.queryText, sensitiveSources: assembly.sensitiveSources, allowedQuestIds: assembly.questIds, draft });
     if (outcome.status === 'blocked') {
@@ -177,7 +180,7 @@ export class AiExecutorService implements OnModuleInit {
       suggestions: result.suggestions,
       citations: assembly.dataClasses,
       limitationNote: result.limitationNote,
-      modelId: Config.get('ai.model'),
+      modelId: model,
       promptVersion: Config.get('ai.prompt-version'),
     });
     await this.repository.recordAudit(task.accountId, task.id, 'finished');

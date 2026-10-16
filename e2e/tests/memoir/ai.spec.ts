@@ -6,7 +6,7 @@ import { type APIRequestContext, type APIResponse } from '@playwright/test';
 /**
  * Importing user defined packages
  */
-import { memoirDb, probeMemoirConfigKeys } from '../../lib';
+import { memoirDb } from '../../lib';
 import { expect, test } from './fixtures';
 import { createDailyQuest, errorCodeOf, memoirCsrfHeaders, memoirMutate } from './helpers';
 
@@ -34,18 +34,11 @@ interface AiConsentView {
  * Declaring the constants
  *
  * `POST /ai/tasks`, `/tasks/{id}/cancel`, `/consents`, `/scheduled-query` and `/results/{id}/apply`
- * (ARCHITECTURE §15). `AiExecutorService.drain()` only ever fires from a sweep, and
- * `AiExecutorService.onModuleInit()` never registers it while `ai.inference-url` is unset (see
- * `ocr.spec.ts`) — every submit/consent/apply path exercised here is otherwise synchronous and never
- * reaches the inference client, so most of these scenarios don't depend on that key at all. The one
- * exception is the cancel-refunds-a-pending-task half of the cancel test below: once `ai.inference-url`
- * is configured, `AiExecutorService.claimNext` (`ai-worker.repository.ts:66-71`) claims any `pending`
- * task with `submitted_at <= now()` — there is no batch-window gate in the claim query itself — on the
- * sweep's own cadence (`ai.batch-poll-interval-minutes`, default 5 minutes). That default is far longer
- * than this test takes to submit-then-cancel, so the race is not live today, but a shorter poll interval
- * (plausible in the dedicated AI test environment being built separately) could let `drain()` claim the
- * task before the cancel lands — that test is guarded with the same `probeMemoirConfigKeys` skip
- * `ocr.spec.ts` uses, rather than assumed safe forever.
+ * (ARCHITECTURE §15). `AiExecutorService.drain()` only ever fires from a sweep, which is always registered; inference goes through
+ * Synapse (task `memoir.insight`), routed to local Ollama in the test environment. Submit, consent and apply paths are synchronous and
+ * never reach inference. The cancel test races the sweep: `claimNext` (`ai-worker.repository.ts`) can claim any `pending` task on the
+ * sweep's cadence (`ai.batch-poll-interval-minutes`, default 5 minutes), so a cancel answers either 200 (refunded) or 409 `AI_004`
+ * (already claimed), and the test asserts the contract of whichever happened.
  *
  * The free- and paid-tier quota caps (`quotas.ai-free-monthly`/`quotas.ai-paid-daily`) are read live by
  * discovering them through real submissions rather than hardcoded, mirroring `ocr.spec.ts`'s live-cap read —
@@ -86,13 +79,6 @@ async function discoverQuotaCap(ctx: APIRequestContext, exhaustedCode: 'AI_001' 
 }
 
 test.describe('memoir ai', () => {
-  let aiConfigured: boolean;
-  let probeFailed: boolean;
-
-  test.beforeAll(async () => {
-    ({ configured: aiConfigured, probeFailed } = await probeMemoirConfigKeys(['AI_INFERENCE_URL']));
-  });
-
   test('should block a free-tier submission past the monthly AI quota with 402 AI_001, staying exhausted on a further attempt', async ({ memoir }) => {
     const persona = await memoir.persona({ label: 'ai-free-quota', onboard: true });
 
@@ -135,9 +121,6 @@ test.describe('memoir ai', () => {
   });
 
   test('should refund quota when cancelling a pending task, and 404 AI_003 for an unknown id', async ({ memoir }) => {
-    test.skip(probeFailed, 'could not read memoir config from the cluster');
-    test.skip(aiConfigured, 'ai.inference-url is configured in this environment; drain() could claim the task before the cancel lands');
-
     const persona = await memoir.persona({ label: 'ai-cancel', onboard: true });
 
     const created = await submitAiTask(persona.ctx, 'question to cancel');
@@ -148,11 +131,13 @@ test.describe('memoir ai', () => {
     expect(beforeCancel?.quotaConsumed, 'the submission consumed quota').toBe(true);
 
     const cancelled = await cancelAiTask(persona.ctx, id);
-    expect(cancelled.status(), await cancelled.text()).toBe(200);
-    expect(((await cancelled.json()) as AiTaskView).status).toBe('cancelled');
-
-    const [afterCancel] = await memoirDb()<{ quotaConsumed: boolean }[]>`SELECT quota_consumed AS "quotaConsumed" FROM ai_tasks WHERE id = ${id}`;
-    expect(afterCancel?.quotaConsumed, 'cancelling a still-pending task refunds the quota it consumed').toBe(false);
+    if (cancelled.status() === 200) {
+      expect(((await cancelled.json()) as AiTaskView).status).toBe('cancelled');
+      const [afterCancel] = await memoirDb()<{ quotaConsumed: boolean }[]>`SELECT quota_consumed AS "quotaConsumed" FROM ai_tasks WHERE id = ${id}`;
+      expect(afterCancel?.quotaConsumed, 'cancelling a still-pending task refunds the quota it consumed').toBe(false);
+    } else {
+      await expectRefusal(cancelled, 409, 'AI_004');
+    }
 
     const unknown = await cancelAiTask(persona.ctx, crypto.randomUUID());
     await expectRefusal(unknown, 404, 'AI_003');

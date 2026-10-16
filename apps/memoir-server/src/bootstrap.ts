@@ -34,9 +34,7 @@ declare module '@shadow-library/common' {
     'ai.max-attempts': number;
     'ai.claim-batch-size': number;
     'ai.free-history-months': number;
-    'ai.inference-url': string;
     'ai.inference-timeout-ms': number;
-    'ai.model': string;
     'ai.prompt-version': string;
     'ai.task-timeout-minutes': number;
 
@@ -151,14 +149,7 @@ Config.load('ai.claim-batch-size', { defaultValue: '50', validateType: 'number',
 /** PRD §6.4: free tier reads a trailing 3 months, paid reads full history. */
 Config.load('ai.free-history-months', { defaultValue: '3', validateType: 'number', reloadable: true });
 
-/**
- * D6: in-cluster inference only — the client refuses to start against a host outside the cluster on a
- * production deployment. Unset means no inference is configured at all, which the AI executor and the
- * OCR structuring path both surface as unavailability rather than a fabricated answer.
- */
-Config.load('ai.inference-url', { defaultValue: '' });
 Config.load('ai.inference-timeout-ms', { defaultValue: '120000', validateType: 'number', reloadable: true });
-Config.load('ai.model', { defaultValue: 'llama3.1' });
 Config.load('ai.prompt-version', { defaultValue: 'v1' });
 Config.load('ai.task-timeout-minutes', { defaultValue: '30', validateType: 'number', reloadable: true });
 

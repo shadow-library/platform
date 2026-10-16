@@ -235,8 +235,8 @@ export class AppErrorCode extends ServerErrorCode {
   /** The addressed suggestion's deep-link quest id does not belong to the caller, or no longer exists */
   static readonly AI_008 = AppErrorCode.notFound('AI_008', 'The quest this suggestion targets was not found');
 
-  /** In-cluster inference was unreachable or answered outside the prompt contract; the worker retries the task and refunds quota once attempts are exhausted (never surfaced to a client — no user route calls inference) */
-  static readonly AI_009 = AppErrorCode.unavailable('AI_009', 'In-cluster inference did not return a usable answer');
+  /** Synapse was unreachable, over budget, timed out or answered outside the prompt contract; the worker retries the task and refunds quota once attempts are exhausted (never surfaced to a client — no user route calls inference) */
+  static readonly AI_009 = AppErrorCode.unavailable('AI_009', 'The AI service did not return a usable answer');
 
   /** The §6.6 post-filter refused the model output; the task fails and its quota is refunded rather than shipping an answer that breaks a guardrail */
   static readonly AI_010 = AppErrorCode.unavailable('AI_010', 'The generated answer was refused by the output guardrails');
@@ -246,6 +246,9 @@ export class AppErrorCode extends ServerErrorCode {
 
   /** A first-decision consent write must name every consent data class exactly once */
   static readonly AI_012 = AppErrorCode.badRequest('AI_012', 'A first consent decision must name every data class exactly once');
+
+  /** Synapse or the model refused the request outright; retrying cannot change that, so the worker fails the task and refunds its quota */
+  static readonly AI_013 = AppErrorCode.badRequest('AI_013', 'The AI service refused this request');
 
   /*!
    * Account Export Errors

@@ -11,7 +11,7 @@ import { InferenceClient } from '@modules/inference';
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 
-import { type OcrLineItem, OcrStructuringClient, type OcrStructuringResult } from './ocr-structuring.client';
+import { type OcrLineItem, OcrStructuringClient, type OcrStructuringRequest, type OcrStructuringResult } from './ocr-structuring.client';
 
 /**
  * Defining types
@@ -65,25 +65,28 @@ export function toStructuringResult(raw: unknown): OcrStructuringResult {
   };
 }
 
-/**
- * ARCHITECTURE §14.3 step 2: receipt text is user data, so structuring runs on the same in-cluster
- * inference boundary as the AI worker (D6) — the seam T-27 left behind a deterministic double until
- * T-33's client existed. Any inference failure surfaces as `OCR_002`, which the endpoint already treats
- * as "the attempt consumed quota and produced nothing", never as a fabricated result.
- */
+/** Any inference failure surfaces as `OCR_002`, which the endpoint already treats as "the attempt consumed quota and produced nothing", never as a fabricated result. */
 @Injectable()
-export class InClusterOcrStructuringClient extends OcrStructuringClient {
-  private readonly logger = Logger.getLogger(APP_NAME, InClusterOcrStructuringClient.name);
+export class SynapseOcrStructuringClient extends OcrStructuringClient {
+  private readonly logger = Logger.getLogger(APP_NAME, SynapseOcrStructuringClient.name);
 
   constructor(private readonly inference: InferenceClient) {
     super();
   }
 
-  async parse(extractedText: string): Promise<OcrStructuringResult> {
-    const raw = await this.inference.completeJson({ systemPrompt: SYSTEM_PROMPT, userPrompt: `Receipt text:\n${extractedText}` }).catch(error => {
-      this.logger.warn('Receipt structuring inference failed', { error });
-      throw AppErrorCode.OCR_002.create();
-    });
-    return toStructuringResult(raw);
+  async parse(request: OcrStructuringRequest): Promise<OcrStructuringResult> {
+    const { content } = await this.inference
+      .completeJson({
+        task: 'memoir.receipt-structuring',
+        subjectId: request.subjectId,
+        plan: request.plan,
+        systemPrompt: SYSTEM_PROMPT,
+        userPrompt: `Receipt text:\n${request.extractedText}`,
+      })
+      .catch(error => {
+        this.logger.warn('Receipt structuring inference failed', { error });
+        throw AppErrorCode.OCR_002.create();
+      });
+    return toStructuringResult(content);
   }
 }
