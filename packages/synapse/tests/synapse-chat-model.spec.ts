@@ -43,7 +43,7 @@ describe('SynapseChatModel', () => {
     synapse.reply(json(CHAT_COMPLETION));
     await model({ temperature: 0.4 }).invoke('Hi');
 
-    expect(synapse.requests[0]?.url).toBe('http://synapse-server/api/v1/chat/completions');
+    expect(synapse.requests[0]?.url).toBe('http://synapse-server.synapse/api/v1/chat/completions');
     expect(synapse.requests[0]?.body).toMatchObject({ model: 'novel-forge.chat', temperature: 0.4, messages: [{ role: 'user', content: 'Hi' }], synapse: ENVELOPE });
   });
 
@@ -64,7 +64,7 @@ describe('SynapseChatModel', () => {
     synapse.reply(json(CHAT_COMPLETION));
     const message = await model({ reasoning: { summary: 'auto' } }).invoke('Hi');
 
-    expect(synapse.requests[0]?.url).toBe('http://synapse-server/api/v1/chat/completions');
+    expect(synapse.requests[0]?.url).toBe('http://synapse-server.synapse/api/v1/chat/completions');
     expect(message.response_metadata.synapse).toEqual(SYNAPSE_BLOCK);
   });
 

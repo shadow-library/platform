@@ -55,7 +55,7 @@ describe('EmbeddingService on the synapse backend', () => {
 
     expect(await h.embedding.embedBatch(7n, ['first chunk', 'second chunk'])).toEqual([vector(1), vector(2)]);
     expect(h.synapse.requests).toHaveLength(1);
-    expect(h.synapse.requests[0]?.url).toBe('http://synapse-server/api/v1/embeddings');
+    expect(h.synapse.requests[0]?.url).toBe('http://synapse-server.synapse/api/v1/embeddings');
     expect(h.synapse.requests[0]?.body).toMatchObject({
       model: 'novel-forge.embedding',
       input: ['first chunk', 'second chunk'],

@@ -1,6 +1,7 @@
 export const NAMESPACE = '@shadow-library/synapse';
 
-export const DEFAULT_SERVICE_NAME = 'synapse-server';
+/** Namespace-qualified so a caller in any namespace reaches it with no `SERVICE_URL_*` override */
+export const DEFAULT_SERVICE_NAME = 'synapse-server.synapse';
 export const API_PATH = '/api/v1';
 
 export const SYNAPSE_RESOURCE = 'api://synapse';

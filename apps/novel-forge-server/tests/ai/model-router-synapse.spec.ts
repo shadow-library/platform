@@ -328,7 +328,7 @@ describe('ModelRouterService on the synapse backend', () => {
       h.synapse.reply(json(completion(JSON.stringify({ title: 'x' }))));
       await h.router.structured(titlePrompt('judge'), {}, CTX, OWNED);
 
-      expect(h.synapse.catalogRequests[0]?.url).toBe('http://synapse-server/api/v1/catalog?task=novel-forge.review&selectors=content_mode%3Astandard%2Ctier%3Aeconomy');
+      expect(h.synapse.catalogRequests[0]?.url).toBe('http://synapse-server.synapse/api/v1/catalog?task=novel-forge.review&selectors=content_mode%3Astandard%2Ctier%3Aeconomy');
     });
 
     it('should neither read nor write the cache when the catalog version cannot be read', async () => {

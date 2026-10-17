@@ -57,7 +57,7 @@ describe('ModelRouterService.images on the synapse backend', () => {
     h.synapse.reply(generated());
     await h.router.images({ prompt: 'a lone tower', n: 2, inputReferences: ['data:image/png;base64,eA=='] }, CTX, OWNED);
 
-    expect(h.synapse.requests[0]?.url).toBe('http://synapse-server/api/v1/images/generations');
+    expect(h.synapse.requests[0]?.url).toBe('http://synapse-server.synapse/api/v1/images/generations');
     expect(h.synapse.requests[0]?.body).toMatchObject({
       model: 'novel-forge.image',
       prompt: 'a lone tower',

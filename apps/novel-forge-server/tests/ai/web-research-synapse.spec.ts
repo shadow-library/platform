@@ -46,7 +46,7 @@ describe('WebResearchService.modeFor on the synapse backend', () => {
     const synapse = new FakeSynapse().reply(json(catalog(true)));
 
     expect(await service(synapse).modeFor('anthropic/claude-opus-5.5', SELECTORS)).toBe('native');
-    expect(synapse.requests[0]?.url).toBe('http://synapse-server/api/v1/catalog?task=novel-forge.chat&selectors=content_mode%3Astandard%2Ctier%3Abalanced');
+    expect(synapse.requests[0]?.url).toBe('http://synapse-server.synapse/api/v1/catalog?task=novel-forge.chat&selectors=content_mode%3Astandard%2Ctier%3Abalanced');
   });
 
   it('should fall back to Brave, or to no web without its key, when the catalog says no or cannot answer', async () => {

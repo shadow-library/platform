@@ -30,14 +30,14 @@ describe('SynapseClient', () => {
   });
 
   afterEach(() => {
-    delete process.env.SERVICE_URL_SYNAPSE_SERVER;
+    delete process.env.SERVICE_URL_SYNAPSE_SERVER_SYNAPSE;
     delete process.env.SERVICE_URL_SYNAPSE_STAGING;
   });
 
   it('should resolve the base url through service discovery, honouring an override set after construction', () => {
-    expect(client.baseUrl).toBe('http://synapse-server/api/v1');
-    process.env.SERVICE_URL_SYNAPSE_SERVER = 'http://synapse-server.synapse';
     expect(client.baseUrl).toBe('http://synapse-server.synapse/api/v1');
+    process.env.SERVICE_URL_SYNAPSE_SERVER_SYNAPSE = 'http://localhost:8090';
+    expect(client.baseUrl).toBe('http://localhost:8090/api/v1');
     process.env.SERVICE_URL_SYNAPSE_STAGING = 'https://synapse.test';
     expect(new SynapseClient({ authClient: auth, serviceName: 'synapse-staging' }).baseUrl).toBe('https://synapse.test/api/v1');
   });
@@ -47,7 +47,7 @@ describe('SynapseClient', () => {
     const response = await client.chat(request());
 
     expect(response.synapse.alias).toBe('opus');
-    expect(synapse.requests[0]).toMatchObject({ url: 'http://synapse-server/api/v1/chat/completions', method: 'POST' });
+    expect(synapse.requests[0]).toMatchObject({ url: 'http://synapse-server.synapse/api/v1/chat/completions', method: 'POST' });
     expect(synapse.requests[0]?.body).toMatchObject({
       model: 'novel-forge.chat',
       stream: false,
@@ -80,7 +80,7 @@ describe('SynapseClient', () => {
       { resource: 'api://synapse', scopes: ['synapse:infer', 'synapse:catalog:read'] },
     ]);
     expect(synapse.requests.map(sent => sent.headers.get('authorization'))).toEqual(['Bearer token-1', 'Bearer token-2']);
-    expect(synapse.requests[1]?.url).toBe('http://synapse-server/api/v1/embeddings');
+    expect(synapse.requests[1]?.url).toBe('http://synapse-server.synapse/api/v1/embeddings');
   });
 
   it('should retry a refused connection once with the same body', async () => {
@@ -174,7 +174,7 @@ describe('SynapseClient', () => {
     const response = await client.images({ model: 'novel-forge.image', prompt: 'a lighthouse', n: 1, synapse: request().synapse });
 
     expect(response.data[0]?.media_type).toBe('image/png');
-    expect(synapse.requests[0]?.url).toBe('http://synapse-server/api/v1/images/generations');
+    expect(synapse.requests[0]?.url).toBe('http://synapse-server.synapse/api/v1/images/generations');
   });
 });
 
