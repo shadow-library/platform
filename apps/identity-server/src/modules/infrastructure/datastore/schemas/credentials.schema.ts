@@ -1,6 +1,8 @@
 import { InferEnum, InferSelectModel, relations, sql } from 'drizzle-orm';
 import { bigint, bigserial, boolean, index, integer, pgEnum, pgTable, text, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
+import { type Envelope } from '@shadow-library/common/crypto';
 
+import { jsonb } from './jsonb';
 import { users } from './users.schema';
 
 export type MfaEnrollment = InferSelectModel<typeof mfaEnrollments>;
@@ -21,8 +23,11 @@ export const mfaEnrollments = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     type: mfaMethod('type').notNull(),
+    /** Legacy, read only by the one-release backfill and fallback; superseded by `secretEnvelope` */
     secretCiphertext: text('secret_ciphertext'),
     kekVersion: integer('kek_version'),
+    /** Null for the methods that store no secret (WebAuthn, email OTP) */
+    secretEnvelope: jsonb('secret_envelope').$type<Envelope>(),
     label: varchar('label', { length: 64 }).notNull().default('default'),
     verifiedAt: timestamp('verified_at', { withTimezone: true }),
     lastUsedAt: timestamp('last_used_at', { withTimezone: true }),

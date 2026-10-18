@@ -24,8 +24,14 @@ Identity and never stores credentials. This is the only doc that describes the a
 - Browser to Identity uses an opaque server-side session cookie (hashed at rest) through one origin: a reverse proxy sends API/OAuth/SAML paths to `identity-server`, the rest to
   `identity-web`. Register/login/recover are short-lived Redis flows that end in a session; OAuth artifacts are minted only by the OAuth endpoints, the app-sessions API and `ServiceTokenService` (Identity's own outbound M2M calls).
 - Postgres is authoritative; Redis holds only flows, rate limits, caches and counters. Signing keys are EdDSA; rotation exists in `KeyService` but nothing calls it, so there is no
-  automated or admin rotation path. The `token_type` claim (user, service, bot) discriminates principals. `security.master-encryption-key` also keys the recovery-code
-  lookup hashes and SAML pairwise ids, so rotating it invalidates every issued recovery code (users must regenerate them) and changes every SAML NameID.
+  automated or admin rotation path. The `token_type` claim (user, service, bot) discriminates principals.
+- Secrets at rest (signing-key private keys, IdP client secrets, TOTP secrets, webhook secrets) are envelopes from `@shadow-library/common/crypto`, sealed under the
+  `identity.crypto.keys` keyring and bound to `identity:<table>:<row id>:<secret>`, so an envelope cannot move between rows or columns; each row id exists before its insert.
+  Rotation prepends a key; boot fails while any stored envelope uses a key the keyring lacks, and a background rewrap moves rows onto the active key. `identity.hmac-key` is
+  separate and is never rotated: it keys the recovery-code lookup hashes and SAML pairwise ids (HKDF, salt `shadow-identity`), so a new value invalidates every issued
+  recovery code and changes every SAML NameID. It holds the former `security.master-encryption-key` value unchanged, and for one release `sha256` of it still reads the
+  pre-keyring legacy columns: the migrate job seals them before the rollout and fails if any row cannot be read, and a row an old pod writes during the rollout is read
+  through them until the next boot seals it. Those columns are kept so an older image can still read older rows, and are never written.
 - PDP/PEP: Identity decides; consuming services enforce via `@shadow-library/auth` (`packages/auth`), configured with issuer, app id and one credential. Its guards verify tokens
   offline against JWKS and call the PDP with a cached decision (shorter for `highRisk`); it also serves first-party login/callback/logout/step-up routes.
 - Identity's own routes use `@Auth({ ... })`; an undecorated route is unguarded, so state intent with `public: true`. Access errors are codes; `identity-web` owns copy.

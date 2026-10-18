@@ -68,8 +68,7 @@ export class SamlService {
   ) {
     this.db = databaseService.getPostgresClient();
     this.redis = databaseService.getRedisClient();
-    const masterKey = Config.get('security.master-encryption-key');
-    this.pairwiseKey = Buffer.from(hkdfSync('sha256', masterKey, 'shadow-identity', 'saml-pairwise-name-id', 32));
+    this.pairwiseKey = Buffer.from(hkdfSync('sha256', Config.get('identity.hmac-key'), 'shadow-identity', 'saml-pairwise-name-id', 32));
   }
 
   private assertValidServiceProvider(entityId: string, acsUrl: string, releasedAttributes: string[]): void {

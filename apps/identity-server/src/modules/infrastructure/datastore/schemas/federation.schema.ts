@@ -1,5 +1,8 @@
 import { InferEnum, InferSelectModel, sql } from 'drizzle-orm';
 import { bigint, bigserial, boolean, index, integer, pgEnum, pgTable, text, timestamp, unique, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
+import { type Envelope } from '@shadow-library/common/crypto';
+
+import { jsonb } from './jsonb';
 
 import { organisations } from './organisations.schema';
 import { users } from './users.schema';
@@ -28,12 +31,14 @@ export const identityProviders = pgTable(
     name: varchar('name', { length: 255 }).notNull(),
     issuer: text('issuer').notNull(),
     clientId: text('client_id').notNull(),
-    clientSecretCiphertext: text('client_secret_ciphertext').notNull(),
-    clientSecretIv: text('client_secret_iv').notNull(),
-    clientSecretAuthTag: text('client_secret_auth_tag').notNull(),
+    /** Legacy, read only by the one-release backfill and fallback; superseded by `clientSecretEnvelope` */
+    clientSecretCiphertext: text('client_secret_ciphertext'),
+    clientSecretIv: text('client_secret_iv'),
+    clientSecretAuthTag: text('client_secret_auth_tag'),
     kekVersion: integer('kek_version').notNull().default(1),
+    clientSecretEnvelope: jsonb('client_secret_envelope').$type<Envelope>(),
     scopes: varchar('scopes', { length: 255 }).notNull().default('openid email profile'),
-    /** Apple only: the Developer Team ID (`iss`) and the `.p8` key's Key ID (`kid`) needed to mint the ES256 client-secret JWT; the key itself rides `clientSecretCiphertext`. */
+    /** Apple only: the Developer Team ID (`iss`) and the `.p8` key's Key ID (`kid`) needed to mint the ES256 client-secret JWT; the key itself rides `clientSecretEnvelope`. */
     appleTeamId: varchar('apple_team_id', { length: 64 }),
     appleKeyId: varchar('apple_key_id', { length: 64 }),
     authorizationEndpoint: text('authorization_endpoint').notNull(),

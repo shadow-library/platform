@@ -6,7 +6,7 @@ import { Injectable, OnModuleInit } from '@shadow-library/app';
 import { AppError, Logger, throwError } from '@shadow-library/common';
 
 import { APP_NAME } from '@server/constants';
-import { KeyProvider } from '@server/modules/auth/keys';
+import { legacyColumns, SEALED_COLUMNS, SecretSealer } from '@server/modules/auth/keys';
 import { DatabaseService, PrimaryDatabase, schema, SigningKey } from '@server/modules/infrastructure/datastore';
 
 export interface SamlSigningKey {
@@ -29,7 +29,7 @@ export class SamlKeyService implements OnModuleInit {
 
   constructor(
     databaseService: DatabaseService,
-    private readonly keyProvider: KeyProvider,
+    private readonly sealer: SecretSealer,
   ) {
     this.db = databaseService.getPostgresClient();
   }
@@ -52,7 +52,8 @@ export class SamlKeyService implements OnModuleInit {
     let activeKid: string | null = null;
     for (const row of rows) {
       if (!row.certificatePem) continue;
-      const der = this.keyProvider.decrypt({ ciphertext: row.privateKeyCiphertext, iv: row.privateKeyIv, authTag: row.privateKeyAuthTag, kekVersion: row.kekVersion });
+      const legacy = legacyColumns(row.privateKeyCiphertext, row.privateKeyIv, row.privateKeyAuthTag);
+      const der = await this.sealer.open({ envelope: row.privateKeyEnvelope, legacy }, SEALED_COLUMNS.signingKey, row.kid);
       const privateKeyPem = createPrivateKey({ key: der, format: 'der', type: 'pkcs8' }).export({ format: 'pem', type: 'pkcs8' }).toString();
       keys.set(row.kid, { kid: row.kid, status: row.status, privateKeyPem, certificatePem: row.certificatePem });
       if (row.status === 'ACTIVE') activeKid = row.kid;
@@ -79,17 +80,14 @@ export class SamlKeyService implements OnModuleInit {
     });
 
     const jwk = publicKey.export({ format: 'jwk' }) as unknown as Record<string, string>;
-    const encrypted = this.keyProvider.encrypt(privateKey.export({ format: 'der', type: 'pkcs8' }));
+    const privateKeyEnvelope = await this.sealer.seal(privateKey.export({ format: 'der', type: 'pkcs8' }), SEALED_COLUMNS.signingKey, kid);
     await this.db.insert(schema.signingKeys).values({
       kid,
       algorithm: 'RS256',
       purpose: 'SAML',
       publicJwk: { ...jwk, kid, use: 'sig', alg: 'RS256' },
       certificatePem: certificate.toString('pem'),
-      privateKeyCiphertext: encrypted.ciphertext,
-      privateKeyIv: encrypted.iv,
-      privateKeyAuthTag: encrypted.authTag,
-      kekVersion: encrypted.kekVersion,
+      privateKeyEnvelope,
       status,
       activatedAt: status === 'ACTIVE' ? new Date() : null,
     });

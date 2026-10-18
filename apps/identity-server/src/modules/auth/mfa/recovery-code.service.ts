@@ -36,7 +36,7 @@ export class RecoveryCodeService {
     private readonly rateLimiter: RateLimiterService,
   ) {
     this.db = databaseService.getPostgresClient();
-    this.lookupKey = Buffer.from(hkdfSync('sha256', Config.get('security.master-encryption-key'), 'shadow-identity', 'recovery-code-lookup', 32));
+    this.lookupKey = Buffer.from(hkdfSync('sha256', Config.get('identity.hmac-key'), 'shadow-identity', 'recovery-code-lookup', 32));
   }
 
   private lookupHash(normalized: string): string {

@@ -237,6 +237,13 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly WHK_003 = AppErrorCode.notFound('WHK_003', 'Webhook delivery not found');
 
   /*!
+   * Stored Secret Error Codes
+   */
+
+  /** A row expected to hold a sealed secret has neither an envelope nor a legacy ciphertext */
+  static readonly KEY_001 = AppErrorCode.internal('KEY_001', 'The stored secret is missing');
+
+  /*!
    * Federation Error Codes
    */
 

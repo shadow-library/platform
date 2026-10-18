@@ -1,5 +1,6 @@
 import { InferEnum, InferSelectModel, sql } from 'drizzle-orm';
 import { integer, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import { type Envelope } from '@shadow-library/common/crypto';
 
 import { jsonb } from './jsonb';
 
@@ -25,10 +26,12 @@ export const signingKeys = pgTable(
     publicJwk: jsonb('public_jwk').notNull().$type<Record<string, string>>(),
     certificatePem: text('certificate_pem'),
 
-    privateKeyCiphertext: text('private_key_ciphertext').notNull(),
-    privateKeyIv: text('private_key_iv').notNull(),
-    privateKeyAuthTag: text('private_key_auth_tag').notNull(),
+    /** Legacy, read only by the one-release backfill and fallback; superseded by `privateKeyEnvelope` */
+    privateKeyCiphertext: text('private_key_ciphertext'),
+    privateKeyIv: text('private_key_iv'),
+    privateKeyAuthTag: text('private_key_auth_tag'),
     kekVersion: integer('kek_version').notNull().default(1),
+    privateKeyEnvelope: jsonb('private_key_envelope').$type<Envelope>(),
 
     status: signingKeyStatus('status').notNull().default('PENDING'),
     notBefore: timestamp('not_before', { withTimezone: true }).notNull().defaultNow(),

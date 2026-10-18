@@ -8,7 +8,9 @@ import { APP_NAME } from '@server/constants';
 import { DatabaseService, PrimaryDatabase, schema, SigningKey } from '@server/modules/infrastructure/datastore';
 
 import { decodeJwtHeader, encodeJwt, JwtClaims, verifyJwtSignature } from './jwt';
-import { KeyProvider } from './key-provider';
+import { legacyColumns } from './legacy-key-provider';
+import { SEALED_COLUMNS } from './sealed-secret.constants';
+import { SecretSealer } from './secret-sealer.service';
 
 export interface Jwk {
   kty: string;
@@ -48,7 +50,7 @@ export class KeyService implements OnModuleInit {
 
   constructor(
     databaseService: DatabaseService,
-    private readonly keyProvider: KeyProvider,
+    private readonly sealer: SecretSealer,
   ) {
     this.db = databaseService.getPostgresClient();
   }
@@ -71,7 +73,8 @@ export class KeyService implements OnModuleInit {
     let activeKid: string | null = null;
     for (const row of rows) {
       const publicKey = createPublicKey({ key: row.publicJwk, format: 'jwk' });
-      const der = this.keyProvider.decrypt({ ciphertext: row.privateKeyCiphertext, iv: row.privateKeyIv, authTag: row.privateKeyAuthTag, kekVersion: row.kekVersion });
+      const legacy = legacyColumns(row.privateKeyCiphertext, row.privateKeyIv, row.privateKeyAuthTag);
+      const der = await this.sealer.open({ envelope: row.privateKeyEnvelope, legacy }, SEALED_COLUMNS.signingKey, row.kid);
       const privateKey = createPrivateKey({ key: der, format: 'der', type: 'pkcs8' });
       keys.set(row.kid, { kid: row.kid, status: row.status, publicKey, privateKey });
       if (row.status === 'ACTIVE') activeKid = row.kid;
@@ -85,16 +88,13 @@ export class KeyService implements OnModuleInit {
     const kid = randomUUID();
     const jwk = publicKey.export({ format: 'jwk' }) as unknown as Record<string, string>;
     const der = privateKey.export({ format: 'der', type: 'pkcs8' });
-    const encrypted = this.keyProvider.encrypt(der);
+    const privateKeyEnvelope = await this.sealer.seal(der, SEALED_COLUMNS.signingKey, kid);
 
     await this.db.insert(schema.signingKeys).values({
       kid,
       algorithm: 'EdDSA',
       publicJwk: { ...jwk, kid, use: 'sig', alg: 'EdDSA' },
-      privateKeyCiphertext: encrypted.ciphertext,
-      privateKeyIv: encrypted.iv,
-      privateKeyAuthTag: encrypted.authTag,
-      kekVersion: encrypted.kekVersion,
+      privateKeyEnvelope,
       status,
       activatedAt: status === 'ACTIVE' ? new Date() : null,
     });

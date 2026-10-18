@@ -107,7 +107,7 @@ export class WebhookDeliveryService {
     await this.targetGuard.assertDeliverable(subscription.targetUrl);
 
     const timestamp = Math.floor(Date.now() / 1000);
-    const secrets = this.webhookService.signingSecretsOf(subscription);
+    const secrets = await this.webhookService.signingSecretsOf(subscription);
     // redirect:'manual' stops a guard-validated endpoint bouncing delivery inward; a rebind window persists (guard-resolve -> fetch) as Bun's fetch exposes no hook to pin the resolved IP.
     const response = await fetch(subscription.targetUrl, {
       method: 'POST',

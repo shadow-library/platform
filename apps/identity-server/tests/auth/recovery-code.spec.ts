@@ -50,7 +50,7 @@ describe('RecoveryCodeService', () => {
   let hash: ReturnType<typeof spyOn<typeof Bun.password, 'hash'>>;
 
   beforeEach(() => {
-    setConfig({ 'security.master-encryption-key': 'test-master-key', 'rate-limit.enabled': true, 'rate-limit.ip-allowlist': '' });
+    setConfig({ 'identity.hmac-key': 'test-master-key', 'rate-limit.enabled': true, 'rate-limit.ip-allowlist': '' });
     hash = spyOn(Bun.password, 'hash').mockImplementation((password => Promise.resolve(`argon2:${String(password)}`)) as typeof Bun.password.hash);
     verify = spyOn(Bun.password, 'verify').mockImplementation(((password, stored) => Promise.resolve(stored === `argon2:${String(password)}`)) as typeof Bun.password.verify);
   });

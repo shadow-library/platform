@@ -3,11 +3,12 @@ import { randomBytes } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger, throwError } from '@shadow-library/common';
+import { CryptoErrorCode } from '@shadow-library/common/crypto';
 
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
-import { KeyProvider } from '@server/modules/auth/keys';
-import { AuditEvent, DatabaseService, PrimaryDatabase, schema, WebhookSubscription } from '@server/modules/infrastructure/datastore';
+import { SEALED_COLUMNS, SecretSealer } from '@server/modules/auth/keys';
+import { AuditEvent, DatabaseService, PrimaryDatabase, reserveSerialId, schema, WebhookSubscription } from '@server/modules/infrastructure/datastore';
 
 import { WebhookTargetGuard } from './webhook-target.guard';
 import { WEBHOOK_ROTATION_OVERLAP_HOURS, WEBHOOK_SECRET_PREFIX } from './webhook.constants';
@@ -32,17 +33,6 @@ export interface CreatedSubscription {
   secret: string;
 }
 
-interface SerializedSecret {
-  ciphertext: string;
-  iv: string;
-  authTag: string;
-}
-
-interface EncryptedSecret {
-  ciphertext: string;
-  kekVersion: number;
-}
-
 interface SubscriptionCache {
   subscriptions: WebhookSubscription[];
   expiresAt: number;
@@ -55,6 +45,8 @@ interface SubscriptionCache {
  * names, `prefix.*` patterns, or `*`.
  */
 const SUBSCRIPTION_CACHE_TTL_MS = 30_000;
+/** A stored secret that is tampered with, malformed or absent; a key missing from the keyring is a deployment fault, not the row's, and is rethrown */
+const UNREADABLE_SECRET_CODES = [CryptoErrorCode.DECRYPTION_FAILED, CryptoErrorCode.ENVELOPE_UNSUPPORTED, AppErrorCode.KEY_001];
 
 @Injectable()
 export class WebhookService {
@@ -64,7 +56,7 @@ export class WebhookService {
 
   constructor(
     databaseService: DatabaseService,
-    private readonly keyProvider: KeyProvider,
+    private readonly sealer: SecretSealer,
     private readonly targetGuard: WebhookTargetGuard,
   ) {
     this.db = databaseService.getPostgresClient();
@@ -74,21 +66,22 @@ export class WebhookService {
     return `${WEBHOOK_SECRET_PREFIX}${randomBytes(32).toString('base64url')}`;
   }
 
-  private encryptSecret(secret: string): EncryptedSecret {
-    const encrypted = this.keyProvider.encrypt(Buffer.from(secret, 'utf8'));
-    const serialized: SerializedSecret = { ciphertext: encrypted.ciphertext, iv: encrypted.iv, authTag: encrypted.authTag };
-    return { ciphertext: JSON.stringify(serialized), kekVersion: encrypted.kekVersion };
+  private async currentSecretOf(subscription: WebhookSubscription): Promise<string> {
+    const stored = { envelope: subscription.secretEnvelope, legacy: subscription.secretCiphertext };
+    return (await this.sealer.open(stored, SEALED_COLUMNS.webhookSecret, subscription.id)).toString('utf8');
   }
 
-  private decryptSecret(ciphertext: string, kekVersion: number): string {
-    const serialized = JSON.parse(ciphertext) as SerializedSecret;
-    return this.keyProvider.decrypt({ ...serialized, kekVersion }).toString('utf8');
+  private async previousSecretOf(subscription: WebhookSubscription): Promise<string | null> {
+    const stored = { envelope: subscription.previousSecretEnvelope, legacy: subscription.previousSecretCiphertext };
+    if (stored.envelope === null && stored.legacy === null) return null;
+    return (await this.sealer.open(stored, SEALED_COLUMNS.webhookPreviousSecret, subscription.id)).toString('utf8');
   }
 
-  signingSecretsOf(subscription: WebhookSubscription): string[] {
-    const secrets = [this.decryptSecret(subscription.secretCiphertext, subscription.kekVersion)];
+  async signingSecretsOf(subscription: WebhookSubscription): Promise<string[]> {
+    const secrets = [await this.currentSecretOf(subscription)];
     const overlapValid = subscription.previousSecretExpiresAt && subscription.previousSecretExpiresAt.getTime() > Date.now();
-    if (subscription.previousSecretCiphertext && overlapValid) secrets.push(this.decryptSecret(subscription.previousSecretCiphertext, subscription.kekVersion));
+    const previous = overlapValid ? await this.previousSecretOf(subscription) : null;
+    if (previous !== null) secrets.push(previous);
     return secrets;
   }
 
@@ -99,10 +92,11 @@ export class WebhookService {
   async create(input: CreateSubscriptionInput): Promise<CreatedSubscription> {
     this.targetGuard.assertAcceptableUrl(input.targetUrl);
     const secret = this.generateSecret();
-    const { ciphertext, kekVersion } = this.encryptSecret(secret);
+    const id = await reserveSerialId(this.db, 'webhook_subscriptions');
+    const secretEnvelope = await this.sealer.seal(secret, SEALED_COLUMNS.webhookSecret, id);
     const subscription = await this.db
       .insert(schema.webhookSubscriptions)
-      .values({ name: input.name, targetUrl: input.targetUrl, eventTypes: input.eventTypes, secretCiphertext: ciphertext, kekVersion })
+      .values({ id, name: input.name, targetUrl: input.targetUrl, eventTypes: input.eventTypes, secretEnvelope })
       .returning()
       .then(([row]) => row ?? throwError(AppError.internal('Failed to create webhook subscription')));
     this.invalidateCache();
@@ -133,25 +127,41 @@ export class WebhookService {
     return updated;
   }
 
+  /**
+   * The outgoing secret is re-sealed under the previous-secret context, since an envelope is bound to its column and cannot simply move. The row is
+   * locked first, so a concurrent rotation demotes this one's secret instead of both demoting the same one and losing a secret already handed out.
+   */
   async rotateSecret(subscriptionId: bigint): Promise<CreatedSubscription> {
-    const subscription = await this.getById(subscriptionId);
     const secret = this.generateSecret();
-    const { ciphertext, kekVersion } = this.encryptSecret(secret);
-    const [updated] = await this.db
-      .update(schema.webhookSubscriptions)
-      .set({
-        secretCiphertext: ciphertext,
-        kekVersion,
-        previousSecretCiphertext: subscription.secretCiphertext,
-        previousSecretExpiresAt: new Date(Date.now() + WEBHOOK_ROTATION_OVERLAP_HOURS * 3_600_000),
-        updatedAt: new Date(),
-      })
-      .where(eq(schema.webhookSubscriptions.id, subscriptionId))
-      .returning();
-    if (!updated) throw AppErrorCode.WHK_001.create();
+    const updated = await this.db.transaction(async tx => {
+      const [subscription] = await tx.select().from(schema.webhookSubscriptions).where(eq(schema.webhookSubscriptions.id, subscriptionId)).for('update');
+      if (!subscription) throw AppErrorCode.WHK_001.create();
+      const outgoing = await this.currentSecretOf(subscription).catch((error: unknown) => this.unreadableOutgoing(subscription.id, error));
+      const [row] = await tx
+        .update(schema.webhookSubscriptions)
+        .set({
+          secretEnvelope: await this.sealer.seal(secret, SEALED_COLUMNS.webhookSecret, subscription.id),
+          previousSecretEnvelope: outgoing === null ? null : await this.sealer.seal(outgoing, SEALED_COLUMNS.webhookPreviousSecret, subscription.id),
+          previousSecretExpiresAt: outgoing === null ? null : new Date(Date.now() + WEBHOOK_ROTATION_OVERLAP_HOURS * 3_600_000),
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.webhookSubscriptions.id, subscription.id))
+        .returning();
+      return row ?? throwError(AppErrorCode.WHK_001.create());
+    });
     this.invalidateCache();
     this.logger.info('Webhook secret rotated', { subscriptionId });
     return { subscription: updated, secret };
+  }
+
+  /** Rotation is how an admin repairs a subscription whose secret no longer opens, so it proceeds without an overlap rather than failing */
+  private unreadableOutgoing(subscriptionId: bigint, error: unknown): null {
+    if (!UNREADABLE_SECRET_CODES.some(code => AppError.is(error, code))) throw error;
+    this.logger.error('Rotating a webhook whose current secret could not be read; it gets no overlap window', {
+      subscriptionId,
+      code: AppError.is(error) ? error.code : 'unknown',
+    });
+    return null;
   }
 
   async remove(subscriptionId: bigint): Promise<void> {

@@ -16,8 +16,10 @@ declare module '@shadow-library/common' {
     /** How long after a rotation the same client's duplicate of the rotated token is refused without being treated as reuse. */
     'auth.refresh-token.reuse-grace-ms': number;
 
-    /** Key-encryption key used to wrap signing and encryption keys at rest; no default is permitted in production. */
-    'security.master-encryption-key': string;
+    /** Keyring sealing secrets at rest, `k2:<base64url 32 bytes>,k1:<…>`: the first entry encrypts and every entry decrypts, so a rotation prepends a key */
+    'identity.crypto.keys': string;
+    /** HKDF input behind SAML pairwise NameIDs and recovery-code lookups; never rotated, since a new value re-keys every NameID and recovery code */
+    'identity.hmac-key': string;
     'rate-limit.enabled': boolean;
     /** Comma-separated client IPs exempt from rate limiting. */
     'rate-limit.ip-allowlist': string;
@@ -79,7 +81,10 @@ Config.load('rate-limit.userinfo.subject-limit', { defaultValue: String(USERINFO
 
 Config.load('webhooks.allow-insecure-targets', { defaultValue: 'false', validateType: 'boolean' });
 
-Config.load('security.master-encryption-key', {
-  isProdRequired: true,
-  defaultValue: 'dev-only-insecure-master-encryption-key-do-not-use-in-production',
-});
+/** Public in this repository, so it protects nothing: production must set its own keyring, and `isProdRequired` refuses to boot without one */
+const DEV_CRYPTO_KEYS = 'dev:nMDVWUltK0QxaHot4ES5CaihPztwP-SAmTJ893KFOiI';
+/** The former `security.master-encryption-key` dev default, kept so local NameIDs, recovery codes and legacy ciphertexts stay valid */
+const DEV_HMAC_KEY = 'dev-only-insecure-master-encryption-key-do-not-use-in-production';
+
+Config.load('identity.crypto.keys', { isProdRequired: true, defaultValue: DEV_CRYPTO_KEYS });
+Config.load('identity.hmac-key', { isProdRequired: true, defaultValue: DEV_HMAC_KEY });

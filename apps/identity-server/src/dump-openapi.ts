@@ -7,14 +7,15 @@ silenceLogger();
 setConfig(OPENAPI_DUMP_CONFIG);
 
 const { AppModule } = await import('./app.module');
-const { KeyService } = await import('@modules/auth/keys');
+const { IdentityKeyringService, KeyService } = await import('@modules/auth/keys');
 const { SamlKeyService } = await import('@modules/auth/saml');
 const { BootstrapService } = await import('@modules/bootstrap');
 const { ApplicationService } = await import('@modules/system/application');
 
-/** Each of these loads or seeds signing keys, applications and the platform organisation from Postgres at boot */
+/** Each of these loads or seeds signing keys, sealed secrets, applications and the platform organisation from Postgres at boot */
 const overrides = [
   fakeDatabaseProvider(),
+  withoutStartupHooks(IdentityKeyringService),
   withoutStartupHooks(KeyService),
   withoutStartupHooks(SamlKeyService),
   withoutStartupHooks(BootstrapService),

@@ -1,5 +1,8 @@
 import { InferEnum, InferSelectModel } from 'drizzle-orm';
 import { bigint, bigserial, boolean, index, integer, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
+import { type Envelope } from '@shadow-library/common/crypto';
+
+import { jsonb } from './jsonb';
 
 export type WebhookSubscription = InferSelectModel<typeof webhookSubscriptions>;
 export type WebhookDelivery = InferSelectModel<typeof webhookDeliveries>;
@@ -16,9 +19,12 @@ export const webhookSubscriptions = pgTable('webhook_subscriptions', {
   targetUrl: text('target_url').notNull(),
   eventTypes: text('event_types').array().notNull(),
   isActive: boolean('is_active').notNull().default(true),
-  secretCiphertext: text('secret_ciphertext').notNull(),
-  kekVersion: integer('kek_version').notNull(),
+  /** Legacy, read only by the one-release backfill and fallback; superseded by `secretEnvelope` and `previousSecretEnvelope` */
+  secretCiphertext: text('secret_ciphertext'),
+  kekVersion: integer('kek_version'),
   previousSecretCiphertext: text('previous_secret_ciphertext'),
+  secretEnvelope: jsonb('secret_envelope').$type<Envelope>(),
+  previousSecretEnvelope: jsonb('previous_secret_envelope').$type<Envelope>(),
   previousSecretExpiresAt: timestamp('previous_secret_expires_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

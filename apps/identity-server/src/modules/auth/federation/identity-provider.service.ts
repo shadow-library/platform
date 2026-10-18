@@ -1,10 +1,12 @@
+import { randomUUID } from 'node:crypto';
+
 import { and, eq, isNull } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger, throwError } from '@shadow-library/common';
 
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME, oidcDiscoveryUrl } from '@server/constants';
-import { KeyProvider } from '@server/modules/auth/keys';
+import { legacyColumns, SEALED_COLUMNS, SecretSealer } from '@server/modules/auth/keys';
 import { type ValidatedSession } from '@server/modules/auth/session';
 import { AuditService } from '@server/modules/infrastructure/audit';
 import { DatabaseService, IdentityProvider, PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
@@ -68,7 +70,7 @@ export class IdentityProviderService {
 
   constructor(
     private readonly databaseService: DatabaseService,
-    private readonly keyProvider: KeyProvider,
+    private readonly sealer: SecretSealer,
     private readonly targetGuard: WebhookTargetGuard,
     private readonly auditService: AuditService,
   ) {
@@ -149,18 +151,17 @@ export class IdentityProviderService {
     input: CreateIdentityProvider,
   ): Promise<IdentityProvider> {
     const endpoints = await this.discover(input.issuer);
-    const secret = this.keyProvider.encrypt(Buffer.from(input.clientSecret));
+    const id = randomUUID();
+    const clientSecretEnvelope = await this.sealer.seal(input.clientSecret, SEALED_COLUMNS.identityProvider, id);
     return this.db
       .insert(schema.identityProviders)
       .values({
         ...scope,
+        id,
         name: input.name,
         issuer: input.issuer.replace(/\/$/, ''),
         clientId: input.clientId,
-        clientSecretCiphertext: secret.ciphertext,
-        clientSecretIv: secret.iv,
-        clientSecretAuthTag: secret.authTag,
-        kekVersion: secret.kekVersion,
+        clientSecretEnvelope,
         scopes: input.scopes ?? 'openid email profile',
         ...endpoints,
       })
@@ -170,8 +171,8 @@ export class IdentityProviderService {
   }
 
   async update(organisationId: bigint, id: string, patch: UpdateIdentityProvider): Promise<IdentityProvider> {
-    await this.requireForOrganisation(organisationId, id);
-    const secret = patch.clientSecret === undefined ? {} : this.toSecretColumns(patch.clientSecret);
+    const provider = await this.requireForOrganisation(organisationId, id);
+    const secret = await this.toSecretColumns(provider.id, patch.clientSecret);
     const [updated] = await this.db
       .update(schema.identityProviders)
       .set({ name: patch.name, clientId: patch.clientId, scopes: patch.scopes, enforced: patch.enforced, isActive: patch.isActive, ...secret, updatedAt: new Date() })
@@ -181,9 +182,10 @@ export class IdentityProviderService {
     return updated;
   }
 
-  private toSecretColumns(clientSecret: string): Partial<IdentityProvider> {
-    const secret = this.keyProvider.encrypt(Buffer.from(clientSecret));
-    return { clientSecretCiphertext: secret.ciphertext, clientSecretIv: secret.iv, clientSecretAuthTag: secret.authTag, kekVersion: secret.kekVersion };
+  /** Seals under the stored id, never the caller's spelling of it: Postgres matches a uuid in any case, and the context must match the row's own. */
+  private async toSecretColumns(id: string, clientSecret: string | undefined): Promise<Partial<Pick<IdentityProvider, 'clientSecretEnvelope'>>> {
+    if (clientSecret === undefined) return {};
+    return { clientSecretEnvelope: await this.sealer.seal(clientSecret, SEALED_COLUMNS.identityProvider, id) };
   }
 
   async remove(organisationId: bigint, id: string): Promise<void> {
@@ -195,7 +197,8 @@ export class IdentityProviderService {
   }
 
   async updateGlobal(id: string, patch: UpdateGlobalIdentityProvider): Promise<IdentityProvider> {
-    const secret = patch.clientSecret === undefined ? {} : this.toSecretColumns(patch.clientSecret);
+    const provider = patch.clientSecret === undefined ? null : await this.requireGlobal(id);
+    const secret = provider ? await this.toSecretColumns(provider.id, patch.clientSecret) : {};
     const [updated] = await this.db
       .update(schema.identityProviders)
       .set({
@@ -221,6 +224,12 @@ export class IdentityProviderService {
       .where(and(eq(schema.identityProviders.id, id), isNull(schema.identityProviders.organisationId)))
       .returning({ id: schema.identityProviders.id });
     if (removed.length === 0) throw AppErrorCode.FED_002.create();
+  }
+
+  private async requireGlobal(id: string): Promise<IdentityProvider> {
+    const provider = await this.db.query.identityProviders.findFirst({ where: and(eq(schema.identityProviders.id, id), isNull(schema.identityProviders.organisationId)) });
+    if (!provider) throw AppErrorCode.FED_002.create();
+    return provider;
   }
 
   listGlobal(): Promise<IdentityProvider[]> {
@@ -263,9 +272,9 @@ export class IdentityProviderService {
     return provider?.isActive ? provider : null;
   }
 
-  decryptClientSecret(provider: IdentityProvider): string {
-    return this.keyProvider
-      .decrypt({ ciphertext: provider.clientSecretCiphertext, iv: provider.clientSecretIv, authTag: provider.clientSecretAuthTag, kekVersion: provider.kekVersion })
-      .toString();
+  async decryptClientSecret(provider: IdentityProvider): Promise<string> {
+    const legacy = legacyColumns(provider.clientSecretCiphertext, provider.clientSecretIv, provider.clientSecretAuthTag);
+    const secret = await this.sealer.open({ envelope: provider.clientSecretEnvelope, legacy }, SEALED_COLUMNS.identityProvider, provider.id);
+    return secret.toString();
   }
 }

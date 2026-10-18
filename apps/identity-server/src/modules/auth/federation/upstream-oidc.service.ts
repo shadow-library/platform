@@ -106,7 +106,7 @@ export class UpstreamOidcService {
       redirect_uri: this.callbackUrl,
       code_verifier: codeVerifier,
       client_id: provider.clientId,
-      client_secret: provider.kind === 'APPLE' ? this.mintAppleClientSecret(provider) : this.identityProviderService.decryptClientSecret(provider),
+      client_secret: provider.kind === 'APPLE' ? await this.mintAppleClientSecret(provider) : await this.identityProviderService.decryptClientSecret(provider),
     });
 
     let idToken: string;
@@ -132,12 +132,12 @@ export class UpstreamOidcService {
 
   /**
    * Apple's client secret is not a stored credential: it is an ES256 JWT minted per exchange from the
-   * admin-provisioned `.p8` key (held encrypted in `clientSecretCiphertext`, exactly like Google's static
+   * admin-provisioned `.p8` key (sealed in `clientSecretEnvelope`, exactly like Google's static
    * secret) and the provider's Developer Team ID / Key ID.
    */
-  private mintAppleClientSecret(provider: IdentityProvider): string {
+  private async mintAppleClientSecret(provider: IdentityProvider): Promise<string> {
     if (!provider.appleTeamId || !provider.appleKeyId) throw new FederationError('apple provider missing team id or key id');
-    const privateKey = createPrivateKey({ key: this.identityProviderService.decryptClientSecret(provider), format: 'pem' });
+    const privateKey = createPrivateKey({ key: await this.identityProviderService.decryptClientSecret(provider), format: 'pem' });
     const now = Math.floor(Date.now() / 1000);
     const header = { alg: 'ES256', kid: provider.appleKeyId };
     const payload = { iss: provider.appleTeamId, iat: now, exp: now + APPLE_CLIENT_SECRET_TTL_SECONDS, aud: APPLE_TOKEN_AUDIENCE, sub: provider.clientId };

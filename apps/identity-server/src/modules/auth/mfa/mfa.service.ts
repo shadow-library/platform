@@ -7,13 +7,13 @@ import { Config, Logger } from '@shadow-library/common';
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { FederatedIdentityService } from '@server/modules/auth/federation';
-import { KeyProvider } from '@server/modules/auth/keys';
+import { SEALED_COLUMNS, SecretSealer } from '@server/modules/auth/keys';
 import { OAuthClientService } from '@server/modules/auth/oauth';
 import { SessionService, type ValidatedSession } from '@server/modules/auth/session';
 import { PasswordService } from '@server/modules/identity/credentials';
 import { UserEmailService } from '@server/modules/identity/user';
 import { AuditService } from '@server/modules/infrastructure/audit';
-import { DatabaseService, MfaEnrollment, PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
+import { DatabaseService, MfaEnrollment, PrimaryDatabase, reserveSerialId, schema } from '@server/modules/infrastructure/datastore';
 import { NotificationService } from '@server/modules/infrastructure/notification';
 
 import { RecoveryCodeService } from './recovery-code.service';
@@ -39,12 +39,6 @@ export interface MfaFactors {
 
 export type StepUpMethod = 'TOTP' | 'WEBAUTHN' | 'PASSWORD' | 'FEDERATED';
 
-interface SerializedSecret {
-  ciphertext: string;
-  iv: string;
-  authTag: string;
-}
-
 const TOTP_SECRET_BYTES = 20;
 const ENROLLED_TEMPLATE = 'auth.mfa.enrolled';
 const DISABLED_TEMPLATE = 'auth.mfa.disabled';
@@ -57,7 +51,7 @@ export class MfaService {
 
   constructor(
     databaseService: DatabaseService,
-    private readonly keyProvider: KeyProvider,
+    private readonly sealer: SecretSealer,
     private readonly userEmailService: UserEmailService,
     private readonly auditService: AuditService,
     private readonly notificationService: NotificationService,
@@ -118,12 +112,12 @@ export class MfaService {
     if (active) throw AppErrorCode.MFA_003.create();
 
     const secret = randomBytes(TOTP_SECRET_BYTES);
-    const encrypted = this.keyProvider.encrypt(secret);
-    const serialized: SerializedSecret = { ciphertext: encrypted.ciphertext, iv: encrypted.iv, authTag: encrypted.authTag };
 
     await this.db.transaction(async tx => {
       await tx.delete(schema.mfaEnrollments).where(and(eq(schema.mfaEnrollments.userId, userId), eq(schema.mfaEnrollments.type, 'TOTP'), isNull(schema.mfaEnrollments.verifiedAt)));
-      await tx.insert(schema.mfaEnrollments).values({ userId, type: 'TOTP', secretCiphertext: JSON.stringify(serialized), kekVersion: encrypted.kekVersion });
+      const id = await reserveSerialId(tx, 'mfa_enrollments');
+      const secretEnvelope = await this.sealer.seal(secret, SEALED_COLUMNS.mfaSecret, id);
+      await tx.insert(schema.mfaEnrollments).values({ id, userId, type: 'TOTP', secretEnvelope });
     });
 
     const account = (await this.userEmailService.getPrimaryEmail(userId)) ?? userId.toString();
@@ -136,7 +130,7 @@ export class MfaService {
     const pending = await this.getTotpEnrollment(userId, 'pending');
     if (!pending) throw AppErrorCode.MFA_001.create();
 
-    const counter = verifyTotp(this.decryptSecret(pending), code);
+    const counter = verifyTotp(await this.decryptSecret(pending), code);
     if (counter === null) throw AppErrorCode.MFA_002.create();
 
     await this.db
@@ -153,7 +147,7 @@ export class MfaService {
     const enrollment = await this.getTotpEnrollment(userId, 'verified');
     if (!enrollment) return false;
 
-    const counter = verifyTotp(this.decryptSecret(enrollment), code);
+    const counter = verifyTotp(await this.decryptSecret(enrollment), code);
     if (counter === null) return false;
     if (enrollment.lastUsedCounter !== null && BigInt(counter) <= enrollment.lastUsedCounter) return false;
 
@@ -243,10 +237,10 @@ export class MfaService {
     });
   }
 
-  private decryptSecret(enrollment: MfaEnrollment): Buffer {
-    if (!enrollment.secretCiphertext || enrollment.kekVersion === null) throw AppErrorCode.MFA_001.create();
-    const serialized = JSON.parse(enrollment.secretCiphertext) as SerializedSecret;
-    return this.keyProvider.decrypt({ ...serialized, kekVersion: enrollment.kekVersion });
+  private async decryptSecret(enrollment: MfaEnrollment): Promise<Buffer> {
+    const stored = { envelope: enrollment.secretEnvelope, legacy: enrollment.secretCiphertext };
+    if (stored.envelope === null && !stored.legacy) throw AppErrorCode.MFA_001.create();
+    return this.sealer.open(stored, SEALED_COLUMNS.mfaSecret, enrollment.id);
   }
 
   private async notify(userId: bigint, templateKey: string, method: string): Promise<void> {
