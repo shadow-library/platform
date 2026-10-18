@@ -225,3 +225,14 @@ export function expectNoSessionCookie(response: APIResponse): void {
 export async function flowChallenges(flowId: string): Promise<{ type: string; target: string }[]> {
   return identityDb()<{ type: string; target: string }[]>`SELECT type, target FROM verification_challenges WHERE flow_id = ${flowId} ORDER BY created_at`;
 }
+
+const ENVELOPE_FIELDS = ['alg', 'ct', 'dek', 'iv', 'kid', 'tag', 'v'];
+
+/** A stored secret is a `@shadow-library/common/crypto` envelope under a keyring key, and none of `plaintexts` appears anywhere in it. */
+export function expectSealedEnvelope(value: unknown, ...plaintexts: string[]): void {
+  expect(typeof value, 'an envelope column holds a JSON object, not a double-encoded string').toBe('object');
+  expect(Object.keys(value as object).sort()).toEqual(ENVELOPE_FIELDS);
+  expect(value).toMatchObject({ v: 1, alg: 'A256GCM', kid: expect.stringMatching(/^[a-z0-9-]{1,16}$/) });
+  const stored = JSON.stringify(value);
+  for (const plaintext of plaintexts) expect(stored, 'the plaintext must not be recoverable from the stored envelope').not.toContain(plaintext);
+}

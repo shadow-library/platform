@@ -223,11 +223,10 @@ export async function linkFederatedIdentity(user: Pick<IdentityUser, 'userId' | 
   return sql.begin(async tx => {
     const [provider] = await tx<{ id: string }[]>`
       INSERT INTO identity_providers (
-        organisation_id, kind, name, issuer, client_id, client_secret_ciphertext, client_secret_iv, client_secret_auth_tag,
-        authorization_endpoint, token_endpoint, jwks_uri, is_active
+        organisation_id, kind, name, issuer, client_id, authorization_endpoint, token_endpoint, jwks_uri, is_active
       )
       VALUES (
-        ${user.personalOrgId}, 'OIDC', 'E2E Upstream', ${issuer}, 'e2e-client', 'unused', 'unused', 'unused',
+        ${user.personalOrgId}, 'OIDC', 'E2E Upstream', ${issuer}, 'e2e-client',
         ${`${issuer}/authorize`}, ${`${issuer}/token`}, ${`${issuer}/jwks`}, ${options.isActive ?? false}
       )
       RETURNING id

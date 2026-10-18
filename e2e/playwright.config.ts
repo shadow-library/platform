@@ -35,6 +35,9 @@ const SERIAL_IDENTITY_SPECS = /tests[\\/]identity[\\/](federation|sms-otp|rate-l
 /** Pulse specs that assert deltas on a deployment-wide aggregate, so no copy of them may run beside another. */
 const SERIAL_PULSE_SPECS = /tests[\\/]pulse[\\/]dashboard\.spec\.ts$/;
 
+/** The one Synapse spec that overwrites the single shared catalog draft, so no copy of it may run beside another. */
+const SERIAL_SYNAPSE_SPECS = /tests[\\/]synapse[\\/]catalog-draft-credentials\.spec\.ts$/;
+
 /** Every other pulse spec; they share one back-channel budget with identity, so they run at a capped width. */
 const PULSE_SPECS = /tests[\\/]pulse[\\/].*\.spec\.ts$/;
 
@@ -87,8 +90,9 @@ export default defineConfig({
   // login or, fail-closed, a 403 on a route the caller is entitled to.
   projects: [
     { name: 'setup', testMatch: /.*\.setup\.ts/ },
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] }, dependencies: ['setup'], testIgnore: [/.*\.setup\.ts/, SERIAL_IDENTITY_SPECS, PULSE_SPECS] },
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] }, dependencies: ['setup'], testIgnore: [/.*\.setup\.ts/, SERIAL_IDENTITY_SPECS, SERIAL_SYNAPSE_SPECS, PULSE_SPECS] },
     { name: 'identity-serial', use: { ...devices['Desktop Chrome'] }, dependencies: ['setup'], testMatch: SERIAL_IDENTITY_SPECS, workers: 1, fullyParallel: false },
+    { name: 'synapse-serial', use: { ...devices['Desktop Chrome'] }, dependencies: ['setup'], testMatch: SERIAL_SYNAPSE_SPECS, workers: 1, fullyParallel: false },
     { name: 'pulse', use: { ...devices['Desktop Chrome'] }, dependencies: ['setup'], testMatch: PULSE_SPECS, testIgnore: SERIAL_PULSE_SPECS, workers: 2 },
     { name: 'pulse-serial', use: { ...devices['Desktop Chrome'] }, dependencies: ['setup'], testMatch: SERIAL_PULSE_SPECS, workers: 1, fullyParallel: false },
   ],

@@ -20,7 +20,7 @@ import {
   verifyChallenge,
 } from '../../lib';
 import { expect, test } from './fixtures';
-import { expectErrorCode, expectNoSessionCookie, expectSessionCookie, flowStepOf, maxOutboxId, pollOutboxRowAfter } from './helpers';
+import { expectErrorCode, expectNoSessionCookie, expectSealedEnvelope, expectSessionCookie, flowStepOf, maxOutboxId, pollOutboxRowAfter } from './helpers';
 
 /**
  * Defining types
@@ -57,9 +57,9 @@ async function mfaSummary(ctx: APIRequestContext): Promise<MfaSummary> {
   return (await response.json()) as MfaSummary;
 }
 
-async function enrolmentRows(userId: string): Promise<{ secretCiphertext: string | null; kekVersion: number | null; verified: boolean }[]> {
-  return identityDb()<{ secretCiphertext: string | null; kekVersion: number | null; verified: boolean }[]>`
-    SELECT secret_ciphertext AS "secretCiphertext", kek_version AS "kekVersion", verified_at IS NOT NULL AS verified FROM mfa_enrollments WHERE user_id = ${userId}
+async function enrolmentRows(userId: string): Promise<{ secretEnvelope: unknown; legacyCiphertext: string | null; verified: boolean }[]> {
+  return identityDb()<{ secretEnvelope: unknown; legacyCiphertext: string | null; verified: boolean }[]>`
+    SELECT secret_envelope AS "secretEnvelope", secret_ciphertext AS "legacyCiphertext", verified_at IS NOT NULL AS verified FROM mfa_enrollments WHERE user_id = ${userId}
   `;
 }
 
@@ -132,9 +132,8 @@ test.describe('identity MFA — TOTP enrolment', () => {
     expect(secret).toMatch(/^[A-Z2-7]{32}$/);
     expect(uri).toMatch(/^otpauth:\/\/totp\//);
     const [pending] = await enrolmentRows(user.userId);
-    expect(pending).toMatchObject({ kekVersion: 1, verified: false });
-    expect(pending?.secretCiphertext, 'the seed is stored').toBeTruthy();
-    expect(pending?.secretCiphertext, 'the seed must be stored encrypted').not.toContain(secret);
+    expect(pending).toMatchObject({ legacyCiphertext: null, verified: false });
+    expectSealedEnvelope(pending?.secretEnvelope, secret);
 
     const authenticator = new TotpAuthenticator(secret);
     await expectRefused(await identityMutate(unelevated, 'post', `${MFA_PATH}/totp/activate`, { code: totpCode(secret) }), 403, 'AUTH_006');
@@ -150,7 +149,9 @@ test.describe('identity MFA — TOTP enrolment', () => {
     const summary = await mfaSummary(ctx);
     expect(summary.enrollments).toEqual([expect.objectContaining({ type: 'TOTP', label: 'default' })]);
     expect(summary.recoveryCodesRemaining).toBe(10);
-    expect(await enrolmentRows(user.userId)).toEqual([expect.objectContaining({ kekVersion: 1, verified: true })]);
+    const [activated] = await enrolmentRows(user.userId);
+    expect(activated).toMatchObject({ legacyCiphertext: null, verified: true });
+    expectSealedEnvelope(activated?.secretEnvelope, secret);
     expect((await (await identity.anonymous()).get(MFA_PATH)).status()).toBe(401);
 
     await expectRefused(await identityMutate(unelevated, 'delete', `${MFA_PATH}/totp`), 403, 'AUTH_006');

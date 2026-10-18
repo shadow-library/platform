@@ -107,11 +107,18 @@ export async function readProviderEndpoints(providerId: string): Promise<Provide
   return row;
 }
 
-/** The stored client-secret ciphertext, so a spec can prove a patch that omitted the secret left it alone. */
-export async function readProviderSecretCiphertext(providerId: string): Promise<string> {
-  const [row] = await identityDb()<{ ciphertext: string }[]>`SELECT client_secret_ciphertext AS ciphertext FROM identity_providers WHERE id = ${providerId}`;
+export interface ProviderSecretStorage {
+  readonly envelope: unknown;
+  readonly legacyCiphertext: string | null;
+}
+
+/** Where the provider's client secret is stored, so a spec can prove a patch that omitted the secret left it alone and that nothing is written to the legacy columns. */
+export async function readProviderSecretStorage(providerId: string): Promise<ProviderSecretStorage> {
+  const [row] = await identityDb()<ProviderSecretStorage[]>`
+    SELECT client_secret_envelope AS envelope, client_secret_ciphertext AS "legacyCiphertext" FROM identity_providers WHERE id = ${providerId}
+  `;
   if (!row) throw new IdentityProviderError(`no identity provider ${providerId}`);
-  return row.ciphertext;
+  return row;
 }
 
 /** How many local accounts the provider has linked, which a refused callback must leave at zero. */

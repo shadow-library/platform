@@ -25,7 +25,7 @@ import {
   listAuthModes,
   listGlobalProviders,
   putAuthMode,
-  readProviderSecretCiphertext,
+  readProviderSecretStorage,
   registerGlobalProvider,
   restoreAuthMode,
   restoreGlobalProviders,
@@ -35,7 +35,7 @@ import {
   updateGlobalProvider,
 } from '../../lib';
 import { expect, test } from './fixtures';
-import { expectErrorCode } from './helpers';
+import { expectErrorCode, expectSealedEnvelope } from './helpers';
 
 /**
  * Defining types
@@ -192,10 +192,12 @@ test.describe('identity federation configuration', () => {
     expect(duplicate.status(), 'one provider per social kind').toBe(409);
     await expectErrorCode(duplicate, 'FED_003');
 
-    const ciphertext = await readProviderSecretCiphertext(provider.id);
+    const stored = await readProviderSecretStorage(provider.id);
+    expectSealedEnvelope(stored.envelope, 'e2e-google-secret');
+    expect(stored.legacyCiphertext, 'the legacy columns are no longer written').toBeNull();
     const renamed = await updateGlobalProvider(admin.ctx, provider.id, { name: 'E2E Google Renamed' });
     expect(renamed.status(), await renamed.text()).toBe(200);
-    expect(await readProviderSecretCiphertext(provider.id), 'a patch without a secret keeps the stored one').toBe(ciphertext);
+    expect(await readProviderSecretStorage(provider.id), 'a patch without a secret keeps the stored one').toEqual(stored);
 
     expect((await putAuthMode(admin.ctx, 'GOOGLE', false)).status(), 'a configured provider can be switched off').toBe(200);
     expect((await listAuthModes(admin.ctx)).find(mode => mode.method === 'GOOGLE')).toMatchObject({ enabled: false, configured: true });
