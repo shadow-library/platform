@@ -5,9 +5,7 @@
 
 .shell {
   display: flex;
-  min-height: 100vh;
-  /* dvh tracks mobile browser chrome; the vh line above is the no-dvh fallback */
-  min-height: 100dvh;
+  min-height: var(--sh-viewport-height);
   background: var(--sh-surface-app);
   color: var(--sh-text-primary);
   /* Room the content region reserves for a bottom nav — override to match a taller custom bar. */
@@ -25,11 +23,10 @@
 
 /* From md up the chrome is pinned and the content region is the scroll container (breakpoint token
    --sh-breakpoint-md 768). Below it the document scrolls, so mobile browsers keep their URL-bar
-   auto-hide and 100dvh never fights the collapsing viewport. */
+   auto-hide and the dynamic viewport height never fights the collapsing viewport. */
 @media (min-width: 768px) {
   .shell {
-    height: 100vh;
-    height: 100dvh;
+    height: var(--sh-viewport-height);
     overflow: hidden;
   }
   .main {

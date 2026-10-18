@@ -80,8 +80,8 @@ Load this when writing or changing frontend code. First determine the rendering 
 - Set `data-density="touch"` on `<html>` → finger-first control metrics (md control = 44px). Sub-44px
   controls already extend invisible hit areas under `@media (pointer: coarse)`.
 - Safe-area insets and dynamic-viewport heights are handled by the tokens (`--sh-tap-target`,
-  `--sh-safe-*`) and edge-anchored components — MUST NOT hand-roll `env(safe-area-inset-*)`/`dvh`/tap
-  targets.
+  `--sh-safe-*`, `--sh-viewport-height`), the `h-screen`/`min-h-screen` utilities and edge-anchored
+  components — MUST NOT hand-roll `env(safe-area-inset-*)`/`vh`/`dvh`/tap targets.
 - App shell is auto-responsive: compose `Shell` + `Sidebar` + `TopNavigation` as on desktop; below
   768px the sidebar becomes a hamburger drawer automatically, no props.
 - Component selection on phone layouts: `BottomNavigation` (3–5 top-level destinations),

@@ -27,6 +27,7 @@ export interface OrganisationSwitchSteps {
   switchOrganisation: AuthApi['switchOrganisation'];
   queryClient: Pick<QueryClient, 'clear'>;
   reload: () => Promise<void>;
+  reloadDocument: () => void;
 }
 
 const SWITCH_FAILED = { code: 'ORGANISATION_SWITCH_FAILED', type: 'ClientError', message: 'The organisation could not be switched' } as const;
@@ -34,6 +35,8 @@ const SWITCH_FAILED = { code: 'ORGANISATION_SWITCH_FAILED', type: 'ClientError',
 /**
  * Every cached response, the permissions included, was answered for the previous organisation, so the cache is dropped whole
  * rather than selectively invalidated: a stale list rendered against new permissions is exactly the confusion this avoids.
+ * Once the session has switched there is no going back, so a failed in-app reload falls back to reloading the whole document
+ * rather than leaving the previous organisation's screen live against the new session.
  */
 export async function switchOrganisationAndReload(organisationId: string, steps: OrganisationSwitchSteps): Promise<ApiError | null> {
   try {
@@ -42,7 +45,11 @@ export async function switchOrganisationAndReload(organisationId: string, steps:
     return isApiError(error) ? error : new ApiError(-1, SWITCH_FAILED);
   }
   steps.queryClient.clear();
-  await steps.reload();
+  try {
+    await steps.reload();
+  } catch {
+    steps.reloadDocument();
+  }
   return null;
 }
 
@@ -53,13 +60,19 @@ export function useOrganisationSwitch(api: OrganisationSwitchApi): OrganisationS
   const [error, setError] = useState<ApiError | null>(null);
   const { data: organisations = [] } = useQuery(api.organisationsQueryOptions());
   const activeId = organisations.find(organisation => organisation.active)?.id;
+  const steps: OrganisationSwitchSteps = {
+    switchOrganisation: api.switchOrganisation,
+    queryClient,
+    reload: () => router.invalidate(),
+    reloadDocument: () => window.location.reload(),
+  };
 
   const switchTo = async (organisationId: string): Promise<void> => {
     if (organisationId === activeId) return;
     setError(null);
     setSwitching(true);
     try {
-      setError(await switchOrganisationAndReload(organisationId, { switchOrganisation: api.switchOrganisation, queryClient, reload: () => router.invalidate() }));
+      setError(await switchOrganisationAndReload(organisationId, steps));
     } finally {
       setSwitching(false);
     }

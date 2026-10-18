@@ -1,5 +1,5 @@
 import { createContext, type ReactElement, type ReactNode, useContext, useId } from 'react';
-import { Spinner } from '@shadow-library/ui';
+import { cn, Spinner } from '@shadow-library/ui';
 
 import { MemoirMark } from './icons';
 import styles from './StatusPage.module.css';
@@ -42,7 +42,7 @@ export function StatusPage({ title, description, pending = false, actions, varia
   const titleId = useId();
 
   return (
-    <Root className={styles.root} data-variant={resolved} aria-busy={pending || undefined} aria-labelledby={titleId}>
+    <Root className={cn(styles.root, resolved === 'page' && 'min-h-screen')} data-variant={resolved} aria-busy={pending || undefined} aria-labelledby={titleId}>
       <div className={styles.panel}>
         {resolved === 'page' ? <StatusBrand /> : null}
         {pending ? <Spinner size="lg" aria-hidden="true" /> : null}

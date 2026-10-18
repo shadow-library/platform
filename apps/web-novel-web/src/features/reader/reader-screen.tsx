@@ -148,14 +148,14 @@ export function ReaderScreen(): React.JSX.Element {
   if (gateVisible) {
     const gateTitle = novel.data?.title ?? chapter.data?.novelTitle ?? 'This novel';
     return (
-      <div className={styles.matureSurface}>
+      <div className={cn(styles.matureSurface, 'min-h-screen')}>
         <MatureGate novelTitle={gateTitle} onContinue={reveal} onBack={() => router.history.back()} />
       </div>
     );
   }
 
   return (
-    <div className={styles.surface} style={{ background: palette.bg, color: palette.fg }}>
+    <div className={cn(styles.surface, 'min-h-screen')} style={{ background: palette.bg, color: palette.fg }}>
       <div className={styles.progressTrack} style={{ background: palette.hairline }}>
         <div className={styles.progressFill} style={{ width: `${scrollPct}%` }} />
       </div>

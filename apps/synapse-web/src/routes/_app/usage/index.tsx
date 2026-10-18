@@ -5,7 +5,7 @@ import { parseUsageSearch, usageParams, UsageScreen } from '@/features/usage';
 import { loadCapabilities, usageQueryOptions } from '@/lib';
 
 export const Route = createFileRoute('/_app/usage/')({
-  validateSearch: parseUsageSearch,
+  validateSearch: (search: Record<string, unknown>) => parseUsageSearch(search, new Date()),
   loaderDeps: ({ search }) => search,
   loader: async ({ context: { queryClient }, deps }) => {
     const capabilities = await loadCapabilities(queryClient);

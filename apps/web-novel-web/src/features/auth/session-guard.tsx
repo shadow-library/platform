@@ -1,4 +1,4 @@
-import { Spinner } from '@shadow-library/ui';
+import { cn, Spinner } from '@shadow-library/ui';
 import { type AuthAccessMode } from '@shadow-library/web/auth';
 
 import { useReaderSessionGuard } from '@/lib/apis';
@@ -15,7 +15,7 @@ export function SessionGuard({ accessMode, children }: SessionGuardProps): React
   const status = useReaderSessionGuard(accessMode);
   if (status === 'redirecting')
     return (
-      <div className={styles.redirecting}>
+      <div className={cn(styles.redirecting, 'min-h-screen')}>
         <Spinner aria-label="Redirecting to sign-in" />
       </div>
     );

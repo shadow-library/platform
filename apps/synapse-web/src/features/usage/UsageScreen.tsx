@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { type ReactElement, useState } from 'react';
-import { Alert, Button, Card, DateRangePicker, FormField, Select, Statistic, Table, type TableColumn } from '@shadow-library/ui';
+import { Alert, Button, Card, type DateRange, DateRangePicker, FormField, Select, Statistic, Table, type TableColumn } from '@shadow-library/ui';
 
 import { formatDate, formatNumber, formatRate, formatUsd, Mono, Muted, PageHeader, PermissionGate, usdFormat } from '@/features/shared';
 import controls from '@/features/shared/controls.module.css';
@@ -9,7 +9,9 @@ import { usageQueryOptions, type UsageRowResponse, useCapabilities } from '@/lib
 
 import styles from './Usage.module.css';
 import {
+  isReportableRange,
   lastIncludedInstant,
+  MAX_USAGE_RANGE_DAYS,
   pickerRangeOf,
   searchRangeOf,
   USAGE_GROUP_LABELS,
@@ -33,19 +35,21 @@ export function UsageScreen({ search }: { search: UsageSearch }): ReactElement {
 function RangeForm({ search }: { search: UsageSearch }): ReactElement {
   const navigate = useNavigate();
   const [today] = useState(() => utcToday(new Date()));
-  const show = (next: UsageSearch): void => void navigate({ to: '/usage', search: next });
+  const [tooLong, setTooLong] = useState(false);
+  const show = (next: UsageSearch): void => {
+    setTooLong(false);
+    void navigate({ to: '/usage', search: next });
+  };
+  const pick = (range: DateRange): void => {
+    const next = { groupBy: search.groupBy, ...searchRangeOf(range) };
+    if (next.from && !isReportableRange(next.from, next.to, new Date())) return setTooLong(true);
+    show(next);
+  };
 
   return (
     <div className={styles.filters} role="group" aria-label="Usage range">
-      <FormField label="Range" helper="Whole days, UTC" className={styles.range}>
-        <DateRangePicker
-          value={pickerRangeOf(search)}
-          onValueChange={range => show({ groupBy: search.groupBy, ...searchRangeOf(range) })}
-          presets={usageRangePresets(today)}
-          max={today}
-          confirm
-          placeholder="Default: last 30 days"
-        />
+      <FormField label="Range" helper="Whole days, UTC" error={tooLong ? `Pick at most ${MAX_USAGE_RANGE_DAYS} days` : undefined} className={styles.range}>
+        <DateRangePicker value={pickerRangeOf(search)} onValueChange={pick} presets={usageRangePresets(today)} max={today} confirm placeholder="Default: last 30 days" />
       </FormField>
       <FormField label="Group by" className={styles.field}>
         <Select value={search.groupBy} onValueChange={value => show({ ...search, groupBy: value as UsageGroup })} aria-label="Group usage by">

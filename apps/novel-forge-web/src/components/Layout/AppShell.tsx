@@ -230,7 +230,7 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
         onSidebarCollapsedChange={rail?.setCollapsed}
         contentWidth="fluid"
         contentPadding="none"
-        className={cn(styles.shellRoot, rail != null && !hydrated && railStyles.pending)}
+        className={cn(styles.shellRoot, 'h-screen', rail != null && !hydrated && railStyles.pending)}
       >
         <div className={`nf-scroll ${styles.content}`}>{children}</div>
       </Chrome>

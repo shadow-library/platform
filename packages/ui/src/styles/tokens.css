@@ -255,6 +255,8 @@
   --sh-safe-right: env(safe-area-inset-right, 0px);
   --sh-safe-bottom: env(safe-area-inset-bottom, 0px);
   --sh-safe-left: env(safe-area-inset-left, 0px);
+  /* Tracks mobile browser chrome where dvh exists (upgraded below); a calc() over the viewport reads this, never raw vh/dvh. */
+  --sh-viewport-height: 100vh;
 
   /* ── Page layout ──────────────────────────────────────────── */
   /* The platform's reading column. `Shell` caps its content region here by default, so an app that lets
@@ -278,6 +280,13 @@
   --sh-breakpoint-lg: 1024px;
   --sh-breakpoint-xl: 1280px;
   --sh-breakpoint-2xl: 1536px;
+}
+
+/* An unsupported unit in a custom property fails where it is used, not where it is declared, so dvh is gated, not cascaded. */
+@supports (height: 100dvh) {
+  :root {
+    --sh-viewport-height: 100dvh;
+  }
 }
 
 /* Compact density — set app-wide via [data-density='compact']; never mixed within a view. */

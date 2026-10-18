@@ -6,7 +6,6 @@
 }
 
 .root[data-variant='page'] {
-  min-height: 100dvh;
   padding-block: max(32px, var(--sh-safe-top)) max(32px, var(--sh-safe-bottom));
   padding-inline: max(16px, var(--sh-safe-left)) max(16px, var(--sh-safe-right));
   background: var(--sh-surface-app);

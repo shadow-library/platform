@@ -202,7 +202,7 @@
   flex-direction: column;
   gap: 2px;
   min-width: 240px;
-  max-height: 60vh;
+  max-height: calc(var(--sh-viewport-height) * 0.6);
   padding: 4px;
   overflow-y: auto;
 }

@@ -1,11 +1,9 @@
 .surface {
-  min-height: 100dvh;
   position: relative;
 }
 
 /* The mature gate replaces the whole reading surface, so it owns the app-themed backdrop (not a reader palette). */
 .matureSurface {
-  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   justify-content: center;

@@ -63,7 +63,7 @@ function DialogHeader({ title, description, showClose = true, className, ...prop
   );
 }
 
-/** Body — the content slot; scrolls internally past ~70vh. */
+/** Body — the content slot; scrolls internally once the dialog reaches the viewport height. */
 function DialogBody({ className, ...props }: DialogBodyProps) {
   return <div className={cn(styles.body, className)} {...props} />;
 }

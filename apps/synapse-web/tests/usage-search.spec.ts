@@ -1,32 +1,112 @@
 import { describe, expect, it } from 'bun:test';
 
-import { addUtcDays, lastIncludedInstant, parseUsageSearch, pickerRangeOf, searchRangeOf, usageParams, usageRangePresets, utcToday } from '../src/features/usage/usage-search';
+import {
+  addUtcDays,
+  isReportableRange,
+  lastIncludedInstant,
+  MAX_USAGE_RANGE_DAYS,
+  parseUsageSearch,
+  pickerRangeOf,
+  searchRangeOf,
+  usageParams,
+  usageRangePresets,
+  utcToday,
+} from '../src/features/usage/usage-search';
 
 describe('parseUsageSearch', () => {
+  const now = new Date('2026-10-18T12:00:00Z');
+
   it('should group by app when nothing is given', () => {
-    expect(parseUsageSearch({})).toEqual({ groupBy: 'app' });
+    expect(parseUsageSearch({}, now)).toEqual({ groupBy: 'app' });
   });
 
   it('should keep calendar dates and a known grouping', () => {
-    expect(parseUsageSearch({ from: '2026-09-01', to: '2026-10-01', groupBy: 'model' })).toEqual({ from: '2026-09-01', to: '2026-10-01', groupBy: 'model' });
+    expect(parseUsageSearch({ from: '2026-09-01', to: '2026-10-01', groupBy: 'model' }, now)).toEqual({ from: '2026-09-01', to: '2026-10-01', groupBy: 'model' });
   });
 
   it('should drop a day that overflows its month', () => {
-    expect(parseUsageSearch({ from: '2026-02-30', to: '2026-04-31', groupBy: 'app' })).toEqual({ groupBy: 'app' });
+    expect(parseUsageSearch({ from: '2026-02-30', to: '2026-04-31', groupBy: 'app' }, now)).toEqual({ groupBy: 'app' });
   });
 
   it('should accept a leap day only in a leap year', () => {
-    expect(parseUsageSearch({ from: '2028-02-29' })).toEqual({ from: '2028-02-29', groupBy: 'app' });
-    expect(parseUsageSearch({ from: '2026-02-29' })).toEqual({ groupBy: 'app' });
+    expect(parseUsageSearch({ from: '2028-02-29', to: '2028-03-01' }, now)).toEqual({ from: '2028-02-29', to: '2028-03-01', groupBy: 'app' });
+    expect(parseUsageSearch({ from: '2026-02-29', to: '2026-03-01' }, now)).toEqual({ to: '2026-03-01', groupBy: 'app' });
   });
 
   it('should drop an empty or inverted range whole', () => {
-    expect(parseUsageSearch({ from: '2026-10-01', to: '2026-10-01', groupBy: 'day' })).toEqual({ groupBy: 'day' });
-    expect(parseUsageSearch({ from: '2026-10-02', to: '2026-10-01', groupBy: 'day' })).toEqual({ groupBy: 'day' });
+    expect(parseUsageSearch({ from: '2026-10-01', to: '2026-10-01', groupBy: 'day' }, now)).toEqual({ groupBy: 'day' });
+    expect(parseUsageSearch({ from: '2026-10-02', to: '2026-10-01', groupBy: 'day' }, now)).toEqual({ groupBy: 'day' });
   });
 
   it('should drop malformed dates and an unknown grouping', () => {
-    expect(parseUsageSearch({ from: '2026-13-45', to: 'yesterday', groupBy: 'subject' })).toEqual({ groupBy: 'app' });
+    expect(parseUsageSearch({ from: '2026-13-45', to: 'yesterday', groupBy: 'subject' }, now)).toEqual({ groupBy: 'app' });
+  });
+
+  it('should keep an open-ended range that starts today', () => {
+    expect(parseUsageSearch({ from: '2026-10-18', groupBy: 'day' }, now)).toEqual({ from: '2026-10-18', groupBy: 'day' });
+  });
+
+  it('should drop an open-ended range that starts after now', () => {
+    expect(parseUsageSearch({ from: '2026-10-19', groupBy: 'day' }, now)).toEqual({ groupBy: 'day' });
+  });
+
+  it('should drop an open-ended range that starts exactly at now, since it would be empty', () => {
+    expect(parseUsageSearch({ from: '2026-10-18' }, new Date('2026-10-18T00:00:00Z'))).toEqual({ groupBy: 'app' });
+  });
+
+  it('should judge an open-ended start against the UTC day, not the local one', () => {
+    expect(parseUsageSearch({ from: '2026-10-18' }, new Date('2026-10-17T23:30:00-05:00'))).toEqual({ from: '2026-10-18', groupBy: 'app' });
+    expect(parseUsageSearch({ from: '2026-10-19' }, new Date('2026-10-19T02:00:00+05:00'))).toEqual({ groupBy: 'app' });
+  });
+
+  it('should leave a future start alone when an explicit end follows it', () => {
+    expect(parseUsageSearch({ from: '2026-10-20', to: '2026-10-25' }, now)).toEqual({ from: '2026-10-20', to: '2026-10-25', groupBy: 'app' });
+  });
+
+  it('should keep an open-ended range that reaches back less than the cap to now', () => {
+    const from = addUtcDays('2026-10-18', 1 - MAX_USAGE_RANGE_DAYS);
+    expect(parseUsageSearch({ from }, now)).toEqual({ from, groupBy: 'app' });
+  });
+
+  it('should drop an open-ended range that reaches back further than the cap to now', () => {
+    expect(parseUsageSearch({ from: addUtcDays('2026-10-18', -MAX_USAGE_RANGE_DAYS), groupBy: 'day' }, now)).toEqual({ groupBy: 'day' });
+  });
+
+  it('should keep an open-ended range that spans exactly the cap at midnight', () => {
+    const from = addUtcDays('2026-10-18', -MAX_USAGE_RANGE_DAYS);
+    expect(parseUsageSearch({ from }, new Date('2026-10-18T00:00:00Z'))).toEqual({ from, groupBy: 'app' });
+  });
+
+  it('should keep an explicit range of exactly the cap and drop one a day longer', () => {
+    const to = '2026-10-01';
+    expect(parseUsageSearch({ from: addUtcDays(to, -MAX_USAGE_RANGE_DAYS), to }, now)).toEqual({ from: addUtcDays(to, -MAX_USAGE_RANGE_DAYS), to, groupBy: 'app' });
+    expect(parseUsageSearch({ from: addUtcDays(to, -MAX_USAGE_RANGE_DAYS - 1), to, groupBy: 'model' }, now)).toEqual({ groupBy: 'model' });
+  });
+
+  it('should keep an explicit range further back than the cap when its own span fits', () => {
+    expect(parseUsageSearch({ from: '2024-01-01', to: '2024-06-01' }, now)).toEqual({ from: '2024-01-01', to: '2024-06-01', groupBy: 'app' });
+  });
+});
+
+describe('isReportableRange', () => {
+  const now = new Date('2026-10-18T12:00:00Z');
+
+  it('should accept a picked range of exactly the cap in whole days', () => {
+    expect(isReportableRange('2025-09-14', addUtcDays('2025-09-14', MAX_USAGE_RANGE_DAYS), now)).toBe(true);
+  });
+
+  it('should refuse a picked range one whole day over the cap', () => {
+    expect(isReportableRange('2025-09-14', addUtcDays('2025-09-14', MAX_USAGE_RANGE_DAYS + 1), now)).toBe(false);
+  });
+
+  it('should refuse an empty or inverted range', () => {
+    expect(isReportableRange('2026-10-01', '2026-10-01', now)).toBe(false);
+    expect(isReportableRange('2026-10-02', '2026-10-01', now)).toBe(false);
+  });
+
+  it('should measure an open-ended range up to now', () => {
+    expect(isReportableRange('2026-10-18', undefined, now)).toBe(true);
+    expect(isReportableRange('2026-10-19', undefined, now)).toBe(false);
   });
 });
 

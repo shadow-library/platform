@@ -1,6 +1,6 @@
 import { useLocation, useNavigate } from '@tanstack/react-router';
 import { type ReactNode, useEffect } from 'react';
-import { IconButton, Spinner } from '@shadow-library/ui';
+import { cn, IconButton, Spinner } from '@shadow-library/ui';
 import { AppShell, type NavConfig } from '@shadow-library/ui/router';
 
 import { BellIcon, BrandGlyph, BuildingIcon, GridIcon, MailIcon, MonitorIcon, PlugIcon, ShieldCheckIcon, TerminalIcon, UserIcon } from '@/components/icons';
@@ -58,7 +58,7 @@ export function PortalShell({ children }: { children: ReactNode }): React.JSX.El
 
   if (me.isLoading || !me.data)
     return (
-      <div className={styles.gate}>
+      <div className={cn(styles.gate, 'min-h-screen')}>
         <Spinner size="lg" label="Loading your account" />
       </div>
     );

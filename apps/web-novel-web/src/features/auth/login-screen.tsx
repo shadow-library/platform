@@ -1,5 +1,5 @@
 import { getRouteApi, useRouter } from '@tanstack/react-router';
-import { Button } from '@shadow-library/ui';
+import { Button, cn } from '@shadow-library/ui';
 
 import { LockIcon } from '@/components/icons';
 import { loginUrl } from '@/lib/apis';
@@ -15,7 +15,7 @@ export function LoginScreen(): React.JSX.Element {
   const returnTo = search.returnTo ?? '/';
 
   return (
-    <div className={`${styles.wrap} wn-fade`}>
+    <div className={cn(styles.wrap, 'min-h-screen', 'wn-fade')}>
       <div className={styles.card}>
         <div className={styles.mark}>
           <LockIcon size={24} />

@@ -212,6 +212,9 @@ const DETAILS: Expected[] = [
 /** Rules deleted with the markup that used them: the two-column secret card and the truth/writer boxes, replaced by the four-state rows. */
 const REMOVED = ['.secretCols', '.secretCol', '.truthBox', '.writerBox', '.ledger', '@media (max-width: 760px) .secretCols'];
 
+/** Rules whose viewport height now reads ui's `--sh-viewport-height` token instead of a hand-rolled `100vh`. */
+const VIEWPORT_TOKEN: Record<string, Record<string, string>> = { '.listCol': { 'max-height': 'calc(var(--sh-viewport-height) - 32px)' } };
+
 describe('Story Bible details spacing', () => {
   it('should keep every new spacing value equal to the canvas line or existing rule it cites', () => {
     const rules = spacingOf('../src/features/story-bible/BibleDetails.module.css');
@@ -227,7 +230,7 @@ describe('Story Bible details spacing', () => {
     const today = spacingOf('./fixtures/story-bible.baseline.module.css');
     const live = spacingOf('../src/features/story-bible/StoryBible.module.css');
     const kept = [...today.entries()].filter(([selector]) => !REMOVED.includes(selector));
-    for (const [selector, values] of kept) expect({ selector, values: live.get(selector) }).toEqual({ selector, values });
+    for (const [selector, values] of kept) expect({ selector, values: live.get(selector) }).toEqual({ selector, values: { ...values, ...VIEWPORT_TOKEN[selector] } });
     expect([...live.keys()].filter(selector => !today.has(selector))).toEqual([]);
     expect(REMOVED.filter(selector => live.has(selector))).toEqual([]);
   });

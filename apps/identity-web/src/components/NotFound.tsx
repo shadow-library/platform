@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router';
-import { Button } from '@shadow-library/ui';
+import { Button, cn } from '@shadow-library/ui';
 
 import { ShieldIcon } from '@/components/icons';
 
@@ -7,7 +7,7 @@ import styles from './boundary.module.css';
 
 export function NotFound(): React.JSX.Element {
   return (
-    <div className={styles.wrap}>
+    <div className={cn(styles.wrap, 'min-h-screen')}>
       <div className={styles.mark}>
         <ShieldIcon size={26} />
       </div>

@@ -1,5 +1,5 @@
 import { type ErrorComponentProps, Link, useRouter } from '@tanstack/react-router';
-import { Button } from '@shadow-library/ui';
+import { Button, cn } from '@shadow-library/ui';
 
 import { ShieldAlertIcon } from '@/components/icons';
 import { isApiError } from '@/lib/apis';
@@ -20,7 +20,7 @@ export function DefaultCatchBoundary({ error, reset }: ErrorComponentProps): Rea
 
   if (sessionExpired) {
     return (
-      <div className={styles.wrap}>
+      <div className={cn(styles.wrap, 'min-h-screen')}>
         <div className={`${styles.mark} ${styles.markDanger}`}>
           <ShieldAlertIcon size={26} />
         </div>
@@ -34,7 +34,7 @@ export function DefaultCatchBoundary({ error, reset }: ErrorComponentProps): Rea
   }
 
   return (
-    <div className={styles.wrap}>
+    <div className={cn(styles.wrap, 'min-h-screen')}>
       <div className={`${styles.mark} ${styles.markDanger}`}>
         <ShieldAlertIcon size={26} />
       </div>

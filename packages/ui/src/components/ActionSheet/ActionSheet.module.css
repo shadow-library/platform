@@ -23,9 +23,7 @@
   z-index: var(--sh-z-modal);
   display: flex;
   flex-direction: column;
-  max-height: calc(100vh - 24px - var(--sh-safe-top));
-  /* dvh tracks mobile browser chrome; the vh line above is the no-dvh fallback */
-  max-height: calc(100dvh - 24px - var(--sh-safe-top));
+  max-height: calc(var(--sh-viewport-height) - 24px - var(--sh-safe-top));
   padding: 8px 8px calc(8px + var(--sh-safe-bottom));
   border-top-left-radius: var(--sh-radius-2xl);
   border-top-right-radius: var(--sh-radius-2xl);

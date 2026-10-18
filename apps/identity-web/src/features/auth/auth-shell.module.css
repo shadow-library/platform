@@ -1,6 +1,5 @@
 .screen {
   display: flex;
-  min-height: 100vh;
   width: 100%;
   background: var(--sh-surface-app);
 }
@@ -107,7 +106,6 @@
   min-width: 0;
   box-sizing: border-box;
   background: var(--sh-surface-app);
-  min-height: 100vh;
   display: flex;
   flex-direction: column;
   align-items: center;

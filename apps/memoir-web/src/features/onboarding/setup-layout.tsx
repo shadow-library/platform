@@ -1,5 +1,5 @@
 import { type ReactElement, type ReactNode } from 'react';
-import { Button, IconButton, Tooltip, useTheme } from '@shadow-library/ui';
+import { Button, cn, IconButton, Tooltip, useTheme } from '@shadow-library/ui';
 
 import { MemoirMark, MoonIcon, SunIcon } from '@/components/icons';
 import { StatusRegion } from '@/components/StatusPage';
@@ -16,7 +16,7 @@ export function SetupLayout({ children }: SetupLayoutProps): ReactElement {
   const { requestSignOut, signingOut, confirmDialog } = useSignOut();
 
   return (
-    <div className={styles.root}>
+    <div className={cn(styles.root, 'min-h-screen')}>
       <header className={styles.bar}>
         <span className={styles.brand}>
           <MemoirMark size={18} />

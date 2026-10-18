@@ -1,6 +1,6 @@
 import { useLocation, useNavigate } from '@tanstack/react-router';
 import { type ReactNode, useEffect } from 'react';
-import { Button, Spinner } from '@shadow-library/ui';
+import { Button, cn, Spinner } from '@shadow-library/ui';
 import { AppShell, type NavConfig } from '@shadow-library/ui/router';
 
 import { ArrowLeftIcon, BrandGlyph, GridIcon, KeyRoundIcon, LayersIcon, LinkIcon, ShieldCheckIcon, UserIcon, UsersIcon, WebhookIcon } from '@/components/icons';
@@ -46,7 +46,7 @@ export function ConsoleShell({ children }: { children: ReactNode }): React.JSX.E
 
   if (me.isLoading || !me.data)
     return (
-      <div className={styles.gate}>
+      <div className={cn(styles.gate, 'min-h-screen')}>
         <Spinner size="lg" label="Loading console" />
       </div>
     );

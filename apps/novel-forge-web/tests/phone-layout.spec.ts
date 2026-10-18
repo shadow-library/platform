@@ -61,8 +61,24 @@ const COARSE = '@media (pointer: coarse)';
 
 // "today" is main d40a7951, frozen in tests/fixtures/*.baseline.module.css; "Phone l.N" / "Main l.N" are lines in
 // scratch-pad/novel-forge/design/*.dc.html. Every desktop rule stays as today; the phone adds blocks of its own.
-const SCREENS: { name: string; live: string; today: string; changed?: Record<string, Record<string, string>>; removed?: string[]; added: string[] }[] = [
-  { name: 'shell', live: '../src/components/Layout/AppShell.module.css', today: './fixtures/app-shell.baseline.module.css', added: [SHELL_PHONE] },
+interface Screen {
+  name: string;
+  live: string;
+  today: string;
+  changed?: Record<string, Record<string, string>>;
+  movedToUtilities?: Record<string, string[]>;
+  removed?: string[];
+  added: string[];
+}
+
+const SCREENS: Screen[] = [
+  {
+    name: 'shell',
+    live: '../src/components/Layout/AppShell.module.css',
+    today: './fixtures/app-shell.baseline.module.css',
+    movedToUtilities: { '.shellRoot': ['height'] },
+    added: [SHELL_PHONE],
+  },
   { name: 'jobs tray', live: '../src/components/Layout/JobsTray.module.css', today: './fixtures/jobs-tray.baseline.module.css', added: [COARSE] },
   {
     name: 'overview',
@@ -89,12 +105,21 @@ describe('Phone layout keeps today’s desktop values', () => {
       const today = sheetOf(screen.today);
       const expected = new Map(today.base);
       for (const [selector, values] of Object.entries(screen.changed ?? {})) expected.set(selector, { ...expected.get(selector), ...values });
+      for (const [selector, properties] of Object.entries(screen.movedToUtilities ?? {})) {
+        expected.set(selector, Object.fromEntries(Object.entries(expected.get(selector) ?? {}).filter(([property]) => !properties.includes(property))));
+      }
       for (const selector of screen.removed ?? []) expected.delete(selector);
       expect(live.base).toEqual(expected);
       for (const [prelude, rules] of today.blocks) expect({ prelude, rules: live.blocks.get(prelude) }).toEqual({ prelude, rules });
       expect([...live.blocks.keys()].filter(prelude => !today.blocks.has(prelude))).toEqual(screen.added);
     });
   }
+});
+
+describe('Phone shell height', () => {
+  it('should pin the shell root to the viewport, which ui Shell leaves unset below md', () => {
+    expect(read('../src/components/Layout/AppShell.tsx')).toMatch(/className=\{cn\(styles\.shellRoot, 'h-screen'/);
+  });
 });
 
 describe('Phone top bar', () => {

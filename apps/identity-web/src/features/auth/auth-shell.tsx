@@ -1,4 +1,5 @@
 import { type ReactNode } from 'react';
+import { cn } from '@shadow-library/ui';
 
 import { CheckIcon, LockIcon } from '@/components/icons';
 
@@ -58,9 +59,9 @@ function AuthBrandPanel(): React.JSX.Element {
 
 export function AuthScreen({ children, footer }: AuthScreenProps): React.JSX.Element {
   return (
-    <div className={styles.screen}>
+    <div className={cn(styles.screen, 'min-h-screen')}>
       <AuthBrandPanel />
-      <div className={styles.formCol}>
+      <div className={cn(styles.formCol, 'min-h-screen')}>
         <div className={styles.brandMark}>
           <BrandGlyph size={26} />
           <span className={styles.brandMarkName}>
