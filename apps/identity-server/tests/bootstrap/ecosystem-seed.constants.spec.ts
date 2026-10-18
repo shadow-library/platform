@@ -22,7 +22,7 @@ describe('ECOSYSTEM_SEED synapse', () => {
     }
   });
 
-  it('should layer viewer, operator and admin permissions and grant only the admin role to the bootstrap administrator', () => {
+  it('should layer viewer, operator and admin permissions and grant only the admin roles to the bootstrap administrator', () => {
     expect([...permissionsOf('SynapseViewer')].sort()).toEqual(['synapse:catalog:read', 'synapse:usage:read']);
     expect([...permissionsOf('SynapseOperator')].sort()).toEqual(['synapse:catalog:read', 'synapse:catalog:write', 'synapse:usage:read']);
     expect([...permissionsOf('SynapseAdmin')].sort()).toEqual([
@@ -33,7 +33,12 @@ describe('ECOSYSTEM_SEED synapse', () => {
       'synapse:providers:write',
       'synapse:usage:read',
     ]);
-    expect(synapse?.roles?.filter(role => role.grantToBootstrapAdmin).map(role => role.name)).toEqual(['SynapseAdmin']);
+    expect(synapse?.roles?.filter(role => role.grantToBootstrapAdmin).map(role => role.name)).toEqual(['SynapseAdmin', 'SynapseCredentialsAdmin']);
+  });
+
+  it('should keep credential management out of every catalog role and in its own role', () => {
+    for (const role of ['SynapseViewer', 'SynapseOperator']) expect(permissionsOf(role)).not.toContain('synapse:credentials:manage');
+    expect(permissionsOf('SynapseCredentialsAdmin')).toEqual(['synapse:credentials:manage']);
   });
 
   it('should grant novel-forge and memoir the inference and catalog scopes on api://synapse', () => {
