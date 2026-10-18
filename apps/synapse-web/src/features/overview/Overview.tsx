@@ -4,9 +4,20 @@ import { type ReactElement } from 'react';
 import { Alert, Badge, type BadgeIntent, Card, DescriptionList, Spinner, Statistic, Table, type TableColumn, Tag } from '@shadow-library/ui';
 
 import { activeVersionOf } from '@/features/catalog';
+import { type KeyStatus, keyStatusOf } from '@/features/credentials/credential-view';
 import { formatDate, formatDateTime, formatNumber, formatRate, Mono, Muted, PageHeader, PermissionGate, SectionHeader, TextOrDash, usdFormat } from '@/features/shared';
+import cells from '@/features/shared/cells.module.css';
 import controls from '@/features/shared/controls.module.css';
-import { type Capabilities, draftQueryOptions, type ProviderResponse, providersQueryOptions, usageQueryOptions, useCapabilities, versionsQueryOptions } from '@/lib';
+import {
+  type Capabilities,
+  credentialsQueryOptions,
+  draftQueryOptions,
+  type ProviderResponse,
+  providersQueryOptions,
+  usageQueryOptions,
+  useCapabilities,
+  versionsQueryOptions,
+} from '@/lib';
 
 import styles from './Overview.module.css';
 
@@ -109,8 +120,38 @@ function UsageCard(): ReactElement {
   );
 }
 
-function ProvidersSection(): ReactElement {
+function KeyStatusCell({ status }: { status: KeyStatus }): ReactElement {
+  switch (status.kind) {
+    case 'not_needed':
+      return <Muted>not needed</Muted>;
+    case 'configured':
+      return <>Configured</>;
+    case 'missing':
+      return (
+        <Badge intent="danger" variant="soft">
+          Missing
+        </Badge>
+      );
+    case 'credential':
+      return status.name ? <>Credential {status.name}</> : <>Stored credential</>;
+    case 'credential_revoked':
+      return (
+        <Badge intent="danger" variant="soft">
+          {status.name} revoked
+        </Badge>
+      );
+    case 'credential_unknown':
+      return (
+        <Badge intent="danger" variant="soft">
+          Credential missing
+        </Badge>
+      );
+  }
+}
+
+function ProvidersSection({ capabilities }: { capabilities: Capabilities }): ReactElement {
   const providers = useQuery(providersQueryOptions());
+  const credentials = useQuery({ ...credentialsQueryOptions(), enabled: capabilities.manageCredentials });
   const data = providers.data;
 
   const columns: TableColumn<ProviderResponse>[] = [
@@ -120,7 +161,7 @@ function ProvidersSection(): ReactElement {
       cell: row => (
         <span>
           <Mono>{row.key}</Mono>
-          <div className={styles.url}>{row.url}</div>
+          <div className={cells.url}>{row.url}</div>
         </span>
       ),
     },
@@ -146,16 +187,7 @@ function ProvidersSection(): ReactElement {
     {
       id: 'apiKey',
       header: 'API key',
-      cell: row =>
-        row.apiKeyConfigured === undefined ? (
-          <Muted>not needed</Muted>
-        ) : row.apiKeyConfigured ? (
-          'Configured'
-        ) : (
-          <Badge intent="danger" variant="soft">
-            Missing
-          </Badge>
-        ),
+      cell: row => <KeyStatusCell status={keyStatusOf(row, capabilities.manageCredentials ? credentials.data?.items : undefined)} />,
     },
     { id: 'calls', header: 'Calls', align: 'end', cell: row => <span className={controls.tabular}>{formatNumber(row.calls)}</span> },
     { id: 'errors', header: 'Errors', align: 'end', cell: row => <span className={controls.tabular}>{formatNumber(row.errors)}</span> },
@@ -203,7 +235,7 @@ function OverviewScreen({ capabilities }: { capabilities: Capabilities }): React
         <CatalogCard />
         {capabilities.readUsage ? <UsageCard /> : null}
       </div>
-      <ProvidersSection />
+      <ProvidersSection capabilities={capabilities} />
     </>
   );
 }

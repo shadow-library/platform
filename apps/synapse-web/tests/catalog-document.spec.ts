@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 
 import {
   activeVersionOf,
+  credentialIssuesByProvider,
   describeAvailability,
   draftExpectation,
   editorSourceOf,
@@ -10,7 +11,10 @@ import {
   parseCatalog,
   readAliases,
   readModels,
+  readProviders,
   withAliasModel,
+  withoutProviderCredential,
+  withProviderCredential,
 } from '../src/features/catalog/catalog-document';
 import { type CatalogVersionSummaryResponse, type DraftResponse } from '../src/lib/apis/api-types.gen';
 
@@ -139,5 +143,89 @@ describe('draftExpectation', () => {
   it('should expect the draft the editor was loaded from, or none when it started from the active version', () => {
     expect(draftExpectation('abc')).toEqual({ expectedFingerprint: 'abc' });
     expect(draftExpectation(null)).toEqual({ expectNoDraft: true });
+  });
+});
+
+const CREDENTIAL_ID = '6f1c1c9e-3a52-4c63-9d7d-0d3d6a5b0c11';
+
+const PROVIDER_DOCUMENT = {
+  ...DOCUMENT,
+  providers: {
+    openrouter: { kind: 'openrouter', url: 'https://openrouter.ai/api/v1', apiKeyConfig: 'synapse.provider.openrouter.api-key', cost: 'paid' },
+    anthropic: { kind: 'anthropic', url: 'https://api.anthropic.com', credential: CREDENTIAL_ID },
+    local: { kind: 'ollama', url: 'http://localhost:11434' },
+    broken: 'not a provider',
+  },
+};
+
+describe('readProviders', () => {
+  it('should read each provider with the credential or the deprecated config key it names', () => {
+    expect(readProviders(PROVIDER_DOCUMENT)).toEqual([
+      { key: 'openrouter', kind: 'openrouter', url: 'https://openrouter.ai/api/v1', apiKeyConfig: 'synapse.provider.openrouter.api-key' },
+      { key: 'anthropic', kind: 'anthropic', url: 'https://api.anthropic.com', credential: CREDENTIAL_ID },
+      { key: 'local', kind: 'ollama', url: 'http://localhost:11434' },
+    ]);
+  });
+
+  it('should read a provider without a URL as an empty one rather than skip it', () => {
+    expect(readProviders({ providers: { bare: { kind: 'openai' } } })).toEqual([{ key: 'bare', kind: 'openai', url: '' }]);
+  });
+
+  it('should read no providers from a document without a providers object', () => {
+    expect(readProviders({})).toEqual([]);
+    expect(readProviders({ providers: [] })).toEqual([]);
+  });
+});
+
+describe('withProviderCredential', () => {
+  it('should drop the deprecated config key when a credential is chosen', () => {
+    const result = withProviderCredential(PROVIDER_DOCUMENT, 'openrouter', CREDENTIAL_ID);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const provider = (result.document.providers as Record<string, Record<string, unknown>>).openrouter;
+    expect(provider).toEqual({ kind: 'openrouter', url: 'https://openrouter.ai/api/v1', cost: 'paid', credential: CREDENTIAL_ID });
+    expect(provider).not.toHaveProperty('apiKeyConfig');
+  });
+
+  it('should leave the other providers and the rest of the document untouched', () => {
+    const result = withProviderCredential(PROVIDER_DOCUMENT, 'openrouter', CREDENTIAL_ID);
+    expect(result.ok && result.document.aliases).toBe(PROVIDER_DOCUMENT.aliases);
+    expect(result.ok && (result.document.providers as Record<string, unknown>).anthropic).toBe(PROVIDER_DOCUMENT.providers.anthropic);
+  });
+
+  it('should refuse a provider the draft does not have, or one that is not an object', () => {
+    expect(withProviderCredential(PROVIDER_DOCUMENT, 'missing', CREDENTIAL_ID)).toEqual({ ok: false, reason: 'The draft has no provider "missing"' });
+    expect(withProviderCredential(PROVIDER_DOCUMENT, 'broken', CREDENTIAL_ID)).toEqual({ ok: false, reason: 'The draft\'s provider "broken" is not an object' });
+  });
+});
+
+describe('withoutProviderCredential', () => {
+  it('should remove only the credential', () => {
+    const result = withoutProviderCredential(PROVIDER_DOCUMENT, 'anthropic');
+    expect(result.ok && (result.document.providers as Record<string, unknown>).anthropic).toEqual({ kind: 'anthropic', url: 'https://api.anthropic.com' });
+  });
+});
+
+describe('credentialIssuesByProvider', () => {
+  const issue = (path: string, code: string) => ({ path, code, message: `${code} at ${path}` });
+
+  it('should group the credential rules by the provider they were found at', () => {
+    const grouped = credentialIssuesByProvider([
+      issue('providers.anthropic.credential', 'unknown_credential'),
+      issue('providers.anthropic.url', 'credential_origin_mismatch'),
+      issue('providers.openrouter.credential', 'credential_revoked'),
+    ]);
+    expect([...grouped.keys()]).toEqual(['anthropic', 'openrouter']);
+    expect(grouped.get('anthropic')?.map(found => found.code)).toEqual(['unknown_credential', 'credential_origin_mismatch']);
+  });
+
+  it('should keep a provider key that contains dots whole', () => {
+    expect([...credentialIssuesByProvider([issue('providers.gpt-4.1.credential', 'credential_revoked')]).keys()]).toEqual(['gpt-4.1']);
+  });
+
+  it('should ignore other issues, even at a provider path', () => {
+    expect(
+      credentialIssuesByProvider([issue('providers.anthropic.url', 'invalid_value'), issue('aliases.opus.model', 'unknown_model'), issue('', 'unknown_credential')]).size,
+    ).toBe(0);
   });
 });

@@ -14,6 +14,7 @@ import {
   type ValidateDraftResponse,
 } from './api-types.gen';
 import { catalogWriteOutcome, type CatalogWriteOutcome, UNPROCESSABLE } from './catalog-outcome';
+import { credentialKeys } from './credentials.api';
 import { providerKeys } from './providers.api';
 import { ApiError, APIRequest, isApiError } from './transport';
 
@@ -110,7 +111,12 @@ function useCatalogWrite<TVariables>(
   const queryClient = useQueryClient();
   return useMutation<VersionOutcome, ApiError, TVariables>({
     mutationFn: async variables => catalogWriteOutcome(await write(variables)),
-    onSettled: () => Promise.all([queryClient.invalidateQueries({ queryKey: catalogKeys.all }), queryClient.invalidateQueries({ queryKey: providerKeys.all })]),
+    onSettled: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: catalogKeys.all }),
+        queryClient.invalidateQueries({ queryKey: providerKeys.all }),
+        queryClient.invalidateQueries({ queryKey: credentialKeys.all }),
+      ]),
   });
 }
 

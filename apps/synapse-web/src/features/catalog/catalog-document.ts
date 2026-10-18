@@ -1,10 +1,12 @@
-import { type CatalogVersionSummaryResponse, type DraftResponse } from '@/lib';
+import { type CatalogIssueResponse, type CatalogVersionSummaryResponse, type DraftResponse } from '@/lib';
 
 export type CatalogDocument = Record<string, unknown>;
 
 export type ParsedCatalog = { ok: true; document: CatalogDocument } | { ok: false; error: string };
 
-export type RetargetResult = { ok: true; document: CatalogDocument } | { ok: false; reason: string };
+export type DocumentEdit = { ok: true; document: CatalogDocument } | { ok: false; reason: string };
+
+export type RetargetResult = DocumentEdit;
 
 export type AliasState = 'active' | 'hidden' | 'retired';
 
@@ -24,6 +26,14 @@ export interface ModelEntry {
   version?: string;
 }
 
+export interface ProviderEntry {
+  key: string;
+  kind?: string;
+  url: string;
+  credential?: string;
+  apiKeyConfig?: string;
+}
+
 export interface EditorSource {
   text: string;
   note: string;
@@ -37,6 +47,9 @@ export interface DraftExpectation {
 }
 
 export const EMPTY_CATALOG: CatalogDocument = { providers: {}, models: {}, aliases: {}, tasks: {}, budgets: [] };
+
+const CREDENTIAL_ISSUE_CODES: readonly string[] = ['unknown_credential', 'credential_revoked', 'credential_origin_mismatch'];
+const CREDENTIAL_ISSUE_PATH = /^providers\.(.+)\.(?:credential|url)$/;
 
 const ALIAS_STATES: readonly string[] = ['active', 'hidden', 'retired'];
 
@@ -134,4 +147,51 @@ export function withAliasModel(document: CatalogDocument, aliasKey: string, mode
   if (!isRecord(alias)) return { ok: false, reason: `The draft's alias "${aliasKey}" is not an object` };
   if (alias.model === model) return { ok: false, reason: `The draft already targets ${model}` };
   return { ok: true, document: { ...document, aliases: { ...aliases, [aliasKey]: { ...alias, model } } } };
+}
+
+export function readProviders(document: CatalogDocument): ProviderEntry[] {
+  if (!isRecord(document.providers)) return [];
+  return Object.entries(document.providers).flatMap(([key, value]): ProviderEntry[] => {
+    if (!isRecord(value)) return [];
+    const kind = text(value.kind);
+    const credential = text(value.credential);
+    const apiKeyConfig = text(value.apiKeyConfig);
+    return [
+      {
+        key,
+        url: text(value.url) ?? '',
+        ...(kind !== undefined && { kind }),
+        ...(credential !== undefined && { credential }),
+        ...(apiKeyConfig !== undefined && { apiKeyConfig }),
+      },
+    ];
+  });
+}
+
+function editProvider(document: CatalogDocument, providerKey: string, edit: (provider: Record<string, unknown>) => Record<string, unknown>): DocumentEdit {
+  const providers = document.providers;
+  if (!isRecord(providers) || !Object.hasOwn(providers, providerKey)) return { ok: false, reason: `The draft has no provider "${providerKey}"` };
+  const provider = providers[providerKey];
+  if (!isRecord(provider)) return { ok: false, reason: `The draft's provider "${providerKey}" is not an object` };
+  return { ok: true, document: { ...document, providers: { ...providers, [providerKey]: edit(provider) } } };
+}
+
+/** A provider names either a credential or a deprecated `apiKeyConfig`, never both, so choosing a credential drops the config key. */
+export function withProviderCredential(document: CatalogDocument, providerKey: string, credentialId: string): DocumentEdit {
+  return editProvider(document, providerKey, ({ apiKeyConfig: _dropped, ...provider }) => ({ ...provider, credential: credentialId }));
+}
+
+export function withoutProviderCredential(document: CatalogDocument, providerKey: string): DocumentEdit {
+  return editProvider(document, providerKey, ({ credential: _dropped, ...provider }) => provider);
+}
+
+export function credentialIssuesByProvider(issues: readonly CatalogIssueResponse[]): Map<string, CatalogIssueResponse[]> {
+  const grouped = new Map<string, CatalogIssueResponse[]>();
+  for (const issue of issues) {
+    if (!CREDENTIAL_ISSUE_CODES.includes(issue.code)) continue;
+    const providerKey = CREDENTIAL_ISSUE_PATH.exec(issue.path)?.[1];
+    if (providerKey === undefined) continue;
+    grouped.set(providerKey, [...(grouped.get(providerKey) ?? []), issue]);
+  }
+  return grouped;
 }

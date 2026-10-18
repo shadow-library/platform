@@ -1,11 +1,12 @@
 import { type ReactElement, useId } from 'react';
 import { Alert, Button, Card, FormField, Input, Textarea } from '@shadow-library/ui';
 
+import { type Notice } from '@/features/shared';
 import controls from '@/features/shared/controls.module.css';
 import { type Capabilities, type CatalogIssueResponse, isApiError, isCatalogConflict, useSaveDraftMutation, useValidateDraftMutation } from '@/lib';
 
 import { draftExpectation, type EditorSource, formatCatalog, type ParsedCatalog } from './catalog-document';
-import { type IssueReport, type Notice } from './catalog-editor.types';
+import { type IssueReport } from './catalog-editor.types';
 import styles from './Catalog.module.css';
 import { IssueList } from './IssueList';
 

@@ -6,7 +6,7 @@ import { AppShell, type NavConfig } from '@shadow-library/ui/router';
 import { userDisplayName } from '@shadow-library/web';
 import { useOrganisationSwitch } from '@shadow-library/web/router';
 
-import { AliasIcon, CatalogIcon, MoonIcon, OverviewIcon, SunIcon, SynapseMark, UsageIcon } from '@/features/shared';
+import { AliasIcon, CatalogIcon, KeyIcon, MoonIcon, OverviewIcon, SunIcon, SynapseMark, UsageIcon } from '@/features/shared';
 import { type Capabilities, logout, meQuery, organisationsQueryOptions, switchOrganisation, useAccessCheck, useCapabilities } from '@/lib';
 
 import styles from './Layout.module.css';
@@ -25,6 +25,7 @@ function navFor(capabilities: Capabilities): NavConfig {
         ],
       },
       { label: 'Metering', hidden: !capabilities.readUsage, items: [{ to: '/usage', label: 'Usage', icon: <UsageIcon /> }] },
+      { label: 'Security', hidden: !capabilities.manageCredentials, items: [{ to: '/credentials', label: 'Credentials', icon: <KeyIcon /> }] },
     ],
   };
 }

@@ -11,3 +11,10 @@
 .text {
   color: var(--sh-text-primary);
 }
+
+.url {
+  font-family: var(--sh-font-mono);
+  font-size: 0.75rem;
+  color: var(--sh-text-tertiary);
+  word-break: break-all;
+}

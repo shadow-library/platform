@@ -13,6 +13,7 @@ import { Route as LoginRouteImport } from './../src/routes/login'
 import { Route as AppRouteImport } from './../src/routes/_app'
 import { Route as AppIndexRouteImport } from './../src/routes/_app/index'
 import { Route as AppUsageIndexRouteImport } from './../src/routes/_app/usage/index'
+import { Route as AppCredentialsIndexRouteImport } from './../src/routes/_app/credentials/index'
 import { Route as AppCatalogIndexRouteImport } from './../src/routes/_app/catalog/index'
 import { Route as AppAliasesIndexRouteImport } from './../src/routes/_app/aliases/index'
 
@@ -35,6 +36,11 @@ const AppUsageIndexRoute = AppUsageIndexRouteImport.update({
   path: '/usage/',
   getParentRoute: () => AppRoute,
 } as any)
+const AppCredentialsIndexRoute = AppCredentialsIndexRouteImport.update({
+  id: '/credentials/',
+  path: '/credentials/',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppCatalogIndexRoute = AppCatalogIndexRouteImport.update({
   id: '/catalog/',
   path: '/catalog/',
@@ -51,6 +57,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/aliases/': typeof AppAliasesIndexRoute
   '/catalog/': typeof AppCatalogIndexRoute
+  '/credentials/': typeof AppCredentialsIndexRoute
   '/usage/': typeof AppUsageIndexRoute
 }
 export interface FileRoutesByTo {
@@ -58,6 +65,7 @@ export interface FileRoutesByTo {
   '/': typeof AppIndexRoute
   '/aliases': typeof AppAliasesIndexRoute
   '/catalog': typeof AppCatalogIndexRoute
+  '/credentials': typeof AppCredentialsIndexRoute
   '/usage': typeof AppUsageIndexRoute
 }
 export interface FileRoutesById {
@@ -67,13 +75,15 @@ export interface FileRoutesById {
   '/_app/': typeof AppIndexRoute
   '/_app/aliases/': typeof AppAliasesIndexRoute
   '/_app/catalog/': typeof AppCatalogIndexRoute
+  '/_app/credentials/': typeof AppCredentialsIndexRoute
   '/_app/usage/': typeof AppUsageIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/aliases/' | '/catalog/' | '/usage/'
+  fullPaths:
+    '/' | '/login' | '/aliases/' | '/catalog/' | '/credentials/' | '/usage/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/login' | '/' | '/aliases' | '/catalog' | '/usage'
+  to: '/login' | '/' | '/aliases' | '/catalog' | '/credentials' | '/usage'
   id:
     | '__root__'
     | '/_app'
@@ -81,6 +91,7 @@ export interface FileRouteTypes {
     | '/_app/'
     | '/_app/aliases/'
     | '/_app/catalog/'
+    | '/_app/credentials/'
     | '/_app/usage/'
   fileRoutesById: FileRoutesById
 }
@@ -119,6 +130,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppUsageIndexRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/credentials/': {
+      id: '/_app/credentials/'
+      path: '/credentials'
+      fullPath: '/credentials/'
+      preLoaderRoute: typeof AppCredentialsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/catalog/': {
       id: '/_app/catalog/'
       path: '/catalog'
@@ -140,6 +158,7 @@ interface AppRouteChildren {
   AppIndexRoute: typeof AppIndexRoute
   AppAliasesIndexRoute: typeof AppAliasesIndexRoute
   AppCatalogIndexRoute: typeof AppCatalogIndexRoute
+  AppCredentialsIndexRoute: typeof AppCredentialsIndexRoute
   AppUsageIndexRoute: typeof AppUsageIndexRoute
 }
 
@@ -147,6 +166,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppIndexRoute: AppIndexRoute,
   AppAliasesIndexRoute: AppAliasesIndexRoute,
   AppCatalogIndexRoute: AppCatalogIndexRoute,
+  AppCredentialsIndexRoute: AppCredentialsIndexRoute,
   AppUsageIndexRoute: AppUsageIndexRoute,
 }
 

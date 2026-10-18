@@ -2,6 +2,8 @@ export * from './access.api';
 export * from './api-types.gen';
 export * from './catalog.api';
 export * from './catalog-outcome';
+export * from './credential-outcome';
+export * from './credentials.api';
 export * from './providers.api';
 export * from './session.api';
 export * from './transport';

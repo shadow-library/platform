@@ -28,6 +28,10 @@ export function UsageIcon(): ReactElement {
   return <StrokeIcon paths={['M4 20V10', 'M10 20V4', 'M16 20v-7', 'M22 20H2']} />;
 }
 
+export function KeyIcon(): ReactElement {
+  return <StrokeIcon paths={['M21 2l-2 2', 'M15.5 7.5l3 3L22 7l-3-3', 'M11.4 11.6a5.5 5.5 0 1 1-7.8 7.8 5.5 5.5 0 0 1 7.8-7.8z', 'M15.5 7.5l-4.1 4.1']} />;
+}
+
 export function MoonIcon(): ReactElement {
   return <StrokeIcon paths={['M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z']} size={16} />;
 }

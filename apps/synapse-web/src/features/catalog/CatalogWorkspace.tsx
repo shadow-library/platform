@@ -3,15 +3,16 @@ import { useBlocker, useNavigate } from '@tanstack/react-router';
 import { type ReactElement, useState } from 'react';
 import { Alert, Spinner, Tabs, useConfirm } from '@shadow-library/ui';
 
-import { formatDateTime, PageHeader, PermissionGate } from '@/features/shared';
+import { formatDateTime, type Notice, PageHeader, PermissionGate } from '@/features/shared';
 import controls from '@/features/shared/controls.module.css';
 import { type Capabilities, catalogKeys, draftQueryOptions, useCapabilities, versionQueryOptions, versionsQueryOptions } from '@/lib';
 
-import { activeVersionOf, type EditorSource, editorSourceOf, parseCatalog } from './catalog-document';
-import { type CatalogTab, type IssueReport, type Notice } from './catalog-editor.types';
+import { activeVersionOf, type EditorSource, editorSourceOf, formatCatalog, parseCatalog } from './catalog-document';
+import { type CatalogTab, type IssueReport } from './catalog-editor.types';
 import styles from './Catalog.module.css';
 import { DraftPanel } from './DraftPanel';
 import { fetchEditorSource } from './editor-source';
+import { ProviderCredentialsPanel } from './ProviderCredentialsPanel';
 import { PublishPanel } from './PublishPanel';
 import { VersionsPanel } from './VersionsPanel';
 
@@ -167,6 +168,12 @@ function CatalogEditor({ tab, capabilities, initial, activeVersion, onNotice, on
           onReport={setReport}
           onNotice={onNotice}
           onConflict={rebaseAfterConflict}
+        />
+        <ProviderCredentialsPanel
+          capabilities={capabilities}
+          parsed={parsed}
+          issues={dirty || report === null || report.source === 'rollback' ? [] : report.issues}
+          onDocumentChange={document => setText(formatCatalog(document))}
         />
       </Tabs.Panel>
       <Tabs.Panel value="publish" className={styles.panel}>

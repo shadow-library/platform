@@ -8,6 +8,7 @@ export const SYNAPSE_PERMISSIONS = {
   catalogWrite: 'synapse:catalog:write',
   catalogPublish: 'synapse:catalog:publish',
   providersWrite: 'synapse:providers:write',
+  credentialsManage: 'synapse:credentials:manage',
   budgetsWrite: 'synapse:budgets:write',
   usageRead: 'synapse:usage:read',
 } as const;
@@ -28,6 +29,7 @@ export interface Capabilities {
   writeDraft: boolean;
   publish: boolean;
   writeProviders: boolean;
+  manageCredentials: boolean;
   writeBudgets: boolean;
   readUsage: boolean;
 }
@@ -39,6 +41,7 @@ export function capabilitiesOf(permissions: readonly string[]): Capabilities {
     writeDraft: held.has(SYNAPSE_PERMISSIONS.catalogWrite),
     publish: held.has(SYNAPSE_PERMISSIONS.catalogPublish),
     writeProviders: held.has(SYNAPSE_PERMISSIONS.providersWrite),
+    manageCredentials: held.has(SYNAPSE_PERMISSIONS.credentialsManage),
     writeBudgets: held.has(SYNAPSE_PERMISSIONS.budgetsWrite),
     readUsage: held.has(SYNAPSE_PERMISSIONS.usageRead),
   };

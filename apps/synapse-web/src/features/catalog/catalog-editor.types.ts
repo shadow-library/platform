@@ -4,12 +4,6 @@ const CATALOG_TABS = ['draft', 'publish', 'versions'] as const;
 
 export type CatalogTab = (typeof CATALOG_TABS)[number];
 
-export interface Notice {
-  intent: 'info' | 'success' | 'warning' | 'danger';
-  title: string;
-  body?: string;
-}
-
 export interface IssueReport {
   source: 'save' | 'validate' | 'publish' | 'rollback';
   issues: CatalogIssueResponse[];

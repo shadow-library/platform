@@ -3,11 +3,12 @@ import { type ReactElement, useState } from 'react';
 import { Alert, Button, Dialog, Spinner, Table, type TableColumn, Textarea, useConfirm } from '@shadow-library/ui';
 
 import { formatDateTime, Mono, TextOrDash, VersionStateBadge } from '@/features/shared';
+import { type Notice } from '@/features/shared';
 import controls from '@/features/shared/controls.module.css';
 import { type Capabilities, type CatalogVersionSummaryResponse, isApiError, useRollbackMutation, versionQueryOptions, versionsQueryOptions } from '@/lib';
 
 import { formatCatalog } from './catalog-document';
-import { type IssueReport, type Notice } from './catalog-editor.types';
+import { type IssueReport } from './catalog-editor.types';
 import { IssueList } from './IssueList';
 
 interface VersionsPanelProps {

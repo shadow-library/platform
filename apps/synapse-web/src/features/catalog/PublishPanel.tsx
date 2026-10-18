@@ -2,10 +2,11 @@ import { useQuery } from '@tanstack/react-query';
 import { type ReactElement, type ReactNode } from 'react';
 import { Alert, Badge, Button, Card, Spinner, useConfirm } from '@shadow-library/ui';
 
+import { type Notice } from '@/features/shared';
 import controls from '@/features/shared/controls.module.css';
 import { type Capabilities, diffQueryOptions, type DraftDiffResponse, isCatalogConflict, usePublishDraftMutation } from '@/lib';
 
-import { type IssueReport, type Notice } from './catalog-editor.types';
+import { type IssueReport } from './catalog-editor.types';
 import styles from './Catalog.module.css';
 import { IssueList } from './IssueList';
 

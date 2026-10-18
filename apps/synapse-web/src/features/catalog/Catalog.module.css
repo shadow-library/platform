@@ -121,3 +121,49 @@
     grid-template-columns: 1fr;
   }
 }
+
+.providers {
+  margin-top: 28px;
+}
+
+.picker {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 240px;
+}
+
+.pickerRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pickerSelect {
+  flex: 1;
+}
+
+.deprecated {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.providerIssue {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.75rem;
+}
+
+.providerIssue + .providerIssue {
+  margin-top: 6px;
+}
+
+.providerIssueMessage {
+  color: var(--sh-danger-text);
+}
+
+.providerIssueAdvice {
+  color: var(--sh-text-tertiary);
+}
