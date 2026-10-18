@@ -29,6 +29,8 @@
 - Read config through `Config` inside the app graph; `process.env` is confined to service discovery and standalone entrypoints (migrate, web server entry, SSR transport). `Config`, `Logger` and the reflector live on `global` so duplicate copies share
   one instance.
 - `common`'s `./errors`, `./utils`, `./cache`, `./interfaces` subpaths pull in no heavy Node-only dependency (winston, undici, chokidar): keep them that way.
+- `common`'s `./crypto` is server-only (`node:crypto`) and outside that browser-safe set: it is never re-exported from the root, and lint bans it in `apps/*-web`, `ui` and `web`.
+  A sealed value is bound to its `context`, so the context names an immutable row identity known before insert. A keyring only gains keys; one is removed only when no row uses it.
 - `ui`: style only through CSS Modules using `--sh-*` tokens; no Tailwind, no hard-coded hex/px/shadow/duration; add a missing token (light and dark) first.
 - `ui`: components never use the global `utilities.css` layer; overlays wrap Radix (never forked); dist stays SSR-import-safe; do not strip the `'use client'` banners.
 - `web`: keep server-fetch contract types beside browser code; importing them from the server-only file drags server code into the client bundle.

@@ -175,6 +175,19 @@ export default defineConfig([
   ...reactLayer(DEFAULT_REACT_VERSION, WEB_APP_SCOPE),
   { files: [`${WEB_APP_SCOPE}/${SOURCE_FILES}`], languageOptions: { globals: globals.browser } },
 
+  /** Browser code: `common/crypto` is server-only — it runs on `node:crypto` and handles master keys, neither of which may reach a client bundle. */
+  {
+    files: [`${WEB_APP_SCOPE}/${SOURCE_FILES}`, `packages/ui/**/${SOURCE_FILES}`, `packages/web/**/${SOURCE_FILES}`],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [{ name: '@shadow-library/common/crypto', message: '@shadow-library/common/crypto is server-only; decrypt on the server and send only what the client may see.' }],
+        },
+      ],
+    },
+  },
+
   /**
    * Backend workspaces: declaration-merged namespaces carry the Fastify request augmentations, so
    * `@typescript-eslint/no-namespace` is off across every server.

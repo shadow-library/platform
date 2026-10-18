@@ -24,8 +24,8 @@ never drift. Adding a new public subpath means editing exactly one place: the so
 
 ## @shadow-library/common — foundation
 
-Root entry (`src/index.ts`, loads `reflect-metadata`, re-exports everything below) **plus 8 real
-subpaths** (declared in `package.json` `exports`, which is what the build reads). Engines: node >= 23.
+Root entry (`src/index.ts`, loads `reflect-metadata`, re-exports everything below except `./crypto`) **plus 10 real
+subpaths**, `./testing` among them (declared in `package.json` `exports`, which is what the build reads). Engines: node >= 23.
 
 ### Config — root or `./config`
 Exports: `Config` (singleton), `ConfigService`, `ConfigRecords`, `ConfigOptions`, `ConfigKey`, `ConfigChangeCallback`, `NodeEnv`, `LogLevel`, `Runtime`.
@@ -64,6 +64,12 @@ Exports: `APIRequest`, `APIResponse`, `APIRequestOptions`, `CustomAPIRequest`, `
 
 ### Reflection — root or `./reflect`
 Exports: `Reflector` (singleton, class `ReflectorService`), `UpdateMetadataOptions` — `defineMetadata/getMetadata/hasMetadata/appendMetadata/prependMetadata/updateMetadata(...,{arrayStrategy})/cloneMetadata`.
+
+### Envelope encryption — `./crypto` only (server-only, never in the root barrel)
+Exports: `SecretBox`, `parseKeyring`, `isEnvelope`, `Envelope`, `Keyring`, `WrappedKey`, `CryptoErrorCode`.
+- `parseKeyring('k2:<base64url 32 bytes>,k1:<…>')` → `Keyring` (`activeKeyId`, `has(kid)`, async `wrap/unwrap`); the first entry encrypts, every entry decrypts. Callers pass the string from their own `Config` key; the module never reads `Config`.
+- `new SecretBox(keyring)` → `seal(plaintext, context)` → `Envelope` (`{ v: 1, alg: 'A256GCM', kid, dek, iv, ct, tag }`, base64url, one jsonb value); `open(envelope, context)` → `Buffer`; `needsRewrap(envelope)`; `rewrap(envelope, context)` re-wraps only the data key (`iv`/`ct`/`tag` unchanged). `context` is `<service>:<table>:<id>:<column>`, an identity fixed before insert.
+- `CryptoErrorCode` (all internal): `KEYRING_INVALID`, `UNKNOWN_KEY`, `DECRYPTION_FAILED` (wrong context and tampering alike), `ENVELOPE_UNSUPPORTED`. Banned by lint in `apps/*-web`, `ui`, `web`.
 
 ### Interfaces & shared types — root or `./interfaces`
 Exports: `DotNotation`, `Fn`, `SyncFn`, `AsyncFn`, `AsType`, `SortOrder`, `PaginationMode`, `OffsetPagination`, `PagePagination`, `CursorPagination`, `OffsetPaginationResult`, `PagePaginationResult`, `CursorPaginationResult`, `PaginationResult`, `NormalizedPagination`, `PrimitiveValue`, `SyncValue`, `MaybeArray`, `MaybeNull`, `MaybeUndefined`, `Nullable`, `MaskOptions`.
