@@ -1,14 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
 import { type ReactElement, useState } from 'react';
-import { Alert, Button, Dialog, Spinner, Table, type TableColumn, Textarea } from '@shadow-library/ui';
+import { Alert, Button, Dialog, Spinner, Table, type TableColumn, Textarea, useConfirm } from '@shadow-library/ui';
 
-import { formatDateTime, Mono, TextOrDash, useConfirm, VersionStateBadge } from '@/features/shared';
+import { formatDateTime, Mono, TextOrDash, VersionStateBadge } from '@/features/shared';
 import controls from '@/features/shared/controls.module.css';
 import { type Capabilities, type CatalogVersionSummaryResponse, isApiError, useRollbackMutation, versionQueryOptions, versionsQueryOptions } from '@/lib';
 
 import { formatCatalog } from './catalog-document';
 import { type IssueReport, type Notice } from './catalog-editor.types';
-import styles from './Catalog.module.css';
 import { IssueList } from './IssueList';
 
 interface VersionsPanelProps {
@@ -33,7 +32,8 @@ function VersionViewer({ version, onClose }: { version: number; onClose: () => v
             </Alert>
           ) : detail.data ? (
             <Textarea
-              className={styles.editor}
+              mono
+              wrap="off"
               value={formatCatalog(detail.data.document)}
               readOnly
               autoGrow={false}
@@ -42,7 +42,7 @@ function VersionViewer({ version, onClose }: { version: number; onClose: () => v
               aria-label={`Catalog v${version} document`}
             />
           ) : (
-            <div className={styles.loading}>
+            <div className={controls.loading}>
               <Spinner aria-label="Loading the version" />
             </div>
           )}

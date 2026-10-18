@@ -1,10 +1,5 @@
-.accessNotice {
+.notice {
   margin-bottom: 20px;
-}
-
-.orgSwitcher {
-  min-width: 180px;
-  max-width: 260px;
 }
 
 .envPill {
@@ -38,9 +33,5 @@
 @media (max-width: 639px) {
   .envPill {
     display: none;
-  }
-
-  .orgSwitcher {
-    min-width: 0;
   }
 }

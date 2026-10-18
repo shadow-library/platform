@@ -37,6 +37,25 @@ describe('Textarea', () => {
     expect(screen.getByRole('textbox')).toHaveAttribute('data-variant', 'bare');
   });
 
+  it('should set the monospace face on the field and its auto-grow twin alike', () => {
+    const { container } = render(<Textarea aria-label="Document" mono />);
+    const [field, twin] = container.querySelectorAll('textarea');
+    expect(field).toHaveAttribute('data-mono', 'true');
+    expect(twin).toHaveAttribute('data-mono', 'true');
+  });
+
+  it('should measure auto-grow with the same wrapping as the field', () => {
+    const { container } = render(<Textarea aria-label="Document" mono wrap="off" />);
+    const [field, twin] = container.querySelectorAll('textarea');
+    expect(field).toHaveAttribute('wrap', 'off');
+    expect(twin).toHaveAttribute('wrap', 'off');
+  });
+
+  it('should keep the proportional face unless mono is asked for', () => {
+    render(<Textarea aria-label="Notes" />);
+    expect(screen.getByRole('textbox')).not.toHaveAttribute('data-mono');
+  });
+
   it('fires onValueChange with the string value', async () => {
     const onValueChange = vi.fn();
     const user = userEvent.setup();

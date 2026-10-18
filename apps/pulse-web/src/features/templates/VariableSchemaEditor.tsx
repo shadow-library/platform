@@ -1,7 +1,7 @@
 import { type ReactElement, useMemo, useState } from 'react';
-import { Alert, Badge, Button, FormField, Input, Select, Switch, Table, type TableColumn } from '@shadow-library/ui';
+import { Alert, Badge, Button, FormField, Input, Select, Switch, Table, type TableColumn, useConfirm } from '@shadow-library/ui';
 
-import { OutlineBadge, SectionHeader, TextOrDash, trimToUndefined, useConfirm, VARIABLE_TYPE_OPTIONS } from '@/features/shared';
+import { OutlineBadge, SectionHeader, TextOrDash, trimToUndefined, VARIABLE_TYPE_OPTIONS } from '@/features/shared';
 import controls from '@/features/shared/controls.module.css';
 import { type TemplateVariableSchema, type TemplateVariableType, useUpdateTemplateMutation } from '@/lib';
 
@@ -39,7 +39,7 @@ export default function VariableSchemaEditor({ templateId, schema }: { templateI
   };
 
   const removeVariable = async (name: string): Promise<void> => {
-    if (!(await confirm({ title: 'Remove variable?', description: `"${name}" will no longer be declared on this template.` }))) return;
+    if (!(await confirm({ title: 'Remove variable?', description: `"${name}" will no longer be declared on this template.`, confirmLabel: 'Remove', intent: 'danger' }))) return;
     const next = { ...schema.variables };
     delete next[name];
     persist(next);

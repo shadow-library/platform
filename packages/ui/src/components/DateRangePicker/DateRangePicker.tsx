@@ -54,11 +54,13 @@ export function DateRangePicker({
   confirm = false,
   size = 'md',
   disabled = false,
+  invalid = false,
   placeholder = 'Select dates',
   locale = DEFAULT_LOCALE,
   id,
   className,
   'aria-label': ariaLabel,
+  'aria-describedby': ariaDescribedBy,
 }: DateRangePickerProps): ReactElement {
   const [current, setCurrent] = useControllableState<DateRange>({ value, defaultValue: defaultValue ?? { start: null, end: null }, onChange: onValueChange });
 
@@ -102,8 +104,10 @@ export function DateRangePicker({
           className={cn(styles.field, className)}
           data-size={size}
           data-empty={display == null || undefined}
+          data-invalid={invalid || undefined}
           disabled={disabled}
           aria-label={ariaLabel}
+          aria-describedby={ariaDescribedBy}
           aria-haspopup="dialog"
         >
           <span className={styles.value}>{display ?? placeholder}</span>

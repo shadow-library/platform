@@ -14,3 +14,9 @@
   justify-content: center;
   padding: 80px 0;
 }
+
+.hint {
+  margin: 10px 0;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-tertiary);
+}

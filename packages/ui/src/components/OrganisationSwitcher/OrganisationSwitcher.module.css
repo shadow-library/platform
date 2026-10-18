@@ -1,0 +1,11 @@
+.root {
+  min-width: 180px;
+  max-width: 260px;
+}
+
+/* Below sm the top bar has no room to reserve; the trigger ellipsises instead. */
+@media (max-width: 639px) {
+  .root {
+    min-width: 0;
+  }
+}

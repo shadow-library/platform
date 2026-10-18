@@ -1,6 +1,6 @@
 import { useNavigate } from '@tanstack/react-router';
 import { type ReactElement, useEffect, useState } from 'react';
-import { Button, Input, Pagination, Select, Table, type TableColumn } from '@shadow-library/ui';
+import { Button, Input, Pagination, Select, Table, type TableColumn, useConfirm } from '@shadow-library/ui';
 import { useSearchParams } from '@shadow-library/web/router';
 
 import {
@@ -17,7 +17,6 @@ import {
   StatusBadge,
   TextOrDash,
   trimToUndefined,
-  useConfirm,
   useDebouncedParam,
   useTablePagination,
   useTableSort,
@@ -58,7 +57,15 @@ export default function ProfileList(): ReactElement {
   };
 
   const requestDelete = async (row: SenderProfileResponse): Promise<void> => {
-    if (await confirm({ title: 'Delete sender profile?', description: `Deleting "${row.key}" also removes its endpoints and unlinks routing rules.` })) setDeleting(row);
+    if (
+      await confirm({
+        title: 'Delete sender profile?',
+        description: `Deleting "${row.key}" also removes its endpoints and unlinks routing rules.`,
+        confirmLabel: 'Delete',
+        intent: 'danger',
+      })
+    )
+      setDeleting(row);
   };
 
   const columns: TableColumn<SenderProfileResponse>[] = [

@@ -1,5 +1,5 @@
 import { type ReactElement, useEffect, useMemo, useState } from 'react';
-import { Button, Input, Pagination, Select, Table, type TableColumn } from '@shadow-library/ui';
+import { Button, Input, Pagination, Select, Table, type TableColumn, useConfirm } from '@shadow-library/ui';
 import { useSearchParams } from '@shadow-library/web/router';
 
 import {
@@ -15,7 +15,6 @@ import {
   PAGE_SIZE_OPTIONS,
   PageHeader,
   trimToUndefined,
-  useConfirm,
   useDebouncedParam,
   useTablePagination,
   useTableSort,
@@ -76,7 +75,7 @@ export default function RuleList(): ReactElement {
   };
 
   const requestDelete = async (row: RoutingRule): Promise<void> => {
-    if (await confirm({ title: 'Delete routing rule?', description: 'This routing rule will be permanently removed.' })) setDeleting(row);
+    if (await confirm({ title: 'Delete routing rule?', description: 'This routing rule will be permanently removed.', confirmLabel: 'Delete', intent: 'danger' })) setDeleting(row);
   };
 
   const columns: TableColumn<RoutingRule>[] = [

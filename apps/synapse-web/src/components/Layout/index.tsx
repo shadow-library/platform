@@ -1,15 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { type PropsWithChildren, type ReactElement } from 'react';
-import { Alert, IconButton, useTheme } from '@shadow-library/ui';
+import { Alert, IconButton, OrganisationSwitcher, useTheme } from '@shadow-library/ui';
 import { AppShell, type NavConfig } from '@shadow-library/ui/router';
 import { userDisplayName } from '@shadow-library/web';
+import { useOrganisationSwitch } from '@shadow-library/web/router';
 
 import { AliasIcon, CatalogIcon, MoonIcon, OverviewIcon, SunIcon, SynapseMark, UsageIcon } from '@/features/shared';
-import { accessQueryOptions, type Capabilities, logout, meQuery, useCapabilities } from '@/lib';
+import { type Capabilities, logout, meQuery, organisationsQueryOptions, switchOrganisation, useAccessCheck, useCapabilities } from '@/lib';
 
 import styles from './Layout.module.css';
-import { OrgSwitcher } from './OrgSwitcher';
 
 function navFor(capabilities: Capabilities): NavConfig {
   return {
@@ -41,7 +41,8 @@ export function Layout({ children }: PropsWithChildren): ReactElement {
   const navigate = useNavigate();
   const me = useQuery(meQuery);
   const capabilities = useCapabilities();
-  const access = useQuery(accessQueryOptions());
+  const access = useAccessCheck();
+  const organisationSwitch = useOrganisationSwitch({ organisationsQueryOptions, switchOrganisation });
   const stage = import.meta.env.DEV ? 'dev' : 'production';
 
   /** RP-initiated logout must replace the local bounce: routing to `/login` would leave the identity session live and sign straight back in. */
@@ -64,16 +65,16 @@ export function Layout({ children }: PropsWithChildren): ReactElement {
           <span className={styles.envValue}>{stage}</span>
         </div>
       }
-      actions={<OrgSwitcher />}
+      actions={<OrganisationSwitcher {...organisationSwitch.switcher} />}
       utility={<ThemeToggle />}
     >
-      {access.isError && !access.data ? (
-        <Alert
-          intent="warning"
-          title="Your Synapse permissions couldn't be checked"
-          action={{ label: 'Retry', onClick: () => void access.refetch() }}
-          className={styles.accessNotice}
-        >
+      {organisationSwitch.error ? (
+        <Alert intent="danger" title="Your organisation wasn't switched" onDismiss={organisationSwitch.dismissError} className={styles.notice}>
+          {organisationSwitch.error.message}
+        </Alert>
+      ) : null}
+      {access.status === 'unavailable' ? (
+        <Alert intent="warning" title="Your Synapse permissions couldn't be checked" className={styles.notice}>
           Controls are hidden until they can be. The server still decides what you may do.
         </Alert>
       ) : null}

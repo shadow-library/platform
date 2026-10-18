@@ -1,6 +1,10 @@
 import { useRouter } from '@tanstack/react-router';
 import { type ReactElement, type ReactNode } from 'react';
-import { AccessDenied } from '@shadow-library/ui';
+import { AccessDenied, EmptyState, Spinner } from '@shadow-library/ui';
+
+import { useAccessCheck } from '@/lib';
+
+import controls from './controls.module.css';
 
 export interface PermissionGateProps {
   allowed: boolean;
@@ -12,7 +16,22 @@ export interface PermissionGateProps {
 
 export function PermissionGate({ allowed, area, homeLink = true, children }: PermissionGateProps): ReactElement {
   const router = useRouter();
+  const access = useAccessCheck();
   if (allowed) return <>{children}</>;
+  if (access.status === 'pending')
+    return (
+      <div className={controls.loading}>
+        <Spinner aria-label="Checking your permissions" />
+      </div>
+    );
+  if (access.status === 'unavailable')
+    return (
+      <EmptyState
+        title="Your permissions couldn’t be checked"
+        description={`Synapse couldn’t confirm whether your role covers ${area}. Nothing was denied; retry the check.`}
+        action={{ label: 'Retry', onClick: access.retry, loading: access.retrying }}
+      />
+    );
   return (
     <AccessDenied
       title="You don’t have permission to view this"

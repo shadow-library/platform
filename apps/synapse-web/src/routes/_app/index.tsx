@@ -18,5 +18,6 @@ export const Route = createFileRoute('/_app/')({
       ...(capabilities.readUsage ? [queryClient.prefetchQuery(usageQueryOptions({ groupBy: 'app' }))] : []),
     ]);
   },
+  head: () => ({ meta: [{ title: 'Overview · Shadow Synapse' }] }),
   component: Overview,
 });

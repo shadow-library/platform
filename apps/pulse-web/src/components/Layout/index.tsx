@@ -1,15 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { type PropsWithChildren, type ReactElement } from 'react';
-import { Button, IconButton, useTheme } from '@shadow-library/ui';
+import { Alert, Button, IconButton, OrganisationSwitcher, useTheme } from '@shadow-library/ui';
 import { AppShell, type NavConfig } from '@shadow-library/ui/router';
 import { userDisplayName } from '@shadow-library/web';
+import { useOrganisationSwitch } from '@shadow-library/web/router';
 
 import { DashboardIcon, LayoutIcon, LogIcon, MoonIcon, PartialIcon, PulseMark, RoutingIcon, SenderIcon, SendIcon, SunIcon, TemplateIcon } from '@/features/shared';
-import { logout, meQuery } from '@/lib/apis';
+import { logout, meQuery, organisationsQueryOptions, switchOrganisation } from '@/lib/apis';
 
 import styles from './Layout.module.css';
-import OrgSwitcher from './OrgSwitcher';
 
 const NAV: NavConfig = {
   variant: 'sections',
@@ -46,6 +46,7 @@ function ThemeToggle(): ReactElement {
 export default function Layout({ children }: PropsWithChildren): ReactElement {
   const navigate = useNavigate();
   const me = useQuery(meQuery);
+  const organisationSwitch = useOrganisationSwitch({ organisationsQueryOptions, switchOrganisation });
   const stage = import.meta.env.DEV ? 'dev' : 'production';
 
   /**
@@ -80,7 +81,7 @@ export default function Layout({ children }: PropsWithChildren): ReactElement {
       }
       actions={
         <>
-          <OrgSwitcher />
+          <OrganisationSwitcher {...organisationSwitch.switcher} />
           <span className={styles.sendAction}>
             <Button variant="primary" size="sm" onClick={() => navigate({ to: '/send' })}>
               Send notification
@@ -90,6 +91,11 @@ export default function Layout({ children }: PropsWithChildren): ReactElement {
       }
       utility={<ThemeToggle />}
     >
+      {organisationSwitch.error ? (
+        <Alert intent="danger" title="Your organisation wasn't switched" onDismiss={organisationSwitch.dismissError} className={styles.notice}>
+          {organisationSwitch.error.message}
+        </Alert>
+      ) : null}
       {children}
     </AppShell>
   );

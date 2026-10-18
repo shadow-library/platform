@@ -1,16 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { type ReactElement } from 'react';
-import { Alert, Badge, type BadgeIntent, Card, DescriptionList, Statistic, Table, type TableColumn, Tag } from '@shadow-library/ui';
+import { Alert, Badge, type BadgeIntent, Card, DescriptionList, Spinner, Statistic, Table, type TableColumn, Tag } from '@shadow-library/ui';
 
 import { activeVersionOf } from '@/features/catalog';
-import { formatDate, formatDateTime, formatNumber, formatRate, Mono, Muted, PageHeader, PermissionGate, SectionHeader, TextOrDash } from '@/features/shared';
+import { formatDate, formatDateTime, formatNumber, formatRate, Mono, Muted, PageHeader, PermissionGate, SectionHeader, TextOrDash, usdFormat } from '@/features/shared';
 import controls from '@/features/shared/controls.module.css';
 import { type Capabilities, draftQueryOptions, type ProviderResponse, providersQueryOptions, usageQueryOptions, useCapabilities, versionsQueryOptions } from '@/lib';
 
 import styles from './Overview.module.css';
 
-const USD = { style: 'currency', currency: 'USD', maximumFractionDigits: 2 } as const;
 const WARNING_ERROR_RATE = 0.01;
 const DANGER_ERROR_RATE = 0.1;
 
@@ -54,8 +53,12 @@ function CatalogCard(): ReactElement {
               <TextOrDash value={active.note} />
             </DescriptionList.Item>
           </DescriptionList>
+        ) : versions.isLoading ? (
+          <div className={controls.loading}>
+            <Spinner aria-label="Loading the active catalog" />
+          </div>
         ) : (
-          <Muted>{versions.isLoading ? 'Loading…' : 'No catalog version has been published yet.'}</Muted>
+          <Muted>No catalog version has been published yet.</Muted>
         )}
         <div className={styles.cardLink}>
           {draft.data ? (
@@ -79,6 +82,8 @@ function CatalogCard(): ReactElement {
 function UsageCard(): ReactElement {
   const usage = useQuery(usageQueryOptions({ groupBy: 'app' }));
   const totals = usage.data?.totals;
+  const listCost = totals?.listCostUsd ?? 0;
+  const billed = totals?.billedCostUsd ?? 0;
   return (
     <Card padding="md">
       <Card.Header title={usage.data ? `Usage ${formatDate(usage.data.from)} – ${formatDate(usage.data.to)}` : 'Usage'} />
@@ -90,8 +95,8 @@ function UsageCard(): ReactElement {
         ) : (
           <div className={styles.totals}>
             <Statistic label="Calls" value={totals?.calls ?? 0} loading={usage.isLoading} size="sm" />
-            <Statistic label="List cost" value={totals?.listCostUsd ?? 0} format={USD} loading={usage.isLoading} size="sm" />
-            <Statistic label="Billed" value={totals?.billedCostUsd ?? 0} format={USD} loading={usage.isLoading} size="sm" />
+            <Statistic label="List cost" value={listCost} format={usdFormat(listCost)} loading={usage.isLoading} size="sm" />
+            <Statistic label="Billed" value={billed} format={usdFormat(billed)} loading={usage.isLoading} size="sm" />
           </div>
         )}
         <div className={styles.cardLink}>

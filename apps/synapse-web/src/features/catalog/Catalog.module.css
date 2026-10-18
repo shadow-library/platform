@@ -10,15 +10,6 @@
   margin-bottom: 20px;
 }
 
-.editor textarea {
-  font-family: var(--sh-font-mono);
-  font-size: 0.8125rem;
-  line-height: 1.5;
-  tab-size: 2;
-  white-space: pre;
-  min-height: 480px;
-}
-
 .toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -34,12 +25,6 @@
 
 .spacer {
   flex: 1;
-}
-
-.hint {
-  margin: 10px 0 0;
-  font-size: 0.8125rem;
-  color: var(--sh-text-tertiary);
 }
 
 .status {
@@ -121,16 +106,10 @@
   margin-top: 20px;
 }
 
-.confirmActions {
+.publishActions {
   display: flex;
   gap: 10px;
   margin-top: 14px;
-}
-
-.loading {
-  display: flex;
-  justify-content: center;
-  padding: 60px 0;
 }
 
 @media (max-width: 1023px) {

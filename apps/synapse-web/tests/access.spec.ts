@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { capabilitiesOf, SYNAPSE_PERMISSIONS } from '../src/lib/access';
+import { accessStatusOf, capabilitiesOf, SYNAPSE_PERMISSIONS } from '../src/lib/access';
 
 describe('capabilitiesOf', () => {
   it('should grant a viewer reading only', () => {
@@ -22,5 +22,23 @@ describe('capabilitiesOf', () => {
 
   it('should grant nothing for permissions of another application', () => {
     expect(Object.values(capabilitiesOf(['pulse:templates:read', 'synapse:infer'])).every(granted => !granted)).toBe(true);
+  });
+});
+
+describe('accessStatusOf', () => {
+  it('should read a failed check with no earlier answer as unavailable, not as a denial', () => {
+    expect(accessStatusOf({ data: undefined, isError: true })).toBe('unavailable');
+  });
+
+  it('should keep an earlier answer when a later refetch fails', () => {
+    expect(accessStatusOf({ data: { permissions: [] }, isError: true })).toBe('known');
+  });
+
+  it('should be pending while the first answer is in flight', () => {
+    expect(accessStatusOf({ data: undefined, isError: false })).toBe('pending');
+  });
+
+  it('should treat an answer holding no permissions as known', () => {
+    expect(accessStatusOf({ data: { permissions: [] }, isError: false })).toBe('known');
   });
 });

@@ -127,7 +127,7 @@ export function OnboardingGate({ children }: { children: ReactElement }): ReactE
 
 function GateSpinner({ label }: { label: string }): ReactElement {
   return (
-    <div className="flex items-center justify-center" style={{ minHeight: '100dvh' }}>
+    <div className="center h-screen">
       <Spinner size="lg" aria-label={label} />
     </div>
   );

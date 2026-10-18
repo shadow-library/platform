@@ -31,7 +31,7 @@ function LoginRedirect(): React.JSX.Element {
   }, [returnTo]);
 
   return (
-    <main style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+    <main className="stack items-center justify-center gap-12 h-screen">
       <Spinner size="lg" />
       <p>Redirecting to sign-in…</p>
     </main>

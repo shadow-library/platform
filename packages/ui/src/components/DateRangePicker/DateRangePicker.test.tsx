@@ -9,6 +9,7 @@ import { describe, expect, it, vi } from 'vitest';
 /**
  * Importing user defined packages
  */
+import { FormField } from '../FormField';
 import { DateRangePicker } from './DateRangePicker';
 
 /**
@@ -20,6 +21,24 @@ const presets = [
 ];
 
 describe('DateRangePicker', () => {
+  it('should take its label, helper and error state from an enclosing FormField', () => {
+    render(
+      <FormField label="Range" helper="Whole days, UTC" error="Pick at most 400 days">
+        <DateRangePicker />
+      </FormField>,
+    );
+    const trigger = screen.getByRole('button', { name: 'Range' });
+    expect(trigger).toHaveAttribute('data-invalid', 'true');
+    expect(trigger).toHaveAccessibleDescription('Pick at most 400 days');
+  });
+
+  it('should stay valid and undescribed on its own', () => {
+    render(<DateRangePicker aria-label="Period" />);
+    const trigger = screen.getByRole('button', { name: 'Period' });
+    expect(trigger).not.toHaveAttribute('data-invalid');
+    expect(trigger).not.toHaveAttribute('aria-describedby');
+  });
+
   it('shows the formatted range on the trigger', () => {
     render(<DateRangePicker value={{ start: '2026-06-01', end: '2026-06-16' }} aria-label="Report period" />);
     expect(screen.getByRole('button', { name: /Report period/ })).toHaveTextContent(/Jun.*–.*Jun/);

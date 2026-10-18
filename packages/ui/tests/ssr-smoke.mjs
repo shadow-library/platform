@@ -24,6 +24,15 @@ assert.ok(Object.keys(UI).length > 100, 'main entry should export the full publi
 //    (NavProgress, asserted in section 8), so the root entry stays free of that peer.
 const router = await import(routerEntry);
 
+const ORGANISATIONS = [
+  { id: 'platform', name: 'Platform' },
+  { id: 'acme', name: 'Acme' },
+];
+
+function ConfirmAsker() {
+  return h('span', null, typeof UI.useConfirm());
+}
+
 // 3. A representative set must server-render without throwing.
 const cases = [
   ['Button', h(UI.Button, null, 'Save')],
@@ -50,6 +59,8 @@ const cases = [
   ['BannerOutlet', h(UI.BannerOutlet, null)],
   ['ThemeProvider', h(UI.ThemeProvider, null, h('span', null, 'themed'))],
   ['ClientOnly', h(UI.ClientOnly, null, h('span', null, 'client'))],
+  ['ConfirmProvider', h(UI.ConfirmProvider, null, h(ConfirmAsker))],
+  ['OrganisationSwitcher', h(UI.OrganisationSwitcher, { organisations: ORGANISATIONS, activeId: 'platform', onSwitch() {} })],
 ];
 for (const [name, node] of cases) {
   assert.doesNotThrow(() => renderToStaticMarkup(node), `${name} should server-render without throwing`);
@@ -82,6 +93,8 @@ assert.ok(!renderToStaticMarkup(h(UI.BannerOutlet, null)).includes('leak-canary-
 for (const name of [
   'ThemeProvider',
   'ClientOnly',
+  'ConfirmProvider',
+  'useConfirm',
   'useTheme',
   'themeInitScript',
   'derivePaginationState',
@@ -96,6 +109,15 @@ for (const name of [
 assert.ok(renderToStaticMarkup(h(UI.ThemeProvider, null, h('span', null, 'themed'))).includes('themed'), 'ThemeProvider should render its children on the server');
 assert.equal(renderToStaticMarkup(h(UI.ClientOnly, null, h('span', null, 'x'))), '', 'ClientOnly should render nothing on the server');
 assert.equal(UI.derivePaginationState(95, 3, 20).skip, 40, 'derivePaginationState should be pure and correct');
+assert.equal(
+  renderToStaticMarkup(h(UI.ConfirmProvider, null, h(ConfirmAsker))),
+  '<span>function</span>',
+  'ConfirmProvider should hand out confirm and render no dialog on the server',
+);
+assert.ok(
+  renderToStaticMarkup(h(UI.OrganisationSwitcher, { organisations: ORGANISATIONS, activeId: 'platform', onSwitch() {} })).includes('aria-label="Active organisation"'),
+  'OrganisationSwitcher should server-render its labelled picker',
+);
 assert.equal(typeof router.NavProgress, 'function', 'router subpath should export NavProgress');
 
 console.log('SSR-SMOKE-OK');

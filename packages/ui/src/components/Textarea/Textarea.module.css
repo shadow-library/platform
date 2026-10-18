@@ -38,6 +38,11 @@
   line-height: 22px;
 }
 
+.field[data-mono='true'] {
+  font-family: var(--sh-font-mono);
+  tab-size: 2;
+}
+
 /* Manual resize is vertical-only; horizontal never — it breaks the layout grid. */
 .field[data-autogrow='false'] {
   resize: vertical;

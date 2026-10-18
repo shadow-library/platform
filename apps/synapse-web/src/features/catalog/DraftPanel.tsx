@@ -1,6 +1,7 @@
 import { type ReactElement, useId } from 'react';
 import { Alert, Button, Card, FormField, Input, Textarea } from '@shadow-library/ui';
 
+import controls from '@/features/shared/controls.module.css';
 import { type Capabilities, type CatalogIssueResponse, isApiError, isCatalogConflict, useSaveDraftMutation, useValidateDraftMutation } from '@/lib';
 
 import { draftExpectation, type EditorSource, formatCatalog, type ParsedCatalog } from './catalog-document';
@@ -114,7 +115,8 @@ export function DraftPanel({
           {dirty ? <strong>Unsaved edits</strong> : null}
         </div>
         <Textarea
-          className={styles.editor}
+          mono
+          wrap="off"
           value={text}
           onValueChange={onTextChange}
           autoGrow={false}
@@ -128,11 +130,11 @@ export function DraftPanel({
           aria-describedby={parsed.ok ? undefined : errorId}
         />
         {parsed.ok ? null : (
-          <p id={errorId} className={styles.hint} role="alert">
+          <p id={errorId} className={controls.hint} role="alert">
             Not valid: {parsed.error}
           </p>
         )}
-        {hint ? <p className={styles.hint}>{hint}</p> : null}
+        {hint ? <p className={controls.hint}>{hint}</p> : null}
         {readOnly ? null : (
           <div className={styles.toolbar}>
             <FormField label="Note" optional className={styles.note}>

@@ -16,7 +16,11 @@ export interface AliasesSearch {
   model?: string;
 }
 
-const STATE_INTENT: Record<AliasState, BadgeIntent> = { active: 'success', hidden: 'warning', retired: 'neutral' };
+const STATE_BADGE: Record<AliasState, { intent: BadgeIntent; label: string }> = {
+  active: { intent: 'success', label: 'Active' },
+  hidden: { intent: 'warning', label: 'Hidden' },
+  retired: { intent: 'neutral', label: 'Retired' },
+};
 
 export function AliasesScreen({ search }: { search: AliasesSearch }): ReactElement {
   const capabilities = useCapabilities();
@@ -109,8 +113,8 @@ function AliasTable({ document, search, capabilities }: { document: CatalogDocum
       id: 'state',
       header: 'State',
       cell: row => (
-        <Badge intent={STATE_INTENT[row.state]} variant="soft" dot>
-          {row.state}
+        <Badge intent={STATE_BADGE[row.state].intent} variant="soft" dot>
+          {STATE_BADGE[row.state].label}
         </Badge>
       ),
     },

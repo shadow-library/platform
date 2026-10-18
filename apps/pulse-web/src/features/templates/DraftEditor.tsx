@@ -1,7 +1,7 @@
 import { type ReactElement, useMemo, useState } from 'react';
-import { Alert, Button, Card, cn, Combobox, FormField, Input, Select, Textarea } from '@shadow-library/ui';
+import { Alert, Button, Card, cn, Combobox, FormField, Input, Select, Textarea, useConfirm } from '@shadow-library/ui';
 
-import { CHANNEL_OPTIONS, type Option, SectionHeader, trimToUndefined, useConfirm } from '@/features/shared';
+import { CHANNEL_OPTIONS, type Option, SectionHeader, trimToUndefined } from '@/features/shared';
 import controls from '@/features/shared/controls.module.css';
 import {
   type ContentResponse,
@@ -85,7 +85,15 @@ export default function DraftEditor({ templateId, versions, channels }: { templa
   };
 
   const deleteContent = async (): Promise<void> => {
-    if (!(await confirm({ title: 'Delete content?', description: `The ${editor.channel} / ${editor.locale} content will be removed from the draft.` }))) return;
+    if (
+      !(await confirm({
+        title: 'Delete content?',
+        description: `The ${editor.channel} / ${editor.locale} content will be removed from the draft.`,
+        confirmLabel: 'Delete',
+        intent: 'danger',
+      }))
+    )
+      return;
     remove.mutate({ channel: editor.channel, locale: editor.locale }, { onSuccess: resetEditor, onError: apiError => setSaveError(apiError.message) });
   };
 

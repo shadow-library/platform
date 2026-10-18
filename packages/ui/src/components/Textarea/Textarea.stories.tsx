@@ -57,6 +57,11 @@ export const ManualResize: Story = {
   args: { autoGrow: false, minRows: 4 },
 };
 
+/** Monospace with unwrapped lines — a JSON or config document edited in place. */
+export const Mono: Story = {
+  args: { mono: true, wrap: 'off', autoGrow: false, minRows: 6, defaultValue: '{\n  "aliases": [\n    { "key": "fast", "model": "gpt-4o-mini", "state": "active" }\n  ]\n}' },
+};
+
 /** The counter stays hidden until 80% of `maxLength`, then turns danger at the limit. */
 export const WithCounter: Story = {
   render: args => {

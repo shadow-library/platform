@@ -1,9 +1,10 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useBlocker, useNavigate } from '@tanstack/react-router';
 import { type ReactElement, useState } from 'react';
-import { Alert, Spinner, Tabs } from '@shadow-library/ui';
+import { Alert, Spinner, Tabs, useConfirm } from '@shadow-library/ui';
 
-import { formatDateTime, PageHeader, PermissionGate, useConfirm } from '@/features/shared';
+import { formatDateTime, PageHeader, PermissionGate } from '@/features/shared';
+import controls from '@/features/shared/controls.module.css';
 import { type Capabilities, catalogKeys, draftQueryOptions, useCapabilities, versionQueryOptions, versionsQueryOptions } from '@/lib';
 
 import { activeVersionOf, type EditorSource, editorSourceOf, parseCatalog } from './catalog-document';
@@ -73,7 +74,7 @@ function CatalogScreen({ tab, capabilities }: { tab: CatalogTab; capabilities: C
           onReload={reload}
         />
       ) : loadError ? null : (
-        <div className={styles.loading}>
+        <div className={controls.loading}>
           <Spinner aria-label="Loading the active catalog" />
         </div>
       )}

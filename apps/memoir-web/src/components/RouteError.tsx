@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { type ErrorComponentProps, useRouter } from '@tanstack/react-router';
 import { type ReactElement, useState } from 'react';
-import { AccessDenied, Button, toast } from '@shadow-library/ui';
+import { AccessDenied, Button, cn, toast } from '@shadow-library/ui';
 import { isApiError } from '@shadow-library/web';
 import { isAccessDeniedError } from '@shadow-library/web/router';
 
@@ -84,7 +84,7 @@ function AccountDenied(): ReactElement {
   };
 
   return (
-    <Root className="flex items-center justify-center" style={{ minHeight: isPage ? '100dvh' : undefined }}>
+    <Root className={cn('flex items-center justify-center', isPage && 'min-h-screen')}>
       <AccessDenied
         illustration={isPage ? undefined : <MemoirMark size={40} />}
         title={

@@ -1,7 +1,7 @@
 import { type ReactElement, useState } from 'react';
-import { Alert, Button, Table, type TableColumn } from '@shadow-library/ui';
+import { Alert, Button, Table, type TableColumn, useConfirm } from '@shadow-library/ui';
 
-import { formatDateTime, Mono, Muted, SectionHeader, TextOrDash, useConfirm, VersionStatusBadge } from '@/features/shared';
+import { formatDateTime, Mono, Muted, SectionHeader, TextOrDash, VersionStatusBadge } from '@/features/shared';
 import controls from '@/features/shared/controls.module.css';
 import { useRollbackVersionMutation, type VersionResponse } from '@/lib';
 

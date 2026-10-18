@@ -4,10 +4,11 @@ import { type ReactElement, useState } from 'react';
 import { Alert, Button, Card, FormField, Select, Statistic, Table, type TableColumn } from '@shadow-library/ui';
 
 import { type AliasEntry, type CatalogDocument, draftExpectation, type ModelEntry, withAliasModel } from '@/features/catalog';
-import { formatNumber, formatSignedUsd, Mono, SectionHeader } from '@/features/shared';
+import { formatNumber, formatSignedUsd, Mono, SectionHeader, signedUsdFormat, usdFormat } from '@/features/shared';
 import controls from '@/features/shared/controls.module.css';
 import { aliasImpactQueryOptions, type AliasImpactRowResponse, type Capabilities, draftQueryOptions, isApiError, isCatalogConflict, useSaveDraftMutation } from '@/lib';
 
+import { relativeChange } from './alias-impact';
 import styles from './Aliases.module.css';
 
 interface AliasImpactPanelProps {
@@ -126,7 +127,7 @@ export function AliasImpactPanel({ alias, models, candidate, activeDocument, cap
           </Button>
         ) : null}
       </div>
-      {candidates.length === 0 ? <p className={styles.hint}>The catalog has no other model to retarget this alias to.</p> : null}
+      {candidates.length === 0 ? <p className={controls.hint}>The catalog has no other model to retarget this alias to.</p> : null}
 
       {retarget.status === 'saved' ? (
         <Alert intent={retarget.issues === 0 ? 'success' : 'warning'} title={`The draft now targets ${retarget.model}`} className={styles.result}>
@@ -155,17 +156,21 @@ export function AliasImpactPanel({ alias, models, candidate, activeDocument, cap
               <Statistic label="Calls" value={data?.totalCalls ?? 0} loading={impact.isLoading} />
               {data?.retarget ? (
                 <>
-                  <Statistic label={`At ${data.retarget.fromModel}`} value={data.retarget.currentUsd} format={{ style: 'currency', currency: 'USD', maximumFractionDigits: 4 }} />
-                  <Statistic label={`At ${data.retarget.toModel}`} value={data.retarget.proposedUsd} format={{ style: 'currency', currency: 'USD', maximumFractionDigits: 4 }} />
-                  <div>
-                    <div className={styles.hint}>List-price delta</div>
-                    <strong className={deltaClass(data.retarget.deltaUsd)}>{formatSignedUsd(data.retarget.deltaUsd)}</strong>
-                  </div>
+                  <Statistic label={`At ${data.retarget.fromModel}`} value={data.retarget.currentUsd} format={usdFormat(data.retarget.currentUsd)} />
+                  <Statistic label={`At ${data.retarget.toModel}`} value={data.retarget.proposedUsd} format={usdFormat(data.retarget.proposedUsd)} />
+                  <Statistic
+                    label="List-price delta"
+                    value={data.retarget.deltaUsd}
+                    format={signedUsdFormat(data.retarget.deltaUsd)}
+                    delta={relativeChange(data.retarget.deltaUsd, data.retarget.currentUsd)}
+                    positiveIs="down"
+                    comparison={`vs ${data.retarget.fromModel}`}
+                  />
                 </>
               ) : null}
             </div>
             {data && !data.retarget ? (
-              <p className={styles.hint}>Choose a candidate model to see what the same traffic would cost at its list prices. Current target: {data.model}.</p>
+              <p className={controls.hint}>Choose a candidate model to see what the same traffic would cost at its list prices. Current target: {data.model}.</p>
             ) : null}
             <Table
               data={data?.rows ?? []}
@@ -175,7 +180,7 @@ export function AliasImpactPanel({ alias, models, candidate, activeDocument, cap
               aria-label={`Calls through ${alias.label} by app and task`}
               emptyState="No calls went through this alias in the window."
             />
-            {data?.retarget ? <p className={styles.hint}>Image output is not priced.</p> : null}
+            {data?.retarget ? <p className={controls.hint}>Image output is not priced.</p> : null}
           </Card.Body>
         </Card>
       )}

@@ -10,6 +10,11 @@
   width: 190px;
 }
 
+.range {
+  width: 280px;
+  max-width: 100%;
+}
+
 .totals {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -33,13 +38,9 @@
 }
 
 .barFill {
+  display: block;
   height: 100%;
   background: var(--sh-accent);
-}
-
-.none {
-  color: var(--sh-text-tertiary);
-  font-style: italic;
 }
 
 @media (max-width: 1023px) {

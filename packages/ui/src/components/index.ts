@@ -36,6 +36,7 @@ export * from './Kbd';
 export * from './MultiSelect';
 export * from './NotificationCenter';
 export * from './NumberStepper';
+export * from './OrganisationSwitcher';
 export * from './OtpInput';
 export * from './Pagination';
 export * from './Popover';

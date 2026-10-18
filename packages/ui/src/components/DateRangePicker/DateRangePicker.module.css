@@ -41,6 +41,12 @@
   box-shadow: 0 0 0 3px var(--sh-focus-field-ring);
   outline: none;
 }
+.field[data-invalid] {
+  border-color: var(--sh-danger-solid);
+}
+.field[data-invalid]:focus-visible {
+  box-shadow: 0 0 0 3px var(--sh-focus-field-ring-error);
+}
 .field:disabled {
   opacity: var(--sh-disabled-opacity);
   cursor: not-allowed;

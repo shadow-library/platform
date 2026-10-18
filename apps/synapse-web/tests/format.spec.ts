@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { formatDateTime, formatRate, formatSignedUsd, formatUsd } from '../src/features/shared/format';
+import { formatDateTime, formatRate, formatSignedUsd, formatUsd, usdFormat } from '../src/features/shared/format';
 
 describe('formatDateTime', () => {
   it('should print in UTC so the server and the browser agree', () => {
@@ -21,9 +21,23 @@ describe('formatUsd', () => {
     expect(formatUsd(-0.25)).toBe('-$0.2500');
   });
 
-  it('should sign a positive delta', () => {
+  it('should group thousands and print negative zero as zero', () => {
+    expect(formatUsd(1234.5)).toBe('$1,234.50');
+    expect(formatUsd(-0)).toBe('$0.00');
+  });
+
+  it('should sign a non-zero delta and leave zero unsigned', () => {
     expect(formatSignedUsd(1.5)).toBe('+$1.50');
     expect(formatSignedUsd(-1.5)).toBe('-$1.50');
+    expect(formatSignedUsd(0.0004)).toBe('+$0.0004');
+    expect(formatSignedUsd(0)).toBe('$0.00');
+  });
+});
+
+describe('usdFormat', () => {
+  it('should give a Statistic the same digits formatUsd prints', () => {
+    expect(new Intl.NumberFormat('en-US', usdFormat(0.00042)).format(0.00042)).toBe(formatUsd(0.00042));
+    expect(new Intl.NumberFormat('en-US', usdFormat(12.5)).format(12.5)).toBe(formatUsd(12.5));
   });
 });
 

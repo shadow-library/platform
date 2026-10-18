@@ -1,16 +1,25 @@
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
-import { type FormEvent, type ReactElement, useState } from 'react';
-import { Alert, Button, Card, FormField, Input, Select, Statistic, Table, type TableColumn } from '@shadow-library/ui';
+import { type ReactElement, useState } from 'react';
+import { Alert, Button, Card, DateRangePicker, FormField, Select, Statistic, Table, type TableColumn } from '@shadow-library/ui';
 
-import { formatDate, formatNumber, formatRate, formatUsd, Mono, PageHeader, PermissionGate } from '@/features/shared';
+import { formatDate, formatNumber, formatRate, formatUsd, Mono, Muted, PageHeader, PermissionGate, usdFormat } from '@/features/shared';
 import controls from '@/features/shared/controls.module.css';
 import { usageQueryOptions, type UsageRowResponse, useCapabilities } from '@/lib';
 
 import styles from './Usage.module.css';
-import { rangeProblem, USAGE_GROUP_LABELS, USAGE_GROUPS, type UsageGroup, usageParams, type UsageSearch } from './usage-search';
-
-const USD = { style: 'currency', currency: 'USD', maximumFractionDigits: 4 } as const;
+import {
+  lastIncludedInstant,
+  pickerRangeOf,
+  searchRangeOf,
+  USAGE_GROUP_LABELS,
+  USAGE_GROUPS,
+  type UsageGroup,
+  usageParams,
+  usageRangePresets,
+  type UsageSearch,
+  utcToday,
+} from './usage-search';
 
 export function UsageScreen({ search }: { search: UsageSearch }): ReactElement {
   const capabilities = useCapabilities();
@@ -23,27 +32,23 @@ export function UsageScreen({ search }: { search: UsageSearch }): ReactElement {
 
 function RangeForm({ search }: { search: UsageSearch }): ReactElement {
   const navigate = useNavigate();
-  const [from, setFrom] = useState(search.from ?? '');
-  const [to, setTo] = useState(search.to ?? '');
-  const problem = rangeProblem(from || undefined, to || undefined);
-
-  const apply = (next: Partial<UsageSearch>): void => void navigate({ to: '/usage', search: { groupBy: search.groupBy, ...(from && { from }), ...(to && { to }), ...next } });
-
-  const handleSubmit = (event: FormEvent<HTMLFormElement>): void => {
-    event.preventDefault();
-    if (!problem) apply({});
-  };
+  const [today] = useState(() => utcToday(new Date()));
+  const show = (next: UsageSearch): void => void navigate({ to: '/usage', search: next });
 
   return (
-    <form className={styles.filters} onSubmit={handleSubmit} aria-label="Usage range">
-      <FormField label="From" helper="Inclusive, UTC" className={styles.field}>
-        <Input type="date" value={from} onValueChange={setFrom} invalid={problem !== null} />
-      </FormField>
-      <FormField label="To" helper="Exclusive, UTC" error={problem ?? undefined} className={styles.field}>
-        <Input type="date" value={to} onValueChange={setTo} invalid={problem !== null} />
+    <div className={styles.filters} role="group" aria-label="Usage range">
+      <FormField label="Range" helper="Whole days, UTC" className={styles.range}>
+        <DateRangePicker
+          value={pickerRangeOf(search)}
+          onValueChange={range => show({ groupBy: search.groupBy, ...searchRangeOf(range) })}
+          presets={usageRangePresets(today)}
+          max={today}
+          confirm
+          placeholder="Default: last 30 days"
+        />
       </FormField>
       <FormField label="Group by" className={styles.field}>
-        <Select value={search.groupBy} onValueChange={value => apply({ groupBy: value as UsageGroup })} aria-label="Group usage by">
+        <Select value={search.groupBy} onValueChange={value => show({ ...search, groupBy: value as UsageGroup })} aria-label="Group usage by">
           {USAGE_GROUPS.map(group => (
             <Select.Item key={group} value={group}>
               {USAGE_GROUP_LABELS[group]}
@@ -51,15 +56,12 @@ function RangeForm({ search }: { search: UsageSearch }): ReactElement {
           ))}
         </Select>
       </FormField>
-      <Button type="submit" variant="secondary" disabled={problem !== null}>
-        Apply range
-      </Button>
       {search.from || search.to ? (
-        <Button type="button" variant="ghost" onClick={() => void navigate({ to: '/usage', search: { groupBy: search.groupBy } })}>
+        <Button type="button" variant="ghost" onClick={() => show({ groupBy: search.groupBy })}>
           Default range
         </Button>
       ) : null}
-    </form>
+    </div>
   );
 }
 
@@ -67,10 +69,11 @@ function UsageReport({ search }: { search: UsageSearch }): ReactElement {
   const usage = useQuery(usageQueryOptions(usageParams(search)));
   const data = usage.data;
   const totalListCost = data?.totals.listCostUsd ?? 0;
+  const totalBilled = data?.totals.billedCostUsd ?? 0;
   const groupLabel = USAGE_GROUP_LABELS[search.groupBy];
 
   const columns: TableColumn<UsageRowResponse>[] = [
-    { id: 'key', header: groupLabel, cell: row => (row.key === null ? <span className={styles.none}>none</span> : <Mono>{row.key}</Mono>) },
+    { id: 'key', header: groupLabel, cell: row => (row.key === null ? <Muted>none</Muted> : <Mono>{row.key}</Mono>) },
     { id: 'calls', header: 'Calls', align: 'end', cell: row => <span className={controls.tabular}>{formatNumber(row.calls)}</span> },
     { id: 'inputTokens', header: 'Input', align: 'end', cell: row => <span className={controls.tabular}>{formatNumber(row.inputTokens)}</span> },
     { id: 'cachedInputTokens', header: 'Cached', align: 'end', cell: row => <span className={controls.tabular}>{formatNumber(row.cachedInputTokens)}</span> },
@@ -87,7 +90,7 @@ function UsageReport({ search }: { search: UsageSearch }): ReactElement {
         return (
           <span className={styles.share}>
             <span className={styles.bar} aria-hidden>
-              <span className={styles.barFill} style={{ display: 'block', width: `${Math.round(share * 100)}%` }} />
+              <span className={styles.barFill} style={{ width: `${Math.round(share * 100)}%` }} />
             </span>
             <span className={controls.tabular}>{totalListCost > 0 ? formatRate(share) : '—'}</span>
           </span>
@@ -102,11 +105,11 @@ function UsageReport({ search }: { search: UsageSearch }): ReactElement {
         title="Usage"
         subtitle={
           data
-            ? `Settled calls from ${formatDate(data.from)} up to ${formatDate(data.to)}, grouped by ${groupLabel.toLowerCase()}. Cost is counted at list price; billed is what providers charged.`
+            ? `Settled calls from ${formatDate(data.from)} through ${formatDate(lastIncludedInstant(data.to))}, grouped by ${groupLabel.toLowerCase()}. Cost is counted at list price; billed is what providers charged.`
             : 'Settled calls from the usage ledger.'
         }
       />
-      <RangeForm key={`${search.from ?? ''}|${search.to ?? ''}`} search={search} />
+      <RangeForm search={search} />
       {usage.error ? (
         <Alert intent="danger" title="Couldn't load usage">
           {usage.error.message}
@@ -131,12 +134,12 @@ function UsageReport({ search }: { search: UsageSearch }): ReactElement {
             </Card>
             <Card padding="md">
               <Card.Body>
-                <Statistic label="List cost" value={totalListCost} format={USD} loading={usage.isLoading} />
+                <Statistic label="List cost" value={totalListCost} format={usdFormat(totalListCost)} loading={usage.isLoading} />
               </Card.Body>
             </Card>
             <Card padding="md">
               <Card.Body>
-                <Statistic label="Billed" value={data?.totals.billedCostUsd ?? 0} format={USD} loading={usage.isLoading} />
+                <Statistic label="Billed" value={totalBilled} format={usdFormat(totalBilled)} loading={usage.isLoading} />
               </Card.Body>
             </Card>
           </div>

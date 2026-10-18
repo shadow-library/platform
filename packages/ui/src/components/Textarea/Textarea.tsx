@@ -44,6 +44,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function 
   {
     size = 'md',
     variant = 'field',
+    mono = false,
     minRows = 3,
     maxRows = 12,
     autoGrow = true,
@@ -54,6 +55,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function 
     onChange,
     onValueChange,
     maxLength,
+    wrap,
     className,
     style,
     ...props
@@ -98,9 +100,11 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function 
         className={styles.field}
         data-size={size}
         data-variant={variant}
+        data-mono={mono || undefined}
         data-autogrow={autoGrow ? 'true' : 'false'}
         data-invalid={invalid || undefined}
         rows={minRows}
+        wrap={wrap}
         value={currentValue}
         maxLength={maxLength}
         onChange={handleChange}
@@ -108,7 +112,19 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function 
         aria-describedby={describedBy}
         {...props}
       />
-      {autoGrow && <textarea ref={twinRef} className={cn(styles.field, styles.twin)} data-size={size} data-variant={variant} rows={1} tabIndex={-1} aria-hidden />}
+      {autoGrow && (
+        <textarea
+          ref={twinRef}
+          className={cn(styles.field, styles.twin)}
+          data-size={size}
+          data-variant={variant}
+          data-mono={mono || undefined}
+          wrap={wrap}
+          rows={1}
+          tabIndex={-1}
+          aria-hidden
+        />
+      )}
       {hasCounter ? (
         <div className={styles.counter} id={counterId} data-visible={nearLimit ? 'true' : undefined} data-state={atLimit ? 'limit' : undefined}>
           {length} / {maxLength}

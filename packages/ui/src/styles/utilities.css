@@ -1161,6 +1161,12 @@
   min-height: 0;
 }
 
+.min-h-screen {
+  min-height: 100vh;
+  /* dvh tracks mobile browser chrome; the vh line above is the no-dvh fallback */
+  min-height: 100dvh;
+}
+
 .max-h-full {
   max-height: 100%;
 }

@@ -19,6 +19,8 @@ export interface TextareaProps extends Omit<TextareaHTMLAttributes<HTMLTextAreaE
   size?: TextareaSize;
   /** `bare` drops the field surface — border, fill, focus ring and padding — for a textarea whose container is the visible surface, as in a chat composer. @default 'field' */
   variant?: TextareaVariant;
+  /** Set the text in the monospace face for code and structured documents; pair with the native `wrap="off"` to keep long lines unbroken. @default false */
+  mono?: boolean;
   /** Minimum visible rows; also the starting height. @default 3 */
   minRows?: number;
   /** Auto-grow cap; content past this scrolls internally. @default 12 */

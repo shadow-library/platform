@@ -21,7 +21,7 @@ function AuthenticatedShell(): ReactElement {
 
   if (status === 'redirecting')
     return (
-      <div className="flex items-center justify-center" style={{ minHeight: '100dvh' }}>
+      <div className="center h-screen">
         <Spinner aria-label="Redirecting to sign-in" />
       </div>
     );

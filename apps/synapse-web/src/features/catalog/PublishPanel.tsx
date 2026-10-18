@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
-import { type ReactElement, type ReactNode, useState } from 'react';
-import { Alert, Badge, Button, Card, Spinner } from '@shadow-library/ui';
+import { type ReactElement, type ReactNode } from 'react';
+import { Alert, Badge, Button, Card, Spinner, useConfirm } from '@shadow-library/ui';
 
+import controls from '@/features/shared/controls.module.css';
 import { type Capabilities, diffQueryOptions, type DraftDiffResponse, isCatalogConflict, usePublishDraftMutation } from '@/lib';
 
 import { type IssueReport, type Notice } from './catalog-editor.types';
@@ -33,7 +34,7 @@ function DiffColumn({ title, paths, tone, intent }: { title: string; paths: stri
       />
       <Card.Body>
         {paths.length === 0 ? (
-          <p className={styles.hint}>None</p>
+          <p className={controls.hint}>None</p>
         ) : (
           <ul className={styles.diffList} aria-label={`${title} paths`}>
             {paths.map(path => (
@@ -55,11 +56,11 @@ function diffSummary(diff: DraftDiffResponse): string {
 export function PublishPanel({ capabilities, fingerprint, dirty, report, onReport, onNotice, onPublished, onConflict }: PublishPanelProps): ReactElement {
   const diff = useQuery(diffQueryOptions());
   const publish = usePublishDraftMutation();
-  const [confirming, setConfirming] = useState(false);
+  const confirm = useConfirm();
 
   if (diff.isLoading)
     return (
-      <div className={styles.loading}>
+      <div className={controls.loading}>
         <Spinner aria-label="Loading the diff" />
       </div>
     );
@@ -82,11 +83,18 @@ export function PublishPanel({ capabilities, fingerprint, dirty, report, onRepor
   const diffMatchesEditor = changes.fingerprint === fingerprint;
   const publishable = diffMatchesEditor && !diff.isFetching;
 
-  const handlePublish = (): void => {
+  /** Publishes the fingerprint the question described; a draft saved meanwhile is the server's conflict to report. */
+  const handlePublish = async (): Promise<void> => {
+    const confirmed = await confirm({
+      title: 'Publish this draft?',
+      description: `It replaces the active catalog for every app with ${unchanged ? 'an identical document' : diffSummary(changes)}. The current version is archived and can be rolled back to.`,
+      confirmLabel: 'Publish',
+      intent: 'danger',
+    });
+    if (!confirmed) return;
     onNotice(null);
     publish.mutate(changes.fingerprint, {
       onSuccess: outcome => {
-        setConfirming(false);
         if (outcome.kind === 'invalid') {
           onReport({ source: 'publish', issues: outcome.issues });
           onNotice({ intent: 'danger', title: 'Publishing was refused', body: `${outcome.issues.length} issue(s) block it; they are listed below.` });
@@ -95,7 +103,6 @@ export function PublishPanel({ capabilities, fingerprint, dirty, report, onRepor
         void onPublished({ intent: 'success', title: `Published catalog v${outcome.value.version}`, body: 'Replicas pick it up on their next poll.' });
       },
       onError: error => {
-        setConfirming(false);
         if (isCatalogConflict(error)) return void onConflict();
         onNotice({ intent: 'danger', title: "Couldn't publish the draft", body: error.message });
       },
@@ -103,7 +110,7 @@ export function PublishPanel({ capabilities, fingerprint, dirty, report, onRepor
   };
 
   const renderAction = (): ReactNode => {
-    if (!capabilities.publish) return <p className={styles.hint}>Your role cannot publish the catalog.</p>;
+    if (!capabilities.publish) return <p className={controls.hint}>Your role cannot publish the catalog.</p>;
     if (dirty)
       return (
         <Alert intent="warning" title="You have unsaved edits" className={styles.confirm}>
@@ -116,32 +123,12 @@ export function PublishPanel({ capabilities, fingerprint, dirty, report, onRepor
           The saved draft is no longer the one in the editor. Reload to review the current draft before publishing it.
         </Alert>
       );
-    if (!confirming)
-      return (
-        <div className={styles.confirmActions}>
-          <Button variant="primary" onClick={() => setConfirming(true)} disabled={!publishable}>
-            Review and publish
-          </Button>
-        </div>
-      );
     return (
-      <Card padding="md" className={styles.confirm} role="region" aria-label="Confirm publish">
-        <Card.Body>
-          <strong>Publish this draft?</strong>
-          <p className={styles.hint}>
-            It replaces the active catalog for every app with {unchanged ? 'an identical document' : diffSummary(changes)}. The current version is archived and can be rolled back
-            to.
-          </p>
-          <div className={styles.confirmActions}>
-            <Button variant="primary" onClick={handlePublish} loading={publish.isPending} disabled={!publishable}>
-              Confirm publish
-            </Button>
-            <Button variant="ghost" onClick={() => setConfirming(false)} disabled={publish.isPending}>
-              Cancel
-            </Button>
-          </div>
-        </Card.Body>
-      </Card>
+      <div className={styles.publishActions}>
+        <Button variant="primary" onClick={() => void handlePublish()} loading={publish.isPending} disabled={!publishable}>
+          Review and publish
+        </Button>
+      </div>
     );
   };
 

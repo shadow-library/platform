@@ -1,6 +1,6 @@
 import { useNavigate } from '@tanstack/react-router';
 import { type ReactElement, useEffect, useMemo, useState } from 'react';
-import { Alert, Breadcrumbs, Button, Card, DescriptionList, Select, Spinner, Table, type TableColumn } from '@shadow-library/ui';
+import { Alert, Breadcrumbs, Button, Card, DescriptionList, Select, Spinner, Table, type TableColumn, useConfirm } from '@shadow-library/ui';
 
 import {
   ACTIVE_FILTER_OPTIONS,
@@ -17,7 +17,6 @@ import {
   SectionHeader,
   StatusBadge,
   trimToUndefined,
-  useConfirm,
 } from '@/features/shared';
 import controls from '@/features/shared/controls.module.css';
 import {
@@ -106,7 +105,15 @@ export default function ProfileDetail({ profileId }: { profileId: string }): Rea
   };
 
   const requestDelete = async (row: SenderEndpointResponse): Promise<void> => {
-    if (await confirm({ title: 'Delete endpoint?', description: `The ${row.channel} / ${row.provider} endpoint will be permanently removed.` })) setDeleting(row);
+    if (
+      await confirm({
+        title: 'Delete endpoint?',
+        description: `The ${row.channel} / ${row.provider} endpoint will be permanently removed.`,
+        confirmLabel: 'Delete',
+        intent: 'danger',
+      })
+    )
+      setDeleting(row);
   };
 
   const columns: TableColumn<SenderEndpointResponse>[] = [

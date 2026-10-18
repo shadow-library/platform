@@ -30,10 +30,13 @@ export interface DateRangePickerProps {
   confirm?: boolean;
   size?: 'sm' | 'md' | 'lg';
   disabled?: boolean;
+  /** Danger border/ring on the trigger. A button cannot carry `aria-invalid`, so the error itself reaches assistive tech through `aria-describedby`. */
+  invalid?: boolean;
   placeholder?: string;
   /** Locale for the range display and calendar labels. Pinned by default so SSR and client agree. @default 'en-US' */
   locale?: string;
   id?: string;
   className?: string;
   'aria-label'?: string;
+  'aria-describedby'?: string;
 }

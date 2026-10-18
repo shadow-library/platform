@@ -1,8 +1,6 @@
 import { type ReactElement } from 'react';
-import { ThemeProvider } from '@shadow-library/ui';
+import { ConfirmProvider, ThemeProvider } from '@shadow-library/ui';
 import { themeCookieDomain } from '@shadow-library/web';
-
-import { ConfirmProvider } from '@/features/shared/ConfirmProvider';
 
 export interface AppProviderProps {
   children?: React.ReactNode;
