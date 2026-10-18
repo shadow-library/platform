@@ -3,6 +3,7 @@ import { type AppError, Logger } from '@shadow-library/common';
 import { type SynapseEnvelope, type SynapseResponseBlock } from '@shadow-library/synapse';
 
 import { ActiveCatalogCache, clampEffort, type Effort, labelFor, type Resolution, resolve, type ResolvedDeployment, type ResolveNeeds, type TaskKind } from '@modules/catalog';
+import { CredentialResolver } from '@modules/credentials/credential-resolver.service';
 import { type BudgetCounterKey, type CallCost, callCost, imageListCost, type LedgerClaim, MeteringService, NO_COST, type SettledStatus, tokenListCost } from '@modules/metering';
 import {
   type ChatRequestBody,
@@ -104,13 +105,14 @@ export class InferenceService {
     private readonly providers: ProviderClient,
     private readonly metering: MeteringService,
     private readonly inflight: InflightRequests,
+    private readonly credentials: CredentialResolver,
   ) {}
 
   async completeChat(app: string, body: InferenceBody<ChatRequestBody>, abort: RequestAbort): Promise<JsonObject> {
     const admission = await this.admit(app, 'chat', body.model, body.synapse, chatNeeds(body), false, abort);
     try {
       const { value, deployment } = await this.serve(admission, abort, async (target, deployment) => {
-        const translated = this.translateChat(body, admission, deployment);
+        const translated = this.translateChat(body, admission, deployment, await this.apiKey(deployment));
         const result = await this.providers.sendChat(target, translated, { stream: false, signal: abort.signal, responseModel: admission.resolution.taskKey });
         return { result, webSearch: translated.webSearch };
       });
@@ -129,7 +131,7 @@ export class InferenceService {
     let opened: Served<OpenedStream>;
     try {
       opened = await this.serve(admission, abort, async (target, deployment) => {
-        const translated = this.translateChat(body, admission, deployment);
+        const translated = this.translateChat(body, admission, deployment, await this.apiKey(deployment));
         const stream = await this.providers.sendChat(target, translated, { stream: true, signal: abort.signal, responseModel: admission.resolution.taskKey });
         const first = await stream.chunks.next();
         return { stream, first, ...(translated.webSearch === undefined ? {} : { webSearch: translated.webSearch }) };
@@ -144,8 +146,9 @@ export class InferenceService {
   async embed(app: string, body: InferenceBody<EmbeddingRequestBody>, abort: RequestAbort): Promise<JsonObject> {
     const admission = await this.admit(app, 'embedding', body.model, body.synapse, {}, false, abort);
     try {
-      const { value: result, deployment } = await this.serve(admission, abort, (target, deployment) => {
-        const translated = translateEmbeddingRequest({ body, provider: deployment.provider, providerKey: deployment.providerKey, deploymentId: deployment.id });
+      const { value: result, deployment } = await this.serve(admission, abort, async (target, deployment) => {
+        const apiKey = await this.apiKey(deployment);
+        const translated = translateEmbeddingRequest({ body, provider: deployment.provider, providerKey: deployment.providerKey, deploymentId: deployment.id, apiKey });
         return this.providers.sendEmbeddings(target, translated, { signal: abort.signal, responseModel: admission.resolution.taskKey });
       });
       const cost = this.tokenCost(admission, deployment, result.usage);
@@ -161,8 +164,9 @@ export class InferenceService {
   async generateImages(app: string, body: InferenceBody<ImageRequestBody>, abort: RequestAbort): Promise<ImageGenerationResult> {
     const admission = await this.admit(app, 'image', body.model, body.synapse, {}, false, abort);
     try {
-      const { value: result, deployment } = await this.serve(admission, abort, (target, deployment) => {
-        const translated = translateImageRequest({ body, provider: deployment.provider, providerKey: deployment.providerKey, deploymentId: deployment.id });
+      const { value: result, deployment } = await this.serve(admission, abort, async (target, deployment) => {
+        const apiKey = await this.apiKey(deployment);
+        const translated = translateImageRequest({ body, provider: deployment.provider, providerKey: deployment.providerKey, deploymentId: deployment.id, apiKey });
         return this.providers.sendImages(target, translated, { signal: abort.signal, responseModel: admission.resolution.taskKey });
       });
       const listUsd = imageListCost(result.data.length, admission.resolution.model.pricePerMTok);
@@ -286,7 +290,11 @@ export class InferenceService {
     sink.end();
   }
 
-  private translateChat(body: InferenceBody<ChatRequestBody>, admission: Admission, deployment: ResolvedDeployment): TranslatedRequest {
+  private apiKey(deployment: ResolvedDeployment): Promise<string | undefined> {
+    return this.credentials.resolve(deployment.provider, deployment.providerKey);
+  }
+
+  private translateChat(body: InferenceBody<ChatRequestBody>, admission: Admission, deployment: ResolvedDeployment, apiKey: string | undefined): TranslatedRequest {
     const { model } = admission.resolution;
     return translateChatRequest({
       body,
@@ -296,6 +304,7 @@ export class InferenceService {
       deploymentId: deployment.id,
       effort: admission.effort ?? null,
       envelope: admission.envelope,
+      apiKey,
     });
   }
 

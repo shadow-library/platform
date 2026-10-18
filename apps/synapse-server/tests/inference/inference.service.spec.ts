@@ -85,7 +85,7 @@ describe('InferenceService.completeChat', () => {
 
   it('should bill what OpenRouter reported while budgets keep counting list price', async () => {
     const { service, fetcher, repository, begin } = harness();
-    fetcher.on('https://openrouter.test', json(200, { ...COMPLETION, usage: { ...UPSTREAM_USAGE, cost: 0.0004 } }));
+    fetcher.on('https://openrouter.ai', json(200, { ...COMPLETION, usage: { ...UPSTREAM_USAGE, cost: 0.0004 } }));
 
     const response = await service.completeChat(APP, chatBody({ model: 'novel-forge.routed' }), begin());
 
@@ -120,6 +120,37 @@ describe('InferenceService.completeChat', () => {
     expect(response['synapse']).toMatchObject({ provider: 'mock', attempts: 2 });
     expect(fetcher.calls).toHaveLength(0);
     expect(providers.inflightCount('mock')).toBe(0);
+  });
+
+  it("should send a provider's stored credential as its bearer key", async () => {
+    const id = '00000000-0000-4000-8000-000000000001';
+    const document = catalogDocument(draft => {
+      delete draft.providers['openrouter']!.apiKeyConfig;
+      draft.providers['openrouter']!.credential = id;
+    });
+    const { service, fetcher, credentials, begin } = harness(document);
+    await credentials.seed(id, 'sk-or-stored-key', { allowedOrigin: 'https://openrouter.ai' });
+    fetcher.on('https://openrouter.ai', json(200, COMPLETION));
+
+    await service.completeChat(APP, chatBody({ model: 'novel-forge.routed' }), begin());
+
+    expect(fetcher.calls[0]?.authorization).toBe('Bearer sk-or-stored-key');
+  });
+
+  it('should refuse a revoked credential without calling the provider or failing over', async () => {
+    const id = '00000000-0000-4000-8000-000000000001';
+    const document = catalogDocument(draft => {
+      delete draft.providers['openrouter']!.apiKeyConfig;
+      draft.providers['openrouter']!.credential = id;
+    });
+    const { service, fetcher, credentials, begin } = harness(document);
+    await credentials.seed(id, 'sk-or-stored-key', { allowedOrigin: 'https://openrouter.ai', revokedAt: new Date() });
+
+    const error = await failureOf(service.completeChat(APP, chatBody({ model: 'novel-forge.routed' }), begin()));
+
+    expect(AppError.is(error, AppErrorCode.SYN_UPSTREAM_ERROR)).toBe(true);
+    expect((error as AppError).data).toMatchObject({ upstreamCode: 'revoked_api_key' });
+    expect(fetcher.calls).toHaveLength(0);
   });
 
   it('should answer an upstream error without failing over when the failure is not retryable', async () => {
@@ -482,7 +513,7 @@ describe('InferenceService.generateImages', () => {
   it("should price every generated image at the model's per-image price and bill the upstream's cost", async () => {
     const { service, fetcher, repository, begin } = harness();
     const image = { b64_json: 'aGk=', media_type: 'image/webp' };
-    fetcher.on('https://openrouter.test/api/v1/images', json(200, { data: [image, image, image], usage: { cost: 0.09 } }));
+    fetcher.on('https://openrouter.ai/api/v1/images', json(200, { data: [image, image, image], usage: { cost: 0.09 } }));
 
     const response = await service.generateImages(APP, { model: 'novel-forge.image', prompt: 'a cat', n: 3, synapse: envelope() }, begin());
 
@@ -494,7 +525,7 @@ describe('InferenceService.generateImages', () => {
 
   it('should bill the list price when the upstream reported no cost, counting the images it actually returned', async () => {
     const { service, fetcher, begin } = harness();
-    fetcher.on('https://openrouter.test/api/v1/images', json(200, { data: [{ b64_json: 'aGk=' }] }));
+    fetcher.on('https://openrouter.ai/api/v1/images', json(200, { data: [{ b64_json: 'aGk=' }] }));
     const response = await service.generateImages(APP, { model: 'novel-forge.image', prompt: 'a cat', n: 2, synapse: envelope() }, begin());
     expect(response.synapse.cost).toEqual({ list_usd: 0.04, billed_usd: 0.04 });
   });
@@ -504,7 +535,7 @@ describe('InferenceService.generateImages', () => {
       draft.models['painter']!.deployments.push({ provider: 'mock', id: 'mock-image' });
     });
     const { service, fetcher, repository, begin } = harness(document);
-    fetcher.on('https://openrouter.test/api/v1/images', json(502, { error: { message: 'bad gateway' } }));
+    fetcher.on('https://openrouter.ai/api/v1/images', json(502, { error: { message: 'bad gateway' } }));
 
     const response = await service.generateImages(APP, { model: 'novel-forge.image', prompt: 'a cat', n: 2, synapse: envelope() }, begin());
 
@@ -514,7 +545,7 @@ describe('InferenceService.generateImages', () => {
 
   it('should settle a refused image generation as an upstream error', async () => {
     const { service, fetcher, repository, begin } = harness();
-    fetcher.on('https://openrouter.test/api/v1/images', json(400, { error: { message: 'prompt refused' } }));
+    fetcher.on('https://openrouter.ai/api/v1/images', json(400, { error: { message: 'prompt refused' } }));
 
     const error = await failureOf(service.generateImages(APP, { model: 'novel-forge.image', prompt: 'a cat', synapse: envelope() }, begin()));
 

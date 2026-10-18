@@ -61,6 +61,11 @@ export interface ImageResult {
 
 export const PROVIDER_FETCH = new InjectionToken<ProviderFetch>('PROVIDER_FETCH');
 
+/** Following one would carry the authorization header to wherever the upstream points, past the origin its key is bound to */
+function isRedirect(response: Response): boolean {
+  return response.type === 'opaqueredirect' || (response.status >= 300 && response.status < 400);
+}
+
 /** The caller's signal, the request timeout and a local cancel as one signal, and the call's in-flight slot */
 class CallScope {
   readonly signal: AbortSignal;
@@ -261,11 +266,21 @@ export class ProviderClient {
     const fetcher = target.provider.kind === 'mock' ? createMockFetch(target) : this.fetcher;
     let response: Response;
     try {
-      response = await fetcher(translated.url, { method: 'POST', headers: translated.headers, body: JSON.stringify(translated.body), signal: scope.signal });
+      response = await fetcher(translated.url, { method: 'POST', headers: translated.headers, body: JSON.stringify(translated.body), redirect: 'manual', signal: scope.signal });
     } catch (error) {
       throw scope.abortError(false) ?? this.sendFailure(error);
     }
     if (response.ok) return response;
+    if (isRedirect(response)) {
+      await response.body?.cancel().catch(() => undefined);
+      const redirected = new ProviderCallError({
+        retryable: false,
+        status: response.status,
+        code: 'redirected',
+        message: `The upstream answered a redirect (HTTP ${response.status}), which is never followed`,
+      });
+      throw scope.abortError(false) ?? redirected;
+    }
     const text = await response.text().catch(() => '');
     throw scope.abortError(false) ?? classifyHttpFailure(response.status, text);
   }

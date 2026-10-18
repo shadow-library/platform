@@ -18,6 +18,12 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly SYN_TIMEOUT = AppErrorCode.unavailable('SYN_TIMEOUT', 'The request timed out', 504);
   static readonly SYN_DUPLICATE_REQUEST = AppErrorCode.conflict('SYN_DUPLICATE_REQUEST', 'The request_id was already used');
 
+  /** Admin-only credential errors, outside the `SYN_*` wire contract that calling apps see */
+  static readonly CRED_NAME_TAKEN = AppErrorCode.conflict('CRED_NAME_TAKEN', 'A credential with this name already exists');
+  /** Carries `referencedBy`, the provider keys of the published catalog that still use the credential */
+  static readonly CRED_IN_USE = AppErrorCode.conflict('CRED_IN_USE', 'The published catalog still uses this credential');
+  static readonly CRED_REVOKED = AppErrorCode.conflict('CRED_REVOKED', 'The credential is revoked');
+
   /** A route reached the default-deny sentinel without declaring an access policy; outside the `SYN_*` wire contract because only a server defect raises it */
   static readonly SEC_003 = AppErrorCode.forbidden('SEC_003', 'Access denied');
 }

@@ -2,6 +2,7 @@ import { type SynapseEnvelope } from '@shadow-library/synapse';
 
 import { type ActiveCatalog, type CatalogDocument, type ModelSpec } from '@modules/catalog/catalog.types';
 import { type ActiveCatalogCache, type CatalogTimers } from '@modules/catalog/active-catalog.cache';
+import { CredentialResolver } from '@modules/credentials/credential-resolver.service';
 import { InferenceService } from '@modules/inference/inference.service';
 import { InflightRequests } from '@modules/inference/inflight-requests.service';
 import { type RequestAbort } from '@modules/inference/request-abort';
@@ -11,6 +12,7 @@ import { ProviderClient } from '@modules/providers/provider-client.service';
 import { type ProviderFetch } from '@modules/providers/provider.types';
 import { AppErrorCode } from '@server/classes';
 
+import { box, FakeCredentialRepository } from '../credentials/credential.fixtures';
 import { FakeMeteringRepository } from '../metering/fake-metering.repository';
 
 const CHAT: ModelSpec['capabilities'] = {
@@ -30,7 +32,7 @@ const DOCUMENT: CatalogDocument = {
     openrouter: {
       kind: 'openai',
       flavor: 'openrouter',
-      url: 'https://openrouter.test/api/v1',
+      url: 'https://openrouter.ai/api/v1',
       apiKeyConfig: 'synapse.provider.openrouter.api-key',
       locality: 'third_party',
       cost: 'metered',
@@ -103,7 +105,7 @@ export type Responder = (url: string, init: RequestInit) => Promise<Response> | 
 
 /** Answers each upstream call with the next responder queued for its URL prefix */
 export class ScriptedFetch {
-  readonly calls: { url: string; body: Record<string, unknown> }[] = [];
+  readonly calls: { url: string; body: Record<string, unknown>; authorization?: string }[] = [];
   private readonly queues = new Map<string, Responder[]>();
   private readonly waiters: { count: number; resolve: () => void }[] = [];
 
@@ -119,7 +121,8 @@ export class ScriptedFetch {
   }
 
   readonly fetch: ProviderFetch = async (url, init) => {
-    this.calls.push({ url, body: JSON.parse(String(init.body)) as Record<string, unknown> });
+    const authorization = (init.headers as Record<string, string> | undefined)?.['authorization'];
+    this.calls.push({ url, body: JSON.parse(String(init.body)) as Record<string, unknown>, ...(authorization ? { authorization } : {}) });
     for (const waiter of this.waiters.filter(candidate => candidate.count <= this.calls.length)) waiter.resolve();
     for (const [prefix, queue] of this.queues) {
       if (url.startsWith(prefix) && queue.length > 0) return (queue.shift() as Responder)(url, init);
@@ -197,6 +200,7 @@ export interface Harness {
   providers: ProviderClient;
   repository: FakeMeteringRepository;
   fetcher: ScriptedFetch;
+  credentials: FakeCredentialRepository;
   inflight: InflightRequests;
   timers: FakeTimers;
   begin(): RequestAbort;
@@ -210,8 +214,10 @@ export function harness(document: CatalogDocument | null = catalogDocument(), ve
   const timers = new FakeTimers();
   const inflight = new InflightRequests(timers);
   const providers = new ProviderClient(fetcher.fetch);
-  const service = new InferenceService(cache, providers, new MeteringService(repository.asRepository()), inflight);
-  return { service, providers, repository, fetcher, inflight, timers, begin: () => inflight.begin() };
+  const credentials = new FakeCredentialRepository();
+  const resolver = new CredentialResolver(credentials.asRepository(), box(), timers);
+  const service = new InferenceService(cache, providers, new MeteringService(repository.asRepository()), inflight, resolver);
+  return { service, providers, repository, fetcher, credentials, inflight, timers, begin: () => inflight.begin() };
 }
 
 export async function failureOf(work: Promise<unknown>): Promise<unknown> {

@@ -9,7 +9,7 @@ import { ActiveCatalogCache } from './active-catalog.cache';
 import { type CatalogDiff, changedSections, diffCatalog } from './catalog-diff';
 import { catalogFingerprint } from './catalog-fingerprint';
 import { parseCatalogDocument } from './catalog-parser';
-import { checkCatalogDocument } from './catalog-validator';
+import { checkPublishable } from './catalog-validator';
 import { type CatalogDocument, type CatalogIssue, type CatalogSection } from './catalog.types';
 import { isRecord } from './catalog.utils';
 import { CatalogVersionRepository, type CatalogVersionStore, type CatalogVersionSummary } from './catalog-version.repository';
@@ -97,7 +97,7 @@ export class CatalogVersionService {
       const activeRow = await store.findActive();
       await authorize(changedSections(document, existing?.document ?? activeRow?.document ?? null));
       const active = activeRow ? this.parseActive(activeRow) : null;
-      const check = checkCatalogDocument(document, active);
+      const check = await checkPublishable(document, active, ids => store.findCredentials(ids));
       const draft = existing ? await store.updateDraft(existing.id, values) : await store.insertDraft(values);
       if (!draft) throw AppErrorCode.SYN_CATALOG_CONFLICT.create();
       return { ...viewOf(draft), issues: check.valid ? [] : check.issues };
@@ -109,7 +109,7 @@ export class CatalogVersionService {
   async validateDraft(): Promise<CatalogIssue[]> {
     const draft = await this.requireDraft();
     const active = await this.repository.findActive();
-    const check = checkCatalogDocument(draft.document, active ? this.parseActive(active) : null);
+    const check = await checkPublishable(draft.document, active ? this.parseActive(active) : null, ids => this.repository.findCredentials(ids));
     return check.valid ? [] : check.issues;
   }
 
@@ -126,7 +126,7 @@ export class CatalogVersionService {
       const draft = await store.findDraft();
       if (draft?.id !== requested.id) throw AppErrorCode.SYN_CATALOG_CONFLICT.create();
       if (catalogFingerprint(draft.document) !== fingerprint) throw AppErrorCode.SYN_CATALOG_CONFLICT.create();
-      this.assertPublishable(draft.document, await this.activeDocument(store));
+      await this.assertPublishable(store, draft.document);
       const version = (await store.maxVersion()) + 1;
       await store.archivePublished();
       return (await store.promoteDraft(draft.id, version, actor)) ?? AppErrorCode.SYN_CATALOG_CONFLICT.throw();
@@ -141,7 +141,7 @@ export class CatalogVersionService {
     const published = await this.repository.exclusive(async store => {
       const target = await store.findVersion(version);
       if (!target) throw AppErrorCode.S009.create();
-      this.assertPublishable(target.document, await this.activeDocument(store));
+      await this.assertPublishable(store, target.document);
       const next = (await store.maxVersion()) + 1;
       await store.archivePublished();
       return store.insertPublished({ version: next, document: target.document, note: `Rollback to v${version}`, createdBy: actor });
@@ -168,8 +168,8 @@ export class CatalogVersionService {
     throw AppError.internal(`Published catalog v${active.version} does not parse`);
   }
 
-  private assertPublishable(document: unknown, active: CatalogDocument | null): void {
-    const check = checkCatalogDocument(document, active);
+  private async assertPublishable(store: CatalogVersionStore, document: unknown): Promise<void> {
+    const check = await checkPublishable(document, await this.activeDocument(store), ids => store.findCredentials(ids));
     if (!check.valid) throw AppErrorCode.SYN_CATALOG_INVALID.create({ issues: check.issues });
   }
 }

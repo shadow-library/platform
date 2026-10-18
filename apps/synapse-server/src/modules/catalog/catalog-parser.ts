@@ -41,6 +41,7 @@ interface NumberRule {
 const KEY_PATTERN = /^[A-Za-z0-9][\w.:/@-]*$/;
 const TASK_KEY_PATTERN = /^[a-z0-9][a-z0-9-]*\.[a-z0-9][a-z0-9._-]*$/;
 const URL_PROTOCOLS = ['http:', 'https:'];
+const CREDENTIAL_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const CREDENTIAL_KEYS: readonly string[] = PROVIDER_CREDENTIAL_KEYS;
 
 function keysOf<T extends string>(values: Record<T, true>): readonly T[] {
@@ -67,6 +68,7 @@ const PROVIDER_FIELDS = keysOf<keyof ProviderSpec>({
   kind: true,
   flavor: true,
   url: true,
+  credential: true,
   apiKeyConfig: true,
   locality: true,
   cost: true,
@@ -143,6 +145,7 @@ class CatalogParser {
       kind: fields.required('kind', this.literal(PROVIDER_KINDS)),
       flavor: fields.optional('flavor', this.literal(FLAVORS)),
       url: fields.required('url', this.url),
+      credential: fields.optional('credential', this.credentialId),
       apiKeyConfig: fields.optional('apiKeyConfig', this.configKey),
       locality: fields.required('locality', this.literal(LOCALITIES)),
       cost: fields.required('cost', this.literal(COSTS)),
@@ -239,8 +242,14 @@ class CatalogParser {
     if (url === '') return url;
     const parsed = URL.canParse(url) ? new URL(url) : undefined;
     if (!parsed || !URL_PROTOCOLS.includes(parsed.protocol)) this.report(path, 'invalid_value', 'Expected an http or https URL');
-    else if (parsed.username || parsed.password) this.report(path, 'invalid_value', 'A URL must not embed credentials; name a Config key in apiKeyConfig instead');
+    else if (parsed.username || parsed.password) this.report(path, 'invalid_value', 'A URL must not embed credentials; name a stored credential instead');
     return url;
+  };
+
+  private readonly credentialId: Reader<string> = (value, path) => {
+    const id = this.text(value, path);
+    if (id !== '' && !CREDENTIAL_ID_PATTERN.test(id)) this.report(path, 'invalid_value', 'Expected the id of a stored credential');
+    return id;
   };
 
   private readonly configKey: Reader<string> = (value, path) => {

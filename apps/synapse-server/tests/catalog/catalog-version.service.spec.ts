@@ -353,3 +353,61 @@ describe('catalogIssuesOf', () => {
     expect(catalogIssuesOf(new TypeError('boom'))).toBeUndefined();
   });
 });
+
+describe('CatalogVersionService credential rules', () => {
+  const CREDENTIAL = '00000000-0000-4000-8000-000000000001';
+
+  function withCredential(document: CatalogDocument): void {
+    delete document.providers.openrouter!.apiKeyConfig;
+    document.providers.openrouter!.credential = CREDENTIAL;
+  }
+
+  it('should publish a draft whose provider names a live credential bound to its origin', async () => {
+    repository.credentials = [{ id: CREDENTIAL, allowedOrigin: 'https://openrouter.ai', revoked: false }];
+    await service.saveDraft(catalogDocument(withCredential), undefined, 'admin-1', allowAll);
+    const published = await service.publish('admin-1', catalogFingerprint(catalogDocument(withCredential)));
+    expect(published.version).toBe(1);
+  });
+
+  it('should refuse to publish a draft naming a revoked credential and list the issue on the saved draft', async () => {
+    repository.credentials = [{ id: CREDENTIAL, allowedOrigin: 'https://openrouter.ai', revoked: true }];
+    const saved = await service.saveDraft(catalogDocument(withCredential), undefined, 'admin-1', allowAll);
+    expect(saved.issues).toEqual([{ path: 'providers.openrouter.credential', code: 'credential_revoked', message: expect.any(String) }]);
+    const error = await expectFailure(service.publish('admin-1', catalogFingerprint(catalogDocument(withCredential))), AppErrorCode.SYN_CATALOG_INVALID);
+    expect(catalogIssuesOf(error)?.map(issue => issue.code)).toEqual(['credential_revoked']);
+  });
+
+  it('should refuse to publish a draft naming a credential that does not exist', async () => {
+    await service.saveDraft(catalogDocument(withCredential), undefined, 'admin-1', allowAll);
+    expect((await service.validateDraft()).map(issue => issue.code)).toEqual(['unknown_credential']);
+    await expectFailure(service.publish('admin-1', catalogFingerprint(catalogDocument(withCredential))), AppErrorCode.SYN_CATALOG_INVALID);
+  });
+
+  it('should refuse to publish a provider whose URL left the origin its credential is bound to', async () => {
+    repository.credentials = [{ id: CREDENTIAL, allowedOrigin: 'https://openrouter.ai', revoked: false }];
+    const moved = (document: CatalogDocument): void => {
+      withCredential(document);
+      document.providers.openrouter!.url = 'https://collector.example/api/v1';
+    };
+    await service.saveDraft(catalogDocument(moved), undefined, 'admin-1', allowAll);
+    const error = await expectFailure(service.publish('admin-1', catalogFingerprint(catalogDocument(moved))), AppErrorCode.SYN_CATALOG_INVALID);
+    expect(catalogIssuesOf(error)?.map(issue => `${issue.path}:${issue.code}`)).toEqual(['providers.openrouter.url:credential_origin_mismatch']);
+  });
+
+  it('should refuse to roll back to a version whose credential has since been revoked', async () => {
+    repository.credentials = [{ id: CREDENTIAL, allowedOrigin: 'https://openrouter.ai', revoked: true }];
+    repository.seed(catalogDocument(withCredential), 1, 'ARCHIVED');
+    repository.seed(catalogDocument(), 2);
+    await expectFailure(service.rollback(1, 'admin-1'), AppErrorCode.SYN_CATALOG_INVALID);
+    expect(states()).toEqual(['v1:ARCHIVED', 'v2:PUBLISHED']);
+  });
+});
+
+describe('CatalogVersionService deprecated apiKeyConfig binding', () => {
+  it('should refuse to publish a provider that would send the env key outside its bound origin', async () => {
+    const exfiltrate = (document: CatalogDocument): void => void (document.providers.openrouter!.url = 'https://evil.example/api/v1');
+    const saved = await service.saveDraft(catalogDocument(exfiltrate), undefined, 'admin-1', allowAll);
+    expect(saved.issues.map(issue => `${issue.path}:${issue.code}`)).toEqual(['providers.openrouter.url:credential_origin_mismatch']);
+    await expectFailure(service.publish('admin-1', catalogFingerprint(catalogDocument(exfiltrate))), AppErrorCode.SYN_CATALOG_INVALID);
+  });
+});

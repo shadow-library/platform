@@ -4,7 +4,7 @@ import { getTableConfig, type PgTable } from 'drizzle-orm/pg-core';
 import { AppError } from '@shadow-library/common';
 
 import { AppErrorCode } from '@server/classes';
-import { budgetCounters, catalogVersions, ledger } from '@server/database/schemas';
+import { budgetCounters, catalogVersions, credentialEvents, ledger, providerCredentials } from '@server/database/schemas';
 import { constraintErrorMap } from '@server/database/database.constants';
 
 /** An unnamed column-level primary key is named `<table>_pkey` by Postgres, not by Drizzle. */
@@ -18,7 +18,7 @@ function declaredConstraintNames(table: PgTable): string[] {
   return [...columnPrimaryKeys, ...tablePrimaryKeys, ...columnUniques, ...tableUniques, ...uniqueIndexes].filter(name => name !== undefined);
 }
 
-const DECLARED_NAMES = new Set([catalogVersions, ledger, budgetCounters].flatMap(declaredConstraintNames));
+const DECLARED_NAMES = new Set([catalogVersions, ledger, budgetCounters, providerCredentials, credentialEvents].flatMap(declaredConstraintNames));
 
 describe('constraintErrorMap', () => {
   it('should key every entry by a primary key, unique constraint or unique index the schema declares', () => {
@@ -37,5 +37,9 @@ describe('constraintErrorMap', () => {
 
   it('should turn a request_id reused at admission into a duplicate request', () => {
     expect(AppError.is(constraintErrorMap.ledger_pkey, AppErrorCode.SYN_DUPLICATE_REQUEST)).toBe(true);
+  });
+
+  it('should turn a credential name already taken into a conflict naming it', () => {
+    expect(AppError.is(constraintErrorMap.provider_credentials_name_unique, AppErrorCode.CRED_NAME_TAKEN)).toBe(true);
   });
 });

@@ -1,11 +1,13 @@
 import { isDeepStrictEqual } from 'node:util';
 
+import { credentialIssues, credentialReferences } from './catalog-credentials';
 import { parseCatalogDocument } from './catalog-parser';
 import {
   type CatalogDocument,
   type CatalogIssue,
   type CatalogIssueCode,
   compareEffort,
+  type CredentialState,
   type Effort,
   EFFORTS,
   isDefaultRoute,
@@ -18,6 +20,8 @@ import {
 import { childPath, itemPath, ownEntry } from './catalog.utils';
 
 export type CatalogCheck = { valid: true; document: CatalogDocument } | { valid: false; issues: CatalogIssue[] };
+
+export type CredentialLookup = (ids: readonly string[]) => Promise<CredentialState[]>;
 
 interface ModelReference {
   path: string;
@@ -44,9 +48,14 @@ class CatalogValidator {
 
   private validateProviders(): void {
     for (const [providerKey, provider] of Object.entries(this.document.providers)) {
-      const path = childPath(childPath('providers', providerKey), 'flavor');
-      if (provider.kind === 'openai' && !provider.flavor) this.report(path, 'missing_field', 'An openai provider must name its flavor');
-      if (provider.kind !== 'openai' && provider.flavor) this.report(path, 'invalid_value', `Only an openai provider takes a flavor, not a ${provider.kind} one`);
+      const path = childPath('providers', providerKey);
+      const flavorPath = childPath(path, 'flavor');
+      if (provider.kind === 'openai' && !provider.flavor) this.report(flavorPath, 'missing_field', 'An openai provider must name its flavor');
+      if (provider.kind !== 'openai' && provider.flavor) this.report(flavorPath, 'invalid_value', `Only an openai provider takes a flavor, not a ${provider.kind} one`);
+      if (!provider.credential) continue;
+      const credentialPath = childPath(path, 'credential');
+      if (provider.apiKeyConfig) this.report(credentialPath, 'invalid_value', 'Name either a credential or an apiKeyConfig, not both');
+      if (provider.kind === 'ollama') this.report(credentialPath, 'invalid_value', 'An ollama provider never sends a credential');
     }
   }
 
@@ -188,6 +197,16 @@ export function checkCatalogDocument(input: unknown, active: CatalogDocument | n
   const parsed = parseCatalogDocument(input);
   if (!parsed.ok) return { valid: false, issues: parsed.issues };
   const issues = validateCatalog(parsed.document, active);
+  if (issues.length > 0) return { valid: false, issues };
+  return { valid: true, document: parsed.document };
+}
+
+/** `checkCatalogDocument` plus the rules that need the credentials table; what publish, rollback and a draft's issues apply. */
+export async function checkPublishable(input: unknown, active: CatalogDocument | null, lookup: CredentialLookup): Promise<CatalogCheck> {
+  const parsed = parseCatalogDocument(input);
+  if (!parsed.ok) return { valid: false, issues: parsed.issues };
+  const states = await lookup([...credentialReferences(parsed.document).keys()]);
+  const issues = [...validateCatalog(parsed.document, active), ...credentialIssues(parsed.document, states)];
   if (issues.length > 0) return { valid: false, issues };
   return { valid: true, document: parsed.document };
 }

@@ -1,8 +1,6 @@
-import { Config } from '@shadow-library/common';
 import { type SynapseEnvelope } from '@shadow-library/synapse';
 
 import { type Effort, type ModelSpec, type ProviderFlavor, type ProviderSpec } from '@modules/catalog';
-import { PROVIDER_CREDENTIAL_KEYS } from '@server/constants';
 
 import { ProviderCallError } from './provider-call.error';
 import {
@@ -26,6 +24,8 @@ export interface ChatTranslationInput {
   /** Already clamped and snapped by dispatch; `null` sends no reasoning control */
   effort: Effort | null | undefined;
   envelope: SynapseEnvelope;
+  /** Resolved by the credential resolver; absent sends no authorization */
+  apiKey?: string;
 }
 
 export interface EmbeddingTranslationInput {
@@ -33,6 +33,7 @@ export interface EmbeddingTranslationInput {
   provider: ProviderSpec;
   providerKey: string;
   deploymentId: string;
+  apiKey?: string;
 }
 
 export interface ImageTranslationInput {
@@ -40,13 +41,14 @@ export interface ImageTranslationInput {
   provider: ProviderSpec;
   providerKey: string;
   deploymentId: string;
+  apiKey?: string;
 }
 
 export const GATEWAY_SESSION_HEADER = 'x-gateway-session';
 export const GATEWAY_WEB_TOOLS_HEADER = 'x-gateway-web-tools';
 export const JSON_SCHEMA_INSTRUCTION = 'Respond with only a JSON object that matches this JSON Schema: ';
 
-const VISIBLE_ASCII = /^[\x21-\x7e]+$/;
+export const VISIBLE_ASCII = /^[\x21-\x7e]+$/;
 const MAX_SESSION_LENGTH = 256;
 const SAMPLING_FIELDS = ['temperature', 'top_p', 'top_k', 'min_p', 'seed', 'stop', 'frequency_penalty', 'presence_penalty', 'repetition_penalty'];
 /** Provider dialect is Synapse's alone: an app's own copy of these never reaches an upstream */
@@ -70,23 +72,11 @@ function endpoint(provider: ProviderSpec, path: string): string {
   return provider.kind === 'ollama' ? `${baseUrl(provider)}/v1/${path}` : `${baseUrl(provider)}/${path}`;
 }
 
-function isCredentialKey(key: string): key is (typeof PROVIDER_CREDENTIAL_KEYS)[number] {
-  return (PROVIDER_CREDENTIAL_KEYS as readonly string[]).includes(key);
-}
-
-function credentialError(code: 'missing_api_key' | 'invalid_api_key', reason: string): ProviderCallError {
-  return new ProviderCallError({ retryable: false, code, message: reason });
-}
-
 // Bun's fetch rejects a header it cannot carry with a TypeError that quotes the value, so a malformed key must never reach it.
-function authHeaders(provider: ProviderSpec, providerKey: string): Record<string, string> {
+function authHeaders(provider: ProviderSpec, providerKey: string, apiKey: string | undefined): Record<string, string> {
   const headers: Record<string, string> = { 'content-type': 'application/json' };
-  const configKey = provider.apiKeyConfig;
-  if (provider.kind === 'ollama' || !configKey) return headers;
-  if (!isCredentialKey(configKey)) throw credentialError('invalid_api_key', `Provider '${providerKey}' names '${configKey}', which is not a credential key`);
-  const apiKey = Config.get(configKey);
-  if (!apiKey) throw credentialError('missing_api_key', `Provider '${providerKey}' has no API key: '${configKey}' is not set`);
-  if (!VISIBLE_ASCII.test(apiKey)) throw credentialError('invalid_api_key', `Provider '${providerKey}' has a key in '${configKey}' no header can carry`);
+  if (provider.kind === 'ollama' || apiKey === undefined) return headers;
+  if (!VISIBLE_ASCII.test(apiKey)) throw new ProviderCallError({ retryable: false, code: 'invalid_api_key', message: `Provider '${providerKey}' has a key no header can carry` });
   headers['authorization'] = `Bearer ${apiKey}`;
   return headers;
 }
@@ -129,7 +119,7 @@ function webSearchRoute({ body, provider, envelope }: ChatTranslationInput, dial
 export function translateChatRequest(input: ChatTranslationInput): TranslatedRequest {
   const { body, model, provider, providerKey, deploymentId, envelope } = input;
   const dialect = providerDialect(provider, providerKey);
-  const headers = authHeaders(provider, providerKey);
+  const headers = authHeaders(provider, providerKey, input.apiKey);
   const translated = withoutFields(body, model.capabilities.sampling ? DIALECT_FIELDS : [...DIALECT_FIELDS, ...SAMPLING_FIELDS]);
   translated['model'] = deploymentId;
 
@@ -155,20 +145,20 @@ export function translateChatRequest(input: ChatTranslationInput): TranslatedReq
   return { url: endpoint(provider, 'chat/completions'), headers, body: translated, ...(webSearch === 'not_requested' ? {} : { webSearch: webSearch !== 'unavailable' }) };
 }
 
-export function translateEmbeddingRequest({ body, provider, providerKey, deploymentId }: EmbeddingTranslationInput): TranslatedRequest {
+export function translateEmbeddingRequest({ body, provider, providerKey, deploymentId, apiKey }: EmbeddingTranslationInput): TranslatedRequest {
   providerDialect(provider, providerKey);
   const translated = withoutFields(body, DIALECT_FIELDS);
   translated['model'] = deploymentId;
-  return { url: endpoint(provider, 'embeddings'), headers: authHeaders(provider, providerKey), body: translated };
+  return { url: endpoint(provider, 'embeddings'), headers: authHeaders(provider, providerKey, apiKey), body: translated };
 }
 
 /** OpenRouter's dedicated images endpoint, which speaks its own shape rather than OpenAI's `images/generations` */
-export function translateImageRequest({ body, provider, providerKey, deploymentId }: ImageTranslationInput): TranslatedRequest {
+export function translateImageRequest({ body, provider, providerKey, deploymentId, apiKey }: ImageTranslationInput): TranslatedRequest {
   const dialect = providerDialect(provider, providerKey);
   const generates = dialect === 'openrouter' || dialect === 'mock';
   if (!generates) throw new ProviderCallError({ retryable: false, code: 'unsupported', message: `Provider '${providerKey}' cannot generate images` });
   const references = body.reference_images ?? [];
   const translated: JsonObject = { model: deploymentId, prompt: body.prompt, n: body.n ?? 1 };
   if (references.length > 0) translated['input_references'] = references.map(url => ({ type: 'image_url', image_url: { url } }));
-  return { url: `${baseUrl(provider)}/images`, headers: authHeaders(provider, providerKey), body: translated };
+  return { url: `${baseUrl(provider)}/images`, headers: authHeaders(provider, providerKey, apiKey), body: translated };
 }

@@ -1,9 +1,11 @@
-import { and, desc, eq, getTableColumns, max, ne, sql } from 'drizzle-orm';
+import { and, desc, eq, getTableColumns, inArray, max, ne, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { Catalog, type DatabaseTransaction, type PrimaryDatabase, schema } from '@server/database';
+
+import { type CredentialState } from './catalog.types';
 
 export type CatalogVersionSummary = Omit<Catalog.Version, 'document'>;
 
@@ -32,6 +34,10 @@ export interface CatalogVersionStore {
   /** Resolves `undefined` when the row is no longer a draft */
   promoteDraft(id: bigint, version: number, createdBy: string): Promise<Catalog.Version | undefined>;
   insertPublished(values: PublishedValues): Promise<Catalog.Version>;
+  /** Read under the catalog lock, which a credential revocation also takes, so a publish never names a credential revoked concurrently */
+  findCredentials(ids: readonly string[]): Promise<CredentialState[]>;
+  /** Whether any published or archived version ever named the credential */
+  referencesCredential(id: string): Promise<boolean>;
 }
 
 type Executor = PrimaryDatabase | DatabaseTransaction;
@@ -40,10 +46,11 @@ type Executor = PrimaryDatabase | DatabaseTransaction;
 export const DRAFT_VERSION = 0;
 
 const versions = schema.catalogVersions;
+const credentials = schema.providerCredentials;
 const { document: _document, ...SUMMARY_COLUMNS } = getTableColumns(versions);
 
 /** Every catalog write takes this transaction-scoped lock, so publishers, rollbacks and draft saves run one at a time on every replica. */
-const CATALOG_WRITE_LOCK = sql`select pg_advisory_xact_lock(hashtext('synapse:catalog'))`;
+export const CATALOG_WRITE_LOCK = sql`select pg_advisory_xact_lock(hashtext('synapse:catalog'))`;
 
 class DrizzleCatalogVersionStore implements CatalogVersionStore {
   constructor(private readonly executor: Executor) {}
@@ -119,6 +126,25 @@ class DrizzleCatalogVersionStore implements CatalogVersionStore {
     if (!row) throw AppError.internal('Inserting the published catalog returned no row');
     return row;
   }
+
+  async findCredentials(ids: readonly string[]): Promise<CredentialState[]> {
+    if (ids.length === 0) return [];
+    const rows = await this.executor
+      .select({ id: credentials.id, allowedOrigin: credentials.allowedOrigin, revokedAt: credentials.revokedAt })
+      .from(credentials)
+      .where(inArray(credentials.id, [...ids]));
+    return rows.map(row => ({ id: row.id, allowedOrigin: row.allowedOrigin, revoked: row.revokedAt !== null }));
+  }
+
+  async referencesCredential(id: string): Promise<boolean> {
+    const path = sql`'$.providers.*.credential ? (@ == $id)'::jsonpath`;
+    const [row] = await this.executor
+      .select({ found: sql<boolean>`true` })
+      .from(versions)
+      .where(and(ne(versions.state, 'DRAFT'), sql`jsonb_path_exists(${versions.document}, ${path}, jsonb_build_object('id', ${id}::text))`))
+      .limit(1);
+    return row !== undefined;
+  }
 }
 
 @Injectable()
@@ -149,6 +175,10 @@ export class CatalogVersionRepository {
 
   activeVersion(): Promise<number | null> {
     return this.databaseService.run(() => this.reads.activeVersion());
+  }
+
+  findCredentials(ids: readonly string[]): Promise<CredentialState[]> {
+    return this.databaseService.run(() => this.reads.findCredentials(ids));
   }
 
   /** Domain errors thrown by `work` pass through untouched; database failures go through the constraint map, so a lost race surfaces as `SYN_CATALOG_CONFLICT`. */

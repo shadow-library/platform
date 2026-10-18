@@ -5,6 +5,7 @@ import { AUTH_ROUTE_METADATA, type RequiredAuthRoute } from '@shadow-library/aut
 import { AccessController } from '@modules/admin/access.controller';
 import { CatalogAdminController } from '@modules/admin/catalog-admin.controller';
 import { CatalogController } from '@modules/admin/catalog.controller';
+import { CredentialsController } from '@modules/admin/credentials.controller';
 import { ProvidersController } from '@modules/admin/providers.controller';
 import { UsageController } from '@modules/admin/usage.controller';
 
@@ -13,7 +14,7 @@ interface DeclaredRoute {
   auth: RequiredAuthRoute | undefined;
 }
 
-const CONTROLLERS = [AccessController, CatalogController, CatalogAdminController, UsageController, ProvidersController];
+const CONTROLLERS = [AccessController, CatalogController, CatalogAdminController, UsageController, ProvidersController, CredentialsController];
 
 function basePath(controller: object): string {
   for (const key of Reflect.getMetadataKeys(controller)) {
@@ -54,11 +55,21 @@ const PERMISSIONS: Record<string, string> = {
   'GET /api/v1/admin/providers': 'synapse:catalog:read',
 };
 
+const CREDENTIAL_ROUTES = [
+  'GET /api/v1/admin/credentials',
+  'POST /api/v1/admin/credentials',
+  'GET /api/v1/admin/credentials/status/keyring',
+  'GET /api/v1/admin/credentials/:id',
+  'PUT /api/v1/admin/credentials/:id/secret',
+  'POST /api/v1/admin/credentials/:id/test',
+  'DELETE /api/v1/admin/credentials/:id',
+];
+
 describe('admin route auth metadata', () => {
   const routes = declaredRoutes();
 
   it('should discover every route', () => {
-    expect(routes).toHaveLength(Object.keys(PERMISSIONS).length + 2);
+    expect(routes).toHaveLength(Object.keys(PERMISSIONS).length + CREDENTIAL_ROUTES.length + 2);
   });
 
   it('should require exactly the documented permission on each admin route', () => {
@@ -66,6 +77,13 @@ describe('admin route auth metadata', () => {
       const declared = routes.find(candidate => candidate.route === route);
       expect(declared?.auth).toMatchObject({ access: 'required', permission });
       expect(declared?.auth?.scopes).toBeUndefined();
+    }
+  });
+
+  it('should require credential management, checked against the short high-risk cache, on every credential route', () => {
+    for (const route of CREDENTIAL_ROUTES) {
+      const declared = routes.find(candidate => candidate.route === route);
+      expect({ route, auth: declared?.auth }).toMatchObject({ route, auth: { access: 'required', permission: 'synapse:credentials:manage', highRisk: true } });
     }
   });
 

@@ -1,3 +1,4 @@
+export * from './credential-import';
 export * from './seed-catalog.applier';
 export * from './seed-catalog.builder';
 export * from './seed-catalog.data';

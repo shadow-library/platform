@@ -25,6 +25,16 @@ describe('validateCatalog', () => {
       const document = catalogDocument(draft => (draft.providers.local!.flavor = 'openai-compatible'));
       expect(issues(document)).toEqual([{ path: 'providers.local.flavor', code: 'invalid_value' }]);
     });
+
+    it('should reject a provider naming both a credential and the deprecated apiKeyConfig', () => {
+      const document = catalogDocument(draft => (draft.providers.openrouter!.credential = '00000000-0000-4000-8000-000000000001'));
+      expect(issues(document)).toEqual([{ path: 'providers.openrouter.credential', code: 'invalid_value' }]);
+    });
+
+    it('should reject a credential on an ollama provider, which never sends one', () => {
+      const document = catalogDocument(draft => (draft.providers.local!.credential = '00000000-0000-4000-8000-000000000001'));
+      expect(issues(document)).toEqual([{ path: 'providers.local.credential', code: 'invalid_value' }]);
+    });
   });
 
   describe('references', () => {

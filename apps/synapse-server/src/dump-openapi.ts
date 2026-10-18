@@ -13,6 +13,14 @@ setConfig({ ...OPENAPI_DUMP_CONFIG, 'auth.issuer': auth.idp.issuer, 'auth.app-id
 const { AppModule } = await import('./app.module');
 const { ActiveCatalogCache } = await import('@modules/catalog');
 const { LedgerRetentionService } = await import('@modules/metering');
-const overrides = [fakeDatabaseProvider(), withoutStartupHooks(ActiveCatalogCache), withoutStartupHooks(LedgerRetentionService), ...auth.providers];
+const { CredentialKeyringService, CredentialResolver } = await import('@modules/credentials');
+const overrides = [
+  fakeDatabaseProvider(),
+  withoutStartupHooks(ActiveCatalogCache),
+  withoutStartupHooks(LedgerRetentionService),
+  withoutStartupHooks(CredentialResolver),
+  withoutStartupHooks(CredentialKeyringService),
+  ...auth.providers,
+];
 await dumpOpenApiDocument(AppModule, { outputPath: process.argv[2], overrides });
 process.exit(0);

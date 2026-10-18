@@ -1,6 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-
-import { type RestoreConfig, setConfig } from '@shadow-library/common/testing';
+import { describe, expect, it } from 'bun:test';
 
 import { type ChatTranslationInput, translateChatRequest, translateEmbeddingRequest, translateImageRequest } from '@modules/providers/chat-translation.util';
 import { type ModelCapabilities, type ProviderSpec } from '@modules/catalog/catalog.types';
@@ -18,19 +16,17 @@ function translate(overrides: Partial<ChatTranslationInput> & { capabilities?: P
     deploymentId: 'anthropic/claude-opus-5.5',
     effort: null,
     envelope: ENVELOPE,
+    apiKey: API_KEY,
     ...rest,
   });
 }
+
+const API_KEY = 'sk-or-secret';
 
 const SCHEMA = { type: 'object', properties: { title: { type: 'string' } }, required: ['title'] };
 const JSON_SCHEMA_FORMAT: ChatRequestBody['response_format'] = { type: 'json_schema', json_schema: { name: 'answer', schema: SCHEMA } };
 
 describe('translateChatRequest', () => {
-  let restore: RestoreConfig;
-
-  beforeEach(() => (restore = setConfig({ 'synapse.provider.openrouter.api-key': 'sk-or-secret' })));
-  afterEach(() => restore());
-
   describe('model id and envelope', () => {
     it('should send the deployment id as the model and drop the synapse envelope', () => {
       const { body } = translate();
@@ -82,15 +78,15 @@ describe('translateChatRequest', () => {
   });
 
   describe('endpoint and auth', () => {
-    it('should post an openai provider to its chat completions endpoint with the configured key', () => {
+    it('should post an openai provider to its chat completions endpoint with the resolved key', () => {
       const { url, headers } = translate();
 
       expect(url).toBe('https://openrouter.test/api/v1/chat/completions');
       expect(headers).toEqual({ 'content-type': 'application/json', authorization: 'Bearer sk-or-secret' });
     });
 
-    it('should send no authorization to a provider without an api key config', () => {
-      expect(translate({ provider: GATEWAY, providerKey: 'subscription' }).headers).toEqual({ 'content-type': 'application/json' });
+    it('should send no authorization when no key was resolved', () => {
+      expect(translate({ provider: GATEWAY, providerKey: 'subscription', apiKey: undefined }).headers).toEqual({ 'content-type': 'application/json' });
     });
 
     it("should use Ollama's OpenAI-compatible endpoint without auth", () => {
@@ -100,35 +96,18 @@ describe('translateChatRequest', () => {
       expect(headers).not.toHaveProperty('authorization');
     });
 
-    it('should refuse a provider whose api key config is unset, naming the key but not a secret', () => {
-      restore();
-      restore = setConfig({ 'synapse.provider.openrouter.api-key': undefined });
-
-      expect(() => translate()).toThrow(
-        expect.objectContaining({ retryable: false, code: 'missing_api_key', message: expect.stringContaining('synapse.provider.openrouter.api-key') }),
-      );
-    });
-
     it('should refuse a key a header cannot carry without ever quoting it', () => {
-      for (const key of ['sk-or-SECRET\r\nX-Injected: 1', 'sk-or-SECRET\u0000', 'sk-or SECRET', 'sk-or-SECRET-✓']) {
-        restore();
-        restore = setConfig({ 'synapse.provider.openrouter.api-key': key });
+      for (const apiKey of ['sk-or-SECRET\r\nX-Injected: 1', 'sk-or-SECRET\u0000', 'sk-or SECRET', 'sk-or-SECRET-✓']) {
         let caught: unknown;
         try {
-          translate();
+          translate({ apiKey });
         } catch (error) {
           caught = error;
         }
         expect(caught).toMatchObject({ retryable: false, code: 'invalid_api_key' });
-        expect((caught as Error).message).toContain('synapse.provider.openrouter.api-key');
+        expect((caught as Error).message).toContain("'openrouter'");
         expect((caught as Error).message).not.toContain('SECRET');
       }
-    });
-
-    it('should refuse an api key config that is not a credential key', () => {
-      const provider: ProviderSpec = { ...OPENROUTER, apiKeyConfig: 'synapse.ledger.retention-days' };
-
-      expect(() => translate({ provider })).toThrow(expect.objectContaining({ retryable: false, code: 'invalid_api_key' }));
     });
   });
 
@@ -297,17 +276,13 @@ describe('translateChatRequest', () => {
 });
 
 describe('translateEmbeddingRequest', () => {
-  let restore: RestoreConfig;
-
-  beforeEach(() => (restore = setConfig({ 'synapse.provider.openrouter.api-key': 'sk-or-secret' })));
-  afterEach(() => restore());
-
   it('should send the deployment id to the provider embeddings endpoint without the envelope', () => {
     const translated = translateEmbeddingRequest({
       body: { model: 'memoir.embed', input: ['a', 'b'], synapse: ENVELOPE },
       provider: OPENROUTER,
       providerKey: 'openrouter',
       deploymentId: 'vendor/embed',
+      apiKey: API_KEY,
     });
 
     expect(translated).toEqual({
@@ -326,11 +301,6 @@ describe('translateEmbeddingRequest', () => {
 });
 
 describe('translateImageRequest', () => {
-  let restore: RestoreConfig;
-
-  beforeEach(() => (restore = setConfig({ 'synapse.provider.openrouter.api-key': 'sk-or-secret' })));
-  afterEach(() => restore());
-
   it("should send OpenRouter's images shape with the references as input references", () => {
     const translated = translateImageRequest({
       body: { model: 'novel-forge.image', prompt: 'A lighthouse', n: 2, reference_images: ['data:image/png;base64,AAA', 'https://img.test/a.png'], synapse: ENVELOPE },

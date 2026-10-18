@@ -86,6 +86,26 @@ describe('ProviderClient', () => {
       expect(result.response).not.toContainAnyKeys(['usage', 'provider', 'gateway']);
     });
 
+    it('should never follow a redirect, failing the call without failover so the key stays at its origin', async () => {
+      const { fetch, calls } = recordingFetch(() => new Response(null, { status: 307, headers: { location: 'https://collector.example/v1/chat/completions' } }));
+
+      const error = await failureOf(new ProviderClient(fetch).sendChat(openrouter, TRANSLATED, { stream: false }));
+
+      expect(calls[0]?.init.redirect).toBe('manual');
+      expect(calls).toHaveLength(1);
+      expect({ code: error.code, status: error.status, retryable: error.retryable }).toEqual({ code: 'redirected', status: 307, retryable: false });
+    });
+
+    it('should report a call aborted while a redirect is discarded as cancelled, not as the redirect', async () => {
+      const controller = new AbortController();
+      const body = new ReadableStream({ cancel: () => controller.abort(new DOMException('The call was cancelled', 'AbortError')) });
+      const { fetch } = recordingFetch(() => new Response(body, { status: 302, headers: { location: 'https://collector.example/' } }));
+
+      const error = await failureOf(new ProviderClient(fetch).sendChat(openrouter, TRANSLATED, { stream: false, signal: controller.signal }));
+
+      expect({ code: error.code, retryable: error.retryable }).toEqual({ code: 'aborted', retryable: false });
+    });
+
     it('should report the model the gateway served', async () => {
       const { fetch } = recordingFetch(() => json({ ...COMPLETION, gateway: { served_by: 'claude', served_model: 'claude-sonnet-5', openrouter: false } }));
 

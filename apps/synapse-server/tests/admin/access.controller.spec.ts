@@ -16,10 +16,16 @@ describe('AccessController', () => {
     expect(access.permissions).toEqual([SYNAPSE_PERMISSIONS.catalogRead, SYNAPSE_PERMISSIONS.catalogWrite, SYNAPSE_PERMISSIONS.usageRead]);
   });
 
-  it('should report every permission to an admin', async () => {
+  it('should report every catalog permission, and not credential management, to an admin', async () => {
     const access = await asPrincipal(userWith('admin'), () => controller.getAccess());
 
-    expect(access.permissions).toEqual(Object.values(SYNAPSE_PERMISSIONS));
+    expect(access.permissions).toEqual(Object.values(SYNAPSE_PERMISSIONS).filter(permission => permission !== SYNAPSE_PERMISSIONS.credentialsManage));
+  });
+
+  it('should report credential management alone to a credentials admin', async () => {
+    const access = await asPrincipal(userWith('credentialsAdmin'), () => controller.getAccess());
+
+    expect(access.permissions).toEqual([SYNAPSE_PERMISSIONS.credentialsManage]);
   });
 
   it('should report no permission to a user without a synapse role', async () => {

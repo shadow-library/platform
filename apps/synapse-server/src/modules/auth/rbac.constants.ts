@@ -6,6 +6,7 @@ export const SYNAPSE_PERMISSIONS = {
   providersWrite: 'synapse:providers:write',
   budgetsWrite: 'synapse:budgets:write',
   usageRead: 'synapse:usage:read',
+  credentialsManage: 'synapse:credentials:manage',
 } as const;
 
 /** Granted to calling services on `api://synapse`; never held by a user. */
@@ -22,4 +23,6 @@ export const SYNAPSE_ROLES = {
   viewer: { name: 'SynapseViewer', permissions: VIEWER_PERMISSIONS },
   operator: { name: 'SynapseOperator', permissions: OPERATOR_PERMISSIONS },
   admin: { name: 'SynapseAdmin', permissions: ADMIN_PERMISSIONS, grantToBootstrapAdmin: true },
+  /** Kept apart from the catalog roles: whoever holds both can point a key at any origin, so only owners should */
+  credentialsAdmin: { name: 'SynapseCredentialsAdmin', permissions: [SYNAPSE_PERMISSIONS.credentialsManage], grantToBootstrapAdmin: true },
 } as const;

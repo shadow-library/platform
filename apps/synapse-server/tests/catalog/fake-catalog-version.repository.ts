@@ -9,6 +9,8 @@ import {
   type DraftValues,
   type PublishedValues,
 } from '@modules/catalog/catalog-version.repository';
+import { type CredentialState } from '@modules/catalog/catalog.types';
+import { referencingProviders } from '@modules/credentials/credential.utils';
 
 type Row = Catalog.Version;
 
@@ -57,6 +59,14 @@ class InMemoryCatalogStore implements CatalogVersionStore {
     return this.insert({ ...values, state: 'PUBLISHED', publishedAt: new Date() });
   }
 
+  async findCredentials(ids: readonly string[]): Promise<CredentialState[]> {
+    return this.repository.credentials.filter(credential => ids.includes(credential.id));
+  }
+
+  async referencesCredential(id: string): Promise<boolean> {
+    return this.repository.rows.some(row => row.state !== 'DRAFT' && referencingProviders(row.document, id).length > 0);
+  }
+
   private insert(values: Omit<Row, 'id' | 'createdAt'>): Row {
     this.assertVersionFree(values.version);
     if (values.state === 'DRAFT' && this.repository.rows.some(row => row.state === 'DRAFT')) throw AppErrorCode.SYN_CATALOG_CONFLICT.create();
@@ -73,6 +83,7 @@ class InMemoryCatalogStore implements CatalogVersionStore {
 /** Serialises `exclusive` like the advisory lock and restores the rows when the work throws, as a rolled-back transaction would. */
 export class FakeCatalogVersionRepository {
   rows: Row[] = [];
+  credentials: CredentialState[] = [];
   beforeExclusive?: () => void;
   private lock: Promise<void> = Promise.resolve();
   private lastId = 0n;
@@ -114,6 +125,10 @@ export class FakeCatalogVersionRepository {
 
   findActive(): Promise<Row | undefined> {
     return new InMemoryCatalogStore(this).findActive();
+  }
+
+  findCredentials(ids: readonly string[]): Promise<CredentialState[]> {
+    return new InMemoryCatalogStore(this).findCredentials(ids);
   }
 
   async activeVersion(): Promise<number | null> {

@@ -255,6 +255,93 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/admin/credentials': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Credentials */
+    get: operations['get_api_v1_admin_credentials'];
+    put?: never;
+    /** Create Credential */
+    post: operations['post_api_v1_admin_credentials'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/credentials/status/keyring': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Keyring Status */
+    get: operations['get_api_v1_admin_credentials_status_keyring'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/credentials/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Credential */
+    get: operations['get_api_v1_admin_credentials_id'];
+    put?: never;
+    post?: never;
+    /** Revoke Credential */
+    delete: operations['delete_api_v1_admin_credentials_id'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/credentials/{id}/secret': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Rotate Credential */
+    put: operations['put_api_v1_admin_credentials_id_secret'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/credentials/{id}/test': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Test Credential */
+    post: operations['post_api_v1_admin_credentials_id_test'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/auth/access': {
     parameters: {
       query?: never;
@@ -816,13 +903,95 @@ export interface components {
       cost: string;
       features: string[];
       maxInflightPerReplica?: number;
-      /** @description Whether the Config key naming the provider's API key holds a value. The value itself is never returned */
+      /** @description Id of the stored credential the provider sends; see /api/v1/admin/credentials */
+      credential?: string;
+      /** @description Deprecated with apiKeyConfig: whether the Config key naming the provider's API key holds a value. The value itself is never returned */
       apiKeyConfigured?: boolean;
       /** @description Requests this provider answered in the window, successfully or with an error. Refused and cancelled requests, and failovers to other providers, are not counted */
       calls: number;
       errors: number;
       /** @description errors / calls; absent when there were no calls */
       errorRate?: number;
+    };
+    CredentialListResponse: {
+      items: components['schemas']['CredentialResponse'][];
+    };
+    CredentialResponse: {
+      /** @description Id a catalog provider names as `credential` */
+      id: string;
+      name: string;
+      /** @description Normalised origin the key is bound to; a provider whose URL has another origin can neither publish nor call with it */
+      allowedOrigin: string;
+      /** @description At most a quarter of the secret: the first six and last four characters from 40 characters up, the last four from 16, else only `…` */
+      hint: string;
+      /** @description Starts at 1 and moves on every rotation */
+      version: number;
+      /** @description The keyring key that wraps the secret */
+      kid?: string;
+      /** @description Subject of the admin who created it, or `import` for the key imported from the environment */
+      createdBy?: string;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      rotatedAt?: string;
+      /**
+       * Format: date-time
+       * @description Set once revoked; a revoked credential is never used again
+       */
+      revokedAt?: string;
+      /** @description Keys of the providers in the published catalog that name this credential */
+      referencedBy: string[];
+    };
+    CreateCredentialBody: {
+      /** @description Unique, and kept by a revoked credential */
+      name: string;
+      /** @description The only origin the key is ever sent to: scheme, host and optional port, e.g. `https://openrouter.ai`. Stored normalised, with the host lowercased and a default port dropped; a path is refused */
+      allowedOrigin: string;
+      /** @description The provider API key. Write-only: it is sealed on receipt, and no response ever carries it */
+      secret: string;
+    };
+    KeyringStatusResponse: {
+      /** @description The key new secrets are sealed under; the background rewrap moves every row onto it */
+      activeKeyId: string;
+      /** @description A key can leave the keyring once its count is zero */
+      keys: components['schemas']['KeyringKeyResponse'][];
+    };
+    KeyringKeyResponse: {
+      kid: string;
+      /** @description Stored credentials, revoked ones included, whose secret this key wraps */
+      credentials: number;
+      /** @description False means every replica refuses to become ready until the key is put back */
+      inKeyring: boolean;
+    };
+    RotateCredentialBody: {
+      /** @description The provider API key. Write-only: it is sealed on receipt, and no response ever carries it */
+      secret: string;
+    };
+    CredentialTestResponse: {
+      ok: boolean;
+      /**
+       * @description Why the test failed; the provider’s own response is never relayed
+       * @enum {string}
+       */
+      code?:
+        | 'revoked_api_key'
+        | 'credential_unreadable'
+        | 'invalid_api_key'
+        | 'unauthorized'
+        | 'rate_limited'
+        | 'not_found'
+        | 'redirected'
+        | 'rejected'
+        | 'upstream_error'
+        | 'timeout'
+        | 'connect';
+    };
+    /** @description The `CRED_IN_USE` error body: revoking is refused while the published catalog names the credential */
+    CredentialInUseResponse: {
+      code: string;
+      message: string;
+      /** @description Keys of the providers in the published catalog that still name the credential */
+      referencedBy: string[];
     };
     AuthAccessResponse: {
       /**
@@ -1572,6 +1741,315 @@ export interface operations {
       };
     };
   };
+  get_api_v1_admin_credentials: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CredentialListResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_admin_credentials: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateCredentialBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CredentialResponse'];
+        };
+      };
+      /** @description Default Response */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_admin_credentials_status_keyring: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['KeyringStatusResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_admin_credentials_id: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CredentialResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  delete_api_v1_admin_credentials_id: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CredentialResponse'];
+        };
+      };
+      /** @description Default Response */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CredentialInUseResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  put_api_v1_admin_credentials_id_secret: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RotateCredentialBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CredentialResponse'];
+        };
+      };
+      /** @description Default Response */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_admin_credentials_id_test: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CredentialTestResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   get_api_auth_access: {
     parameters: {
       query?: never;
@@ -1952,6 +2430,14 @@ export type UsageRowResponse = components['schemas']['UsageRowResponse'];
 export type UsageTotalsResponse = components['schemas']['UsageTotalsResponse'];
 export type ProvidersResponse = components['schemas']['ProvidersResponse'];
 export type ProviderResponse = components['schemas']['ProviderResponse'];
+export type CredentialListResponse = components['schemas']['CredentialListResponse'];
+export type CredentialResponse = components['schemas']['CredentialResponse'];
+export type CreateCredentialBody = components['schemas']['CreateCredentialBody'];
+export type KeyringStatusResponse = components['schemas']['KeyringStatusResponse'];
+export type KeyringKeyResponse = components['schemas']['KeyringKeyResponse'];
+export type RotateCredentialBody = components['schemas']['RotateCredentialBody'];
+export type CredentialTestResponse = components['schemas']['CredentialTestResponse'];
+export type CredentialInUseResponse = components['schemas']['CredentialInUseResponse'];
 export type AuthAccessResponse = components['schemas']['AuthAccessResponse'];
 export type AuthLogoutResponse = components['schemas']['AuthLogoutResponse'];
 export type AuthSessionResponse = components['schemas']['AuthSessionResponse'];
@@ -1965,6 +2451,7 @@ export type GetVersionPathParams = Exclude<paths['/api/v1/admin/catalog/versions
 export type AliasImpactQueryParams = Exclude<paths['/api/v1/admin/catalog/aliases/{key}/impact']['get']['parameters']['query'], undefined>;
 export type AliasImpactPathParams = Exclude<paths['/api/v1/admin/catalog/aliases/{key}/impact']['get']['parameters']['path'], undefined>;
 export type GetUsageQueryParams = Exclude<paths['/api/v1/admin/usage']['get']['parameters']['query'], undefined>;
+export type GetCredentialPathParams = Exclude<paths['/api/v1/admin/credentials/{id}']['get']['parameters']['path'], undefined>;
 export type LoginQueryParams = Exclude<paths['/api/auth/login']['get']['parameters']['query'], undefined>;
 export type CallbackQueryParams = Exclude<paths['/api/auth/callback']['get']['parameters']['query'], undefined>;
 export type StepUpQueryParams = Exclude<paths['/api/auth/step-up']['get']['parameters']['query'], undefined>;

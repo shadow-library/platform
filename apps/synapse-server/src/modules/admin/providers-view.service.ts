@@ -17,6 +17,7 @@ export interface ProviderView {
   cost: ProviderSpec['cost'];
   features: string[];
   maxInflightPerReplica?: number;
+  credential?: string;
   apiKeyConfigured?: boolean;
   calls: number;
   errors: number;
@@ -69,6 +70,7 @@ export class ProvidersViewService {
         cost: provider.cost,
         features: provider.features ?? [],
         ...(provider.maxInflightPerReplica !== undefined && { maxInflightPerReplica: provider.maxInflightPerReplica }),
+        ...(provider.credential !== undefined && { credential: provider.credential }),
         ...(provider.apiKeyConfig !== undefined && { apiKeyConfigured: isKeyConfigured(provider.apiKeyConfig) }),
         calls,
         errors,

@@ -1,13 +1,14 @@
 import { drizzle } from 'drizzle-orm/bun-sql';
 import { migrate } from 'drizzle-orm/bun-sql/migrator';
 import { Config, Logger } from '@shadow-library/common';
+import { parseKeyring, SecretBox } from '@shadow-library/common/crypto';
 import { createMigrationClient } from '@shadow-library/modules/bootstrap';
 
 import '@server/bootstrap';
 
 import { APP_NAME } from '@server/constants';
 import { schema } from '@server/database';
-import { applySeedCatalog, buildSeedCatalog, openSeedDatabase } from '@server/database/seed';
+import { applySeedCatalog, buildSeedCatalog, importEnvCredential, openSeedDatabase } from '@server/database/seed';
 
 const url = process.env.DATABASE_POSTGRES_URL ?? 'postgresql://postgres:postgres@localhost/synapse';
 const migrationsFolder = process.env.MIGRATIONS_FOLDER || 'generated/drizzle';
@@ -28,6 +29,8 @@ try {
     local: Config.get('synapse.provider.local.url'),
   });
   await applySeedCatalog(seedDatabase.repository, document);
+  const box = new SecretBox(parseKeyring(Config.get('synapse.crypto.keys')));
+  await importEnvCredential({ catalog: seedDatabase.repository, credentials: seedDatabase.credentials, box }, Config.get('synapse.provider.openrouter.api-key'));
   logger.info('Database migration completed successfully');
 } catch (error: any) {
   failed = true;

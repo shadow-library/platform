@@ -26,7 +26,10 @@ export class ProviderResponse {
   @Field(() => Integer, { optional: true })
   maxInflightPerReplica?: number;
 
-  @Field({ optional: true, description: "Whether the Config key naming the provider's API key holds a value. The value itself is never returned" })
+  @Field({ optional: true, description: 'Id of the stored credential the provider sends; see /api/v1/admin/credentials' })
+  credential?: string;
+
+  @Field({ optional: true, description: "Deprecated with apiKeyConfig: whether the Config key naming the provider's API key holds a value. The value itself is never returned" })
   apiKeyConfigured?: boolean;
 
   @Field(() => Integer, {

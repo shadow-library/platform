@@ -2,6 +2,7 @@ import { drizzle } from 'drizzle-orm/bun-sql';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { CatalogVersionRepository } from '@modules/catalog/catalog-version.repository';
+import { CredentialRepository } from '@modules/credentials/credential.repository';
 
 import { constraintErrorMap } from '../database.constants';
 import { type PrimaryDatabase } from '../database.module';
@@ -16,6 +17,7 @@ export type SeedDatabaseFactory = (config: SeedConnection) => PrimaryDatabase;
 
 export interface SeedDatabase {
   repository: CatalogVersionRepository;
+  credentials: CredentialRepository;
   databaseService: Pick<DatabaseService, 'getPostgresClient' | 'run' | 'translateError'>;
   close(): Promise<void>;
 }
@@ -30,6 +32,7 @@ export function openSeedDatabase(url: string, factory: SeedDatabaseFactory = dri
   };
   return {
     repository: new CatalogVersionRepository(databaseService as DatabaseService),
+    credentials: new CredentialRepository(databaseService as DatabaseService),
     databaseService,
     close: async () => void (await (db as unknown as { $client: { close(): Promise<void> } }).$client.close()),
   };

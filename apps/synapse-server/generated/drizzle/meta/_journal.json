@@ -15,6 +15,13 @@
       "when": 1792188703154,
       "tag": "0001_ledger_pending_index",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792353992087,
+      "tag": "0002_provider_credentials",
+      "breakpoints": true
     }
   ]
 }

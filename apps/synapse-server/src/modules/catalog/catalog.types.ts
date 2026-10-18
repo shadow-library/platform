@@ -35,7 +35,12 @@ export interface ProviderSpec {
   /** Required for kind `openai`, which several dialects share, and rejected on any other kind */
   flavor?: ProviderFlavor;
   url: string;
-  /** A Config key name, never a secret value */
+  /** Id of a stored provider credential, bound to the origin of `url` */
+  credential?: string;
+  /**
+   * A Config key name, never a secret value. Mutually exclusive with `credential`.
+   * @deprecated Kept for one release; name a stored `credential` instead.
+   */
   apiKeyConfig?: string;
   locality: ProviderLocality;
   cost: ProviderCost;
@@ -130,13 +135,23 @@ export type CatalogIssueCode =
   | 'no_routes'
   | 'default_route_count'
   | 'no_deployments'
-  | 'budget_without_limit';
+  | 'budget_without_limit'
+  | 'unknown_credential'
+  | 'credential_revoked'
+  | 'credential_origin_mismatch';
 
 export interface CatalogIssue {
   /** e.g. `tasks.novel-forge.chat.routes[1].model`; empty for the document itself */
   path: string;
   message: string;
   code: CatalogIssueCode;
+}
+
+/** What publish needs to know of a stored credential: never its secret */
+export interface CredentialState {
+  id: string;
+  allowedOrigin: string;
+  revoked: boolean;
 }
 
 export interface ActiveCatalog {
