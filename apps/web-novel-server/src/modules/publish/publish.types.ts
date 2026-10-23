@@ -21,10 +21,7 @@ export interface PublishAuditRouteMetadata {
 
 declare module 'fastify' {
   interface FastifyRequest {
-    /**
-     * Set once the publish service has written this request's audit row, so the error trailer
-     * never double-records a call that already produced its applied/noop/stale_rejected row.
-     */
+    /** Set once the service has written this request's audit row, so the error trailer never double-records it. */
     publishAuditRecorded?: boolean;
   }
 }

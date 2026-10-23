@@ -4,15 +4,12 @@ import { type ContentRating, type DarkContentLevel, type Genre, type SexualConte
 
 import { DarkContentRating, NovelGenre, NovelTag, SexualContentRating, ViolenceRating } from '@server/classes';
 
-/** Every numeric field here lands in an int4 column (including the audit trail) — values beyond this must be rejected, not passed through to the database */
+/** Every numeric field here lands in an int4 column, the audit trail included; larger values must be rejected, not passed to the database. */
 export const INT4_MAX = 2_147_483_647;
 
 export const NOVEL_VISIBILITIES = ['PUBLIC', 'ORGANISATION', 'RESTRICTED'] as const;
 
-/**
- * A share list is a handful of people, not an audience. The cap is a guard against a malformed push
- * rather than a product limit — an author who needs more than this wants `ORGANISATION`.
- */
+/** A guard against a malformed push, not a product limit. */
 const MAX_GRANT_SUBJECTS = 500;
 
 const RATING_DESCRIPTION = 'Omit when unrated. An absent dimension is stored as unrated and is never inferred to be "none".';
@@ -93,15 +90,7 @@ export class NovelUpsertBody {
   revision: number;
 }
 
-/**
- * The share list, replaced wholesale. Carried on its own sub-resource with its own revision so that
- * adding a viewer does not churn the metadata row (and vice versa), and so each resource gets its
- * own stale-push rejection.
- *
- * `visibility` is deliberately repeated from the metadata push rather than owned solely here: a
- * novel must be created already restricted, so the tier has to arrive with the very first metadata
- * push, before any grant exists. This body is the authority when both are in flight.
- */
+/** Replaced wholesale on its own revision. `visibility` also rides the metadata push because a novel must be created already restricted, before any grant exists. */
 @Schema()
 export class NovelAccessBody {
   @Field(() => String, { enum: [...NOVEL_VISIBILITIES] })
@@ -137,7 +126,7 @@ export class NovelAccessResponse {
   revision: number;
 }
 
-/** The per-chapter rating, three independent optional dimensions. Omitting one leaves it unrated; there is no way to say "no content" other than the explicit `'none'`. */
+/** Omitting a dimension leaves it unrated; "no content" must be said explicitly as `'none'`. */
 @Schema()
 class ChapterContentRating {
   @Field(() => SexualContentRating, { optional: true, description: RATING_DESCRIPTION })

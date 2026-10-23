@@ -58,7 +58,7 @@ export class ReaderController {
   @Delete('/library/:slug')
   @HttpStatus(204)
   async removeFromLibrary(@Params() params: NovelSlugParams): Promise<void> {
-    // Removal must remain available after access to a shelved novel is revoked.
+    // Deliberately not access-checked: removal must still work after access to a shelved novel is revoked.
     await this.readerService.removeFromLibrary(this.principal().sub, params.slug);
   }
 

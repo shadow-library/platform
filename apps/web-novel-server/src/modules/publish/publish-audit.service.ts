@@ -20,11 +20,7 @@ export class PublishAuditService {
     this.db = databaseService.getPostgresClient();
   }
 
-  /**
-   * Records an audit row; pass `tx` to make the row atomic with the mutation it describes. The
-   * caller marks the request recorded only after its transaction commits, so a rollback never
-   * leaves the call flagged without a row.
-   */
+  /** Pass `tx` to make the row atomic with its mutation; callers mark the request recorded only after commit, so a rollback never leaves it flagged without a row. */
   async record(entry: PublishAuditEntry, tx?: Parameters<Parameters<PrimaryDatabase['transaction']>[0]>[0]): Promise<void> {
     const executor = tx ?? this.db;
     await executor.insert(schema.publishAuditLog).values({

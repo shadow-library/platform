@@ -6,11 +6,7 @@ export namespace PublishAuditLog {
   export type Outcome = InferEnum<typeof publishOutcome>;
 }
 
-/**
- * Append-only trail of the internal publish surface: exactly one row per mutation call, including
- * every rejected attempt. It carries no foreign keys — audit rows must outlive the novels and
- * chapters they describe (an unpublish or a rebuild must not erase its own history).
- */
+/** No foreign keys: audit rows must outlive the novels and chapters they describe. */
 
 export const publishOutcome = pgEnum('publish_outcome', ['applied', 'noop', 'stale_rejected', 'unauthorized', 'error']);
 
@@ -18,7 +14,7 @@ export const publishAuditLog = pgTable(
   'publish_audit_log',
   {
     id: bigserial('id', { mode: 'bigint' }).primaryKey(),
-    /** Verified when the guard admits the caller; decoded unverified (best effort) on rejections */
+    /** Verified when the guard admits the caller; decoded unverified, best effort, on rejections. */
     callerSub: varchar('caller_sub', { length: 128 }),
     callerClientId: varchar('caller_client_id', { length: 128 }),
     action: varchar('action', { length: 64 }).notNull(),

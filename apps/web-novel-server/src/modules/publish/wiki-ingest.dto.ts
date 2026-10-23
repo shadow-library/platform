@@ -42,10 +42,7 @@ export class WikiImageInput {
   visibleFromOrdinal: number;
 }
 
-/**
- * A wiki entry pushed whole. Like the chapter push, absent optional fields compare as their defaults, and the
- * facets and images are a full replacement — the reader diffs nothing, it drops the lot and rewrites it.
- */
+/** A wiki entry pushed whole: facets and images are a full replacement. */
 @Schema()
 export class WikiEntryUpsertBody {
   @Field(() => String, { enum: [...WIKI_ENTRY_TYPES] })

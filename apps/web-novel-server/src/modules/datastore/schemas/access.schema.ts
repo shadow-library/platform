@@ -5,14 +5,7 @@ import { novels } from './novels.schema';
 
 export type NovelGrant = InferSelectModel<typeof novelGrants>;
 
-/**
- * Who may read a `RESTRICTED` novel. Part of the forge-owned projection, not audience data: the
- * author decides the share list in novel-forge and it arrives over `PUT /internal/novels/:slug/access`
- * as a full replacement, so dropping this table and re-pushing converges to identical state.
- *
- * Only resolved identity subjects land here — the forge does the email → subject resolution at share
- * time, so no address the author typed is ever stored in the reader's database.
- */
+/** Who may read a `RESTRICTED` novel; replaced wholesale by `PUT /internal/novels/:slug/access`. Holds resolved identity subjects only, never emails. */
 
 export const novelGrants = pgTable(
   'novel_grants',

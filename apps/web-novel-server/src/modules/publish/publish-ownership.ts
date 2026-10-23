@@ -10,11 +10,7 @@ export interface PublishCaller {
   callerClientId: string;
 }
 
-/**
- * `InternalServiceGuard` admits only service principals to `/internal/*`, so an absent client id is a
- * broken invariant rather than a caller error. It must never fall back to a placeholder: the fallback
- * would become the row's owner and thereby gain write authority over a novel it never published.
- */
+/** `InternalServiceGuard` admits only service principals, so a missing client id is a broken invariant; a placeholder fallback would become a row's owner. */
 export function publishCaller(context: ContextService): PublishCaller {
   const principal = context.getAuthPrincipalOrNull();
   if (!principal?.clientId) throw AppError.internal('internal publish call carries no client id');
@@ -25,11 +21,7 @@ export function assertNovelOwnership(novel: Novel, caller: PublishCaller): void 
   if (!isOwnedBy(novel, caller)) throw AppErrorCode.WBN_010.create();
 }
 
-/**
- * A read answers "owned by someone else" exactly as it answers "does not exist", or 409-vs-404 becomes
- * an oracle over another publisher's slugs — and an unknown novel must keep reading as an empty shelf
- * for ledger recovery.
- */
+/** Foreign ownership reads as "does not exist", or 409-vs-404 becomes an oracle over other publishers' slugs. */
 function assertNovelReadable(novel: Novel, caller: PublishCaller): void {
   if (!isOwnedBy(novel, caller)) throw AppErrorCode.WBN_001.create();
 }

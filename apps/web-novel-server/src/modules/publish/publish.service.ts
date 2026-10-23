@@ -33,23 +33,14 @@ interface StaleMarker {
   stored: number;
 }
 
-/**
- * Raised out of the novel insert to roll its transaction back; only a re-read of the committed row can say
- * whose the slug is. A second race within one call escapes as a 500 the publisher retries, never as an
- * ownership verdict — being wrong about ownership is what sends a publisher off to re-slug.
- */
+/** Rolls the insert transaction back so the committed row can be re-read; a second race escapes as a retryable 500, never as an ownership verdict. */
 class NovelInsertRace extends Error {
   constructor() {
     super('novel insert lost a slug race; the committed row must be re-read');
   }
 }
 
-/**
- * Optimistic-concurrency rules (same for novels and chapters): an incoming revision behind the
- * stored one is a 409 stale rejection; an equal revision carrying identical content is a no-op;
- * anything else replaces the row and stores the incoming revision. Every branch — including the
- * rejection — commits exactly one audit row atomically with its decision.
- */
+/** Same revision ladder for every push: behind stored is a 409, equal with identical content is a no-op, else replace; the audit row commits with the decision. */
 
 @Injectable()
 export class PublishService {
@@ -64,12 +55,7 @@ export class PublishService {
     this.db = databaseService.getPostgresClient();
   }
 
-  /**
-   * A first push locks nothing — the row does not exist yet — so two converge passes of the same
-   * publisher can both reach the insert, and the index rejects the loser. That is a self-race, not
-   * foreign ownership: the loser re-runs against the now-committed row, where its own `sourceRef`
-   * resolves the row it just lost and only another publisher's slug still answers `WBN_010`.
-   */
+  /** A first push locks nothing, so two passes of one publisher can both reach the insert; the loser re-runs against the committed row, where its own `sourceRef` resolves it. */
   async upsertNovel(slug: string, body: NovelUpsertBody): Promise<UpsertResult> {
     const caller = this.caller();
     const result = await this.runNovelUpsert(slug, body, caller).catch((err: unknown) => {
@@ -127,7 +113,7 @@ export class PublishService {
   async upsertChapter(slug: string, ordinal: number, body: ChapterUpsertBody): Promise<UpsertResult> {
     const caller = this.caller();
     const novel = await loadOwnedNovel(this.db, slug, caller);
-    // Absent stays absent all the way through: it is what an older publisher sends, what the hash omits, and what the column stores as unrated.
+    // Absent stays absent: older publishers omit it, the hash omits it, and the column stores it as unrated.
     const contentRating = normalizeContentRating(body.contentRating);
     const expectedHash = chapterContentHash({ title: body.title, content: body.content, authorNote: body.authorNote, contentRating });
     if (expectedHash !== body.contentHash) throw AppErrorCode.WBN_011.create();
@@ -200,15 +186,7 @@ export class PublishService {
     return result;
   }
 
-  /**
-   * Replaces a novel's whole access record — tier, organisation and grant set — under the same
-   * revision ladder the metadata push uses, against `accessRevision` rather than `revision`.
-   *
-   * The replacement is wholesale and transactional: a partial apply would leave a novel restricted
-   * to a stale set, which is either a leak or a lockout depending on which half landed. Grants are
-   * deleted and re-inserted rather than diffed because the set is small and a diff has more ways to
-   * be subtly wrong than the whole-set write it would replace.
-   */
+  /** Replaces tier, organisation and grants wholesale on `accessRevision`: a partial apply would leak or lock out. Grants are rewritten, not diffed. */
   async upsertAccess(slug: string, body: NovelAccessBody): Promise<UpsertResult> {
     const caller = this.caller();
     if (body.visibility === 'ORGANISATION' && !body.organisationId) throw AppErrorCode.WBN_007.create();
@@ -280,14 +258,8 @@ export class PublishService {
   }
 
   /**
-   * `(sourceClientId, sourceRef)` is the only thing that resolves a novel; the slug is read solely to find
-   * out whether the row this push would create or rename onto can hold it. Anything already sitting there
-   * is therefore some other novel — another publisher's, or another of this caller's — and both answer
-   * WBN_010 because both take the same remedy: publish under a slug this novel can hold. Deciding that
-   * ahead of the revision ladder also keeps WBN_003 from quoting a stored revision to a foreign caller.
-   *
-   * Both lookups share one statement, hence one snapshot: as two reads, a concurrent first push committing
-   * between them was missed by ref and then found by slug, refusing this caller its own novel.
+   * Only `(sourceClientId, sourceRef)` resolves a novel; the slug detects a collision (WBN_010) before the revision ladder, so WBN_003 never quotes a revision to a foreign caller.
+   * One statement means one snapshot: as two reads, a first push committing between them was missed by ref, then found by slug, refusing the caller its own novel.
    */
   private async lockNovel(tx: PublishTransaction, slug: string, body: NovelUpsertBody, caller: PublishCaller): Promise<Novel | undefined> {
     const byRef = and(eq(schema.novels.sourceClientId, caller.callerClientId), eq(schema.novels.sourceRef, body.sourceRef)) as SQL;
@@ -302,11 +274,7 @@ export class PublishService {
     return undefined;
   }
 
-  /**
-   * A conflict on the update is a decided rename onto a slug this novel cannot hold, so it surfaces as
-   * WBN_010 rather than a re-read: the re-read would find the same row and attempt the same rename. On the
-   * insert it is a race with a concurrent create, which only the committed row can adjudicate.
-   */
+  /** A conflict on update is a rename onto a slug this novel cannot hold (WBN_010); on insert it is a create race only a re-read can adjudicate. */
   private async saveNovel(tx: PublishTransaction, stored: Novel | undefined, values: typeof schema.novels.$inferInsert): Promise<bigint> {
     if (!stored) {
       const [inserted] = await this.databaseService
@@ -326,17 +294,13 @@ export class PublishService {
     return and(eq(schema.publishedChapters.novelId, novelId), eq(schema.publishedChapters.ordinal, ordinal)) as SQL;
   }
 
-  /**
-   * The `publishToken` is deliberately not part of this equality: binding it is not itself a reader-visible
-   * metadata change, so a legacy novel adopts one on its next content/revision change rather than on an
-   * otherwise-identical push (which stays a no-op). New novels always bind on their creating insert.
-   */
   private resolvePublishToken(stored: Novel | undefined, body: NovelUpsertBody): string | null {
     const verdict = nextPublishToken(stored?.publishToken ?? null, body.publishToken);
     if (verdict.mismatch) throw AppErrorCode.WBN_012.create();
     return verdict.token;
   }
 
+  // `publishToken` is excluded: binding it is not reader-visible, so a legacy novel adopts one on its next real change and an otherwise-identical push stays a no-op.
   private isNovelUnchanged(stored: Novel, body: NovelUpsertBody, slug: string, coverPath: string | null): boolean {
     return (
       stored.slug === slug &&

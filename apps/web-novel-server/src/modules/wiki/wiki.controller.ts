@@ -9,13 +9,6 @@ import { NovelSlugParams, WikiEntryKeyParams } from '@server/modules/publish';
 import { WikiEntryDetailResponse, WikiListResponse } from './wiki.dto';
 import { type WikiRead, WikiService } from './wiki.service';
 
-/**
- * The spoiler-gated wiki surface, under the catalog's access rules: read anonymously at gate 0 (public mode
- * only), or as a signed-in reader gated by their furthest ordinal. A public novel read anonymously in public
- * mode is CDN-cacheable with an ETag; anything else is `private, no-store`, because the very content is a
- * function of who is asking.
- */
-
 @HttpController('/api/novels')
 @OptionalAuth()
 export class WikiController {
@@ -50,12 +43,7 @@ export class WikiController {
     return read.body;
   }
 
-  /**
-   * A public novel read anonymously gates at 0 for everyone, so in public mode a shared cache may hold it.
-   * A reader-specific response (a signed-in reader, whose gate moves with their progress), a non-public
-   * novel, or anything served in private mode — where only signed-in callers get through — must never be
-   * held by a CDN: `no-store` plus `Vary`, exactly as the catalog treats them.
-   */
+  /** Only an anonymous read of a public novel in public mode is identical for everyone; anything else must never sit in a shared cache. */
   private applyCachePolicy(response: HttpResponse, visibility: WikiRead<unknown>['visibility'], personalized: boolean): void {
     const shareable = visibility === 'PUBLIC' && !personalized && !this.accessPolicy.isPrivate();
     if (shareable) return void response.header('cache-control', `public, max-age=${Config.get('catalog.cache-max-age')}`);
@@ -67,7 +55,7 @@ export class WikiController {
     response.header('vary', 'Cookie, Authorization');
   }
 
-  /** RFC 9110 §13.1.2: any listed entity-tag may match; weak-prefixed and unquoted forms are tolerated. */
+  /** RFC 9110 section 13.1.2: any listed entity-tag may match; weak-prefixed and unquoted forms are tolerated. */
   private matchesETag(header: string | string[] | undefined, etag: string): boolean {
     if (typeof header !== 'string' || header.length === 0) return false;
     if (header.trim() === '*') return true;

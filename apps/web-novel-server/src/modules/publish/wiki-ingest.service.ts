@@ -19,13 +19,7 @@ interface StaleMarker {
   stored: number;
 }
 
-/**
- * The wiki push obeys the same optimistic-concurrency ladder as the chapter push: a revision behind the
- * stored one is a 409 stale rejection, an equal revision carrying an identical content hash is a no-op, and
- * anything else replaces the entry and its whole set of facets and images in one transaction — the reader
- * diffs nothing, so a partial apply cannot leave a half-revealed entry. Every branch commits exactly one
- * audit row atomically with its decision.
- */
+/** Same revision ladder as the chapter push; facets and images are replaced wholesale in one transaction, so a partial apply cannot leave a half-revealed entry. */
 
 @Injectable()
 export class WikiIngestService {
@@ -59,9 +53,9 @@ export class WikiIngestService {
         return { outcome: 'stale', stored: stored.revision } satisfies StaleMarker;
       }
       const headline = isImageRef(body.imageRef) ? body.imageRef : null;
-      // The gate is stored as sent even when a malformed ref is dropped, so the manifest echoes what the forge projected and never reads as drift.
+      // The gate is stored as sent even when a malformed ref is dropped, so the manifest never reads as drift.
       const imageVisibleFromOrdinal = body.imageVisibleFromOrdinal ?? null;
-      // The stored gate joins the no-op test because a rolled-back reader rewrites entries without it, leaving a stale gate under a matching hash.
+      // The stored gate joins the no-op test: a rolled-back reader rewrites entries without it, leaving a stale gate under a matching hash.
       if (stored && body.revision === stored.revision && body.contentHash === stored.contentHash && imageVisibleFromOrdinal === stored.imageVisibleFromOrdinal) {
         await this.auditService.record({ ...base, outcome: 'noop' }, tx);
         return { outcome: 'noop', novelId: novel.id, revision: stored.revision } satisfies UpsertResult;

@@ -3,13 +3,7 @@ export interface PublishTokenVerdict {
   mismatch: boolean;
 }
 
-/**
- * Trust-on-first-use binding for a novel's per-project publish token: the first push carrying one binds it,
- * every later push under the same `(sourceClientId, sourceRef)` must present the same token, and a push that
- * carries none leaves an existing binding untouched (older publishers predate the token, so absence can never
- * enforce). A mismatch is fatal to the caller; it hardens the guessable `sourceRef` against targeting and is
- * not on its own a control against a publisher-side authorization gap acting on the target project directly.
- */
+/** Trust-on-first-use: the first token binds, later pushes must match it, and an absent token never enforces because older publishers predate it. */
 export function nextPublishToken(stored: string | null, incoming: string | null | undefined): PublishTokenVerdict {
   if (stored && incoming && stored !== incoming) return { token: stored, mismatch: true };
   return { token: stored ?? incoming ?? null, mismatch: false };

@@ -6,11 +6,7 @@ import { novels } from './novels.schema';
 export type ReadingProgress = InferSelectModel<typeof readingProgress>;
 export type LibraryEntry = InferSelectModel<typeof library>;
 
-/**
- * Audience data originates here and stays here — the forge never reads or writes these tables.
- * `user_id` is the identity-issued subject; accounts live in the identity service, so there are
- * deliberately no local users/sessions tables to join against.
- */
+/** Audience data originates here and never crosses back to the forge; `user_id` is the identity subject, with no local account table. */
 
 export const readingProgress = pgTable(
   'reading_progress',
@@ -21,7 +17,7 @@ export const readingProgress = pgTable(
       .references(() => novels.id, { onDelete: 'cascade' }),
     ordinal: integer('ordinal').notNull(),
     position: doublePrecision('position').notNull().default(0),
-    /** Furthest chapter ever reached — monotonic, never decreases even when `ordinal` moves back on a reread. Gates spoilers. */
+    /** Monotonic: never decreases when `ordinal` moves back on a reread. Gates wiki spoilers. */
     furthestOrdinal: integer('furthest_ordinal').notNull().default(0),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },

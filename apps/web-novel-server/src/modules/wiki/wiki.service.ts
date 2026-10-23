@@ -14,10 +14,6 @@ import { type Novel, type PrimaryDatabase, schema } from '@server/modules/datast
 import { type GalleryCandidate, listThumbnailRef, visibleHeadlineRef } from './wiki-headline';
 import { type WikiEntryDetailResponse, type WikiListResponse } from './wiki.dto';
 
-/**
- * What the controller needs to answer a wiki read: the serialized body, plus the tier and whether the
- * response is reader-specific (so it can pick a caching story) and a gate-aware ETag for revalidation.
- */
 export interface WikiRead<T> {
   body: T;
   etag: string;
@@ -25,12 +21,7 @@ export interface WikiRead<T> {
   personalized: boolean;
 }
 
-/**
- * The gate is the reader's furthest-reached ordinal, or 0 for an anonymous reader or one with no progress —
- * entries and facets at ordinal 0 are the pre-reading public view. Everything gated is filtered in SQL by
- * `<= gate`, so nothing beyond the reader's progress is ever loaded, let alone serialized. A missing entry
- * and one lying beyond the gate are answered identically (WBN_009) so existence cannot be probed.
- */
+/** Gated rows are filtered in SQL by `<= gate`, so nothing beyond the reader's progress is ever loaded, let alone serialized. */
 
 @Injectable()
 export class WikiService {
@@ -155,7 +146,7 @@ export class WikiService {
     return galleries;
   }
 
-  /** Anonymous readers and those with no progress row gate at 0 — the pre-reading public view. */
+  /** The gate is the reader's furthest ordinal; anonymous readers and those without progress gate at 0, the pre-reading public view. */
   private async resolveGate(novelId: bigint, principal: AuthPrincipal | null): Promise<number> {
     if (!this.isPersonalized(principal)) return 0;
     const sub = (principal as AuthPrincipal).sub;
@@ -170,11 +161,7 @@ export class WikiService {
     return !!principal && principal.kind === 'user';
   }
 
-  /**
-   * A revalidation tag that changes whenever the answer could: the novel's access revision (a re-share can
-   * flip visibility), the relevant wiki revision (any content change bumps it), and the gate (progress moves
-   * the reveal line). Two of the three are reader-independent, so anonymous readers share cache entries.
-   */
+  /** Changes whenever the answer could: the access revision (a re-share can flip visibility), the wiki revision, and the gate (progress moves the reveal line). */
   private etag(accessRevision: number, revision: number, gate: number): string {
     return `"${createHash('sha1').update(`${accessRevision}:${revision}:${gate}`).digest('hex')}"`;
   }

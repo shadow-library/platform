@@ -11,11 +11,6 @@ import { type Novel, type PrimaryDatabase, schema } from '@server/modules/datast
 
 import { type LibraryItem, type ProgressBody, type ProgressListItem, type ProgressResponse } from './reader.dto';
 
-/**
- * Audience data: originates here, stays here — never crosses back to the forge. `userId` is the
- * identity subject; there is deliberately no local account row to attach it to.
- */
-
 @Injectable()
 export class ReaderService {
   private readonly logger = Logger.getLogger(APP_NAME, ReaderService.name);
@@ -64,10 +59,7 @@ export class ReaderService {
     return { ordinal: progress.ordinal, position: progress.position, furthestOrdinal: progress.furthestOrdinal, updatedAt: progress.updatedAt.toISOString() };
   }
 
-  /**
-   * `furthestOrdinal` is monotonic: a fresh row initializes it to the saved ordinal, and an upsert takes
-   * `GREATEST` of the stored value and the new ordinal so rereading an earlier chapter never lowers it.
-   */
+  /** `furthestOrdinal` takes `GREATEST` on upsert so rereading an earlier chapter never lowers it. */
   async saveProgress(principal: AuthPrincipal, slug: string, body: ProgressBody): Promise<ProgressResponse> {
     const novel = await this.catalogService.getReadableNovel(slug, principal);
     const userId = principal.sub;
@@ -100,12 +92,7 @@ export class ReaderService {
     return rows.filter(row => readable.has(row.novel.id)).map(row => this.toLibraryItem(row.novel, row.addedAt));
   }
 
-  /**
-   * The shelf of novels shared *with* this reader — the only place a non-public novel is ever
-   * listed. Two queries rather than one because the two tiers are answered by different authorities:
-   * a restricted grant is a row in this database, whereas organisation membership is identity's to
-   * say, and no join can express it.
-   */
+  /** The only listing of non-public novels; two queries because grants live in this database while organisation membership is identity's to say. */
   async listShared(principal: AuthPrincipal): Promise<LibraryItem[]> {
     const granted = await this.db
       .select({ novel: schema.novels })

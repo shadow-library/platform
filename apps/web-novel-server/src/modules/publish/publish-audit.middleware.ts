@@ -15,12 +15,7 @@ interface CallerInfo {
   callerClientId?: string;
 }
 
-/**
- * Route-level `onError` trailer for the audited internal routes: any mutation call that fails
- * before or outside the publish service (missing/invalid token, missing scope, validation error,
- * unexpected failure) still leaves exactly one audit row. The hook runs before the error response
- * is dispatched, so the trail is durable by the time the caller sees the failure.
- */
+/** Records the audit row for calls that fail before or outside the publish service (auth, validation, unexpected errors); the service records handled outcomes itself. */
 
 @Middleware({ type: 'onError', weight: 50 })
 export class PublishAuditTrailer {
@@ -57,11 +52,11 @@ export class PublishAuditTrailer {
       if (!result.success) this.logger.error('failed to record publish audit row for rejected call', { action: audit.action, error: result.error });
     };
 
-    /** Arity 3 marks the hook promise-style for fastify; the router's handler type models only (req, res) */
+    /** Arity 3 marks the hook promise-style for fastify; the router's handler type models only (req, res). */
     return handler as unknown as RouteHandler;
   }
 
-  /** The audit columns are int4 — a rejected call carrying a pathological number must not sink its own audit row (found by e2e: 3e9 revision overflowed the trailer's insert) */
+  /** The audit columns are int4; an out-of-range number on a rejected call must not sink its own audit row. */
   private toInt4(value: unknown): number | undefined {
     if (typeof value !== 'number' || !Number.isInteger(value)) return undefined;
     return Math.abs(value) <= 2_147_483_647 ? value : undefined;
@@ -76,14 +71,14 @@ export class PublishAuditTrailer {
     return isAuthFailure ? 'unauthorized' : 'error';
   }
 
-  /** Best-effort caller identification from the (possibly unverified) bearer token — audit only */
+  /** Decodes the bearer token without verifying it: the caller identity is best-effort, for audit only. */
   private extractCaller(request: HttpRequest): CallerInfo {
     const header = request.headers.authorization;
     if (typeof header !== 'string' || !header.startsWith('Bearer ')) return {};
     const decoded = tryCatch(() => decodeJwt(header.slice(7)));
     if (!decoded.success) return {};
     const { sub, client_id: clientId } = decoded.data.payload;
-    /** Truncated to the audit columns' varchar(128) so an over-long claim can't overflow the insert and sink the row (mirrors `contentHash`) */
+    /** Truncated to the audit columns' varchar(128) so an over-long claim cannot sink the row. */
     return { callerSub: typeof sub === 'string' ? sub.slice(0, 128) : undefined, callerClientId: typeof clientId === 'string' ? clientId.slice(0, 128) : undefined };
   }
 }

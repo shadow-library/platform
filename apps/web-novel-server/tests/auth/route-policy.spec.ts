@@ -30,12 +30,7 @@ function frameworkMetadata<T>(target: object, description: string): T | undefine
   return key === undefined ? undefined : (Reflect.getMetadata(key, target) as T);
 }
 
-/**
- * Approximates the router's deep merge of a method's handler metadata over its class's: the auth entry is
- * merged shallowly, so class and method arrays such as `scopes` replace rather than concatenate, and only
- * the controller's own prototype is walked. Neither matters while no controller here inherits handlers or
- * repeats a requirement at both levels.
- */
+/** Approximates the router's metadata merge (shallow auth entry, own prototype only), which holds while no controller inherits handlers or repeats a requirement. */
 function routesOf(controller: Controller): Route[] {
   const classMetadata = frameworkMetadata<HandlerMetadata>(controller, 'handler-metadata') ?? {};
   const prototype = controller.prototype as Record<string, unknown>;

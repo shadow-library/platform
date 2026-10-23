@@ -9,12 +9,7 @@ import { ChapterOrdinalParams, NOVEL_VISIBILITIES, NovelSlugParams } from '@serv
 import { ChapterContentResponse, ChapterListResponse, NovelCatalogQuery, NovelCatalogResponse, NovelDetailResponse } from './catalog.dto';
 import { CatalogService } from './catalog.service';
 
-/**
- * The catalog reading surface: anonymous in public mode, signed-in only in private mode. Chapter content
- * is served cache-first: the ETag is the forge's contentHash, `If-None-Match` short-circuits to 304, and
- * where a shared cache may hold it a modest max-age keeps CDNs and browsers holding a copy — a republish
- * changes the hash, so revalidation misses naturally.
- */
+/** Chapter ETags are the forge's contentHash, so a republish that changes content naturally misses revalidation. */
 
 @HttpController('/api/novels')
 @OptionalAuth()
@@ -62,27 +57,20 @@ export class CatalogController {
     return this.context.getAuthPrincipalOrNull();
   }
 
-  /**
-   * A shared cache may hold only what anyone could have been served: a public novel, in public mode. In
-   * private mode even a public novel went to a signed-in caller, and a CDN copy would hand it to anyone.
-   */
+  /** A shared cache may hold only what anyone could be served: a public novel in public mode; in private mode even a public novel went to a signed-in caller. */
   private applyCachePolicy(response: HttpResponse, visibility: (typeof NOVEL_VISIBILITIES)[number]): void {
     const shareable = visibility === 'PUBLIC' && !this.accessPolicy.isPrivate();
     if (shareable) return void response.header('cache-control', `public, max-age=${Config.get('catalog.cache-max-age')}`);
     this.preventSharedCaching(response);
   }
 
-  /**
-   * `no-store` rather than `private` alone, so that even a browser's back/forward cache does not retain the
-   * response after a share is revoked, and `Vary` so any intermediary that ignores the first directive still
-   * cannot serve one reader's copy to another.
-   */
+  /** `no-store` so a browser's back/forward cache does not outlive a revoked share; `Vary` so an intermediary ignoring it still cannot cross readers. */
   private preventSharedCaching(response: HttpResponse): void {
     response.header('cache-control', 'private, no-store');
     response.header('vary', 'Cookie, Authorization');
   }
 
-  /** RFC 9110 §13.1.2: any listed entity-tag may match; weak-prefixed and unquoted forms are tolerated */
+  /** RFC 9110 section 13.1.2: any listed entity-tag may match; weak-prefixed and unquoted forms are tolerated. */
   private matchesETag(header: string | string[] | undefined, contentHash: string): boolean {
     if (typeof header !== 'string' || header.length === 0) return false;
     if (header.trim() === '*') return true;
