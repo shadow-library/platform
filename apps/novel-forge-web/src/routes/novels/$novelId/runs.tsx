@@ -41,11 +41,7 @@ export const Route = createFileRoute('/novels/$novelId/runs')({
   component: RunsScreen,
 });
 
-/**
- * The person most likely to hit this is the product owner before granting themselves the role — a silent
- * bounce to Overview would just look like the nav entry doesn't exist. This names the role and stays on
- * the URL they asked for, rather than redirecting or rendering a generic 404.
- */
+/** Names the missing role and stays on the URL, since a silent bounce to Overview would look like the nav entry doesn't exist. */
 function AdminRequired(): React.JSX.Element {
   const navigate = useNavigate();
   const { novelId } = Route.useParams();

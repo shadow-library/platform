@@ -29,10 +29,7 @@ function spacingOf(file: string): Map<string, Record<string, string>> {
   return rules;
 }
 
-// Line numbers are in scratch-pad/novel-forge/design/Audit.dc.html (canvas v11). Every value here is either a literal
-// canvas number, or a value copied verbatim from an already-reviewed sibling file (cited by file + selector) — never a
-// number invented for this file alone. The audit history drawer is not on the canvas (logged as a deviation in the
-// task report), so its spacing is copied wholesale from an existing screen rather than designed fresh.
+// Every value is a design number or copied verbatim from a sibling stylesheet (cited by file + selector), never invented here.
 const AUDIT_DIALOG: Expected[] = [
   { selector: '.body', values: { gap: '16px' }, source: 'canvas l.80 dialog content wrapper gap 16px' },
   { selector: '.loading', values: { padding: '48px' }, source: 'copied from components/nf/nf.module.css .paneLoader (padding 48, flex-centered loading state)' },

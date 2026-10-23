@@ -32,11 +32,7 @@ export function relativeTime(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
-/**
- * A compact absolute timestamp for a chat message — clock time for today, date + clock time otherwise
- * (dropping the year unless it differs from now). Complements `relativeTime`, which reads better for
- * lists but hides the wall-clock time a transcript wants.
- */
+/** A compact absolute timestamp for a chat message: clock time for today, date + clock time otherwise, the year only when it differs from now. */
 export function messageTime(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '';
@@ -119,7 +115,7 @@ export function projectKindTag(kind: ProjectResponse['kind']): string {
   return kindTags[kind] ?? kind;
 }
 
-/** Chip intent for a project kind — always accent now that `new_novel` is the only one. */
+/** Chip intent for a project kind; accent for every kind today. */
 export function projectKindIntent(_kind: ProjectResponse['kind']): 'accent' | 'info' | 'success' | 'warning' {
   return 'accent';
 }
@@ -145,7 +141,7 @@ export function sharedOwnerTag(project: Pick<ProjectResponse, 'ownerKind' | 'sha
   return project.ownerKind === 'bot' ? 'Bot-owned' : 'Shared';
 }
 
-/** Sidebar lifecycle labels for the one project workflow this app now has. */
+/** Sidebar lifecycle labels for the project workflow. */
 export const LIFECYCLE_PHASES: Partial<Record<ProjectResponse['kind'], readonly string[]>> = {
   new_novel: ['Bible', 'Volumes', 'Drafts', 'Review'],
 };

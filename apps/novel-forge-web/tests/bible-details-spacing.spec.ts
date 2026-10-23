@@ -48,8 +48,7 @@ function spacingOf(path: string): Rules {
   return rules;
 }
 
-// "Bible l.N" / "Power l.N" are lines in scratch-pad/novel-forge/design/{Bible,Power}.dc.html (canvas v11); "rule N" is
-// scratch-pad/novel-forge/ui-spacing-reference.md; "StoryBible .x" is today's rule in src/features/story-bible/StoryBible.module.css.
+// "StoryBible .x" in a `source` is today's rule in src/features/story-bible/StoryBible.module.css.
 const DETAILS: Expected[] = [
   {
     selector: '.stateRow',

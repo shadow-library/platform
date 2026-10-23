@@ -28,11 +28,5 @@ export * from './plugin.api';
 export * from './finalize-review.api';
 export * from './volume.api';
 
-/**
- * `publishing.api.ts` predates its feature's OpenAPI schema and hand-authors its own request/response
- * shapes ("until the OpenAPI spec regenerates" — see its file comment); now that `api-types.gen.ts`
- * independently exports same-named schemas, the star export above collides with the ones from
- * `api-types.gen`. Explicit re-exports win over an ambiguous star export, so this keeps the hand-authored
- * shape the app already builds on — migrating to the generated one is a separate, unrelated follow-up.
- */
+/** `publishing.api.ts` hand-authors types that `api-types.gen` also exports; an explicit re-export wins over the ambiguous star exports and keeps the hand-authored shape. */
 export type { ChapterPublicationStatus, PublicationStatus, PublishNovelBody } from './publishing.api';

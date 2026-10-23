@@ -5,10 +5,7 @@ import { isApiError, meQuery, projectQueryOptions, useProjectEventStream } from 
 import { projectTitle } from '@/lib/format';
 import { requireSession } from '@/lib/session';
 
-// A missing novel is a genuine 404: resolving it in the loader lets the router render the standard
-// page-not-found chrome instead of booting the project workspace (sidebar, nav, lifecycle bar) around a
-// project that doesn't exist and then surfacing "Project not found" inside it. Prefetching the project
-// here also seeds the cache every workspace screen reuses, so they render on the server without a refetch.
+// A missing novel 404s in the loader, so the router renders page-not-found chrome instead of a workspace around nothing; the prefetch also seeds the cache screens reuse.
 export const Route = createFileRoute('/novels/$novelId')({
   beforeLoad: ({ context, location }) => requireSession(context.queryClient, location.href),
   loader: async ({ context, params }) => {

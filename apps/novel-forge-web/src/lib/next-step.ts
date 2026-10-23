@@ -132,12 +132,8 @@ function roadmapAnchorIndex(input: NextStepInput): number {
 }
 
 /**
- * The Overview "Next step" rule engine: evaluates the fixed priority order below against the project's
- * current state and returns the one action the author should take next, plus a short preview of what
- * follows. Priority (highest first): a contradicted draft, pending items waiting on the author, an empty plan,
- * un-drafted briefs, then chapters awaiting finalize. `comingUp` prefers other rules that are
- * independently true right now (in priority order) and pads the rest from the roadmap stages ahead of
- * wherever the author actually is.
+ * Priority, highest first: a contradicted draft, pending items waiting on the author, an empty plan, un-drafted briefs, then chapters awaiting finalize.
+ * `comingUp` prefers other rules that are true right now and pads the rest from the roadmap stages ahead of the author.
  */
 export function computeNextStep(input: NextStepInput): NextStepResult {
   const evaluated = RULES.map(rule => ({ rule, isTrue: rule.test(input) }));
@@ -216,10 +212,6 @@ function formatChapterRange(chapters: readonly number[]): string {
   return ranges.join(', ');
 }
 
-/**
- * Shapes the raw project/brief/draft/pending-item data the Overview screen already has into the rule
- * engine's input. Kept separate from `computeNextStep` so both halves stay independently testable.
- */
 export function deriveNextStepInput(state: NextStepStateInput): NextStepInput {
   const draftedChapterSet = new Set(state.draftedChapters.map(draft => draft.chapter));
   const undraftedBriefChapters = state.briefs

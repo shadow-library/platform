@@ -36,12 +36,7 @@ function formatOpValue(value: unknown): string {
   return String(value);
 }
 
-/**
- * A readable view of one change-set op: the identifying/scalar fields as a compact key/value grid,
- * and the prose fields (a rewritten body, a new objective, a revision note) rendered as Markdown —
- * so a change reads as what it does, not as a raw JSON blob. Also reused for a continuity proposal's
- * findings, whose blob has no `op` field of its own.
- */
+/** One change-set op: scalar fields as a key/value grid, prose fields as Markdown. Also reused for a continuity proposal's findings, whose blob has no `op` field. */
 export function ChangeOpBody({ op }: { op: ChangeOp }): React.JSX.Element {
   const rationale = typeof op.rationale === 'string' ? op.rationale.trim() : '';
   const entries = Object.entries(op).filter(([k]) => k !== 'op' && k !== 'rationale' && op[k] !== undefined);

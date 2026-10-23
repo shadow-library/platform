@@ -33,7 +33,6 @@ function check(path: string, table: Expected[]): void {
   expect(uncited).toEqual([]);
 }
 
-// Line numbers are in scratch-pad/novel-forge/design/Chapter.dc.html; "reference" is scratch-pad/novel-forge/ui-spacing-reference.md.
 const DETAILS: Expected[] = [
   { selector: '.panel', values: { 'border-radius': '0' }, source: 'canvas l.140 aside is border-left only; reference SidePanel “next to a transcript: border-left only”' },
   { selector: '.tab', values: { gap: '14px' }, source: 'canvas l.144 aside body gap 14px' },
@@ -80,7 +79,7 @@ function chaptersCss(): { top: string; phone: string } {
   return { top: phoneAt === -1 ? css : css.slice(0, phoneAt) + css.slice(phoneEnd + 3), phone: phoneAt === -1 ? '' : css.slice(phoneAt, phoneEnd + 3) };
 }
 
-// "main" is routes/novels/$novelId/chapters.module.css at 2469d4ea, before the details panel split the editor body.
+// "main" is routes/novels/$novelId/chapters.module.css before the details panel split the editor body.
 const REUSED: [string, Record<string, string>][] = [
   ['.editorScreen', { position: 'absolute', inset: '0', display: 'flex', 'flex-direction': 'column', background: 'var(--sh-surface-app)', overflow: 'hidden' }],
   ['.editorHead', { height: '60px', 'flex-shrink': '0', display: 'flex', 'align-items': 'center', gap: '14px', padding: '0 20px 0 14px' }],

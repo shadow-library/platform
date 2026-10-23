@@ -3,8 +3,6 @@ import { useMutation, type UseMutationResult, useQuery, useQueryClient, type Use
 import { type AddChapterImageBody } from './api-types.gen';
 import { ApiError, APIRequest } from './transport';
 
-// Scene illustrations attached to an authored chapter. Hand-authored until the generated OpenAPI
-// types pick up the new endpoints on redeploy.
 export interface ChapterImage {
   id: string;
   projectId: string;

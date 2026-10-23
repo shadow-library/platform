@@ -5,15 +5,7 @@ import { type AuthLogoutResult, createAuthApi } from '@shadow-library/web/auth';
 import { type AccessResponse } from './api-types.gen';
 import { apiClient, type ApiError, APIRequest } from './transport';
 
-/**
- * `/api/auth/*` is `@shadow-library/auth`'s surface, not Novel Forge's: the SDK owns `session`, `logout`,
- * `organisations` and `organisation` on every service that mounts it. `createAuthApi` is the client half of
- * that contract, so this module binds it to the app's auth surface and re-exports it under the names the
- * app already uses, rather than restating endpoints and response shapes a backend change could invalidate.
- *
- * `SessionResponse` is the SDK's principal: `sub` is the stable user id, and the cookie carries an opaque
- * handle rather than a token, so the browser is told only what the guard exposes.
- */
+/** `/api/auth/*` is `@shadow-library/auth`'s surface; `sub` is the stable user id, and the cookie carries an opaque handle, not a token. */
 export type { AuthPrincipal as SessionResponse } from '@shadow-library/web/auth';
 
 const authApi = createAuthApi(apiClient.auth, { staleTime: 60_000 });

@@ -38,9 +38,7 @@ function spacingOf(path: string): { base: Rules; phone: Rules } {
 const AUDIT = '../src/features/story-bible/AuditDialog.module.css';
 const FINALIZE_BUTTON = './fixtures/finalize-button.baseline.module.css';
 
-// "l.N" is a line in scratch-pad/novel-forge/design/Updates.dc.html (canvas v11, frame 8 "Finalize — what needs your call first");
-// "rule N" is scratch-pad/novel-forge/ui-spacing-reference.md. The canvas call card is the audit dialog's finding card, so those
-// values are also checked against the live audit stylesheet, so the two cards cannot drift apart.
+// The call card is the audit dialog's finding card, so those values are also checked against the live audit stylesheet and cannot drift apart.
 const DIALOG: Expected[] = [
   { selector: '.body', values: { gap: '16px' }, source: 'l.38 scroll body gap 16', baseline: { file: AUDIT, selector: '.body' } },
   { selector: '.loading', values: { padding: '48px' }, source: 'AuditDialog .loading', baseline: { file: AUDIT, selector: '.loading' } },

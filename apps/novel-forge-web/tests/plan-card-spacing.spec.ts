@@ -26,8 +26,7 @@ function spacingOf(file: string, media?: string): Map<string, Record<string, str
   return rules;
 }
 
-// Line numbers are in scratch-pad/novel-forge/design/NextChapter.dc.html (canvas v11); "reference" is scratch-pad/novel-forge/ui-spacing-reference.md;
-// "turnCard" is today's chat proposal card in routes/novels/$novelId/chat.module.css, whose frame the plan card keeps (P4-9).
+// "turnCard" is the chat proposal card in routes/novels/$novelId/chat.module.css, whose frame the plan card keeps.
 const CARD: Expected[] = [
   {
     selector: '.card',

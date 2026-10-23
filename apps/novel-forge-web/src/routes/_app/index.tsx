@@ -10,8 +10,7 @@ import { projectKindLabel, projectTitle, relativeTime, sharedOwnerLabel } from '
 
 import styles from './index.module.css';
 
-// The project list is the landing screen's primary data, so the loader prefetches it — the grid is
-// server-rendered on first paint. Per-card status stays a client query (secondary, one request per card).
+// The loader prefetches the project list so the grid server-renders; per-card status stays a client query.
 export const Route = createFileRoute('/_app/')({
   head: () => ({ meta: [{ title: 'Projects · Novel Forge' }] }),
   loader: ({ context }) => context.queryClient.prefetchQuery(listProjectsQueryOptions({ limit: 50 })),

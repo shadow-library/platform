@@ -4,8 +4,6 @@ import { useMutation, type UseMutationResult, useQuery, useQueryClient, type Use
 import { type AccessGrantItem, type PublicationAccessBody, type PublicationAccessResponse } from './api-types.gen';
 import { ApiError, APIRequest } from './transport';
 
-/** Publication ledger types remain hand-authored until the OpenAPI spec regenerates. */
-
 export type PublicationStatus = 'live' | 'retired';
 export type ChapterPublicationStatus = 'scheduled' | 'published' | 'failed' | 'unpublished';
 /** Local aliases retain the generated access contract while improving its call-site names. */

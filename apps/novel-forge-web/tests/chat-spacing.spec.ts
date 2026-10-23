@@ -58,9 +58,7 @@ function spacingOf(path: string): { base: Rules; phone: Rules } {
   return { base: rulesOf(css.slice(0, start) + css.slice(end)), phone: rulesOf(css.slice(open + 1, end - 1)) };
 }
 
-// "chat.module.css" is today's route stylesheet, frozen in tests/fixtures/chat.baseline.module.css (main 3a572630) and compared
-// wherever an entry names a `baseline` rule; "Main l.N" / "NextChapter l.N" / "Phone l.N" are lines in scratch-pad/novel-forge/design/*.dc.html
-// (canvas v11); "rule N" is scratch-pad/novel-forge/ui-spacing-reference.md.
+// "chat.module.css" is the route stylesheet frozen in tests/fixtures/chat.baseline.module.css, compared wherever an entry names a `baseline` rule.
 const CHAT: Expected[] = [
   { selector: '.frame', values: { 'min-height': '0' }, source: 'chat redesign .shell: the chat beside its progress panel, min-height 0 as .column' },
   { selector: '.column', values: { 'min-height': '0' }, baseline: '.column', source: 'chat.module.css .column' },
@@ -247,7 +245,7 @@ const CHAT: Expected[] = [
   },
 ];
 
-// Passage comments: mockup screen 2 (chips in the composer) and screen 3 (sent chips above the bubble).
+// Passage comments: chips in the composer, and sent chips above the bubble.
 const PASSAGES: Expected[] = [
   {
     selector: '.sentPassages',
@@ -297,7 +295,7 @@ const MODEL_MENU: Expected[] = [
   { selector: '.done', values: { 'margin-left': 'auto' }, source: 'Main l.216 Done margin-left auto' },
 ];
 
-// "redesign l.N" are lines in the approved chat redesign prototype (novel-forge-chat-redesign.html): its Cowork-style progress panel and receipt.
+// The Cowork-style progress panel and receipt.
 const PANEL: Expected[] = [
   { selector: '.panel', values: { width: '320px', 'min-height': '0' }, source: 'redesign l.46 .shell third column 320' },
   { selector: '.sheetBody.sheetBody', values: { padding: '0' }, source: 'each .psec pads itself inside the sheet (redesign l.160)' },
@@ -366,7 +364,7 @@ function atRulesOf(path: string): { base: Rules; at: Map<string, Rules> } {
   return { base: rulesOf(base + css.slice(index)), at };
 }
 
-// "mockup" is the owner-approved chat-first review mockup (https://claude.ai/artifact/35KytWnhv6NJGDqcNNEhBk), screens 2–4.
+// The chapter panel beside the chat.
 const CHAPTER_PANEL: Expected[] = [
   {
     selector: '.panel',

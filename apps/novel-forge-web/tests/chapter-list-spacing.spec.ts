@@ -39,8 +39,7 @@ function checkAll(path: string, table: Expected[]): void {
   expect(uncited).toEqual([]);
 }
 
-// Line numbers are in scratch-pad/novel-forge/design/Chapters.dc.html; "reference" is scratch-pad/novel-forge/ui-spacing-reference.md; "today" is the
-// chapters list before T35 (routes/novels/$novelId/chapters.module.css at d40a7951).
+// "today" in a `source` is the chapters list's value before the volume layout.
 const VOLUMES: Expected[] = [
   { selector: '.volumes', values: { gap: '16px', 'margin-top': '12px' }, source: 'canvas l.61 main gap 16px between volumes; today .listBody margin-top 12px under the filters' },
   {

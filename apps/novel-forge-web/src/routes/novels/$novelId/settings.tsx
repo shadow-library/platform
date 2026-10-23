@@ -37,14 +37,11 @@ export const Route = createFileRoute('/novels/$novelId/settings')({
   component: SettingsScreen,
 });
 
-// Mirrors the server's application default (`WORD_TARGET_MIN`/`MAX` in `deterministic-metrics.ts`) —
-// shown as the field placeholder so an unset project visibly states what it inherits.
+// Mirrors the server's default (`WORD_TARGET_MIN`/`MAX` in `deterministic-metrics.ts`), shown as the placeholder.
 const DEFAULT_WORD_TARGET_MIN = 1800;
 const DEFAULT_WORD_TARGET_MAX = 2600;
 
-// Mirrors the server's `WORD_TARGET_FLOOR`/`WORD_TARGET_CEILING` in project.dto.ts — client-side
-// validation is a UX convenience, not a substitute for the server's own check, but it should reject
-// the same values rather than round-trip a 422 for something the field could have refused outright.
+// Mirrors the server's `WORD_TARGET_FLOOR`/`WORD_TARGET_CEILING` in project.dto.ts, so the field rejects what the server would instead of round-tripping a 422.
 const WORD_TARGET_FLOOR = 500;
 const WORD_TARGET_CEILING = 6000;
 

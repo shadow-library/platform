@@ -44,10 +44,7 @@ function cardParam(value: unknown): string | undefined {
   return /^[0-9]+$/.test(card) ? card : undefined;
 }
 
-// The open chat lives in the URL so a refresh or shared link reopens the same conversation.
-// No loader by design: the refinement chat is a live, streaming conversation whose data is
-// session-selection driven — the session list, transcript, and pending-turn polling aren't needed for the
-// first server paint. Project context is already seeded by the parent novel loader.
+// The open chat lives in the URL so a refresh or shared link reopens it. No loader: the session list, transcript and turn polling are not needed for the first paint.
 export const Route = createFileRoute('/novels/$novelId/chat')({
   validateSearch: (search: Record<string, unknown>): ChatSearch => ({
     session: typeof search.session === 'string' && search.session ? search.session : undefined,
@@ -173,8 +170,8 @@ interface ChatHistoryDialogProps {
 }
 
 /**
- * Every conversation, in one fixed 680×660 frame: search, Active/Archived, recency groups, and the
- * rename/archive/delete that used to live on the directory rows. The frame never resizes with its
+ * Every conversation, in one fixed 680×660 frame: search, Active/Archived, recency groups, and
+ * rename/archive/delete. The frame never resizes with its
  * contents — a list that shrinks under the pointer moves the row you were reaching for.
  */
 function ChatHistoryDialog({ novelId, open, onOpenChange, openSessionId, onDeleted }: ChatHistoryDialogProps): React.JSX.Element {

@@ -30,7 +30,7 @@ function spacingOf(path: string): Map<string, Record<string, string>> {
   return rules;
 }
 
-// EntityImages.tsx renders the "Portrait & gallery" section extracted out of story-bible/EntityPane.tsx (T39).
+// EntityImages.tsx renders the "Portrait & gallery" section extracted out of story-bible/EntityPane.tsx.
 // `.imagesSection` is a straight copy of the container it lived in there, and must stay declaration-for-declaration
 // identical to it (compared against the live file, not a hardcoded table, so any future drift on either side fails
 // here); `.label` is reused directly from StoryBible.module.css rather than redefined, so there is nothing to copy.
@@ -51,10 +51,7 @@ describe('Entity images extraction — no drift from the container it was copied
   });
 });
 
-// "reference" is scratch-pad/novel-forge/ui-spacing-reference.md; values are copied from this app's own
-// ReferenceImages.module.css (.row), the sibling panel the new dating rows are modelled on, per rule zero
-// ("reuse the existing component or copy the existing screen's values"). These rules have no main-branch
-// original to diff against — they are new UI this task adds — so they stay allowlisted and cited instead.
+// Values are copied from ReferenceImages.module.css (.row), the sibling panel the dating rows are modelled on; with no original to diff against they stay allowlisted and cited.
 const NEW_RULES: Expected[] = [
   {
     selector: '.dateField',

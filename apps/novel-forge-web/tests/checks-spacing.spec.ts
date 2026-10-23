@@ -24,7 +24,6 @@ function spacingOf(file: string): Map<string, Record<string, string>> {
   return rules;
 }
 
-// Line numbers are in scratch-pad/novel-forge/design/Chapter.dc.html (canvas v11); "reference" is scratch-pad/novel-forge/ui-spacing-reference.md.
 const PANEL: Expected[] = [
   { selector: '.panel', values: { gap: '14px' }, source: 'canvas l.144 aside body gap 14px; reference rule 9 (Drawer body gap 14–16)' },
   { selector: '.kindLine', values: { gap: '8px' }, source: 'canvas l.157 heading row (title + status pill) gap 8px — the kind row pairs the same title and chip' },

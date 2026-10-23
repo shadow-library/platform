@@ -59,8 +59,7 @@ const PHONE = '@media (max-width: 760px)';
 const SHELL_PHONE = '@media (max-width: 767px)';
 const COARSE = '@media (pointer: coarse)';
 
-// "today" is main d40a7951, frozen in tests/fixtures/*.baseline.module.css; "Phone l.N" / "Main l.N" are lines in
-// scratch-pad/novel-forge/design/*.dc.html. Every desktop rule stays as today; the phone adds blocks of its own.
+// "today" is the desktop stylesheet frozen in tests/fixtures/*.baseline.module.css. Every desktop rule stays as today; the phone adds blocks of its own.
 interface Screen {
   name: string;
   live: string;

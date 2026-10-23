@@ -8,14 +8,7 @@ export interface AppProvidersProps {
   children?: React.ReactNode;
 }
 
-/**
- * App-wide client providers, rendered inside the root document around every route. The QueryClientProvider
- * is intentionally absent — TanStack Start's router/query SSR integration (see `src/router.tsx`) mounts a
- * per-request QueryClient and provider for us, which is also what makes loader-hydrated data work.
- *
- * The Toaster is SSR-safe on its own — it returns null on the server and its store reports a stable empty
- * server snapshot — so it no longer needs a ClientOnly boundary.
- */
+/** The QueryClientProvider is absent on purpose: TanStack Start's router/query SSR integration (`src/router.tsx`) mounts a per-request one, which loader-hydrated data needs. */
 export function AppProviders(props: AppProvidersProps): React.JSX.Element {
   return (
     <ThemeProvider cookieDomain={themeCookieDomain()} legacyStorageKey="theme">

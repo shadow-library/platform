@@ -133,7 +133,7 @@ export function ChapterList({ novelId, view, onOpen, onView }: ChapterListProps)
   }, []);
   const highlightRef = highlight?.focus ? focusRow : scrollIntoView;
 
-  // Judge + repair costs more per draft, so it stays a per-run choice — on by default per product decision.
+  // Judge + repair costs more per draft, so it stays a per-run choice.
   const [autoFix, setAutoFix] = useState(true);
   const [briefChapter, setBriefChapter] = useState<number | undefined>();
   const [teachingRefusal, setTeachingRefusal] = useState<{ chapter: number; message: string } | undefined>();

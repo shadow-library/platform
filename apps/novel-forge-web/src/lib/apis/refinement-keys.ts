@@ -1,10 +1,6 @@
 import { type ListProposalsQueryParams } from './api-types.gen';
 
-/**
- * The refinement surface: conversational chat sessions that reason over the novel and stage
- * reviewable proposals, plus the proposals those (and the analysis passes) produce. Canon is never
- * edited directly — a chat turn returns a proposal, and applying it writes the change-set.
- */
+/** Canon is never edited directly: a chat turn stages a proposal, and applying it writes the change-set. */
 export const refinementKeys = {
   sessions: (projectId: string) => ['projects', projectId, 'chat-sessions'] as const,
   session: (projectId: string, sessionId: string) => ['projects', projectId, 'chat-sessions', sessionId] as const,

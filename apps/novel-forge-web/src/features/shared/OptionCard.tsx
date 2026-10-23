@@ -5,7 +5,7 @@ import { StatusChip } from '@/components/nf';
 
 import styles from './shared.module.css';
 
-/** "More like this" / "not this" / "mix in", kept local rather than importing the generated Blueprint enum a server module this outlived defined it for. */
+/** "More like this" / "not this" / "mix in". */
 export type OptionVerdict = 'more' | 'not' | 'mix';
 
 const VERDICT_LABELS: Record<OptionVerdict, string> = {

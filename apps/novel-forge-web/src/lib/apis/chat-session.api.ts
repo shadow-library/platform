@@ -151,7 +151,7 @@ export type TurnState = { kind: 'idle' } | { kind: 'pending'; pending: PendingTu
 
 // A turn opens its workflow run within a beat of the user message landing, so a trailing unanswered
 // message younger than this is a turn still spinning up. Older than it, with no run either way, means
-// nothing is coming — the state that used to read as a hung chat with no way out but a reload.
+// nothing is coming, which would otherwise read as a hung chat.
 const TURN_SPINUP_GRACE_MS = 2 * 60 * 1000;
 
 export function turnState(data: ListChatMessagesResponse | undefined): TurnState {

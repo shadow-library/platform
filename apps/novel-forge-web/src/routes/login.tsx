@@ -6,12 +6,7 @@ interface LoginSearch {
   returnTo: string;
 }
 
-/**
- * The only public route. There is no local sign-in UI — the backend's relying-party auth module owns the
- * OIDC flow — so this shim immediately hands the browser to `/api/auth/login?return_to=` with a full-page
- * load. It exists (rather than `requireAuth` redirecting straight to the backend path) so client-side
- * navigations land on a real route and escape the SPA cleanly.
- */
+/** The only public route: a shim that hands the browser to the backend's `/api/auth/login?return_to=` with a full-page load, so client-side navigations to it escape the SPA. */
 export const Route = createFileRoute('/login')({
   /** Constrain returnTo to a same-origin path (reject `//host` and `/\host`) before it reaches the redirect. */
   validateSearch: (search: Record<string, unknown>): LoginSearch => {

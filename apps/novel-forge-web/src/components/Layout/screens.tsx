@@ -20,10 +20,7 @@ export interface ProjectScreen {
   adminOnly?: boolean;
 }
 
-/**
- * Every project-scoped screen, declared once. The sidebar nav, the breadcrumb's leaf label, and the
- * command palette all derive from this list rather than keeping their own copies, which used to drift.
- */
+/** Every project-scoped screen, declared once; the sidebar nav, the breadcrumb's leaf label and the command palette all derive from it. */
 export const PROJECT_SCREENS: ProjectScreen[] = [
   { segment: 'chat', to: '/novels/$novelId/chat', label: 'Chat', icon: <ChatIcon /> },
   { segment: 'overview', to: '/novels/$novelId/overview', label: 'Overview', icon: <OverviewIcon /> },
@@ -42,7 +39,7 @@ const ACCOUNT_CRUMBS: Record<string, string> = { '/settings': 'Settings', '/usag
 
 export interface TopBarCrumbs {
   root: string;
-  /** The screen inside a project; the phone top bar drops it and keeps the novel's title (Phone.dc.html l.35). */
+  /** The screen inside a project; the phone top bar drops it and keeps the novel's title. */
   leaf?: string;
 }
 

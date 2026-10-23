@@ -24,7 +24,6 @@ function spacingOf(file: string): Map<string, Record<string, string>> {
   return rules;
 }
 
-// Line numbers are in scratch-pad/novel-forge/design/Start.dc.html (canvas v11); "reference" is scratch-pad/novel-forge/ui-spacing-reference.md.
 const DIALOG: Expected[] = [
   { selector: '.form', values: { gap: '16px' }, source: 'canvas l.78 dialog form gap 16px; reference "New-novel modal" form gap 16 (today’s value kept)' },
   {

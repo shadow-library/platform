@@ -25,11 +25,7 @@ const projectKeys = {
   status: (projectId: string) => [...projectKeys.all, projectId, 'status'] as const,
 };
 
-/**
- * Query-option factories shared by route loaders and component hooks. A loader prefetches these via
- * `context.queryClient.ensureQueryData(...)` and the matching hook reads the same cache entry — identical
- * key + fn — so the SSR-dehydrated data hydrates without a second request.
- */
+/** Shared by route loaders and component hooks, so a loader's prefetch and the hook read one cache entry and SSR data hydrates without a second request. */
 export const listProjectsQueryOptions = (params?: ListProjectsQueryParams): UseQueryOptions<ListProjectResponse, ApiError> =>
   queryOptions<ListProjectResponse, ApiError>({
     queryKey: projectKeys.list(params),
