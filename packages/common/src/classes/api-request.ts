@@ -39,18 +39,12 @@ export interface CustomAPIRequest {
 export class APIRequest {
   private static readonly logger = Logger.getLogger(NAMESPACE, 'APIRequest');
 
-  /**
-   * undici's `request` does not follow redirects, unlike `fetch`, whose behaviour callers reasonably
-   * expect — a 3xx would otherwise arrive as a bodyless response rather than the resource. Redirects are
-   * followed by hand rather than through `getGlobalDispatcher().compose(interceptors.redirect(...))`,
-   * because Bun's built-in `undici` shadows the npm package and its `Dispatcher` has no `compose`.
-   */
+  /** undici's `request` never follows redirects; they are followed by hand because Bun's built-in `undici` shadows the npm package and its `Dispatcher` has no `compose`. */
   private static readonly DEFAULT_MAX_REDIRECTIONS = 5;
 
   private static readonly REDIRECT_STATUS_CODES = new Set([301, 302, 303, 307, 308]);
   private static readonly CREDENTIAL_HEADERS = new Set(['authorization', 'proxy-authorization', 'cookie', 'set-cookie']);
   private static readonly CREDENTIAL_HEADER_PATTERN = /api-?key|token|secret/i;
-  /** Token-endpoint and credential fields as they appear in OAuth forms and JSON bodies: `access_token`, `refresh_token`, `id_token`, `client_secret`, `client_assertion`, `accessToken`, … */
   private static readonly CREDENTIAL_FIELD_PATTERN = /token$|secret$|assertion$|password$|^code_verifier$/i;
   private static readonly REDACTED = '[redacted]';
 
@@ -139,13 +133,7 @@ export class APIRequest {
     return this;
   }
 
-  /**
-   * Sends `data` as `application/x-www-form-urlencoded`. Required by specifications that mandate it
-   * rather than merely accept it — an OAuth 2.0 token endpoint (RFC 6749 §4.1.3) rejects JSON.
-   *
-   * Form bodies are flat by definition, so a nested object is a mistake rather than something to
-   * encode a guess for; an array becomes repeated keys, which is how form encoding spells a list.
-   */
+  /** Sends `data` as `application/x-www-form-urlencoded`, which an OAuth 2.0 token endpoint (RFC 6749 §4.1.3) mandates. Must be flat; arrays become repeated keys. */
   form(data: object): this {
     this.options.data = data as JsonObject;
     this.options.bodyFormat = 'form';
@@ -158,7 +146,6 @@ export class APIRequest {
     return this;
   }
 
-  /** Flat by construction: a nested object has no unambiguous form encoding, so it is a caller mistake rather than something to guess at. */
   private static encodeForm(data: JsonObject): string {
     const params = new URLSearchParams();
     const append = (key: string, value: JsonValue): void => {
@@ -250,7 +237,7 @@ export class APIRequest {
     }
     const redirections = maxRedirections ?? APIRequest.DEFAULT_MAX_REDIRECTIONS;
 
-    /** Log the request. Read the level per request so a runtime level change is honoured. */
+    /** The level is read per request so a runtime level change is honoured. */
     const isDebug = Logger.isDebugEnabled();
     const reqLog = `${this.options.method} ${uri}`;
     if (isDebug) {
@@ -262,7 +249,7 @@ export class APIRequest {
       });
     } else APIRequest.logger.info(reqLog);
 
-    /** Execute the request. One signal bounds dispatch and body read together, so the timeout is a total budget rather than undici's per-phase ones. */
+    /** One signal bounds dispatch and body read together, so the timeout is a total budget rather than undici's per-phase ones. */
     const signal = timeout === undefined ? undefined : AbortSignal.timeout(timeout);
     const startTime = process.hrtime();
     const perform = async (): Promise<{ response: Dispatcher.ResponseData; resData: unknown }> => {
@@ -299,12 +286,10 @@ export class APIRequest {
     const endTime = process.hrtime(startTime);
     const timeTaken = (endTime[0] * 1e3 + endTime[1] * 1e-6).toFixed(3);
 
-    /** Log the response */
     const resLog = `${this.options.method} ${uri} - ${response.statusCode} - ${timeTaken}ms`;
     if (isDebug) APIRequest.logger.debug(resLog, { statusCode: response.statusCode, data: APIRequest.redactFields(resData), headers: APIRequest.redactHeaders(response.headers) });
     else APIRequest.logger.info(resLog, { contentLength: response.headers['content-length'] ?? 0, statusCode: response.statusCode });
 
-    /** Handle errors */
     if (throwErrorOnFailure && response.statusCode >= 400) {
       APIRequest.logger.error(`Request failed with status code ${response.statusCode}`, {
         data: APIRequest.redactFields(resData),

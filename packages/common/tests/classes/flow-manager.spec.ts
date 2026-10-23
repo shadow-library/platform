@@ -431,7 +431,7 @@ describe('FlowManager', () => {
       expect(flow.getContext()).toMatchObject({
         leftStart: true,
         enteredMiddle: true,
-        value: 22, // (10 + 1) * 2
+        value: 22,
       });
     });
 
@@ -463,8 +463,6 @@ describe('FlowManager', () => {
         },
       };
       const flow = FlowManager.create(flowDef, { value: 5 });
-
-      // onEnter of start state should have been called
       expect(flow.getContext()).toStrictEqual({ value: 5 });
       expect(flow.getCurrentState()).toBe('middle');
     });
@@ -496,8 +494,6 @@ describe('FlowManager', () => {
 
       const flow = FlowManager.create(autoFlow, { count: 0 });
       flow.transitionTo('step1');
-
-      // step1 -> action -> step2 -> action -> end
       expect(flow.getCurrentState()).toBe('end');
       expect(flow.getContext().count).toBe(2);
       expect(flow.getHistory()).toStrictEqual(['start', 'step1', 'step2']);

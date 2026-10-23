@@ -185,13 +185,13 @@ describe('Pagination Utils', () => {
         const items = [{ id: 1 }];
 
         const result1 = utils.pagination.createResult(query, items, 25);
-        expect(result1.totalPages).toBe(9); // ceil(25/3)
+        expect(result1.totalPages).toBe(9);
 
         const result2 = utils.pagination.createResult(query, items, 27);
-        expect(result2.totalPages).toBe(9); // ceil(27/3)
+        expect(result2.totalPages).toBe(9);
 
         const result3 = utils.pagination.createResult(query, items, 28);
-        expect(result3.totalPages).toBe(10); // ceil(28/3)
+        expect(result3.totalPages).toBe(10);
       });
 
       it('should handle empty items', () => {

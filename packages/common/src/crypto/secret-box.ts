@@ -14,10 +14,7 @@ interface DecodedEnvelope {
   tag: Buffer;
 }
 
-/**
- * Envelope encryption: a fresh data key per `seal`, wrapped by the keyring's active key. Both layers bind `context` as AAD, so neither can be
- * moved to another row; `context` must therefore name a stable row identity known before insert, e.g. `synapse:provider_credentials:<id>:secret`.
- */
+/** `context` is bound as AAD at both layers, so it must name a stable row identity known before insert, e.g. `synapse:provider_credentials:<id>:secret`. */
 export class SecretBox {
   constructor(private readonly keyring: Keyring) {}
 

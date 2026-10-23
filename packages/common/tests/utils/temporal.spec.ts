@@ -26,7 +26,7 @@ describe('Temporal Utils', () => {
     });
 
     it('should call setTimeout with the correct duration in milliseconds when unit is "s"', async () => {
-      const duration = 2; // 2 seconds
+      const duration = 2;
       await utils.temporal.sleep(duration, 's');
 
       const expectedMs = duration * 1000;
@@ -35,7 +35,7 @@ describe('Temporal Utils', () => {
     });
 
     it('should call setTimeout with the correct duration in milliseconds when unit is "m"', async () => {
-      const duration = 0.5; // 0.5 minutes
+      const duration = 0.5;
       await utils.temporal.sleep(duration, 'm');
 
       const expectedMs = duration * 60 * 1000;
@@ -44,7 +44,7 @@ describe('Temporal Utils', () => {
     });
 
     it('should call setTimeout with the correct duration in milliseconds when unit is "h"', async () => {
-      const duration = 0.1; // 0.1 hours
+      const duration = 0.1;
       await utils.temporal.sleep(duration, 'h');
 
       const expectedMs = duration * 60 * 60 * 1000;
@@ -69,7 +69,6 @@ describe('Temporal Utils', () => {
 
       await Promise.all(promises);
 
-      // Should have called setTimeout for each sleep operation
       expect(setTimeoutSpy).toHaveBeenCalledTimes(3);
       expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 100);
       expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 150);

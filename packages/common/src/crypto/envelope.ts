@@ -4,7 +4,6 @@ import { decodeBase64Url, ENVELOPE_ALGORITHM, ENVELOPE_VERSION, IV_LENGTH, TAG_L
 export interface Envelope {
   v: 1;
   alg: 'A256GCM';
-  /** The master key that wrapped `dek` */
   kid: string;
   /** The data key as the keyring wrapped it; for the env keyring `iv(12) | ciphertext(32) | tag(16)` */
   dek: string;

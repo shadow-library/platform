@@ -70,7 +70,6 @@ describe('Config Service', () => {
     });
 
     it('should not overwrite a value already in cache when load is called', () => {
-      /** Simulates a dev injecting a value directly into cache during testing */
       config['cache'].set('custom.key', 'injected-value');
       config.load('custom.key', { defaultValue: 'env-default' });
       expect(config.get('custom.key')).toBe('injected-value');
@@ -137,11 +136,6 @@ describe('Config Service', () => {
     });
   });
 
-  /**
-   * `app.stage` is the deployment stage every app shares, and it fails safe: an operator who never sets
-   * `APP_STAGE` must land on `prod` and lose the dev-only surfaces, never gain them. These guard that
-   * default and the two-signal production check that reads it.
-   */
   describe('app.stage', () => {
     let previousStage: string | undefined;
 
@@ -164,11 +158,6 @@ describe('Config Service', () => {
     });
   });
 
-  /**
-   * An operator sets `APP_STAGE` (`app.stage`) while `isProd()` reads `NODE_ENV` (`app.env`). Keying a
-   * security gate on `NODE_ENV` alone let an `APP_STAGE=prod` box with `NODE_ENV` unset fall back to
-   * insecure dev defaults, so EITHER signal has to count as production.
-   */
   describe('isProductionDeployment', () => {
     it('should treat an APP_STAGE=prod deployment as production even when NODE_ENV is not production', () => {
       config['cache'].set('app.stage', 'prod');

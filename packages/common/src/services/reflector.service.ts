@@ -4,9 +4,7 @@ import deepmerge, { type Options as DeepMergeOpts } from 'deepmerge';
 type MetadataKey = string | symbol;
 
 export interface UpdateMetadataOptions {
-  /**
-   * Array merge strategy. Defaults to 'merge'.
-   */
+  /** Array merge strategy. Defaults to 'merge'. */
   arrayStrategy?: 'merge' | 'replace';
 }
 

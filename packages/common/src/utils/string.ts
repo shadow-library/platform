@@ -30,9 +30,7 @@ class StringUtils {
     return result.filter(item => item !== '');
   }
 
-  /**
-   * Interpolates the given string with the given object
-   */
+  /** Replaces `{dot.path}` placeholders from `obj`; unresolved placeholders stay as written and `\{x}` is emitted literally as `{x}`. */
   interpolate(str: string, obj: Record<string, any>): string {
     return str.replace(/\\?\{([^{}]+)\}/g, (match, key) => {
       if (match.startsWith('\\')) return match.slice(1);

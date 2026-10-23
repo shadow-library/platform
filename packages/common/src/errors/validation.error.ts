@@ -14,13 +14,7 @@ export interface ValidationErrorObject extends AppErrorObject {
   fields: FieldError[];
 }
 
-/**
- * Declaring the constants
- *
- * The one deliberate AppError subclass: field-level accumulation is a genuinely different payload
- * shape, so it keeps its own class instead of complicating the common case.
- */
-
+/** The one deliberate `AppError` subclass: field-level accumulation is a different payload shape from the common case. */
 export class ValidationError extends AppError {
   private errors: FieldError[] = [];
 

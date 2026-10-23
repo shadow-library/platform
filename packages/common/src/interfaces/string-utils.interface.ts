@@ -1,23 +1,19 @@
 export interface MaskOptions {
-  /** Character to use for masking. Default: '*' */
+  /** Defaults to `*` */
   maskChar?: string;
 
-  /** How many characters to keep at the start and end (of the whole string). */
-  keepStart?: number; // Default: 1
-  keepEnd?: number; // Default: 1
+  /** Characters left unmasked at the start of the whole string. Defaults to 1. */
+  keepStart?: number;
 
-  /** Preserve spaces literally? Default: true */
+  /** Characters left unmasked at the end of the whole string. Defaults to 1. */
+  keepEnd?: number;
+
+  /** Defaults to true */
   preserveSpaces?: boolean;
 
-  /**
-   * Preserve “separators” (non-alphanumeric punctuation like .-_/() etc)?
-   * - true  → preserve all non-alphanumeric chars (except space, which is controlled by preserveSpaces)
-   * - false → do not preserve (mask like normal)
-   * - RegExp | string[] → only preserve matches of the regex or chars in the list
-   * Default: false
-   */
+  /** `true` preserves every non-alphanumeric char except space (see `preserveSpaces`); a RegExp or string[] preserves only matches. Defaults to false. */
   preserveSeparators?: boolean | RegExp | string[];
 
-  /** Ensure at least this many masked chars (helps with very short strings). Default: 0 */
+  /** Minimum number of masked chars, for very short strings. Defaults to 0. */
   minMask?: number;
 }

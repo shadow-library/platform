@@ -1,6 +1,6 @@
 import { ErrorCode } from '@lib/errors';
 
-/** Every key is internal: a response must never reveal which part of a sealed secret, or of the keyring, was wrong. Messages never carry key material. */
+/** Every key is internal so a response never reveals which part of a sealed secret or keyring was wrong; messages never carry key material. */
 export class CryptoErrorCode extends ErrorCode {
   static readonly KEYRING_INVALID = CryptoErrorCode.internal('CRYPTO_KEYRING_INVALID', 'The keyring is malformed: {reason}');
 

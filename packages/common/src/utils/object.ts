@@ -3,26 +3,17 @@ export type PropertyFilter<T = string> = (key: string | T, desc: PropertyDescrip
 const IS_CLASS_REGEX = /^class\s/;
 
 class ObjectUtils {
-  /**
-   * Checks if the given object is a plain object.
-   * A plain object is an object created by the Object constructor or one with a null prototype.
-   */
+  /** A plain object has `Object.prototype` or `null` as its prototype. */
   isPlainObject(obj: any): boolean {
     if (typeof obj !== 'object' || obj === null) return false;
     return Object.getPrototypeOf(obj) === Object.prototype || Object.getPrototypeOf(obj) === null;
   }
 
-  /**
-   * Checks if the given object is a class.
-   * A class is a function that starts with the keyword 'class'.
-   */
+  /** Detects a class by its source text starting with `class`, so transpiled constructor functions are not recognised. */
   isClass(Class: any): boolean {
     return typeof Class === 'function' && IS_CLASS_REGEX.test(Class.toString());
   }
 
-  /**
-   * Returns the value of the given path in the object
-   */
   getByPath<T = any>(obj: Record<string, any>, path: string): T | undefined {
     let value = obj;
     for (const key of path.split('.')) {
@@ -33,18 +24,12 @@ class ObjectUtils {
     return value as T;
   }
 
-  /**
-   * Returns a new object with the needed fields.
-   */
   pickKeys<T extends object, K extends keyof T>(obj: T, keys: K[]): Pick<T, K> {
     const newObj: any = {};
     for (const key of keys) newObj[key] = obj[key];
     return newObj;
   }
 
-  /**
-   * Return a new object after removing the unneeded keys from the orginal object.
-   */
   omitKeys<T extends object, K extends keyof T>(obj: T, keys: K[]): Omit<T, K> {
     const newObj: any = {};
     const allKeys = Object.keys(obj) as K[];
@@ -54,9 +39,7 @@ class ObjectUtils {
     return newObj;
   }
 
-  /**
-   * Returns the object after recursively freezing all the properties.
-   */
+  /** Freezes `obj` in place, recursing into nested objects, and returns the same reference. */
   deepFreeze<T extends object>(obj: T): Readonly<T> {
     const keys = Object.getOwnPropertyNames(obj);
     for (const key of keys) {

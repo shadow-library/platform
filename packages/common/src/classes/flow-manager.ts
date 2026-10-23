@@ -145,7 +145,6 @@ export class FlowManager<StateNames extends string = string, Context extends Rec
     const currentStateDef = this.definition.states[currentState];
     const nextStateDef = this.definition.states[nextState];
 
-    /** Validate next state */
     const availableTransitions = this.getAvailableTransitions();
     if (!availableTransitions.includes(nextState)) {
       const flowName = this.definition.name;
@@ -153,7 +152,6 @@ export class FlowManager<StateNames extends string = string, Context extends Rec
       FlowErrorCode.INVALID_FLOW_TRANSITION.throw({ currentState, targetState: nextState, flowName, allowed: transitions });
     }
 
-    /** Handle onLeave hook */
     let onLeaveUpdates: Partial<Context> | null = null;
     if (currentStateDef.onLeave) {
       const result = currentStateDef.onLeave(this.state.context, nextState);
@@ -162,13 +160,11 @@ export class FlowManager<StateNames extends string = string, Context extends Rec
       } else if (typeof result === 'object') onLeaveUpdates = result;
     }
 
-    /** Perform the transition */
     this.state.history.push(currentState);
     this.state.currentState = nextState;
     if (onLeaveUpdates) this.updateContext(onLeaveUpdates);
     if (contextUpdates) this.updateContext(contextUpdates);
 
-    /** Handle onEnter hook */
     if (nextStateDef && nextStateDef.onEnter) {
       const result = nextStateDef.onEnter(this.state.context, currentState);
       if (typeof result === 'object') this.updateContext(result);

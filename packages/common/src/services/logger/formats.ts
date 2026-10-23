@@ -33,9 +33,7 @@ function padLevel(level: string) {
   return level.replace(rawLevel, rawLevel.toUpperCase() + padding);
 }
 
-// `message`, `stack` and `name` are non-enumerable on Error, so an error parked in log metadata
-// serialises to `{}` and the cause is lost. Winston's own `errors` format only unwraps an error passed
-// as the log entry itself, never one nested in the metadata, which is where every caller here puts it.
+// `message`, `stack` and `name` are non-enumerable on Error, so an error nested in log metadata serialises to `{}`; winston's `errors` format only unwraps a top-level one.
 function toPlainError(error: Error): Record<string, unknown> {
   const plain: Record<string, unknown> = {};
   for (const key of ERROR_KEYS) {

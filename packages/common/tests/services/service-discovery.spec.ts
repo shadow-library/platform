@@ -21,7 +21,6 @@ describe('ServiceDiscovery', () => {
       expect(ServiceDiscovery.getUrl('identity-server.identity')).toBe('http://identity-server.identity');
     });
 
-    /** The override key replaces dots as well as dashes, so a cross-namespace name is still addressable */
     it('should read a dotted name override from SERVICE_URL_IDENTITY_SERVER_IDENTITY', () => {
       process.env['SERVICE_URL_IDENTITY_SERVER_IDENTITY'] = 'http://localhost:8080';
       expect(ServiceDiscovery.getUrl('identity-server.identity')).toBe('http://localhost:8080');
@@ -64,7 +63,6 @@ describe('ServiceDiscovery', () => {
       expect(() => ServiceDiscovery.getUrl('pulse-server')).toThrow(AppError);
     });
 
-    /** The override is read per call, so a value set after first use still takes effect */
     it('should observe an override set after a previous resolution', () => {
       expect(ServiceDiscovery.getUrl('pulse-server')).toBe('http://pulse-server');
       process.env['SERVICE_URL_PULSE_SERVER'] = 'http://localhost:4000';

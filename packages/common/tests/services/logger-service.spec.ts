@@ -134,7 +134,6 @@ describe('Logger Service', () => {
 
       const context = Logger['getLogContext']();
 
-      // Last provider wins for conflicting keys, but merges non-conflicting keys
       expect(context).toStrictEqual({ http: { requestId: '456', method: 'GET', url: '/api' } });
     });
 

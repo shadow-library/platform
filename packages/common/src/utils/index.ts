@@ -9,9 +9,7 @@ class Utils {
   readonly temporal = temporalUtils;
   readonly pagination = paginationUtils;
 
-  /**
-   * Validates the object.
-   */
+  /** False for null, undefined, blank strings and NaN; narrows to NonNullable. */
   isValid<T>(value: T): value is NonNullable<T> {
     if (value === undefined || value === null) return false;
     else if (typeof value === 'string') return !(value.trim() === '');

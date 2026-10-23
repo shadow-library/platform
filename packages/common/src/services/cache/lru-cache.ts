@@ -7,7 +7,7 @@ type UintArray = Uint8Array | Uint16Array | Uint32Array;
 type UintArrayConstructor = Uint8ArrayConstructor | Uint16ArrayConstructor | Uint32ArrayConstructor;
 
 export interface LRUCacheOptions {
-  /** Time to live in milliseconds, must be a non-zero positive number */
+  /** Time to live in milliseconds; a falsy value disables expiry */
   ttl?: number;
 }
 
@@ -16,14 +16,7 @@ const MAX_16BIT_INTEGER = Math.pow(2, 16);
 const MAX_32BIT_INTEGER = Math.pow(2, 32);
 
 export class LRUCache {
-  /*!
-   * The cache is a stack where recently used items are moved to the top of the stack.
-   *
-   * `top` - The most recently used item in the cache
-   * `bottom` - The least recently used item in the cache
-   * `downward` - The earlier item in the cache
-   * `upward` - The recent item in the cache
-   */
+  /*! A stack of slots linked by index: `top` is the most recently used slot, `bottom` the least; `downward`/`upward` point to the next older/newer slot. */
 
   private top = 0;
   private bottom = 0;
@@ -125,13 +118,11 @@ export class LRUCache {
       delete this.items[key];
     }
 
-    /** Storing key and value */
     this.items[key] = pointer;
     this.keys[pointer] = key;
     this.values[pointer] = value;
     if (this.options.ttl) this.ttls[pointer] = performance.now() + this.options.ttl;
 
-    /** Updating the pointers */
     this.downward[pointer] = this.top;
     this.upward[this.top] = pointer;
     this.top = pointer;

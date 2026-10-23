@@ -32,7 +32,7 @@ describe('LRUCache', () => {
       cache.set('key1', 'value1');
       cache.set('key2', 'value2');
       cache.set('key3', 'value3');
-      cache.set('key4', 'value4'); // This should evict 'key1'
+      cache.set('key4', 'value4');
 
       expect(cache.has('key1')).toBe(false);
       expect(cache.get('key1')).toBeUndefined();
@@ -49,8 +49,8 @@ describe('LRUCache', () => {
       cache.set('key1', 'value1');
       cache.set('key2', 'value2');
       cache.set('key3', 'value3');
-      cache.get('key1'); // Access 'key1' to make it most recently used
-      cache.set('key4', 'value4'); // Evict the least recently used (which should now be 'key2')
+      cache.get('key1');
+      cache.set('key4', 'value4');
 
       expect(cache.has('key1')).toBe(true);
       expect(cache.has('key2')).toBe(false);
@@ -61,11 +61,11 @@ describe('LRUCache', () => {
       cache.set('key2', 'value2');
       cache.set('key3', 'value3');
       cache.remove('key2');
-      cache.set('key4', 'value4'); // Set a new value, this should reuse the deleted space (pointer)
+      cache.set('key4', 'value4');
 
       expect(cache.get('key4')).toBe('value4');
-      expect(cache.get('key2')).toBeUndefined(); // key2 was deleted and replaced
-      expect(cache['keys'][1]).toBe('key4'); // key4 should be at the deleted pointer
+      expect(cache.get('key2')).toBeUndefined();
+      expect(cache['keys'][1]).toBe('key4');
     });
   });
 
@@ -82,9 +82,9 @@ describe('LRUCache', () => {
     it('should move the accessed key to the front (most recently used)', () => {
       cache.set('key1', 'value1');
       cache.set('key2', 'value2');
-      cache.get('key1'); // 'key1' becomes most recently used
+      cache.get('key1');
       cache.set('key3', 'value3');
-      cache.set('key4', 'value4'); // This should evict 'key2' instead of 'key1'
+      cache.set('key4', 'value4');
 
       expect(cache.has('key2')).toBe(false);
       expect(cache.has('key1')).toBe(true);
@@ -106,11 +106,11 @@ describe('LRUCache', () => {
     it('should return the value without updating the recently used status', () => {
       cache.set('key1', 'value1');
       cache.set('key2', 'value2');
-      cache.peek('key1'); // Peek 'key1' (it should not become most recently used)
+      cache.peek('key1');
       cache.set('key3', 'value3');
-      cache.set('key4', 'value4'); // This should evict 'key1' because it was not accessed
+      cache.set('key4', 'value4');
 
-      expect(cache.has('key1')).toBe(false); // 'key1' should be evicted
+      expect(cache.has('key1')).toBe(false);
     });
 
     it('should return undefined if the key does not exist', () => {
@@ -140,10 +140,10 @@ describe('LRUCache', () => {
       cache.set('key1', 'value1');
       cache.set('key2', 'value2');
       cache.set('key3', 'value3');
-      cache.remove('key3'); // Remove the head (most recently used) item
+      cache.remove('key3');
 
       expect(cache.peek('key3')).toBeUndefined();
-      expect(cache.peek('key2')).toBe('value2'); // 'key2' should now be the head
+      expect(cache.peek('key2')).toBe('value2');
       expect(cache['top']).toBe(1);
     });
 
@@ -151,24 +151,24 @@ describe('LRUCache', () => {
       cache.set('key1', 'value1');
       cache.set('key2', 'value2');
       cache.set('key3', 'value3');
-      cache.remove('key1'); // Remove the tail (least recently used) item
+      cache.remove('key1');
 
       expect(cache.peek('key1')).toBeUndefined();
       expect(cache.peek('key2')).toBe('value2');
-      expect(cache['bottom']).toBe(1); // 'key2' should now be the tail
+      expect(cache['bottom']).toBe(1);
     });
 
     it('should update forward and backward pointers when removing an item', () => {
       cache.set('key1', 'value1');
       cache.set('key2', 'value2');
       cache.set('key3', 'value3');
-      cache.remove('key2'); // 'key2' is in the middle, so pointers for 'key1' and 'key3' should update
+      cache.remove('key2');
 
       expect(cache.peek('key1')).toBe('value1');
       expect(cache.peek('key3')).toBe('value3');
 
-      expect(cache['upward'][0]).toBe(2); // 'key1' should now point to 'key3'
-      expect(cache['downward'][2]).toBe(0); // 'key3' should now point back to 'key1'
+      expect(cache['upward'][0]).toBe(2);
+      expect(cache['downward'][2]).toBe(0);
     });
 
     it('should add the deleted pointer back to the deleted array', () => {
@@ -178,7 +178,7 @@ describe('LRUCache', () => {
       cache.remove('key2');
 
       expect(cache['deletedSize']).toBe(1);
-      expect(cache['deleted'][0]).toBe(1); // 'key2' was at pointer 1
+      expect(cache['deleted'][0]).toBe(1);
     });
   });
 
@@ -258,7 +258,7 @@ describe('LRUCache', () => {
         ttlCache.set('key1', 'value1');
 
         const ttl = ttlCache['ttls'][0];
-        expect(ttl).toBeGreaterThan(performance.now() + 900); // Allow some time tolerance
+        expect(ttl).toBeGreaterThan(performance.now() + 900);
       });
 
       it('should update TTL timestamp when updating existing item', () => {
@@ -266,7 +266,6 @@ describe('LRUCache', () => {
         ttlCache.set('key1', 'value1');
         const firstTtl = ttlCache['ttls'][0] as number;
 
-        // Wait a bit to ensure different timestamp
         Bun.sleepSync(2);
 
         ttlCache.set('key1', 'updated');
@@ -289,7 +288,6 @@ describe('LRUCache', () => {
         const ttlCache = new LRUCache(3, { ttl: 2 });
         ttlCache.set('key1', 'value1');
 
-        // Wait for TTL to expire
         await Bun.sleep(3);
 
         const value = ttlCache.get('key1');
@@ -302,9 +300,9 @@ describe('LRUCache', () => {
         ttlCache.set('key1', 'value1');
 
         await Bun.sleep(2);
-        ttlCache.set('key2', 'value2'); // key2 expires later
+        ttlCache.set('key2', 'value2');
 
-        await Bun.sleep(1); // key1 expires, key2 still valid
+        await Bun.sleep(1);
 
         expect(ttlCache.get('key1')).toBeUndefined();
         expect(ttlCache.get('key2')).toBe('value2');
@@ -324,7 +322,6 @@ describe('LRUCache', () => {
         const ttlCache = new LRUCache(3, { ttl: 2 });
         ttlCache.set('key1', 'value1');
 
-        // Wait for TTL to expire
         await Bun.sleep(3);
 
         const value = ttlCache.peek('key1');
@@ -345,7 +342,6 @@ describe('LRUCache', () => {
         const ttlCache = new LRUCache(3, { ttl: 2 });
         ttlCache.set('key1', 'value1');
 
-        // Wait for TTL to expire
         await Bun.sleep(3);
 
         expect(ttlCache.has('key1')).toBe(false);
@@ -363,7 +359,7 @@ describe('LRUCache', () => {
       });
 
       it('should handle very short TTL', async () => {
-        const ttlCache = new LRUCache(3, { ttl: 1 }); // 1ms TTL
+        const ttlCache = new LRUCache(3, { ttl: 1 });
         ttlCache.set('key1', 'value1');
 
         await Bun.sleep(5);
@@ -372,7 +368,7 @@ describe('LRUCache', () => {
       });
 
       it('should handle very long TTL', () => {
-        const ttlCache = new LRUCache(3, { ttl: 86400000 }); // 24 hours
+        const ttlCache = new LRUCache(3, { ttl: 86400000 });
         ttlCache.set('key1', 'value1');
 
         expect(ttlCache.get('key1')).toBe('value1');
@@ -382,7 +378,6 @@ describe('LRUCache', () => {
         const noTtlCache = new LRUCache(3);
         noTtlCache.set('key1', 'value1');
 
-        // Even after waiting, item should still be there
         expect(noTtlCache.get('key1')).toBe('value1');
       });
     });
@@ -392,11 +387,10 @@ describe('LRUCache', () => {
         const ttlCache = new LRUCache(3, { ttl: 100 });
         ttlCache.set('key1', 'value1');
 
-        Bun.sleepSync(90); // near the original 100ms expiry
-        ttlCache.set('key1', 'updated'); // refreshes the entry: new expiry ~100ms from here
+        Bun.sleepSync(90);
+        ttlCache.set('key1', 'updated');
 
-        // Short observation window (small sleeps drift the least under load): we are now well past
-        // the original 100ms expiry yet far inside the refreshed window, so the item is still alive.
+        // Past the original 100ms expiry yet inside the refreshed window; small sleeps drift the least under load
         Bun.sleepSync(20);
 
         expect(ttlCache.get('key1')).toBe('updated');
@@ -410,10 +404,10 @@ describe('LRUCache', () => {
 
         Bun.sleepSync(30);
 
-        // Access key1 to move to top (but TTL doesn't reset on get)
+        // get() moves key1 to the top but does not reset its TTL
         ttlCache.get('key1');
 
-        Bun.sleepSync(30); // ~60ms from start: past the 50ms TTL, so key1 is expired
+        Bun.sleepSync(30);
 
         expect(ttlCache.get('key1')).toBeUndefined();
       });

@@ -18,19 +18,10 @@ export interface SerializedAppError extends AppErrorObject {
 type ErrorCodeClass<T extends ErrorCode> = new (code: string, message: string, status?: number, isInternal?: boolean) => T;
 
 /**
- * Declaring the constants
- *
- * The single error catalog base: a key carries everything an error needs — machine code, message
- * with optional `{placeholder}` interpolation, category (encoded as the HTTP status, the most
- * widely understood numeric taxonomy; non-HTTP consumers map ranges to exit codes, retry policy,
- * or dialog kinds), and whether the message is internal-only. `create()`/`throw()` mean the key
- * alone decides what is thrown — packages declare catalogs by subclassing and using the factories.
- *
- * `ErrorCode` and `AppError` share this module because each reaches for the other at runtime —
- * `create()` builds the error, `AppError.internal()` and `toResponse()` read the shared keys — so
- * splitting them into sibling files reintroduces an import cycle.
+ * The error catalog base: a key carries its machine code, `{placeholder}` message, category (encoded as the HTTP status) and whether the message is
+ * internal-only. Catalogs subclass it and use the factories. Shares this module with `AppError` because each uses the other at runtime,
+ * so splitting them reintroduces an import cycle.
  */
-
 export class ErrorCode {
   constructor(
     readonly code: string,
@@ -38,11 +29,6 @@ export class ErrorCode {
     readonly status = 500,
     readonly isInternal = false,
   ) {}
-
-  /*!
-   * Factories — called on the catalog subclass (`AppErrorCode.notFound(...)`) so the key belongs
-   * to its catalog; the trailing status parameter covers outliers like 410, 429 and 503.
-   */
 
   /** The request is malformed or violates a business rule (400) */
   static badRequest<T extends ErrorCode>(this: ErrorCodeClass<T>, code: string, message: string, status = 400): T {
@@ -95,10 +81,6 @@ export class ErrorCode {
     Error.captureStackTrace(error, this.throw);
     throw error;
   }
-
-  /*!
-   * Shared codes
-   */
 
   /** Unknown error — the public face every internal error presents in responses */
   static readonly UNKNOWN = ErrorCode.internal('UNKNOWN', 'Unknown Error');

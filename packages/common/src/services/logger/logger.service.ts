@@ -23,7 +23,7 @@ interface ContextProviderConfig {
   provider: ContextProvider;
 }
 
-/** Declared in `logger.types` so `ConfigService` can name it without importing this module, which needs `Config` at construction */
+/** `LoggerInstance` lives in `logger.types` so `ConfigService` can name it without importing this module, which needs `Config` at construction */
 export type Logger = LoggerInstance;
 
 const noop = new Transport({ log: () => {} }); // eslint-disable-line @typescript-eslint/no-empty-function
@@ -68,12 +68,11 @@ class LoggerStatic {
     return this;
   }
 
-  /** Creates a redactor to remove sensitive fields. This mutates the original value. If no censor is given, the field is removed */
+  /** Mutates the original value when applied. */
   getRedactor(paths: string[], censor: string | ((value: any) => any) = 'xxxx'): redactFn {
     return fastRedact({ paths, serialize: false, censor });
   }
 
-  /** Adds a transport to the logger */
   addTransport(transport: Transport): this {
     const index = this.logger.transports.findIndex(t => t === noop);
     if (index >= 0) this.logger.remove(noop);
@@ -119,7 +118,6 @@ class LoggerStatic {
     return this;
   }
 
-  /** Returns a child logger with the provided metadata */
   getLogger(namespace: string, label: string): Logger;
   getLogger(metadata: object): Logger;
   getLogger(metadata: string | object, label?: string): Logger {

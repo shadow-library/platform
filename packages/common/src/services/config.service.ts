@@ -37,12 +37,10 @@ type ExtractPrefixes<T extends string> = T extends `${infer Prefix}.${infer Rest
 export type ConfigKey<Configs> = (keyof Configs & string) | ExtractPrefixes<keyof Configs & string>;
 
 export interface ConfigRecords {
-  /** Application configs */
   'app.env': NodeEnv;
   'app.name': string;
   'app.stage': AppStage;
 
-  /** Log configs */
   'log.level': LogLevel;
   'log.dir': string;
 }
@@ -66,7 +64,6 @@ export class ConfigService<Configs extends ConfigRecords = ConfigRecords> {
   private fsWatcher: FSWatcher | null = null;
 
   constructor(configs?: Partial<Configs>) {
-    /** Load from env files specified in ENV_FILES (comma separated) */
     const envFiles = utils.string.parseCsv(process.env.ENV_FILES ?? '');
     if (envFiles.length > 0) {
       const filePaths = envFiles.map(p => path.resolve(p));
@@ -83,12 +80,7 @@ export class ConfigService<Configs extends ConfigRecords = ConfigRecords> {
     this.load('app.env', { envKey: 'NODE_ENV', allowedValues: appEnvs, defaultValue: 'development' });
     this.load('app.name', { defaultValue: defaultAppName });
 
-    /**
-     * Defaults to the most restrictive stage on purpose: this key gates surfaces that are safe on a
-     * laptop and unsafe in front of real users, so an operator who forgets to set it must lose a debug
-     * route, never gain one. That safe default is also why the key is deliberately not `isProdRequired` —
-     * requiring it in production would trade the fail-safe for a boot crash on the very deployment it protects.
-     */
+    /** Defaults to `prod` so a forgotten value loses dev-only surfaces; deliberately not `isProdRequired`, which would trade that fail-safe for a boot crash. */
     this.load('app.stage', { allowedValues: appStages, defaultValue: 'prod' });
 
     this.load('log.level', { allowedValues: logLevels, defaultValue: this.isDev() ? 'debug' : 'info' });
@@ -166,7 +158,6 @@ export class ConfigService<Configs extends ConfigRecords = ConfigRecords> {
     }
     const values = opts.isArray ? value.split(',').filter(val => val !== '') : [value];
 
-    /** Allowed values validation */
     if (opts.allowedValues) {
       for (const val of values) {
         if (!opts.allowedValues.includes(val)) {
@@ -176,7 +167,6 @@ export class ConfigService<Configs extends ConfigRecords = ConfigRecords> {
       }
     }
 
-    /** Custom validation */
     if (opts.validator) {
       for (const val of values) {
         if (!opts.validator(val)) throw AppError.internal(`Environment Variable '${envKey}' has invalid value '${val}', validation failed`);
@@ -188,10 +178,7 @@ export class ConfigService<Configs extends ConfigRecords = ConfigRecords> {
   }
 
   load(name: keyof Configs, opts: ConfigOptions = DEFAULT_CONFIG_OPTIONS): this {
-    /**
-     * Prevent loading the same config key multiple times with different configs as it can lead to unexpected behavior, especially with hot reloading
-     * Allowing multiple loads in test environment to facilitate testing with different config values within the same test suite
-     */
+    /** A key loads once outside tests: a second load with different options misbehaves under hot reloading. */
     const existingOpts = this.loadedOptions.get(name);
     if (existingOpts && existingOpts === opts) return this;
     if (!this.isTest() && existingOpts !== undefined) throw AppError.internal(`Config key '${name.toString()}' is already loaded`);
@@ -209,11 +196,7 @@ export class ConfigService<Configs extends ConfigRecords = ConfigRecords> {
     return this;
   }
 
-  /**
-   * Like `load`, but on a resolution failure prints the reason and exits the process. For the app's
-   * own composition root that wants fail-fast-at-boot; the plain `load` throws so callers stay in
-   * control. Never call this from library code.
-   */
+  /** Like `load`, but exits the process on a resolution failure. For an app's composition root only, never library code. */
   loadOrExit(name: keyof Configs, opts: ConfigOptions = DEFAULT_CONFIG_OPTIONS): this {
     const result = tryCatch(() => this.load(name, opts));
     if (result.success) return result.data;
@@ -231,7 +214,6 @@ export class ConfigService<Configs extends ConfigRecords = ConfigRecords> {
     for (const [name, opts] of this.loadedOptions.entries()) {
       if (!opts.reloadable) continue;
 
-      /** Check if relevant env var has changed, if not skip processing this config */
       const envKey = this.toEnvKey(name);
       const oldEnvValue = this.envVars[envKey];
       const newEnvValue = newEnvVars[envKey];
@@ -310,13 +292,7 @@ export class ConfigService<Configs extends ConfigRecords = ConfigRecords> {
     return this.cache.get('app.env') === 'test';
   }
 
-  /**
-   * Whether this process is serving a real deployment, as opposed to `isProd()` which only reports what
-   * `NODE_ENV` claims. A deployment counts as production when EITHER signal says so: gating a security
-   * fail-fast or a Secure-cookie on `NODE_ENV` alone lets an `APP_STAGE=prod` box that never set
-   * `NODE_ENV` fall back to insecure development defaults. Prefer this over `isProd()` for anything whose
-   * failure mode is exposure; keep `isProd()` for what genuinely tracks the Node runtime, such as log transports.
-   */
+  /** True when either `app.stage` or `NODE_ENV` says production, so `APP_STAGE=prod` without `NODE_ENV` stays secure. Prefer over `isProd()` where failure means exposure. */
   isProductionDeployment(): boolean {
     return this.cache.get('app.stage') === 'prod' || this.isProd();
   }
