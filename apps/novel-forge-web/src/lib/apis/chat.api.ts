@@ -209,7 +209,7 @@ export function mergeChatJobs(
   return [...merged.values()].map(job => (job.messageId ? job : { ...job, messageId: anchors.get(job.id) ?? job.messageId })).sort((a, b) => a.firstSeq - b.firstSeq);
 }
 
-export function useChatJobsQuery(projectId: string, sessionId: string | undefined): UseQueryResult<ListChatJobsResponse, ApiError> {
+function useChatJobsQuery(projectId: string, sessionId: string | undefined): UseQueryResult<ListChatJobsResponse, ApiError> {
   return useQuery<ListChatJobsResponse, ApiError>({
     queryKey: chatKeys.jobs(projectId, sessionId ?? ''),
     queryFn: () => APIRequest.get(`/projects/${projectId}/chat/sessions/${sessionId}/jobs`).execute(),

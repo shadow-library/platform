@@ -20,7 +20,6 @@ export {
 export { ContentRatingPicker, RatingField, UNRATED } from './ContentRating';
 export { type DetailAsideWidth, type DetailIdentityProps, DetailPage, type DetailPageProps, type DetailProseProps } from './DetailPage';
 export { EmptyState, type EmptyStateProps } from './EmptyState';
-export { FieldCard, type FieldCardProps } from './FieldCard';
 export { GenerationStatus, type GenerationStatusProps } from './GenerationStatus';
 export { ItemPager, type ItemPagerJump, type ItemPagerProps } from './ItemPager';
 export { ReadingSheet, type ReadingSheetProps } from './ReadingSheet';

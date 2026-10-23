@@ -7,7 +7,7 @@ const milestoneKeys = {
   all: (projectId: string) => ['projects', projectId, 'milestones'] as const,
 };
 
-export const listMilestonesQueryOptions = (projectId: string): UseQueryOptions<ListMilestonesResponse, ApiError> =>
+const listMilestonesQueryOptions = (projectId: string): UseQueryOptions<ListMilestonesResponse, ApiError> =>
   queryOptions<ListMilestonesResponse, ApiError>({
     queryKey: milestoneKeys.all(projectId),
     queryFn: () => APIRequest.get(`/projects/${projectId}/milestones`).execute(),

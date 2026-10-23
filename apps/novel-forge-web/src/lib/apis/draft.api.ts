@@ -18,7 +18,6 @@ import {
   type DraftConflictResponse,
   type DraftResponse,
   type DraftSummaryResponse,
-  type FeedbackBody,
   type FinalizeReadinessResponse,
   type GenerateBody,
   type JobEnqueueResponse,
@@ -29,7 +28,6 @@ import {
   type ProposalResponse,
   type SeedFromBriefBody,
   type UpdateDraftBody,
-  type UserFeedbackResponse,
   type WorkflowRunResponse,
 } from './api-types.gen';
 import { ApiError, APIRequest } from './transport';
@@ -118,7 +116,7 @@ export function useDraftQuery(projectId: string, n: number | undefined, enabled 
   return useQuery({ ...draftQueryOptions(projectId, n ?? -1), enabled: enabled && Boolean(projectId) && n !== undefined });
 }
 
-export const continuityProposalsQueryOptions = (projectId: string, status: ContinuityProposalStatus = 'pending'): UseQueryOptions<ListContinuityProposalResponse, ApiError> =>
+const continuityProposalsQueryOptions = (projectId: string, status: ContinuityProposalStatus = 'pending'): UseQueryOptions<ListContinuityProposalResponse, ApiError> =>
   queryOptions<ListContinuityProposalResponse, ApiError>({
     queryKey: draftKeys.continuityProposals(projectId, status),
     queryFn: () => APIRequest.get(`/projects/${projectId}/continuity-proposals`).query({ status }).execute(),
@@ -249,14 +247,6 @@ export function useReviseDraftMutation(projectId: string, n: number): UseMutatio
   const queryClient = useQueryClient();
   return useMutation<DraftResponse, ApiError, { note: string }>({
     mutationFn: data => APIRequest.post(`/projects/${projectId}/drafts/${n}/revise`).body(data).execute(),
-    onSuccess: () => invalidateDraft(queryClient, projectId),
-  });
-}
-
-export function useDraftFeedbackMutation(projectId: string, n: number): UseMutationResult<UserFeedbackResponse, ApiError, FeedbackBody> {
-  const queryClient = useQueryClient();
-  return useMutation<UserFeedbackResponse, ApiError, FeedbackBody>({
-    mutationFn: data => APIRequest.post(`/projects/${projectId}/drafts/${n}/feedback`).body(data).execute(),
     onSuccess: () => invalidateDraft(queryClient, projectId),
   });
 }
