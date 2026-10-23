@@ -23,8 +23,8 @@ export interface GroupMappingFilter {
 }
 
 /**
- * The group→role sync engine (T-905). A mapping never stores an assignment: it is glue that drives
- * ordinary `role_assignments` rows carrying a `scim:group:<groupId>` provenance marker (D-A9), org =
+ * The group→role sync engine. A mapping never stores an assignment: it is glue that drives
+ * ordinary `role_assignments` rows carrying a `scim:group:<groupId>` provenance marker, org =
  * the group's organisation, principal = the member USER. `reconcile` is the single source of truth —
  * it re-derives whether *any* mapped group in the org still grants the role to the member and either
  * materialises the marker row or, for a marker row only (never a manual grant), revokes it. Because

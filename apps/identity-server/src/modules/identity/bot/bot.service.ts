@@ -61,7 +61,6 @@ export interface BotOwnershipView extends BotOwnership {
   recipients: BotTransferRecipient[];
 }
 
-/** Accounts that may be handed a bot's records. See `recipientEligible`. */
 const RECIPIENT_ELIGIBLE_ACCOUNT_STATUSES: User.Status[] = ['ACTIVE'];
 
 export interface BotUsage {
@@ -242,8 +241,7 @@ export class BotService {
   }
 
   /**
-   * Suspension is immediate and local; the handover is not. Keys are revoked and the bot is put into
-   * `DELETING` here, and the worker only flips it to `DELETED` once every bot-aware application has
+   * Keys are revoked and the bot goes to `DELETING` here; the worker flips it to `DELETED` only once every bot-aware application has
    * confirmed the transfer. The row survives as a tombstone, so the handle stays reserved.
    */
   async requestDeletion(actor: BotActor, organisationId: bigint, botId: bigint, input: DeleteBot): Promise<void> {

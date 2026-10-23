@@ -38,7 +38,7 @@ interface ScimUserChanges {
 }
 
 /**
- * Ownership rules (recorded decisions, T-704):
+ * Ownership rules:
  * - `userName` must be an email whose domain the organisation has VERIFIED — a tenant can only
  *   provision its own namespace, which also closes the account-enumeration oracle for foreign
  *   addresses (probing gmail.com fails identically whether or not an account exists).

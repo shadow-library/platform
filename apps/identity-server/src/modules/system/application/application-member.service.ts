@@ -119,7 +119,7 @@ export class ApplicationMemberService {
    * The launcher surface: every application the user may currently enter (per the access resolver),
    * enriched with when they first and last used it. Keying on the accessible set — not on membership —
    * is deliberate: it surfaces apps the user can open but has never launched, and drops apps they once
-   * used but can no longer reach (D-A4), so the launcher never advertises access the sign-in gate denies.
+   * used but can no longer reach, so the launcher never advertises access the sign-in gate denies.
    *
    * Identity itself is excluded: the launcher answers "where else can I go", and the user is already
    * inside the app it would link back to. The exclusion lives here rather than in the access resolver

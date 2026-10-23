@@ -13,13 +13,10 @@ import { type Organisation } from '@server/modules/infrastructure/datastore';
 export interface AuthOptions {
   /** Require a live first-party session (AAL1). Implied by `elevated`, `permission`, `orgRole` and `orgMember`. */
   session?: boolean;
-  /** Require a recent second-factor proof (AAL2 step-up). */
   elevated?: boolean;
   /** Require this platform-admin permission, checked by the PDP in the platform organisation. */
   permission?: AdminPermission;
-  /** Require at least this role in the organisation named by `orgParam`. */
   orgRole?: Organisation.MemberRole;
-  /** Require any membership of the organisation named by `orgParam`. */
   orgMember?: boolean;
   /** Path parameter carrying the organisation id for `orgRole`/`orgMember`. Defaults to `organisationId`. */
   orgParam?: string;
@@ -49,7 +46,6 @@ export interface ClientInfo {
  */
 export interface AuthContext {
   session?: ValidatedSession;
-  /** Whether the session carries a still-valid second-factor step-up. */
   elevated?: boolean;
   actor?: AdminActor;
   membership?: Organisation.Member;
@@ -75,5 +71,4 @@ export interface BotCaller {
 
 export type Caller = UserCaller | BotCaller;
 
-/** A request augmented by the access guard with its resolved authentication context. */
 export type AuthenticatedRequest = FastifyRequest & { auth?: AuthContext };

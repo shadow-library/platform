@@ -6,7 +6,7 @@ export interface BootstrapAdminPassword {
 }
 
 /**
- * A generated secret must never reach the structured logger (MEDIUM-001): in a production
+ * A generated secret must never reach the structured logger: in a production
  * deployment there is no legitimate reader for it, so it is dropped entirely; elsewhere it is
  * still worth surfacing for local wiring, so it goes to stdout directly, bypassing the winston
  * transports that ship to aggregation.

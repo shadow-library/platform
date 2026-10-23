@@ -23,7 +23,7 @@ export interface RateDecision {
 }
 
 /**
- * Redis-backed fixed-window counters for the tiered abuse controls (architecture §13.2), plus the
+ * Redis-backed fixed-window counters for the tiered abuse controls, plus the
  * dynamic IP deny list that the security correlation layer and operators feed. Counters are
  * window-scoped keys, so a Redis flush only ever loosens limits — state loss fails open by design
  * while the middleware decides per-route whether a Redis *error* fails open or closed.

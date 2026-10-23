@@ -38,10 +38,9 @@ export class AdminRoleController {
   }
 
   /**
-   * The base rule — an org-wide grant targets an active team organisation — holds for every caller. The stronger tenant
-   * checks (the role's application entitled in the target, and for a user their membership of it) close HIGH-001 for the
-   * lower-trust app-scoped tier: without them an app admin could plant its application's role onto any principal in any
-   * organisation. A platform `iam:roles:manage` admin is already trusted across every tenant, so it keeps unrestricted reach.
+   * An org-wide grant must target an active team organisation for every caller. The tenant checks (the role's application entitled in the target,
+   * and for a user their membership of it) bind the app-scoped tier: without them an app admin could plant its application's role onto any
+   * principal in any organisation. A platform `iam:roles:manage` admin is already trusted across every tenant, so it keeps unrestricted reach.
    */
   private async assertAssignable(role: Application.Role, principal: Principal, organisationId: string, scope: AdminScope): Promise<void> {
     if (principal.type === 'ORGANISATION') {
@@ -55,7 +54,10 @@ export class AdminRoleController {
     if (principal.type === 'USER') await this.organisationService.assertMember(this.parseUserId(principal.id), organisation.id);
   }
 
-  /** Revocation deliberately skips organisation liveness so a suspended-org grant stays removable; the app-scoped tier still may not touch a tenant its application is not entitled in, so a cross-tenant app admin cannot tamper (HIGH-001). The platform tier is unrestricted, mirroring assignment. */
+  /**
+   * Revocation skips organisation liveness so a suspended-org grant stays removable; the app-scoped tier still may not touch a tenant its
+   * application is not entitled in, so a cross-tenant app admin cannot tamper. The platform tier is unrestricted, mirroring assignment.
+   */
   private async assertRevocable(role: Application.Role, organisationId: string, scope: AdminScope): Promise<void> {
     if (scope !== 'application') return;
     await this.assertApplicationEntitled(role.applicationId, this.parseOrganisationId(organisationId), AppErrorCode.ORG_011_REVOKE);

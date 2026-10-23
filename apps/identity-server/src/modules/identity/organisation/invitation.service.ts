@@ -48,7 +48,7 @@ export class InvitationService {
   /**
    * Issues (or refreshes) the single live invitation for the address and queues its email. The
    * response never varies with account existence: an invitation row and email are produced either
-   * way, and only delivery reveals anything — to the inbox owner alone (D-12).
+   * way, and only delivery reveals anything — to the inbox owner alone.
    */
   async invite(input: InviteInput): Promise<Organisation.Invitation> {
     const organisationId = input.organisation.id;

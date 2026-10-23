@@ -10,7 +10,7 @@ export namespace SamlServiceProvider {
 }
 
 /**
- * Registered SAML 2.0 relying parties (T-701). Service providers are platform-tier integrations,
+ * Registered SAML 2.0 relying parties. Service providers are platform-tier integrations,
  * managed by the same administrators as OAuth clients. The ACS URL is matched exactly against the
  * AuthnRequest (never taken from the request alone) so a compromised SP request can never redirect
  * assertions. `PERSISTENT` NameIDs are stable pairwise identifiers derived per (user, entity id);

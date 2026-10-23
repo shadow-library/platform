@@ -14,9 +14,8 @@ export interface ScimTenant {
 
 /**
  * SCIM authenticates with ordinary client-credentials service tokens carrying `scim:provision`
- * (recorded decision: the reserved `scim_tokens` table was subsumed — an org-bound SERVICE client
- * already gives per-tenant, rotatable credentials with introspection and dual-secret rotation for
- * free, instead of a second bearer format). The client's `organisation_id` binding scopes every
+ * (an org-bound SERVICE client already gives per-tenant, rotatable credentials with introspection and
+ * dual-secret rotation, so there is no second bearer format). The client's `organisation_id` binding scopes every
  * operation; a client without one cannot provision anything.
  */
 const SCIM_SCOPE = 'scim:provision';

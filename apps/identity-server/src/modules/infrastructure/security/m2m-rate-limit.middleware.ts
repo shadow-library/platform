@@ -13,7 +13,7 @@ import { ServiceCallerService } from './service-caller.service';
 const UNAUTHENTICATED_STATUSES = new Set([401, 403]);
 
 /**
- * The second half of the per-client M2M budget (T-804). On a route marked `@M2MBudget(...)`,
+ * The second half of the per-client M2M budget. On a route marked `@M2MBudget(...)`,
  * `RateLimitMiddleware` charges a verified first-party service to its client and only *reads* the IP
  * counter for anyone else, so something has to count the requests that never reach a client budget —
  * otherwise the IP tier would be free on exactly the endpoints an attacker floods without credentials.

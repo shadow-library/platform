@@ -87,9 +87,8 @@ export interface ScimListResult<TResource> {
 }
 
 /**
- * SCIM bodies are validated at runtime rather than through class-schema DTOs (recorded deviation):
- * RFC 7644 PATCH values are polymorphic (boolean | string | object | array — Entra even sends
- * `"False"` as a string for booleans), which a static JSON schema cannot express without lying.
+ * SCIM bodies are validated at runtime rather than through class-schema DTOs, because RFC 7644 PATCH values are polymorphic
+ * (boolean | string | object | array — Entra even sends `"False"` as a string for booleans), which a static JSON schema cannot express without lying.
  * Every accessor below narrows `unknown` explicitly, so the surface stays `any`-free.
  */
 export const SCIM_CONTENT_TYPE = 'application/scim+json; charset=utf-8';

@@ -1,6 +1,5 @@
 import { type Application } from '@server/modules/infrastructure/datastore';
 
-/** A scope exposed by an application's own API resource. */
 interface SeedScope {
   name: string;
   description: string;
@@ -10,7 +9,6 @@ interface SeedScope {
   principalType?: 'USER' | 'SERVICE' | 'BOTH';
 }
 
-/** An entry in an application's RBAC catalogue, granted to roles by name. */
 interface SeedPermission {
   name: string;
   description: string;
@@ -19,38 +17,32 @@ interface SeedPermission {
 interface SeedRole {
   name: string;
   description: string;
-  /** Permission names from the same application's catalogue. */
   permissions: readonly string[];
   /** Assigns this role to the bootstrap administrator in the platform organisation at creation. */
   grantToBootstrapAdmin?: boolean;
 }
 
-/** A grant to a scope already exposed by another application's API resource. */
 export interface SeedScopeGrant {
   /** Owning resource identifier: `api://<app>`, or `shadow-identity` for the platform API. */
   resource: string;
   scope: string;
 }
 
-/** A caller allow-listed onto an application's otherwise deny-by-default routes. */
 interface SeedServiceAccessRule {
   callerClientId: string;
   method: string;
   pathPattern: string;
 }
 
-/** One first-party application and the API resource, client, catalogue and grants derived for it. */
 export interface SeedApplication {
   name: string;
   displayName: string;
   description: string;
-  /** Display name of the `api://<name>` API resource. */
   resourceName: string;
   /** DNS label the application is actually deployed under, when it differs from `name`; drives the subdomain, public origins and relying-party redirect URIs. */
   publicHost?: string;
   /** Initial release visibility, applied only when the application is created. */
   visibility?: Application.Visibility;
-  /** Whether the application's primary origin exposes the conventional logo asset. */
   logo?: boolean;
   scopes?: readonly SeedScope[];
   permissions?: readonly SeedPermission[];
@@ -61,13 +53,10 @@ export interface SeedApplication {
   serviceAccess?: readonly SeedServiceAccessRule[];
 }
 
-/** An M2M client owned by an application but distinct from that application's own client. */
 export interface SeedServiceClient {
   /** Fixed rather than generated: consumers look the client up by this exact id. */
   id: string;
-  /** Human label used in the first-boot credential log line. */
   label: string;
-  /** Name of the owning application, which must already exist when seeding runs. */
   application: string;
   grants?: readonly SeedScopeGrant[];
 }

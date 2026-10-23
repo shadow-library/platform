@@ -55,7 +55,7 @@ export class PolicyDecisionService {
     /**
      * An ORGANISATION grant's invalidation lives on the per-org component every member's decision
      * folds in — never a principal key nothing reads — so one org-wide change converges all members
-     * without enumerating them (T-904).
+     * without enumerating them.
      */
     return principal.type === 'ORGANISATION' ? this.orgVersionKey(principal.id) : `authz_version:${principal.type}:${principal.id}`;
   }
@@ -95,7 +95,7 @@ export class PolicyDecisionService {
 
   /**
    * A bot's lifecycle is not expressible as a role assignment, so a suspended or deleted bot — or one whose
-   * organisation is no longer active — is refused here as well as at key exchange (§7.4). Service accounts
+   * organisation is no longer active — is refused here as well as at key exchange. Service accounts
    * that back no bot are untouched.
    */
   private async principalDenial(principal: Principal, organisationId: string): Promise<string | null> {

@@ -26,8 +26,8 @@ export interface DirectoryUser {
  * verified address is globally unique here (`user_emails_verified_email_unique`), so a hit names
  * exactly one account and there is no substring surface to walk. And an address that resolves to
  * nothing is simply **absent** from the answer — never echoed with a reason — so a caller learns
- * "no account you may name" without learning whether the address is unknown, unverified or closed
- * (D-A3). It remains an enumeration oracle by construction, which is why every call is audited and
+ * "no account you may name" without learning whether the address is unknown, unverified or closed.
+ * It remains an enumeration oracle by construction, which is why every call is audited and
  * the route is service-only.
  */
 
@@ -94,7 +94,7 @@ export class DirectoryService {
              * Scoped to users holding an active consent for the calling client — the relationship every
              * user of a first-party app has (`FIRST_PARTY_POLICY`). Ids are sequential, so an id the
              * caller has no relationship with must resolve to nothing, not a name, or the endpoint is a
-             * walk-the-counter directory harvest (MEDIUM-003).
+             * walk-the-counter directory harvest.
              */
             .innerJoin(schema.consents, and(eq(schema.consents.userId, schema.users.id), eq(schema.consents.clientId, callerClientId), isNull(schema.consents.revokedAt)))
             /** Left-joined: an account with no profile row still resolves, just without a name to show. */

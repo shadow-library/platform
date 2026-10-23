@@ -14,7 +14,7 @@ export namespace SigningKey {
 
 export const signingKeyAlgorithm = pgEnum('signing_key_algorithm', ['EdDSA', 'RS256']);
 export const signingKeyStatus = pgEnum('signing_key_status', ['PENDING', 'ACTIVE', 'RETIRING', 'RETIRED']);
-/** OIDC keys are Ed25519 (JWKS); SAML keys are RSA-2048 — XML-DSIG interop rules out EdDSA (T-701). */
+/** OIDC keys are Ed25519 (JWKS); SAML keys are RSA-2048 — XML-DSIG interop rules out EdDSA. */
 export const signingKeyPurpose = pgEnum('signing_key_purpose', ['OIDC', 'SAML']);
 
 export const signingKeys = pgTable(

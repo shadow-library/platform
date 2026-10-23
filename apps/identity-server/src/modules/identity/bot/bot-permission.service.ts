@@ -103,11 +103,8 @@ const ADMIN_RANKS: Organisation.MemberRole[] = ['ADMIN', 'OWNER'];
 const LEVEL_ORDER: Record<Application.BotGrantLevel, number> = { read: 0, write: 1 };
 
 /**
- * Provenance marker on `granted_by`, following the `scim:group:` precedent: the same principal's
- * assignments can also be written by the platform admin role-assignment API, and there is no provenance
- * column to tell them apart. Tagging the rows this endpoint writes lets it replace its own grants — a
- * grant whose role later stops being bot-grantable included, which no desired set can name and which
- * would otherwise be unrevokable — while leaving a staff assignment untouched.
+ * Provenance marker on `granted_by`: the platform admin role-assignment API writes assignments for the same principal and no column tells them apart.
+ * Tagging this endpoint's rows lets it replace its own grants, including one whose role stopped being bot-grantable, without touching a staff assignment.
  */
 const GRANT_MARKER = 'bot:';
 

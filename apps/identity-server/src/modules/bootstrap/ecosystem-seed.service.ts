@@ -45,14 +45,7 @@ export class EcosystemSeedService {
     for (const application of newApplications) await this.bindApplication(application, scopes);
     for (const application of existingApplications) await this.reconcileApplication(application, operator, scopes);
 
-    /**
-     * Every service client, not only the ones just created: a grant added to the seed after a deployment
-     * exists would otherwise never reach it, and the caller would be denied forever with nothing to show
-     * for it. `grantScope` inserts on conflict do nothing, so re-running costs a no-op per grant, and a
-     * seeded grant an operator revokes comes back on the next restart, as a seeded application grant
-     * already does. This runs last because `reconcileApplication` is what adds a newly declared scope to
-     * `scopes`.
-     */
+    /** Every service client, not only new ones, so a later seed grant still arrives; last because `reconcileApplication` adds newly declared scopes. */
     for (const client of ECOSYSTEM_SEED.serviceClients) await this.grantScopes(client.id, client.grants, scopes);
   }
 
@@ -137,7 +130,7 @@ export class EcosystemSeedService {
 
   /**
    * In a production deployment the client is bound to its workload subject at creation with no
-   * `client_secret_basic` credential generated at all (§8.4) — workload identity is the credential
+   * `client_secret_basic` credential generated at all — workload identity is the credential
    * that is actually presented, and there is no legitimate reader for a generated one there.
    * Outside production (no projected service-account token to present) a fallback secret is still
    * generated for local wiring, disclosed once via `announceSecretOnce`, never logged.

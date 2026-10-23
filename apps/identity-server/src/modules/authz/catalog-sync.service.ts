@@ -54,16 +54,10 @@ export interface CatalogSyncResult {
 }
 
 /**
- * A service token's client id is a UUID; guard the lookup so a malformed value is a clean 403
- * rather than a Postgres cast error.
- *
- * Declarative role-catalog reconciliation (D-15): a service owns the roles and permissions of its
- * own application and pushes the full manifest through the SDK. The manifest is the source of
- * truth — anything absent from it is deleted, cascading (ON DELETE CASCADE) into `role_permissions`
- * and `role_assignments`. Because cascades do not touch the Redis `authz_version`, every principal
- * holding a role in the application is snapshotted before mutation and invalidated after commit, so
- * a revoked grant cannot survive in an enforcement-point cache. Assignments themselves stay an
- * administrative operation — a service never grants roles to users.
+ * Declarative role-catalog reconciliation: a service owns the roles and permissions of its own application and pushes the full manifest through
+ * the SDK. The manifest is the source of truth — anything absent from it is deleted, cascading into `role_permissions` and `role_assignments`.
+ * Cascades do not touch the Redis `authz_version`, so every principal holding a role in the application is snapshotted before mutation and
+ * invalidated after commit, or a revoked grant could survive in an enforcement-point cache. A service never grants roles to users.
  */
 
 @Injectable()
@@ -88,7 +82,7 @@ export class CatalogSyncService {
 
   /**
    * A full sync is destructive by design, so a manifest that would remove more than half of an
-   * application's permissions or roles is refused unless the push says `force` (D-15, T-805). This
+   * application's permissions or roles is refused unless the push says `force`. This
    * catches a broken build pushing a truncated manifest; it is not a security boundary, since the
    * caller may always set `force`. Consequently the counts are read outside the sync transaction —
    * a second concurrent push from the same application is a deploy anomaly, not a threat.
