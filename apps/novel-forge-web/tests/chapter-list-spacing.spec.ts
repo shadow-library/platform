@@ -103,6 +103,6 @@ describe('Chapters list spacing', () => {
   });
 
   it('should keep today’s list values and the canvas values it adds', () => {
-    checkListed('routes/novels/$novelId/chapters.module.css', LIST);
+    checkListed('features/chapters/chapters.module.css', LIST);
   });
 });

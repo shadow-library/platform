@@ -52,14 +52,13 @@ import { timelineOfTrace, turnTimeline } from '@/lib/chat-turn-timeline';
 import { messageTime, projectTitle } from '@/lib/format';
 import { chipContexts, chipLimitReason, type ChipReveal, chipsOfSent, nextReveal, type PassageChip, rewriteChip, shownContexts, staleChipIds } from '@/lib/passage-comments';
 import { PANEL_DOCK_MIN } from '@/lib/sidebar-rail';
-import { takePendingFirstTurn } from '@/lib/pending-first-turn';
 import { type PendingItem, pendingKey } from '@/lib/pending-items';
 import { useGenerationActivity } from '@/lib/use-generation-activity';
 
 import { ChapterDraftCard } from './ChapterDraftCard';
 import { ChapterPanel, type PanelComments } from './ChapterPanel';
 import { type CommentFollowUp } from './ChapterReader';
-import { afterFailedSend, editQueued, inputCaption, type QueuedTurn, queuedView, queueStep, releaseSettings, type TurnSettings } from './chat-queue';
+import { afterFailedSend, inputCaption, type QueuedTurn, queuedView, type TurnSettings } from './chat-queue';
 import { ChatComposer } from './ChatComposer';
 import { NotesChip, SaveAsNotesOffer } from './ChatExtras';
 import { ContinuityProposalCard } from './ContinuityProposalCard';
@@ -99,7 +98,6 @@ import styles from './Chat.module.css';
 import { ComposerModeMenu } from './ComposerModeMenu';
 import { JobProgress } from './JobProgress';
 import { ComposerPassages, SentPassages } from './PassageChips';
-import { findPending, revealPending } from './pending-reveal';
 import { ProgressDock, ProgressDockStrip } from './ProgressPanel';
 import { type DockState, dockState, jobProposals, organiseIdeas, type PanelProposals, panelTurnOf, turnRefs } from './progress-panel-view';
 import { QuestionCard } from './QuestionCard';
@@ -111,8 +109,12 @@ import { useUnansweredCount } from './suggestion-store';
 import { TurnProposalCard } from './TurnProposalCard';
 import { TurnReceipt } from './TurnReceipt';
 import { TurnTrace } from './TurnTimeline';
+import { useJobAnnouncements, useLiveAnnouncer } from './use-live-announcer';
+import { useOpeningTurn } from './use-opening-turn';
 import { usePassageChips } from './use-passage-chips';
 import { PENDING_PROPOSAL_LIMIT, usePendingItems } from './use-pending-items';
+import { useRevealPending } from './use-reveal-pending';
+import { useTurnQueue } from './use-turn-queue';
 import { PendingAnchor, WaitingTray } from './WaitingTray';
 
 const PLAN_KIND = 'chapter_plan';
@@ -120,8 +122,6 @@ const NO_JOBS: readonly ChatJobState[] = [];
 const NO_PROPOSALS: readonly ProposalResponse[] = [];
 // The server refuses these before the turn starts, naming a passage the author has to select again or take out.
 const PASSAGE_REFUSALS = new Set(['CHT_009', 'CHT_010', 'CHT_011']);
-// A card brought into the chat appears once the card list refetches; past this the reveal gives up rather than jumping later.
-const REVEAL_WAIT_MS = 10_000;
 
 export interface ChatColumnProps {
   novelId: string;
@@ -209,12 +209,10 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
   const [proseEdits, setProseEdits] = useState(false);
   const [justDiscussing, setJustDiscussing] = useState(false);
   const [draftMode, setDraftMode] = useState<SessionMode>('auto');
-  const [queued, setQueued] = useState<QueuedTurn>();
   const [turnChoice, setTurnChoice] = useState<TurnChoice>();
   const [renamingHeader, setRenamingHeader] = useState(false);
   const [checklistOpen, setChecklistOpen] = useState(false);
   const [planStartOpen, setPlanStartOpen] = useState(false);
-  const [announcement, setAnnouncement] = useState('');
   const [cancellingJob, setCancellingJob] = useState<string>();
   const [hiddenBibleReceipts, setHiddenBibleReceipts] = useState(hiddenReceipts);
   // Where the transcript's assistant messages stood when this tab's turn began; the turn's own reply is the first one past it.
@@ -337,11 +335,6 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
     awaitingAnswer: awaitingAnswer(messages),
   });
 
-  const step = queueStep({ queued, running: pending, locked, stream: stream.status, finishedId, inTranscript: finishedId !== undefined && messageIds.has(finishedId) });
-  const queueNow = useRef(queued);
-  useLayoutEffect(() => {
-    queueNow.current = queued;
-  });
   const switching = updateSession.isPending && updateSession.variables?.mode !== undefined;
   const shownMode = (switching ? updateSession.variables?.mode : undefined) ?? mode;
 
@@ -396,26 +389,8 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
     wasPending.current = pending;
   }, [pending]);
 
-  // The region is emptied before each message so the same words — two turns ending alike — are read out again.
-  const announceTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const announce = (text: string): void => {
-    clearTimeout(announceTimer.current);
-    setAnnouncement('');
-    announceTimer.current = setTimeout(() => setAnnouncement(text), 100);
-  };
-  useEffect(() => () => clearTimeout(announceTimer.current), []);
-
-  // A job is announced once, when it ends while this chat is open: seen running earlier, or first seen through a live event (seq above 0)
-  // because it started and ended between two listings. A job the listing already reports as settled is history, not news.
-  const jobStatuses = useRef(new Map<string, string>());
-  useEffect(() => {
-    for (const job of jobStream.jobs) {
-      const before = jobStatuses.current.get(job.id);
-      const endedNow = before === undefined ? job.seq > 0 : !jobSettled(before);
-      if (endedNow && jobSettled(job.status)) announce(`${jobView(job).title}.`);
-      jobStatuses.current.set(job.id, job.status);
-    }
-  }, [jobStream.jobs]);
+  const { announcement, announce } = useLiveAnnouncer();
+  useJobAnnouncements(jobStream.jobs, announce);
 
   // A job that ends with changes while the panel follows the latest settled turn takes the panel, so its card opens the dock as a turn's would.
   const [jobsSeen, setJobsSeen] = useState(jobStream.jobs);
@@ -484,13 +459,6 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
     );
   };
 
-  const enqueue = (content: string, chips: readonly PassageChip[]): void => {
-    if (queued || locked) return;
-    setQueued({ content, chips, ...currentSettings(), watching: turn.isPending, after: finishedId });
-    setInput('');
-    passages.drop(new Set(chips.map(chip => chip.id)));
-  };
-
   const staleChips = passages.chips.some(chip => chip.stale);
   const sendable = !staleChips && (input.trim().length > 0 || (Boolean(session) && passages.chips.length > 0));
 
@@ -508,67 +476,41 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
     sendTurn(content, content, currentSettings(), undefined, chips);
   };
 
-  const releaseQueued = (via: 'auto' | 'now'): void => {
-    if (!queued || pending || locked) return;
-    setQueued(undefined);
-    sendTurn(queued.content, undefined, releaseSettings(queued, currentSettings(), via), queued, queued.chips);
-  };
+  const { queued, setQueued, queueNow, step, enqueue, releaseQueued, editQueuedMessage } = useTurnQueue({
+    running: pending,
+    locked,
+    watching: turn.isPending,
+    streamStatus: stream.status,
+    finishedId,
+    inTranscript: finishedId !== undefined && messageIds.has(finishedId),
+    input,
+    settings: currentSettings,
+    send: sendTurn,
+    onEnqueued: chips => {
+      setInput('');
+      passages.drop(new Set(chips.map(chip => chip.id)));
+    },
+    onEdited: edited => {
+      passages.restore(edited.chips);
+      setInput(edited.input);
+      setProseEdits(edited.settings.proseEdits);
+      setJustDiscussing(edited.settings.justDiscussing);
+      inputRef.current?.focus();
+    },
+  });
 
-  const editQueuedMessage = (): void => {
-    if (!queued) return;
-    const edited = editQueued(queued, input);
-    passages.restore(edited.chips);
-    setInput(edited.input);
-    setProseEdits(edited.settings.proseEdits);
-    setJustDiscussing(edited.settings.justDiscussing);
-    setQueued(undefined);
-    inputRef.current?.focus();
-  };
-
-  useEffect(() => {
-    if (step !== 'send') return;
-    const timer = setTimeout(() => releaseQueued('auto'));
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- releases the queue once, on the step turning to 'send'; the timer runs the render's own releaseQueued
-  }, [step]);
-
-  // Both opening messages are sent from a timer the effect's cleanup cancels, not from the effect itself: under StrictMode's
-  // mount–unmount–mount the first pass only schedules, its cleanup cancels the timer (never a request in flight), and the ref keeps
-  // the text for the second pass to send.
-  const initialRef = useRef<string | undefined>(undefined);
-  const initialConsumed = useRef(false);
-  useEffect(() => {
-    if (!initialTurn || initialConsumed.current) return;
-    initialRef.current = initialTurn;
-    const timer = setTimeout(() => {
-      const content = initialRef.current;
-      if (!content || initialConsumed.current) return;
-      initialConsumed.current = true;
-      onInitialTurnSent?.();
+  useOpeningTurn({
+    sessionId: session?.id,
+    initialTurn,
+    onInitialTurnSent,
+    messagesLoaded: messagesQuery.isSuccess,
+    empty: messages.length === 0,
+    sendInitial: content => {
       setInput(current => (current.trim() === content ? '' : current));
       sendTurn(content, content, currentSettings(), undefined, passages.latest());
-    });
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- sends once per handed-off message; initialConsumed guards every later run
-  }, [initialTurn]);
-
-  // The Start screen's opening message: taken only once the transcript is known to be empty, and sent only while it still is.
-  const queuedRef = useRef<string | undefined>(undefined);
-  const messagesLoaded = messagesQuery.isSuccess;
-  const empty = messages.length === 0;
-  useEffect(() => {
-    if (!session || !messagesLoaded || !empty) return;
-    queuedRef.current ??= takePendingFirstTurn(session.id);
-    if (!queuedRef.current) return;
-    const timer = setTimeout(() => {
-      const queued = queuedRef.current;
-      if (!queued) return;
-      queuedRef.current = undefined;
-      sendTurn(queued, queued);
-    });
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- sends at most once: the ref empties as it sends, and a transcript with messages stops the next pass
-  }, [session?.id, messagesLoaded, empty]);
+    },
+    sendFirst: content => sendTurn(content, content),
+  });
 
   const stop = (): void => {
     if (!activeRunId) return;
@@ -738,26 +680,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
     };
   }, [chapter]);
 
-  // The tray's click has long returned by the time a card brought into the chat renders, so the card it asked for is looked for after every render.
-  const revealing = useRef<{ key: string; until: number } | undefined>(undefined);
-  useEffect(() => {
-    const wanted = revealing.current;
-    if (!wanted) return;
-    if (Date.now() > wanted.until) {
-      revealing.current = undefined;
-      return;
-    }
-    const target = findPending(scrollRef.current, wanted.key);
-    if (!target) return;
-    revealing.current = undefined;
-    revealPending(target);
-  });
-
-  const showPending = (key: string): void => {
-    const target = findPending(scrollRef.current, key);
-    if (target) return revealPending(target);
-    revealing.current = { key, until: Date.now() + REVEAL_WAIT_MS };
-  };
+  const { showPending, awaitPending } = useRevealPending(scrollRef);
 
   const adoptPending = (item: PendingItem & { proposalId: string }): void => {
     if (!session) return props.onStartForCard(item.proposalId);
@@ -765,7 +688,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
       { proposalId: item.proposalId, sessionId: session.id },
       {
         onSuccess: () => {
-          revealing.current = { key: item.key, until: Date.now() + REVEAL_WAIT_MS };
+          awaitPending(item.key);
         },
         onError: err => toast.danger(err.message),
       },

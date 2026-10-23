@@ -74,7 +74,7 @@ function declarationsOf(css: string, selector: string): Record<string, string> |
 }
 
 function chaptersCss(): { top: string; phone: string } {
-  const css = readFileSync(new URL('../src/routes/novels/$novelId/chapters.module.css', import.meta.url), 'utf-8').replace(/\/\*[\s\S]*?\*\//g, '');
+  const css = readFileSync(new URL('../src/features/chapters/chapters.module.css', import.meta.url), 'utf-8').replace(/\/\*[\s\S]*?\*\//g, '');
   const phoneAt = css.indexOf('@media (max-width: 960px)');
   const phoneEnd = css.indexOf('\n}\n', phoneAt);
   return { top: phoneAt === -1 ? css : css.slice(0, phoneAt) + css.slice(phoneEnd + 3), phone: phoneAt === -1 ? '' : css.slice(phoneAt, phoneEnd + 3) };
