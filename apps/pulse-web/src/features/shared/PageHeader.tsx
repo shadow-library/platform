@@ -8,7 +8,6 @@ export interface PageHeaderProps {
   subtitle?: ReactNode;
   action?: ReactNode;
   breadcrumb?: ReactNode;
-  /** Render the title in the monospace face (for keys / identifiers). */
   mono?: boolean;
 }
 

@@ -18,7 +18,7 @@ const partialKeys = {
   detail: (partialId: string) => [...partialKeys.all, partialId],
 } as const;
 
-/** Shared by the partials list route's loader prefetch and `useListPartialsQuery` — identical key + fn, so SSR-dehydrated data hydrates without a second request. */
+/** Shared with the route loader prefetch: identical key + fn, so SSR-dehydrated data hydrates without a second request. */
 export const listPartialsQueryOptions = (): UseQueryOptions<ListPartialResponse, ApiError> =>
   queryOptions<ListPartialResponse, ApiError>({
     queryKey: partialKeys.list(),

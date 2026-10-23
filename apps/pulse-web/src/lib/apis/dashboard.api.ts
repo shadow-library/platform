@@ -7,7 +7,7 @@ const dashboardKeys = {
   stats: ['stats'],
 } as const;
 
-/** Shared by the dashboard route's loader prefetch and `useStatsQuery` — identical key + fn, so SSR-dehydrated data hydrates without a second request. */
+/** Shared with the route loader prefetch: identical key + fn, so SSR-dehydrated data hydrates without a second request. */
 export const dashboardStatsQueryOptions = (): UseQueryOptions<DashboardStats, ApiError> =>
   queryOptions<DashboardStats, ApiError>({
     queryKey: dashboardKeys.stats,

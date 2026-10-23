@@ -6,14 +6,7 @@ interface LoginSearch {
   returnTo: string;
 }
 
-/**
- * The bounce target of the session gate: `requireSession` lands here with the intended destination in
- * `returnTo`, and this route hands the browser to the server's OIDC login, which returns the user to
- * `returnTo` once the flow completes. A document navigation (not a router one) is required because the
- * login endpoint lives on pulse-server, outside this app — so the redirect runs client-side, in an
- * effect, rather than from `beforeLoad`: `beforeLoad` now runs on the SSR server too (no `window` there),
- * and a client-side navigation still needs a real route to land on before escaping to the backend.
- */
+// The login endpoint lives on pulse-server, so this is a document navigation; it runs in an effect because beforeLoad also runs on the SSR server (no `window`).
 export const Route = createFileRoute('/login')({
   /** Constrain returnTo to a same-origin path (reject `//host` and `\host`) before it reaches the redirect. */
   validateSearch: (search: Record<string, unknown>): LoginSearch => {

@@ -13,12 +13,7 @@ export function formatDateTime(iso?: string | null): string {
   return `${MONTHS[d.getMonth()] ?? ''} ${pad(d.getDate())}, ${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-/**
- * "Jul 11" — short axis/label form for an ISO calendar date (`YYYY-MM-DD`), em dash when unparseable.
- *
- * Read field-by-field rather than through `Date`: a calendar day carries no zone, but `Date` would parse
- * it as UTC midnight and `getDate()` would then shift it a day backwards for every viewer west of UTC.
- */
+// Not parsed through Date: a bare YYYY-MM-DD is UTC midnight, so getDate() would shift it back a day west of UTC.
 export function formatDay(date: string): string {
   const match = CALENDAR_DATE.exec(date);
   if (!match) return '—';

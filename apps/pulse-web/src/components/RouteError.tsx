@@ -4,15 +4,7 @@ import { AccessDenied, EmptyState } from '@shadow-library/ui';
 import { isApiError } from '@shadow-library/web';
 import { isAccessDeniedError } from '@shadow-library/web/router';
 
-/**
- * The router's last resort for anything a route throws.
- *
- * A 403 gets its own face because it is not a failure the user can retry their way out of. Note the
- * copy speaks of *permission*, not of access to Pulse: reaching this screen means the operator is
- * already inside the application, and only lacks the role that covers this area. Application access
- * is refused earlier and elsewhere — identity turns those users away at sign-in, so they never load
- * this bundle at all.
- */
+// A 403 means a signed-in operator lacking the role (identity refuses application access at sign-in), so the copy speaks of permission, not access to Pulse.
 export default function RouteError({ error, reset }: ErrorComponentProps): ReactElement {
   const router = useRouter();
   const code = isApiError(error) ? error.code : undefined;

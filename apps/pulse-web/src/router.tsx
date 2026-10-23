@@ -5,16 +5,7 @@ import RouteError from '@/components/RouteError';
 
 import { routeTree } from '../generated/routeTree.gen';
 
-/**
- * TanStack Start calls this once per request on the server and once on the client. `createAppRouter`
- * (from `@shadow-library/web`) owns the per-request QueryClient, the SSR-query integration, and the
- * shared preload/staleness/pending defaults — so this app only supplies its own error and not-found
- * screens.
- *
- * Without an error component a route that throws renders TanStack's bare default, which says nothing an
- * operator can act on — least of all for a 403, the one failure they meet by simply lacking a role.
- * Without a not-found component an unmatched path renders TanStack's bare `<p>Not Found</p>`.
- */
+// Replaces TanStack's bare defaults, which say nothing actionable for a 403 or an unmatched path.
 const buildRouter = () => createAppRouter(routeTree, { router: { defaultErrorComponent: RouteError, defaultNotFoundComponent: NotFound } });
 
 export function getRouter(): ReturnType<typeof buildRouter> {

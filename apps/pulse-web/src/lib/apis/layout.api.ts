@@ -11,7 +11,7 @@ const layoutKeys = {
   detail: (layoutId: string) => [...layoutKeys.all, layoutId],
 } as const;
 
-/** Shared by the layouts list route's loader prefetch and `useListLayoutsQuery` — identical key + fn, so SSR-dehydrated data hydrates without a second request. */
+/** Shared with the route loader prefetch: identical key + fn, so SSR-dehydrated data hydrates without a second request. */
 export const listLayoutsQueryOptions = (): UseQueryOptions<ListLayoutResponse, ApiError> =>
   queryOptions<ListLayoutResponse, ApiError>({
     queryKey: layoutKeys.list(),

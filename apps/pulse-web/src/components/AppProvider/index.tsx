@@ -6,11 +6,7 @@ export interface AppProviderProps {
   children?: React.ReactNode;
 }
 
-/**
- * The QueryClientProvider is installed by `createAppRouter` (via the SSR-query integration's router
- * `Wrap`), so this provider owns only theming and the confirm dialog.
- */
-
+// QueryClientProvider is installed by createAppRouter, not here.
 export default function AppProvider(props: AppProviderProps): ReactElement {
   return (
     <ThemeProvider cookieDomain={themeCookieDomain()} legacyStorageKey="theme">

@@ -4,10 +4,8 @@ import { type ReactElement } from 'react';
 import { ProfileDetail } from '@/features/senders';
 import { senderProfileQueryOptions } from '@/lib/apis';
 
-// The profile is the query that gates this screen's loading state, so the loader prefetches it — the
-// endpoint table's own query stays a client fetch, same as the endpoints list on this page (secondary,
-// filtered client-side).
 export const Route = createFileRoute('/_app/senders/$profileId')({
+  // Only the profile is prefetched; the endpoint table's query stays a client fetch (secondary, filtered client-side).
   loader: ({ context, params }) => context.queryClient.prefetchQuery(senderProfileQueryOptions(params.profileId)),
   component: ProfileDetailRoute,
 });

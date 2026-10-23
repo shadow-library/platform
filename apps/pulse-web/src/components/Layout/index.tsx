@@ -49,13 +49,7 @@ export default function Layout({ children }: PropsWithChildren): ReactElement {
   const organisationSwitch = useOrganisationSwitch({ organisationsQueryOptions, switchOrganisation });
   const stage = import.meta.env.DEV ? 'dev' : 'production';
 
-  /**
-   * Ends the app session server-side, then hands the browser on. Where the deployment configures
-   * RP-initiated logout, the reply carries identity's end-session URL — a full-page navigation to another
-   * origin that must *replace* the local `/login` bounce, not follow it: routing to `/login` would leave
-   * the central identity session live and sign the operator straight back in. The session cookie is
-   * cleared regardless of the request outcome, so a failed call still signs out locally.
-   */
+  // RP-initiated logout's end-session URL must replace the /login bounce, or the still-live identity session signs the operator straight back in.
   const handleSignOut = async (): Promise<void> => {
     try {
       const { redirectTo } = await logout();

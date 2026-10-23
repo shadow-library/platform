@@ -31,18 +31,12 @@ export const Route = createRootRouteWithContext<RouterContext>()({
       { rel: 'manifest', href: '/manifest.json' },
     ],
   }),
-  /**
-   * Fires only when ROOT's own render path fails (its own loader, or something above every route's own
-   * boundary) — the normal `component` below never runs, so the document shell has to be rebuilt here by
-   * hand. A route-level throw is caught by the nearer `defaultErrorComponent` (`router.tsx`) instead,
-   * which mounts inside the shell this component already built and needs no such wrap.
-   */
+  // Fires only when root itself fails, so the normal component never ran and the document shell must be rebuilt here.
   errorComponent: props => (
     <RootDocument>
       <RouteError {...props} />
     </RootDocument>
   ),
-  /** Root always matches, so `component` still runs for a genuinely unmatched path — no shell rewrap needed. */
   notFoundComponent: () => <NotFound />,
   component: RootComponent,
 });
@@ -55,11 +49,7 @@ function RootComponent(): React.JSX.Element {
   );
 }
 
-/**
- * The full HTML document TanStack Start renders on the server and hydrates on the client. `themeInitScript`
- * runs before paint to avoid a theme flash; `<html suppressHydrationWarning>` tolerates the `data-theme`/
- * `dark` attributes it sets, which intentionally differ from the server markup.
- */
+// suppressHydrationWarning: themeInitScript sets data-theme/dark before paint, which intentionally differs from the server markup.
 function RootDocument({ children }: { children: ReactNode }): React.JSX.Element {
   return (
     <html lang="en" suppressHydrationWarning>

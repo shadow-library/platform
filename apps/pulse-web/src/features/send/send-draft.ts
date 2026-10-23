@@ -46,10 +46,7 @@ export function consoleSendStepUpUrl(): string {
   return `${apiClient.auth.basePath}/step-up?return_to=${encodeURIComponent(SEND_PATH)}`;
 }
 
-/**
- * Holds the form, recipients and payload included, across the step-up round trip only: the page clears it once restored, and a draft
- * older than ten minutes is treated as an abandoned step-up and dropped rather than kept for the tab's lifetime.
- */
+/** Survives the step-up round trip only: the page clears it once restored, and a draft older than ten minutes is dropped as abandoned. */
 export function stashSendDraft(draft: SendDraft, storage: Storage | undefined = sessionStore()): void {
   try {
     const stashed: StashedDraft = { draft, stashedAt: Date.now() };
@@ -59,7 +56,7 @@ export function stashSendDraft(draft: SendDraft, storage: Storage | undefined = 
   }
 }
 
-/** Leaves a live draft in place, so a render that React repeats (StrictMode) sees it too; {@link clearSendDraft} removes it. Expired or malformed ones are dropped. */
+/** Leaves a live draft in place so a repeated render (StrictMode) sees it too; {@link clearSendDraft} removes it. Expired or malformed drafts are dropped. */
 export function readSendDraft(storage: Storage | undefined = sessionStore()): SendDraft | null {
   try {
     const stored = storage?.getItem(DRAFT_KEY) ?? null;

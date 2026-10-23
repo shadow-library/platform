@@ -10,12 +10,7 @@ export const Route = createFileRoute('/_app')({
   component: AuthenticatedShell,
 });
 
-/**
- * `beforeLoad` guarantees a valid session on entry, but TanStack never re-runs it while navigating
- * inside the shell. `useSessionGuard` keeps validating for as long as the shell is mounted and flips to
- * `redirecting` once the session is gone — at which point we withhold the chrome and show a spinner
- * until the bounce to SSO completes, so a logged-out user never keeps seeing the app.
- */
+// beforeLoad does not re-run on in-shell navigation; once the guard reports `redirecting`, the chrome is withheld so a logged-out user never keeps seeing the app.
 function AuthenticatedShell(): ReactElement {
   const status = useSessionGuard();
 

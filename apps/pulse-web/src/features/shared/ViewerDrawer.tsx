@@ -24,13 +24,10 @@ export interface ViewerDrawerProps {
   open: boolean;
   data: ViewerData | null;
   onOpenChange: (open: boolean) => void;
-  /** Header title override (used by the live preview drawer, where `data` is absent until rendered). */
   title?: ReactNode;
-  /** Header meta override. */
   meta?: ReactNode;
-  /** Interactive inputs rendered above the preview (e.g. the preview channel / payload editor). */
   controls?: ReactNode;
-  /** Shown in place of the preview while `controls` are present but nothing has been rendered yet. */
+  /** Shown instead of the preview while `controls` are present but nothing has been rendered yet. */
   placeholder?: ReactNode;
 }
 

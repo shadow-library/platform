@@ -27,10 +27,7 @@ export function useTablePagination(total: number | undefined, defaultLimit = 20)
   };
 }
 
-/**
- * URL-backed single-column sort for `Table`. Only time columns (`createdAt`/`updatedAt`) are
- * server-sortable, so those are the ids to pass as sortable column ids.
- */
+/** Sortable column ids must be ones the endpoint's `sortBy` accepts (`createdAt`/`updatedAt`). */
 export function useTableSort(defaultSort: TableSort): { sort: TableSort; onSortChange: (sort: TableSort | null) => void } {
   const { search, appendSearch } = useSearchParams();
   const sort: TableSort = search.sortBy ? { id: search.sortBy, direction: (search.sortOrder as SortDirection) ?? 'desc' } : defaultSort;
@@ -43,10 +40,7 @@ export function useTableSort(defaultSort: TableSort): { sort: TableSort; onSortC
   return { sort, onSortChange };
 }
 
-/**
- * Local input state mirrored to a URL search param after a debounce (resets `offset`).
- * Drives the live search/filter text inputs without a request per keystroke.
- */
+/** Resets `offset` when the debounced value reaches the URL. */
 export function useDebouncedParam(key: string, delay = 300): [string, (value: string) => void] {
   const { search, appendSearch } = useSearchParams();
   const [value, setValue] = useState(search[key] ?? '');

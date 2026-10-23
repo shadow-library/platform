@@ -10,25 +10,7 @@ import {
   type VersionResponse,
 } from './api-types.gen';
 
-/**
- * Every shape that's a byte-for-byte match for something `api-types.gen.ts` already exports (the vast
- * majority of what this file used to hand-author) has been deleted — `src/lib/apis/index.ts` now
- * resolves those names straight off the generated file, so they can never drift again (see
- * `bun scripts/gen-api-types.ts --check`). What's left here is real: `variableSchema`.
- *
- * `apps/pulse-server/src/modules/template/template.dto.ts` deliberately declares `variableSchema` with
- * `@Field(() => Object, { additionalProperties: true })` ("loosely typed since it is authored by trusted
- * operators and stored as-is") — `class-schema` can't express the real nested shape through `Object`, so
- * the OpenAPI doc (and therefore `api-types.gen.ts`) widens it to `{ [key: string]: unknown }`. The
- * actual runtime/DB shape, `Template.VariableSchema` in
- * `apps/pulse-server/src/database/schemas/templates.ts`, is the structured type below — verified
- * identical field-for-field. `VariableSchemaEditor.tsx` reads and writes that structure directly
- * (`schema.variables[name].type`/`.required`/`.example`), so `Record<string, unknown>` isn't just looser,
- * it's unusable there without an `any`/`as` escape hatch. These five types re-derive from the generated
- * ones via `Omit<Generated, 'variableSchema'> & { variableSchema: ... }` instead of a hand-copied field
- * list, so every OTHER field still flows straight from the OpenAPI contract and stays drift-checked —
- * only `variableSchema` itself is a deliberate, evidenced override.
- */
+// The server DTO types `variableSchema` loosely, so the generated types widen it; the editor needs the real structure. Other fields still derive from the generated types.
 export type TemplateVariableType = 'string' | 'number' | 'boolean';
 
 interface TemplateVariable {
@@ -48,14 +30,6 @@ export type ListTemplateResponse = Omit<GeneratedListTemplateResponse, 'items'> 
 export type CreateTemplateBody = Omit<GeneratedCreateTemplateBody, 'variableSchema'> & { variableSchema?: TemplateVariableSchema };
 export type UpdateTemplateBody = Omit<GeneratedUpdateTemplateBody, 'variableSchema'> & { variableSchema?: TemplateVariableSchema };
 
-/**
- * Front-end-only shapes with no `api-types.gen.ts` equivalent at all — either the server names the
- * generated schema differently (`SetChannelSettingBody`, `VersionListResponse`, `SaveLayoutDraftBody`,
- * `SavePartialDraftBody`, `LayoutListResponse`, `PartialListResponse`) or the endpoint takes path/query
- * variables that were never going to be a `components.schemas` entry (`DeleteContentVariables`,
- * `RollbackVersionBody`'s `{ version }` companion). None of these collide with a star-exported name from
- * `api-types.gen.ts`, so there's nothing to disambiguate for them in `index.ts`.
- */
 interface UpdateChannelSettingBody {
   isEnabled: boolean;
 }
