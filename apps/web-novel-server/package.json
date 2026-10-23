@@ -33,7 +33,6 @@
     "@types/bun": "catalog:",
     "drizzle-kit": "catalog:",
     "fastify": "catalog:",
-    "type-fest": "catalog:",
     "typescript": "catalog:"
   },
   "dependencies": {

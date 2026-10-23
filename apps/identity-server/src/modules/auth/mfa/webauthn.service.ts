@@ -1,7 +1,6 @@
 import {
   type AuthenticationResponseJSON,
   type AuthenticatorAttachment,
-  type AuthenticatorTransportFuture,
   type PublicKeyCredentialCreationOptionsJSON,
   type PublicKeyCredentialRequestOptionsJSON,
   type RegistrationResponseJSON,
@@ -44,7 +43,7 @@ export interface WebauthnRegistrationOptions {
   challenge: string;
   pubKeyCredParams: { alg: number; type: 'public-key' }[];
   timeout?: number;
-  excludeCredentials?: { id: string; type: 'public-key'; transports?: AuthenticatorTransportFuture[] }[];
+  excludeCredentials?: { id: string; type: 'public-key'; transports?: string[] }[];
   authenticatorSelection?: PublicKeyCredentialCreationOptionsJSON['authenticatorSelection'];
   attestation?: PublicKeyCredentialCreationOptionsJSON['attestation'];
   extensions?: { credProps?: boolean };
@@ -94,7 +93,7 @@ export class WebauthnService {
       response: {
         clientDataJSON: input.response.clientDataJSON,
         attestationObject: input.response.attestationObject,
-        transports: input.response.transports as AuthenticatorTransportFuture[] | undefined,
+        transports: input.response.transports,
       },
       clientExtensionResults: {},
       authenticatorAttachment: input.authenticatorAttachment as AuthenticatorAttachment | undefined,
@@ -143,7 +142,7 @@ export class WebauthnService {
       challenge: options.challenge,
       pubKeyCredParams: options.pubKeyCredParams.map(param => ({ alg: param.alg, type: param.type })),
       timeout: options.timeout,
-      excludeCredentials: options.excludeCredentials?.map(credential => ({ id: credential.id, type: credential.type, transports: credential.transports })),
+      excludeCredentials: options.excludeCredentials?.map(credential => ({ id: credential.id, type: 'public-key' as const, transports: credential.transports })),
       authenticatorSelection: options.authenticatorSelection,
       attestation: options.attestation,
       extensions: options.extensions ? { credProps: options.extensions.credProps } : undefined,
@@ -178,8 +177,8 @@ export class WebauthnService {
     };
   }
 
-  private parseTransports(credential: WebauthnCredential): AuthenticatorTransportFuture[] | undefined {
-    return credential.transports ? (credential.transports.split(',') as AuthenticatorTransportFuture[]) : undefined;
+  private parseTransports(credential: WebauthnCredential): string[] | undefined {
+    return credential.transports ? credential.transports.split(',') : undefined;
   }
 
   async listForUser(userId: bigint): Promise<WebauthnCredential[]> {

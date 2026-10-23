@@ -260,8 +260,8 @@ export class ConfigService<Configs extends ConfigRecords = ConfigRecords> {
 
     this.fsWatcher = watch(this.envFilePaths, {
       depth: 0,
-      usePolling: true,
-      interval: 1000,
+      backend: 'polling',
+      pollingInterval: 1000,
       ignoreInitial: true,
       ignored: filePath => !this.envFilePaths.includes(path.resolve(filePath)),
     });

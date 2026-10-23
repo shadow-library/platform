@@ -53,7 +53,7 @@
     "@types/luxon": "^3.7.1",
     "@types/memcached": "^2.2.10",
     "drizzle-orm": "catalog:",
-    "ioredis": "^5.8.2",
+    "ioredis": "^6.0.0",
     "light-my-request": "catalog:",
     "memcached": "^2.2.2",
     "reflect-metadata": "catalog:",
@@ -65,7 +65,7 @@
     "@shadow-library/common": "workspace:*",
     "@shadow-library/fastify": "workspace:*",
     "drizzle-orm": "^0.45.0",
-    "ioredis": "^5.8.2",
+    "ioredis": "^6.0.0",
     "memcached": "^2.2.2",
     "reflect-metadata": "^0.2.2"
   },

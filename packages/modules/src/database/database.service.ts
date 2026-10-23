@@ -85,7 +85,8 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       const config: RedisConfig = this.options.redis === true ? {} : this.options.redis;
       const { url, options = {} } = config;
       const connectionUrl = this.resolveConnectionUrl('Redis', 'database.redis.url', url);
-      this.redisClient = new RedisClient(connectionUrl, options);
+      // Pins RESP2 so the wire behaviour matches ioredis 5: no HELLO handshake or RESP3 push frames.
+      this.redisClient = new RedisClient(connectionUrl, { protocol: 2, ...options });
       await new Promise<void>((resolve, reject) => {
         if (!this.redisClient) throw AppError.internal('Redis client is in an impossible state: undefined after instantiation');
         this.redisClient.once('ready', () => resolve());

@@ -30,7 +30,6 @@
   "devDependencies": {
     "@types/bun": "catalog:",
     "drizzle-kit": "catalog:",
-    "type-fest": "catalog:",
     "typescript": "catalog:"
   },
   "dependencies": {
