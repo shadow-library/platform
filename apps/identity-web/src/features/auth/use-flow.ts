@@ -1,9 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 
 import { type FlowState, isApiError } from '@/lib/apis';
-
-/** Why a flow became unrecoverable: `expired` (timed out / not found) vs `locked` (terminated after too many failures). */
-type DeadReason = 'expired' | 'locked';
+import { type DeadReason, flowFailureOutcome, rejectedProofMessage } from '@/lib/auth-flow';
 
 export interface FlowUiState {
   flow: FlowState | null;
@@ -22,23 +20,6 @@ export interface FlowActions {
   reset(): void;
   setError(message: string | null): void;
 }
-
-const RETRY_MESSAGE = (seconds?: number): string => (seconds ? `Too many attempts — try again in ${seconds}s.` : 'Too many attempts — try again shortly.');
-
-const REJECTED_MESSAGE = (attemptsLeft: number): string =>
-  attemptsLeft > 0 ? `That didn’t work — ${attemptsLeft} ${attemptsLeft === 1 ? 'attempt' : 'attempts'} left.` : 'No attempts left. This attempt is locked.';
-
-/**
- * The identifier step now answers for the account itself rather than deferring to the password step, so these codes
- * need copy the server deliberately does not carry. Each names the state and who can lift it, because a dead end with
- * no next step is worse than no message at all.
- */
-const ACCOUNT_STATE_MESSAGES: Record<string, string> = {
-  AUTH_008: 'We couldn’t find an account with those details. Check them, or create an account.',
-  AUTH_009: 'This account has been blocked. Contact support if you believe this is a mistake.',
-  AUTH_010: 'This account is temporarily suspended. Contact your administrator to restore access.',
-  AUTH_011: 'This account has been deactivated. Contact your administrator to reactivate it.',
-};
 
 /**
  * Shared state-machine plumbing for the login / registration / recovery pages. Every transition runs
@@ -62,23 +43,16 @@ export function useFlow(): FlowUiState & FlowActions {
       previousFlow.current = next;
       setFlow(next);
       /** A same-status answer carrying an attempts budget is a rejected proof, not a transition. */
-      if (previous && previous.status === next.status && next.attemptsLeft !== undefined) setError(REJECTED_MESSAGE(next.attemptsLeft));
+      const rejected = rejectedProofMessage(previous, next);
+      if (rejected) setError(rejected);
       return next;
     } catch (cause) {
-      /**
-       * `isApiError` (web 0.2) instead of `instanceof` — the guard still holds when the SSR and client
-       * bundles each carry their own `ApiError` class identity. AUTH_004 is a flow terminated after too
-       * many failures (a lock-out); any other 410/409 is an expiry.
-       */
-      const accountState = isApiError(cause) && cause.code ? ACCOUNT_STATE_MESSAGES[cause.code] : undefined;
-      if (isApiError(cause) && (cause.status === 410 || cause.status === 409)) {
+      /** `isApiError` (web 0.2) instead of `instanceof` — the guard still holds when the SSR and client bundles each carry their own `ApiError` class identity. */
+      const outcome = flowFailureOutcome(isApiError(cause) ? cause : null);
+      if (outcome.kind === 'dead') {
         setDead(true);
-        setDeadReason(cause.code === 'AUTH_004' ? 'locked' : 'expired');
-      } else if (accountState) setError(accountState);
-      else if (isApiError(cause) && cause.status === 429) setError(RETRY_MESSAGE(cause.retryAfterSeconds));
-      else if (isApiError(cause) && cause.fields?.length) setError(cause.fields.map(field => field.msg).join(' '));
-      else if (isApiError(cause)) setError(cause.message);
-      else setError('Something went wrong. Please try again.');
+        setDeadReason(outcome.reason);
+      } else setError(outcome.message);
       return null;
     } finally {
       setBusy(false);

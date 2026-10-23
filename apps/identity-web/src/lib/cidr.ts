@@ -19,6 +19,7 @@ function isValidIPv6(value: string): boolean {
   let ipv4Weight = 0;
   const lastGroup = groups[groups.length - 1];
   if (lastGroup?.includes('.')) {
+    if (value.endsWith('::')) return false;
     if (!isValidIPv4(lastGroup)) return false;
     groups = groups.slice(0, -1);
     ipv4Weight = 2;

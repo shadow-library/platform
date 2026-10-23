@@ -17,7 +17,7 @@ const BOT_ERROR_MESSAGES: Record<string, string> = {
 };
 
 export function botErrorMessage(error: ApiError): string {
-  return BOT_ERROR_MESSAGES[error.code] ?? error.message;
+  return (Object.hasOwn(BOT_ERROR_MESSAGES, error.code) ? BOT_ERROR_MESSAGES[error.code] : undefined) ?? error.message;
 }
 
 export type BotFieldErrorTarget = 'handle' | 'ipAllowlist' | 'expiresAt' | 'transferToUserId';
@@ -31,6 +31,6 @@ const BOT_FIELD_ERRORS: Partial<Record<string, BotFieldErrorTarget>> = {
 
 /** Maps a conflict/validation code with no server-side field detail onto the form field it concerns. */
 export function botFieldError(error: ApiError): { field: BotFieldErrorTarget; message: string } | null {
-  const field = BOT_FIELD_ERRORS[error.code];
+  const field = Object.hasOwn(BOT_FIELD_ERRORS, error.code) ? BOT_FIELD_ERRORS[error.code] : undefined;
   return field ? { field, message: botErrorMessage(error) } : null;
 }

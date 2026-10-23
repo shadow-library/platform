@@ -28,21 +28,7 @@ import {
 import { ArrowLeftIcon, BotIcon, KeyIcon } from '@/components/icons';
 import { QueryState, SectionCard, StatusChip } from '@/components/si';
 import { SecretDialog } from '@/features/console';
-import {
-  baselineFromGrants,
-  countChangedSlots,
-  DeleteBotDialog,
-  type DesiredGrantMap,
-  desiredGrantsList,
-  humanizeResource,
-  PermissionsMatrix,
-  resolvedNotHeldRemovals,
-  resolvedStaleRemovals,
-  staleLevelGrants,
-  summarizeGrants,
-  unrepresentableManagedGrantCount,
-  unresolvedNotHeldGrants,
-} from '@/features/bots';
+import { DeleteBotDialog, PermissionsMatrix } from '@/features/bots';
 import { useStepUpGate } from '@/features/portal';
 import {
   type ApiError,
@@ -78,6 +64,20 @@ import {
   useUpdateBotMutation,
 } from '@/lib/apis';
 import { botErrorMessage, botFieldError } from '@/lib/bot-errors';
+import { customExpiry, MAX_KEY_LIFETIME_DAYS, presetExpiry } from '@/lib/bot-key-expiry';
+import {
+  baselineFromGrants,
+  countChangedSlots,
+  type DesiredGrantMap,
+  desiredGrantsList,
+  humanizeResource,
+  resolvedNotHeldRemovals,
+  resolvedStaleRemovals,
+  staleLevelGrants,
+  summarizeGrants,
+  unrepresentableManagedGrantCount,
+  unresolvedNotHeldGrants,
+} from '@/lib/bot-permissions';
 import { isValidRateLimit, MAX_RATE_LIMIT, MIN_RATE_LIMIT, rateLimitError } from '@/lib/bot-rate-limit';
 import { validateCidr } from '@/lib/cidr';
 import { daysUntil, formatDate, relativeTime } from '@/lib/format';
@@ -134,8 +134,6 @@ const STATUS_META: Record<BotItem['status'], { label: string; intent: 'success' 
 const MAX_IP_ENTRIES = 20;
 const MAX_ACTIVE_KEYS = 2;
 const EXPIRY_WARNING_DAYS = 7;
-const DAY_MS = 24 * 60 * 60 * 1000;
-const MAX_KEY_LIFETIME_DAYS = 365;
 const RECENT_ACTIVITY_LIMIT = 3;
 const EMPTY_APPLICATIONS: BotCatalogApplicationItem[] = [];
 const EMPTY_GRANTS: BotGrantItem[] = [];
@@ -1101,23 +1099,6 @@ function SettingsTab({ orgId, organisationName, bot, require, onSuspendToggle, s
 type ExpiryOption = '30' | '90' | '180' | '365' | 'custom';
 
 const EXPIRY_LABEL: Record<ExpiryOption, string> = { '30': '30 days', '90': '90 days', '180': '180 days', '365': '1 year', custom: 'Custom date' };
-const EXPIRY_SAFETY_MARGIN_MS = 60_000;
-
-function expiryCeiling(): number {
-  return Date.now() + MAX_KEY_LIFETIME_DAYS * DAY_MS - EXPIRY_SAFETY_MARGIN_MS;
-}
-
-function presetExpiry(days: number): Date {
-  return new Date(Math.min(Date.now() + days * DAY_MS, expiryCeiling()));
-}
-
-function customExpiry(isoDate: string): Date | null {
-  const parsed = parseISODate(isoDate);
-  if (!parsed) return null;
-  const endOfDay = new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate(), 23, 59, 59, 999);
-  return new Date(Math.min(endOfDay.getTime(), expiryCeiling()));
-}
-
 interface GenerateKeyDialogProps {
   orgId: string;
   botId: string;
@@ -1139,7 +1120,8 @@ function GenerateKeyDialog({ orgId, botId, botLabel, open, onOpenChange, require
   const today = new Date();
   const minDate = toISODate(addDays(today, 1));
   const maxDate = toISODate(addDays(today, MAX_KEY_LIFETIME_DAYS - 1));
-  const resolvedDate = expiryOption === 'custom' ? (customDate ? customExpiry(customDate) : null) : presetExpiry(Number(expiryOption));
+  const customParsed = expiryOption === 'custom' && customDate ? parseISODate(customDate) : null;
+  const resolvedDate = expiryOption === 'custom' ? (customParsed ? customExpiry(customParsed, today) : null) : presetExpiry(Number(expiryOption), today);
 
   const reset = (): void => {
     setName('');

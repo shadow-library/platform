@@ -58,6 +58,7 @@ import {
   useUpdateClientMutation,
 } from '@/lib/apis';
 import { formatDate, relativeTime } from '@/lib/format';
+import { isValidWorkloadBinding } from '@/lib/workload-binding';
 
 import styles from './console.module.css';
 
@@ -119,9 +120,6 @@ const AUTH_METHOD_LABEL: Record<string, string> = {
 };
 
 const MEMBERS_PAGE_SIZE = 25;
-
-/** An exact SA subject `system:serviceaccount:<ns>:<name>` or a namespace-scoped pattern `…:<ns>:*`. */
-const WORKLOAD_BINDING_PATTERN = /^system:serviceaccount:[a-z0-9]([-a-z0-9]*[a-z0-9])?:[a-z0-9*]([-a-z0-9*]*[a-z0-9*])?$/;
 
 function memberLabel(member: ApplicationMemberItem): string {
   return member.primaryEmail ?? member.username ?? member.userId;
@@ -787,7 +785,7 @@ function CredentialsTab(props: { appId: string; appName: string; publicUrls: str
                     value={workloadTokens}
                     onValueChange={setWorkloadTokens}
                     placeholder="system:serviceaccount:novel-forge:novel-forge-server"
-                    validate={value => WORKLOAD_BINDING_PATTERN.test(value) || 'Must be system:serviceaccount:namespace:name (name may be *)'}
+                    validate={value => isValidWorkloadBinding(value) || 'Must be system:serviceaccount:namespace:name (name may be *)'}
                   />
                 </FormField>
               )}

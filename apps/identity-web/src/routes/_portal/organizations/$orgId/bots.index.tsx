@@ -4,7 +4,6 @@ import { Avatar, Badge, Button, ClientOnly, DropdownMenu, EmptyState, IconButton
 
 import { AlertTriangleIcon, BotIcon, ClockIcon, LayersIcon, MoreIcon, PlusIcon, SearchIcon, ShieldCheckIcon } from '@/components/icons';
 import { QueryState, StatusChip } from '@/components/si';
-import { countFlaggedGrants, countGrantsByApplication } from '@/features/bots';
 import { useStepUpGate } from '@/features/portal';
 import {
   type BotItem,
@@ -19,6 +18,7 @@ import {
   useSuspendBotMutation,
 } from '@/lib/apis';
 import { botErrorMessage } from '@/lib/bot-errors';
+import { countFlaggedGrants, countGrantsByApplication } from '@/lib/bot-permissions';
 import { daysUntil, formatDate, relativeTime } from '@/lib/format';
 
 import styles from './bots.module.css';

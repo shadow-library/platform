@@ -4,10 +4,11 @@ import { Avatar, Button, DescriptionList, FormField, Input, NumberStepper, Texta
 
 import { ArrowLeftIcon, BotIcon } from '@/components/icons';
 import { QueryState, SectionCard } from '@/components/si';
-import { type DesiredGrantMap, desiredGrantsList, PermissionsMatrix, summarizePermissions } from '@/features/bots';
+import { PermissionsMatrix } from '@/features/bots';
 import { useStepUpGate } from '@/features/portal';
 import { botPermissionCatalogQueryOptions, myOrganisationsQueryOptions, orgAccessOf, useBotPermissionCatalogQuery, useCreateBotMutation, useOrgAccess } from '@/lib/apis';
 import { botErrorMessage, botFieldError } from '@/lib/bot-errors';
+import { type DesiredGrantMap, desiredGrantsList, summarizePermissions } from '@/lib/bot-permissions';
 import { isValidRateLimit, MAX_RATE_LIMIT, MIN_RATE_LIMIT, rateLimitError } from '@/lib/bot-rate-limit';
 import { validateCidr } from '@/lib/cidr';
 
