@@ -21,7 +21,7 @@ export class OpenApiService {
   private schemaIdMap = new Map<string, string>();
 
   constructor(@Inject(HTTP_CORE_CONFIGS) options: HttpCoreModuleOptions) {
-    /** The stamped version ties the served contract to the code revision that produced it, so consumers can trace generated artifacts back to a commit */
+    // Stamped so consumers can trace generated artifacts back to a commit
     const version = options.openapi.info?.version ?? Config.register('app.version', DEFAULT_CONFIGS['app.version']);
     this.options = { ...options.openapi, info: { title: Config.get('app.name'), ...options.openapi.info, version } };
   }
@@ -50,12 +50,7 @@ export class OpenApiService {
     return normalized;
   }
 
-  /**
-   * Rewrites every internal class-schema reference below `node` to its `#/components/schemas` name, in place.
-   * A reference to a composition is replaced by the composition itself: its `type`/`additionalProperties` are
-   * dropped on the way in, because "an object with no properties" and "one of these schemas" contradict each
-   * other, and a reader that honours the first rejects every variant.
-   */
+  /** An inlined composition drops `type`/`additionalProperties`: "object with no properties" contradicts "one of these" and readers honouring the first reject every variant */
   private resolveRefs(node: JSONSchema | undefined, compositions: Map<string, JSONSchema>): void {
     if (!node || typeof node !== 'object') return;
 
@@ -94,9 +89,7 @@ export class OpenApiService {
     if (document.components.schemas[schemaId]) return { $ref: `#/components/schemas/${schemaId}` };
 
     const definitions = [schema, ...Object.values(schema.definitions ?? {})];
-    // A composition has no name a consumer could use — `SchemaComposer` derives its id from the classes it
-    // unites so identical compositions dedupe — so it is inlined at every reference instead of published as
-    // a component. Its own references are resolved first, because inlining copies the body as it stands.
+    // Compositions have no consumer-usable name (id derived from united classes), so they are inlined at each reference after resolving their own refs first
     const compositions = new Map<string, JSONSchema>();
     for (const definition of definitions) {
       if (definition.$id && COMPOSED_SCHEMA_ID.test(definition.$id)) compositions.set(definition.$id, definition);

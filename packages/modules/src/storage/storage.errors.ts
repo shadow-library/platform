@@ -1,8 +1,7 @@
 import { ErrorCode } from '@shadow-library/common';
 
-/** The object-storage error catalog. Infra faults stay `AppError.internal`; these are the domain-shaped keys callers can branch on. */
+/** Infra faults stay `AppError.internal`; these are the domain-shaped keys callers can branch on */
 export class StorageErrorCode extends ErrorCode {
-  /** The requested ref has no object behind it */
   static readonly OBJECT_NOT_FOUND = StorageErrorCode.notFound('STORAGE_OBJECT_NOT_FOUND', 'Stored object not found');
 
   /** Presigned uploads were requested from a driver that cannot mint them (the local-disk driver) */

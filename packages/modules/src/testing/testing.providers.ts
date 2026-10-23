@@ -7,8 +7,6 @@ import { FakeDatabaseService } from './fake-database.service';
 import { FakeStorageService } from './fake-storage.service';
 
 /**
- * Declaring the constants
- *
  * Entries for `ShadowFactory.create(AppModule, { overrides })`, which swaps providers by token wherever
  * they are declared. They are factories rather than value providers so an entry can also sit in a test
  * `@Module`'s `providers`, whose metadata is deep-frozen along with any value it holds. An override for a

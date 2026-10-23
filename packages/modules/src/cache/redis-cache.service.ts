@@ -50,7 +50,6 @@ export class RedisCacheService implements ICacheStore {
     return result;
   }
 
-  /** Publishes a message to a specific channel in Redis Pub/Sub */
   async publish(channel: string, message: string): Promise<void> {
     await this.redis.publish(channel, message);
     this.logger.debug(`Published message to channel: ${channel}`, { message });

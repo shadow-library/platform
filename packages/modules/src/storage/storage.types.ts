@@ -16,7 +16,6 @@ declare module '@shadow-library/common' {
 
 export type StorageDriver = 's3' | 'local';
 
-/** The bytes of a stored object plus the content type it was written with. */
 export interface StorageObject {
   bytes: Uint8Array;
   contentType: string;
@@ -43,17 +42,12 @@ export interface PresignDownloadOptions {
   expiresSeconds?: number;
 }
 
-/** Metadata fetched without a body transfer (an S3 `HEAD`, or the local driver's file stat). */
 export interface HeadResult {
   size: number;
   contentType: string;
 }
 
-/**
- * The driver seam. Providers deal only in already-computed refs — content addressing, URL policy and
- * MIME/extension derivation live in `StorageService`, so a provider stays a thin bytes-in/bytes-out
- * adapter over its backend.
- */
+/** Providers deal only in already-computed refs; content addressing, URL policy and MIME/extension derivation live in `StorageService` */
 export interface StorageProvider {
   /** Writes bytes at `ref`. Callers guarantee `ref` is content-addressed, so a re-put is idempotent */
   put(ref: string, bytes: Uint8Array, contentType: string): Promise<void>;
@@ -64,7 +58,6 @@ export interface StorageProvider {
   /** Removes the object at `ref`; a missing object is not an error */
   delete(ref: string): Promise<void>;
 
-  /** Whether an object exists at `ref` */
   exists(ref: string): Promise<boolean>;
 
   /** Metadata for the object at `ref` without transferring its bytes; `null` when absent */

@@ -33,7 +33,7 @@ export class CacheService {
     }
   }
 
-  /** Retrieves data by key. Checks L1 (In-Memory). On miss, checks L2 (Memcached or Redis fallback) and hydrates L1 if found */
+  /** Reads L1, then L2, hydrating L1 on an L2 hit */
   async get<T = any>(key: string): Promise<T | null> {
     let value: Nullable<T> = this.lruCache.get<T>(key);
     if (value !== undefined) {
@@ -54,7 +54,6 @@ export class CacheService {
     return null;
   }
 
-  /** Writes data to both L1 (In-Memory) and L2 (Memcached or Redis fallback) with an optional Time-To-Live */
   async set<T = any>(key: string, value: T, ttlSeconds?: number): Promise<void> {
     this.lruCache.set(key, value);
     this.logger.debug(`L1 cache set for key: ${key}`, { value });
@@ -62,7 +61,6 @@ export class CacheService {
     this.logger.debug(`L2 cache set for key: ${key}`, { value, ttlSeconds });
   }
 
-  /** Deletes the key from both L1 (In-Memory) and L2 (Memcached or Redis fallback) */
   async del(key: string): Promise<void> {
     this.lruCache.remove(key);
     this.logger.debug(`L1 cache deleted for key: ${key}`);
@@ -70,11 +68,7 @@ export class CacheService {
     this.logger.debug(`L2 cache deleted for key: ${key}`);
   }
 
-  /**
-   * Returns the cached value for the key, computing and caching it via the factory on a miss.
-   * Concurrent calls for the same key share a single factory invocation (cache-stampede protection).
-   * Nullish factory results are returned but not cached, so they are recomputed on the next call.
-   */
+  /** Concurrent misses for a key share one factory call; nullish results are returned but not cached */
   async getOrSet<T = any>(key: string, factory: () => Promisable<T>, ttlSeconds?: number): Promise<T> {
     const pending = this.inflight.get(key) as Promise<T> | undefined;
     if (pending) return pending;
@@ -82,7 +76,7 @@ export class CacheService {
     const cached = await this.get<T>(key);
     if (cached !== null) return cached;
 
-    /*! A factory for this key may have started while the cache read was awaited */
+    // A factory for this key may have started while the cache read was awaited
     const started = this.inflight.get(key) as Promise<T> | undefined;
     if (started) return started;
 

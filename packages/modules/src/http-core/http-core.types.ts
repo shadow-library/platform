@@ -6,7 +6,6 @@ import { type CSRFOptions } from './services/csrf-token.types';
 
 declare module '@shadow-library/common' {
   export interface ConfigRecords {
-    /*! Build metadata stamped into the served OpenAPI document */
     'app.version': string;
 
     'http-core.csrf.enabled': boolean;
@@ -14,7 +13,6 @@ declare module '@shadow-library/common' {
     'http-core.compress.enabled'?: boolean;
     'http-core.openapi.enabled'?: boolean;
 
-    /*! Health Service configs */
     'health.host': string;
     'health.port': number;
     'health.enabled': boolean;

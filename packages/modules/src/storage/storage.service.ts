@@ -17,12 +17,6 @@ import {
 } from './storage.types';
 import { extFromContentType, sha256Hex } from './storage.utils';
 
-/**
- * The public object-storage surface. Refs are content-addressed (`<sha256hex>.<ext>`) so a re-upload of
- * identical bytes yields the same ref and is deduplicated by construction, and a stored ref is immutable.
- * URL policy (public origin, presign endpoint) and MIME/extension derivation live here; the driver seam
- * below stays a thin bytes adapter.
- */
 @Injectable()
 export class StorageService implements OnModuleInit {
   private readonly logger = Logger.getLogger(LOGGER_NAMESPACE, 'StorageService');
@@ -40,7 +34,7 @@ export class StorageService implements OnModuleInit {
     this.logger.info('Storage service initialized', { driver: this.driver, publicOrigin: this.publicOrigin });
   }
 
-  /** Writes `bytes` under a content-addressed ref (`<sha256hex>.<ext>`) and returns it; identical bytes reuse the existing object. */
+  /** Writes `bytes` under the content-addressed ref `<sha256hex>.<ext>` and returns it; identical bytes are deduplicated and a stored ref is immutable. */
   async save(bytes: Uint8Array, options: SaveOptions): Promise<string> {
     const ext = options.ext ?? extFromContentType(options.contentType);
     const ref = `${sha256Hex(bytes)}.${ext}`;
@@ -49,22 +43,21 @@ export class StorageService implements OnModuleInit {
     return ref;
   }
 
-  /** Writes `bytes` at the caller-supplied `ref`, bypassing content-addressing — for objects a ref scheme other than `save`'s already keys (e.g. a per-job export manifest). A re-put at the same ref overwrites it. */
+  /** Writes at a caller-supplied `ref`, bypassing content-addressing (e.g. a per-job export manifest); a re-put overwrites */
   putAt(ref: string, bytes: Uint8Array, contentType: string): Promise<void> {
     return this.provider.put(ref, bytes, contentType);
   }
 
-  /** Reads the object at `ref`; throws `StorageErrorCode.OBJECT_NOT_FOUND` when it is absent. */
+  /** Reads the object at `ref`; throws `StorageErrorCode.OBJECT_NOT_FOUND` when it is absent */
   read(ref: string): Promise<StorageObject> {
     return this.provider.get(ref);
   }
 
-  /** Removes the object at `ref`; a missing object is not an error. */
+  /** Removes the object at `ref`; a missing object is not an error */
   delete(ref: string): Promise<void> {
     return this.provider.delete(ref);
   }
 
-  /** Whether an object exists at `ref`. */
   exists(ref: string): Promise<boolean> {
     return this.provider.exists(ref);
   }
@@ -76,7 +69,7 @@ export class StorageService implements OnModuleInit {
     return result;
   }
 
-  /** The anonymous public download URL for `ref` (`<publicOrigin>/<ref>`); passthrough for a nullish ref eases DTO mapping. */
+  /** `<publicOrigin>/<ref>`; a nullish ref yields `undefined` to ease DTO mapping */
   getPublicUrl(ref: string): string;
   getPublicUrl(ref: null | undefined): undefined;
   getPublicUrl(ref: string | null | undefined): string | undefined;
@@ -97,7 +90,7 @@ export class StorageService implements OnModuleInit {
     return this.provider.presignDownload(ref, options.expiresSeconds ?? 900);
   }
 
-  /** Lists every ref under `prefix` (a bounded prefix walk, ADR-0008); unsupported on the local driver. */
+  /** Lists every ref under `prefix`; unsupported on the local driver. */
   list(prefix: string): Promise<string[]> {
     if (!this.provider.list) throw StorageErrorCode.LIST_UNSUPPORTED.create({ driver: this.driver });
     return this.provider.list(prefix);

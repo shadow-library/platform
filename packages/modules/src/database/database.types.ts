@@ -44,16 +44,14 @@ export interface PostgresConnectionConfig {
   maxConnections?: number;
 
   /**
-   * Named server-side prepared statements; the factory passes it to the driver's `prepare` option. Default `false` (`database.postgres.prepare`):
-   * Bun SQL 1.3.14 stalls pipelined queries on named prepared statements, leaving connections idle in transaction, so a production deployment
-   * under Bun refuses to boot with it on and anywhere else only warns. Unnamed statements get no parameter type inference, so an object or a
-   * Date must never reach the driver raw: jsonb is bound as JSON text cast `::text::jsonb`, which stores the same value under either setting.
+   * Named server-side prepared statements; the factory must pass it to the driver's `prepare` option. Default `false` (`database.postgres.prepare`):
+   * Bun SQL 1.3.14 stalls pipelined queries on named prepared statements, so `true` under Bun refuses to boot in a production deployment and warns elsewhere.
+   * Unnamed statements get no parameter type inference, so never hand the driver a raw object or Date; bind jsonb as JSON text cast `::text::jsonb`.
    */
   prepare: boolean;
 }
 
 export interface PostgresConfig {
-  /** Factory function that creates and returns a Drizzle client instance. */
   factory: (config: DrizzleConfig, connection: PostgresConnectionConfig) => Promisable<PostgresClient>;
 
   /** Map of PostgreSQL constraint names to application-specific error instances used by `translateError()` */

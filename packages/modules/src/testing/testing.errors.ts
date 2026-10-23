@@ -1,11 +1,5 @@
 import { ErrorCode } from '@shadow-library/common';
 
-/**
- * Declaring the constants
- *
- * The in-memory Redis keeps Redis's own reply text, so an assertion written against a real server's
- * error reads the same against the fake.
- */
 export class TestingErrorCode extends ErrorCode {
   /** A query reached the fake database's postgres client, which was never given a real one to answer with */
   static readonly POSTGRES_CLIENT_MISSING = TestingErrorCode.internal(
@@ -16,6 +10,7 @@ export class TestingErrorCode extends ErrorCode {
   /** Memcached has no fake; no application reads it */
   static readonly MEMCACHE_UNSUPPORTED = TestingErrorCode.internal('TESTING_MEMCACHE_UNSUPPORTED', 'FakeDatabaseService does not provide a memcached client');
 
+  // Redis's own reply text, so assertions written against a real server read the same against the fake
   static readonly REDIS_WRONG_TYPE = TestingErrorCode.internal('TESTING_REDIS_WRONG_TYPE', 'WRONGTYPE Operation against a key holding the wrong kind of value');
   static readonly REDIS_NOT_INTEGER = TestingErrorCode.internal('TESTING_REDIS_NOT_INTEGER', 'ERR value is not an integer or out of range');
   static readonly REDIS_INVALID_EXPIRE = TestingErrorCode.internal('TESTING_REDIS_INVALID_EXPIRE', "ERR invalid expire time in '{command}' command");

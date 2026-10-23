@@ -27,7 +27,6 @@ export class MemcacheService implements ICacheStore {
     return this.memcached !== undefined;
   }
 
-  /** Runs a Memcached operation as a promise, throwing when the client is inactive */
   private exec<T>(operation: (client: Memcached, done: MemcachedCallback<T>) => void): Promise<T> {
     const client = this.memcached;
     if (!client) throw AppError.internal('Memcached client is not initialized. Ensure memcache config is provided in DatabaseModuleOptions');
@@ -55,7 +54,6 @@ export class MemcacheService implements ICacheStore {
     throw AppError.internal(`Unexpected value returned from Memcached ${operation} for key '${key}': ${String(result)}`);
   }
 
-  /** Retrieves data exclusively from Memcached */
   async get<T = any>(key: string): Promise<MaybeNull<T>> {
     if (!this.memcached) return null;
     const data = await this.exec<T | undefined>((client, done) => client.get(key, done));
@@ -64,26 +62,22 @@ export class MemcacheService implements ICacheStore {
     return data ?? null;
   }
 
-  /** Stores data exclusively in Memcached */
   async set<T = any>(key: string, value: T, ttlSeconds = 0): Promise<void> {
     if (!this.memcached) return;
     await this.exec<boolean>((client, done) => client.set(key, value, ttlSeconds, done));
     this.logger.debug(`cache set for key: ${key}`, { value, lifetime: ttlSeconds });
   }
 
-  /** Deletes data exclusively from Memcached */
   async del(key: string): Promise<void> {
     if (!this.memcached) return;
     await this.exec<boolean>((client, done) => client.del(key, done));
     this.logger.debug(`cache deleted for key: ${key}`);
   }
 
-  /** Increments a numeric value exclusively in Memcached, initializing if not found */
   async incr(key: string, amount = 1): Promise<number> {
     return this.adjust('incr', key, amount);
   }
 
-  /** Decrements a numeric value exclusively in Memcached, initializing if not found */
   async decr(key: string, amount = 1): Promise<number> {
     return this.adjust('decr', key, amount);
   }

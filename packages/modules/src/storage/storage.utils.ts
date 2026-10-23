@@ -20,7 +20,6 @@ const EXT_TO_CONTENT_TYPE: Record<string, string> = Object.entries(CONTENT_TYPE_
   { jpeg: 'image/jpeg' },
 );
 
-/** Lowercase hex SHA-256 of the bytes — the content address a ref is built from. */
 export function sha256Hex(bytes: Uint8Array): string {
   return createHash('sha256').update(bytes).digest('hex');
 }

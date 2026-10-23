@@ -15,12 +15,7 @@ export interface S3StorageProviderConfig {
   secretAccessKey: string;
 }
 
-/**
- * S3-compatible provider backed by Bun's built-in `S3Client` (Garage in production). Reads and writes
- * go through the in-cluster endpoint; presigned uploads are signed against the external endpoint so the
- * URL a browser receives resolves from outside the cluster. Presigning is an offline signature — no
- * network call — so the presign client exists purely to carry the external endpoint into the signature.
- */
+/** Presigning is offline, so `presignClient` exists only to sign against the external endpoint a browser can resolve; reads and writes use the in-cluster one */
 export class S3StorageProvider implements StorageProvider {
   private readonly client: S3Client;
   private readonly presignClient: S3Client;
