@@ -273,7 +273,7 @@ export class BibleAuditService {
   }
 
   private async runJob(job: Job.Row): Promise<void> {
-    if (job.attempts > 0 && (await this.alreadyAudited(job.id))) {
+    if (job.attempts > 1 && (await this.alreadyAudited(job.id))) {
       this.logger.info('audit job retried after its report was stored — settling it as done', { jobId: job.id, projectId: job.projectId });
       await this.workflowRunService.settleJobRuns(job.id, 'completed');
       return;

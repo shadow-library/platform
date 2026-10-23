@@ -337,7 +337,7 @@ describe('ChapterReviewService review job', () => {
     const run = reviewHarness({ priorRun: { id: 'run-1' } });
     await run.service.run(1n, 4, { kind: 'judge' });
 
-    await run.runRegisteredJob(job(1));
+    await run.runRegisteredJob(job(2));
 
     expect(run.reviews.length).toBe(1);
     expect(run.modelCalls.length).toBe(1);
@@ -347,16 +347,16 @@ describe('ChapterReviewService review job', () => {
   it('should review on a retry whose earlier attempt stored nothing', async () => {
     const run = reviewHarness({ priorRun: { id: 'run-0' } });
 
-    await run.runRegisteredJob(job(1));
+    await run.runRegisteredJob(job(2));
 
     expect(run.reviews.length).toBe(1);
   });
 
-  it('should review on a first attempt without looking for an earlier one', async () => {
+  it('should review on the first attempt of a re-enqueued job, though its previous enqueue stored a review under the same job', async () => {
     const run = reviewHarness({ priorRun: { id: 'run-1' } });
     await run.service.run(1n, 4, { kind: 'judge' });
 
-    await run.runRegisteredJob(job(0));
+    await run.runRegisteredJob(job(1));
 
     expect(run.reviews.length).toBe(2);
   });

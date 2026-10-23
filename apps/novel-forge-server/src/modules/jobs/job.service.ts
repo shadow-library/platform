@@ -1,4 +1,4 @@
-import { and, desc, eq, getTableColumns, inArray, isNull, not, type SQL, sql } from 'drizzle-orm';
+import { and, desc, eq, getTableColumns, inArray, isNull, not, notInArray, type SQL, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
@@ -10,6 +10,7 @@ import { type DbExecutor, type Job, type PrimaryDatabase, type Project, schema }
 
 import { scopedCostTier } from '../ai/cost-tier-scope';
 import { isCostTier } from '../ai/defaults';
+import { RUN_OWNER_SILENCE_MS } from '../ai/graphs/run-liveness';
 import { type CallUsageTotals, emptyCallUsageTotals, type GroupedUsageRow, summarizeGroupedCallUsage } from '../ai/usage/call-usage';
 import { ProjectEventService } from '../events/project-event.service';
 import { type OrganiseReceipt } from '../notes/organise-card';
@@ -54,6 +55,9 @@ export interface EnqueuedJob {
   outcome: 'inserted' | 'reset' | 'deduped';
 }
 
+/** One run of a job: `attempts` as its `start()` counted it. Its writes to the job row are fenced on it; what its handler writes elsewhere is not. */
+export type JobAttempt = Pick<Job.Row, 'id' | 'attempts'>;
+
 export interface JobCancelResult {
   status: Job.Status;
   outcome: 'cancelled' | 'stopping' | 'already_settled';
@@ -89,6 +93,16 @@ const RESPONSE_PAYLOAD = sql`case when ${schema.jobs.kind} = 'import' then jsonb
 
 const RESPONSE_COLUMNS = { ...getTableColumns(schema.jobs), payload: RESPONSE_PAYLOAD };
 
+function stillRunning(job: JobAttempt): SQL | undefined {
+  return and(eq(schema.jobs.id, job.id), eq(schema.jobs.attempts, job.attempts), eq(schema.jobs.status, 'in_progress'));
+}
+
+/** `updated_at` is UTC wall time written by the app; it stands in for the heartbeat of a job started by a replica that never stamps one. */
+function jobIsSilent(): SQL {
+  const { heartbeatAt, updatedAt } = schema.jobs;
+  return sql`greatest(${heartbeatAt}, ${updatedAt} at time zone 'utc') < now() - make_interval(secs => ${RUN_OWNER_SILENCE_MS / 1000})`;
+}
+
 export function payloadOrigin(payload: unknown): JobOrigin | undefined {
   const origin = (payload as { origin?: Partial<JobOrigin> } | null)?.origin;
   return typeof origin?.sessionId === 'string' ? (origin as JobOrigin) : undefined;
@@ -110,10 +124,6 @@ export class JobService {
     private readonly claims: AuthoringClaimService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
-  }
-
-  async onModuleInit(): Promise<void> {
-    await this.recoverStuck();
   }
 
   async enqueue(projectId: bigint, kind: Job.Kind, target: string, jobPayload?: unknown): Promise<string> {
@@ -175,47 +185,70 @@ export class JobService {
     return rows.map(row => row.id);
   }
 
-  // Atomically claim a pending job. Returns false if another worker already claimed it, which keeps the
+  // Atomically claim a pending job, answering the attempt it starts. Undefined if another worker already claimed it, which keeps the
   // boot dispatcher and a fresh enqueue+dispatch from ever running the same job twice.
-  async start(jobId: string): Promise<boolean> {
+  async start(jobId: string): Promise<number | undefined> {
     const job = await this.db.transaction(async tx => {
       const [row] = await tx
         .update(schema.jobs)
-        .set({ status: 'in_progress', attempts: sql`${schema.jobs.attempts} + 1`, nextAttemptAt: null, updatedAt: new Date() })
+        .set({ status: 'in_progress', attempts: sql`${schema.jobs.attempts} + 1`, nextAttemptAt: null, heartbeatAt: sql`now()`, updatedAt: new Date() })
         .where(and(eq(schema.jobs.id, jobId), eq(schema.jobs.status, 'pending')))
         .returning({ ...TRANSITIONED, attempts: schema.jobs.attempts });
       if (row) await this.record(tx, jobId, row, 'started', { attempt: row.attempts });
       return row;
     });
-    if (!job) return false;
+    if (!job) return undefined;
     this.publish(jobId, job);
-    return true;
+    return job.attempts;
   }
 
-  async progress(jobId: string, progress: JobProgress): Promise<void> {
+  /** False once the attempt no longer holds the row: it settled, or was reset and started again. */
+  async heartbeat(job: JobAttempt): Promise<boolean> {
+    const rows = await this.db
+      .update(schema.jobs)
+      .set({ heartbeatAt: sql`now()` })
+      .where(stillRunning(job))
+      .returning({ id: schema.jobs.id });
+    return rows.length > 0;
+  }
+
+  async progress(attempt: JobAttempt, progress: JobProgress): Promise<void> {
+    const jobId = attempt.id;
     this.logger.debug('job progress', { jobId, ...progress });
     const job = await this.db.transaction(async tx => {
       const [row] = await tx
         .update(schema.jobs)
         .set({ progress: progress as never, updatedAt: new Date() })
-        .where(eq(schema.jobs.id, jobId))
+        .where(stillRunning(attempt))
         .returning(TRANSITIONED);
       if (row) await this.record(tx, jobId, row, 'step', progress);
       return row;
     });
     if (job) this.publish(jobId, job);
+    else this.logger.debug('job progress dropped: the attempt no longer holds the row', { jobId, attempt: attempt.attempts });
+  }
+
+  /** Once an import's chapters and cover are stored, its bundle prose has no use on the row; a superseded attempt leaves it to the newer one. */
+  async compactImportPayload(attempt: JobAttempt, chapters: number, hasCover: boolean): Promise<void> {
+    const rows = await this.db
+      .update(schema.jobs)
+      .set({ payload: { chapters, hasCover } as never, updatedAt: new Date() })
+      .where(stillRunning(attempt))
+      .returning({ id: schema.jobs.id });
+    if (rows.length === 0) this.logger.debug('import payload left for the attempt that holds the row', { jobId: attempt.id, attempt: attempt.attempts });
   }
 
   // The settles below take the caller's transaction when it has one; the caller then owns the commit, and publishes the transition each
   // returns once it has committed, since a subscriber refetches as soon as it hears one.
 
-  async succeed(jobId: string, db?: DbExecutor): Promise<TransitionedJob | undefined> {
+  async succeed(attempt: JobAttempt, db?: DbExecutor): Promise<TransitionedJob | undefined> {
+    const jobId = attempt.id;
     this.logger.debug('marking job done', { jobId });
     const job = await this.within(db, async tx => {
       const [row] = await tx
         .update(schema.jobs)
         .set({ status: 'done', updatedAt: new Date() })
-        .where(eq(schema.jobs.id, jobId))
+        .where(stillRunning(attempt))
         .returning({ ...TRANSITIONED, progress: schema.jobs.progress });
       if (row) await this.record(tx, jobId, row, 'done', row.progress);
       return row;
@@ -224,11 +257,20 @@ export class JobService {
     return job;
   }
 
-  async fail(jobId: string, error: string, db?: DbExecutor): Promise<TransitionedJob | undefined> {
+  async fail(attempt: JobAttempt, error: string, db?: DbExecutor): Promise<TransitionedJob | undefined> {
+    return this.markFailed(attempt.id, stillRunning(attempt), error, db);
+  }
+
+  /** Fails a job dispatch refused to start; one cancelled or started meanwhile is left alone. */
+  async refuse(jobId: string, error: string): Promise<TransitionedJob | undefined> {
+    return this.markFailed(jobId, and(eq(schema.jobs.id, jobId), eq(schema.jobs.status, 'pending')), error);
+  }
+
+  private async markFailed(jobId: string, where: SQL | undefined, error: string, db?: DbExecutor): Promise<TransitionedJob | undefined> {
     const lastError = error.slice(0, 2000);
     this.logger.warn('marking job failed', { jobId, error: lastError });
     const job = await this.within(db, async tx => {
-      const [row] = await tx.update(schema.jobs).set({ status: 'failed', lastError, updatedAt: new Date() }).where(eq(schema.jobs.id, jobId)).returning(TRANSITIONED);
+      const [row] = await tx.update(schema.jobs).set({ status: 'failed', lastError, updatedAt: new Date() }).where(where).returning(TRANSITIONED);
       if (row) await this.record(tx, jobId, row, 'failed', { error: lastError });
       return row;
     });
@@ -240,14 +282,15 @@ export class JobService {
    * Puts a job that failed transiently back in the queue; it is dispatched again once `nextAttemptAt` passes. A job whose cancel landed
    * meanwhile is left alone and answers undefined, so the caller settles it as cancelled instead.
    */
-  async scheduleRetry(jobId: string, error: string, nextAttemptAt: Date, db?: DbExecutor): Promise<TransitionedJob | undefined> {
+  async scheduleRetry(attempt: JobAttempt, error: string, nextAttemptAt: Date, db?: DbExecutor): Promise<TransitionedJob | undefined> {
+    const jobId = attempt.id;
     const lastError = error.slice(0, 2000);
     this.logger.warn('scheduling job retry', { jobId, nextAttemptAt, error: lastError });
     const job = await this.within(db, async tx => {
       const [row] = await tx
         .update(schema.jobs)
         .set({ status: 'pending', lastError, nextAttemptAt, updatedAt: new Date() })
-        .where(and(eq(schema.jobs.id, jobId), isNull(schema.jobs.cancelRequestedAt)))
+        .where(and(stillRunning(attempt), isNull(schema.jobs.cancelRequestedAt)))
         .returning({ ...TRANSITIONED, attempts: schema.jobs.attempts });
       if (row) await this.record(tx, jobId, row, 'retrying', { attempt: row.attempts, nextAttemptAt: nextAttemptAt.toISOString(), error: lastError });
       return row;
@@ -258,10 +301,11 @@ export class JobService {
 
   // The terminal write for a job the executor stopped: `cancel()` deliberately leaves an in_progress
   // job's status alone, so this is the only path that converts the request into a settled row.
-  async settleCancelled(jobId: string, db?: DbExecutor): Promise<TransitionedJob | undefined> {
+  async settleCancelled(attempt: JobAttempt, db?: DbExecutor): Promise<TransitionedJob | undefined> {
+    const jobId = attempt.id;
     this.logger.info('marking job cancelled', { jobId });
     const job = await this.within(db, async tx => {
-      const [row] = await tx.update(schema.jobs).set({ status: 'cancelled', updatedAt: new Date() }).where(eq(schema.jobs.id, jobId)).returning(TRANSITIONED);
+      const [row] = await tx.update(schema.jobs).set({ status: 'cancelled', updatedAt: new Date() }).where(stillRunning(attempt)).returning(TRANSITIONED);
       if (row) await this.record(tx, jobId, row, 'cancelled');
       return row;
     });
@@ -378,16 +422,17 @@ export class JobService {
     }
   }
 
-  // A job named by a live, started claim is still running on some replica, so boot recovery leaves it alone; the janitor resets it once stale.
-  async recoverStuck(): Promise<void> {
-    const reset = await this.resetOrphaned(and(eq(schema.jobs.status, 'in_progress'), not(jobHoldsLiveClaim(this.claims.ttlMs, true))));
-    if (reset.length > 0) this.logger.warn(`Crash recovery: reset ${reset.length} in-progress job(s) back to pending`, { jobs: reset });
-  }
-
-  async resetOrphanedAuthoring(): Promise<void> {
-    const where = and(eq(schema.jobs.status, 'in_progress'), inArray(schema.jobs.kind, AUTHORING_JOB_KINDS), not(jobHoldsLiveClaim(this.claims.ttlMs, true)));
-    const reset = await this.resetOrphaned(where);
-    if (reset.length > 0) this.logger.warn(`Reset ${reset.length} authoring job(s) whose claim went stale back to pending`, { jobs: reset });
+  /** Never resets `excluding`; a job another replica still runs but has not heartbeated within the window is reset, and its run is then fenced out. */
+  async resetAbandoned(excluding: readonly string[]): Promise<string[]> {
+    const notRunningHere = excluding.length > 0 ? notInArray(schema.jobs.id, [...excluding]) : undefined;
+    const where = and(eq(schema.jobs.status, 'in_progress'), jobIsSilent(), not(jobHoldsLiveClaim(this.claims.ttlMs, true)), notRunningHere);
+    const reset = await this.db
+      .update(schema.jobs)
+      .set({ status: 'pending', updatedAt: new Date() })
+      .where(where)
+      .returning({ id: schema.jobs.id, kind: schema.jobs.kind, target: schema.jobs.target });
+    if (reset.length > 0) this.logger.warn(`Reset ${reset.length} abandoned in-progress job(s) back to pending`, { jobs: reset });
+    return reset.map(job => job.id);
   }
 
   /** Pending authoring jobs no live claim or reservation names: nobody is dispatching them. */
@@ -397,14 +442,6 @@ export class JobService {
       .from(schema.jobs)
       .where(and(eq(schema.jobs.status, 'pending'), inArray(schema.jobs.kind, AUTHORING_JOB_KINDS), not(jobHoldsLiveClaim(this.claims.ttlMs, false))));
     return rows.map(row => row.id);
-  }
-
-  private async resetOrphaned(where: SQL | undefined): Promise<{ id: string; kind: Job.Kind; target: string }[]> {
-    return this.db
-      .update(schema.jobs)
-      .set({ status: 'pending', updatedAt: new Date() })
-      .where(where)
-      .returning({ id: schema.jobs.id, kind: schema.jobs.kind, target: schema.jobs.target });
   }
 
   /** Cost/token totals per job id across every run it drove (`workflow_runs.job_id`) — zeroed, never absent, for a job with no model calls. */

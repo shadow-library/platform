@@ -5,6 +5,7 @@ import { AppErrorCode } from '@server/classes';
 import { type Job } from '@server/database';
 
 import { JobExecutor, retryAfter } from '@modules/jobs/job.executor';
+import { type JobAttempt, type TransitionedJob } from '@modules/jobs/job.service';
 import { JobHandlerRegistry } from '@modules/jobs/job-handler.registry';
 
 import { FakeAuthoringClaims } from './authoring-claim-fixtures';
@@ -32,41 +33,42 @@ class FakeJobs {
     return this.get(id);
   }
 
-  async start(id: string): Promise<boolean> {
+  async start(id: string): Promise<number | undefined> {
     const row = this.rows.get(id);
-    if (row?.status !== 'pending') return false;
+    if (row?.status !== 'pending') return undefined;
     Object.assign(row, { status: 'in_progress', attempts: row.attempts + 1 });
-    return true;
+    return row.attempts;
   }
 
   async progress(): Promise<void> {}
 
-  async succeed(id: string): Promise<undefined> {
-    return this.settle(id, { status: 'done' });
+  async succeed(attempt: JobAttempt): Promise<TransitionedJob | undefined> {
+    return this.settle(attempt, { status: 'done' });
   }
 
-  async fail(id: string, error: string): Promise<undefined> {
-    return this.settle(id, { status: 'failed', lastError: error });
+  async fail(attempt: JobAttempt, error: string): Promise<TransitionedJob | undefined> {
+    return this.settle(attempt, { status: 'failed', lastError: error });
   }
 
-  async settleCancelled(id: string): Promise<undefined> {
-    return this.settle(id, { status: 'cancelled' });
+  async settleCancelled(attempt: JobAttempt): Promise<TransitionedJob | undefined> {
+    return this.settle(attempt, { status: 'cancelled' });
   }
 
-  async scheduleRetry(id: string, error: string, nextAttemptAt: Date): Promise<{ projectId: bigint; kind: Job.Kind; status: Job.Status; sessionId: null } | undefined> {
+  async scheduleRetry(attempt: JobAttempt, error: string, nextAttemptAt: Date): Promise<TransitionedJob | undefined> {
     if (this.cancelBeforeRetry) return undefined;
-    this.retries.push({ jobId: id, error, nextAttemptAt });
-    this.settle(id, { status: 'pending', lastError: error, nextAttemptAt });
-    return { projectId: 1n, kind: 'organise', status: 'pending', sessionId: null };
+    this.retries.push({ jobId: attempt.id, error, nextAttemptAt });
+    return this.settle(attempt, { status: 'pending', lastError: error, nextAttemptAt });
   }
 
   publish(_id: string, transition: { status: Job.Status }): void {
     this.published.push(transition.status);
   }
 
-  private settle(id: string, change: Partial<Job.Row>): undefined {
-    Object.assign(this.rows.get(id) ?? {}, change);
-    return undefined;
+  private settle(attempt: JobAttempt, change: Partial<Job.Row>): TransitionedJob | undefined {
+    const row = this.rows.get(attempt.id);
+    if (row?.status !== 'in_progress' || row.attempts !== attempt.attempts) return undefined;
+    Object.assign(row, change);
+    return { projectId: row.projectId, kind: row.kind, status: row.status, sessionId: null };
   }
 }
 
@@ -102,20 +104,20 @@ describe('retryAfter', () => {
   it('should retry an organise or plan job once after a transient model failure, with backoff', () => {
     const now = 1_000;
 
-    expect(retryAfter({ kind: 'organise', attempts: 0 }, timeout(), TTL_MS, now)?.getTime()).toBe(now + 30_000);
-    expect(retryAfter({ kind: 'plan', attempts: 0 }, timeout(), TTL_MS, now)?.getTime()).toBe(now + 30_000);
+    expect(retryAfter({ kind: 'organise', attempts: 1 }, timeout(), TTL_MS, now)?.getTime()).toBe(now + 30_000);
+    expect(retryAfter({ kind: 'plan', attempts: 1 }, timeout(), TTL_MS, now)?.getTime()).toBe(now + 30_000);
   });
 
   it('should wait no longer than half the claim TTL, so the reservation holding the novel is still live when the retry is due', () => {
-    expect(retryAfter({ kind: 'organise', attempts: 0 }, timeout(), 20_000, 0)?.getTime()).toBe(10_000);
+    expect(retryAfter({ kind: 'organise', attempts: 1 }, timeout(), 20_000, 0)?.getTime()).toBe(10_000);
   });
 
   it('should not retry a job past its last attempt, another kind, a refusal the request caused, or any other failure', () => {
-    expect(retryAfter({ kind: 'organise', attempts: 1 }, timeout(), TTL_MS)).toBeUndefined();
-    expect(retryAfter({ kind: 'generate', attempts: 0 }, timeout(), TTL_MS)).toBeUndefined();
-    expect(retryAfter({ kind: 'organise', attempts: 0 }, refused(), TTL_MS)).toBeUndefined();
-    expect(retryAfter({ kind: 'organise', attempts: 0 }, AppErrorCode.NTS_003.create({ words: '600' }), TTL_MS)).toBeUndefined();
-    expect(retryAfter({ kind: 'organise', attempts: 0 }, new Error('LLM call exceeded 300000ms timeout budget'), TTL_MS)).toBeUndefined();
+    expect(retryAfter({ kind: 'organise', attempts: 2 }, timeout(), TTL_MS)).toBeUndefined();
+    expect(retryAfter({ kind: 'generate', attempts: 1 }, timeout(), TTL_MS)).toBeUndefined();
+    expect(retryAfter({ kind: 'organise', attempts: 1 }, refused(), TTL_MS)).toBeUndefined();
+    expect(retryAfter({ kind: 'organise', attempts: 1 }, AppErrorCode.NTS_003.create({ words: '600' }), TTL_MS)).toBeUndefined();
+    expect(retryAfter({ kind: 'organise', attempts: 1 }, new Error('LLM call exceeded 300000ms timeout budget'), TTL_MS)).toBeUndefined();
   });
 });
 

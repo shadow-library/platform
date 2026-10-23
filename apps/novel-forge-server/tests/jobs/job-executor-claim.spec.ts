@@ -3,8 +3,9 @@ import { describe, expect, it } from 'bun:test';
 import { type Job } from '@server/database';
 
 import { type WorkflowRunResult } from '@modules/ai/graphs/workflow-run.service';
-import { AuthoringJobJanitor } from '@modules/jobs/authoring-job.janitor';
 import { JobExecutor } from '@modules/jobs/job.executor';
+import { JobJanitor } from '@modules/jobs/job.janitor';
+import { type JobAttempt, type TransitionedJob } from '@modules/jobs/job.service';
 import { JobHandlerRegistry } from '@modules/jobs/job-handler.registry';
 
 import { FakeAuthoringClaims } from './authoring-claim-fixtures';
@@ -17,7 +18,7 @@ class FakeJobs {
   readonly rows = new Map<string, Job.Row>();
 
   add(id: string, overrides: Partial<Job.Row> = {}): void {
-    const row = { id, projectId: 1n, kind: 'generate', target: id, status: 'pending', payload: { chapters: [1, 2] }, cancelRequestedAt: null, lastError: null };
+    const row = { id, projectId: 1n, kind: 'generate', target: id, status: 'pending', attempts: 0, payload: { chapters: [1, 2] }, cancelRequestedAt: null, lastError: null };
     this.rows.set(id, { ...row, ...overrides } as Job.Row);
   }
 
@@ -35,30 +36,39 @@ class FakeJobs {
     return this.get(id);
   }
 
-  async start(id: string): Promise<boolean> {
+  async start(id: string): Promise<number | undefined> {
     const row = this.rows.get(id);
-    if (row?.status !== 'pending') return false;
-    row.status = 'in_progress';
-    return true;
+    if (row?.status !== 'pending') return undefined;
+    Object.assign(row, { status: 'in_progress', attempts: row.attempts + 1 });
+    return row.attempts;
   }
 
   async progress(): Promise<void> {}
 
-  async succeed(id: string): Promise<void> {
-    this.settle(id, 'done');
+  async succeed(attempt: JobAttempt): Promise<TransitionedJob | undefined> {
+    return this.settle(attempt, 'done');
   }
 
-  async fail(id: string, error: string): Promise<void> {
-    this.settle(id, 'failed', error);
+  async fail(attempt: JobAttempt, error: string): Promise<TransitionedJob | undefined> {
+    return this.settle(attempt, 'failed', error);
   }
 
-  async settleCancelled(id: string): Promise<void> {
-    this.settle(id, 'cancelled');
-  }
-
-  private settle(id: string, status: Job.Status, lastError: string | null = null): void {
+  async refuse(id: string, error: string): Promise<void> {
     const row = this.rows.get(id);
-    if (row) Object.assign(row, { status, lastError });
+    if (row?.status === 'pending') Object.assign(row, { status: 'failed', lastError: error });
+  }
+
+  async settleCancelled(attempt: JobAttempt): Promise<TransitionedJob | undefined> {
+    return this.settle(attempt, 'cancelled');
+  }
+
+  publish(): void {}
+
+  private settle(attempt: JobAttempt, status: Job.Status, lastError: string | null = null): TransitionedJob | undefined {
+    const row = this.rows.get(attempt.id);
+    if (row?.status !== 'in_progress' || row.attempts !== attempt.attempts) return undefined;
+    Object.assign(row, { status, lastError });
+    return { projectId: row.projectId, kind: row.kind, status, sessionId: null };
   }
 }
 
@@ -241,17 +251,42 @@ describe('JobExecutor — authoring claim', () => {
   });
 });
 
-describe('AuthoringJobJanitor.sweep', () => {
-  it('should reset authoring jobs whose claim went stale before re-dispatching every pending one nobody is handling', async () => {
+describe('JobJanitor.sweep', () => {
+  function janitorOver(reset: string[], unclaimed: string[], running: string[] = []) {
     const calls: string[] = [];
     const jobService = {
-      resetOrphanedAuthoring: async () => void calls.push('reset'),
-      findUnclaimedPendingAuthoring: async () => (calls.push('find'), ['job-a', 'job-b']),
+      resetAbandoned: async (excluding: readonly string[]) => (calls.push(`reset except [${excluding.join(', ')}]`), reset),
+      findUnclaimedPendingAuthoring: async () => (calls.push('find'), unclaimed),
     };
-    const executor = { dispatch: async (jobId: string) => void calls.push(`dispatch ${jobId}`) };
-    const janitor = new AuthoringJobJanitor(jobService as never, executor as never, new FakeAuthoringClaims().asService());
+    const executor = { runningJobIds: () => running, dispatch: async (jobId: string) => void calls.push(`dispatch ${jobId}`) };
+    return { janitor: new JobJanitor(jobService as never, executor as never, new FakeAuthoringClaims().asService()), calls };
+  }
 
-    expect(await janitor.sweep()).toEqual(['job-a', 'job-b']);
-    expect(calls).toEqual(['reset', 'find', 'dispatch job-a', 'dispatch job-b']);
+  it('should reset abandoned jobs before re-dispatching them with every pending authoring job nobody is handling', async () => {
+    const { janitor, calls } = janitorOver(['job-r'], ['job-a', 'job-b']);
+
+    expect(await janitor.sweep()).toEqual(['job-r', 'job-a', 'job-b']);
+    expect(calls).toEqual(['reset except []', 'find', 'dispatch job-r', 'dispatch job-a', 'dispatch job-b']);
+  });
+
+  it('should spare the jobs this replica is itself running from the reset', async () => {
+    const { janitor, calls } = janitorOver([], [], ['job-x', 'job-y']);
+
+    await janitor.sweep();
+
+    expect(calls[0]).toBe('reset except [job-x, job-y]');
+  });
+
+  it('should dispatch a reset authoring job once, though it is also found unclaimed', async () => {
+    const { janitor, calls } = janitorOver(['job-a'], ['job-a']);
+
+    expect(await janitor.sweep()).toEqual(['job-a']);
+    expect(calls.filter(call => call.startsWith('dispatch'))).toEqual(['dispatch job-a']);
+  });
+
+  it('should sweep as often as a silent worker is presumed gone', () => {
+    const { janitor } = janitorOver([], []);
+
+    expect(janitor.intervalMs).toBe(30_000);
   });
 });

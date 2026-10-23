@@ -12,7 +12,7 @@ setConfig({ ...OPENAPI_DUMP_CONFIG, 'auth.issuer': auth.idp.issuer, 'auth.app-id
 
 const { AppModule } = await import('./app.module');
 const { WorkflowRunService } = await import('@modules/ai/graphs/workflow-run.service');
-const { AuthoringJobJanitor, CheckpointJanitor, JobExecutor, JobService, PublicationJanitor } = await import('@modules/jobs');
+const { CheckpointJanitor, JobExecutor, JobJanitor, PublicationJanitor } = await import('@modules/jobs');
 const { TurnEventJanitor } = await import('@modules/refinement/turn-event.janitor');
 
 /** Each of these recovers, dispatches or sweeps jobs at boot; the workflow runner opens its own LangGraph checkpoint connection */
@@ -21,9 +21,8 @@ const overrides = [
   fakeStorageProvider(),
   ...auth.providers,
   withoutStartupHooks(WorkflowRunService),
-  withoutStartupHooks(JobService),
   withoutStartupHooks(JobExecutor),
-  withoutStartupHooks(AuthoringJobJanitor),
+  withoutStartupHooks(JobJanitor),
   withoutStartupHooks(CheckpointJanitor),
   withoutStartupHooks(PublicationJanitor),
   withoutStartupHooks(TurnEventJanitor),

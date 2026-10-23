@@ -8,6 +8,7 @@ import { FakeAuthoringClaims } from './authoring-claim-fixtures';
 
 const SESSION = '11111111-1111-4111-8111-111111111111';
 const ORIGIN = { sessionId: SESSION, messageId: '4', proposalId: '9', opIndex: 0 } as const;
+const ATTEMPT = { id: 'job-1', attempts: 1 };
 
 interface Transition {
   projectId: bigint;
@@ -95,9 +96,9 @@ describe('JobService — events for a job started from a chat', () => {
     const failed = jobsOver({ jobs: [chatJob('failed')] });
 
     await started.service.start('job-1');
-    await step.service.progress('job-1', progress);
-    await done.service.succeed('job-1');
-    await failed.service.fail('job-1', 'the gateway timed out');
+    await step.service.progress(ATTEMPT, progress);
+    await done.service.succeed(ATTEMPT);
+    await failed.service.fail(ATTEMPT, 'the gateway timed out');
 
     expect(started.recorded[0]).toMatchObject({ type: 'started', data: { attempt: 1 } });
     expect(step.recorded[0]).toMatchObject({ type: 'step', data: progress });
@@ -109,7 +110,7 @@ describe('JobService — events for a job started from a chat', () => {
   it('should leave publishing to the caller whose transaction it settled in', async () => {
     const { service, log, db } = jobsOver({ jobs: [chatJob('done')] });
 
-    const settled = await service.succeed('job-1', db as never);
+    const settled = await service.succeed(ATTEMPT, db as never);
 
     expect(settled).toMatchObject({ status: 'done' });
     expect(log.filter(entry => entry.startsWith('publish'))).toEqual([]);
@@ -120,7 +121,7 @@ describe('JobService — events for a job started from a chat', () => {
     const cancelled = jobsOver({ jobs: [chatJob('cancelled')] });
     const due = new Date('2026-09-26T10:00:30.000Z');
 
-    await retrying.service.scheduleRetry('job-1', 'AI model call failed', due);
+    await retrying.service.scheduleRetry(ATTEMPT, 'AI model call failed', due);
     await cancelled.service.cancel('job-1', 1n);
 
     expect(retrying.recorded[0]).toMatchObject({ type: 'retrying', data: { attempt: 1, nextAttemptAt: '2026-09-26T10:00:30.000Z' } });
@@ -130,7 +131,7 @@ describe('JobService — events for a job started from a chat', () => {
   it('should not retry a job whose cancel landed first, and record nothing for it', async () => {
     const { service, recorded } = jobsOver({ jobs: [] });
 
-    const retried = await service.scheduleRetry('job-1', 'AI model call failed', new Date());
+    const retried = await service.scheduleRetry(ATTEMPT, 'AI model call failed', new Date());
 
     expect(retried).toBeUndefined();
     expect(recorded).toEqual([]);
@@ -139,7 +140,7 @@ describe('JobService — events for a job started from a chat', () => {
   it('should settle the job even when its event cannot be recorded', async () => {
     const { service, log } = jobsOver({ jobs: [chatJob('done')], failEvents: true });
 
-    const settled = await service.succeed('job-1');
+    const settled = await service.succeed(ATTEMPT);
 
     expect(settled).toMatchObject({ status: 'done' });
     expect(log).toEqual(['begin', 'begin', 'commit', 'publish:done']);
@@ -149,7 +150,7 @@ describe('JobService — events for a job started from a chat', () => {
     const { service, recorded } = jobsOver({ jobs: [{ projectId: 1n, kind: 'publish', status: 'in_progress', sessionId: null }] });
 
     await service.start('job-1');
-    await service.progress('job-1', { done: 0, total: 1, current: 'all', phase: 'publish' });
+    await service.progress(ATTEMPT, { done: 0, total: 1, current: 'all', phase: 'publish' });
 
     expect(recorded).toEqual([]);
   });

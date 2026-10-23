@@ -8,6 +8,7 @@ import { APP_NAME } from '@server/constants';
 import { type DbExecutor, type Job, type PrimaryDatabase, schema } from '@server/database';
 
 import { runWithCostTier } from '../ai/cost-tier-scope';
+import { RUN_HEARTBEAT_MS } from '../ai/graphs/run-liveness';
 import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { isTransientModelFailure } from '../ai/transient-model-error';
 import { IndexingService } from '../ai/retrieval/indexing.service';
@@ -17,7 +18,7 @@ import { PublishRunner } from '../publishing/publish-runner';
 import { AuthoringClaimService } from './authoring-claim.service';
 import { JobHandlerRegistry } from './job-handler.registry';
 import { redactJobForResponse } from './job-response';
-import { JobService, payloadCostTier, type TransitionedJob } from './job.service';
+import { type JobAttempt, JobService, payloadCostTier, type TransitionedJob } from './job.service';
 
 interface GeneratePayload {
   chapters: number[];
@@ -55,11 +56,11 @@ type SettleOutcome =
   { status: 'done' } | { status: 'failed'; error: string; cause: unknown } | { status: 'retry'; error: string; cause: unknown; nextAttemptAt: Date } | { status: 'cancelled' };
 
 /**
- * `attempts` is read before the dispatch that counts this attempt, so the attempt now ending is one more. The wait stays within half the
- * claim TTL: the reservation that holds the novel for the retry is not heartbeated, and must not go stale before the retry is due.
+ * `attempts` is the attempt now ending. The wait stays within half the claim TTL: the reservation that holds the novel for the retry is not
+ * heartbeated, and must not go stale before the retry is due.
  */
 export function retryAfter(job: Pick<Job.Row, 'kind' | 'attempts'>, err: unknown, claimTtlMs: number, now = Date.now()): Date | undefined {
-  const attempt = job.attempts + 1;
+  const attempt = job.attempts;
   if (!RETRYABLE_KINDS.has(job.kind) || attempt >= MAX_JOB_ATTEMPTS) return undefined;
   if (!AppError.is(err) || !(isTransientModelFailure(err) || err.data?.['retryable'] === true)) return undefined;
   return new Date(now + Math.min(RETRY_BACKOFF_MS * 2 ** (attempt - 1), claimTtlMs / 2));
@@ -68,7 +69,10 @@ export function retryAfter(job: Pick<Job.Row, 'kind' | 'attempts'>, err: unknown
 interface JobWatch {
   observed: boolean;
   claimLost: boolean;
+  superseded: boolean;
+  stopped: boolean;
   claim?: { projectId: bigint; token: string };
+  stopTimers: () => void;
 }
 
 @Injectable()
@@ -91,9 +95,7 @@ export class JobExecutor {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
 
-  // On boot, drain any jobs left pending — including ones just reset from in_progress by crash recovery.
-  // Without this a crashed job would sit pending forever with no one to pick it up. It waits for application ready, after every
-  // module's init, so the job kinds other modules register have their handlers by then.
+  // Waits for application ready, after every module's init, so the job kinds other modules register have their handlers by then.
   async onApplicationReady(): Promise<void> {
     const pending = await this.jobService.findPendingIds();
     if (pending.length === 0) return;
@@ -101,13 +103,21 @@ export class JobExecutor {
     for (const jobId of pending) this.dispatch(jobId).catch(err => this.logger.error('Boot dispatch failed', { err, jobId }));
   }
 
+  /** The jobs this replica is running, which its own janitor must never reset however long it stalls. */
+  runningJobIds(): string[] {
+    return [...this.cancelWatches.keys()];
+  }
+
   onModuleDestroy(): void {
     for (const timer of this.retryTimers.values()) clearTimeout(timer);
     this.retryTimers.clear();
+    for (const watch of this.cancelWatches.values()) watch.stopTimers();
   }
 
   async dispatch(jobId: string): Promise<void> {
     this.logger.debug('dispatch requested', { jobId });
+    // Runs of a job are keyed by its id here, so a second attempt on the replica still running the first would share them.
+    if (this.cancelWatches.has(jobId)) return this.logger.warn('dispatch: this replica is still running an earlier attempt of the job', { jobId });
     const job = await this.jobService.get(jobId);
     if (!job) {
       this.logger.warn('dispatch: job not found', { jobId });
@@ -152,17 +162,18 @@ export class JobExecutor {
     const holder = await this.claims.holder(job.projectId);
     if (holder?.jobId === job.id) return this.logger.info('dispatch: job waits for its previous claim to go stale', { jobId: job.id, projectId: job.projectId });
     this.logger.warn('dispatch: another authoring job holds the project', { jobId: job.id, projectId: job.projectId, holderJobId: holder?.jobId, holderKind: holder?.kind });
-    await this.jobService.fail(job.id, CLAIM_REFUSED_MESSAGE);
+    await this.jobService.refuse(job.id, CLAIM_REFUSED_MESSAGE);
   }
 
-  private async execute(job: Job.Row, token?: string): Promise<void> {
-    const { id: jobId, projectId } = job;
-    const claimed = await this.jobService.start(jobId);
-    if (!claimed) {
+  private async execute(dispatched: Job.Row, token?: string): Promise<void> {
+    const { id: jobId, projectId } = dispatched;
+    const attempts = await this.jobService.start(jobId);
+    if (attempts === undefined) {
       this.logger.warn('dispatch: job already claimed by another worker', { jobId });
       if (token) await this.claims.release(projectId, token);
       return;
     }
+    const job: Job.Row = { ...dispatched, status: 'in_progress', attempts, nextAttemptAt: null };
 
     // Winning `start()` is what earns the right to refuse to start. Two paths reach here already cancelled: a job
     // cancelled after the status read above, and one that crash recovery reset from in_progress back to
@@ -181,7 +192,7 @@ export class JobExecutor {
 
   // Watching stops before the settle releases the claim, so a heartbeat racing the release is never reported as a lost claim.
   private async runWatched(job: Job.Row, token: string | undefined): Promise<SettleOutcome> {
-    const stopWatching = this.watchForCancellation(job.id, job.projectId, token);
+    const stopWatching = this.watchForCancellation(job, token);
     try {
       await runWithCostTier(payloadCostTier(job.payload), () => this.runJob(job));
       return (await this.cancelRequested(job.id)) ? { status: 'cancelled' } : { status: 'done' };
@@ -203,13 +214,13 @@ export class JobExecutor {
     const settled: { outcome: SettleOutcome; transitions: TransitionedJob[] } = { outcome, transitions: [] };
     const keep = (transition: TransitionedJob | undefined): void => void (transition && settled.transitions.push(transition));
     const write = async (db?: DbExecutor): Promise<void> => {
-      if (outcome.status === 'done') return keep(await this.jobService.succeed(job.id, db));
-      if (outcome.status === 'failed') return keep(await this.jobService.fail(job.id, outcome.error, db));
-      if (outcome.status === 'cancelled') return keep(await this.jobService.settleCancelled(job.id, db));
-      const retried = await this.jobService.scheduleRetry(job.id, outcome.error, outcome.nextAttemptAt, db);
+      if (outcome.status === 'done') return keep(await this.jobService.succeed(job, db));
+      if (outcome.status === 'failed') return keep(await this.jobService.fail(job, outcome.error, db));
+      if (outcome.status === 'cancelled') return keep(await this.jobService.settleCancelled(job, db));
+      const retried = await this.jobService.scheduleRetry(job, outcome.error, outcome.nextAttemptAt, db);
       if (!retried) {
         settled.outcome = { status: 'cancelled' };
-        return keep(await this.jobService.settleCancelled(job.id, db));
+        return keep(await this.jobService.settleCancelled(job, db));
       }
       keep(retried);
       // Re-reserved as the claim is released, so no other authoring job takes the novel while this one waits out its backoff.
@@ -218,6 +229,7 @@ export class JobExecutor {
     if (!token) await write();
     else if (!(await this.claims.settle(job.projectId, token, write))) return this.settleLostClaim(job, outcome);
     else for (const transition of settled.transitions) this.jobService.publish(job.id, transition);
+    if (settled.transitions.length === 0) return this.settleSuperseded(job, outcome);
 
     const final = settled.outcome;
     if (final.status === 'retry') {
@@ -234,25 +246,53 @@ export class JobExecutor {
     const holder = await this.claims.holder(job.projectId);
     this.logger.warn('Job lost its authoring claim before settling', { jobId: job.id, projectId: job.projectId, outcome: outcome.status, holderJobId: holder?.jobId });
     if (holder?.jobId === job.id) return;
-    await this.jobService.fail(job.id, CLAIM_LOST_MESSAGE);
+    await this.jobService.fail(job, CLAIM_LOST_MESSAGE);
   }
 
-  private watchForCancellation(jobId: string, projectId: bigint, token?: string): () => void {
-    this.cancelWatches.set(jobId, { observed: false, claimLost: false, claim: token ? { projectId, token } : undefined });
-    const stopHeartbeat = token ? this.claims.keepAlive(projectId, token, () => void this.onClaimLost(jobId)) : undefined;
-    const timer = setInterval(() => void this.cancelRequested(jobId).catch(err => this.logger.warn('cancel poll failed', { err, jobId })), CANCEL_POLL_MS);
-    timer.unref();
-    return () => {
-      clearInterval(timer);
-      stopHeartbeat?.();
-      this.cancelWatches.delete(jobId);
+  // A newer attempt owns the row, and the job's runs by `workflow_runs.job_id`, so the superseded run settles none of them.
+  private settleSuperseded(job: JobAttempt, outcome: SettleOutcome): void {
+    this.logger.warn('Job attempt was superseded or its row is gone; leaving the row as it is', { jobId: job.id, attempt: job.attempts, outcome: outcome.status });
+  }
+
+  private watchForCancellation(job: Job.Row, token?: string): () => void {
+    const { id: jobId, projectId } = job;
+    const stopClaimHeartbeat = token ? this.claims.keepAlive(projectId, token, () => void this.onClaimLost(jobId)) : undefined;
+    const poll = setInterval(() => void this.cancelRequested(jobId).catch(err => this.logger.warn('cancel poll failed', { err, jobId })), CANCEL_POLL_MS);
+    const beat = async (): Promise<void> => {
+      if (await this.jobService.heartbeat(job)) return;
+      clearInterval(heartbeat);
+      this.onSuperseded(watch, job);
     };
+    const heartbeat = setInterval(() => void beat().catch(err => this.logger.warn('job heartbeat failed', { err, jobId })), RUN_HEARTBEAT_MS);
+    poll.unref();
+    heartbeat.unref();
+    const stopTimers = (): void => {
+      clearInterval(poll);
+      clearInterval(heartbeat);
+      stopClaimHeartbeat?.();
+    };
+    const watch: JobWatch = { observed: false, claimLost: false, superseded: false, stopped: false, claim: token ? { projectId, token } : undefined, stopTimers };
+    this.cancelWatches.set(jobId, watch);
+    return () => {
+      watch.stopped = true;
+      stopTimers();
+      if (this.cancelWatches.get(jobId) === watch) this.cancelWatches.delete(jobId);
+    };
+  }
+
+  // Aborts only this replica's runs of the job: `workflow_runs.job_id` also names the newer attempt's runs, which must keep going.
+  private onSuperseded(watch: JobWatch, job: JobAttempt): void {
+    if (watch.stopped || watch.superseded) return;
+    watch.superseded = true;
+    this.logger.warn('Job attempt was superseded by a newer one; stopping its runs', { jobId: job.id, attempt: job.attempts });
+    this.workflowRunService.cancelJobRuns(job.id);
   }
 
   // At a chapter boundary the heartbeat doubles as the fence check, so a job that lost its claim never starts the next chapter.
   private async mayContinue(jobId: string): Promise<boolean> {
     if (await this.cancelRequested(jobId)) return false;
     const watch = this.cancelWatches.get(jobId);
+    if (watch?.superseded) return false;
     if (!watch?.claim) return true;
     if (!watch.claimLost && (await this.claims.heartbeat(watch.claim.projectId, watch.claim.token))) return true;
     await this.onClaimLost(jobId);
@@ -320,7 +360,7 @@ export class JobExecutor {
 
     for (const [i, chapter] of chapters.entries()) {
       if (!(await this.mayContinue(job.id))) return;
-      await this.jobService.progress(job.id, { done: i, total, current: String(chapter), phase: 'generating', startedAt: new Date().toISOString() });
+      await this.jobService.progress(job, { done: i, total, current: String(chapter), phase: 'generating', startedAt: new Date().toISOString() });
       this.logger.debug('runGenerate: generating chapter', { jobId: job.id, chapter, index: i, total });
       const result = await this.workflowRunService.runChapterGeneration({ projectId: job.projectId, chapter, autoFix, maxFixes, guidance, jobId: job.id });
       this.logger.debug('runGenerate: chapter finished', { jobId: job.id, chapter, status: result.status, outcome: result.outcome, runId: result.runId });
@@ -334,7 +374,7 @@ export class JobExecutor {
       if (result.outcome !== 'accepted') {
         const skipped = chapters.slice(i + 1);
         this.logger.warn('runGenerate: halting batch for review', { jobId: job.id, chapter, outcome: result.outcome, skipped });
-        await this.jobService.progress(job.id, { done: i + 1, total, current: String(chapter), phase: 'awaiting_review', skipped });
+        await this.jobService.progress(job, { done: i + 1, total, current: String(chapter), phase: 'awaiting_review', skipped });
         return;
       }
     }
@@ -342,9 +382,9 @@ export class JobExecutor {
 
   private async runBackfill(job: Job.Row): Promise<void> {
     this.logger.info('runBackfill: reindexing project', { jobId: job.id, projectId: job.projectId });
-    await this.jobService.progress(job.id, { done: 0, total: 1, current: 'all', phase: 'embedding' });
+    await this.jobService.progress(job, { done: 0, total: 1, current: 'all', phase: 'embedding' });
     await this.indexingService.backfill(job.projectId);
-    await this.jobService.progress(job.id, { done: 1, total: 1, current: 'all', phase: 'embedding' });
+    await this.jobService.progress(job, { done: 1, total: 1, current: 'all', phase: 'embedding' });
     this.logger.info('runBackfill: done', { jobId: job.id, projectId: job.projectId });
   }
 
@@ -352,7 +392,7 @@ export class JobExecutor {
   // ledgered-unpublish DELETEs. Per-row failures land on the ledger rows (the row is the outbox);
   // the job fails on any of them so the janitor sweep keeps retrying until the reader converges.
   private async runPublish(job: Job.Row): Promise<void> {
-    await this.jobService.progress(job.id, { done: 0, total: 0, current: 'converging', phase: 'publish' });
+    await this.jobService.progress(job, { done: 0, total: 0, current: 'converging', phase: 'publish' });
     const result = await this.publishRunner.converge(job.projectId);
     const total =
       result.pushed.length +
@@ -364,7 +404,7 @@ export class JobExecutor {
       result.wiki.skipped.length +
       result.wiki.failed.length;
     const failed = result.failed.length + result.wiki.failed.length;
-    await this.jobService.progress(job.id, { done: total - failed, total, current: 'done', phase: 'publish' });
+    await this.jobService.progress(job, { done: total - failed, total, current: 'done', phase: 'publish' });
     if (failed > 0) throw AppError.internal(`publish convergence incomplete: ${failed} push(es) failed — see the publication ledger`);
   }
 
@@ -381,13 +421,13 @@ export class JobExecutor {
     // The finished novel: human-authored, immutable, publishable from chapter 1 (PUB_002/PUB_003).
     await landFinalChapters(this.db, projectId, chapters, {
       onBatch: async (done, chapterTotal) => {
-        await this.jobService.progress(job.id, { done, total: chapterTotal, current: done === chapterTotal ? 'chapters' : String(done + 1), phase: 'inserting' });
+        await this.jobService.progress(job, { done, total: chapterTotal, current: done === chapterTotal ? 'chapters' : String(done + 1), phase: 'inserting' });
       },
     });
 
     // The only boundary an import has: the chapters are landed and kept, the cover is abandoned. The
     // payload is still compacted, so a cancelled import never leaves the whole bundle's prose sitting on the row.
-    if (!(await this.mayContinue(job.id))) return this.compactImportPayload(job.id, total, !!cover);
+    if (!(await this.mayContinue(job.id))) return this.jobService.compactImportPayload(job, total, !!cover);
 
     if (cover) {
       this.logger.debug('runImport: storing cover asset', { jobId: job.id, projectId });
@@ -396,18 +436,7 @@ export class JobExecutor {
       await setProjectCover(this.db, projectId, ref);
     }
 
-    await this.compactImportPayload(job.id, total, !!cover);
+    await this.jobService.compactImportPayload(job, total, !!cover);
     this.logger.info('runImport: complete', { jobId: job.id, projectId, chapters: total });
-  }
-
-  // The chapters/cover are now durably in the `chapters`/`projects` tables — the full bundle prose
-  // sitting in `jobs.payload` (up to the novel-import size limit) has no further purpose and must not
-  // linger. `redactJobForResponse` keeps the wire safe regardless (mid-run or on a failed job, where
-  // this is never reached), but this keeps the row itself small.
-  private async compactImportPayload(jobId: string, chapters: number, hasCover: boolean): Promise<void> {
-    await this.db
-      .update(schema.jobs)
-      .set({ payload: { chapters, hasCover } as never, updatedAt: new Date() })
-      .where(eq(schema.jobs.id, jobId));
   }
 }

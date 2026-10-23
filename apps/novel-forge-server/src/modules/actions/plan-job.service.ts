@@ -147,13 +147,13 @@ export class PlanJobService {
     if (staged !== undefined) {
       this.logger.info('plan job retried after its card was staged — settling it as done', { jobId, projectId, chapter, proposalId: staged });
       await this.workflowRunService.settleJobRuns(jobId, 'completed');
-      return this.jobService.progress(jobId, { done: 1, total: 1, current, phase: 'staged', proposalId: String(staged) });
+      return this.jobService.progress(job, { done: 1, total: 1, current, phase: 'staged', proposalId: String(staged) });
     }
 
-    await this.jobService.progress(jobId, { done: 0, total: 1, current, phase: 'planning', startedAt: new Date().toISOString() });
+    await this.jobService.progress(job, { done: 0, total: 1, current, phase: 'planning', startedAt: new Date().toISOString() });
     const input = planJobInput(request);
     const { result: card } = await this.workflowRunService.runChain(projectId, PLAN_GRAPH, job.target, input, runId => this.plan(job, input, runId), jobId);
-    await this.jobService.progress(jobId, { done: 1, total: 1, current, phase: 'staged', proposalId: String(card) });
+    await this.jobService.progress(job, { done: 1, total: 1, current, phase: 'staged', proposalId: String(card) });
   }
 
   // Checked again at run time: a draft written while the job waited moves the next chapter on.

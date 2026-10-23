@@ -166,10 +166,20 @@ describe('BibleAuditService', () => {
     const { service, reports, queued, runRegisteredJob } = auditHarness({ priorRun: { id: 'run-1' } });
     await service.run(1n);
 
-    await runRegisteredJob({ id: 'job-1', projectId: 1n, kind: 'audit', attempts: 1 });
+    await runRegisteredJob({ id: 'job-1', projectId: 1n, kind: 'audit', attempts: 2 });
 
     expect(reports).toHaveLength(1);
     expect(queued).toContainEqual(['settled', 'job-1', 'completed']);
+  });
+
+  it('should audit on the first attempt of a re-enqueued job, though its previous enqueue stored a report under the same job', async () => {
+    const { service, reports, queued, runRegisteredJob } = auditHarness({ priorRun: { id: 'run-1' } });
+    await service.run(1n);
+
+    await runRegisteredJob({ id: 'job-1', projectId: 1n, kind: 'audit', attempts: 1 });
+
+    expect(reports).toHaveLength(2);
+    expect(queued).not.toContainEqual(['settled', 'job-1', 'completed']);
   });
 
   it('should queue an audit as a job under its own run', async () => {

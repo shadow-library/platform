@@ -81,6 +81,8 @@ export const jobs = pgTable(
     progress: jsonb('progress'),
     nextAttemptAt: timestamp('next_attempt_at'),
     cancelRequestedAt: timestamp('cancel_requested_at'),
+    /** Stamped by the database clock when the job starts and while it runs; null on a job no heartbeating worker has started. */
+    heartbeatAt: timestamp('heartbeat_at', { withTimezone: true }),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },

@@ -13,7 +13,7 @@ import { ModelRouterService, type ProjectConfig } from '../ai/model-router.servi
 import { CANON_REFRESH_OPS, PROMPT_REGISTRY } from '../ai/prompts';
 import { type ChapterCanonRefreshOutput } from '../ai/schemas';
 import { JobHandlerRegistry } from '../jobs/job-handler.registry';
-import { JobService } from '../jobs/job.service';
+import { type JobAttempt, JobService } from '../jobs/job.service';
 import { PluginPolicyService } from '../plugins/plugin-policy.service';
 import { type ArtifactState, loadArtifactStates } from '../refinement/artifact-state';
 import { ProposalService } from '../refinement/proposal.service';
@@ -65,7 +65,7 @@ export class ChapterCanonRefreshService {
     this.jobHandlers.register('canon_refresh', job => this.runJob(job));
   }
 
-  async refresh(projectId: bigint, chapter: number, jobId?: string): Promise<CanonRefreshResult> {
+  async refresh(projectId: bigint, chapter: number, job?: JobAttempt): Promise<CanonRefreshResult> {
     const existing = await this.findReport(this.db, projectId, chapter);
     if (existing) return { outcome: 'already_refreshed', reportId: existing.id, proposalId: existing.proposalId };
 
@@ -77,7 +77,7 @@ export class ChapterCanonRefreshService {
       return { outcome: loaded.outcome };
     }
     const { rows, states } = loaded;
-    if (jobId) await this.jobService.progress(jobId, { done: 0, total: 1, current: String(chapter), phase: 'refreshing' });
+    if (job) await this.jobService.progress(job, { done: 0, total: 1, current: String(chapter), phase: 'refreshing' });
 
     const { runId, result } = await this.workflowRunService.runChain(
       projectId,
@@ -145,7 +145,7 @@ export class ChapterCanonRefreshService {
           return { outcome: 'staged' as const, reportId: report.id, proposalId: proposal?.id ?? null };
         });
       },
-      jobId,
+      job?.id,
     );
 
     this.logger.info('canon refresh: done', { projectId, chapter, runId, ...result });
@@ -155,9 +155,9 @@ export class ChapterCanonRefreshService {
   private async runJob(job: Job.Row): Promise<void> {
     const chapter = refreshChapter(job.payload);
     if (chapter === undefined) throw AppError.internal(`canon refresh job ${job.id} names no chapter`);
-    const result = await this.refresh(job.projectId, chapter, job.id);
+    const result = await this.refresh(job.projectId, chapter, job);
     const card = result.proposalId ? { proposalId: String(result.proposalId) } : {};
-    await this.jobService.progress(job.id, { done: 1, total: 1, current: String(chapter), phase: result.outcome, ...card });
+    await this.jobService.progress(job, { done: 1, total: 1, current: String(chapter), phase: result.outcome, ...card });
   }
 
   private async findReport(db: PrimaryDatabase | PrimaryTransaction, projectId: bigint, chapter: number): Promise<{ id: bigint; proposalId: bigint | null } | undefined> {

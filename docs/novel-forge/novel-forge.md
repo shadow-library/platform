@@ -45,6 +45,10 @@
   synchronous run. The holder heartbeats; a claim silent past `jobs.authoring-claim.ttl-ms` (database clock, UTC) may be taken over, and a janitor re-dispatches authoring jobs
   left without a live claim. Heartbeat, release and settle are conditioned on the holder's fencing token, but draft writes are not: a job that lost its claim may still land the
   chapter in flight, then stops and never settles as done. Publish and reindex jobs take no claim.
+- **Running jobs heartbeat their row** (`jobs.heartbeat_at`, database clock) every 5 s. Every replica's janitor resets to pending, and re-dispatches, a running job silent for
+  30 s that no live claim names, unless that replica runs it itself; a row no heartbeating worker started counts its last update as its heartbeat. A run's writes to its job row are
+  fenced on the attempt `start()` counted, so a run reset underneath it (its replica stalled past 30 s) stops at its next heartbeat and leaves the row to the newer attempt;
+  its writes elsewhere (drafts, cards, reviews, chapters) are not fenced, as with a lost authoring claim.
 - **Durable chat actions**: accepting an organise, plan or write card starts a job (one per accepted op) and never runs the work inline; the author's own request to organise
   the notes starts its job through that same accept (see the write policy). A job started from a chat carries its origin (session, message, card, op) from the transaction that
   queues it. Organise and plan retry once on a transient model failure (timeout, rate limit, 5xx, lost connection

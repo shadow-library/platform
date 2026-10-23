@@ -80,12 +80,12 @@ export class OrganiseJobService {
     if (staged !== undefined) {
       this.logger.info('organise job retried after its card was staged — settling it as done', { jobId, projectId, proposalId: staged });
       await this.workflowRunService.settleJobRuns(jobId, 'completed');
-      return this.jobService.progress(jobId, { done: 1, total: 1, current: 'notes', phase: 'staged', ...stagedProgress(await this.stagedByRun(projectId, jobId)) });
+      return this.jobService.progress(job, { done: 1, total: 1, current: 'notes', phase: 'staged', ...stagedProgress(await this.stagedByRun(projectId, jobId)) });
     }
 
-    await this.jobService.progress(jobId, { done: 0, total: 1, current: 'notes', phase: 'organising', startedAt: new Date().toISOString() });
+    await this.jobService.progress(job, { done: 0, total: 1, current: 'notes', phase: 'organising', startedAt: new Date().toISOString() });
     const { result } = await this.workflowRunService.runChain(projectId, ORGANISE_GRAPH, job.target, {}, runId => this.organise(job, runId), jobId);
-    await this.jobService.progress(jobId, { done: result.steps, total: result.steps, current: 'notes', phase: 'staged', ...stagedProgress(result.staged) });
+    await this.jobService.progress(job, { done: result.steps, total: result.steps, current: 'notes', phase: 'staged', ...stagedProgress(result.staged) });
   }
 
   private async organise(job: Job.Row, runId: string): Promise<{ staged: Staged; steps: number }> {
@@ -102,13 +102,13 @@ export class OrganiseJobService {
     const steps = passes.length + 1;
     const outputs: NotesOrganiseOutput[] = [];
     for (const [index, pass] of passes.entries()) {
-      if (index > 0) await this.jobService.progress(job.id, { done: index, total: steps, current: 'notes', phase: 'organising' });
+      if (index > 0) await this.jobService.progress(job, { done: index, total: steps, current: 'notes', phase: 'organising' });
       const context = organiseContext(ledger, pass, passes.length, earlierParts(outputs));
       outputs.push(await this.modelRouter.structured(prompt, { ...context }, telemetry, project as ProjectConfig, policy));
     }
     const { options } = organiseOptions(mergeOrganiseOutputs(outputs), ledger);
     screenModelWriting(project, options);
-    await this.jobService.progress(job.id, { done: passes.length, total: steps, current: 'notes', phase: 'staging' });
+    await this.jobService.progress(job, { done: passes.length, total: steps, current: 'notes', phase: 'staging' });
 
     const mode = await this.sessionMode(job);
     const staged: Staged = {};

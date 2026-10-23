@@ -26,16 +26,18 @@ function reviewJob(overrides: Record<string, unknown> = {}) {
   };
 }
 
+const settledAs = (status: string) => ({ projectId: 1n, kind: 'review', status, sessionId: null });
+
 function executorOver(job: ReturnType<typeof reviewJob>) {
   const jobService = {
     findPendingIds: async () => [job.id],
     get: async () => job,
     cancellation: async () => job,
-    start: mock(async () => true),
+    start: mock(async () => 1),
     progress: async () => undefined,
-    succeed: mock(async () => undefined),
-    fail: mock(async () => undefined),
-    settleCancelled: mock(async () => undefined),
+    succeed: mock(async () => settledAs('done')),
+    fail: mock(async () => settledAs('failed')),
+    settleCancelled: mock(async () => settledAs('cancelled')),
   };
   const settled: unknown[][] = [];
   const workflowRunService = { cancel: () => undefined, forgetJobRuns: () => undefined, settleJobRuns: async (...args: unknown[]) => void settled.push(args) };

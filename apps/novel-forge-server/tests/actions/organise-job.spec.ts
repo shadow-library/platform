@@ -54,6 +54,7 @@ function job(overrides: Partial<Job.Row> = {}): Job.Row {
     progress: null,
     nextAttemptAt: null,
     cancelRequestedAt: null,
+    heartbeatAt: null,
     createdAt: new Date(0),
     updatedAt: new Date(0),
     ...overrides,
@@ -168,7 +169,7 @@ describe('OrganiseJobService', () => {
     );
 
     expect(err).toMatchObject({ code: 'NTS_011' });
-    expect(retryAfter({ kind: 'organise', attempts: 0 }, err, 60_000, 0)).toEqual(new Date(30_000));
+    expect(retryAfter({ kind: 'organise', attempts: 1 }, err, 60_000, 0)).toEqual(new Date(30_000));
   });
 
   it('should say on the job why what the notes back did not apply at once', async () => {

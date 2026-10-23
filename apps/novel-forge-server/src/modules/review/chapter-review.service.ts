@@ -213,11 +213,10 @@ export class ChapterReviewService {
     return this.get(projectId, chapter, reviewId);
   }
 
-  // `attempts` is read before this dispatch counted itself, so above zero means an earlier attempt started — and may have stored the review
-  // before the worker died unsettled; running again would store it twice.
+  // `attempts` counts this attempt, so above one means an earlier one started and may have stored the review before dying unsettled.
   private async runJob(job: Job.Row): Promise<void> {
     const { chapter, kind, contentMode } = job.payload as ReviewJobPayload;
-    if (job.attempts > 0 && (await this.alreadyReviewed(job.id))) {
+    if (job.attempts > 1 && (await this.alreadyReviewed(job.id))) {
       this.logger.info('review job retried after its review was stored — settling it as done', { jobId: job.id, projectId: job.projectId, chapter, kind });
       await this.workflowRunService.settleJobRuns(job.id, 'completed');
       return;

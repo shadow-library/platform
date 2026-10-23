@@ -257,8 +257,8 @@ describe('ChapterCanonRefreshService', () => {
   it('should not stage the same chapter twice when the job runs again', async () => {
     const { service, staged } = refreshHarness();
 
-    await service.refresh(1n, 5, 'job-1');
-    await expect(service.refresh(1n, 5, 'job-1')).resolves.toMatchObject({ outcome: 'already_refreshed', proposalId: 40n });
+    await service.refresh(1n, 5, { id: 'job-1', attempts: 1 });
+    await expect(service.refresh(1n, 5, { id: 'job-1', attempts: 1 })).resolves.toMatchObject({ outcome: 'already_refreshed', proposalId: 40n });
 
     expect(staged).toHaveLength(1);
   });
