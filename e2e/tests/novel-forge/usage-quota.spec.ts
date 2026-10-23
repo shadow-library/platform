@@ -2,7 +2,7 @@ import { type APIRequestContext, type APIResponse } from '@playwright/test';
 
 import { mutate } from '../../lib';
 import { expect, type ForgeActor, test } from './forge-actors';
-import { assertSpendGuarded, insertModelCallBatch, insertModelCalls, listDispatchedModelCalls, listModelCallModels, readAccountDefaultCostTier, SpendGuardError } from './forge-db';
+import { assertSpendGuarded, insertModelCallBatch, insertModelCalls, listDispatchedModelCalls, readAccountDefaultCostTier } from './forge-db';
 import { errorCode, uniqueSuffix } from './forge-helpers';
 
 interface Quota {
@@ -12,15 +12,6 @@ interface Quota {
   readonly maxCostUsd: number;
   readonly windowMs: number;
   readonly resetsAt: string | null;
-}
-
-interface RegistryModel {
-  readonly id: string;
-  readonly provider: string;
-  readonly label: string;
-  readonly kind: string;
-  readonly inputPricePerMToken?: number;
-  readonly outputPricePerMToken?: number;
 }
 
 interface BreakdownItem {
@@ -56,17 +47,16 @@ interface ProjectBody {
 /**
  * Declaring the constants
  *
- * Spend control and the figures behind it. The AI quota is a rolling window per owner over `model_calls`, reported by `GET /ai/quota` on
- * both backends but enforced before the router resolves a model only on the legacy one: on Synapse the spend limits are Synapse budgets,
- * so a request at novel-forge's own ceiling would be dispatched, not refused AI_008/AI_009. The specs that refuse at that ceiling are
- * therefore legacy-scoped and skip on Synapse; the quota pin still refuses on both, through the owner's Synapse budget there. A request is
- * sent only once the owner stands at a ceiling. Below a ceiling the quota's own report is what is asserted. Cost figures are asserted
- * over seeded calls whose prices this spec controls; the one list-price estimate is computed from the registry `GET /ai/models` serves.
+ * Spend control and the figures behind it. The AI quota is a rolling window per owner over `model_calls`, reported by `GET /ai/quota` and
+ * enforced by nothing in novel-forge: the spend limits are Synapse budgets, which the quota pin stands at their cap. A request is sent only
+ * once the owner is pinned. Otherwise the quota's own report is what is asserted. Cost figures are asserted over seeded calls whose prices
+ * this spec controls; the one list-price estimate comes from the historical list price of a pre-Synapse slug.
  */
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-const LEGACY_QUOTA_ONLY = 'novel-forge enforces its own quota only on the legacy backend; on Synapse its budgets refuse instead';
+/** A pre-Synapse slug the server still names and prices from `historical-models.ts`, so a row recording no cost is estimated from it. */
+const HISTORICAL_MODEL = { id: 'anthropic/claude-sonnet-5', label: 'Claude Sonnet 5', inputPricePerMToken: 2 };
 
 /** Not in the registry, so its calls are labelled by id and never estimated. */
 const UNKNOWN_MODEL = 'e2e/unknown-model';
@@ -92,16 +82,6 @@ async function enhancePremise(owner: ForgeActor, projectId: string): Promise<API
   return postEnhancePremise(owner, projectId);
 }
 
-/** For an owner stood at a ceiling by seeded calls rather than a quota pin: refuses to send unless the server's own report says a ceiling is reached. */
-async function enhancePremiseAtCeiling(owner: ForgeActor, projectId: string): Promise<APIResponse> {
-  const quota = await readQuota(owner.ctx);
-  const atRate = quota.maxCalls > 0 && quota.calls >= quota.maxCalls;
-  const overSpend = quota.maxCostUsd > 0 && quota.costUsd > quota.maxCostUsd;
-  if (!atRate && !overSpend)
-    throw new SpendGuardError(`project ${projectId}'s owner stands under both ceilings (${quota.calls} calls, $${quota.costUsd}): the request would dispatch`);
-  return postEnhancePremise(owner, projectId);
-}
-
 async function expectOutcome(response: APIResponse, status: number, code: string, what: string): Promise<void> {
   expect(response.status(), `${what} — body ${await response.text()}`).toBe(status);
   expect(await errorCode(response), what).toBe(code);
@@ -119,65 +99,11 @@ async function readCost(ctx: APIRequestContext, path: string): Promise<Cost> {
   return (await response.json()) as Cost;
 }
 
-async function pricedModel(ctx: APIRequestContext): Promise<RegistryModel & { inputPricePerMToken: number }> {
-  const response = await ctx.get('/api/v1/ai/models');
-  expect(response.status(), await response.text()).toBe(200);
-  const models = ((await response.json()) as { models: RegistryModel[] }).models;
-  const priced = models.find(model => model.kind === 'llm' && (model.inputPricePerMToken ?? 0) > 0);
-  expect(priced, 'the registry lists a priced text model').toBeDefined();
-  return priced as RegistryModel & { inputPricePerMToken: number };
-}
-
 function item(items: BreakdownItem[], key: string): BreakdownItem | undefined {
   return items.find(entry => entry.key === key);
 }
 
 test.describe('novel-forge AI quota', () => {
-  test('should count calls up to the rate ceiling and refuse at it without dispatching', async ({ forge }) => {
-    test.skip((await forge.aiBackend()) === 'synapse', LEGACY_QUOTA_ONLY);
-    const author = await forge.actor({ label: 'quota-rate' });
-    const projectId = await newProjectId(author);
-    const limits = await readQuota(author.ctx);
-    expect(limits.maxCalls, 'the rate dimension is enabled').toBeGreaterThan(0);
-
-    await insertModelCallBatch(limits.maxCalls - 1, { projectId, costUsd: 0, costSource: 'provider' });
-    expect((await readQuota(author.ctx)).calls, 'one call below the ceiling').toBe(limits.maxCalls - 1);
-
-    await insertModelCallBatch(1, { projectId, costUsd: 0, costSource: 'provider' });
-    await expectOutcome(await enhancePremiseAtCeiling(author, projectId), 429, 'AI_008', 'at the ceiling the next dispatch is the one over the line');
-
-    const quota = await readQuota(author.ctx);
-    expect(quota).toMatchObject({ calls: limits.maxCalls, costUsd: 0, maxCalls: limits.maxCalls, maxCostUsd: limits.maxCostUsd, windowMs: limits.windowMs });
-    const resetsIn = Date.parse(quota.resetsAt ?? '') - Date.now();
-    expect(resetsIn, 'the window frees capacity one window after its oldest call').toBeGreaterThan(limits.windowMs - 120_000);
-    expect(resetsIn).toBeLessThanOrEqual(limits.windowMs);
-    expect((await listModelCallModels(projectId)).length, 'neither request dispatched a model call').toBe(limits.maxCalls);
-  });
-
-  test('should price recorded and token-only calls into the spend ceiling and report a rate breach first', async ({ forge }) => {
-    test.skip((await forge.aiBackend()) === 'synapse', LEGACY_QUOTA_ONLY);
-    const author = await forge.actor({ label: 'quota-spend' });
-    const projectId = await newProjectId(author);
-    const limits = await readQuota(author.ctx);
-    expect(limits.maxCostUsd, 'the spend dimension is enabled').toBeGreaterThan(0);
-    const model = await pricedModel(author.ctx);
-    const estimated = model.inputPricePerMToken;
-    expect(estimated, 'one estimated call stays under the ceiling').toBeLessThan(limits.maxCostUsd);
-
-    await insertModelCalls([
-      { projectId, model: model.id, inputTokens: 1_000_000, outputTokens: 0, costUsd: null, costSource: null },
-      { projectId, model: model.id, costUsd: limits.maxCostUsd - estimated - 0.01, costSource: 'provider' },
-    ]);
-    expect((await readQuota(author.ctx)).costUsd, 'a cent under the spend ceiling').toBeCloseTo(limits.maxCostUsd - 0.01, 6);
-
-    await insertModelCalls([{ projectId, model: model.id, costUsd: 0.02, costSource: 'provider' }]);
-    await expectOutcome(await enhancePremiseAtCeiling(author, projectId), 429, 'AI_009', 'past the spend ceiling, counting the token-only estimate');
-
-    await insertModelCallBatch(limits.maxCalls, { projectId, costUsd: 0, costSource: 'provider' });
-    await expectOutcome(await enhancePremiseAtCeiling(author, projectId), 429, 'AI_008', 'with both ceilings breached the rate breach is reported');
-    expect((await listModelCallModels(projectId)).length).toBe(limits.maxCalls + 3);
-  });
-
   test('should refuse a quota-pinned project before routing, so no model is ever resolved', async ({ forge }) => {
     const author = await forge.actor({ label: 'quota-pin' });
     const projectId = await newProjectId(author);
@@ -198,9 +124,7 @@ test.describe('novel-forge AI quota', () => {
     await insertModelCallBatch(limits.maxCalls, { projectId, costUsd: limits.maxCostUsd, costSource: 'provider', ageMs: limits.windowMs + 60_000 });
 
     expect(await readQuota(author.ctx), "another owner's calls and this owner's expired ones do not count").toMatchObject({ calls: 0, costUsd: 0, resetsAt: null });
-    expect((await readQuota(neighbour.ctx)).calls, 'the neighbour is at its own ceiling').toBe(limits.maxCalls);
-    if ((await forge.aiBackend()) === 'synapse') return;
-    await expectOutcome(await enhancePremiseAtCeiling(neighbour, neighbourProject), 429, 'AI_008', 'which refuses its next dispatch where novel-forge enforces it');
+    expect((await readQuota(neighbour.ctx)).calls, 'the neighbour counts its own calls').toBe(limits.maxCalls);
   });
 });
 
@@ -209,7 +133,7 @@ test.describe('novel-forge cost figures', () => {
     const author = await forge.actor({ label: 'cost' });
     const project = await createProject(author);
     const other = await createProject(author);
-    const model = await pricedModel(author.ctx);
+    const model = HISTORICAL_MODEL;
     const estimate = model.inputPricePerMToken;
 
     await insertModelCalls([

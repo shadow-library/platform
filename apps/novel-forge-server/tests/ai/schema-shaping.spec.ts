@@ -7,14 +7,12 @@ import { notesOrganisePrompt } from '@modules/ai/prompts/notes-organise.prompt';
 import { NotesOrganiseSchema } from '@modules/ai/schemas/notes-organise.schema';
 import { toHostedPromptSchema } from '@modules/ai/schemas/validate';
 
+import { FakeSynapse } from './synapse-fakes';
+
 function stubDatabaseService(): never {
   const noopInsert = { values: () => ({ onConflictDoNothing: () => Promise.resolve() }) };
-  const db = { query: { llmCache: { findFirst: async () => undefined } }, insert: () => noopInsert };
+  const db = { query: { llmCache: { findFirst: async () => undefined }, projects: { findFirst: async () => undefined } }, insert: () => noopInsert };
   return { getPostgresClient: () => db } as never;
-}
-
-function stubQuotaService(): never {
-  return { enforce: async () => undefined } as never;
 }
 
 function propertyAt(schema: Record<string, unknown>, path: string[]): Record<string, unknown> {
@@ -63,8 +61,8 @@ describe('ModelRouterService.buildMessages', () => {
         coachMessage: 'ok',
       }),
     }));
-    const router = new ModelRouterService({} as never, stubDatabaseService(), stubQuotaService());
-    (router as unknown as Record<string, unknown>)['buildClient'] = () => ({ invoke });
+    const router = new ModelRouterService({} as never, stubDatabaseService(), new FakeSynapse().client);
+    (router as unknown as Record<string, unknown>)['buildSynapseClient'] = () => ({ invoke });
 
     const prompt = { ...notesOrganisePrompt, template: { formatMessages: async () => [] } as never, postValidate: undefined };
     await router.structured(prompt, {}, { projectId: BigInt(1), promptKey: 'notes-organise', promptVersion: notesOrganisePrompt.version, role: 'bible' });

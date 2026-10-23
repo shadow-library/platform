@@ -427,7 +427,7 @@ export function createChapterGenerationNodes(services: Omit<GraphServices, 'chec
     const mode = state.contentMode ?? (await chapterModeFor(projectId, state.chapter));
     const runPolicy = (id: bigint, call: PolicyCall) => policyFor(id, mode, call);
     const call = { role, chapter: state.chapter, mode, raised: state.writerClassRaised };
-    return routeRunCall({ pluginPolicy: runPluginPolicy, modelRouter, runPolicy }, projectId, call, project);
+    return routeRunCall({ pluginPolicy: runPluginPolicy, runPolicy }, projectId, call, project);
   }
 
   async function assembleContext(state: ChapterGenState) {

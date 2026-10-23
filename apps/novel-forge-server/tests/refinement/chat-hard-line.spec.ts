@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'bun:test';
 
-import { UNRESTRICTED_DEFAULTS } from '@modules/ai/defaults';
 import { HARD_LINE_LEXICON, isHardLineRefusal } from '@modules/ai/hard-line';
 import { ChatService } from '@modules/refinement/chat.service';
 import { AppErrorCode } from '@server/classes';
@@ -37,8 +36,7 @@ function chat() {
     }),
   };
   const modelRouter = {
-    resolveModel: () => UNRESTRICTED_DEFAULTS.chat,
-    routeModel: () => ({ resolved: UNRESTRICTED_DEFAULTS.chat, costTier: 'balanced', contentMode: 'unrestricted' }),
+    routeModel: () => ({ task: 'novel-forge.chat', costTier: 'balanced', contentMode: 'unrestricted' }),
   };
   const workflowRunService = {
     runChain: async (_projectId: bigint, _graph: string, _target: string, input: unknown) => {
@@ -48,14 +46,14 @@ function chat() {
   };
   const service = new ChatService(
     { getPostgresClient: () => db } as never,
-    { forNovelChat: async () => ({ id: null, renderedStable: '', renderedVolatile: '' }) } as never,
+    { forNovelChat: async () => ({ id: null, sections: [], omitted: [], renderedStable: '', renderedVolatile: '' }) } as never,
     modelRouter as never,
     workflowRunService as never,
     {} as never,
     {} as never,
     { getRaw: () => [] } as never,
     {} as never,
-    { compactIfNeeded: async () => undefined, buildHistory: async () => [] } as never,
+    { compactIfNeeded: async () => undefined, buildHistory: async () => [], continueConversation: async () => ({ plain: [], history: [], segment: null }) } as never,
     { resolve: async () => ({ writerClass: 'permissive', raised: false, systemMessages: [] }) } as never,
     { publish: () => undefined } as never,
     { read: async () => ({ text: '' }) } as never,
@@ -127,7 +125,6 @@ describe('ChatCompactionService.compactIfNeeded under the hard line', () => {
       }),
     };
     const modelRouter = {
-      resolveModel: () => UNRESTRICTED_DEFAULTS.compact,
       structured: async (_prompt: unknown, input: { transcript: string }) => {
         transcripts.push(input.transcript);
         return fold();

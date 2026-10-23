@@ -40,11 +40,11 @@ function harness(owner: { ownerKind: string; ownerId: bigint | null } = { ownerK
   return { embedding, synapse, logged };
 }
 
-describe('EmbeddingService on the synapse backend', () => {
+describe('EmbeddingService', () => {
   let restore: RestoreConfig;
 
   beforeEach(() => {
-    restore = setConfig({ 'ai.backend': 'synapse', 'ai.llm.timeout-ms': 60_000 });
+    restore = setConfig({ 'ai.llm.timeout-ms': 60_000 });
   });
 
   afterEach(() => restore());
@@ -123,31 +123,6 @@ describe('EmbeddingService on the synapse backend', () => {
 
   it('should name the pinned task as the vector space it embeds into', () => {
     expect(harness().embedding.task).toBe('novel-forge.embedding');
-  });
-});
-
-describe('EmbeddingService on the legacy backend', () => {
-  let restore: RestoreConfig;
-
-  beforeEach(() => {
-    restore = setConfig({ 'ai.backend': 'legacy', 'ai.embedding.model': 'qwen3-embedding:0.6b' });
-  });
-
-  afterEach(() => restore());
-
-  it('should embed each text through the local Ollama and never call Synapse', async () => {
-    const h = harness();
-    const prompts: string[] = [];
-    (h.embedding as unknown as Record<string, unknown>)['ollama'] = {
-      embeddings: async ({ prompt }: { prompt: string }) => {
-        prompts.push(prompt);
-        return { embedding: vector(prompts.length) };
-      },
-    };
-
-    expect(await h.embedding.embedBatch(7n, ['first', 'second'])).toEqual([vector(1), vector(2)]);
-    expect(prompts).toEqual(['first', 'second']);
-    expect(h.synapse.requests).toEqual([]);
   });
 
   it('should compare its vectors with the rows stored before tasks were recorded', () => {

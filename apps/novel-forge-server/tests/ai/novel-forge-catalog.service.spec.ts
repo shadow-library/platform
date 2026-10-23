@@ -1,6 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { describe, expect, it } from 'bun:test';
 
-import { type RestoreConfig, setConfig } from '@shadow-library/common/testing';
 import { type CatalogAliasView, type CatalogAppResponse, type CatalogModelView, type CatalogTaskView } from '@shadow-library/synapse';
 
 import { CATALOG_SELECTIONS, catalogModelLabels, catalogModelsResponse, NovelForgeCatalogService } from '@modules/ai/novel-forge-catalog.service';
@@ -73,14 +72,6 @@ function service(synapse: FakeSynapse = catalogSynapse()): NovelForgeCatalogServ
 const views = () => CATALOG_SELECTIONS.map(selection => ({ ...selection, view: appView(selection.contentMode, selection.costTier) }));
 
 describe('NovelForgeCatalogService', () => {
-  let restore: RestoreConfig;
-
-  beforeEach(() => {
-    restore = setConfig({ 'ai.backend': 'synapse' });
-  });
-
-  afterEach(() => restore());
-
   describe('the models response', () => {
     it('should offer every chat alias once, as a Synapse option in catalog order', () => {
       const response = catalogModelsResponse(views());
@@ -113,7 +104,7 @@ describe('NovelForgeCatalogService', () => {
       });
     });
 
-    it('should leave an image model without per-token prices, as the registry did', () => {
+    it('should leave an image model without per-token prices', () => {
       const image = catalogModelsResponse(views()).tiers.find(entry => entry.group === 'image');
 
       expect(image).toMatchObject({ model: 'grok-imagine-image-2.0', label: 'Grok Imagine Image 2.0' });
@@ -146,7 +137,7 @@ describe('NovelForgeCatalogService', () => {
   });
 
   describe('labels', () => {
-    it("should name a routed model by its own label, an alias-only model by its alias's, and a legacy slug by the registry's", () => {
+    it("should name a routed model by its own label, an alias-only model by its alias's, and a pre-Synapse slug by its historical name", () => {
       const labels = new Map(catalogModelLabels(views().map(({ view }) => view)).map(entry => [entry.model, entry.label]));
 
       expect(labels.get('claude-opus-5.5')).toBe('Claude Opus 5.5');
@@ -162,27 +153,18 @@ describe('NovelForgeCatalogService', () => {
       expect(entry?.outputPricePerMToken).toBeGreaterThan(0);
     });
 
-    it('should name catalog models on the Synapse backend', async () => {
+    it('should name catalog models', async () => {
       const labels = await service().modelLabels();
 
       expect(labels.get('deepseek-v4-pro')).toBe('DeepSeek V4 Pro');
       expect(labels.get('x-ai/grok-4.6')).toBe('Grok 4.6');
     });
 
-    it('should keep the registry names when the catalog cannot be read, never failing the view', async () => {
+    it('should keep the historical names when the catalog cannot be read, never failing the view', async () => {
       const labels = await service(new FakeSynapse().answerCatalog(synapseError(503, 'SYN_NO_ACTIVE_CATALOG'))).modelLabels();
 
       expect(labels.get('x-ai/grok-4.6')).toBe('Grok 4.6');
       expect(labels.has('deepseek-v4-pro')).toBe(false);
-    });
-
-    it('should not read the catalog on the legacy backend', async () => {
-      setConfig({ 'ai.backend': 'legacy' });
-      const synapse = catalogSynapse();
-      const labels = await service(synapse).modelLabels();
-
-      expect(synapse.catalogRequests).toEqual([]);
-      expect(labels.get('moonshotai/kimi-k3')).toBe('Kimi K3');
     });
   });
 

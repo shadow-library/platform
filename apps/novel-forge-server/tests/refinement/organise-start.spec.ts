@@ -128,7 +128,7 @@ function chat({ mode, output, refusal }: ChatSetup) {
     select: () => ({ from: () => ({ where: async () => [{ max: 0 }] }) }),
   };
   const modelRouter = {
-    routeModel: () => ({ resolved: { provider: 'p', model: 'm' }, costTier: 'balanced', contentMode: 'standard' }),
+    routeModel: () => ({ task: 'novel-forge.chat', costTier: 'balanced', contentMode: 'standard' }),
     structured: async () => output,
   };
   const workflowRunService = {
@@ -148,14 +148,14 @@ function chat({ mode, output, refusal }: ChatSetup) {
   const actionRegistry = { refusal: async () => refusal };
   const service = new ChatService(
     { getPostgresClient: () => db } as never,
-    { forNovelChat: async () => ({ id: null, renderedStable: '', renderedVolatile: '' }) } as never,
+    { forNovelChat: async () => ({ id: null, sections: [], omitted: [], renderedStable: '', renderedVolatile: '' }) } as never,
     modelRouter as never,
     workflowRunService as never,
     proposalService as never,
     proposalApplyService as never,
     { getRaw: () => [] } as never,
     {} as never,
-    { compactIfNeeded: async () => undefined, buildHistory: async () => [] } as never,
+    { compactIfNeeded: async () => undefined, buildHistory: async () => [], continueConversation: async () => ({ plain: [], history: [], segment: null }) } as never,
     { resolve: async () => ({ writerClass: 'standard', raised: false, systemMessages: [] }) } as never,
     { publish: () => undefined } as never,
     { read: async () => ({ text: NOTES }) } as never,

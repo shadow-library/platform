@@ -2,7 +2,6 @@ import { beforeAll, describe, expect, it } from 'bun:test';
 
 import { type BaseMessage } from '@langchain/core/messages';
 
-import { PRODUCTION_DEFAULTS, UNRESTRICTED_DEFAULTS } from '@modules/ai/defaults';
 import { createChapterGenerationNodes } from '@modules/ai/graphs/chapter-generation.graph';
 import {
   ISOLATED_EXTRACTION_NOTE,
@@ -115,8 +114,6 @@ function recordingRouter(calls: RecordedCall[], extracted?: unknown) {
       },
     }),
     screenOutput: async () => undefined,
-    resolveModel: (role: string, project?: { contentMode?: string }) =>
-      project?.contentMode === 'unrestricted' ? UNRESTRICTED_DEFAULTS[role as 'generation'] : PRODUCTION_DEFAULTS[role as 'generation'],
   };
 }
 

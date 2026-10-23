@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'bun:test';
 
-import { PRODUCTION_DEFAULTS, UNRESTRICTED_DEFAULTS } from '@modules/ai/defaults';
 import { createChapterGenerationNodes } from '@modules/ai/graphs/chapter-generation.graph';
 import { schema } from '@server/database';
 
@@ -21,8 +20,6 @@ function recordingRouter(calls: RecordedCall[], answer: (key: string) => unknown
       calls.push({ key: prompt.key, vars });
       return answer(prompt.key);
     },
-    resolveModel: (role: string, project?: { contentMode?: string }) =>
-      project?.contentMode === 'unrestricted' ? UNRESTRICTED_DEFAULTS[role as 'generation'] : PRODUCTION_DEFAULTS[role as 'generation'],
   };
 }
 

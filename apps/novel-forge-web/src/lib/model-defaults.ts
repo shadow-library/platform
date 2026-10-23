@@ -51,8 +51,8 @@ export interface PinMenu {
 type PinnedSession = Pick<ChatSessionResponse, 'modelProvider' | 'modelId'>;
 
 /**
- * The chat-model pin menu: the default first, then the options `offered` for the chat's own model type and cost tier — Synapse aliases or
- * registry models, as the server sends them. Until that selection's offer has loaded only the default is listed.
+ * The chat-model pin menu: the default first, then the options `offered` for the chat's own model type and cost tier — Synapse aliases, as
+ * the server sends them. Until that selection's offer has loaded only the default is listed.
  */
 export function pinMenu(
   models: AiModelsResponse | undefined,

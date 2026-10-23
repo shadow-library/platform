@@ -29,12 +29,10 @@ const PHASES: Record<string, Phase> = {
 const FAILURE_COPY: Record<string, FailureCopy> = {
   AI_001: { title: 'The model’s answer came back unreadable', reason: 'It replied, but not in a shape that could be used.' },
   AI_002: { title: 'This model can’t be used here', reason: 'Pick a different model for this conversation, then try again.' },
-  AI_003: { title: 'This model isn’t allowed for this project', reason: 'Unrestricted projects can only use models on their allowlist.' },
-  AI_006: { title: 'AI isn’t set up on this server', reason: 'An API key has to be configured on the server first.' },
-  AI_007: { title: 'Couldn’t reach the model', reason: 'It didn’t respond after a few tries.' },
+  AI_003: { title: 'No model can take this right now', reason: 'No model can serve this call under its model type and cost tier.' },
+  AI_007: { title: 'Couldn’t reach the model', reason: 'It didn’t respond. Try again shortly.' },
   AI_008: { title: 'Too many model calls right now', reason: 'Wait a moment, then try again.' },
   AI_009: { title: 'AI spending limit reached', reason: 'Model calls are paused for this account until the limit resets.' },
-  AI_018: { title: 'Couldn’t check your AI usage', reason: 'The usage limit couldn’t be checked, so the model wasn’t called. Try again shortly.' },
 };
 
 const UNKNOWN_FAILURE: FailureCopy = { title: 'That turn didn’t finish', reason: 'Something went wrong on the server.' };

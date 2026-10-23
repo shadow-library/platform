@@ -106,9 +106,9 @@ describe('pinUpdate', () => {
     expect(pinUpdate(DEFAULT_PIN)).toEqual({ provider: null, model: null });
   });
 
-  it('should send a registry pick as its provider and model, as the legacy backend expects', () => {
-    const legacy: AiModelsResponse = { ...SYNAPSE_MODELS, models: [{ id: 'anthropic/claude-opus-5', provider: 'openrouter', label: 'Claude Opus 5', kind: 'llm', enabled: true }] };
-    const [opus] = pinMenu(legacy, unpinned, ['anthropic/claude-opus-5']).choices;
+  it('should send any option as its own provider and model', () => {
+    const other: AiModelsResponse = { ...SYNAPSE_MODELS, models: [{ id: 'anthropic/claude-opus-5', provider: 'openrouter', label: 'Claude Opus 5', kind: 'llm', enabled: true }] };
+    const [opus] = pinMenu(other, unpinned, ['anthropic/claude-opus-5']).choices;
 
     expect(pinUpdate(opus?.value ?? '')).toEqual({ provider: 'openrouter', model: 'anthropic/claude-opus-5' });
   });

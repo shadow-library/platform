@@ -328,7 +328,6 @@ describe('ChapterAmendService', () => {
         prompts.push(vars);
         return { summary: 'Two ships', changeSet: [{ op: 'entity.upsert', entityKey: 'keeper', type: 'character' }] };
       },
-      resolveModel: () => ({ model: 'fake-extractor' }),
     };
     const generation = makeGenerationService(fake.db, {
       modelRouter,

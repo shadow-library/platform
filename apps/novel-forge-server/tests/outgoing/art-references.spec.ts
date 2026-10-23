@@ -20,7 +20,7 @@ function references(cast: CastMember[] = CAST): { service: IllustrationReference
   const chain = { from: () => chain, innerJoin: () => chain, where: () => chain, orderBy: async () => (reads++, cast) };
   const db = { select: () => chain, query: { entities: { findFirst: async () => undefined } } };
   const storage = { stat: async () => ({ size: 10, contentType: 'image/png' }), read: async () => ({ bytes: new Uint8Array([1]) }) };
-  const service = new IllustrationReferenceService({ getPostgresClient: () => db } as never, storage as never, { referenceCapacity: () => 4 } as never);
+  const service = new IllustrationReferenceService({ getPostgresClient: () => db } as never, storage as never);
   return { service, castReads: () => reads };
 }
 
@@ -35,16 +35,18 @@ const input = (overrides: Partial<ResolveReferencesInput>): ResolveReferencesInp
 });
 
 describe('the reference portraits auto-selected for reader-facing art (P4-51)', () => {
-  it('should leave out a chapter image cast portrait dated after that chapter and keep earlier and undated ones', async () => {
-    const resolved = await references().service.resolve(input({}));
+  it('should leave out a chapter image cast portrait dated after that chapter, giving its slot to the next one', async () => {
+    const [mira, dace, vell] = CAST as [CastMember, CastMember, CastMember];
+    const refs = async (cast: CastMember[]) => (await references(cast).service.resolve(input({}))).references.map(reference => reference.ref);
 
-    expect(resolved.references.map(reference => reference.ref)).toEqual(['portraits/mira-ch2.png', 'portraits/vell-undated.png']);
+    expect(await refs([dace, vell])).toEqual(['portraits/vell-undated.png']);
+    expect(await refs([dace, mira])).toEqual(['portraits/mira-ch2.png']);
   });
 
   it('should keep a portrait dated at the chapter itself', async () => {
-    const resolved = await references().service.resolve(input({ subjectKey: '5' }));
+    const resolved = await references([CAST[1] as CastMember]).service.resolve(input({ subjectKey: '5' }));
 
-    expect(resolved.references.map(reference => reference.ref)).toContain('portraits/dace-ch5.png');
+    expect(resolved.references.map(reference => reference.ref)).toEqual(['portraits/dace-ch5.png']);
   });
 
   it('should select no portrait at all for a cover, so none can show past the latest final chapter', async () => {

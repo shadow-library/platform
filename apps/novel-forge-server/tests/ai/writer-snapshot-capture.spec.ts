@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'bun:test';
 
-import { PRODUCTION_DEFAULTS, UNRESTRICTED_DEFAULTS } from '@modules/ai/defaults';
 import { createChapterGenerationNodes } from '@modules/ai/graphs/chapter-generation.graph';
 
 import { writerAssembler, writerDb, writerTables } from './writer-disclosure-fixtures';
@@ -55,8 +54,6 @@ function fakeRouter(reply: (key: string) => unknown) {
       );
       return reply(prompt.key);
     },
-    resolveModel: (role: string, project?: { contentMode?: string }) =>
-      project?.contentMode === 'unrestricted' ? UNRESTRICTED_DEFAULTS[role as 'generation'] : PRODUCTION_DEFAULTS[role as 'generation'],
   };
 }
 

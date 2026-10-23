@@ -288,7 +288,7 @@ export class CostBreakdownItem {
   @Field({ description: 'The model group, role, or model id this row aggregates.' })
   key: string;
 
-  @Field({ description: 'Display name: the registry label for a model, otherwise the key itself.' })
+  @Field({ description: 'Display name: the catalog or historical label for a model, otherwise the key itself.' })
   label: string;
 
   @Field(() => Integer)
@@ -303,7 +303,7 @@ export class CostBreakdownItem {
   @Field({ description: 'Recorded cost plus the list-price estimate for calls that recorded none.' })
   costUsd: number;
 
-  @Field({ description: 'The part of `costUsd` estimated from registry list prices because the call recorded no cost.' })
+  @Field({ description: 'The part of `costUsd` estimated from list prices because the call recorded no cost.' })
   estimatedCostUsd: number;
 }
 
@@ -324,7 +324,7 @@ export class CostResponse {
   @Field()
   totalCostUsd: number;
 
-  @Field({ description: 'The part of `totalCostUsd` estimated from registry list prices because the call recorded no cost. Zero means every figure was recorded.' })
+  @Field({ description: 'The part of `totalCostUsd` estimated from list prices because the call recorded no cost. Zero means every figure was recorded.' })
   estimatedCostUsd: number;
 
   @Field({ description: 'Spend by calls made in the last 7 days.' })

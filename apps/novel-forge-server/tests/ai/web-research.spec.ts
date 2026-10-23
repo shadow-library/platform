@@ -174,45 +174,11 @@ describe('WebResearchService', () => {
   it('should refuse to search without a Brave key', async () => {
     setConfig('ai.web-search.brave.api.key', undefined);
 
-    expect(await refusal(new WebResearchService().search('x'))).toBe('Web search is not configured — set AI_WEB_SEARCH_BRAVE_API_KEY');
-  });
-
-  describe('modeFor', () => {
-    function gateway(answer: (url: string) => Promise<Response>) {
-      setConfig('ai.openrouter.api.url', 'http://gateway:7431/v1/');
-      const asked: string[] = [];
-      const service = new WebResearchService();
-      service.fetcher = async input => (asked.push(String(input)), answer(String(input)));
-      return { service, asked };
-    }
-
-    it('should hand the web to a model the gateway runs with its own search, asking once a minute', async () => {
-      const { service, asked } = gateway(async () =>
-        respond(JSON.stringify({ model: 'anthropic/claude-sonnet-5', native: true }), { headers: { 'content-type': 'application/json' } }),
-      );
-      let now = 0;
-      service.now = () => now;
-
-      expect(await service.modeFor('anthropic/claude-sonnet-5')).toBe('native');
-      expect(await service.modeFor('anthropic/claude-sonnet-5')).toBe('native');
-      now = 61_000;
-      await service.modeFor('anthropic/claude-sonnet-5');
-
-      expect(asked).toEqual(['http://gateway:7431/v1/web-tools?model=anthropic%2Fclaude-sonnet-5', 'http://gateway:7431/v1/web-tools?model=anthropic%2Fclaude-sonnet-5']);
-    });
-
-    it('should fall back to Brave, or to no web without its key, wherever the gateway says no or cannot answer', async () => {
-      setConfig('ai.web-search.brave.api.key', 'brave-key');
-      expect(await gateway(async () => respond(JSON.stringify({ native: false }), { headers: { 'content-type': 'application/json' } })).service.modeFor('m')).toBe('brave');
-      expect(await gateway(async () => respond('not found', { status: 404 })).service.modeFor('m')).toBe('brave');
-      expect(await gateway(() => Promise.reject(new Error('refused'))).service.modeFor('m')).toBe('brave');
-      setConfig('ai.web-search.brave.api.key', undefined);
-      expect(await gateway(async () => respond('', { status: 404 })).service.modeFor('m')).toBe('off');
-    });
+    expect(await refusal(new WebResearchService({} as never).search('x'))).toBe('Web search is not configured — set AI_WEB_SEARCH_BRAVE_API_KEY');
   });
 
   it('should let a turn fetch the links the author wrote, without their fragment or trailing punctuation', () => {
-    const turn = new WebResearchService().forTurn(['Read https://example.com/guide#part-2, then (https://example.org/x).']);
+    const turn = new WebResearchService({} as never).forTurn(['Read https://example.com/guide#part-2, then (https://example.org/x).']);
 
     expect([...turn.fetchable]).toEqual(['https://example.com/guide', 'https://example.org/x']);
   });

@@ -1,9 +1,8 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it, mock } from 'bun:test';
+import { describe, expect, it, mock } from 'bun:test';
 
 import { awaitAllCallbacks } from '@langchain/core/callbacks/promises';
 import { AIMessage, HumanMessage } from '@langchain/core/messages';
 
-import { GatewayChatOpenAI } from '@modules/ai/gateway-chat-openai';
 import {
   describeSection,
   findHardLine,
@@ -25,7 +24,8 @@ import { toHostedPromptSchema } from '@modules/ai/schemas/validate';
 import { TelemetryHandler } from '@modules/ai/telemetry.handler';
 import { AppErrorCode } from '@server/classes';
 import { schema } from '@server/database';
-import { Config } from '@shadow-library/common';
+
+import { FakeSynapse } from './synapse-fakes';
 
 const PLACEHOLDERS: HardLineLexicon = {
   standalone: [/\bBANNED_MARKER\b/],
@@ -59,14 +59,6 @@ const echoPrompt = {
   schema: JudgeSchema,
 };
 
-function setConfig(key: string, value: unknown): void {
-  (Config as unknown as { cache: Map<string, unknown> })['cache'].set(key, value);
-}
-
-function getConfig(key: string): unknown {
-  return (Config as unknown as { cache: Map<string, unknown> })['cache'].get(key);
-}
-
 interface Insert {
   table: unknown;
   values: Record<string, unknown>;
@@ -74,7 +66,7 @@ interface Insert {
 
 function fakeDb(inserts: Insert[]) {
   return {
-    query: { llmCache: { findFirst: async () => undefined } },
+    query: { llmCache: { findFirst: async () => undefined }, projects: { findFirst: async () => undefined } },
     insert: (table: unknown) => ({
       values: (values: Record<string, unknown>) => {
         inserts.push({ table, values });
@@ -88,13 +80,14 @@ function router(answer = CONSISTENT) {
   const inserts: Insert[] = [];
   const databaseService = { getPostgresClient: () => fakeDb(inserts) } as never;
   const telemetry = new TelemetryHandler(databaseService);
-  const service = new ModelRouterService(telemetry, databaseService, { enforce: async () => undefined } as never);
+  const synapse = new FakeSynapse();
+  const service = new ModelRouterService(telemetry, databaseService, synapse.client);
   const invoke = mock(async () => ({ content: answer }));
   const stream = mock(async function* () {
     yield { content: answer };
   });
-  const stubClient = () => ((service as unknown as Record<string, unknown>)['buildClient'] = () => ({ invoke, stream }));
-  return { service, inserts, invoke, stream, stubClient };
+  const stubClient = () => ((service as unknown as Record<string, unknown>)['buildSynapseClient'] = () => ({ invoke, stream }));
+  return { service, synapse, inserts, invoke, stream, stubClient };
 }
 
 async function refusal(call: Promise<unknown>): Promise<unknown> {
@@ -213,25 +206,6 @@ describe('screen sources', () => {
 });
 
 describe('ModelRouterService hard line', () => {
-  const realFetch = globalThis.fetch;
-  const savedConfig = new Map(['ai.openrouter.api.key', 'ai.openrouter.api.url'].map(key => [key, getConfig(key)]));
-  beforeAll(() => {
-    setConfig('ai.openrouter.api.key', 'test-openrouter-key');
-    setConfig('ai.openrouter.api.url', 'http://gateway.invalid/openrouter');
-  });
-  afterEach(() => {
-    globalThis.fetch = realFetch;
-  });
-  afterAll(() => {
-    for (const [key, value] of savedConfig) setConfig(key, value);
-  });
-
-  function recordFetch() {
-    const sent = mock(async () => new Response('{}'));
-    globalThis.fetch = sent as unknown as typeof fetch;
-    return sent;
-  }
-
   it('should refuse supplied text before any model call and record the rule and source', async () => {
     const run = router();
     run.stubClient();
@@ -240,8 +214,8 @@ describe('ModelRouterService hard line', () => {
 
     expect(err).toMatchObject({ code: AppErrorCode.AI_015.code, status: 422, data: { rule: 'standalone-term', source: 'The guidance for this chapter' } });
     expect(run.invoke).not.toHaveBeenCalled();
-    expect(run.inserts.map(({ table, values }) => [table, values['status'], values['error']])).toEqual([
-      [schema.modelCalls, 'refused', { code: 'AI_015', rule: 'standalone-term', source: 'The guidance for this chapter', sourceRefs: [] }],
+    expect(run.inserts.map(({ table, values }) => [table, values['status'], values['provider'], values['model'], values['error']])).toEqual([
+      [schema.modelCalls, 'refused', 'synapse', 'novel-forge.review', { code: 'AI_015', rule: 'standalone-term', source: 'The guidance for this chapter', sourceRefs: [] }],
     ]);
   });
 
@@ -292,7 +266,7 @@ describe('ModelRouterService hard line', () => {
   it('should release a streamed unrestricted reply a sentence at a time and never send the sentence it refuses', async () => {
     const run = router();
     const chunks = [`{"reply":"The harbour`, ` wakes. The ${MINOR} ${SEXUAL_ONLY}`, ` follows. Tail"}`];
-    (run.service as unknown as Record<string, unknown>)['buildClient'] = () => ({
+    (run.service as unknown as Record<string, unknown>)['buildSynapseClient'] = () => ({
       stream: async function* () {
         for (const content of chunks) yield { content };
       },
@@ -322,7 +296,7 @@ describe('ModelRouterService hard line', () => {
     const clean = { op: 'entity.upsert', entityKey: 'mara', type: 'character', name: 'Mara' };
     const refused = { op: 'entity.upsert', entityKey: 'jon', type: 'character', name: 'Jon', body: `The ${MINOR} ${SEXUAL_ONLY}.` };
     const payload = JSON.stringify({ reply: 'Two people.', changeSet: [clean, refused] });
-    (run.service as unknown as Record<string, unknown>)['buildClient'] = () => ({
+    (run.service as unknown as Record<string, unknown>)['buildSynapseClient'] = () => ({
       stream: async function* () {
         yield { content: payload };
       },
@@ -366,7 +340,6 @@ describe('ModelRouterService hard line', () => {
   });
 
   it('should refuse at the wire a tool-bound judge client, send nothing, and record the refusal with its rule', async () => {
-    const sent = recordFetch();
     const run = router();
     const client = await run.service.chatFor('judge', CTX, { contentMode: 'unrestricted' });
     const tool = { type: 'function', function: { name: 'noop', description: 'Does nothing.', parameters: { type: 'object', properties: {} } } };
@@ -375,33 +348,16 @@ describe('ModelRouterService hard line', () => {
     await awaitAllCallbacks();
 
     expect(isHardLineRefusal(err)).toBe(true);
-    expect(sent).not.toHaveBeenCalled();
+    expect(run.synapse.requests).toEqual([]);
     expect(run.inserts.map(({ values }) => [values['status'], (values['error'] as { rule?: string }).rule])).toEqual([['refused', 'standalone-term']]);
   });
 
-  it('should guard a client that takes the Responses API as well', async () => {
-    const sent = recordFetch();
-    const screen = mock(() => {
-      throw AppErrorCode.AI_015.create({ source: 'The request', rule: 'standalone-term', sourceRefs: [] });
-    });
-    const client = new GatewayChatOpenAI(
-      { model: 'x-ai/grok-4.6', apiKey: 'k', maxRetries: 0, useResponsesApi: true, configuration: { baseURL: 'http://gateway.invalid/openrouter' } },
-      { screen, systemLine: HARD_LINE_SYSTEM_LINE },
-    );
-
-    const err = await refusal(client.invoke([new HumanMessage('Anything.')]));
-
-    expect(isHardLineRefusal(err)).toBe(true);
-    expect(screen).toHaveBeenCalledTimes(1);
-    expect(sent).not.toHaveBeenCalled();
-  });
-
   it('should refuse an unrestricted image prompt before the request', async () => {
-    const sent = recordFetch();
+    const run = router();
 
-    const err = await refusal(router().service.images({ prompt: `Cover: ${PROBE}.`, n: 1 }, { ...CTX, role: 'image' }, { contentMode: 'unrestricted' }));
+    const err = await refusal(run.service.images({ prompt: `Cover: ${PROBE}.`, n: 1 }, { ...CTX, role: 'image' }, { contentMode: 'unrestricted' }));
 
     expect(err).toMatchObject({ code: 'AI_015', data: { source: 'The image prompt' } });
-    expect(sent).not.toHaveBeenCalled();
+    expect(run.synapse.requests).toEqual([]);
   });
 });

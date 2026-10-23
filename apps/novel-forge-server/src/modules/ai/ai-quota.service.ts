@@ -1,15 +1,13 @@
-import { and, eq, gte, isNull, ne, type SQL, sql } from 'drizzle-orm';
+import { and, eq, gte, ne, type SQL, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
-import { Config, Logger } from '@shadow-library/common';
+import { Config } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
-import { AppErrorCode } from '@server/classes';
 import { ownedBy, type OwnerRef } from '@server/common';
-import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, schema } from '@server/database';
 
 import { type AiQuotaResponse } from './ai.dto';
-import { computeWindowUsage, quotaBreach, type WindowUsageRow } from './quota';
+import { computeWindowUsage, type WindowUsageRow } from './quota';
 
 const DEFAULT_WINDOW_MS = 60 * 60 * 1000;
 const DEFAULT_MAX_CALLS = 1000;
@@ -26,14 +24,12 @@ interface QuotaLimits {
 
 @Injectable()
 export class AiQuotaService {
-  private readonly logger = Logger.getLogger(APP_NAME, AiQuotaService.name);
   private readonly db: PrimaryDatabase;
 
   constructor(private readonly databaseService: DatabaseService) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
 
-  // The one place these three settings are read, so `enforce` and `currentWindowStatus` can never disagree on what the window is.
   private limits(): QuotaLimits {
     return {
       maxCalls: Config.get('ai.quota.max-calls') ?? DEFAULT_MAX_CALLS,
@@ -42,30 +38,7 @@ export class AiQuotaService {
     };
   }
 
-  // Per-principal (project owner) throttle enforced before any model dispatch. The window is counted
-  // over `model_calls` joined to the owner's projects, so background jobs are gated the same as request
-  // turns even though neither carries the acting principal down to this point. A read failure fails
-  // closed: on unrestricted routes this is the only spend ceiling, so an unreadable window must not lift it.
-  async enforce(projectId: bigint): Promise<void> {
-    const { maxCalls, maxCostUsd, windowMs } = this.limits();
-    if (maxCalls <= 0 && maxCostUsd <= 0) return;
-
-    const windowStart = new Date(Date.now() - windowMs);
-
-    let rows: WindowUsageRow[];
-    try {
-      rows = await this.readWindowUsage(projectId, windowStart);
-    } catch (err) {
-      this.logger.error('AI quota check failed — usage read failed, refusing the model call', { projectId, err });
-      throw AppErrorCode.AI_018.create({ retryable: true });
-    }
-
-    const breach = quotaBreach(computeWindowUsage(rows), { maxCalls, maxCostUsd });
-    if (breach === 'rate') throw AppErrorCode.AI_008.create();
-    if (breach === 'spend') throw AppErrorCode.AI_009.create();
-  }
-
-  /** The caller's own rolling-window status: what `enforce` would check, shown rather than enforced. */
+  /** The caller's own rolling-window status, reported only: Synapse budgets are what refuse a call. */
   async currentWindowStatus(owner: OwnerRef): Promise<AiQuotaResponse> {
     const { maxCalls, maxCostUsd, windowMs } = this.limits();
     const windowStart = new Date(Date.now() - windowMs);
@@ -90,13 +63,6 @@ export class AiQuotaService {
       windowMs,
       resetsAt: oldest ? new Date(oldest.createdAt.getTime() + windowMs) : null,
     };
-  }
-
-  private async readWindowUsage(projectId: bigint, windowStart: Date): Promise<WindowUsageRow[]> {
-    const project = await this.db.query.projects.findFirst({ columns: { ownerKind: true, ownerId: true }, where: eq(schema.projects.id, projectId) });
-    if (!project) return [];
-    const owner = project.ownerId === null ? isNull(schema.projects.ownerId) : ownedBy(schema.projects, { kind: project.ownerKind, id: project.ownerId });
-    return this.readWindowUsageWhere(owner, windowStart);
   }
 
   private async readWindowUsageWhere(owner: SQL, windowStart: Date): Promise<WindowUsageRow[]> {

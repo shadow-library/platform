@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'bun:test';
 
-import { PRODUCTION_DEFAULTS, type ResolvedModel, UNRESTRICTED_DEFAULTS } from '@modules/ai/defaults';
 import { AppErrorCode } from '@server/classes';
 import { schema } from '@server/database';
 
@@ -18,21 +17,17 @@ interface RoutedCall {
 interface SetupOptions {
   draft: DraftRow;
   raised?: boolean;
-  unrestrictedModel?: ResolvedModel;
   /** The writer's required material is over its limits, so an enforcing pack request fails. */
   overCaps?: boolean;
 }
 
-function setup({ draft, raised = false, unrestrictedModel, overCaps = false }: SetupOptions) {
+function setup({ draft, raised = false, overCaps = false }: SetupOptions) {
   const fake = fakeGenerationDb({ draftReads: [draft], draftWriteResult: [{ ...draft, revision: draft.revision + 1 }] });
   const policyBaselines: (string | null | undefined)[] = [];
   const modelCalls: RoutedCall[] = [];
-  const resolveModel = (role: string, project?: { contentMode?: string }) =>
-    project?.contentMode === 'unrestricted' ? (unrestrictedModel ?? UNRESTRICTED_DEFAULTS[role as 'revision']) : PRODUCTION_DEFAULTS[role as 'revision'];
 
   const service = makeGenerationService(fake.db, {
     modelRouter: {
-      resolveModel,
       structured: async (module: { role?: string; key: string }, _input: unknown, _ctx: unknown, project?: RoutedCall['project'], policy?: RoutedCall['policy']) => {
         modelCalls.push({ role: module.role ?? module.key, project, policy });
         return REVISED;
@@ -73,14 +68,6 @@ describe('GenerationService.reviseDraft containment', () => {
     const values = run.proseUpdate()?.values;
     expect(values?.isolated).toBe(true);
     expect(values).not.toHaveProperty('generator');
-  });
-
-  it('should refuse an isolated draft whose unrestricted route resolves off the allowlist without calling the model or writing', async () => {
-    const run = setup({ draft: draftRow(ISOLATED), unrestrictedModel: PRODUCTION_DEFAULTS.revision });
-
-    await expect(run.service.reviseDraft(1n, 4, { note: 'Tighten the ending.' })).rejects.toMatchObject({ code: 'AI_003' });
-    expect(run.modelCalls).toEqual([]);
-    expect(run.writes()).toEqual([]);
   });
 
   it('should revise a standard draft on the project route without isolating it', async () => {

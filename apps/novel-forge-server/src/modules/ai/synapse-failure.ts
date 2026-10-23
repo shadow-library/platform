@@ -40,7 +40,7 @@ export function fromSynapseFailure(error: unknown): unknown {
   return mapSynapseFailure(error) ?? error;
 }
 
-/** The router's give-up error on the Synapse path: a failure that did not come from Synapse is still `AI_007`, flagged as the legacy path flags it. */
+/** The router's give-up error: a failure that did not come from Synapse is still `AI_007`, flagged transient or not. */
 export function synapseCallFailed(error: unknown): AppError {
   return mapSynapseFailure(error) ?? modelCallFailed(error);
 }

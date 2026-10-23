@@ -2,7 +2,6 @@ import { describe, expect, it } from 'bun:test';
 
 import { type Refinement } from '@server/database';
 
-import { UNRESTRICTED_DEFAULTS } from '@modules/ai/defaults';
 import { findHardLine, HARD_LINE_LEXICON, isHardLineRefusal } from '@modules/ai/hard-line';
 import { passageHash } from '@modules/generation/passage-anchor';
 import { ChatService } from '@modules/refinement/chat.service';
@@ -261,8 +260,7 @@ function chat(contentMode: 'standard' | 'unrestricted', draftRows: DraftRow[] = 
     select: () => ({ from: () => ({ where: async () => [{ max: 0 }] }) }),
   };
   const modelRouter = {
-    resolveModel: () => UNRESTRICTED_DEFAULTS.chat,
-    routeModel: () => ({ resolved: { provider: 'p', model: 'm' }, costTier: 'balanced', contentMode }),
+    routeModel: () => ({ task: 'novel-forge.chat', costTier: 'balanced', contentMode }),
     structured: async (_prompt: unknown, prompt: { userMessage: string }) => {
       prompts.push(prompt);
       return { reply: 'Tightened.' };
@@ -278,14 +276,14 @@ function chat(contentMode: 'standard' | 'unrestricted', draftRows: DraftRow[] = 
   };
   const service = new ChatService(
     { getPostgresClient: () => db } as never,
-    { forNovelChat: async () => ({ id: null, renderedStable: '', renderedVolatile: '' }) } as never,
+    { forNovelChat: async () => ({ id: null, sections: [], omitted: [], renderedStable: '', renderedVolatile: '' }) } as never,
     modelRouter as never,
     workflowRunService as never,
     {} as never,
     {} as never,
     { getRaw: () => [] } as never,
     {} as never,
-    { compactIfNeeded: async () => undefined, buildHistory: async () => [] } as never,
+    { compactIfNeeded: async () => undefined, buildHistory: async () => [], continueConversation: async () => ({ plain: [], history: [], segment: null }) } as never,
     { resolve: async () => ({ writerClass: 'standard', raised: false, systemMessages: [] }) } as never,
     { publish: () => undefined } as never,
     { read: async () => ({ text: '' }) } as never,

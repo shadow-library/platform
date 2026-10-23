@@ -9,7 +9,6 @@ import { parseKnowledgeContract, revokeProvisionalReveals } from '@server/common
 import { APP_NAME } from '@server/constants';
 import { type ChapterReviewFinding, type Generation, type Job, type PrimaryDatabase, type PrimaryTransaction, type Project, type Review, schema } from '@server/database';
 
-import { isSynapseBackend } from '../ai/ai-backend';
 import { chapterContentMode, routeChapterCall } from '../ai/chapter-route';
 import { ContextAssembler } from '../ai/context/context-assembler.service';
 import { loadWriterBrief } from '../ai/context/writer-brief';
@@ -306,12 +305,10 @@ export class ChapterReviewService {
     );
   }
 
-  // Only a review served from llm_cache recorded no call. On Synapse the routes, not the registry, pick the model, so none is named rather than a guess.
+  // Only a review served from llm_cache recorded no call. Synapse's routes pick the model, so none is named rather than a guess.
   private routedModel(role: 'judge' | 'review', route: CallRoute): UsedModel {
-    const routed = this.modelRouter.routeModel(role, route.project, route.policy);
-    const { costTier, contentMode } = routed;
-    if (isSynapseBackend()) return { modelProvider: null, model: null, costTier, contentMode };
-    return { modelProvider: routed.resolved.provider, model: routed.resolved.model, costTier, contentMode };
+    const { costTier, contentMode } = this.modelRouter.routeModel(role, route.project, route.policy);
+    return { modelProvider: null, model: null, costTier, contentMode };
   }
 
   private async judge({ projectId, chapter, source, brief, route, settled, runId }: ModelKindContext): Promise<ReviewOutcome> {
@@ -408,8 +405,7 @@ export class ChapterReviewService {
   }
 
   private routeFor(projectId: bigint, role: 'judge' | 'review', chapter: number, setting: ChapterSetting): Promise<CallRoute> {
-    const deps = { pluginPolicy: this.pluginPolicy, modelRouter: this.modelRouter };
-    return routeChapterCall(deps, projectId, { role, chapter, mode: setting.mode }, setting.project as ProjectConfig | undefined);
+    return routeChapterCall({ pluginPolicy: this.pluginPolicy }, projectId, { role, chapter, mode: setting.mode }, setting.project as ProjectConfig | undefined);
   }
 
   private async reviewableSource(projectId: bigint, chapter: number): Promise<ReviewSource> {

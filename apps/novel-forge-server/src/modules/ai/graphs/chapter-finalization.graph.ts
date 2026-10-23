@@ -41,7 +41,7 @@ export interface IsolatedContinuityInput {
  * logged and the chapter still finalizes.
  */
 export async function stageIsolatedContinuity(
-  services: { db: PrimaryDatabase; modelRouter: Pick<ModelRouterService, 'structured' | 'resolveModel'> },
+  services: { db: PrimaryDatabase; modelRouter: Pick<ModelRouterService, 'structured'> },
   input: IsolatedContinuityInput,
   ctx: TelemetryContext,
 ): Promise<void> {
@@ -49,17 +49,17 @@ export async function stageIsolatedContinuity(
   try {
     const projectRow = await db.query.projects.findFirst({ where: eq(schema.projects.id, input.projectId) });
     const routed = chapterProjectConfig(projectRow as ProjectConfig | undefined, 'unrestricted');
+    let answered: string | undefined;
     const extracted = (await modelRouter.structured(
       PROMPT_REGISTRY.continuity,
       { contextPack: isolatedExtractionContext(input.contextPack), chapterNumber: input.chapter, chapterProse: input.prose },
-      ctx,
+      { ...ctx, onAnswered: ({ model }) => void (answered = model) },
       routed,
     )) as ContinuityOutput;
     const proposal = isolatedContinuityProposal(extracted);
-    const resolvedModel = modelRouter.resolveModel('continuity', routed);
     await db
       .insert(schema.continuityProposals)
-      .values({ projectId: input.projectId, chapter: input.chapter, proposal: proposal as never, model: resolvedModel.model, status: 'pending' })
+      .values({ projectId: input.projectId, chapter: input.chapter, proposal: proposal as never, model: answered ?? null, status: 'pending' })
       .onConflictDoUpdate({
         target: [schema.continuityProposals.projectId, schema.continuityProposals.chapter],
         set: { proposal: sql`EXCLUDED.proposal`, model: sql`EXCLUDED.model`, updatedAt: new Date() },
@@ -328,7 +328,8 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
     }
 
     const contextPack = await continuityRoster(db, projectId);
-    const ctx = continuityContext(state, projectId);
+    let answered: string | undefined;
+    const ctx = { ...continuityContext(state, projectId), onAnswered: ({ model }: { model: string }) => void (answered = model) };
     const projectRow = await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
     // Containment decides the route here, not the plan: this prose is not walled off, so it goes to the standard map.
     const routed = chapterProjectConfig(projectRow as ProjectConfig | undefined, 'standard');
@@ -344,12 +345,11 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
       )) as ContinuityOutput;
 
       // Upsert continuity proposal.
-      const resolvedModel = modelRouter.resolveModel('continuity', routed);
       await db.transaction(async tx => {
         await assertOwnsClaim(tx, projectId, state.chapter, state.runId, 'extractContinuity');
         await tx
           .insert(schema.continuityProposals)
-          .values({ projectId, chapter: state.chapter, proposal: delta as never, model: resolvedModel.model, status: 'pending' })
+          .values({ projectId, chapter: state.chapter, proposal: delta as never, model: answered ?? null, status: 'pending' })
           .onConflictDoUpdate({
             target: [schema.continuityProposals.projectId, schema.continuityProposals.chapter],
             set: { proposal: sql`EXCLUDED.proposal`, model: sql`EXCLUDED.model`, status: 'pending', updatedAt: new Date() },

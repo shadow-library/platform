@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'bun:test';
 
-import { PRODUCTION_DEFAULTS, UNRESTRICTED_DEFAULTS } from '@modules/ai/defaults';
 import { SummaryConflictError } from '@server/classes';
 import { schema } from '@server/database';
 
@@ -21,8 +20,6 @@ function summarizingRouter(summary = SUMMARY) {
         calls.push(input);
         return { summary, state: { lastBeat: 'counted' } };
       },
-      resolveModel: (role: string, project?: { contentMode?: string }) =>
-        project?.contentMode === 'unrestricted' ? UNRESTRICTED_DEFAULTS[role as 'continuity'] : PRODUCTION_DEFAULTS[role as 'continuity'],
     },
     pluginPolicy: {
       resolve: async (_projectId: bigint, _call: unknown, baseline?: { contentMode?: string | null }) => ({

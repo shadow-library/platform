@@ -64,8 +64,7 @@ export class UpdateSessionModelBody {
   @Field({
     optional: true,
     nullable: true,
-    description:
-      "The picked option's id: a registry model on the legacy backend, an alias key on the Synapse backend, which must be offered for the chat's model type and cost tier after this update (`AI_022` otherwise).",
+    description: "The picked option's id: an alias key, which must be offered for the chat's model type and cost tier after this update (`AI_022` otherwise).",
   })
   model?: string | null;
 
@@ -111,7 +110,7 @@ export class ChatSessionResponse {
   @Field({ optional: true, nullable: true, description: "The pinned option's provider: `synapse` for an alias pin. Null when the chat is unpinned." })
   modelProvider?: string | null;
 
-  @Field({ optional: true, nullable: true, description: "The pinned option's id: a registry model on the legacy backend, an alias key on the Synapse backend." })
+  @Field({ optional: true, nullable: true, description: "The pinned option's id: an alias key." })
   modelId?: string | null;
 
   @Field(() => ContentMode, { optional: true, nullable: true, description: "The chat's own model type; null follows the project's content mode." })
@@ -374,7 +373,7 @@ export class ChatMessageResponse {
   @Field({
     optional: true,
     nullable: true,
-    description: 'The model that wrote the reply: its catalog model on the Synapse backend, named by `GET /ai/models` `modelLabels`; null on user messages.',
+    description: 'The model that wrote the reply: its catalog model, named by `GET /ai/models` `modelLabels`; null on user messages.',
   })
   modelId?: string | null;
 

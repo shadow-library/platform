@@ -1,4 +1,5 @@
 import { eq } from 'drizzle-orm';
+import { Config } from '@shadow-library/common';
 import { type SynapseSubject } from '@shadow-library/synapse';
 import { type SynapseRequestHook } from '@shadow-library/synapse/langchain';
 
@@ -22,7 +23,7 @@ export const SYNAPSE_EMBEDDING_TASK = `${TASK_PREFIX}embedding`;
 /** Where a record names Synapse rather than a provider: an alias pin or option, whose key is the model, or a call that never answered. */
 export const SYNAPSE_PROVIDER = 'synapse';
 
-/** Every project without an owner shares one subject, as they shared one quota window. */
+/** Every project without an owner shares one subject. */
 export const UNOWNED_SUBJECT: SynapseSubject = { type: 'owner', id: 'unowned' };
 
 export function synapseGroupTask(group: ModelGroup): string {
@@ -34,6 +35,21 @@ export function synapseChatTask(role: AiRole): string {
   const group = ROLE_GROUP[role];
   if (!group || group === 'image' || group === 'embedding') throw AppErrorCode.AI_002.create();
   return synapseGroupTask(group);
+}
+
+export function synapseTask(role: AiRole): string {
+  if (role === 'image') return SYNAPSE_IMAGE_TASK;
+  if (role === 'embedding') return SYNAPSE_EMBEDDING_TASK;
+  return synapseChatTask(role);
+}
+
+/**
+ * Names the conversation a chat call continues, sent as the envelope's `session`: Synapse forwards it only to a deployment that keeps
+ * sessions, which then resumes its own conversation and is sent only the new messages. Dev and prod share one host gateway, so the stage
+ * keeps their conversations apart.
+ */
+export function gatewaySessionKey(projectId: bigint, chatSessionId: string): string {
+  return `${Config.get('app.stage')}:${projectId}:${chatSessionId}`;
 }
 
 export function synapseSelectors({ costTier, contentMode }: Pick<ModelRoute, 'costTier' | 'contentMode'>): Record<string, string> {
@@ -50,7 +66,7 @@ export function ownerSubject(owner: OwnedRow | undefined): SynapseSubject {
   return { type: 'owner', id: `${owner.ownerKind}:${owner.ownerId}` };
 }
 
-/** The owner whose Synapse budget a call on the project spends, as the legacy quota window counted it. */
+/** The owner whose Synapse budget a call on the project spends. */
 export async function projectSubject(db: PrimaryDatabase, projectId: bigint): Promise<SynapseSubject> {
   const owner = await db.query.projects.findFirst({ columns: { ownerKind: true, ownerId: true }, where: eq(schema.projects.id, projectId) });
   return ownerSubject(owner);

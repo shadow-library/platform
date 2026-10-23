@@ -1,4 +1,4 @@
-import { describe, expect, it, jest } from 'bun:test';
+import { describe, expect, it } from 'bun:test';
 
 import { ModelRouterService, type ReplyStreamHandlers } from '@modules/ai/model-router.service';
 import { type ChatRefineOutput, ChatRefineSchema } from '@modules/ai/schemas/chat-refine.schema';
@@ -7,7 +7,6 @@ type StreamEvent = { type: 'delta'; text: string } | { type: 'reset' };
 
 interface StreamScript {
   chunks: string[];
-  fail?: boolean;
 }
 
 const CTX = { projectId: BigInt(1), promptKey: 'judge', promptVersion: '1.0.0', role: 'judge' };
@@ -32,7 +31,7 @@ const cacheablePrompt = { key: 'judge' as const, version: '1.0.0', kind: 'analyt
 function stubDb(cachedResponse?: string): unknown {
   const cached = cachedResponse === undefined ? undefined : { response: cachedResponse };
   return {
-    query: { llmCache: { findFirst: async () => cached } },
+    query: { llmCache: { findFirst: async () => cached }, projects: { findFirst: async () => undefined } },
     insert: () => ({ values: () => ({ onConflictDoNothing: () => Promise.resolve() }) }),
   };
 }
@@ -51,7 +50,6 @@ function fakeClient(streams: StreamScript[], invokeResponses: string[] = []) {
       const script = streams[streamCalls++] ?? { chunks: [] };
       return (async function* () {
         for (const chunk of script.chunks) yield { content: chunk };
-        if (script.fail) throw new Error('transport boom');
       })();
     },
     invoke: async () => ({ content: invokeResponses[invokeCalls++] ?? '' }),
@@ -60,9 +58,9 @@ function fakeClient(streams: StreamScript[], invokeResponses: string[] = []) {
 
 function makeRouter(client: unknown, cachedResponse?: string) {
   const warns: { message: string; meta: Record<string, unknown> }[] = [];
-  const router = new ModelRouterService({} as never, { getPostgresClient: () => stubDb(cachedResponse) } as never, { enforce: async () => undefined } as never);
-  (router as unknown as Record<string, unknown>)['buildClient'] = () => client;
-  (router as unknown as Record<string, unknown>)['llmBackoffMs'] = 0;
+  const synapse = { catalog: async () => ({ catalog_version: 1 }) } as never;
+  const router = new ModelRouterService({} as never, { getPostgresClient: () => stubDb(cachedResponse) } as never, synapse);
+  (router as unknown as Record<string, unknown>)['buildSynapseClient'] = () => client;
   (router as unknown as Record<string, unknown>)['logger'] = {
     debug: () => undefined,
     error: () => undefined,
@@ -84,22 +82,6 @@ const deltaText = (events: StreamEvent[]): string =>
     .filter(event => event.type === 'delta')
     .map(event => event.text)
     .join('');
-
-const tick = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
-
-const settle = async (): Promise<void> => {
-  for (let i = 0; i < 50; i++) await Promise.resolve();
-};
-
-async function runClockUntil(isDone: () => boolean): Promise<void> {
-  for (let step = 0; step < 100; step++) {
-    await settle();
-    if (isDone()) return;
-    if (jest.getTimerCount() === 0) throw new Error('clock stalled before the scenario finished');
-    jest.advanceTimersToNextTimer();
-  }
-  throw new Error('clock never settled');
-}
 
 const split = (text: string, size: number): string[] => text.match(new RegExp(`[\\s\\S]{1,${size}}`, 'g')) ?? [];
 
@@ -142,7 +124,7 @@ describe('ModelRouterService.streamStructured', () => {
     expect(client.invokeCalls).toBe(0);
   });
 
-  it('should warn with provider, model and prompt key when the response carries no reply, and still return', async () => {
+  it('should warn with the task and prompt key when the response carries no reply, and still return', async () => {
     const noReply = JSON.stringify({ changeSet: [{ op: 'brief.update' }] });
     const repaired = JSON.stringify({ reply: 'Recovered.', changeSet: [] });
     const { router, warns } = makeRouter(fakeClient([{ chunks: split(noReply, 9) }], [repaired]));
@@ -154,8 +136,7 @@ describe('ModelRouterService.streamStructured', () => {
 
     const defeated = warns.find(warn => warn.message.includes('defeated the reply stream'));
     expect(defeated).toBeDefined();
-    expect(defeated?.meta['provider']).toBeString();
-    expect(defeated?.meta['model']).toBeString();
+    expect(defeated?.meta['task']).toBe('novel-forge.chat');
     expect(defeated?.meta['promptKey']).toBe('chat-refine');
     expect(defeated?.meta['role']).toBe('chat');
   });
@@ -184,23 +165,6 @@ describe('ModelRouterService.streamStructured', () => {
     expect(result.reply).toBe('Draft answer.');
   });
 
-  it('should reset once and restart the reply when a transport retry follows a partial stream', async () => {
-    const payload = JSON.stringify({ reply: 'Second attempt wins.', changeSet: [] });
-    const client = fakeClient([{ chunks: ['{"reply":"First att'], fail: true }, { chunks: split(payload, 8) }]);
-    const { router } = makeRouter(client);
-    const { handlers, events } = recorder();
-
-    const result = await router.streamStructured<ChatRefineOutput>(chatPrompt, {}, CHAT_CTX, handlers);
-    const resetAt = events.findIndex(event => event.type === 'reset');
-
-    expect(client.streamCalls).toBe(2);
-    expect(resetAt).toBeGreaterThan(-1);
-    expect(deltaText(events.slice(0, resetAt))).toBe('First att');
-    expect(deltaText(events.slice(resetAt))).toBe('Second attempt wins.');
-    expect(events.filter(event => event.type === 'reset')).toHaveLength(1);
-    expect(result.reply).toBe('Second attempt wins.');
-  });
-
   it('should finish the turn when the delta sink throws', async () => {
     const payload = JSON.stringify({ reply: 'Sink is gone.', changeSet: [] });
     const { router } = makeRouter(fakeClient([{ chunks: split(payload, 4) }]));
@@ -211,72 +175,6 @@ describe('ModelRouterService.streamStructured', () => {
       },
     });
     expect(result.reply).toBe('Sink is gone.');
-  });
-
-  it('should stop feeding the relay when an attempt is abandoned, not when its backoff ends', async () => {
-    const payload = JSON.stringify({ reply: 'SECOND.', changeSet: [] });
-    const yielded: string[] = [];
-    let lateChunkYielded = false;
-    let streamCalls = 0;
-    const client = {
-      invoke: async () => ({ content: payload }),
-      stream: async () => {
-        const stalling = streamCalls++ === 0;
-        return (async function* () {
-          if (!stalling) {
-            yield { content: payload };
-            return;
-          }
-          // Keeps producing long after `withTimeout` has rejected — the case a clean transport throw
-          // cannot model, and the only one that catches a guard taken after the backoff sleep.
-          for (const [chunk, delay] of [
-            ['{"reply":"A', 5],
-            ['B', 5],
-            ['LATE', 400],
-          ] as const) {
-            // `LATE` is timed to land inside the backoff window, which is the only interval where a
-            // zombie chunk can reach the author: once the retry calls `restart()` the fresh scanner
-            // swallows it, so a later arrival would pass whether or not the guard exists.
-            await tick(delay);
-            yielded.push(chunk);
-            // Before the yield: breaking the consumer's `for await` returns into the generator, so nothing
-            // after the yield ever runs.
-            if (chunk === 'LATE') lateChunkYielded = true;
-            yield { content: chunk };
-          }
-        })();
-      },
-    };
-    const { router } = makeRouter(client);
-    (router as unknown as Record<string, unknown>)['llmTimeoutMs'] = 300;
-    (router as unknown as Record<string, unknown>)['llmBackoffMs'] = 800;
-    const { handlers, events } = recorder();
-    let result: ChatRefineOutput | undefined;
-
-    jest.useFakeTimers();
-    try {
-      let settled = false;
-      const run = router.streamStructured<ChatRefineOutput>(chatPrompt, {}, CHAT_CTX, handlers).finally(() => (settled = true));
-      // The abandoned generator is still mid-sleep when the retry lands, so the clock runs until both the retry
-      // has settled and the zombie chunk has been produced — an unguarded delivery would land in between.
-      await runClockUntil(() => settled && lateChunkYielded);
-      result = await run;
-    } finally {
-      jest.useRealTimers();
-    }
-    const texts = events.filter(event => event.type === 'delta').map(event => event.text);
-
-    expect(yielded).toContain('LATE');
-    expect(texts).not.toContain('LATE');
-    expect(
-      deltaText(
-        events.slice(
-          0,
-          events.findIndex(event => event.type === 'reset'),
-        ),
-      ),
-    ).toBe('AB');
-    expect(result?.reply).toBe('SECOND.');
   });
 
   it('should treat a chunk whose content is neither a string nor a parts array as empty', async () => {
@@ -364,19 +262,6 @@ describe('ModelRouterService.streamStructured changes', () => {
     await router.streamStructured<ChatRefineOutput>(chatPrompt, {}, CHAT_CTX, handlers);
     expect(events[0]).toEqual({ type: 'change', index: 0, op: 'premise.update' });
     expect(events.some(event => event.type === 'reset')).toBe(false);
-  });
-
-  it('should reset and restart change indexes when a transport retry follows a streamed change', async () => {
-    const payload = JSON.stringify({ reply: 'Retry.', changeSet: CHANGES });
-    const partial = `{"reply":"Retry.","changeSet":[${JSON.stringify(CHANGES[0])},{"op":"ent`;
-    const { router } = makeRouter(fakeClient([{ chunks: [partial], fail: true }, { chunks: split(payload, 11) }]));
-    const { handlers, events } = changeRecorder();
-
-    await router.streamStructured<ChatRefineOutput>(chatPrompt, {}, CHAT_CTX, handlers);
-    const resetAt = events.findIndex(event => event.type === 'reset');
-    expect(changeOps(events.slice(0, resetAt))).toEqual(['0:premise.update']);
-    expect(changeOps(events.slice(resetAt))).toEqual(['0:premise.update', '1:entity.upsert']);
-    expect(events.filter(event => event.type === 'reset')).toHaveLength(1);
   });
 
   it('should reset when repair keeps the reply but changes the change set', async () => {

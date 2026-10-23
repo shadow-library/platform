@@ -13,8 +13,7 @@ import { type Ai, type PrimaryDatabase, type Project, schema } from '@server/dat
 import { type PluginStamp } from '../plugins/plugin-policy.service';
 import { countTokens } from './context/token-budget';
 import { isHardLineRefusal } from './hard-line';
-import { type ReasoningEffort } from './models';
-import { classifyCostSource, classifySynapseCostSource, estimateCallCostUsd, type GatewayInfo } from './quota';
+import { classifySynapseCostSource } from './quota';
 
 export type AnsweredHook = (answered: { provider: string; model: string }) => void;
 
@@ -29,15 +28,15 @@ export interface TelemetryContext {
   chapter?: number;
   /** Asks the AI gateway to run this call with the model's own web search, where it serves the model on a CLI that has one. */
   webTools?: boolean;
-  /** The conversation this call continues, sent as `x-gateway-session` wherever the gateway keeps a session for the call's model. */
+  /** The conversation this call continues, sent as the envelope's `session`; Synapse forwards it only to a deployment that keeps sessions. */
   gatewaySession?: string;
   /** Fired before a repair re-ask with the rejected reply and the request that follows it, the two messages the re-ask adds to the conversation. */
   onRepair?: (reply: string, request: string) => void;
-  /** Fired with the provider and catalog model that answered, after each Synapse call that answered; the legacy path never fires it. */
+  /** Fired with the provider and catalog model that answered, after each call that answered; a cache hit answers without a call. */
   onAnswered?: AnsweredHook;
   /**
-   * Fired once, synchronously, with the exact messages `buildMessages` produced for this call and the provider/model it
-   * resolved to — before the request is sent. Only a writer-attempt call site sets it, to snapshot what the router received
+   * Fired once, synchronously, with the exact messages `buildMessages` produced for this call and the Synapse task it
+   * was routed to — before the request is sent. Only a writer-attempt call site sets it, to snapshot what the router received
    * without reassembling it later. A ctx spread onto a follow-up call (draft expansion, title) carries the same reference,
    * so the writer-snapshot capture built from it must ignore every call after its first.
    */
@@ -51,7 +50,6 @@ interface PendingCall {
   model: string;
   attempt: number;
   promptTokensEstimate: number;
-  reasoningEffort?: string;
   plugins?: PluginStamp[];
   policyDigest?: string;
   tier?: Project.CostTier;
@@ -73,7 +71,6 @@ interface CallBilling {
   costUsd: number;
   costSource: Ai.CostSource;
   reasoningEffort?: string;
-  servedBy?: string;
 }
 
 const INPUT_KEYS = ['input_tokens', 'prompt_tokens', 'promptTokens'];
@@ -128,39 +125,6 @@ export function extractTokenUsage(output: LLMResult, promptTokensEstimate: numbe
   };
 }
 
-// OpenRouter includes `usage.cost` (USD) in every completion response, but @langchain/openai's parser only
-// lifts the OpenAI-standard usage fields onto the message and discards the rest. `buildClient` sets
-// `__includeRawResponse` so the untouched provider payload survives on `additional_kwargs.__raw_response`,
-// which is the only place this reaches — `response_metadata.usage` is only populated when the provider also
-// echoed `system_fingerprint`, so it is checked as a fallback rather than the primary source.
-export function extractProviderCost(output: LLMResult): number | undefined {
-  const generation = output.generations?.[0]?.[0] as { message?: { additional_kwargs?: Record<string, unknown>; response_metadata?: Record<string, unknown> } } | undefined;
-  const rawResponseUsage = (generation?.message?.additional_kwargs?.['__raw_response'] as { usage?: UsageBag } | undefined)?.usage;
-  const responseMetadataUsage = generation?.message?.response_metadata?.['usage'] as UsageBag;
-  const cost = rawResponseUsage?.['cost'] ?? responseMetadataUsage?.['cost'];
-  return typeof cost === 'number' && Number.isFinite(cost) ? cost : undefined;
-}
-
-function parseGatewayInfo(raw: UsageBag): GatewayInfo | undefined {
-  if (typeof raw?.['openrouter'] !== 'boolean') return undefined;
-  const servedBy = typeof raw['served_by'] === 'string' ? raw['served_by'] : undefined;
-  const servedModel = typeof raw['served_model'] === 'string' ? raw['served_model'] : undefined;
-  return { servedBy, servedModel, openrouter: raw['openrouter'] };
-}
-
-// Non-streaming: the gateway response's top-level `gateway` object rides on the same `__raw_response`
-// escape hatch as `extractProviderCost`. Streaming: the gateway sends `gateway` only on its final,
-// choice-less SSE frame, which @langchain/openai 1.5.5's streaming loop discards before it ever reaches
-// `additional_kwargs` — `GatewayChatOpenAI` (`./gateway-chat-openai.ts`) is what recovers it, stamping it
-// onto the one synthetic usage chunk the loop still emits, so `response_metadata.gateway` is the fallback
-// this checks for a streamed call, the same way `extractProviderCost` falls back to `response_metadata.usage`.
-export function extractGatewayInfo(output: LLMResult): GatewayInfo | undefined {
-  const generation = output.generations?.[0]?.[0] as { message?: { additional_kwargs?: Record<string, unknown>; response_metadata?: Record<string, unknown> } } | undefined;
-  const rawResponse = generation?.message?.additional_kwargs?.['__raw_response'] as { gateway?: UsageBag } | undefined;
-  const responseMetadataGateway = generation?.message?.response_metadata?.['gateway'] as UsageBag;
-  return parseGatewayInfo(rawResponse?.gateway ?? responseMetadataGateway);
-}
-
 /** Synapse turned these away before any model ran, so they are no more a dispatched call than a hard-line refusal is. */
 const ADMISSION_REFUSALS: ReadonlySet<string> = new Set<SynapseErrorCode>(['SYN_BUDGET_CALLS', 'SYN_BUDGET_COST']);
 
@@ -202,19 +166,9 @@ export function synapseBilling(synapse: SynapseResponseBlock): CallBilling {
   };
 }
 
-function legacyBilling(output: LLMResult, call: PendingCall, inputTokens: number, outputTokens: number): CallBilling {
-  const providerCostUsd = extractProviderCost(output);
-  const gateway = extractGatewayInfo(output);
-  // The provider figure is authoritative when it reported one; otherwise fall back to the same
-  // per-million-token price table the AI-quota spend guard already estimates from.
-  return {
-    provider: call.provider,
-    model: call.model,
-    costUsd: providerCostUsd ?? estimateCallCostUsd(call.model, inputTokens, outputTokens),
-    costSource: classifyCostSource(providerCostUsd, gateway),
-    ...(call.reasoningEffort ? { reasoningEffort: call.reasoningEffort } : {}),
-    ...(gateway?.servedBy ? { servedBy: gateway.servedBy } : {}),
-  };
+/** A response without Synapse's block names no served model or price, so it keeps the routed task and records no cost. */
+function unbilled(call: PendingCall): CallBilling {
+  return { provider: call.provider, model: call.model, costUsd: 0, costSource: 'estimate' };
 }
 
 @Injectable()
@@ -259,19 +213,17 @@ export class TelemetryHandler extends BaseCallbackHandler {
           provider: string;
           model: string;
           attempt: number;
-          reasoningEffort?: ReasoningEffort;
           plugins?: PluginStamp[];
           policyDigest?: string;
         })
       | undefined;
     if (nf) {
-      const { provider, model, attempt, projectId, reasoningEffort, plugins, policyDigest, ...ctx } = nf;
+      const { provider, model, attempt, projectId, plugins, policyDigest, ...ctx } = nf;
       this.logger.debug('LLM call started', {
         runId,
         provider,
         model,
         attempt,
-        reasoningEffort,
         role: ctx.role,
         promptKey: ctx.promptKey,
         node: ctx.node,
@@ -285,7 +237,6 @@ export class TelemetryHandler extends BaseCallbackHandler {
         model,
         attempt,
         promptTokensEstimate,
-        reasoningEffort,
         plugins,
         policyDigest,
         tier,
@@ -318,7 +269,7 @@ export class TelemetryHandler extends BaseCallbackHandler {
     const rawOutput = generation ? (typeof generation.text === 'string' ? generation.text : JSON.stringify(generation)) : '';
     const { inputTokens, cachedInputTokens, outputTokens } = extractTokenUsage(output, call.promptTokensEstimate, rawOutput);
     const synapse = extractSynapseBlock(output);
-    const { provider, model, costUsd, costSource, reasoningEffort, servedBy } = synapse ? synapseBilling(synapse) : legacyBilling(output, call, inputTokens, outputTokens);
+    const { provider, model, costUsd, costSource, reasoningEffort } = synapse ? synapseBilling(synapse) : unbilled(call);
 
     this.logger.debug('LLM call completed', {
       runId,
@@ -331,7 +282,6 @@ export class TelemetryHandler extends BaseCallbackHandler {
       outputTokens,
       costUsd,
       costSource,
-      servedBy,
       attempt: call.attempt,
     });
 
@@ -386,7 +336,6 @@ export class TelemetryHandler extends BaseCallbackHandler {
         status: failureStatus(err),
         plugins: call.plugins ?? null,
         policyDigest: call.policyDigest ?? null,
-        reasoningEffort: call.reasoningEffort ?? null,
         tier: call.tier ?? null,
         contentMode: call.contentMode ?? null,
         chapter: call.ctx.chapter ?? null,

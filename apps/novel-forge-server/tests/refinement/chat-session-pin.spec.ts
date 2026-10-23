@@ -1,6 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-
-import { type RestoreConfig, setConfig } from '@shadow-library/common/testing';
+import { describe, expect, it } from 'bun:test';
 
 import { AppErrorCode } from '@server/classes';
 
@@ -52,82 +50,53 @@ function harness(session: Row = {}): Harness {
 const pin = (h: Harness, update: SessionModelUpdate) => h.service.updateSessionModel(1n, 's1', update);
 
 describe('ChatService.updateSessionModel', () => {
-  let restore: RestoreConfig;
+  it('should store an offered alias as the pin and clear the registry slug pin beside it', async () => {
+    const h = harness({ modelProvider: 'openrouter', modelId: 'anthropic/claude-opus-5', aliasKey: 'opus' });
 
-  afterEach(() => restore());
+    const updated = await pin(h, { provider: 'synapse', model: 'grok' });
 
-  describe('on the Synapse backend', () => {
-    beforeEach(() => {
-      restore = setConfig({ 'ai.backend': 'synapse' });
-    });
-
-    it('should store an offered alias as the pin and clear the legacy pin beside it', async () => {
-      const h = harness({ modelProvider: 'openrouter', modelId: 'anthropic/claude-opus-5', aliasKey: 'opus' });
-
-      const updated = await pin(h, { provider: 'synapse', model: 'grok' });
-
-      expect(h.writes[0]).toMatchObject({ aliasKey: 'grok', modelProvider: null, modelId: null });
-      expect(updated.aliasKey).toBe('grok');
-      expect(h.checked).toEqual([{ alias: 'grok', selection: { contentMode: 'standard', costTier: 'balanced' } }]);
-    });
-
-    it('should refuse an alias the catalog does not offer, writing nothing', async () => {
-      const h = harness();
-
-      await expect(pin(h, { provider: 'synapse', model: 'claude' })).rejects.toMatchObject({ code: 'AI_022' });
-      expect(h.writes).toEqual([]);
-    });
-
-    it('should judge the alias under the model type and cost tier the chat will have after the update', async () => {
-      const unrestricted = harness();
-      await expect(pin(unrestricted, { provider: 'synapse', model: 'opus', contentMode: 'unrestricted', costTier: 'economy' })).rejects.toMatchObject({ code: 'AI_022' });
-      expect(unrestricted.checked[0]?.selection).toEqual({ contentMode: 'unrestricted', costTier: 'economy' });
-
-      const cleared = harness({ contentMode: 'unrestricted' });
-      await pin(cleared, { provider: 'synapse', model: 'opus', contentMode: null });
-      expect(cleared.checked[0]?.selection).toEqual({ contentMode: 'standard', costTier: 'balanced' });
-    });
-
-    it('should refuse a registry pick or a half-named pin as AI_002', async () => {
-      for (const update of [{ provider: 'openrouter', model: 'anthropic/claude-opus-5' }, { provider: 'synapse' }, { model: 'opus' }]) {
-        await expect(pin(harness(), update)).rejects.toMatchObject({ code: 'AI_002' });
-      }
-    });
-
-    it("should clear both backends' pins together, so the alias backfill cannot bring the slug back", async () => {
-      const h = harness({ modelProvider: 'openrouter', modelId: 'anthropic/claude-opus-5', aliasKey: 'opus' });
-
-      await pin(h, { provider: null, model: null });
-
-      expect(h.writes[0]).toMatchObject({ aliasKey: null, modelProvider: null, modelId: null });
-      expect(h.checked).toEqual([]);
-    });
-
-    it('should change only the selection when no pin field is sent', async () => {
-      const h = harness({ aliasKey: 'opus' });
-
-      await pin(h, { costTier: 'performant' });
-
-      expect(h.writes[0]).toEqual({ updatedAt: expect.any(Date), costTier: 'performant' });
-    });
+    expect(h.writes[0]).toMatchObject({ aliasKey: 'grok', modelProvider: null, modelId: null });
+    expect(updated.aliasKey).toBe('grok');
+    expect(h.checked).toEqual([{ alias: 'grok', selection: { contentMode: 'standard', costTier: 'balanced' } }]);
   });
 
-  describe('on the legacy backend', () => {
-    beforeEach(() => {
-      restore = setConfig({ 'ai.backend': 'legacy' });
-    });
+  it('should refuse an alias the catalog does not offer, writing nothing', async () => {
+    const h = harness();
 
-    it('should store a registry pin as before, keeping its alias in step for a move to Synapse', async () => {
-      const h = harness();
+    await expect(pin(h, { provider: 'synapse', model: 'claude' })).rejects.toMatchObject({ code: 'AI_022' });
+    expect(h.writes).toEqual([]);
+  });
 
-      await pin(h, { provider: 'openrouter', model: 'anthropic/claude-opus-5' });
+  it('should judge the alias under the model type and cost tier the chat will have after the update', async () => {
+    const unrestricted = harness();
+    await expect(pin(unrestricted, { provider: 'synapse', model: 'opus', contentMode: 'unrestricted', costTier: 'economy' })).rejects.toMatchObject({ code: 'AI_022' });
+    expect(unrestricted.checked[0]?.selection).toEqual({ contentMode: 'unrestricted', costTier: 'economy' });
 
-      expect(h.writes[0]).toMatchObject({ modelProvider: 'openrouter', modelId: 'anthropic/claude-opus-5', aliasKey: 'opus' });
-      expect(h.checked).toEqual([]);
-    });
+    const cleared = harness({ contentMode: 'unrestricted' });
+    await pin(cleared, { provider: 'synapse', model: 'opus', contentMode: null });
+    expect(cleared.checked[0]?.selection).toEqual({ contentMode: 'standard', costTier: 'balanced' });
+  });
 
-    it('should refuse an alias option as a model the registry does not hold', async () => {
-      await expect(pin(harness(), { provider: 'synapse', model: 'opus' })).rejects.toMatchObject({ code: 'AI_002' });
-    });
+  it('should refuse a registry pick or a half-named pin as AI_002', async () => {
+    for (const update of [{ provider: 'openrouter', model: 'anthropic/claude-opus-5' }, { provider: 'synapse' }, { model: 'opus' }]) {
+      await expect(pin(harness(), update)).rejects.toMatchObject({ code: 'AI_002' });
+    }
+  });
+
+  it('should clear the alias and the registry slug pin together, so the alias backfill cannot bring the slug back', async () => {
+    const h = harness({ modelProvider: 'openrouter', modelId: 'anthropic/claude-opus-5', aliasKey: 'opus' });
+
+    await pin(h, { provider: null, model: null });
+
+    expect(h.writes[0]).toMatchObject({ aliasKey: null, modelProvider: null, modelId: null });
+    expect(h.checked).toEqual([]);
+  });
+
+  it('should change only the selection when no pin field is sent', async () => {
+    const h = harness({ aliasKey: 'opus' });
+
+    await pin(h, { costTier: 'performant' });
+
+    expect(h.writes[0]).toEqual({ updatedAt: expect.any(Date), costTier: 'performant' });
   });
 });

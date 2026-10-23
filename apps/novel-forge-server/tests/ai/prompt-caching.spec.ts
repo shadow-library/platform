@@ -4,19 +4,21 @@ import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { convertMessagesToCompletionsMessageParams } from '@langchain/openai';
 
 import { countTokens } from '@modules/ai/context/token-budget';
-import { COST_TIER_DEFAULTS } from '@modules/ai/defaults';
-import { ModelRouterService, supportsPromptCaching } from '@modules/ai/model-router.service';
+import { ModelRouterService, type ProjectConfig } from '@modules/ai/model-router.service';
 import { applyAnthropicCacheControl, MIN_CACHEABLE_TOKENS } from '@modules/ai/prompt-caching';
 import { chatRefinePrompt } from '@modules/ai/prompts/chat-refine.prompt';
 import { generationPrompt, generationWordTargetVars } from '@modules/ai/prompts/generation.prompt';
 import { resolveWordTarget } from '@modules/eval/deterministic-metrics';
 
+import { FakeSynapse } from './synapse-fakes';
+
 const bigText = 'the sect trials continue with rising stakes and sharper blades. '.repeat(150);
 const smallText = 'short volatile tail';
+const OWNED: ProjectConfig = { ownerKind: 'user', ownerId: 1n };
 
 function makeRouter(fakeLlm: { invoke: ReturnType<typeof mock> }): ModelRouterService {
-  const router = new ModelRouterService({} as never, { getPostgresClient: () => ({}) } as never, { enforce: async () => undefined } as never);
-  (router as unknown as Record<string, unknown>)['buildClient'] = () => fakeLlm;
+  const router = new ModelRouterService({} as never, { getPostgresClient: () => ({}) } as never, new FakeSynapse().client);
+  (router as unknown as Record<string, unknown>)['buildSynapseClient'] = () => fakeLlm;
   return router;
 }
 
@@ -63,14 +65,11 @@ describe('ModelRouterService cacheStrategy integration', () => {
   };
   const ctx = { projectId: BigInt(1), promptKey: 'chat-refine', promptVersion: '1.0.0', role: 'chat' };
 
-  it('injects cache_control blocks for anthropic models on openrouter (and routes by module role, not key)', async () => {
+  it('should inject cache_control blocks on a cacheStrategy module, leaving Synapse to keep or strip them per model', async () => {
     const fakeLlm = { invoke: mock(async () => ({ content: JSON.stringify({ reply: 'sharper stakes proposed' }) })) };
     const router = makeRouter(fakeLlm);
-    // The chat model applies to role 'chat' alone — reaching the anthropic model proves the router maps key
-    // 'chat-refine' to role 'chat' before resolving the model.
-    const project = { chatModel: { provider: 'openrouter', model: 'anthropic/claude-sonnet-5' } };
 
-    const result = await router.structured<{ reply: string }>(chatRefinePrompt, input, ctx, project);
+    const result = await router.structured<{ reply: string }>(chatRefinePrompt, input, ctx, OWNED);
     expect(result.reply).toBe('sharper stakes proposed');
 
     const [messages] = fakeLlm.invoke.mock.calls[0] as unknown as [{ content: unknown; getType(): string }[]];
@@ -80,35 +79,11 @@ describe('ModelRouterService cacheStrategy integration', () => {
     expect(cacheControlOf(messages[1]?.content)).toEqual({ type: 'ephemeral' });
     expect(typeof messages[messages.length - 1]?.content).toBe('string');
   });
-
-  it('keeps messages unmarked for a non-anthropic model on the same openrouter provider', async () => {
-    const fakeLlm = { invoke: mock(async () => ({ content: JSON.stringify({ reply: 'ok' }) })) };
-    const router = makeRouter(fakeLlm);
-    const project = { chatModel: { provider: 'openrouter', model: 'x-ai/grok-4.6' } };
-
-    await router.structured<{ reply: string }>(chatRefinePrompt, input, ctx, project);
-
-    const [messages] = fakeLlm.invoke.mock.calls[0] as unknown as [{ content: unknown }[]];
-    expect(messages.every(m => typeof m.content === 'string')).toBe(true);
-  });
-
-  it('keeps messages unmarked for non-anthropic models while preserving stable-first order', async () => {
-    const fakeLlm = { invoke: mock(async () => ({ content: JSON.stringify({ reply: 'ok' }) })) };
-    const router = makeRouter(fakeLlm);
-    const project = { chatModel: { provider: 'openrouter', model: 'z-ai/glm-5.2' } };
-
-    await router.structured<{ reply: string }>(chatRefinePrompt, input, ctx, project);
-
-    const [messages] = fakeLlm.invoke.mock.calls[0] as unknown as [{ content: unknown; getType(): string }[]];
-    expect(messages.every(m => typeof m.content === 'string')).toBe(true);
-    expect(messages[0]?.getType()).toBe('system');
-    expect(String(messages[1]?.content)).toContain(bigText.slice(0, 40));
-  });
 });
 
-// The breakpoints are only worth anything if they survive the hop to OpenRouter's OpenAI-compatible
-// chat-completions endpoint. @langchain/openai passes non-multimodal content parts through verbatim,
-// which is what carries `cache_control` onto the wire in the shape OpenRouter forwards to Anthropic.
+// The breakpoints are only worth anything if they survive the hop to Synapse's OpenAI-compatible chat-completions endpoint, which
+// `SynapseChatModel` reaches through @langchain/openai: it passes non-multimodal content parts through verbatim, which is what carries
+// `cache_control` onto the wire.
 describe('cache_control wire shape through ChatOpenAI', () => {
   it('survives the completions-params conversion as a text part carrying cache_control', () => {
     const messages = applyAnthropicCacheControl([new SystemMessage(bigText), new HumanMessage(bigText), new HumanMessage(smallText)]);
@@ -136,10 +111,7 @@ describe('generation path caching', () => {
   it('breakpoints the stable pack and leaves the per-chapter tail uncached', async () => {
     const fakeLlm = { invoke: mock(async () => ({ content: JSON.stringify(draft) })) };
     const router = makeRouter(fakeLlm);
-    const project = { costTier: 'balanced' as const };
-    expect(supportsPromptCaching(COST_TIER_DEFAULTS.balanced.standard.writing)).toBe(true);
-
-    await router.structured(generationPrompt, input, ctx, project);
+    await router.structured(generationPrompt, input, ctx, { ...OWNED, costTier: 'balanced' });
 
     // The JSON-schema reminder is appended after cache injection, so it never displaces a breakpoint.
     const [messages] = fakeLlm.invoke.mock.calls[0] as unknown as [{ content: unknown; getType(): string }[]];

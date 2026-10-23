@@ -152,9 +152,7 @@ export class ChatCompactionService {
     const target = `session:${session.id}`;
     const folding = this.workflowRunService.runChain(projectId, CHAT_COMPACT_GRAPH, target, { watermark, contentMode }, async runId => {
       const ctx = { projectId, runId, node: CHAT_COMPACT_GRAPH, promptKey: prompt.key, promptVersion: prompt.version, role: 'compact' };
-      const route = raised
-        ? await resolveUnrestrictedRoute({ pluginPolicy: this.pluginPolicy, modelRouter: this.modelRouter }, projectId, { role: 'compact' }, selected)
-        : undefined;
+      const route = raised ? await resolveUnrestrictedRoute({ pluginPolicy: this.pluginPolicy }, projectId, { role: 'compact' }, selected) : undefined;
       const input = { priorSummary: session.summary ?? 'none', transcript };
       const output = (await this.modelRouter.structured(prompt, input, ctx, route?.project ?? selected, route?.policy)) as ChatCompactOutput;
       return output.summary;

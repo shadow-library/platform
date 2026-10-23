@@ -216,7 +216,7 @@ function chat({ outputs, failTraceUpdate = false, tools = [getNotes], webResearc
     select: () => ({ from: () => ({ where: async () => [{ max: 0 }] }) }),
   };
   const modelRouter = {
-    routeModel: () => ({ resolved: { provider: 'p', model: 'm' }, costTier: 'balanced', contentMode: 'standard' }),
+    routeModel: () => ({ task: 'novel-forge.chat', costTier: 'balanced', contentMode: 'standard' }),
     structured: async (_prompt: unknown, input: { rounds: { content: unknown }[] }, ctx: { webTools?: boolean }) => {
       inputs.push(input);
       contexts.push(ctx);
@@ -237,14 +237,14 @@ function chat({ outputs, failTraceUpdate = false, tools = [getNotes], webResearc
   };
   const service = new ChatService(
     { getPostgresClient: () => db } as never,
-    { forNovelChat: async () => ({ id: null, renderedStable: '', renderedVolatile: '' }) } as never,
+    { forNovelChat: async () => ({ id: null, sections: [], omitted: [], renderedStable: '', renderedVolatile: '' }) } as never,
     modelRouter as never,
     workflowRunService as never,
     {} as never,
     {} as never,
     { getRaw: () => tools } as never,
     {} as never,
-    { compactIfNeeded: async () => undefined, buildHistory: async () => [] } as never,
+    { compactIfNeeded: async () => undefined, buildHistory: async () => [], continueConversation: async () => ({ plain: [], history: [], segment: null }) } as never,
     { resolve: async () => ({ writerClass: 'standard', raised: false, systemMessages: [] }) } as never,
     { publish: () => undefined } as never,
     { read: async () => ({ text: '' }) } as never,

@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'bun:test';
 
-import { PRODUCTION_DEFAULTS } from '@modules/ai/defaults';
 import { hashReviewedBody } from '@modules/review/review-findings';
 import { schema } from '@server/database';
 
@@ -247,14 +246,6 @@ describe('ChapterReviewService.run', () => {
     expect(review.contentMode).toBe('unrestricted');
   });
 
-  it('should refuse an isolated chapter whose unrestricted route resolves off the allowlist, without calling the model or storing a review', async () => {
-    const run = reviewHarness({ draft: reviewDraft({ isolated: true }), unrestrictedModel: PRODUCTION_DEFAULTS.judge });
-
-    await expect(run.service.run(1n, 4, { kind: 'judge' })).rejects.toMatchObject({ code: 'AI_003' });
-    expect(run.modelCalls).toEqual([]);
-    expect(run.reviews).toEqual([]);
-  });
-
   it('should judge and review from the pack as it is when the writer’s required material is over its limits', async () => {
     const run = reviewHarness({ overCaps: true });
 
@@ -311,13 +302,6 @@ describe('ChapterReviewService.start', () => {
     const started = await run.service.start(1n, 4, { kind: 'editorial' });
 
     expect(started).toMatchObject({ queued: true, job: { status: 'in_progress' } });
-  });
-
-  it('should refuse an off-allowlist unrestricted route before queuing anything', async () => {
-    const run = reviewHarness({ draft: reviewDraft({ isolated: true }), unrestrictedModel: PRODUCTION_DEFAULTS.judge });
-
-    await expect(run.service.start(1n, 4, { kind: 'judge' })).rejects.toMatchObject({ code: 'AI_003' });
-    expect(run.enqueued).toEqual([]);
   });
 
   it('should answer a deterministic review at once', async () => {

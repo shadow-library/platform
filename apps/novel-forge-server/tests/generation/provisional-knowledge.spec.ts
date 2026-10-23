@@ -2,7 +2,6 @@ import { describe, expect, it } from 'bun:test';
 import { AIMessage } from '@langchain/core/messages';
 import { type SQL } from 'drizzle-orm';
 
-import { UNRESTRICTED_DEFAULTS } from '@modules/ai/defaults';
 import { type GenerationService } from '@modules/generation/generation.service';
 import { markDescendantDraftsStale, REVEAL_STALE_PREFIX } from '@server/common';
 import { schema } from '@server/database';
@@ -24,7 +23,6 @@ function serviceOver(options: FakeGenerationDbOptions) {
   const fake = fakeGenerationDb(options);
   const service = makeGenerationService(fake.db, {
     modelRouter: {
-      resolveModel: () => UNRESTRICTED_DEFAULTS.generation,
       structured: async () => PROSE,
       chatFor: async () => ({ invoke: async () => new AIMessage('{"verdict":"consistent","findings":[]}') }),
     },

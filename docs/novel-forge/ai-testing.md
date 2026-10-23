@@ -60,8 +60,6 @@ is **stale in three places** — see "Where the old README is wrong" at the end.
 | An **identity** deployment     | booting the server at all     | **yes** (see §3)                                                                                                                                                                                                                                               |
 | A **synapse** deployment       | every model call              | yes — every chat, structured, streamed, tool-loop and image call goes to `svc://synapse-server.synapse` (`SERVICE_URL_SYNAPSE_SERVER_SYNAPSE` off-cluster); unreachable → `AI_007` (`AI_005` for an image); embeddings go there too, but degrade silently (§6) |
 | Synapse's `local` provider     | lore/prose vector search only | **no — it degrades silently** (§6): host Ollama on :11434, dialled by `synapse-server`, serves the pinned `novel-forge.embedding` task                                                                                                                         |
-| `AI_OPENROUTER_API_KEY`        | `AI_BACKEND=legacy` only      | yes there — `AI_006` for every chat call, `AI_004` for an image; never loaded on Synapse                                                                                                                                                                       |
-| Ollama on :11434 (legacy)      | legacy vector search only     | **no — it degrades silently** (§6); under `AI_BACKEND=legacy` the server dials it directly                                                                                                                                                                     |
 
 There is **no docker-compose, Tiltfile or skaffold in this repo** (`AGENTS.md:25`, `AGENTS.md:71`: "there is no
 local compose deployment"). Only per-app `Dockerfile`s exist. The provided local stack is a k3d cluster driven by
@@ -245,31 +243,22 @@ harness-observability routes below.
 ### 4. Every env var that matters for AI
 
 This app's own config keys are declared in `apps/novel-forge-server/src/bootstrap.ts`; the env-var spelling is the
-key upper-snaked (`ai.openrouter.api.key` → `AI_OPENROUTER_API_KEY`). The rows whose "Declared" column names
+key upper-snaked (`ai.llm.timeout-ms` → `AI_LLM_TIMEOUT_MS`). The rows whose "Declared" column names
 `config.service.ts` come from `@shadow-library/common`, and the `STORAGE_*` and `DATABASE_*` keys from
 `@shadow-library/modules` — none of those appear in `bootstrap.ts`.
 
 | Env var                              | Default                                          | Declared                                    | What it changes                                                                                                                                     |
 | ------------------------------------ | ------------------------------------------------ | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `NODE_ENV`                           | `development`                                    | `config.service.ts:96`                      | the real dev switch: gates OpenAPI, the health port, and the `LOG_LEVEL` default                                                                    |
-| `APP_STAGE`                          | `prod`                                           | `packages/common/.../config.service.ts:105` | the first part of the chat's gateway session key (`modules/ai/gateway-session.ts`), so dev and prod conversations stay apart on the host's gateway  |
+| `APP_STAGE`                          | `prod`                                           | `packages/common/.../config.service.ts:105` | the first part of the chat's gateway session key (`modules/ai/synapse-request.ts`), so dev and prod conversations stay apart on the host's gateway |
 | `LOG_LEVEL`                          | `debug` when `NODE_ENV=development`, else `info` | `config.service.ts:107`                     | **keep it `debug`** — the full prompt input and raw output only ride on debug (§7)                                                                  |
 | `SERVER_PORT` / `SERVER_HOST`        | `8080` / `0.0.0.0`                               | `bootstrap.ts:40-41`                        |                                                                                                                                                     |
 | `DATABASE_POSTGRES_URL`              | `…@localhost:7070/novel_forge` in the example    | `.env.example:14`                           | pgvector required; `src/migrate.ts:15` falls back to the same DSN without the port                                                                  |
-| `AI_BACKEND`                         | `synapse`                                        | `bootstrap.ts`                              | `synapse` \| `legacy` — `legacy` restores the direct OpenRouter and Ollama paths for one release; every `AI_*` row marked legacy applies only there |
 | `SERVICE_URL_SYNAPSE_SERVER_SYNAPSE` | — (`svc://synapse-server.synapse`)               | `packages/common` service discovery         | where Synapse is reached off-cluster; in any namespace the cluster resolves the default by DNS                                                      |
-| `AI_OPENROUTER_API_KEY`              | —                                                | `bootstrap.ts`                              | legacy only, not even loaded on Synapse: **every** chat model (absent → `AI_006`) and image generation (absent → `AI_004`)                          |
-| `AI_OPENROUTER_API_URL`              | `https://openrouter.ai/api/v1`                   | `bootstrap.ts`                              | legacy only: every chat and image call; point at any OpenAI-compatible gateway                                                                      |
-| `AI_OLLAMA_HOST`                     | `http://localhost:11434`                         | `bootstrap.ts`                              | legacy only: embeddings; on Synapse the pinned `novel-forge.embedding` task embeds                                                                  |
-| `AI_EMBEDDING_MODEL`                 | `qwen3-embedding:0.6b`                           | `bootstrap.ts`                              | legacy only, **pinned to 1024 dims** by the `vector(1024)` columns — do not swap (`qwen3-embedding:8b` emits 4096 and fails every insert)           |
-| `AI_MODEL_OVERRIDE`                  | —                                                | `bootstrap.ts`                              | legacy only, local-model test environments — see below; unset is inert                                                                              |
-| `AI_STRUCTURED_OUTPUT`               | `prompt`                                         | `bootstrap.ts`                              | legacy only, `prompt` \| `json-schema` — see below; Synapse always gets the schema                                                                  |
-| `AI_LLM_TIMEOUT_MS`                  | `300000`                                         | `bootstrap.ts`                              | per-call budget; on Synapse it aborts the request                                                                                                   |
-| `AI_LLM_MAX_RETRIES`                 | `2`                                              | `bootstrap.ts`                              | legacy only: **transport** retries of chat and image calls → 3 attempts; a Synapse call is made once (Synapse fails over itself)                    |
-| `AI_LLM_BACKOFF_MS`                  | `500`                                            | `bootstrap.ts`                              | exponential, wherever the retries above apply                                                                                                       |
-| `AI_QUOTA_WINDOW_MS`                 | `3600000`                                        | `bootstrap.ts`                              | rolling window, per project owner — enforced only under legacy (Synapse budgets gate every call otherwise); `GET /ai/quota` reports it always       |
-| `AI_QUOTA_MAX_CALLS`                 | `1000`                                           | `bootstrap.ts`                              | **set `0`** locally                                                                                                                                 |
-| `AI_QUOTA_MAX_COST_USD`              | `50`                                             | `bootstrap.ts`                              | **set `0`** locally                                                                                                                                 |
+| `AI_LLM_TIMEOUT_MS`                  | `300000`                                         | `bootstrap.ts`                              | per-call budget: it aborts the request to Synapse, which fails over itself, so a call is made once                                                   |
+| `AI_QUOTA_WINDOW_MS`                 | `3600000`                                        | `bootstrap.ts`                              | rolling window, per project owner, that `GET /ai/quota` reports; nothing enforces it — Synapse budgets gate every call                             |
+| `AI_QUOTA_MAX_CALLS`                 | `1000`                                           | `bootstrap.ts`                              | the call limit `GET /ai/quota` reports                                                                                                              |
+| `AI_QUOTA_MAX_COST_USD`              | `50`                                             | `bootstrap.ts`                              | the spend limit `GET /ai/quota` reports                                                                                                             |
 | `AI_LANGSMITH_API_KEY`               | —                                                | `bootstrap.ts:53`                           | **does nothing** — loaded but read nowhere in `apps/` or `packages/`, and LangChain ignores the `AI_` prefix (§7)                                   |
 | `LANGSMITH_TRACING`                  | `false`                                          | `.env.example:41`                           | LangChain's own switch — pair it with LangChain's own `LANGSMITH_API_KEY` (§7)                                                                      |
 | `PROJECTS_MAX_PER_OWNER`             | `100`                                            | `bootstrap.ts:55`                           | `0` disables; breach → `PRJ_004`                                                                                                                    |
@@ -281,29 +270,13 @@ key upper-snaked (`ai.openrouter.api.key` → `AI_OPENROUTER_API_KEY`). The rows
 
 #### Local-model test environments
 
-On Synapse a test environment is local by Synapse's own `local-only` seed profile: every chat and embedding deployment is replaced by
-local Ollama and every image deployment by Synapse's `mock` provider, so
-novel-forge needs no setting of its own and every structured call already carries its `json_schema` `response_format` (Synapse
-decides per model whether it is native or prompted). The two settings below apply only under `AI_BACKEND=legacy`.
+A test environment is local by Synapse's own `local-only` seed profile: every chat and embedding deployment is replaced by local Ollama
+and every image deployment by Synapse's `mock` provider, so novel-forge needs no setting of its own. Every structured call carries its
+`json_schema` `response_format` (Synapse decides per model whether it is native or prompted), with change-set ops, the chat question card
+and `readerValue` typed there (`PromptModule.constrainedProperties`). An image call succeeds there: the `mock` provider answers every
+requested image with a 1×1 transparent PNG, at no billed cost but at the image model's list price ($0.04 each).
 
-Under legacy, two settings exist so a test environment can serve every chat call from one small local model (Ollama's OpenAI-compatible
-`/v1`, reached through `AI_OPENROUTER_API_URL`) and still get output the cards can render. Both are inert unless set: a deployment
-that leaves them alone sends exactly the requests it always did.
-
-- `AI_MODEL_OVERRIDE=<model id>` puts that one id on the wire for every chat call — structured, streamed, image-attached and the
-  judge/validation tool loops — with `reasoning: { effort: 'none' }`, because Ollama maps any reasoning field to thinking. Routing,
-  the registry checks (`AI_002`/`AI_003`), quota, `model_calls.model`, cost and `llm_cache` keys all keep the resolved id, so a spec
-  learns which model a role routed to from `model_calls`, never from behaviour. The server refuses to boot (`AI_017`) when the
-  override is set and `AI_OPENROUTER_API_URL` is unset or points at OpenRouter, so it can never re-route paid traffic. Image generation
-  and vision are not local: images keep the logical image model and fail closed with `AI_005`, and an image-attached call reaches the
-  text-only local model and fails closed with `AI_007`. On Synapse's `local-only` profile an image call succeeds instead: the `mock`
-  provider answers every requested image with a 1×1 transparent PNG, at no billed cost but at the image model's list price ($0.04 each).
-- `AI_STRUCTURED_OUTPUT=json-schema` also sends each structured call's schema as a grammar-constrained
-  `response_format: { type: 'json_schema' }`, with change-set ops, the chat question card and `readerValue` typed there
-  (`PromptModule.constrainedProperties`) — a small model cannot write them from the loose in-band schema. The in-band schema and every
-  prompt are unchanged, and a constrained reply still goes through AJV, `postValidate` and the repair round like any other.
-
-Two flows are never exercised in json-schema mode, so an e2e spec must not depend on them:
+Two flows are never exercised where a model takes that schema natively as a grammar, so an e2e spec must not depend on them:
 
 - **Chat lookups.** The chat turn's `lookups` is constrained to an empty array (`chat-refine.prompt.ts`), because a schema cannot keep
   lookups apart from a changeSet; a turn never fetches before it edits, and answers from the provided context only.
@@ -316,26 +289,11 @@ Model selection is **Synapse's catalog**, not environment. Each call names the t
 selectors `tier` and `content_mode`; Synapse's routes for that task pick the model, and its effort range the reasoning effort
 (no effort is sent). A chat's pin is a Synapse alias key (`chat_sessions.alias_key`), sent as the envelope's `alias` while the
 catalog offers it for the reply's selectors; pins stored as registry slugs were mapped by `LEGACY_SLUG_ALIAS` at migration
-(e.g. `anthropic/claude-opus-5` → `opus`). Novel-forge still resolves a registry model locally (`defaults.ts`), but on Synapse only
-for the hard-line and session checks; `model_calls` and the reply's `chat_messages.model_id` record the catalog model Synapse
-reports actually answered, and the `llm_cache` key carries the task, selectors, alias and catalog version. The Synapse
-seed (`apps/synapse-server/src/database/seed/seed-catalog.data.ts`) was generated from the maps below, so they agree until an
-admin publishes a change. What follows is the legacy path, and the local view of the same choice.
-
-- Roles → groups: `src/modules/ai/defaults.ts`. `bible`, `plan`, `outline`, `premise`,
-  `extraction` all map to **`planning`**.
-- Production group defaults (`defaults.ts:85-95`):
-  `writing` → `anthropic/claude-sonnet-5`, `planning` → `anthropic/claude-opus-5.5`, `review` → `anthropic/claude-sonnet-5`,
-  `chat` → `anthropic/claude-opus-5.5`, `helper` → `openai/gpt-5.6-luna`, `image` → `x-ai/grok-imagine-image-2.0`,
-  `vision` → `openai/gpt-5.6-luna`, `embedding` → `ollama qwen3-embedding:0.6b`.
-- Unrestricted map (`defaults.ts:101-111`) applies when `project.contentMode === 'unrestricted'`; overrides are
-  clamped to `UNRESTRICTED_LLM_ALLOWLIST` (`defaults.ts:117`).
-- Reasoning effort per group (legacy only; Synapse's task effort ranges were seeded from it): `REASONING_POLICY` (`defaults.ts:142-152`) — every authoring group asks for `low`.
-  **Watch out:** `resolveReasoningEffort` (`defaults.ts:157-165`) omits the field entirely when the model's
-  registry entry does not list the policy effort and its mode is `optional`. `z-ai/glm-5.2` lists only
-  `['xhigh','high']` (`src/modules/ai/models.ts:204`), so the default planning model runs with **reasoning off**.
-- Registry of selectable models: `src/modules/ai/models.ts:41-247`. Every LLM id is an OpenRouter `vendor/model`
-  slug and its `provider` must be `openrouter`.
+(e.g. `anthropic/claude-opus-5` → `opus`). Novel-forge picks no model itself: `model_calls` and the reply's `chat_messages.model_id`
+record the catalog model Synapse reports actually answered, and the `llm_cache` key carries the task, selectors, alias and catalog
+version. Roles map to groups in `src/modules/ai/defaults.ts` (`ROLE_GROUP`): `bible`, `plan`, `outline`, `premise` and `extraction`
+all map to **`planning`**. The models novel-forge called directly before Synapse keep their names and list prices in
+`src/modules/ai/historical-models.ts`, read only to label and estimate the `model_calls` rows they wrote.
 
 How a model is picked:
 
@@ -343,17 +301,16 @@ How a model is picked:
    `{"provider":"synapse","model":"opus"}`: an option from `GET /ai/models` `models`, whose `provider` is `synapse` and whose
    `id` is the alias key. It must be one the catalog offers the chat task for the chat's model type and cost tier after the
    update — `GET /projects/:p/ai/models` `chatAliases` lists them — or the PATCH is `AI_022`; a registry slug or a half-named
-   pin is `AI_002`. The session then reads back `modelProvider: "synapse"`, `modelId: "opus"`. Legacy backend only: the pin is a
-   registry model, `{"provider":"openrouter","model":"anthropic/claude-opus-5"}`, checked by `isRegisteredModel` (`AI_002`).
-2. Otherwise the platform model for the cost tier and model type (Synapse's routes; `COST_TIER_DEFAULTS` on legacy). A chat turn's tier
+   pin is `AI_002`. The session then reads back `modelProvider: "synapse"`, `modelId: "opus"`.
+2. Otherwise the platform model for the cost tier and model type (Synapse's routes). A chat turn's tier
    outranks the chat's, which outranks the project's. No project setting pins a model to a role, and there is no
    per-account model default; `PUT /api/v1/ai/settings` `{"defaultCostTier":"economy"}` only sets the tier a new
    project starts on.
 
-`GET /api/v1/ai/models` is built from the catalog on Synapse: `models` holds every chat alias as a `synapse` option,
+`GET /api/v1/ai/models` is built from the catalog: `models` holds every chat alias as a `synapse` option,
 `unrestrictedAllowlist` the alias keys offered to an unrestricted chat, `tiers` each tier × type × group's default model, label and
-price, and `modelLabels` the label for every model key a call, reply or review records (catalog models, then registry slugs for
-older rows). On legacy it returns the registry and its default maps.
+price, and `modelLabels` the label for every model key a call, reply or review records (catalog models, then historical slugs for
+older rows).
 
 For the cheapest live runs, put the project on the Economy tier (`useEconomyTier` in `e2e/tests/novel-forge/forge-helpers.ts`);
 `HAIKU_ALIAS` there is the `{"provider":"synapse","model":"haiku"}` pin, offered to standard chats.
@@ -406,8 +363,7 @@ exist but do not want to pay for generation.
 - Client: `src/modules/ai/retrieval/embedding.service.ts`. On Synapse every embedding is `POST /api/v1/embeddings` with task
   `novel-forge.embedding` (pinned), the owner's subject and no selectors: a chapter's chunks travel as one batch, so indexing a
   chapter spends **one** Synapse budget call, and every `search_lore` / `search_prose` query spends another. Synapse's `local`
-  provider (host Ollama, `qwen3-embedding:0.6b`) serves it in every environment. Under `AI_BACKEND=legacy` the server calls
-  `new Ollama({ host: AI_OLLAMA_HOST })` itself, one text at a time.
+  provider (host Ollama, `qwen3-embedding:0.6b`) serves it in every environment.
 - **`embed()` / `embedBatch()` never throw: any failure logs and returns `null`** per text — Synapse unreachable, a timeout, a
   budget refusal (`SYN_BUDGET_*`, logged at `warn` with its code), or a vector whose width is not the columns' 1024 (`AI_023`,
   logged at `error`; `synapse.dimensions` and each vector's length are both checked, and nothing of the batch is stored).
@@ -417,11 +373,11 @@ exist but do not want to pay for generation.
   `addLore` for lore); an embedded chunk stores the task that built it in `embedding_task`.
 - Retrieval returns `[]` on a null embedding or any error, and compares a query only with chunks of its own task:
   `coalesce(embedding_task, 'novel-forge.embedding') = <task>` (`retrieval.service.ts`, `embedding.service.ts` `sameTask`). A row
-  from before the column existed counts as the first pinned task, which is the same model the legacy Ollama embedder ran.
+  from before the column existed counts as the first pinned task, which is the same model the pre-Synapse Ollama embedder ran.
 - The bible builder's final node wraps `addLore` in its own try/catch and calls the failure non-fatal
   (`src/modules/ai/graphs/bible-builder.graph.ts`).
 
-**Consequence:** with Synapse's embedder (or, under legacy, Ollama) down, every AI workflow still reports success, the outline
+**Consequence:** with Synapse's embedder down, every AI workflow still reports success, the outline
 pack's `## LORE REFERENCES` / `## PROSE REFERENCES` sections are simply absent
 (`src/modules/ai/context/context-assembler.service.ts`), and `search_lore` answers "No lore found.". Nothing in the UI tells you
 — look for `Embedding through Synapse failed` in the server log. If you are testing anything retrieval-shaped, make sure the host
@@ -544,19 +500,16 @@ model-call rows comparable.
 cp apps/novel-forge-server/.env.example apps/novel-forge-server/.env
 ```
 
-The example already ships `NODE_ENV=development`, `APP_STAGE=dev`, `LOG_LEVEL=debug`, `AI_BACKEND=synapse` and
+The example already ships `NODE_ENV=development`, `APP_STAGE=dev`, `LOG_LEVEL=debug` and
 `DATABASE_POSTGRES_URL=postgresql://postgres:postgres@localhost:7070/novel_forge` — the cluster's Postgres port. Leave
-those alone unless your Postgres is elsewhere; the legacy-only `AI_OPENROUTER_*`, `AI_OLLAMA_HOST` and `AI_EMBEDDING_MODEL`
-stay commented out, as Synapse never reads them. What you must change:
+those alone unless your Postgres is elsewhere. What you must change:
 
 ```
-SERVICE_URL_SYNAPSE_SERVER_SYNAPSE=<synapse>   # every model call goes there; AI_BACKEND=legacy plus AI_OPENROUTER_API_KEY is the old path
+SERVICE_URL_SYNAPSE_SERVER_SYNAPSE=<synapse>   # every model call goes there
 AUTH_ISSUER=<reachable identity>       # the example points at prod identity
 AUTH_CLIENT_SECRET=<secret>            # blank breaks the boot, it does not disable login
 AUTH_SESSION_COOKIE_SECURE=false       # plain http — must be set with the next line
 AUTH_SESSION_COOKIE_NAME=shadow-session
-AI_QUOTA_MAX_CALLS=0                   # legacy only; Synapse budgets gate every call
-AI_QUOTA_MAX_COST_USD=0
 STORAGE_DRIVER=local                   # the example ships s3 (Garage)
 PUBLISHING_AUTO_PUSH=false             # no reader service on the host
 # AUTH_APP_ID stays novel-forge; PLUGINS_DIR stays unset
@@ -598,7 +551,6 @@ bun test tests/eval     # eval tests only (no DB needed)
 bun run test:ai:unit    # prompts.spec + model-router.spec + context-assembler.spec
 bun run test:ai:graph   # tests/ai/workflow.spec.ts only
 bun run test:ai:tools   # tests/ai/tool-registry.spec.ts only
-bun run ai:smoke        # prints a cost estimate and exits 0 unless AI_SMOKE_SPEND is set
 bun run eval:metrics    -- --project <id> [--from n --to n | --all] [--source final|draft] [--json]
 bun run eval:invariants -- --project <id> [--from --to] [--since <ISO>] [--json]
 ```
@@ -658,22 +610,8 @@ for this workspace — a change in coverage behavior worth confirming is intenti
   repair attempts per run from `model_calls.node ∈ {repairPatch, repairRewrite}`, batch halts, and validation
   window coverage. Also prints and exits 0; its own text says "Fail-open … must be 0" but nothing enforces it.
 
-#### `tests/ai/ai-smoke.ts` — the only live-model tool
-
-Gated on `AI_SMOKE_SPEND` (`:14,30-39`): a bare `bun run ai:smoke` prints the model list and estimated cost and
-exits 0 without spending. With the var set it exits 1 if `ai.openrouter.api.key` is missing (`:41-44`). It always runs the legacy
-backend (`AI_BACKEND=legacy`, set by `tests/ai/legacy-backend.ts` before bootstrap loads, since bootstrap loads the OpenRouter keys
-only under legacy), so it proves the OpenRouter leg, not Synapse.
-
-It builds a real `ModelRouterService` with stub telemetry/DB/quota (`:53-62`) and makes **4 live calls** —
-`ROLES` at `:15` is `['bible','title','judge','generation']`, so on the production
-defaults that is claude-opus-5.5, gpt-5.6-luna, claude-sonnet-5 ×2. Estimated at 1,500
-in / 700 out per call (`:18-28`), roughly **$0.04** total. Assertions are shape-only: the foundation rung checks
-`typeof result.body === 'string' && result.body.length > 10` (`:81`); the judge rung feeds an obvious canon
-contradiction but accepts **either** verdict (`:105`).
-
-**Proves:** the models are reachable and return schema-conformant structured output through the repair ladder.
-**Does not prove:** that any answer is correct or good.
+There is **no live-model tool** in the repo: every spec stubs the model, and the whole-platform `e2e/` suite is the only thing that
+reaches Synapse.
 
 #### `tests/ai/bible-builder-graph.spec.ts` (368 lines)
 
@@ -695,8 +633,9 @@ therefore the repair ladder — is bypassed.
   strips `$id`/`definitions`/`$ref`/`default`; also asserts the schema really is placed in a message in front of
   the model.
 - `tests/ai/json-extract.spec.ts` — brace/quote/fence tolerance of `extractJsonCandidates`.
-- `tests/ai/model-router.spec.ts` (709 lines) — role resolution, allowlist coercion, reasoning policy, the
-  ladder's call counts, image/vision guards. No real model, no DB.
+- `tests/ai/model-router.spec.ts` — the repair ladder's call counts and the image-attached call. No real model, no DB.
+- `tests/ai/model-router-synapse.spec.ts` — the task, selectors, alias, session and response format each call sends Synapse, the
+  hard line on the wire, telemetry, the `llm_cache` key, failure mapping and cancellation, against a fake Synapse.
 - `tests/bible/bible-manifest.spec.ts` — one chapter per stage, unique `section/slug`, every chapter has at least one
   guidance topic, the escalation map asks for no endgame, and `renderManifest()` states no count.
 - `tests/ai/bible-stage-contract.spec.ts` — no stage prompt has a `postValidate` (nothing is retried for a record count),
@@ -707,9 +646,6 @@ therefore the repair ladder — is bypassed.
 **Proven without a model:** prompt/schema wiring and version pins; JSON extraction and the repair ladder;
 fail-closed judge routing; bible-builder persistence and atomicity; manifest shape and readiness arithmetic;
 the prose-metric and process-invariant maths.
-
-**Proven for ~$0.04** (`AI_SMOKE_SPEND=1 bun run ai:smoke`): the production models behind four roles are reachable and return
-schema-conformant output.
 
 **Proven by nothing in the repo:** bible content quality; that a real model records what it establishes and invents nothing; that real
 chapters land in the length band or avoid stock phrases; judge accuracy (false positives or negatives); anything
@@ -726,7 +662,7 @@ Closing that gap needs a blind evaluation of real output against a baseline.
 | README said                                                    | Actually                                                                                                                                                                                                                                                    |
 | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `STORAGE_DRIVER` default `local`, `STORAGE_IMAGE_DIR=./images` | the driver is `s3` (Garage) in `.env.example:46`, and the key is `STORAGE_LOCAL_DIR` (`:58`); `STORAGE_IMAGE_DIR` no longer exists                                                                                                                          |
-| the env table is the whole list                                | it omits `AI_LLM_TIMEOUT_MS`, `AI_LLM_MAX_RETRIES`, `AI_LLM_BACKOFF_MS`, `AI_QUOTA_*`, `PROJECTS_MAX_PER_OWNER`, `PUBLISHING_AUTO_PUSH`, `PLUGINS_DIR` (all in `bootstrap.ts:47-59`), and every `AUTH_*` var — without which the server does not boot       |
+| the env table is the whole list                                | it omits `AI_LLM_TIMEOUT_MS`, `AI_QUOTA_*`, `PROJECTS_MAX_PER_OWNER`, `PUBLISHING_AUTO_PUSH`, `PLUGINS_DIR` (all in `bootstrap.ts`), and every `AUTH_*` var — without which the server does not boot                                                       |
 | "five LangGraph workflows"                                     | there are now six graphs in `src/modules/ai/graphs/` — the five listed plus mechanical-check                                                                                                                                                                |
 | route table                                                    | routes have moved: the bible document route is `GET/PUT /projects/:id/bible/:section/:slug` (`bible-document.controller.ts:23,32`), volumes are read-only over HTTP (`GET /projects/:id/volumes[/:volumeKey]`), and many screens' routes did not exist then |
 | `.env.example:13` "Run `bun run db:migrate`"                   | there is no `db:migrate` script in `apps/novel-forge-server/package.json`; use `bun run db apps/novel-forge-server migrate` from the root                                                                                                                   |
@@ -1396,7 +1332,7 @@ Veil pledge' out loud to Amara."}` — the guidance is the provocation, and `aut
   `…/context` adds the exact `rendered` text; on screen that is "Prompt anatomy" → "View full context"
   → the "Rendered prompt context" dialog (`runs.tsx:404,247,281`), not a tab.
   `GET /cost` totals spend by model group, role and model, plus the last 7 and 30 days; `estimatedCostUsd` is
-  the part priced at query time from registry list prices because the row recorded no cost. See 0.5.
+  the part priced at query time from historical list prices because the row recorded no cost. See 0.5.
   A `truncated: true` section, or `usedTokens` pinned at `budgetTokens`, is the harness dropping canon the
   draft needed — the most useful single signal when output quality is poor.
 - **Fails when:** `CTX_001` — no context pack linked to the run (the graph links it in `assembleContext`, so
@@ -1466,7 +1402,7 @@ Legend: **[det]** = deterministic code (a bug there is a code bug, not a model b
 ## Part 5: chat hub, illustrations, plugins, settings, quota, admin inspection
 
 Base: every route is under `/api/v1`. `$P` = project id, `$S` = chat session id, `$T` = bearer token. Short paths are relative to `apps/novel-forge-server/src/modules/`; anything outside that is given from the repository root.
-Cost basis: per-model prices are in `ai/models.ts` and the default model per group, type and tier in `ai/defaults.ts` (Standard Balanced: planning and chat `anthropic/claude-opus-5.5`, writing and review `anthropic/claude-sonnet-5`, helper `openai/gpt-5.6-luna`). Read the price of the model your turn actually resolved to before estimating.
+Cost basis: the model and list price behind every tier × model type × group are in `GET /ai/models` `tiers`, read from Synapse's catalog. Read the price of the model your turn actually ran on (`model_calls.model`) before estimating.
 
 ---
 
@@ -1511,16 +1447,16 @@ Cost basis: per-model prices are in `ai/models.ts` and the default model per gro
 3. Then append what the router adds (`buildMessages`, `ai/model-router.service.ts:574`):
    - a final human message: "Respond with ONLY one valid JSON object matching this JSON schema…";
    - plugin `prompt.contribute` system messages, inserted after the leading system messages;
-   - `cache_control` breakpoints whenever the module has a `cacheStrategy`; Synapse strips them for a model without Anthropic prompt caching (legacy: only for an `openrouter` model id starting `anthropic/`, `supportsPromptCaching`). `chat-refine` has one, over `scopeInstructions` and `stableContext`.
+   - `cache_control` breakpoints whenever the module has a `cacheStrategy`; Synapse strips them for a model without Anthropic prompt caching. `chat-refine` has one, over `scopeInstructions` and `stableContext`.
 4. **Shortcut, dev only.** With `LOG_LEVEL=debug` the server logs `structured: invoking model` (`ai/model-router.service.ts:355`) with `input` (all template variables, not the system prompt or schema). Query `shadow-logs-dev`: `{environment="dev",namespace="novel-forge",component="server"} |= "structured: invoking model"`, bounded by start/end. Prod does not log it.
 5. `AI_LANGSMITH_API_KEY` is loaded as `ai.langsmith.api.key` (`bootstrap.ts:53`) but nothing reads it back — there is no tracing wiring in `apps/novel-forge-server/src`, so setting it changes nothing.
 
 #### 0.5 Tokens and cost per call
 
 - `input_tokens = max(provider-reported, tiktoken o200k_base estimate of the prompt)` (`ai/telemetry.handler.ts:84`). It is a floor and can be slightly high. `output_tokens` is provider-reported, else estimated. Reasoning tokens bill as output on the provider side but are not split out.
-- A text call's `provider` and `model` are what Synapse reports answered (`synapse.provider`, `synapse.model`, a catalog model key such as `claude-opus-5.5`), and its `cost_usd` is `synapse.cost.list_usd`, with `cost_source` `provider` when `billed_usd > 0`, `gateway` when nothing was billed but the list price is above zero (the subscription gateway), else `estimate` (`ai/telemetry.handler.ts` `synapseBilling`). A call that failed records provider `synapse`, the task id as its model and the `SYN_*` code in `error.code`; a budget refusal (`SYN_BUDGET_*`) is status `refused`, since no model ran. Legacy: the provider's `usage.cost` when reported, otherwise the list-price estimate `input_tokens/1e6 × inputPrice + output_tokens/1e6 × outputPrice` frozen at write time (`ai/quota.ts` `estimateCallCostUsd`). An image call is recorded by the router itself, the same way on Synapse (served `provider` and `model`, `cost_usd` = `list_usd`, the same `cost_source` rule; a failure is provider `synapse`, model `novel-forge.image`, with the `SYN_*` code); on legacy its cost is the provider figure or null and its `cost_source` null. A transport-error row carries no tokens and no cost, except a Synapse image call that answered with no image, which keeps what it cost.
+- A text call's `provider` and `model` are what Synapse reports answered (`synapse.provider`, `synapse.model`, a catalog model key such as `claude-opus-5.5`), and its `cost_usd` is `synapse.cost.list_usd`, with `cost_source` `provider` when `billed_usd > 0`, `gateway` when nothing was billed but the list price is above zero (the subscription gateway), else `estimate` (`ai/telemetry.handler.ts` `synapseBilling`). A call that failed records provider `synapse`, the task id as its model and the `SYN_*` code in `error.code`; a budget refusal (`SYN_BUDGET_*`) is status `refused`, since no model ran. A response with no Synapse block is recorded at the routed task with cost 0 and `cost_source` `estimate`. An image call is recorded by the router itself, the same way (served `provider` and `model`, `cost_usd` = `list_usd`, the same `cost_source` rule; a failure is provider `synapse`, model `novel-forge.image`, with the `SYN_*` code). A transport-error row carries no tokens and no cost, except a Synapse image call that answered with no image, which keeps what it cost.
 - `GET /cost` sums `cost_usd` and prices only the rows where it is null (older rows, silent image providers) at query time, reporting that part as `estimatedCostUsd`. Cached tokens are billed at full price, so estimates are an upper bound.
-- `reasoning_effort` records the effort Synapse applied (`synapse.effort`; legacy: the effort the reasoning policy sent, `ai/defaults.ts` `resolveReasoningEffort`); null when none was applied, and on every row written before the column existed.
+- `reasoning_effort` records the effort Synapse applied (`synapse.effort`); null when none was applied, and on every row written before the column existed.
 
 #### 0.6 Reading retries, repairs and cache
 
@@ -1593,7 +1529,7 @@ Ordinary hub turns run `chat-refine@2.13.0`, role `chat` (planning-group model),
 - **Fails when:**
   - `tool_calls.status='invalid_args'`: the model used a wrong arg name.
   - A `volume.upsert` with no `get_volume` row: blind overwrite (prompt-following defect).
-  - `search_lore` and `search_prose` return "No lore found" or fail: they need embeddings (Synapse's `novel-forge.embedding`, served by host Ollama; legacy: `AI_OLLAMA_HOST`) and content indexed under the current embedding task (§6). Draft and isolated content is never indexed.
+  - `search_lore` and `search_prose` return "No lore found" or fail: they need embeddings (Synapse's `novel-forge.embedding`, served by host Ollama) and content indexed under the current embedding task (§6). Draft and isolated content is never indexed.
 
 #### 1.3 Hub pushback quality (harness-vs-baseline comparison)
 
@@ -1728,19 +1664,19 @@ Graph is `illustration` (in `GET /runs`). UI: "Illustrations" → "Start an illu
 #### 2.1 Entity portrait (compose + render + derived appearance)
 
 - **Entry:** UI "Illustrations" → Start → An entity. API `POST /illustrations {"subjectType":"entity","subjectKey":"<wren key>","instruction":"..."}`.
-- **Preconditions:** entity Wren exists (1.1) with EMPTY `appearance` (`GET /entities/<key>`); Synapse's `novel-forge.image` routes reach an image-capable provider (on the `local-only` profile that is the `mock` provider, so every candidate is a 1×1 transparent PNG and only the structure, not the picture, can be judged); storage configured. Legacy: `AI_OPENROUTER_API_KEY` set.
+- **Preconditions:** entity Wren exists (1.1) with EMPTY `appearance` (`GET /entities/<key>`); Synapse's `novel-forge.image` routes reach an image-capable provider (on the `local-only` profile that is the `mock` provider, so every candidate is a 1×1 transparent PNG and only the structure, not the picture, can be judged); storage configured.
 - **Input:** `subjectType:entity`, `instruction`: `three-quarter view, harbour fog at dawn, cold blue key light, weathered apprentice coat`.
 - **Verify:**
   - 201 with `status:'active'`, `revision:1`, `candidates` of 2 (each `ref`, `imageUrl` that loads with 200, `references`), `prompt` (the exact rendered image prompt), `instructions:[<your text>]`, and `suggestedAppearance` set. The composer invented an appearance, and the UI shows "Forge invented this appearance" with a save-to-entity action.
   - `illustrations.prompt_spec` JSON: `basePrompt`, `subjectFraming`, `styleNotes`, `negativePrompt?`, `appearanceAnchor` = derived, `appearanceDerived:true`, `promptKey:'illustration-compose'`.
-  - Run: `model_calls` has one compose row and one image row (`role=image`; on Synapse `attempt` is always 0 and `provider`/`model` are what Synapse reports served, e.g. `openrouter` / `grok-imagine-image-2.0`; legacy: `attempt` is the retry index, so 0 when the provider answered first try). Cost is visible only on the image row.
+  - Run: `model_calls` has one compose row and one image row (`role=image`; `attempt` is always 0 and `provider`/`model` are what Synapse reports served, e.g. `openrouter` / `grok-imagine-image-2.0`). Cost is visible only on the image row.
   - Run context is not linked: `GET /runs/<id>/context` returns 404 `CTX_001`. Use `context_packs where purpose='illustration'` for the input (sections `premise`, `subject_card`, `world_facts`, `art_style` if present).
   - **Quality:**
     - The prompt is comma-separated descriptive phrases (no sentences addressed to the model). It says none of "novel", "chapter", "illustration".
     - It is framed as a portrait or half-body study that reads at thumbnail size, includes your instruction, and is consistent with Wren's canon (age, apprentice, no invented scars). It reveals nothing from the SECRET fact.
     - The two candidates differ but show the same character. The character matches the derived appearance across candidates.
 - **Fails when:**
-  - 500 `AI_005`: the image call failed — on Synapse after one call (Synapse fails over between deployments itself; `model_calls.error.code` holds the `SYN_*` code), on legacy after its retries. A Synapse budget refusal is 429 `AI_008`/`AI_009` instead. `AI_010`: more references attached than the image model accepts — the capacity is the registry's `maxInputReferences` for the tier's image model, on both backends, since the Synapse catalog carries none. Legacy only: 500 `AI_004` when `AI_OPENROUTER_API_KEY` is missing, unreachable in practice because compose fails first with `AI_006`.
+  - 500 `AI_005`: the image call failed after one call (Synapse fails over between deployments itself; `model_calls.error.code` holds the `SYN_*` code). A Synapse budget refusal is 429 `AI_008`/`AI_009` instead. 400 `AI_010`: Synapse refused the reference images (past its own request cap); the Synapse catalog carries no per-model reference limit, so the illustration module caps references itself (`IMAGE_REFERENCE_CAPACITY`, 1) and an over-capacity attachment is `ILL_011` first.
   - 400 `ILL_006`: subject key missing (chapter key must be digits).
   - The composer output ignores the appearance or instruction (inspect the compose call's `rawOutput`).
 
@@ -1755,7 +1691,7 @@ Graph is `illustration` (in `GET /runs`). UI: "Illustrations" → "Start an illu
   4. Start a second portrait for the same entity.
 - **Verify:**
   - Refine: `revision:2`, 4 candidates total, `selectedRef:null`, `instructions` has 2 entries. The body must carry exactly one of `add|removeIndex|replace` — the DTO is `minProperties:1, maxProperties:1`, so zero or two keys is a plain schema 400 and `ILL_007` may never be reachable over HTTP; a bad index is `ILL_008`. New candidates carry a different `instructionsHash`.
-  - The edit source rides along as an image-to-image reference (`references[].role='edit-source'`, `reason:'auto:edit-source'`). It is `selectedRef ?? the newest candidate` — in the order above nothing is selected yet, so it is the last candidate; select first if you want to steer which one. The image model accepts only 1 reference (`maxInputReferences:1`), so other auto references are dropped and reported in `referenceWarnings` (returned, never persisted). Attaching more than capacity gives 400 `ILL_011`.
+  - The edit source rides along as an image-to-image reference (`references[].role='edit-source'`, `reason:'auto:edit-source'`). It is `selectedRef ?? the newest candidate` — in the order above nothing is selected yet, so it is the last candidate; select first if you want to steer which one. Only 1 reference is sent (`IMAGE_REFERENCE_CAPACITY` in `illustration-reference.service.ts`), so other auto references are dropped and reported in `referenceWarnings` (returned, never persisted). Attaching more than capacity gives 400 `ILL_011`.
   - Save with no selection returns 400 `ILL_003`; a ref not in this illustration `ILL_004`; wrong target for the subject (`chapter` on an entity) `ILL_005` — but the no-selection check runs first, so a wrong target on an unselected illustration reads `ILL_003`; act on a saved or discarded one `ILL_002`.
   - After Save: `illustrations.status='saved'`; `entities.image_path=<ref>` (target `portrait`); target `gallery` adds an `entity_images` row. Unselected candidate objects are deleted from storage (their URLs stop resolving) unless another record references them. Discard deletes all unreferenced candidates.
   - Second portrait: `references[0]` has `reason:'auto:entity-portrait'`, `role:'likeness'` (the saved portrait is sent as a likeness reference) and the new anchor is the entity's `appearance` (if you PATCHed it) rather than re-invented.
@@ -1920,10 +1856,10 @@ export default function createPlugin() {
   - Step 4: the chat call's `model` is the Economy chat model from `GET /ai/models` `tiers`, and `chat_messages.model_id` (assistant) matches: the catalog model Synapse reports, shown by its `modelLabels` label.
   - Precedence exactly: the chat's pin > the turn's tier > the chat's tier > the project's tier. Step 5 uses the pin; step 6 uses the Performant chat model for both turns (the chat session's `costTier` is `performant`) and the third is back on Economy with the session's `costTier` null.
   - Step 5: the pinned turn's envelope carries `alias: "gpt-luna"`; the unoffered alias is 400 `AI_022` and changes nothing.
-  - Step 7: an alias the catalog does not offer unrestricted chats is not sent (no `alias` in the envelope); the reply uses the unrestricted route for its tier. `GET /ai/models` `unrestrictedAllowlist` lists the alias keys offered there (`grok`, `deepseek`, `glm`, `kimi` in the seed); on legacy it lists the registry allowlist.
+  - Step 7: an alias the catalog does not offer unrestricted chats is not sent (no `alias` in the envelope); the reply uses the unrestricted route for its tier. `GET /ai/models` `unrestrictedAllowlist` lists the alias keys offered there (`grok`, `deepseek`, `glm`, `kimi` in the seed).
   - `GET /projects/:p/models` reports each group's tier model for the novel's (or the previewed) type and tier; a `PATCH /projects/:p` carrying `config` stores nothing.
   - Group→role mapping: Illustrations compose runs on the helper group (not Planning); embedding and vision are not configurable.
-- **Fails when:** a project created without a tier ignores the account default, a PUT with a value outside economy/balanced/performant is accepted, a chat pin to an alias the catalog does not offer is not refused with 400 `AI_022`, or a registry slug pin is not refused with 400 `AI_002` (on legacy, an unregistered id).
+- **Fails when:** a project created without a tier ignores the account default, a PUT with a value outside economy/balanced/performant is accepted, a chat pin to an alias the catalog does not offer is not refused with 400 `AI_022`, or a registry slug pin is not refused with 400 `AI_002`.
 
 ---
 
@@ -1934,33 +1870,17 @@ owner (`subject` `owner`, `<ownerKind>:<ownerId>`, or `unowned` for every projec
 price, changed by publishing the Synapse catalog, not by env. A refused call is `SYN_BUDGET_CALLS` → 429 `AI_008` or
 `SYN_BUDGET_COST` → 429 `AI_009`, with the same copy and the same failed-turn shape as below; Synapse's window is fixed, not
 rolling. An embedding refused this way is not an error at all: it degrades to an unembedded chunk or an empty search (Part 1 §6).
-Novel-forge's own window below gates only `AI_BACKEND=legacy`, and `GET /api/v1/ai/quota` reports it from `model_calls` either
-way, which only approximates Synapse's counters (embeddings spend Synapse calls but write no row). The recipe below is the legacy
-guard. In the `local-only` test environment the e2e suite trips a Synapse budget on purpose: its quota pin stands a test owner's
+Novel-forge enforces no limit of its own: `GET /api/v1/ai/quota` reports a rolling window from `model_calls`, which only approximates
+Synapse's counters (embeddings spend Synapse calls but write no row). In the `local-only` test environment the e2e suite trips a Synapse budget on purpose: its quota pin stands a test owner's
 counters at the cap so model-capable requests are refused before dispatch. Otherwise only images count there: each `mock` image adds
 its $0.04 list price to the owner's $50 budget although nothing is billed.
 
-#### 5.1 Rate and spend ceilings (per owner, rolling window)
+#### 5.1 The window `GET /ai/quota` reports (per owner, rolling)
 
-- **Entry:** operator env `AI_QUOTA_MAX_CALLS` (default 1000), `AI_QUOTA_MAX_COST_USD` (default 50), `AI_QUOTA_WINDOW_MS` (default 3600000) — `bootstrap.ts:50-52`, documented in `.env.example:32-34`. `<=0` disables a limit dimension; a `<=0` window does not disable anything, it just makes the window empty. Restart to apply. The chat failure copy reads "Too many model calls right now" (`AI_008`) and "AI spending limit reached" (`AI_009`) (`novel-forge-web/src/components/nf/TurnStatus.tsx:39-40`).
-- **Preconditions:** a fresh owner or project; `AI_QUOTA_MAX_CALLS=4`, `AI_QUOTA_MAX_COST_USD=0`, `AI_QUOTA_WINDOW_MS=600000`.
-- **Run:**
-  1. Two manual hub turns (first turn writes 2 rows: chat plus title; second 1 row = 3).
-  2. Send a third turn; if it succeeds (4 rows), send a fourth.
-  3. For spend: `AI_QUOTA_MAX_CALLS=0`, `AI_QUOTA_MAX_COST_USD=0.005`, restart; run turns until it trips.
-  4. Create a second project of the same owner and send a turn.
+- **Entry:** operator env `AI_QUOTA_MAX_CALLS` (default 1000), `AI_QUOTA_MAX_COST_USD` (default 50), `AI_QUOTA_WINDOW_MS` (default 3600000) — `bootstrap.ts`. They set only the limits and window the report shows; nothing refuses a call on them. Restart to apply.
 - **Verify:**
-  - The call that would exceed it returns 429 `AI_008` (rate) or `AI_009` (spend); comparison is `>=` (at the limit the NEXT dispatch is refused). No model row is written for the refused call.
-  - The refused turn: user message persisted, run `status='failed'`, `error.code='AI_008'`; `GET /chat/sessions/$S/messages` returns `failedTurn.code='AI_008'`; SSE gives an `error` frame with the same code.
-  - Rate counts every `model_calls` row in the window across ALL the owner's projects except `refused` ones (repair rows and transport-error rows count; a hard-line or Synapse budget refusal ran no model, and cache hits write no row, so neither does). Spend is `Σ recorded cost_usd` (image) plus `Σ tokens × registry price` for rows where `cost_usd IS NULL`, with cached input tokens billed at full price. Check by hand with 0.5's formula and compare to the point where 429 begins.
-  - The check runs once per top-level call and BEFORE the `llm_cache` lookup, so at the limit even a would-be cache hit is refused.
-  - Step 4: the second project is blocked too (per owner). Projects with no owner id share one window. After the window elapses (or with a smaller window) calls resume.
-  - `chat-title` and helper calls are gated the same way; the refused title call is silent.
-  - Read failure fails CLOSED: 503 `AI_018` with `retryable: true` (an `organise` or `plan` job is retried once; every other job fails with it), logged at error "AI quota check failed — usage read failed, refusing the model call".
-- **Fails when:**
-  - Refused at count N-1 (off by one), or the second project not blocked.
-  - Spend never trips for an unpriced model: unknown or unpriced models contribute 0.
-  - Image spend is counted only when the provider returns `usage.cost`; otherwise it is 0 because image models have no registry price.
+  - `calls` counts every `model_calls` row in the window across ALL the owner's projects except `refused` ones (repair rows and transport-error rows count; a hard-line or Synapse budget refusal ran no model, and cache hits write no row). `costUsd` is `Σ recorded cost_usd` plus `Σ tokens × historical price` for rows where `cost_usd IS NULL`, with cached input tokens billed at full price.
+  - Projects with no owner id share one window; `resetsAt` is one window after the oldest counted call, null when the window is empty.
 
 ---
 
@@ -1968,10 +1888,10 @@ its $0.04 list price to the owner's $50 budget although nothing is billed.
 
 1. **Tool-loop calls are recorded only with a telemetry context.** `ModelRouterService.chatFor` binds the telemetry callback only when its caller passes a `TelemetryContext`; a `runToolLoop` over a client built without one writes no `model_calls` row, and `GET /cost`, the quota's spend window and the Runs view leave that spend out. Check the judge's calls appear in `model_calls` before trusting a cost figure.
 2. **`model_calls.status` enum is mostly dead.** `parse_error`, `repaired`, `refused` and `timeout` are never written (enum at `src/database/schemas/ai.ts:42`). The Runs UI "repaired" chip can never show; a repaired call is an `attempt=1` row with `ok`.
-3. **Every recorded cost counts as the real charge.** `model_calls.cost_source` says where a figure came from (`provider`, `gateway`, or `estimate`; null on older rows), and `GET /cost` breaks spend down by it, but the totals add every source alike (`ai/quota.ts` `classifySynapseCostSource`, legacy `classifyCostSource`).
+3. **Every recorded cost counts as the real charge.** `model_calls.cost_source` says where a figure came from (`provider`, `gateway`, or `estimate`; null on older rows), and `GET /cost` breaks spend down by it, but the totals add every source alike (`ai/quota.ts` `classifySynapseCostSource`).
 4. **Illustration runs have no linked context pack.** `/runs/:id/context` returns 404 `CTX_001`; the pack is only in `context_packs`. `chat-title`/`chat-compact` are also not listed in `GET /runs`.
 5. **Dead plugin API surface.** Manifest `actions` and the hooks `invoke`, `onEvent`, `registerPrompts` and `contributeWritingKnobs` are declared but never called (`plugin-policy.service.ts` hard-codes `knobs: {}`).
-6. **Unused error codes.** `CHT_004` and `CHT_005` are never thrown anywhere in the server (`AI_003` is: an unrestricted call that resolves off the allowlist refuses with it, `ai/unrestricted-route.ts`, and so does a resolution Synapse refuses, `SYN_ALIAS_UNAVAILABLE` or `SYN_NO_ELIGIBLE_MODEL`, `ai/synapse-failure.ts`). Lookup-budget exhaustion is silent. `RFN_008`'s message ("Action execution failed — see the per-op results on the proposal") does not match its use (`proposal-apply.service.ts:246`: no executor registered).
+6. **Unused error codes.** `CHT_004` and `CHT_005` are never thrown anywhere in the server (`AI_003` is: a resolution Synapse refuses, `SYN_ALIAS_UNAVAILABLE`, `SYN_NO_ELIGIBLE_MODEL` or `SYN_POLICY_DENIED`, maps to it in `ai/synapse-failure.ts`). Lookup-budget exhaustion is silent. `RFN_008`'s message ("Action execution failed — see the per-op results on the proposal") does not match its use (`proposal-apply.service.ts:246`: no executor registered).
 7. **Proposal hand-edit skips the scope allowlist.** `proposal.service.ts:184` `updateChangeSet` calls `validateOps(kind, changeSet)` with no `allowedOps`, so a hub proposal can be hand-edited to carry any op in the global list. (Plugin proposals keep their own allowlist.)
 8. **`GET /context/preview` persists a pack for every purpose except `generation`.** Only the `generation` branch passes `dryRun` (`refine.service.ts`); `outline`, `chat`, `premise` and `audit` all insert a `context_packs` row (deduplicated by hash).
 9. **Product doc.** `novel-forge.md` matches the code on hub, proposals, plugins and quota. One gap: the doc says every call logs `promptKey@promptVersion`, true for `model_calls`, but no API returns the full prompt (0.3).
@@ -2209,9 +2129,8 @@ author to finalize` and the chat card offers Done instead. Answering the last it
 
 ### 13. The chat's gateway session (prompt caching)
 
-- **Precondition:** the chat runs in standard mode on a Claude model Synapse serves through its `subscription` provider (the AI gateway); legacy:
-  the server points `AI_OPENROUTER_API_URL` at the gateway. Every standard turn sends the Synapse `session`; Synapse forwards it only to a
-  provider that keeps sessions. The gateway's own web tools do not matter: a web-tools turn is keyed like any other.
+- **Precondition:** the chat runs in standard mode on a Claude model Synapse serves through its `subscription` provider (the AI gateway).
+  Every standard turn sends the Synapse `session`; Synapse forwards it only to a provider that keeps sessions. The gateway's own web tools do not matter: a web-tools turn is keyed like any other.
 - **Entry:** one chat, four or five short turns in a row, one of which needs a lookup ("what do my notes say about …") and one a web search.
 - **Verify** in Loki (`shadow-logs-dev` / `shadow-logs-prod`), reading only the session and token fields — never `prompt` or `answer`, which hold the
   author's content:

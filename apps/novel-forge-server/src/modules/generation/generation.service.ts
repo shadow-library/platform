@@ -982,7 +982,15 @@ export class GenerationService {
     const pack = await this.contextAssembler.forChapter(projectId, chapter, { policy });
 
     const promptModule = PROMPT_REGISTRY['chapter-extract'];
-    const ctx = { projectId, chapter, promptKey: promptModule.key, promptVersion: promptModule.version, role: promptModule.role ?? promptModule.key };
+    let answered: string | undefined;
+    const ctx = {
+      projectId,
+      chapter,
+      promptKey: promptModule.key,
+      promptVersion: promptModule.version,
+      role: promptModule.role ?? promptModule.key,
+      onAnswered: ({ model }: { model: string }) => void (answered = model),
+    };
     const contextPack = draft.isolated ? isolatedExtractionContext(pack.rendered) : pack.rendered;
     const extracted = (await this.modelRouter.structured(
       promptModule,
@@ -1004,7 +1012,7 @@ export class GenerationService {
       summary: output.summary?.trim() || `Canon from chapter ${chapter}`,
       changeSet,
       allowedOps: CHAPTER_EXTRACT_OPS,
-      model: this.modelRouter.resolveModel(promptModule.role ?? 'extraction', project, policy).model,
+      model: answered ?? null,
       sourceIsolated: draft.isolated,
     });
   }
@@ -1322,7 +1330,7 @@ export class GenerationService {
   }
 
   private chapterRoute(projectId: bigint, call: { role: ChapterRole; chapter: number; mode: Project.ContentMode }, project: Project.Row | undefined): Promise<CallRoute> {
-    return routeChapterCall({ pluginPolicy: this.pluginPolicy, modelRouter: this.modelRouter }, projectId, call, project as ProjectConfig | undefined);
+    return routeChapterCall({ pluginPolicy: this.pluginPolicy }, projectId, call, project as ProjectConfig | undefined);
   }
 
   private async chapterSetting(projectId: bigint, chapter: number, draft: { isolated: boolean }): Promise<{ project: Project.Row | undefined; mode: Project.ContentMode }> {

@@ -16,7 +16,7 @@ export function slugsByAlias(aliases: Readonly<Record<string, string>> = LEGACY_
 /**
  * Reconciles every chat pinned to a registry slug with the Synapse alias that slug maps to, so a pin an older pod retargeted during the rollout,
  * which wrote `model_id` without `alias_key`, is corrected on the next migrate. A rerun with nothing retargeted changes nothing. A pin cleared or
- * replaced on the Synapse backend clears `model_id` as well, so it is never brought back, and a slug the map does not know stays a legacy-only pin.
+ * replaced since clears `model_id` as well, so it is never brought back, and a slug the map does not know leaves the chat unpinned.
  * Accepted residual: a pin an older pod cleared during the rollout nulls only `model_id`, so it keeps its `alias_key` and stays pinned on Synapse.
  * `updated_at` is left alone so the chat list keeps its order.
  */

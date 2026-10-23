@@ -33,19 +33,7 @@ import {
   runAll,
   type TeamOrganisation,
 } from '../../lib';
-import {
-  type AiBackend,
-  budgetPin,
-  deleteAccountSettings,
-  deleteForgeProjects,
-  deleteForgeProjectsOwnedBy,
-  type ForgeOwner,
-  type QuotaLimits,
-  quotaPin,
-  readAiBackend,
-  readQuotaLimits,
-  releaseBudgetPins,
-} from './forge-db';
+import { budgetPin, deleteAccountSettings, deleteForgeProjects, deleteForgeProjectsOwnedBy, type ForgeOwner, releaseBudgetPins } from './forge-db';
 
 export type ForgeRole = 'NovelForgeCurator' | 'NovelForgeAdmin';
 
@@ -102,14 +90,9 @@ export interface ForgeHarness {
   identity(actor: ForgeActor): Promise<APIRequestContext>;
   /** Removes a project the test created for an owner the harness does not track (a seeded persona) after the test. */
   trackProject(projectId: string): void;
-  /** The server's AI quota window, read once per worker through this test's first actor — creating a `quota-reader` actor when there is none. */
-  quotaLimits(): Promise<QuotaLimits>;
-  /** The server's AI backend, read once per worker through this test's first actor, as `quotaLimits` is. */
-  aiBackend(): Promise<AiBackend>;
   /**
-   * Stands the project's owner — an actor or bot this harness created, never anyone else — at the AI_008 call ceiling for the rest of the
-   * test, and tracks the project for teardown. The default guard before any model-capable request; it may create a `quota-reader` actor.
-   * On Synapse the ceiling is the owner's Synapse budget, on legacy novel-forge's own window (see `forge-db.ts`).
+   * Stands the project's owner — an actor or bot this harness created, never anyone else — at its Synapse budget's call ceiling (AI_008) for
+   * the rest of the test, and tracks the project for teardown. The default guard before any model-capable request (see `forge-db.ts`).
    */
   quotaPin(projectId: string): Promise<void>;
 }
@@ -234,10 +217,6 @@ export const test = base.extend<{ forge: ForgeHarness }>({
       return created;
     };
 
-    const quotaReader = async (): Promise<APIRequestContext> => actors[0]?.ctx ?? (await actor({ label: 'quota-reader' })).ctx;
-    const quotaLimits = (): Promise<QuotaLimits> => readQuotaLimits(quotaReader);
-    const aiBackend = (): Promise<AiBackend> => readAiBackend(quotaReader);
-
     const team = async (label = 'team'): Promise<ForgeTeam> => {
       allowThrottling();
       const owner = await createIdentityUser({ label: `forge-${label}-owner` });
@@ -276,13 +255,9 @@ export const test = base.extend<{ forge: ForgeHarness }>({
       trackProject: projectId => {
         projects.push(projectId);
       },
-      quotaLimits,
-      aiBackend,
       quotaPin: async projectId => {
         const owners: ForgeOwner[] = [...users.map(user => ({ kind: 'user' as const, id: user.userId })), ...bots.map(created => ({ kind: 'bot' as const, id: created.botId }))];
-        const ownerCtx = (owner: ForgeOwner): APIRequestContext | undefined => actors.find(candidate => owner.kind === 'user' && candidate.owner.id === owner.id)?.ctx;
-        if ((await aiBackend()) === 'synapse') await budgetPin(projectId, owners);
-        else await quotaPin(projectId, await quotaLimits(), { owners, reader: quotaReader, ownerCtx });
+        await budgetPin(projectId, owners);
         projects.push(projectId);
       },
     });

@@ -1,11 +1,6 @@
-import { Logger } from '@shadow-library/common';
-
-import { AppErrorCode } from '@server/classes';
-import { APP_NAME } from '@server/constants';
-
 import { type ForgeCallPolicy, type PluginPolicyService, type PolicyCall } from '../plugins/plugin-policy.service';
-import { type AiRole, isUnrestrictedAllowed } from './defaults';
-import { type ModelRouterService, type ProjectConfig } from './model-router.service';
+import { type AiRole } from './defaults';
+import { type ProjectConfig } from './model-router.service';
 
 export interface RoutedCall extends PolicyCall {
   role: AiRole;
@@ -18,16 +13,10 @@ export interface CallRoute {
 
 export interface UnrestrictedRouteDeps {
   pluginPolicy: Pick<PluginPolicyService, 'resolve'>;
-  modelRouter: Pick<ModelRouterService, 'resolveModel'>;
 }
 
-const logger = Logger.getLogger(APP_NAME, 'unrestricted-route');
-
+/** Isolation holds only while Synapse's catalog defines a `content_mode: unrestricted` route for every tier: one it lacks falls to the task's default. */
 export async function resolveUnrestrictedRoute(deps: UnrestrictedRouteDeps, projectId: bigint, call: RoutedCall, project: ProjectConfig | undefined): Promise<CallRoute> {
   const policy = await deps.pluginPolicy.resolve(projectId, call, { contentMode: 'unrestricted' });
-  const routed: ProjectConfig = { ...project, contentMode: 'unrestricted' };
-  const resolved = deps.modelRouter.resolveModel(call.role, routed, policy);
-  if (isUnrestrictedAllowed(call.role, resolved)) return { policy, project: routed };
-  logger.warn('unrestricted route resolved a model off the allowlist — refusing the call', { projectId, role: call.role, model: resolved.model });
-  throw AppErrorCode.AI_003.create();
+  return { policy, project: { ...project, contentMode: 'unrestricted' } };
 }

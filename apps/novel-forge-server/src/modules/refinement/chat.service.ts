@@ -5,7 +5,6 @@ import { and, asc, desc, eq, gt, inArray, isNull, lt, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger, OffsetPaginationResult, utils } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
-import { LEGACY_SLUG_ALIAS } from '@shadow-library/synapse';
 
 import { AppErrorCode } from '@server/classes';
 import { PROGRESS_ITEM_KEYS } from '@server/common';
@@ -14,9 +13,7 @@ import { type PrimaryDatabase, type PrimaryTransaction, type Project, type Refin
 
 import { CHAT_HISTORY_BUDGET, ContextAssembler } from '../ai/context/context-assembler.service';
 import { countTokens } from '../ai/context/token-budget';
-import { isSynapseBackend } from '../ai/ai-backend';
-import { isRegisteredModel, type ResolvedModel } from '../ai/defaults';
-import { gatewaySessionKey, keepsGatewaySession } from '../ai/gateway-session';
+import { type ResolvedModel } from '../ai/defaults';
 import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { hardLineError, screenTexts } from '../ai/hard-line';
 import { type ModelRoute, ModelRouterService, type ProjectConfig } from '../ai/model-router.service';
@@ -24,7 +21,7 @@ import { buildChatRefinePrompt, chatPromptTokens, chatScopeInstructions, HUB_ALL
 import { RetrievalService } from '../ai/retrieval';
 import { type ChatRefineOutput, type ChatTitleOutput } from '../ai/schemas';
 import { NovelForgeCatalogService } from '../ai/novel-forge-catalog.service';
-import { SYNAPSE_CHAT_TASK, SYNAPSE_PROVIDER, synapseAlias, synapseSelectors } from '../ai/synapse-request';
+import { gatewaySessionKey, SYNAPSE_CHAT_TASK, SYNAPSE_PROVIDER, synapseAlias, synapseSelectors } from '../ai/synapse-request';
 import { type ToolContext, ToolRegistryService } from '../ai/tools';
 import { resolveUnrestrictedRoute } from '../ai/unrestricted-route';
 import { type WebLookups, type WebMode, WebResearchService } from '../ai/web';
@@ -39,16 +36,7 @@ import { ChatCompactionService, type ChatConversation } from './chat-compaction.
 import { contextUpdate, playbookDigest, toExchangeMessage } from './chat-exchange';
 import { type ChatTurnEmitter, EmitterRelay } from './chat-turn-emitter';
 import { TurnTraceCollector } from './chat-turn-trace';
-import {
-  aliasRoutedProject,
-  CHAT_TURN_GRAPH,
-  chatRoutedProject,
-  type ChatSelection,
-  chatSelection,
-  type ChatSelectionOverride,
-  loadTurnSelections,
-  withChatModel,
-} from './chat-selection';
+import { aliasRoutedProject, CHAT_TURN_GRAPH, type ChatSelection, chatSelection, type ChatSelectionOverride, loadTurnSelections } from './chat-selection';
 import { sanitizeChatQuestion } from './chat-question';
 import { loadRejectedIdeas } from './idea-rejections';
 import { requestedNegations } from './negation-echo';
@@ -93,7 +81,7 @@ export interface SessionModelUpdate {
   costTier?: Project.CostTier | null;
 }
 
-/** What a Synapse reply records when no response named its model, as a call that never answered records itself: never the registry's slug. */
+/** What a reply records when no response named its model, as a call that never answered records itself. */
 const UNANSWERED_CHAT: ResolvedModel = { provider: SYNAPSE_PROVIDER, model: SYNAPSE_CHAT_TASK };
 
 interface SessionPin {
@@ -347,21 +335,13 @@ export class ChatService {
     if (update.costTier !== undefined) set.costTier = update.costTier;
     if (update.provider !== undefined || update.model !== undefined) {
       const pin = { provider: update.provider ?? null, model: update.model ?? null };
-      // Clearing (both null) restores the cost tier's model and clears both backends' pins, so the alias backfill cannot bring the old slug back.
-      if (pin.provider === null && pin.model === null) Object.assign(set, { modelProvider: null, modelId: null, aliasKey: null });
-      else if (isSynapseBackend()) Object.assign(set, { modelProvider: null, modelId: null, aliasKey: await this.offeredAlias(projectId, { ...session, ...set }, pin) });
-      else Object.assign(set, this.registryPin(pin));
+      // The registry slug columns are cleared on every pin change, so the alias backfill cannot bring an old slug back.
+      const aliasKey = pin.provider === null && pin.model === null ? null : await this.offeredAlias(projectId, { ...session, ...set }, pin);
+      Object.assign(set, { modelProvider: null, modelId: null, aliasKey });
     }
     const [updated] = await this.db.update(schema.chatSessions).set(set).where(eq(schema.chatSessions.id, session.id)).returning();
     if (!updated) throw AppErrorCode.CHT_001.create();
     return updated;
-  }
-
-  // A pin must name a registry model with the matching provider, regardless of contentMode, so a raw pick never reaches the platform key. Its
-  // alias is kept in step, so the chat stays pinned to the same family if the backend moves to Synapse.
-  private registryPin({ provider, model }: SessionPin): Pick<Refinement.ChatSession, 'modelProvider' | 'modelId' | 'aliasKey'> {
-    if (!provider || !model || !isRegisteredModel('chat', { provider, model })) throw AppErrorCode.AI_002.create();
-    return { modelProvider: provider, modelId: model, aliasKey: LEGACY_SLUG_ALIAS[model] ?? null };
   }
 
   /** An alias pin must be one the catalog offers this chat's chat task under the model type and cost tier the chat will have after this update. */
@@ -505,10 +485,10 @@ export class ChatService {
     const prompt = buildChatRefinePrompt(session.scopeType, { proseEdits, organiseNotes: organiseRequest });
     const guarded = (output: ChatRefineOutput): ChatRefineOutput => withLaterPlansRouted(withheldProse(output, proseEdits), organise);
     const turnRules = renderTurnRules({ proseEdits, justDiscussing, organiseNotes: organiseRequest, mode: session.mode });
-    const webMode = await this.webResearch.modeFor(route.resolved.model, synapseSelectors(route), synapseAlias('chat', routed));
+    const webMode = await this.webResearch.modeFor(synapseSelectors(route), synapseAlias('chat', routed));
     const scopeInstructions = chatScopeInstructions(this.toolRegistry.getRaw(CHAT_HUB_NODE, webMode), webMode);
     const playbook = playbookDigest(scopeInstructions);
-    const keyed = route.contentMode === 'standard' && keepsGatewaySession(route.resolved.model);
+    const keyed = route.contentMode === 'standard';
     const conversation = keyed
       ? await this.compaction.continueConversation(session, project, playbook)
       : plainConversation(await this.compaction.buildHistory(session, project, route.contentMode));
@@ -520,10 +500,6 @@ export class ChatService {
     const stableContext = conversation.segment?.stableContext ?? pack.renderedStable;
     const turnParts = { volatileContext: context?.text ?? (pack.renderedVolatile || 'nothing'), turnRules, userMessage: message };
 
-    // Pinned as the chat model so every round of this turn — lookups and repairs included — lands on the model recorded on the reply. On Synapse
-    // the reply records the model its last answered call names instead, since the routes and the alias pick it there.
-    const resolvedModel = route.resolved;
-    const effectiveProject = withChatModel(routed, resolvedModel);
     const selection: ChatSelection = { contentMode: route.contentMode, costTier: route.costTier };
     const relay = emitter ? new EmitterRelay(emitter, err => this.logger.warn('chat turn emitter failed — running the turn unobserved', { projectId, sessionId, err })) : null;
     const streamHandlers = relay ? trace.observe(relay.streamHandlers) : undefined;
@@ -565,8 +541,8 @@ export class ChatService {
       const invoke = async (): Promise<ChatRefineOutput> => {
         const input = { scopeInstructions, stableContext, history: conversation.history, ...turnParts, rounds: [...rounds] };
         const output = streamHandlers
-          ? await this.modelRouter.streamStructured(prompt, input, ctx, streamHandlers, effectiveProject, policy)
-          : await this.modelRouter.structured(prompt, input, ctx, effectiveProject, policy);
+          ? await this.modelRouter.streamStructured(prompt, input, ctx, streamHandlers, routed, policy)
+          : await this.modelRouter.structured(prompt, input, ctx, routed, policy);
         settled = rounds.length;
         return output as ChatRefineOutput;
       };
@@ -617,7 +593,7 @@ export class ChatService {
         sections: context.sections,
         messages: [{ role: 'user', content: renderTurnMessage(turnParts) }, ...rounds.slice(0, settled).map(toExchangeMessage)],
       };
-      const model = answered ?? (isSynapseBackend() ? UNANSWERED_CHAT : resolvedModel);
+      const model = answered ?? UNANSWERED_CHAT;
       const persisted = await this.persistAssistantTurn(projectId, session, userMessage, output, runId, { model, exchange }, turnWarnings, staging, trace);
       return { ...persisted, assistantMessage: { ...persisted.assistantMessage, ...selection } };
     });
@@ -733,17 +709,15 @@ export class ChatService {
   }
 
   /**
-   * Routes the reply under the turn's selection: the chat's own model pin, then the tier map. An unrestricted
-   * reply goes through the unrestricted route, which refuses rather than fall back to standard.
+   * Routes the reply under the turn's selection: the chat's own model pin, then the tier's route. An unrestricted reply goes through the
+   * unrestricted route, which reaches an unrestricted model only where the catalog routes `content_mode: unrestricted` for the tier.
    */
   private async routeChatReply(projectId: bigint, session: Refinement.ChatSession, project: ProjectConfig | undefined, selection: ChatSelection): Promise<ChatReplyRoute> {
     const call = { role: 'chat' as const };
-    const base = isSynapseBackend()
-      ? aliasRoutedProject(project, session, selection, await this.catalog?.offeredChatAliases(selection))
-      : chatRoutedProject(project, session, selection);
+    const base = aliasRoutedProject(project, session, selection, await this.catalog?.offeredChatAliases(selection));
     const { policy, project: routed } =
       selection.contentMode === 'unrestricted'
-        ? await resolveUnrestrictedRoute({ pluginPolicy: this.pluginPolicy, modelRouter: this.modelRouter }, projectId, call, base)
+        ? await resolveUnrestrictedRoute({ pluginPolicy: this.pluginPolicy }, projectId, call, base)
         : { policy: await this.pluginPolicy.resolve(projectId, call, { contentMode: 'standard' }), project: base };
     const route = this.modelRouter.routeModel(call.role, routed ?? base, policy);
     return { policy, project: routed ?? base, route };

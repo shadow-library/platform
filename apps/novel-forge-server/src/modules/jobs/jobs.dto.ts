@@ -37,7 +37,7 @@ export class JobUsageResponse {
   @Field({ description: 'Recorded cost plus the list-price estimate for calls that recorded none.' })
   costUsd: number;
 
-  @Field({ description: 'The part of costUsd estimated from registry list prices because the call recorded no cost.' })
+  @Field({ description: 'The part of costUsd estimated from list prices because the call recorded no cost.' })
   estimatedCostUsd: number;
 
   @Field(() => [JobCostSourceItem])

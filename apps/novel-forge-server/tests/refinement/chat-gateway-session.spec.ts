@@ -2,7 +2,6 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { type BaseMessage } from '@langchain/core/messages';
 import { Config } from '@shadow-library/common';
-import { type RestoreConfig, setConfig } from '@shadow-library/common/testing';
 import { z } from 'zod';
 
 import { schema } from '@server/database';
@@ -12,8 +11,10 @@ import { ModelRouterService } from '@modules/ai/model-router.service';
 import { ChatCompactionService } from '@modules/refinement/chat-compaction.service';
 import { ChatService } from '@modules/refinement/chat.service';
 
+import { FakeSynapse } from '../ai/synapse-fakes';
+
 const cache = (Config as unknown as { cache: Map<string, unknown> })['cache'];
-const CONFIG = { 'app.stage': 'dev', 'ai.openrouter.api.url': 'http://host.docker.internal:8318/v1', 'ai.openrouter.api.key': 'test-key', 'ai.model-override': undefined };
+const CONFIG = { 'app.stage': 'dev' };
 const saved = new Map(Object.keys(CONFIG).map(key => [key, cache.get(key)]));
 
 beforeAll(() => Object.entries(CONFIG).forEach(([key, value]) => cache.set(key, value)));
@@ -123,14 +124,13 @@ function harness(outputs: Record<string, unknown[]>, webMode = 'off', served?: {
     setParentRun: async () => undefined,
   };
   const calls: Call[] = [];
-  const modelRouter = new ModelRouterService({} as never, databaseService, { enforce: async () => undefined } as never);
+  const modelRouter = new ModelRouterService({} as never, databaseService, new FakeSynapse().client);
   const client = (role: string | undefined, opts: ClientOptions) => ({
     invoke: async (messages: BaseMessage[]) => {
       calls.push({ role, session: opts.session, webTools: opts.webTools, alias: opts.alias, messages });
       return { content: JSON.stringify(outputs[role ?? '']?.shift()), response_metadata: served ? { synapse: { ...served, task: `novel-forge.${role}` } } : {} };
     },
   });
-  (modelRouter as unknown as Record<string, unknown>)['buildClient'] = (_resolved: unknown, opts: ClientOptions & { role?: string }) => client(opts.role, opts);
   (modelRouter as unknown as Record<string, unknown>)['buildSynapseClient'] = (role: string, _route: unknown, opts: ClientOptions) => client(role, opts);
   const pluginPolicy = { resolve: async () => ({ writerClass: 'standard', raised: false, plugins: [], systemMessages: [] }) };
   const compaction = new ChatCompactionService(databaseService, modelRouter, workflowRunService as never, pluginPolicy as never);
@@ -299,15 +299,7 @@ describe('ChatService.turn — gateway session', () => {
   });
 });
 
-describe('ChatService.turn — Synapse session', () => {
-  let restore: RestoreConfig;
-
-  beforeAll(() => {
-    restore = setConfig({ 'ai.backend': 'synapse' });
-  });
-
-  afterAll(() => restore());
-
+describe('ChatService.turn — the pin and the answering model', () => {
   it('should key a standard chat pinned to an alias too, replaying the conversation and sending the pin as its alias', async () => {
     const run = harness({ chat: [{ reply: 'Under the stairs.' }, { reply: 'At dawn.' }], title: [{ title: 'The ledger' }] });
     Object.assign(run.session, { modelProvider: 'openrouter', modelId: 'anthropic/claude-opus-5', aliasKey: 'gpt-sol' });
@@ -321,7 +313,7 @@ describe('ChatService.turn — Synapse session', () => {
     expect(resumes(wire((first as Call).messages), wire((next as Call).messages))).toBe(true);
   });
 
-  it('should record on the reply the model Synapse says answered, not the slug the tier map holds', async () => {
+  it('should record on the reply the model Synapse says answered', async () => {
     const run = harness({ chat: [{ reply: 'Under the stairs.' }], title: [{ title: 'The ledger' }] }, 'off', { provider: 'subscription', model: 'claude-opus-5.5' });
 
     await run.service.turn(1n, 'session-1', 'Where does Mara hide the ledger?');
@@ -337,7 +329,7 @@ describe('ChatService.turn — Synapse session', () => {
     expect(run.rows.find(row => row['role'] === 'assistant')).toMatchObject({ modelProvider: 'synapse', modelId: 'novel-forge.chat' });
   });
 
-  it('should leave an unpinned chat to Synapse’s routes, though the turn holds the tier default as its chat model', async () => {
+  it('should leave an unpinned chat to Synapse’s routes', async () => {
     const run = harness({ chat: [{ reply: 'Noted.' }], title: [{ title: 'Noted' }] });
 
     await run.service.turn(1n, 'session-1', 'Mara keeps the lighthouse.');

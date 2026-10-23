@@ -100,7 +100,7 @@ test.describe('novel-forge chat sessions', () => {
       await mutate(owner.ctx, 'patch', `/api/v1/projects/${projectId}/chat/sessions/${sessionId}/model`, { data: { provider: 'openrouter', model: 'e2e/unregistered' } }),
       400,
       'AI_002',
-      'pinning a registry slug, which only the legacy backend accepts',
+      'pinning a registry slug, which is not a Synapse alias',
     );
 
     const pinned = await mutate(owner.ctx, 'patch', `/api/v1/projects/${projectId}/chat/sessions/${sessionId}/model`, { data: HAIKU_ALIAS });

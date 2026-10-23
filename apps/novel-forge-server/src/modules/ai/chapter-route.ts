@@ -46,7 +46,7 @@ export function chapterContainment(mode: Project.ContentMode, policy: Pick<Forge
   return mode === 'unrestricted' || policy.raised ? { generator: 'unrestricted', isolated: true } : {};
 }
 
-/** For a call made without a plugin policy; the router's unrestricted branch confines it to the allowlist. */
+/** For a call made without a plugin policy; an unrestricted one reaches an unrestricted model only where the catalog routes that tier's `content_mode: unrestricted`. */
 export function chapterProjectConfig(project: ProjectConfig | undefined, mode: Project.ContentMode): ProjectConfig {
   return { ...project, contentMode: mode };
 }
@@ -63,8 +63,9 @@ export interface ChapterCall {
 }
 
 /**
- * The unrestricted branch never falls back: an off-allowlist model refuses the call (AI_003). The standard branch pins the project's mode to
- * standard, so an author who set one chapter of a dark book back to Standard gets standard models, while a plugin may still raise the call.
+ * The unrestricted branch sends `content_mode: unrestricted`, which isolates only where the catalog routes it for the tier. The standard branch
+ * pins the project's mode to standard, so an author who set one chapter of a dark book back to Standard gets standard models, while a plugin may
+ * still raise the call.
  */
 export async function routeChapterCall(deps: ChapterRouteDeps, projectId: bigint, call: ChapterCall, project: ProjectConfig | undefined): Promise<CallRoute> {
   const policyCall = { role: CHAPTER_ROUTE_TABLE[call.role], chapter: call.chapter };

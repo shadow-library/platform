@@ -2,7 +2,6 @@ import { describe, expect, it } from 'bun:test';
 
 import { type SQL } from 'drizzle-orm';
 
-import { UNRESTRICTED_DEFAULTS } from '@modules/ai/defaults';
 import { stageIsolatedContinuity } from '@modules/ai/graphs/chapter-finalization.graph';
 import { ISOLATED_EXTRACTION_NOTE, WALLED_OFF_EXCERPT } from '@modules/ai/isolation-read-policy';
 
@@ -29,7 +28,6 @@ function staging(extract: () => Promise<unknown> = async () => ({ relationships:
       calls.push({ contextPack: input.contextPack, contentMode: project?.contentMode });
       return extract();
     },
-    resolveModel: () => UNRESTRICTED_DEFAULTS.continuity,
   };
   const run = () => stageIsolatedContinuity({ db: db as never, modelRouter: modelRouter as never }, { projectId: 7n, chapter: 4, prose: MARKER, contextPack: 'ROSTER' }, CTX);
   return { run, calls, upserts };

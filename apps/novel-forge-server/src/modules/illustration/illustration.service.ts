@@ -168,7 +168,6 @@ export class IllustrationService {
     const resolved = await this.referenceService
       .resolve({
         projectId,
-        project,
         subjectType,
         subjectKey,
         attached: attachedReferences,
@@ -230,7 +229,6 @@ export class IllustrationService {
     const resolved = await this.referenceService
       .resolve({
         projectId,
-        project,
         subjectType: row.subjectType,
         subjectKey: row.subjectKey,
         attached: [],
@@ -279,7 +277,6 @@ export class IllustrationService {
 
     const resolved = await this.referenceService.resolve({
       projectId,
-      project,
       subjectType: row.subjectType,
       subjectKey: row.subjectKey,
       attached: requested.filter(request => !isStored(request)),
@@ -303,9 +300,9 @@ export class IllustrationService {
 
   async referenceOptions(projectId: bigint, query: ReferenceOptionsRequest): Promise<ReferenceOptions> {
     const subjectKey = this.normalizeSubjectKey(query.subjectType, query.subjectKey);
-    const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
+    const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId), columns: { id: true } });
     if (!project) throw AppErrorCode.PRJ_001.create();
-    return this.referenceService.options({ projectId, project, subjectType: query.subjectType, subjectKey, limit: query.limit ?? DEFAULT_REFERENCE_OPTIONS_LIMIT });
+    return this.referenceService.options({ projectId, subjectType: query.subjectType, subjectKey, limit: query.limit ?? DEFAULT_REFERENCE_OPTIONS_LIMIT });
   }
 
   async select(projectId: bigint, illustrationId: bigint, ref: string): Promise<PresentedIllustration> {

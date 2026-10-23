@@ -7,9 +7,8 @@ import { APP_NAME } from '@server/constants';
 import { type Project } from '@server/database';
 
 import { type AiModelLabel, type AiModelOption, type AiModelsResponse, type AiRoleDefault } from './ai.dto';
-import { isSynapseBackend } from './ai-backend';
 import { CONTENT_MODES, COST_TIERS, DEFAULT_COST_TIER, SELECTABLE_MODEL_GROUPS, type SelectableModelGroup } from './defaults';
-import { MODEL_REGISTRY } from './models';
+import { HISTORICAL_MODELS } from './historical-models';
 import { fromSynapseFailure } from './synapse-failure';
 import { SYNAPSE_CHAT_TASK, SYNAPSE_PROVIDER, synapseGroupTask, synapseSelectors } from './synapse-request';
 
@@ -42,7 +41,7 @@ interface SelectionView extends CatalogSelection {
 
 export const CATALOG_SELECTIONS: readonly CatalogSelection[] = COST_TIERS.flatMap(costTier => CONTENT_MODES.map(contentMode => ({ costTier, contentMode })));
 
-/** An image model is priced per image, so it carries no per-token price, as the registry's image entries never did. */
+/** An image model is priced per image, so it carries no per-token price. */
 export function tokenPrices({ price }: Pick<CatalogModelView, 'price'>): Pick<CatalogPricedModel, 'inputPricePerMToken' | 'outputPricePerMToken'> {
   if (price.perImage !== undefined) return {};
   return { inputPricePerMToken: price.input, outputPricePerMToken: price.output };
@@ -73,21 +72,16 @@ function chatAliasesOf(view: CatalogAppResponse): readonly CatalogAliasView[] {
   return view.tasks[SYNAPSE_CHAT_TASK]?.aliases ?? [];
 }
 
-function registryLabels(): AiModelLabel[] {
-  return MODEL_REGISTRY.map(entry => ({
-    model: entry.id,
-    label: entry.kind === 'embedding' ? entry.id : entry.label,
-    ...(entry.inputPricePerMToken !== undefined && { inputPricePerMToken: entry.inputPricePerMToken }),
-    ...(entry.outputPricePerMToken !== undefined && { outputPricePerMToken: entry.outputPricePerMToken }),
-  }));
+function historicalLabels(): AiModelLabel[] {
+  return Object.entries(HISTORICAL_MODELS).map(([model, entry]) => ({ model, ...entry }));
 }
 
 /**
- * Names for every model key a record may hold: the registry's for rows written before Synapse, then each alias's for its target, then the
+ * Names for every model key a record may hold: the historical name for rows written before Synapse, then each alias's for its target, then the
  * model's own label wherever a task routes to it, which wins because it is the label Synapse gives a call no alias chose.
  */
 export function catalogModelLabels(views: readonly CatalogAppResponse[]): AiModelLabel[] {
-  const labels = new Map(registryLabels().map(entry => [entry.model, entry]));
+  const labels = new Map(historicalLabels().map(entry => [entry.model, entry]));
   const tasks = views.flatMap(view => Object.values(view.tasks));
   const aliases = tasks.flatMap(task => task.aliases);
   for (const alias of aliases) if (!labels.has(alias.model)) labels.set(alias.model, { model: alias.model, label: alias.label, ...tokenPrices(alias) });
@@ -118,12 +112,12 @@ export function labelMap(labels: readonly AiModelLabel[]): ReadonlyMap<string, s
   return new Map(labels.map(entry => [entry.model, entry.label]));
 }
 
-/** What novel-forge reads from Synapse's catalog on the Synapse backend: every model list, label, price and pinnable alias. */
+/** What novel-forge reads from Synapse's catalog: every model list, label, price and pinnable alias. */
 @Injectable()
 export class NovelForgeCatalogService {
   private readonly logger = Logger.getLogger(APP_NAME, NovelForgeCatalogService.name);
 
-  constructor(private readonly synapse?: SynapseClient) {}
+  constructor(private readonly synapse: SynapseClient) {}
 
   async chatTask(selection: CatalogSelection): Promise<CatalogTaskResponse> {
     return this.read(client => client.catalog({ task: SYNAPSE_CHAT_TASK, selectors: synapseSelectors(selection) }));
@@ -156,14 +150,13 @@ export class NovelForgeCatalogService {
     }
   }
 
-  /** Never fails: a record whose model the catalog cannot name keeps its key, and an unreadable catalog leaves the registry's names alone. */
+  /** Never fails: a record whose model the catalog cannot name keeps its key, and an unreadable catalog leaves only the historical names. */
   async modelLabels(): Promise<ReadonlyMap<string, string>> {
-    if (!isSynapseBackend()) return labelMap(registryLabels());
     try {
       return labelMap(catalogModelLabels(await Promise.all(CATALOG_SELECTIONS.map(selection => this.appView(selection)))));
     } catch (err) {
-      this.logger.warn('Synapse catalog unreadable, so recorded models keep their registry names or keys', { err });
-      return labelMap(registryLabels());
+      this.logger.warn('Synapse catalog unreadable, so recorded models keep their historical names or keys', { err });
+      return labelMap(historicalLabels());
     }
   }
 
@@ -172,7 +165,6 @@ export class NovelForgeCatalogService {
   }
 
   private async read<T extends CatalogTaskView | CatalogAppResponse>(call: (client: SynapseClient) => Promise<T>): Promise<T> {
-    if (!this.synapse) throw AppErrorCode.AI_007.create({ transient: true });
     try {
       return await call(this.synapse);
     } catch (err) {

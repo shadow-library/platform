@@ -8,7 +8,6 @@ import { isDepictedBy } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type Illustration, type PrimaryDatabase, schema } from '@server/database';
 
-import { ModelRouterService, type ProjectConfig } from '../ai/model-router.service';
 import { type WriterDisclosurePolicy } from '../bible/fact/writer-disclosure-policy';
 
 export type ReferenceRequest = Illustration.AttachedReference;
@@ -17,7 +16,6 @@ export type ReferenceLoadMode = 'bytes' | 'metadata';
 
 export interface ResolveReferencesInput {
   projectId: bigint;
-  project?: ProjectConfig;
   subjectType: Illustration.SubjectType;
   subjectKey: string | null;
   /** Attached by this request: an unresolvable, unreadable or over-capacity entry is an error. */
@@ -64,7 +62,6 @@ export interface ReferenceSummary {
 
 export interface ReferenceOptionsInput {
   projectId: bigint;
-  project?: ProjectConfig;
   subjectType: Illustration.SubjectType;
   subjectKey: string | null;
   /** Upper bound on each group. */
@@ -122,6 +119,10 @@ export const MAX_REFERENCE_BYTES = 4 * 1024 * 1024;
 export const MAX_REFERENCE_REQUEST_BYTES = 8 * 1024 * 1024;
 export const MAX_CHAPTER_CAST_REFERENCES = 3;
 
+// Synapse's catalog carries no per-model reference limit and refuses references only past its own request cap (`AI_010`); the image model its
+// catalog is seeded with honours one.
+export const IMAGE_REFERENCE_CAPACITY = 1;
+
 const REFERENCE_CONTENT_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
 const BIGINT_MAX = 2n ** 63n - 1n;
 const ENTITY_PORTRAIT_REASON = 'auto:entity-portrait';
@@ -138,13 +139,12 @@ export class IllustrationReferenceService {
   constructor(
     databaseService: DatabaseService,
     private readonly storage: StorageService,
-    private readonly modelRouter: ModelRouterService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
 
   async resolve(input: ResolveReferencesInput): Promise<ResolvedReferences> {
-    const capacity = this.modelRouter.referenceCapacity(input.project);
+    const capacity = IMAGE_REFERENCE_CAPACITY;
     const warnings: ReferenceWarning[] = [];
     const attached = await this.attachedReferences(input, warnings);
     const count = attached.length + (input.editSourceRef ? 1 : 0);

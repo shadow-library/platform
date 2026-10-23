@@ -3,7 +3,6 @@ import { type SQL } from 'drizzle-orm';
 import { PgDialect } from 'drizzle-orm/pg-core';
 
 import { scopedCostTier } from '@modules/ai/cost-tier-scope';
-import { PRODUCTION_DEFAULTS, type ResolvedModel, UNRESTRICTED_DEFAULTS } from '@modules/ai/defaults';
 import { ChapterReviewService } from '@modules/review/chapter-review.service';
 import { AppErrorCode } from '@server/classes';
 import { type Review, schema } from '@server/database';
@@ -51,7 +50,6 @@ export interface ReviewFakeOptions {
   /** An autosave folds new text into the revision while the model reads it: same revision, next save sequence. */
   foldWhileReading?: boolean;
   /** The model the unrestricted route resolves, to try one off the allowlist. */
-  unrestrictedModel?: ResolvedModel;
   /** The writer's required material is over its limits, so an enforcing pack request fails. */
   overCaps?: boolean;
   /** What the run's telemetry recorded for its model call. */
@@ -192,12 +190,9 @@ export function reviewHarness(options: ReviewFakeOptions = {}): ReviewHarness {
   const record = (role: string, project: { contentMode?: string } | undefined, prompt: string) =>
     modelCalls.push({ role, contentMode: project?.contentMode, costTier: scopedCostTier(), prompt });
   const judgeAnswer = options.judgeAnswer ?? { verdict: 'consistent', findings: [], readabilityCompliance: { compliant: true, issues: [] } };
-  const routed = (role: string, project?: { contentMode?: string }) =>
-    project?.contentMode === 'unrestricted' ? (options.unrestrictedModel ?? UNRESTRICTED_DEFAULTS[role as 'judge']) : PRODUCTION_DEFAULTS[role as 'judge'];
   const modelRouter = {
-    resolveModel: (role: string, project?: { contentMode?: string }) => routed(role, project),
-    routeModel: (role: string, project?: { contentMode?: string }) => ({
-      resolved: routed(role, project),
+    routeModel: (_role: string, project?: { contentMode?: string }) => ({
+      task: 'novel-forge.review',
       costTier: scopedCostTier() ?? 'balanced',
       contentMode: project?.contentMode === 'unrestricted' ? 'unrestricted' : 'standard',
     }),

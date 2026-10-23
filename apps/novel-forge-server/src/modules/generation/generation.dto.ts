@@ -862,7 +862,7 @@ export class RunModelCallResponse {
   @Field()
   provider: string;
 
-  @Field({ description: 'The model that answered, as recorded: a catalog model on the Synapse backend, its task when no model answered. Named by `GET /ai/models` `modelLabels`.' })
+  @Field({ description: 'The model that answered, as recorded: a catalog model, or its task when no model answered. Named by `GET /ai/models` `modelLabels`.' })
   model: string;
 
   @Field()
@@ -1019,7 +1019,7 @@ export class RunUsageResponse {
   @Field({ description: 'Recorded cost plus the list-price estimate for calls that recorded none.' })
   costUsd: number;
 
-  @Field({ description: 'The part of costUsd estimated from registry list prices because the call recorded no cost.' })
+  @Field({ description: 'The part of costUsd estimated from list prices because the call recorded no cost.' })
   estimatedCostUsd: number;
 
   @Field(() => Integer, { optional: true, nullable: true, description: 'Wall-clock milliseconds from startedAt to endedAt; null while the run is still in progress.' })

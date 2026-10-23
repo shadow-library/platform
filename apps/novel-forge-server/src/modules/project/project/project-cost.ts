@@ -1,7 +1,7 @@
 import { type Ai, type Project } from '@server/database';
 
 import { type AiRole, ROLE_GROUP } from '../../ai/defaults';
-import { MODEL_MAP } from '../../ai/models';
+import { HISTORICAL_MODELS } from '../../ai/historical-models';
 import { classifyRowCost } from '../../ai/quota';
 import { type CostBreakdownItem, type CostResponse } from './project.dto';
 
@@ -85,13 +85,8 @@ export function summarizeByDay(rows: readonly DayCostRow[]): DayCostItem[] {
   return [...byDay.values()].sort((a, b) => a.day.localeCompare(b.day));
 }
 
-function registryLabel(model: string): string | undefined {
-  const entry = MODEL_MAP[model];
-  return entry && 'label' in entry ? entry.label : undefined;
-}
-
 // `byDay` is populated by a separate query and left empty here — a caller that needs it merges in `summarizeByDay`'s result. `labels` names the
-// recorded model keys (`NovelForgeCatalogService.modelLabels`); a key it lacks falls back to the registry's name, then to itself.
+// recorded model keys (`NovelForgeCatalogService.modelLabels`); a key it lacks falls back to its historical name, then to itself.
 export function summarizeCost(rows: readonly CostUsageRow[], labels: ReadonlyMap<string, string> = new Map()): CostResponse {
   const groups: Accumulator = new Map();
   const roles: Accumulator = new Map();
@@ -130,7 +125,7 @@ export function summarizeCost(rows: readonly CostUsageRow[], labels: ReadonlyMap
     const group = costGroupFor(row.role);
     add(groups, group, group, row, costUsd, estimatedPortion);
     add(roles, row.role, row.role, row, costUsd, estimatedPortion);
-    add(models, row.model, labels.get(row.model) ?? registryLabel(row.model) ?? row.model, row, costUsd, estimatedPortion);
+    add(models, row.model, labels.get(row.model) ?? HISTORICAL_MODELS[row.model]?.label ?? row.model, row, costUsd, estimatedPortion);
     // An errored call never gets classified — it recorded no cost at all — so it would otherwise blend into
     // the same 'unknown' bucket as a legitimate pre-classification row; keying it separately keeps that bucket honest.
     const costSourceKey = row.status === 'ok' ? (row.costSource ?? UNKNOWN_KEY) : ERROR_KEY;

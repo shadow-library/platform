@@ -1,5 +1,7 @@
 import { describe, expect, it, mock } from 'bun:test';
 
+import { AppErrorCode } from '@server/classes';
+
 import { AppearanceDescriberService } from '@modules/ai/appearance-describer.service';
 import { appearanceDescribePrompt } from '@modules/ai/prompts/appearance-describe.prompt';
 
@@ -59,12 +61,12 @@ describe('AppearanceDescriberService', () => {
     expect(structuredWithImage).not.toHaveBeenCalled();
   });
 
-  it('should propagate router errors such as an image-incapable model', async () => {
+  it('should propagate router errors such as no vision model for the call', async () => {
     const structuredWithImage = mock(async () => {
-      throw Object.assign(new Error('Model qwen3:8b does not accept image input'), { code: 'AI_011' });
+      throw AppErrorCode.AI_003.create();
     });
     const describer = new AppearanceDescriberService({ structuredWithImage } as never);
 
-    await expect(describer.describe({ projectId: 7n, imageDataUrl: IMAGE, subjectLabel: 'Mira' })).rejects.toMatchObject({ code: 'AI_011' });
+    await expect(describer.describe({ projectId: 7n, imageDataUrl: IMAGE, subjectLabel: 'Mira' })).rejects.toMatchObject({ code: 'AI_003' });
   });
 });

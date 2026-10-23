@@ -3134,16 +3134,16 @@ export interface components {
       unrestrictedAllowlist: string[];
       /** @description The platform model for every cost tier × model type × author-selectable group. Balanced equals `defaults` / `unrestrictedDefaults`. */
       tiers: components['schemas']['AiTierModel'][];
-      /** @description Names for the model keys calls, replies and reviews record, which `models` does not list on the Synapse backend. */
+      /** @description Names for the model keys calls, replies and reviews record, which `models` does not list. */
       modelLabels: components['schemas']['AiModelLabel'][];
     };
-    /** @description A model an author can pin a chat to: a registry model on the legacy backend, a Synapse alias (provider `synapse`) on the Synapse backend. */
+    /** @description A model an author can pin a chat to: a Synapse alias (provider `synapse`). */
     AiModelOption: {
-      /** @description The registry model id, or the Synapse alias key; a chat pin sends it as `model` with this `provider`. */
+      /** @description The Synapse alias key; a chat pin sends it as `model` with this `provider`. */
       id: string;
       /** @description `synapse` for a Synapse alias. */
       provider: string;
-      /** @description The name to show an author — a product name on its own, never a gateway or a slug. The embedding entry, which is never offered, carries its id. */
+      /** @description The name to show an author — a product name on its own, never a gateway or a slug. */
       label: string;
       /** @enum {string} */
       kind: 'llm' | 'embedding' | 'image';
@@ -3157,7 +3157,7 @@ export interface components {
     };
     AiRoleDefault: {
       role: string;
-      /** @description `synapse` on the Synapse backend, where `model` is the catalog model its routes pick. */
+      /** @description `synapse`, where `model` is the catalog model its routes pick. */
       provider: string;
       model: string;
     };
@@ -3166,7 +3166,7 @@ export interface components {
       contentMode: components['schemas']['ContentMode'];
       /** @description Model group: writing, planning, review, chat, helper or image. */
       group: string;
-      /** @description `synapse` on the Synapse backend, where `model` is the catalog model its routes pick. */
+      /** @description `synapse`, where `model` is the catalog model its routes pick. */
       provider: string;
       model: string;
       /** @description The product name to show an author. */
@@ -3191,7 +3191,7 @@ export interface components {
     /** @description Cost, tokens and calls across every novel the signed-in author owns — the same shaping as a single project's cost, plus a per-novel breakdown. */
     AccountUsageResponse: {
       totalCostUsd: number;
-      /** @description The part of `totalCostUsd` estimated from registry list prices because the call recorded no cost. Zero means every figure was recorded. */
+      /** @description The part of `totalCostUsd` estimated from list prices because the call recorded no cost. Zero means every figure was recorded. */
       estimatedCostUsd: number;
       /** @description Spend by calls made in the last 7 days. */
       last7DaysCostUsd: number;
@@ -3222,14 +3222,14 @@ export interface components {
     CostBreakdownItem: {
       /** @description The model group, role, or model id this row aggregates. */
       key: string;
-      /** @description Display name: the registry label for a model, otherwise the key itself. */
+      /** @description Display name: the catalog or historical label for a model, otherwise the key itself. */
       label: string;
       calls: number;
       inputTokens: number;
       outputTokens: number;
       /** @description Recorded cost plus the list-price estimate for calls that recorded none. */
       costUsd: number;
-      /** @description The part of `costUsd` estimated from registry list prices because the call recorded no cost. */
+      /** @description The part of `costUsd` estimated from list prices because the call recorded no cost. */
       estimatedCostUsd: number;
     };
     /** @description Spend on one UTC calendar day. */
@@ -3267,13 +3267,13 @@ export interface components {
       contentMode: components['schemas']['ContentMode'];
       costTier: components['schemas']['CostTier'];
       models: components['schemas']['ProjectModelRoute'][];
-      /** @description The `GET /ai/models` option ids a chat may pin under exactly this model type and cost tier: Synapse alias keys, or registry models on the legacy backend. */
+      /** @description The `GET /ai/models` option ids a chat may pin under exactly this model type and cost tier: Synapse alias keys. */
       chatAliases: string[];
     };
     ProjectModelRoute: {
       /** @description Model group: writing, planning, review, chat, helper or image. */
       group: string;
-      /** @description `synapse` on the Synapse backend, where `model` is the catalog model its routes pick. */
+      /** @description `synapse`, where `model` is the catalog model its routes pick. */
       provider: string;
       model: string;
       /** @description The product name to show an author. */
@@ -3576,7 +3576,7 @@ export interface components {
       outputTokens: number;
       /** @description Recorded cost plus the list-price estimate for calls that recorded none. */
       costUsd: number;
-      /** @description The part of costUsd estimated from registry list prices because the call recorded no cost. */
+      /** @description The part of costUsd estimated from list prices because the call recorded no cost. */
       estimatedCostUsd: number;
       byCostSource: components['schemas']['JobCostSourceItem'][];
     };
@@ -4000,7 +4000,7 @@ export interface components {
       outputTokens: number;
       /** @description Recorded cost plus the list-price estimate for calls that recorded none. */
       costUsd: number;
-      /** @description The part of costUsd estimated from registry list prices because the call recorded no cost. */
+      /** @description The part of costUsd estimated from list prices because the call recorded no cost. */
       estimatedCostUsd: number;
       /** @description Wall-clock milliseconds from startedAt to endedAt; null while the run is still in progress. */
       durationMs?: number | null;
@@ -4047,7 +4047,7 @@ export interface components {
       node?: string | null;
       role: string;
       provider: string;
-      /** @description The model that answered, as recorded: a catalog model on the Synapse backend, its task when no model answered. Named by `GET /ai/models` `modelLabels`. */
+      /** @description The model that answered, as recorded: a catalog model, or its task when no model answered. Named by `GET /ai/models` `modelLabels`. */
       model: string;
       promptKey: string;
       promptVersion: string;
@@ -4156,7 +4156,7 @@ export interface components {
       node?: string | null;
       role: string;
       provider: string;
-      /** @description The model that answered, as recorded: a catalog model on the Synapse backend, its task when no model answered. Named by `GET /ai/models` `modelLabels`. */
+      /** @description The model that answered, as recorded: a catalog model, or its task when no model answered. Named by `GET /ai/models` `modelLabels`. */
       model: string;
       promptKey: string;
       promptVersion: string;
@@ -4715,7 +4715,7 @@ export interface components {
       mode: components['schemas']['ChatMode'];
       /** @description The pinned option's provider: `synapse` for an alias pin. Null when the chat is unpinned. */
       modelProvider?: string | null;
-      /** @description The pinned option's id: a registry model on the legacy backend, an alias key on the Synapse backend. */
+      /** @description The pinned option's id: an alias key. */
       modelId?: string | null;
       /** @description The chat's own model type; null follows the project's content mode. */
       contentMode?: components['schemas']['ContentMode'] | null;
@@ -4758,7 +4758,7 @@ export interface components {
       runId?: string | null;
       /** @description Who served the reply; null on user messages. */
       modelProvider?: string | null;
-      /** @description The model that wrote the reply: its catalog model on the Synapse backend, named by `GET /ai/models` `modelLabels`; null on user messages. */
+      /** @description The model that wrote the reply: its catalog model, named by `GET /ai/models` `modelLabels`; null on user messages. */
       modelId?: string | null;
       /** @description The model type the reply was written under; null on user messages and on replies older than the selection. */
       contentMode?: components['schemas']['ContentMode'] | null;
@@ -4973,7 +4973,7 @@ export interface components {
     UpdateSessionModelBody: {
       /** @description The picked option's provider from `GET /ai/models`: `synapse` for a Synapse alias. Clear both pin fields to use the cost tier's model. */
       provider?: string | null;
-      /** @description The picked option's id: a registry model on the legacy backend, an alias key on the Synapse backend, which must be offered for the chat's model type and cost tier after this update (`AI_022` otherwise). */
+      /** @description The picked option's id: an alias key, which must be offered for the chat's model type and cost tier after this update (`AI_022` otherwise). */
       model?: string | null;
       /** @description This chat's default model type for its replies; chapters keep their own content mode. */
       contentMode?: components['schemas']['ContentMode'] | null;
@@ -6294,7 +6294,7 @@ export interface components {
     };
     CostResponse: {
       totalCostUsd: number;
-      /** @description The part of `totalCostUsd` estimated from registry list prices because the call recorded no cost. Zero means every figure was recorded. */
+      /** @description The part of `totalCostUsd` estimated from list prices because the call recorded no cost. Zero means every figure was recorded. */
       estimatedCostUsd: number;
       /** @description Spend by calls made in the last 7 days. */
       last7DaysCostUsd: number;

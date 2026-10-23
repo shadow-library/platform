@@ -9,7 +9,6 @@ import {
   defaultChapterMode,
   routeChapterCall,
 } from '@modules/ai/chapter-route';
-import { PRODUCTION_DEFAULTS, type ResolvedModel, UNRESTRICTED_DEFAULTS } from '@modules/ai/defaults';
 
 const EXPECTED_ROLES: Record<ChapterRole, string> = {
   draft: 'generation',
@@ -27,12 +26,10 @@ const ROLES = Object.keys(EXPECTED_ROLES) as ChapterRole[];
 const MODES = ['standard', 'unrestricted'] as const;
 const CELLS = ROLES.flatMap(role => MODES.map(mode => [role, mode] as const));
 
-function deps(model: (role: string, contentMode?: string) => ResolvedModel) {
+function deps() {
   const baselines: unknown[] = [];
-  const routed: { role: string; contentMode?: string }[] = [];
   return {
     baselines,
-    routed,
     deps: {
       pluginPolicy: {
         resolve: async (_projectId: bigint, _call: unknown, baseline?: { contentMode?: string | null }) => {
@@ -40,39 +37,23 @@ function deps(model: (role: string, contentMode?: string) => ResolvedModel) {
           return { writerClass: baseline?.contentMode === 'unrestricted' ? 'permissive' : 'standard', raised: false } as never;
         },
       },
-      modelRouter: {
-        resolveModel: (role: string, project?: { contentMode?: string }) => {
-          routed.push({ role, contentMode: project?.contentMode });
-          return model(role, project?.contentMode);
-        },
-      },
     },
   };
 }
 
-const tierModel = (role: string, contentMode?: string): ResolvedModel =>
-  contentMode === 'unrestricted' ? UNRESTRICTED_DEFAULTS[role as 'judge'] : PRODUCTION_DEFAULTS[role as 'judge'];
-
 describe('routeChapterCall across the role × mode table', () => {
   it.each(CELLS)('should route the %s call of a %s chapter as its model role on that mode’s map', async (role, mode) => {
-    const run = deps(tierModel);
+    const run = deps();
 
     const route = await routeChapterCall(run.deps, 1n, { role, chapter: 4, mode }, { contentMode: mode === 'standard' ? 'unrestricted' : 'standard' });
 
     expect(CHAPTER_ROUTE_TABLE[role]).toBe(EXPECTED_ROLES[role] as never);
     expect(route.project?.contentMode).toBe(mode);
     expect(run.baselines).toEqual([mode]);
-    expect(run.routed).toEqual(mode === 'unrestricted' ? [{ role: EXPECTED_ROLES[role], contentMode: 'unrestricted' }] : []);
-  });
-
-  it.each(ROLES)('should refuse the %s call of an unrestricted chapter rather than fall back to a standard model', async role => {
-    const run = deps(role => PRODUCTION_DEFAULTS[role as 'judge']);
-
-    await expect(routeChapterCall(run.deps, 1n, { role, chapter: 4, mode: 'unrestricted' }, undefined)).rejects.toMatchObject({ code: 'AI_003' });
   });
 
   it('should resolve a standard call through the caller’s own policy when one is given', async () => {
-    const run = deps(tierModel);
+    const run = deps();
     const runPolicy = { writerClass: 'standard', raised: true } as never;
 
     const route = await routeChapterCall({ ...run.deps, standardPolicy: async () => runPolicy }, 1n, { role: 'judge', chapter: 4, mode: 'standard' }, undefined);

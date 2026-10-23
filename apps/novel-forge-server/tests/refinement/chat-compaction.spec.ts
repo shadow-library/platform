@@ -2,7 +2,6 @@ import { describe, expect, it } from 'bun:test';
 
 import { schema } from '@server/database';
 
-import { COST_TIER_DEFAULTS } from '@modules/ai/defaults';
 import { type ProjectConfig } from '@modules/ai/model-router.service';
 import { ChatCompactionService, UNRESTRICTED_REPLY_PLACEHOLDER, UNRESTRICTED_SUMMARY_PLACEHOLDER } from '@modules/refinement/chat-compaction.service';
 import { type ChatSelection } from '@modules/refinement/chat-selection';
@@ -48,7 +47,6 @@ function fakeCompaction(scenario: Scenario = {}) {
     },
   };
   const modelRouter = {
-    resolveModel: () => COST_TIER_DEFAULTS.economy.unrestricted.helper,
     structured: async (_prompt: unknown, _input: unknown, _ctx: unknown, project: ProjectConfig, policy: unknown) => {
       calls.push({ project, policy });
       return { summary: 'folded' };

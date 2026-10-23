@@ -103,8 +103,6 @@ class ModelDesk {
     return new Promise(resolve => this.waiting.push({ id, prompt: prompt.key, chapter: Number(ctx.chapter ?? 0), resolve }));
   };
 
-  resolveModel = (): { provider: string; model: string } => ({ provider: 'fake', model: 'deepseek/deepseek-v4-pro' });
-
   get lastIssued(): number {
     return this.issued;
   }

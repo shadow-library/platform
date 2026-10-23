@@ -108,18 +108,14 @@ export class AppErrorCode extends ServerErrorCode {
    * AI Errors
    */
   static readonly AI_001 = AppErrorCode.badRequest('AI_001', 'AI model returned unparseable response');
-  static readonly AI_002 = AppErrorCode.badRequest('AI_002', 'Role or model not in registry, or provider is not supported');
-  static readonly AI_003 = AppErrorCode.badRequest('AI_003', 'Unrestricted projects and unrestricted-generation operations may only use models on the unrestricted allowlist');
-  // User-facing 500s: both are actionable by the operator (set the key / retry), so the detail must not
-  // be swallowed by the internal() mask.
-  static readonly AI_004 = new AppErrorCode('AI_004', 'Image generation is not configured — set AI_OPENROUTER_API_KEY', 500);
+  static readonly AI_002 = AppErrorCode.badRequest('AI_002', 'Role or model is not one this server can route');
+  static readonly AI_003 = AppErrorCode.badRequest('AI_003', 'No model can serve this call under its model type and cost tier');
+  // User-facing 5xx: actionable by the operator, so the detail must not be swallowed by the internal() mask.
   static readonly AI_005 = new AppErrorCode('AI_005', 'Image generation failed — see the model call log', 500);
-  static readonly AI_006 = new AppErrorCode('AI_006', 'AI is not configured — set AI_OPENROUTER_API_KEY', 500);
   static readonly AI_007 = new AppErrorCode('AI_007', 'AI model call failed — see the model call log', 502);
   static readonly AI_008 = AppErrorCode.badRequest('AI_008', 'AI request rate limit reached — too many model calls in the current window, try again shortly', 429);
   static readonly AI_009 = AppErrorCode.badRequest('AI_009', 'AI spend limit reached for this account in the current window — try again later', 429);
-  static readonly AI_010 = AppErrorCode.badRequest('AI_010', 'Model {model} accepts at most {max} reference image(s), but {count} were supplied');
-  static readonly AI_011 = AppErrorCode.badRequest('AI_011', 'Model {model} does not accept image input');
+  static readonly AI_010 = AppErrorCode.badRequest('AI_010', 'The image model cannot take the {count} reference image(s) supplied');
   static readonly AI_012 = AppErrorCode.badRequest('AI_012', 'Appearance description needs the reference image as an inline base64 data: URL');
   static readonly AI_013 = AppErrorCode.conflict('AI_013', 'Workflow run was cancelled');
   static readonly AI_014 = AppErrorCode.badRequest('AI_014', 'Invalid date range — from and to must be valid dates, and from must not be after to');
@@ -129,12 +125,6 @@ export class AppErrorCode extends ServerErrorCode {
     422,
   );
   static readonly AI_016 = AppErrorCode.forbidden('AI_016', 'A bot has no account settings; its projects start on the Balanced cost tier');
-  static readonly AI_017 = new AppErrorCode(
-    'AI_017',
-    'AI_MODEL_OVERRIDE is for local-model test environments — AI_OPENROUTER_API_URL must point at the local model server, not {url}',
-    500,
-  );
-  static readonly AI_018 = new AppErrorCode('AI_018', 'AI usage could not be checked against the quota, so the model call was refused — try again shortly', 503);
   // The web lookups' refusals: the chat model reads their message as the lookup's result, so each says what to do instead.
   static readonly AI_019 = new AppErrorCode('AI_019', 'Web search is not configured — set AI_WEB_SEARCH_BRAVE_API_KEY', 500);
   static readonly AI_020 = new AppErrorCode('AI_020', 'Web search failed: {reason}', 502);

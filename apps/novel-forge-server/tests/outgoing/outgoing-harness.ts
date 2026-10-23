@@ -12,6 +12,7 @@ import { IllustrationService } from '@modules/illustration/illustration.service'
 import { WriterPreviewService } from '@modules/refinement/writer-preview.service';
 import { type WriterSnapshotMessage } from '@server/database/schemas';
 
+import { FakeSynapse } from '../ai/synapse-fakes';
 import { draftRow, fakeGenerationDb, makeGenerationService } from '../generation/generation-fixtures';
 import { PROJECT_ID, type WorldDb, worldDb, type WorldSpec, worldTables } from './outgoing-world';
 
@@ -70,15 +71,18 @@ interface Capture {
 
 function capturingRouter(): Capture {
   const wire: BaseMessage[][] = [];
-  const db = { query: { llmCache: { findFirst: async () => undefined } }, insert: () => ({ values: () => ({ onConflictDoNothing: () => Promise.resolve() }) }) };
-  const router = new ModelRouterService({} as never, { getPostgresClient: () => db } as never, { enforce: async () => undefined } as never);
+  const db = {
+    query: { llmCache: { findFirst: async () => undefined }, projects: { findFirst: async () => undefined } },
+    insert: () => ({ values: () => ({ onConflictDoNothing: () => Promise.resolve() }) }),
+  };
+  const router = new ModelRouterService({} as never, { getPostgresClient: () => db } as never, new FakeSynapse().client);
   let promptKey = '';
   const structured = router.structured.bind(router);
   router.structured = (prompt, ...rest) => {
     promptKey = prompt.key;
     return structured(prompt, ...rest);
   };
-  (router as unknown as Record<string, unknown>)['buildClient'] = () => ({
+  (router as unknown as Record<string, unknown>)['buildSynapseClient'] = () => ({
     invoke: async (messages: BaseMessage[]) => {
       wire.push(messages);
       return { content: JSON.stringify(ANSWERS[promptKey] ?? {}) };

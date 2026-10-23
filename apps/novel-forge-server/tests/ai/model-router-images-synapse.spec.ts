@@ -4,7 +4,6 @@ import { type RestoreConfig, setConfig } from '@shadow-library/common/testing';
 import { type SynapseResponseBlock } from '@shadow-library/synapse';
 
 import { ModelRouterService, type ProjectConfig } from '@modules/ai/model-router.service';
-import { MODEL_MAP } from '@modules/ai/models';
 
 import { FakeSynapse, hang, json, SYNAPSE_BLOCK, synapseError } from './synapse-fakes';
 
@@ -29,25 +28,22 @@ interface Harness {
   router: ModelRouterService;
   synapse: FakeSynapse;
   rows: Row[];
-  quotaChecks: bigint[];
 }
 
 function harness(): Harness {
   const rows: Row[] = [];
-  const quotaChecks: bigint[] = [];
   const db = { insert: () => ({ values: async (row: Row) => void rows.push(row) }) };
-  const quota = { enforce: async (projectId: bigint) => void quotaChecks.push(projectId) } as never;
   const synapse = new FakeSynapse();
-  const router = new ModelRouterService({} as never, { getPostgresClient: () => db } as never, quota, synapse.client);
+  const router = new ModelRouterService({} as never, { getPostgresClient: () => db } as never, synapse.client);
   (router as unknown as Record<string, unknown>)['logger'] = { debug: () => undefined, warn: () => undefined, error: () => undefined };
-  return { router, synapse, rows, quotaChecks };
+  return { router, synapse, rows };
 }
 
-describe('ModelRouterService.images on the synapse backend', () => {
+describe('ModelRouterService.images', () => {
   let restore: RestoreConfig;
 
   beforeEach(() => {
-    restore = setConfig({ 'ai.backend': 'synapse', 'ai.llm.max-retries': 2, 'ai.llm.backoff-ms': 0, 'ai.llm.timeout-ms': 60_000 });
+    restore = setConfig({ 'ai.llm.timeout-ms': 60_000 });
   });
 
   afterEach(() => restore());
@@ -111,33 +107,23 @@ describe('ModelRouterService.images on the synapse backend', () => {
     ]);
   });
 
-  it('should leave the spend guard to Synapse and need no OpenRouter key', async () => {
+  it('should send every reference to Synapse and answer its refusal of them as AI_010, recorded against the task', async () => {
     const h = harness();
-    h.synapse.reply(generated());
-
-    expect(await h.router.images({ prompt: 'a lone tower', n: 1 }, CTX, OWNED)).toHaveLength(1);
-    expect(h.quotaChecks).toEqual([]);
-  });
-
-  it('should keep the local quota guard and the OpenRouter key on the legacy backend', async () => {
-    const h = harness();
-    const restoreLegacy = setConfig({ 'ai.backend': 'legacy', 'ai.openrouter.api.key': undefined });
-    try {
-      await expect(h.router.images({ prompt: 'a lone tower', n: 1 }, CTX, OWNED)).rejects.toMatchObject({ code: 'AI_004' });
-      expect(h.quotaChecks).toEqual([7n]);
-      expect(h.synapse.requests).toEqual([]);
-    } finally {
-      restoreLegacy();
-    }
-  });
-
-  it("should refuse more references than the registry's image model takes before any request", async () => {
-    const h = harness();
-    const capacity = MODEL_MAP[h.router.resolveModel('image', OWNED).model]?.maxInputReferences ?? 0;
-    const references = Array.from({ length: capacity + 1 }, (_, i) => `data:image/png;base64,${i}`);
+    const references = Array.from({ length: 17 }, (_, i) => `data:image/png;base64,${i}`);
+    h.synapse.reply(
+      json({ error: { message: 'reference_images: must NOT have more than 16 items', type: 'invalid_request_error', code: 'VALIDATION_ERROR', param: 'reference_images' } }, 400),
+    );
 
     await expect(h.router.images({ prompt: 'a lone tower', n: 1, inputReferences: references }, CTX, OWNED)).rejects.toMatchObject({ code: 'AI_010' });
-    expect(h.synapse.requests).toEqual([]);
+    expect(h.synapse.requests[0]?.body?.reference_images).toHaveLength(17);
+    expect(h.rows[0]).toMatchObject({ provider: 'synapse', model: 'novel-forge.image', status: 'transport_error' });
+  });
+
+  it('should give up with AI_005 on any other invalid request', async () => {
+    const h = harness();
+    h.synapse.reply(json({ error: { message: 'prompt: must NOT be empty', type: 'invalid_request_error', code: 'VALIDATION_ERROR', param: 'prompt' } }, 400));
+
+    await expect(h.router.images({ prompt: 'a lone tower', n: 1 }, CTX, OWNED)).rejects.toMatchObject({ code: 'AI_005' });
   });
 
   it('should make one call and give up with AI_005 on a failure Synapse could not fail over, recording it against the task', async () => {
