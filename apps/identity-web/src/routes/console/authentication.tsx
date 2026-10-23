@@ -15,7 +15,7 @@ import {
   useUpdateGlobalIdentityProviderMutation,
 } from '@/lib/apis';
 
-import styles from './console.module.css';
+import styles from '@/features/console/console.module.css';
 
 type RequireGate = (action: () => void) => void;
 

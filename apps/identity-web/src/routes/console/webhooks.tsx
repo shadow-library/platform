@@ -18,7 +18,7 @@ import {
 } from '@/lib/apis';
 import { relativeTime } from '@/lib/format';
 
-import styles from './console.module.css';
+import styles from '@/features/console/console.module.css';
 
 export const Route = createFileRoute('/console/webhooks')({
   loader: ({ context }) => context.queryClient.ensureQueryData(webhooksQueryOptions()),

@@ -21,7 +21,7 @@ import { botErrorMessage } from '@/lib/bot-errors';
 import { countFlaggedGrants, countGrantsByApplication } from '@/lib/bot-permissions';
 import { daysUntil, formatDate, relativeTime } from '@/lib/format';
 
-import styles from './bots.module.css';
+import styles from '@/features/bots/bots.module.css';
 
 const KEY_EXPIRY_WARNING_DAYS = 7;
 

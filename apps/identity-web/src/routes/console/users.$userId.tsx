@@ -21,7 +21,7 @@ import {
 } from '@/lib/apis';
 import { formatDate, relativeTime } from '@/lib/format';
 
-import styles from './console.module.css';
+import styles from '@/features/console/console.module.css';
 import { userStatusChip } from './users.index';
 
 export const Route = createFileRoute('/console/users/$userId')({

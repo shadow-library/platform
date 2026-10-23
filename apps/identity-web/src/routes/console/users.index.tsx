@@ -6,7 +6,7 @@ import { PageHeader, StatusChip } from '@/components/si';
 import { type UserStatus, type UserSummaryItem, useUsersQuery } from '@/lib/apis';
 import { formatDate } from '@/lib/format';
 
-import styles from './console.module.css';
+import styles from '@/features/console/console.module.css';
 
 export const Route = createFileRoute('/console/users/')({
   component: UsersPage,

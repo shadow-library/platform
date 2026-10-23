@@ -19,7 +19,7 @@ import {
 } from '@/lib/apis';
 import { relativeTime } from '@/lib/format';
 
-import styles from './console.module.css';
+import styles from '@/features/console/console.module.css';
 
 export const Route = createFileRoute('/console/roles')({
   /** The chosen application and role live in the URL (`?app=&role=`) so they survive refresh and are deep-linkable. */

@@ -12,7 +12,7 @@ import { type DesiredGrantMap, desiredGrantsList, summarizePermissions } from '@
 import { isValidRateLimit, MAX_RATE_LIMIT, MIN_RATE_LIMIT, rateLimitError } from '@/lib/bot-rate-limit';
 import { validateCidr } from '@/lib/cidr';
 
-import styles from './bots.module.css';
+import styles from '@/features/bots/bots.module.css';
 
 export const Route = createFileRoute('/_portal/organizations/$orgId/bots/new')({
   loader: async ({ context, params }) => {

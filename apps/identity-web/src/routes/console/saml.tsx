@@ -14,7 +14,7 @@ import {
   useUpdateServiceProviderMutation,
 } from '@/lib/apis';
 
-import styles from './console.module.css';
+import styles from '@/features/console/console.module.css';
 
 export const Route = createFileRoute('/console/saml')({
   loader: ({ context }) => context.queryClient.ensureQueryData(serviceProvidersQueryOptions()),

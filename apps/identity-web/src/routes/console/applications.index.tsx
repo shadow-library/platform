@@ -15,7 +15,7 @@ import {
 } from '@/lib/apis';
 import { formatDate } from '@/lib/format';
 
-import styles from './console.module.css';
+import styles from '@/features/console/console.module.css';
 
 const VISIBILITY: Record<ApplicationVisibility, { label: string; intent: 'success' | 'warning' | 'info' }> = {
   PUBLIC: { label: 'Public', intent: 'success' },
