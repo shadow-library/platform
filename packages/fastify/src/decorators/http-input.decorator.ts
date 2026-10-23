@@ -45,7 +45,6 @@ export const Query = (schema?: JSONSchema): ParameterDecorator => HttpInput(Rout
 
 export const Headers = (): ParameterDecorator => HttpInput(RouteInputType.HEADERS);
 
-/** Injects the untouched request body buffer and flags the route so the buffer is captured during parsing. */
 export function RawBody(): ParameterDecorator {
   return (target, propertyKey, index) => {
     assert(propertyKey, 'Cannot apply @RawBody to a constructor parameter');
@@ -56,10 +55,7 @@ export function RawBody(): ParameterDecorator {
   };
 }
 
-/**
- * Injects the parsed request cookies and flags the route to enable cookie parsing.
- * Requires the optional `@fastify/cookie` peer dependency — the module loads it lazily only when a route uses `@Cookie`.
- */
+/** Requires the optional `@fastify/cookie` peer dependency; the module loads it lazily when a route uses `@Cookie`. */
 export function Cookie(): ParameterDecorator {
   return (target, propertyKey, index) => {
     assert(propertyKey, 'Cannot apply @Cookie to a constructor parameter');

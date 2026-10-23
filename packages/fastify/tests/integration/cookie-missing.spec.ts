@@ -3,7 +3,6 @@ import { Module, ShadowFactory } from '@shadow-library/app';
 
 import { Cookie, FastifyModule, Get, HttpController } from '@shadow-library/fastify';
 
-/** Simulate `@fastify/cookie` not being installed: the lazy import inside the router rejects. */
 mock.module('@fastify/cookie', () => {
   throw new Error("Cannot find package '@fastify/cookie'");
 });

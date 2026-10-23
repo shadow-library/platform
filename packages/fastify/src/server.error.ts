@@ -1,17 +1,6 @@
 import { ErrorCode } from '@shadow-library/common';
 
-/**
- * Declaring the constants
- *
- * The generic http error catalog. Keys create and throw `AppError`s directly (`ServerErrorCode.S002.throw()`);
- * consuming apps extend `ErrorCode` for their own catalogs.
- */
-
 export class ServerErrorCode extends ErrorCode {
-  /*!
-   * List of all server related errors
-   */
-
   /** An unexpected server error occurred while processing the request */
   static readonly S001 = new ServerErrorCode('S001', 'An unexpected server error occurred while processing the request');
   /** The requested endpoint does not exist */

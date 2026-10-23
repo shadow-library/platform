@@ -875,12 +875,10 @@ describe('FastifyRouter', () => {
       const fn = jest.fn<any>().mockResolvedValue({ json: () => ({ called: true }) });
       customRouter['instance'].inject = fn;
 
-      // Make multiple requests
       await customRouter.resolveChildRoute('/call/1');
       await customRouter.resolveChildRoute('/call/2');
       await customRouter.resolveChildRoute('/call/3');
 
-      // Verify the function was called for each request
       expect(childRouteHeadersMock).toHaveBeenCalledTimes(3);
       expect(childRouteHeadersMock).toHaveBeenCalledWith(context);
       expect(fn).toHaveBeenCalledTimes(3);

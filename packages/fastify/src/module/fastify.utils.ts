@@ -45,30 +45,18 @@ function compileSchema(ajv: Ajv, schema: JSONSchema): ValidateFunction<unknown> 
 export function compileValidator(routeSchema: FastifyRouteSchemaDef<SchemaObject>, validators: AjvValidators): FastifyValidationResult {
   assert(allowedHttpParts.includes(routeSchema.httpPart as string), `Invalid httpPart: ${routeSchema.httpPart}`);
 
-  /**
-   * The body is validated as-is by the strict validator; querystring and params arrive as strings and so are
-   * coerced by the lenient validator. All three reject constraint violations identically — a query param outside
-   * its declared `minimum`/`maximum`/`enum` fails the same way a body or params field would, rather than being
-   * silently defaulted.
-   */
   const ajv = routeSchema.httpPart === 'body' ? validators.strictValidator : validators.lenientValidator;
   const validate = compileSchema(ajv, routeSchema.schema);
   const dataVar = routeSchema.httpPart as SchemaErrorDataVar;
 
-  /**
-   * The errors are formatted here rather than by the schema error formatter because resolving a field's
-   * `errorMessage` needs the route schema, and because it keeps the raw Ajv errors from leaving this handler.
-   */
+  // Formatted here, not by Fastify's schema error formatter: resolving `errorMessage` needs the route schema.
   return data => {
     if (validate(data)) return {};
     return { error: formatSchemaErrors(validate.errors ?? [], dataVar, routeSchema.schema) };
   };
 }
 
-/**
- * Locates the schema that declares the failing keyword. Ajv reports `schemaPath` relative to the root schema as
- * `#/properties/name/minLength`, or relative to the `$id` of the definition holding it as `Address/properties/street/minLength`.
- */
+/** Ajv reports `schemaPath` relative to the root (`#/properties/name/minLength`) or to the `$id` of the holding definition (`Address/properties/street/minLength`). */
 function resolveErrorSchema(schemaPath: string, rootSchema: JSONSchema): MaybeUndefined<JSONSchema> {
   const definitions = rootSchema.definitions ?? {};
   /** Matching the longest `$id` first keeps an id that itself contains a slash from being split at the wrong place */
@@ -86,7 +74,6 @@ function resolveErrorSchema(schemaPath: string, rootSchema: JSONSchema): MaybeUn
     pointer = schemaPath.slice(2);
   } else return undefined;
 
-  /** The trailing segment is the keyword that failed, the ones before it lead to the schema declaring it */
   const segments = pointer.split('/').slice(0, -1);
   for (const segment of segments) {
     schema = schema?.[segment.replaceAll('~1', '/').replaceAll('~0', '~')];
@@ -96,7 +83,6 @@ function resolveErrorSchema(schemaPath: string, rootSchema: JSONSchema): MaybeUn
   return schema;
 }
 
-/** Picks the message for the failing keyword, falling back to the `_` catch all */
 function resolveFieldErrorMessage(schema: MaybeUndefined<JSONSchema>, keyword: string): MaybeUndefined<string> {
   const errorMessage = schema?.errorMessage as MaybeUndefined<FieldErrorMessage>;
   if (!errorMessage) return undefined;
@@ -131,10 +117,9 @@ export function formatSchemaErrors(errors: FastifySchemaValidationError[], dataV
 }
 
 /**
- * fast-json-stringify picks an `anyOf`/`oneOf` branch (every nullable `$ref` is one) by validating the value with Ajv, where
- * `additionalProperties: false` rejects an object carrying any undeclared property. A typed schema's serializer writes only
- * declared properties, so it compiles from a copy without the constraint; an untyped one keeps it, because without it fjs
- * no longer infers an object and writes the whole value through `JSON.stringify`.
+ * fast-json-stringify picks an `anyOf`/`oneOf` branch (every nullable `$ref` is one) by Ajv validation, where `additionalProperties: false`
+ * rejects any object with an undeclared property. A typed schema compiles from a copy without it; an untyped one keeps it, else fjs stops
+ * inferring an object and writes the whole value through `JSON.stringify`.
  */
 function openClosedObjects(schema: unknown): unknown {
   if (Array.isArray(schema)) return schema.map(openClosedObjects);

@@ -34,7 +34,6 @@ export class UserController {
   @AuthGuard({ accessLevel: 0 })
   @RespondFor(200, UserResponse)
   async getMyProfile(): Promise<User> {
-    /* The access guard has already rejected anonymous requests, so the user is guaranteed to be in the context. */
     return this.contextService.get<User>('CURRENT_USER', true);
   }
 

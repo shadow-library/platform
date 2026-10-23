@@ -8,7 +8,6 @@ export class AccessMiddleware implements MiddlewareGenerator {
   constructor(private readonly contextService: ContextService) {}
 
   generate(metadata: HandlerMetadata): AsyncRouteHandler | undefined {
-    /* Narrowed once here so the returned handler closes over the guard options instead of re-reading the optional metadata. */
     const authGuard = metadata.authGuard;
     if (!authGuard) return;
 

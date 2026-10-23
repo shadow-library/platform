@@ -7,13 +7,10 @@ import { HTTP_CONTROLLER_TYPE } from '../constants';
 export type MiddlewareType = 'onRequest' | 'preParsing' | 'preValidation' | 'preHandler' | 'preSerialization' | 'onSend' | 'onResponse' | 'onError';
 
 export interface MiddlewareOptions {
-  /**
-   * Denotes when to execute the middleware. default value is `preHandler`.
-   * see https://fastify.dev/docs/latest/Reference/Lifecycle for more information
-   */
+  /** Fastify lifecycle hook the middleware runs in (https://fastify.dev/docs/latest/Reference/Lifecycle). Defaults to `preHandler`. */
   type: MiddlewareType;
 
-  /** Denotes the execution order, the higher value gets executed first */
+  /** Execution order within the hook; the higher weight runs first. Defaults to `0`. */
   weight: number;
 }
 

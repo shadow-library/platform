@@ -18,10 +18,8 @@ declare module '@shadow-library/common' {
 const isDevValue = String(Config.isDev());
 const logger = Logger.getLogger(NAMESPACE, 'Config');
 
-// Fastify's `trustProxy: true` derives `request.ip` from the client-supplied, left-most x-forwarded-for entry, which is spoofable.
-// A numeric hop count is likewise spoofable — a direct client can supply enough hops (CVE-2026-16732) — so fastify removed it (>= 5.12.1)
-// and treats it as trust-nothing; a numeric value is mapped to `false` here to match. A trusted-CIDR list trusts only addresses the ingress
-// attached and is the safe form; identity-server keys rate limits and IP blocks on request.ip.
+// `true` trusts the spoofable client-supplied x-forwarded-for; a numeric hop count is spoofable too (CVE-2026-16732),
+// so fastify >= 5.12.1 treats it as trust-nothing and it maps to `false`. Only a CIDR list is safe.
 export function parseTrustProxy(value: string): TrustProxy {
   if (value === 'true' || value === 'false') return value === 'true';
   if (/^\d+$/.test(value)) {
@@ -38,7 +36,7 @@ Config.load('app.host', { defaultValue: 'localhost' });
 Config.load('app.port', { defaultValue: '8080', validateType: 'integer' });
 Config.load('app.trust-proxy', { defaultValue: 'false', transform: parseTrustProxy });
 if (Config.get('app.trust-proxy') === true) {
-  logger.warn('APP_TRUST_PROXY=true trusts every proxy hop and lets a client spoof request.ip; prefer a hop count or a trusted CIDR list');
+  logger.warn('APP_TRUST_PROXY=true trusts every proxy hop and lets a client spoof request.ip; prefer a trusted CIDR list');
 }
 
 Config.load('app.dev.delay', { validateType: 'integer' });

@@ -3,7 +3,7 @@ import { AppError } from '@shadow-library/common';
 import { HttpResponse } from '../interfaces';
 
 export interface EventStreamOptions {
-  /** Interval for the comment line an idle stream writes so proxy idle timeouts never cut it. Defaults to 20 seconds; `0` disables it. */
+  /** Interval of the comment line an idle stream writes so proxy idle timeouts never cut it. Defaults to 20 seconds; `0` disables it. */
   heartbeatMs?: number;
   /** Ends the stream after this long, sending the client back through the route's guards: an open stream is never re-authorised. Defaults to 15 minutes; `0` never ends it. */
   maxLifetimeMs?: number;
@@ -27,11 +27,7 @@ const DEFAULT_MAX_LIFETIME_MS = 15 * 60_000;
 const DEFAULT_RETRY_MS = 3_000;
 const LINE_BREAK = /\r\n|\r|\n/;
 
-/**
- * A server-sent event stream on a route's own response. The reply is hijacked, so Fastify's `onSend` hooks — response
- * compression among them, which would hold events back in its buffer — never see the stream, and the route's return
- * value is ignored. Headers already set on the reply (cookies, security headers) are carried onto the stream.
- */
+/** The reply is hijacked: `onSend` hooks (compression would buffer events) never see the stream and the return value is ignored. Headers already set carry over. */
 export class EventStream {
   /** A connected stream never ends on its own, and Fastify's `close()` waits for it: the router ends these first. */
   private static readonly openStreams = new WeakMap<HttpServer, Set<EventStream>>();
@@ -53,8 +49,7 @@ export class EventStream {
     response.raw.writeHead(200, headers as Record<string, string | string[]>);
     response.raw.write(`retry: ${retryMs}\n\n`);
 
-    // A client disconnect surfaces differently per runtime: Node closes the response, Bun only the socket (and the
-    // request, which Node also closes as soon as a body-less request has been read, so it cannot be used).
+    // Node closes the response on client disconnect, Bun only the socket; the request cannot be used since Node closes it once a body-less request is read.
     response.raw.on('close', this.onDisconnect);
     response.request.raw.socket?.on('close', this.onDisconnect);
     if (heartbeatMs > 0) this.heartbeat = setInterval(() => response.raw.write(': heartbeat\n\n'), heartbeatMs);
@@ -68,7 +63,6 @@ export class EventStream {
     return new EventStream(response, options);
   }
 
-  /** Ends every stream still open on this server, so a graceful shutdown is not held open by connected clients. */
   static closeAll(server: HttpServer): void {
     for (const stream of EventStream.openStreams.get(server) ?? []) stream.close();
   }
@@ -77,7 +71,7 @@ export class EventStream {
     return this.isClosed;
   }
 
-  /** Returns `false` once the stream has closed, so a publisher can drop a subscriber that outlived its client. */
+  /** Returns `false` once the stream has closed, so a publisher can drop the subscriber. */
   send(message: EventStreamMessage): boolean {
     if (this.isClosed) return false;
     if (message.event !== undefined && LINE_BREAK.test(message.event)) throw AppError.internal(`event stream event name '${message.event}' contains a line break`);
@@ -91,7 +85,7 @@ export class EventStream {
     return true;
   }
 
-  /** Runs once when the stream ends for any reason; registered after it has ended, it runs immediately. */
+  /** Runs once when the stream ends for any reason; runs immediately if it already ended. */
   onClose(listener: () => void): void {
     if (this.isClosed) listener();
     else this.closeListeners.add(listener);

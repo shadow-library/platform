@@ -61,10 +61,7 @@ describe('field errorMessage', () => {
 
   afterAll(() => app.stop());
 
-  /**
-   * The key is neither declared nor understood by the schema generator, it only survives because unknown field options
-   * are copied into the property schema. Pinning it here keeps a generator upgrade from silently muting every message.
-   */
+  // `errorMessage` survives only because the schema generator copies unknown field options; this pins it against a generator upgrade.
   it('should carry errorMessage through into the generated json schema', () => {
     const schema = ClassSchema.generate(RegisterDto);
     const definition = Object.values(schema.definitions ?? {})[0];

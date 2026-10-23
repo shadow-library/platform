@@ -36,7 +36,7 @@ declare module 'fastify' {
   }
 }
 
-/** Parsed cookies as provided by `@fastify/cookie`; typed locally so the package stays an optional dependency. */
+// `@fastify/cookie` is an optional dependency, so its cookie type is declared locally.
 export type CookieValues = Record<string, string | undefined>;
 
 export interface RequestContext {
@@ -67,9 +67,7 @@ interface ParsedControllers {
 }
 
 export interface RequestMetadata {
-  /** request id */
   rid?: string;
-  /** Service request id */
   srid?: string;
   method?: string;
   url?: string;
@@ -77,7 +75,6 @@ export interface RequestMetadata {
   reqLen?: string;
   reqIp?: string;
   resLen?: string;
-  /** Time taken to process the request */
   timeTaken?: string;
   body?: any;
   query?: object;
@@ -111,10 +108,7 @@ const DEFAULT_ARTIFACTS: RouteArtifacts = { masks: {}, transformers: {} };
 const isClassSchema = (schema: object): schema is SchemaClass => typeof schema === 'function' || (Array.isArray(schema) && typeof schema[0] === 'function');
 const isSuccessCode = (code: string): boolean => code === '2xx' || (Number(code) >= 200 && Number(code) < 300);
 
-// No first-party DTO uses `@Sensitive`, so the compiled masks never fire; this default pass is the only thing keeping
-// credentials out of request logs. Long unambiguous stems match anywhere in the normalized key so compound names like
-// `accessToken`, `passwordHash` and `sessionId` are caught; short ambiguous stems match the whole key only, so
-// `postcode`/`zipcode`/`barcode` are left alone. `_`/`-` are stripped first, folding `client_secret`, `api_key`, etc.
+// Long stems match anywhere in the normalized key (`accessToken`, `passwordHash`); short ambiguous ones must match the whole key so `postcode`/`barcode` are left alone.
 const SENSITIVE_KEY_STEMS = ['password', 'secret', 'token', 'authorization', 'credential', 'assertion', 'apikey', 'privatekey', 'cookie', 'session'];
 const SENSITIVE_EXACT_KEYS = new Set(['code', 'codeverifier', 'otp', 'pin']);
 const LOG_REDACTION_PLACEHOLDER = '****';
@@ -125,7 +119,6 @@ const isSensitiveLogKey = (key: string): boolean => {
   return SENSITIVE_EXACT_KEYS.has(normalized) || SENSITIVE_KEY_STEMS.some(stem => normalized.includes(stem));
 };
 
-/** Deep-copies `value` for logging, replacing sensitive-keyed properties with a placeholder; never mutates the source. */
 function redactSensitiveLogData(value: unknown, depth = 0, seen = new WeakSet<object>()): any {
   if (Array.isArray(value)) {
     if (depth > MAX_LOG_REDACTION_DEPTH || seen.has(value)) return LOG_REDACTION_PLACEHOLDER;
@@ -152,11 +145,8 @@ const isPlainObject = (value: object): value is Record<string, unknown> => {
   return prototype === Object.prototype || prototype === null;
 };
 
-/**
- * Bigints go on the wire as strings. Neither `JSON.stringify` nor the Ajv checks fast-json-stringify runs for `anyOf`
- * and multi-type schemas (every nullable field) accept a raw bigint, so they are converted before serialization. Only
- * plain objects and arrays are walked, and a cycle is left pointing at the original object.
- */
+/** Bigints become strings, since fast-json-stringify's Ajv checks for `anyOf`/multi-type schemas (every nullable field) reject them. */
+/** Only plain objects and arrays are walked, copy-on-write; non-plain values and cycles pass through unchanged. */
 function stringifyBigInts(value: unknown, ancestors = new WeakSet<object>()): unknown {
   if (typeof value === 'bigint') return value.toString();
   if (value === null || typeof value !== 'object' || ancestors.has(value)) return value;
@@ -247,7 +237,6 @@ export class FastifyRouter extends Dispatcher {
     });
   }
 
-  /** Lazily loads and registers the optional `@fastify/cookie` plugin; only runs when a route uses `@Cookie()`. */
   private async registerCookies(): Promise<void> {
     let cookiePlugin: FastifyPluginCallback;
     try {
@@ -378,17 +367,12 @@ export class FastifyRouter extends Dispatcher {
       const cookies = (request as { cookies?: CookieValues }).cookies;
       const context: RequestContext = { request, response, params, query, body, headers: request.headers, cookies, rawBody: request.rawBody };
 
-      /** Setting the status code and headers */
       response.status(statusCode);
       for (const [key, value] of headerEntries) {
         response.header(key, typeof value === 'function' ? value() : value);
       }
 
-      /**
-       * A handler that sends through `@Res()` and returns nothing leaves Fastify a resolved `undefined`; while an async
-       * `onSend` hook such as compression is still streaming, Fastify reads that as "nothing sent" and sends again, empty.
-       * Handing the reply back makes Fastify wait for the first send to finish instead.
-       */
+      // Returning undefined after a `@Res()` send makes Fastify re-send an empty body while an async `onSend` hook (compression) still streams; returning the reply makes it wait.
       let isSentByHandler = false;
       if (injectsResponse) {
         const send = response.send;
@@ -422,7 +406,6 @@ export class FastifyRouter extends Dispatcher {
   private async getMiddlewareHandler(middleware: ParsedController<MiddlewareMetadata>, metadata: HandlerMetadata): Promise<MiddlewareHandler | undefined> {
     if (!middleware.metadata.generates) return middleware.handler.bind(middleware.instance);
 
-    /** The cache is scoped per middleware instance so that two generators on the same route never share a handler */
     const genCacheKey =
       'cacheKey' in middleware.instance && typeof middleware.instance.cacheKey === 'function' ? middleware.instance.cacheKey.bind(middleware.instance) : stringify;
     const cacheKey = genCacheKey(metadata);
@@ -434,7 +417,6 @@ export class FastifyRouter extends Dispatcher {
     const cachedMiddleware = cache.get(cacheKey);
     if (cachedMiddleware) return cachedMiddleware;
 
-    /** Generating the middleware handler */
     const handler = await middleware.handler.apply(middleware.instance, [metadata]);
     cache.set(cacheKey, handler);
     return handler;
@@ -528,7 +510,6 @@ export class FastifyRouter extends Dispatcher {
       routeOptions.method = metadata.method === HttpMethod.ALL ? httpMethods : [metadata.method];
       routeOptions.handler = this.generateRouteHandler(route);
 
-      /** Applying middlewares */
       for (const middleware of middlewares) {
         const name = middleware.metatype.name;
         const { type } = middleware.metadata;
@@ -629,11 +610,6 @@ export class FastifyRouter extends Dispatcher {
     this.logger.info('server stopped');
   }
 
-  /**
-   * Creates a new child context derived from the current one to load route-specific data
-   * during SSR. Automatically reuses middleware results from the parent context to avoid
-   * redundant execution and ensures correct context isolation for nested route data fetching.
-   */
   async resolveChildRoute<T extends JsonValue = JsonObject>(url: string, headers: Record<string, string> = {}): Promise<T> {
     if (!this.childRouter) throw AppError.internal('Child routes are not enabled');
     const childHeaders = this.config.childRouteHeaders?.(this.context) ?? {};

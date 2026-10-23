@@ -26,12 +26,7 @@ function isBoundQueryError(value: Record<string, unknown>): value is Record<stri
   return typeof value['query'] === 'string' && Array.isArray(value['params']);
 }
 
-/**
- * Drizzle/bun-sql query-failure errors interpolate the statement's bound parameter values into
- * `message`/`stack`/`params` as positional text rather than named fields, so a manifest-driven,
- * field-name redactor can never reach them. Walks the `.cause` chain and rebuilds any such node with
- * its parameter values elided, keeping the SQL text (placeholders only) for diagnosis.
- */
+/** Drizzle/bun-sql query errors inline bound parameters into `message`/`stack`/`params`, beyond field-name redaction; they are elided along the `.cause` chain. */
 export function sanitizeCause(cause: unknown, seen: WeakSet<object> = new WeakSet<object>()): unknown {
   if (typeof cause !== 'object' || cause === null || seen.has(cause)) return cause;
   seen.add(cause);

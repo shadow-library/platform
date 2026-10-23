@@ -8,107 +8,52 @@ import { ErrorHandler } from '../interfaces';
 import { ContextService } from '../services';
 
 export interface FastifyConfig extends FastifyServerOptions {
-  /**
-   * The host on which the Fastify instance is to be started
-   * @default localhost
-   */
+  /** Defaults to the `app.host` config value (`localhost`). */
   host?: string;
 
-  /**
-   * The port on which the Fastify instance is to be started
-   * @default 8080
-   */
+  /** Defaults to the `app.port` config value (`8080`). */
   port?: number;
 
-  /**
-   * The error handler to be used to handle errors thrown by the Fastify instance
-   * @default DefaultErrorHandler
-   */
+  /** Defaults to `DefaultErrorHandler`. */
   errorHandler?: ErrorHandler;
 
-  /**
-   * The schema to be used to validate the response of the Fastify instance
-   * @default { '4xx': errorResponseSchema, '5xx': errorResponseSchema }
-   */
+  /** Response schemas keyed by status code or class (`'4xx'`); defaults to the error response schema for `4xx` and `5xx`. */
   responseSchema?: Record<string | number, JSONSchema>;
 
-  /**
-   * Enables internal execution of child routes (e.g., for SSR data fetching) without making actual HTTP requests.
-   * Useful for loading data while reusing middleware logic and shared context.
-   * @default false
-   */
+  /** Enables `resolveChildRoute`, which runs a GET against this server in-process (e.g. SSR data loading) without an HTTP round trip. */
   enableChildRoutes?: boolean;
 
-  /**
-   * Function to provide custom headers for internal child route requests.
-   * Useful for passing authentication tokens or other necessary headers.
-   */
+  /** Headers added to every `resolveChildRoute` request, e.g. forwarded credentials. */
   childRouteHeaders?: (contextService: ContextService) => Record<string, string>;
 
-  /**
-   * Masks fields marked as sensitive in API inputs (body, query, and URL params) when written to logs.
-   * @default true
-   */
+  /** Masks fields marked as sensitive in API inputs (body, query, and URL params) when written to logs. `FastifyModule` defaults it to on in production only. */
   maskSensitiveData?: boolean;
 
-  /**
-   * Enables prefix-based versioning for all routes in the Fastify instance.
-   * @default false
-   */
+  /** Prefixes every route with `/v{version}`. */
   prefixVersioning?: boolean;
 
-  /**
-   * The global route prefix for all routes in the Fastify instance
-   */
   routePrefix?: string;
 
-  /**
-   * Object defining custom transformers for request and response data transformation
-   */
   transformers?: Record<keyof CustomTransformers, (value: any) => any>;
 
-  /**
-   * Options forwarded to the optional `@fastify/cookie` plugin, registered lazily when a route uses `@Cookie()`.
-   * See https://github.com/fastify/fastify-cookie for available options (e.g. `secret` for signed cookies).
-   */
+  /** Options for the optional `@fastify/cookie` plugin, registered lazily when a route uses `@Cookie()` (e.g. `secret` for signed cookies). */
   cookie?: Record<string, unknown>;
 }
 
 export interface FastifyModuleOptions extends Partial<FastifyConfig> {
-  /**
-   * The list of modules whose controllers are to be registered in the Fastify instance
-   */
   imports?: ModuleMetadata['imports'];
 
-  /**
-   * Factory function to modify the Fastify instance before it is used to register the controllers
-   */
   fastifyFactory?: (instance: FastifyInstance) => Promisable<FastifyInstance>;
 
-  /**
-   * The list of controllers to be registered in the Fastify instance
-   */
   controllers?: ModuleMetadata['controllers'];
 
-  /**
-   * The list of providers to be registered in the Fastify instance
-   */
   providers?: ModuleMetadata['providers'];
 
-  /**
-   * The list of providers to be exported by the Fastify module
-   */
   exports?: ModuleMetadata['exports'];
 }
 
 export interface FastifyModuleAsyncOptions extends Pick<FastifyModuleOptions, 'imports' | 'controllers' | 'providers' | 'exports' | 'fastifyFactory'> {
-  /**
-   * Factory function to create the FastifyModuleOptions
-   */
   useFactory: (...args: any[]) => Promisable<FastifyConfig>;
 
-  /**
-   * The list of providers to be injected into the factory function
-   */
   inject?: FactoryProvider['inject'];
 }

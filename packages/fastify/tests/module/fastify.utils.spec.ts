@@ -108,7 +108,6 @@ describe('Create Fastify Instance', () => {
   });
 
   describe('errorMessage', () => {
-    /** Mirrors a generated schema: the root carries the fields, referenced classes live in `definitions` keyed by `$id` */
     const rootSchema: JSONSchema = {
       $id: 'class-schema:Register-1',
       type: 'object',
@@ -259,10 +258,7 @@ describe('Create Fastify Instance', () => {
       expect(formatSchemaErrors(errors as any, 'body', schema).toResponse().fields).toStrictEqual([{ field: 'body.password', msg: 'Must be at least 8 characters' }]);
     });
 
-    /**
-     * Messages are resolved from `schemaPath` so that `verbose` stays off; enabling it would attach the submitted values
-     * to every error object, which are then retained on the long lived compiled validator until the next failure.
-     */
+    // `verbose` must stay off: it attaches submitted values to errors, which the long-lived compiled validator retains.
     describe('independence from the ajv verbose option', () => {
       const schema = {
         $id: 'VerboseSchema',
@@ -313,7 +309,6 @@ describe('Create Fastify Instance', () => {
     it('should coerce the string query params of a valid query and accept it', () => {
       const data: Record<string, unknown> = { limit: '20', offset: '5', sortBy: 'title' };
       expect(compile()(data)).toStrictEqual({});
-      /** Ajv coerces the URL strings in place, so the coerced values reach the handler even though no `value` is returned */
       expect(data).toStrictEqual({ limit: 20, offset: 5, sortBy: 'title' });
     });
 
