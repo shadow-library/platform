@@ -1,8 +1,3 @@
-/**
- * The only file in `scripts/` permitted to call `console.*` directly — every script imports these
- * instead, keeping `no-console` meaningful everywhere else while still letting tooling do its one
- * job of talking to the terminal.
- */
 export const log = {
   info: (message: string): void => console.log(message), // eslint-disable-line no-console
   success: (message: string): void => console.log('\x1b[32m%s\x1b[0m', message), // eslint-disable-line no-console

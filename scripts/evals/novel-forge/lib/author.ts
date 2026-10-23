@@ -45,7 +45,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-/** Drives Forge the way the web does, timing every step it takes and recording each run's model calls before the project can be deleted. */
 export class Author {
   readonly captured: CapturedRun[] = [];
 
@@ -78,7 +77,6 @@ export class Author {
     }
   }
 
-  /** Accepts one action card the way an author clicks it, and waits for the durable job it starts. */
   async runAction(projectId: string, proposal: Proposal, op: string, kind: TurnKind, chapter?: number): Promise<Job | null> {
     const index = actionIndex(proposal, op);
     if (index < 0) return null;
@@ -88,7 +86,6 @@ export class Author {
     return this.waitJob(projectId, started.jobId, kind, chapter, started.runId);
   }
 
-  /** Waits for a job that is setup rather than a measured author action, such as an import. */
   async settle(jobId: string): Promise<Job> {
     const deadline = Date.now() + this.options.jobTimeoutMs;
     let job = await this.api.getJob(jobId);
@@ -126,7 +123,6 @@ export class Author {
     };
   }
 
-  /** Asks the chat to plan the chapter, accepts the plan action, then accepts the plan card it stages. Returns false when the chat never offered it. */
   async planChapter(projectId: string, sessionId: string, chapter: number, intent?: string): Promise<boolean> {
     const trace = await this.turn(projectId, sessionId, `Plan chapter ${chapter}.${intent ? ` I know what happens: ${intent}` : ''}`);
     const proposal = trace.result.proposal;
@@ -148,7 +144,6 @@ export class Author {
     return draft;
   }
 
-  /** Approve, wait for the finalize review, keep everything it found (an author trusting the review), then finalize. */
   async approveAndFinalize(projectId: string, draft: Draft): Promise<FinalizeOutcome> {
     await this.api.approveDraft(projectId, draft);
     const review = await this.awaitReview(projectId, draft.chapter);

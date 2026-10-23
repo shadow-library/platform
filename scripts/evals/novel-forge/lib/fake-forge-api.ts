@@ -77,11 +77,7 @@ const NEGATION = /\b(not|no|never|don't|doesn't|isn't)\b/i;
 const SARCASM = /\b(oh sure|why not|yeah right)\b/i;
 const QUOTED = /["“”]/;
 
-/**
- * An in-process stand-in for Novel Forge used by `--dry-run`. It follows the product's rules closely enough to exercise every harness path
- * — quote-rule auto-apply, action cards, durable jobs, finalize review, isolation bridges and writer snapshots — with no network and no model.
- * Its "model" is deterministic text assembly, so a dry run proves the harness wiring, never the product's quality.
- */
+// Backs `--dry-run`: deterministic text instead of a model, so it proves the harness wiring, never the product's quality.
 export class FakeForgeApi implements ForgeApi {
   readonly target = 'fake://novel-forge';
   private readonly projects = new Map<string, FakeProject>();

@@ -5,7 +5,6 @@ import path from 'node:path';
 export interface RunOptions {
   cwd: string;
   env?: NodeJS.ProcessEnv;
-  /** Set to false to capture stdout/stderr instead of streaming to the parent terminal. Defaults to true. */
   stream?: boolean;
 }
 
@@ -15,21 +14,12 @@ export interface RunResult {
   stderr: string;
 }
 
-/**
- * Strips `GIT_*` variables (`GIT_DIR`, `GIT_WORK_TREE`, `GIT_INDEX_FILE`, …) from `env`. Git sets these
- * when invoking hooks, and they take precedence over `cwd` for repo discovery — without this, any `git`
- * command spawned while running inside a git hook (e.g. `verify`/`check-migrations` wired into
- * `.husky/pre-commit`) would silently operate on whatever repo invoked the hook instead of `cwd`.
- */
+// Git sets GIT_DIR and friends inside hooks and they override `cwd` for repo discovery, so a git child spawned from a hook would hit the wrong repo.
 export function stripGitEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   return Object.fromEntries(Object.entries(env).filter(([key]) => !key.startsWith('GIT_')));
 }
 
-/**
- * Spawns `command` with structured `args` — never a shell string — so paths and user-controlled
- * values can never be interpreted as shell syntax. `status` is normalized to 1 when the process was
- * killed by a signal or failed to spawn (`spawnSync` reports both as `status: null`).
- */
+// `status` is 1 when killed by a signal (`spawnSync` reports null).
 export function run(command: string, args: string[], options: RunOptions): RunResult {
   const stream = options.stream ?? true;
   const spawnOptions: SpawnSyncOptions = {
@@ -49,10 +39,6 @@ export function run(command: string, args: string[], options: RunOptions): RunRe
   };
 }
 
-/**
- * The asynchronous counterpart to {@link run}, always capturing output — the only way to have several
- * commands genuinely in flight at once, which `build --all` needs to build a dependency level in parallel.
- */
 export async function runAsync(command: string, args: string[], options: RunOptions): Promise<RunResult> {
   const child = Bun.spawn([command, ...args], {
     cwd: options.cwd,
@@ -65,12 +51,7 @@ export async function runAsync(command: string, args: string[], options: RunOpti
   return { status, stdout, stderr };
 }
 
-/**
- * Resolves a command's leading token to a `node_modules/.bin/<bin>` under one of `dirs` (first match
- * wins, so a workspace-local bin beats the hoisted root one) — a bare command like `"vite build"` must
- * still find the installed bundler even though {@link run} spawns without a shell, so `.bin` is not on
- * PATH. A token that isn't a local bin (`bun`, `node`, an absolute path) is left for PATH to resolve.
- */
+// `run` spawns without a shell, so `.bin` is not on PATH; the first dir with the bin wins, letting a workspace-local bin beat the hoisted one.
 export function resolveBin(bin: string, dirs: string[]): string {
   for (const dir of dirs) {
     const local = path.join(dir, 'node_modules', '.bin', bin);

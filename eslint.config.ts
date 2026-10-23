@@ -9,28 +9,19 @@ import { defineConfig } from 'eslint/config';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
-/** Which runtime globals the config treats as defined — a Node workspace, a browser workspace, or both. */
 export type GlobalsEnv = 'node' | 'browser' | 'both';
 
-/** A file-scoped rule override layered after the base config (e.g. relaxing rules for stories or fixtures). */
 export interface LintOverride {
   files: string[];
   rules: Linter.RulesRecord;
 }
 
-/** The per-workspace deviations a workspace `eslint.config.ts` hands to {@link createConfig}. */
 export interface LintOptions {
-  /** Enable the React/JSX/a11y layer. */
   react?: boolean;
-  /** React version handed to `eslint-plugin-react`; its `'detect'` mode throws under ESLint 10. */
   reactVersion?: string;
-  /** Runtime globals treated as defined. Defaults to Node. */
   globals?: GlobalsEnv;
-  /** Rules merged over the base rule block, scoped to every `.ts`/`.tsx` source file. */
   rules?: Linter.RulesRecord;
-  /** Extra ignore globs appended to the shared defaults, relative to the config file's directory. */
   ignores?: string[];
-  /** File-scoped overrides appended last, so they win over both the base rules and the test-file relaxations. */
   overrides?: LintOverride[];
 }
 
@@ -80,47 +71,25 @@ const noSectionBanner: Rule.RuleModule = {
   },
 };
 
-/**
- * Concrete React version for `eslint-plugin-react`. Never `'detect'`: the plugin's auto-detection calls
- * `context.getFilename()`, removed in ESLint 9+, so it throws under ESLint 10. Pinned to the `react` version
- * the root `package.json` catalog resolves for every workspace.
- */
+// Never `'detect'`: the plugin's auto-detection calls `context.getFilename()`, removed in ESLint 9+, so it throws under ESLint 10.
 const DEFAULT_REACT_VERSION = '19.2';
 
-/**
- * Path scope for web apps that carry no `eslint.config.ts` of their own — they still need the React layer and
- * browser globals, which the root config cannot infer from a workspace-local file that does not exist.
- */
 const WEB_APP_SCOPE = 'apps/*-web/**';
 
-/** Resolves the requested runtime-globals set — Node, browser, or the union of both — into ESLint's globals map. */
 function resolveGlobals(env: GlobalsEnv | undefined): Record<string, boolean> {
   if (env === 'browser') return globals.browser;
   if (env === 'both') return { ...globals.node, ...globals.browser };
   return globals.node;
 }
 
-/**
- * `eslint-plugin-react-hooks` v7 also ships the React Compiler's own analysis as lint rules — `set-state-in-effect`,
- * `refs`, `purity`, `immutability` and the rest. They catch a class of defect the two classic hook rules cannot:
- * state derived through an effect instead of during render, refs read during render, side effects in a reducer.
- *
- * `todo` is excluded because it reports where the compiler could not lower a construct (a `try` with `finally`, an
- * `UpdateExpression` on a global), which says nothing about whether the code is correct.
- */
+// react-hooks v7 ships the React Compiler's analysis as rules; `todo` is excluded because it only reports constructs the compiler could not lower, not defects.
 const COMPILER_RULES: Linter.RulesRecord = Object.fromEntries(
   Object.keys(reactHooks.rules)
     .filter(name => name !== 'todo' && name !== 'rules-of-hooks' && name !== 'exhaustive-deps')
     .map(name => [`react-hooks/${name}`, 'error']),
 );
 
-/**
- * The React/JSX layer. Bundles `eslint-plugin-react` (with the new JSX runtime, so `react-in-jsx-scope` is off,
- * and `prop-types` off since TypeScript types supersede it), `eslint-plugin-jsx-a11y`, and
- * `eslint-plugin-react-hooks`. React/a11y rules are scoped to JSX files; hook rules cover all `.ts`/`.tsx` so
- * `.ts` custom hooks are checked. `scope` narrows the layer to a subtree — used by the root config to reach web
- * apps that have no config file of their own.
- */
+// Hook rules cover all `.ts`/`.tsx` so custom hooks in plain `.ts` files are checked; React/a11y rules are JSX-only.
 export function reactLayer(version: string = DEFAULT_REACT_VERSION, scope = '**'): Linter.Config[] {
   const jsxFiles = [`${scope}/${JSX_FILES}`];
   const sourceFiles = [`${scope}/${SOURCE_FILES}`];
@@ -138,12 +107,6 @@ export function reactLayer(version: string = DEFAULT_REACT_VERSION, scope = '**'
   ] as Linter.Config[];
 }
 
-/**
- * The shared flat config every workspace lints with, so tooling versions and rules stay identical across the
- * platform. Covers `.ts` and `.tsx`; import declarations keep their authored order and only named-import
- * specifiers are sorted (`eslint-plugin-perfectionist`). A workspace layers its own rules, ignores, overrides and globals by calling this from its own
- * `eslint.config.ts`; ESLint's per-file config lookup then picks the nearest one.
- */
 export function createConfig(options: LintOptions = {}): Linter.Config[] {
   return defineConfig([
     { ignores: [...DEFAULT_IGNORES, ...(options.ignores ?? [])] },
@@ -163,7 +126,7 @@ export function createConfig(options: LintOptions = {}): Linter.Config[] {
         '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
         'n/prefer-node-protocol': 'error',
         'no-console': 'error',
-        // Preserve established declarations; removing organizational banner partitions must not rewrite imports.
+        // Import grouping is authored (external, then internal); only named specifiers are sorted.
         'perfectionist/sort-imports': 'off',
         'perfectionist/sort-named-imports': ['error', { type: 'natural', order: 'asc', ignoreCase: true }],
         ...options.rules,
@@ -186,26 +149,18 @@ export function createConfig(options: LintOptions = {}): Linter.Config[] {
   ]) as Linter.Config[];
 }
 
-/** The unmodified base — Node globals, no React — for workspaces that only need to append to it. */
 export const baseConfig = createConfig();
 
-/**
- * ESLint requires a default export from a config file; this is the framework exception to the named-export rule.
- * Node globals stay in force for the web-app scope because those apps' Vite and config files run under Node.
- *
- * Every workspace lints against this single file — there is no per-workspace `eslint.config.ts` — so every
- * deviation from the base rules lives here as a `files`-scoped block. Blocks are grouped by concern, not by
- * workspace, and merge identical deviations shared by several workspaces into one block with multiple globs.
- */
+// The single config for every workspace; node globals stay in force for web apps because their Vite and config files run under Node.
 export default defineConfig([
   ...baseConfig,
   ...reactLayer(DEFAULT_REACT_VERSION, WEB_APP_SCOPE),
   { files: [`${WEB_APP_SCOPE}/${SOURCE_FILES}`], languageOptions: { globals: globals.browser } },
 
-  /** Comment policy: the legacy section banners are noise; the autofix deletes them. */
+  // Section banners are noise; the autofix deletes them.
   { files: ['**/*.{ts,tsx}'], plugins: { local: { rules: { 'no-section-banner': noSectionBanner } } }, rules: { 'local/no-section-banner': 'error' } },
 
-  /** Browser code: `common/crypto` is server-only — it runs on `node:crypto` and handles master keys, neither of which may reach a client bundle. */
+  // `common/crypto` runs on `node:crypto` and handles master keys, so it must not reach a client bundle.
   {
     files: [`${WEB_APP_SCOPE}/${SOURCE_FILES}`, `packages/ui/**/${SOURCE_FILES}`, `packages/web/**/${SOURCE_FILES}`],
     rules: {
@@ -218,10 +173,7 @@ export default defineConfig([
     },
   },
 
-  /**
-   * Backend workspaces: declaration-merged namespaces carry the Fastify request augmentations, so
-   * `@typescript-eslint/no-namespace` is off across every server.
-   */
+  // Declaration-merged namespaces carry the Fastify request augmentations in every server.
   {
     files: [
       'apps/identity-server/**/*.{ts,tsx}',
@@ -234,12 +186,7 @@ export default defineConfig([
     rules: { '@typescript-eslint/no-namespace': 'off' },
   },
 
-  /**
-   * memoir-server: `OwnerScopedRepository` (ARCHITECTURE §8.3, §5.3) is the only sanctioned entry
-   * point to user-owned tables — raw `DatabaseService.getPostgresClient()` access is confined to
-   * `*.repository.ts` files and `database/`, so a domain service reaching for the client directly (and
-   * skipping owner scoping) fails lint instead of only code review.
-   */
+  // memoir-server: `OwnerScopedRepository` is the only sanctioned entry to user-owned tables, so raw client access outside repositories would skip owner scoping.
   {
     files: ['apps/memoir-server/**/*.{ts,tsx}'],
     rules: {
@@ -257,11 +204,8 @@ export default defineConfig([
     rules: { 'no-restricted-syntax': 'off' },
   },
 
-  /**
-   * novel-forge-server: a `db`/`tx` handle may be a transaction, one Postgres connection, and concurrent queries over one connection
-   * are undefined behaviour — the shape that left connections idle in transaction under prepared statements. Queries through a
-   * handle are awaited one at a time; `this.db` is the pool and may fan out.
-   */
+  // novel-forge-server: a `db`/`tx` handle may be one transaction connection, and concurrent queries over it left connections idle in transaction;
+  // `this.db` is the pool and may fan out.
   {
     files: ['apps/novel-forge-server/src/**/*.ts'],
     rules: {
@@ -276,22 +220,22 @@ export default defineConfig([
     },
   },
 
-  /** identity-server also renders and ships the OIDC consent client from the same workspace: needs both global sets. */
+  // identity-server also ships the OIDC consent client, so it needs both global sets.
   {
     files: ['apps/identity-server/**/*.{ts,tsx}'],
     languageOptions: { globals: resolveGlobals('both') },
   },
 
-  /** Router/API modules whose return type is inferred (TanStack Router, generated API clients) — cannot be written out by hand. */
+  // Return types are inferred (TanStack Router, generated API clients) and cannot be written out by hand.
   {
     files: ['apps/identity-web/src/lib/apis/**/*.ts', 'apps/identity-web/src/router.tsx', 'apps/web-novel-web/src/lib/apis/*.api.ts', 'apps/web-novel-web/src/router.tsx'],
     rules: { '@typescript-eslint/explicit-module-boundary-types': 'off' },
   },
 
-  /** identity-web: autofocus is allowed on the app's own components. */
+  // identity-web: autofocus is allowed on the app's own components.
   { files: ['apps/identity-web/**/*.{ts,tsx}'], rules: { 'jsx-a11y/no-autofocus': 'off' } },
 
-  /** novel-forge-web: autofocus is allowed on non-DOM components, and the label rule has to know the `Checkbox` wrapper. */
+  // novel-forge-web: autofocus is allowed on non-DOM components, and the label rule must know the `Checkbox` wrapper.
   {
     files: ['apps/novel-forge-web/**/*.tsx'],
     rules: {
@@ -300,7 +244,7 @@ export default defineConfig([
     },
   },
 
-  /** memoir-web Insights: a horizontally scrollable chart row needs to be keyboard-reachable, and `role="group"` is the correct role for it — just not one jsx-a11y's default allowlist treats as interactive. */
+  // memoir-web Insights: a scrollable chart row needs keyboard reach, and `role="group"` is correct for it but not in jsx-a11y's default allowlist.
   {
     files: ['apps/memoir-web/src/features/insights/**/*.tsx'],
     rules: {
@@ -308,10 +252,7 @@ export default defineConfig([
     },
   },
 
-  /**
-   * novel-forge-web chapter panel: its resize divider is WAI-ARIA's window splitter, a focusable `role="separator"` with a value that the
-   * keyboard and the pointer move. jsx-a11y counts separator as non-interactive, and its handler overrides key on the element, not the role.
-   */
+  // novel-forge-web chapter panel: the resize divider is WAI-ARIA's focusable window splitter (`role="separator"`), which jsx-a11y counts as non-interactive.
   {
     files: ['apps/novel-forge-web/src/features/chat/ChapterPanel.tsx'],
     rules: {
@@ -320,7 +261,7 @@ export default defineConfig([
     },
   },
 
-  /** packages/fastify: route specs declare unused fixture classes and stubs purely to exercise the decorators. */
+  // packages/fastify: route specs declare unused fixture classes and stubs purely to exercise the decorators.
   {
     files: ['packages/fastify/tests/**/*.spec.ts'],
     rules: {
@@ -331,12 +272,8 @@ export default defineConfig([
     },
   },
 
-  /**
-   * packages/ui: a primitive component library — needs the React/JSX layer plus both global sets (Storybook and
-   * the SSR smoke script run under Node). It owns the interaction contract its consumers rely on, so the a11y
-   * rules that assume application-level markup are off here and re-asserted by the apps. Stories and Storybook
-   * config call hooks outside components by design.
-   */
+  // packages/ui: a primitive library owns its interaction contract, so a11y rules assuming application markup are off here and re-asserted by the apps.
+  // Stories call hooks outside components by design.
   ...reactLayer(DEFAULT_REACT_VERSION, 'packages/ui/**'),
   { files: ['packages/ui/**/*.{ts,tsx}'], languageOptions: { globals: resolveGlobals('both') } },
   {
@@ -356,20 +293,15 @@ export default defineConfig([
   },
   { files: ['packages/ui/.storybook/**/*.{ts,tsx}'], rules: { 'react-hooks/rules-of-hooks': 'off' } },
   { files: ['packages/ui/**/*.test.{ts,tsx}'], rules: { 'jsx-a11y/anchor-has-content': 'off', 'no-constant-binary-expression': 'off' } },
-  /**
-   * The SSR smoke harness is plain Node `.mjs`, outside every `*.{ts,tsx}` glob above (including the one
-   * that declares Node globals), so `console` reads as undefined without this; its two inline
-   * `onPageChange() {}` stubs are deliberate no-op handlers for components under test, same as the
-   * `@typescript-eslint/no-empty-function` relaxation already granted to `.ts`/`.tsx` test files.
-   */
+  // The SSR smoke harness is plain `.mjs`, outside every `*.{ts,tsx}` glob, so it gets Node globals; its `onPageChange() {}` stubs are deliberate no-ops.
   { files: ['packages/ui/tests/ssr-smoke.mjs'], languageOptions: { globals: globals.node }, rules: { '@typescript-eslint/no-empty-function': 'off' } },
 
-  /** e2e seed: a directly-invoked Bun CLI script whose job includes printing a run summary to stdout. */
+  // e2e seed: a directly-invoked Bun CLI that prints a run summary to stdout.
   { files: ['e2e/seed/**/*.ts'], rules: { 'no-console': 'off' } },
 
-  /** packages/web: hooks live in plain `.ts` files, and the offline/PWA/service-worker code needs both global sets. */
   ...reactLayer(DEFAULT_REACT_VERSION, 'packages/web/**'),
+  // packages/web: hooks live in plain `.ts` files, and offline/PWA/service-worker code needs both global sets.
   { files: ['packages/web/**/*.{ts,tsx}'], languageOptions: { globals: resolveGlobals('both') } },
-  /** `createRouter`'s return type is the inferred TanStack router type, which cannot be written out by hand. */
+  // `createRouter`'s inferred TanStack router type cannot be written out by hand.
   { files: ['packages/web/src/router/create-router.ts'], rules: { '@typescript-eslint/explicit-module-boundary-types': 'off' } },
 ]);

@@ -22,7 +22,6 @@ export interface RecordDiff {
 
 const PREMISE_FIELDS = ['brief', 'theme', 'ending', 'endingQuestion', 'readerPromise', 'opposition', 'protagonistKey'] as const satisfies readonly (keyof Project)[];
 
-/** Everything the Story Bible holds as searchable text, one record per page, entity, fact, volume and story field. */
 export async function captureBible(api: ForgeApi, projectId: string): Promise<BibleRecord[]> {
   const [project, docs, entities, facts, volumes] = await Promise.all([
     api.getProject(projectId),

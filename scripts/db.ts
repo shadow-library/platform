@@ -7,7 +7,6 @@ import { findWorkspace, MIGRATIONS_DIR, type Workspace } from './workspaces.ts';
 type DbCommand = 'generate' | 'migrate' | 'seed';
 
 interface DbCommandOptions {
-  /** `generate` only: drizzle-kit's `--name`, replacing its random tag so a regenerated baseline keeps its file name. */
   name?: string;
 }
 
@@ -24,29 +23,21 @@ that have one (a real dev seed, not a template-DB fixture).`;
 
 const COMMANDS: DbCommand[] = ['generate', 'migrate', 'seed'];
 
-/** Convention default for a backend's Drizzle schema entry, workspace-relative. Override via `shadow.db.schema`. */
 const DEFAULT_SCHEMA = 'src/database/schemas/index.ts';
 
-/** Convention default for a standalone seed entry — only workspaces with a real dev seed have one. */
 const SEED_ENTRY = 'tests/fixtures/seed.ts';
 
-/** This workspace's Drizzle schema entry: its `shadow.db.schema` override, or the convention default. */
 function resolveSchema(workspace: Workspace): string {
   return workspace.shadow.db?.schema ?? DEFAULT_SCHEMA;
 }
 
-/**
- * This workspace's migration entrypoint. Every backend already declares its prod migration runner in
- * `shadow.entries` (bundled standalone alongside `src/main.ts`) — `scripts/db.ts` reuses that declaration
- * instead of inventing a second, possibly-drifting convention for the same file.
- */
 function resolveMigrateEntry(workspace: Workspace): string {
   const entry = (workspace.shadow.entries ?? []).find(candidate => /migrate/i.test(candidate));
   if (!entry) throw new ShadowError(`${workspace.dir} has no migration entry in its "shadow.entries" — expected one matching /migrate/i`);
   return entry;
 }
 
-/** `drizzle-kit generate` needs only schema/out/dialect to diff — no live DB connection, so no `--url` and no config file. */
+// drizzle-kit generate diffs schema against migrations with no DB connection, so it needs neither `--url` nor a config file.
 function runGenerate(workspace: Workspace, options: DbCommandOptions): number {
   const schema = resolveSchema(workspace);
   const args = ['drizzle-kit', 'generate', '--schema', schema, '--out', MIGRATIONS_DIR, '--dialect', 'postgresql'];
@@ -61,18 +52,12 @@ function runMigrate(workspace: Workspace): number {
   return run('bun', ['run', entry], { cwd: workspace.path }).status;
 }
 
-/**
- * Runs the workspace's standalone seed entry directly at its convention path. Deliberately does NOT consult
- * the workspace's own `db:seed` package.json script — that script now delegates to this very command, so
- * looking it up here would recurse into itself.
- */
 function runSeed(workspace: Workspace): number {
   if (!fs.existsSync(path.join(workspace.path, SEED_ENTRY))) throw new ShadowError(`${workspace.dir} has no ${SEED_ENTRY} — there is nothing to seed`);
   log.info(`run    ${SEED_ENTRY}`);
   return run('bun', ['run', SEED_ENTRY], { cwd: workspace.path }).status;
 }
 
-/** Dispatches `command` for `workspace`, returning the child process's exit status. */
 export function runDbCommand(workspace: Workspace, command: DbCommand, options: DbCommandOptions = {}): number {
   if (workspace.type !== 'backend') throw new ShadowError(`${workspace.dir} is not a backend workspace — scripts/db.ts only applies to type: backend`);
   switch (command) {
@@ -85,7 +70,6 @@ export function runDbCommand(workspace: Workspace, command: DbCommand, options: 
   }
 }
 
-/** Parses argv and runs the requested command against the target workspace. */
 async function main(): Promise<number> {
   const args = process.argv.slice(2);
   if (args.includes('--help') || args.includes('-h')) {
@@ -110,8 +94,7 @@ async function main(): Promise<number> {
   return 0;
 }
 
-// Guarded so importing `runDbCommand` (e.g. from check-migrations.ts) doesn't also re-parse argv and
-// print this file's own --help/USAGE as a side effect of the import.
+// Guarded so check-migrations.ts can import `runDbCommand` without re-parsing argv.
 if (import.meta.main) {
   try {
     process.exitCode = await main();

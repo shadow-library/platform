@@ -22,7 +22,6 @@ export interface SuiteContext {
 }
 
 export interface SuiteVerdict {
-  /** Whether this suite's gate held; advisory suites report `null`. */
   passed: boolean | null;
   headline: string;
 }
@@ -121,7 +120,6 @@ async function buildApi(flags: Flags, dryRun: boolean): Promise<ForgeApi> {
   return api;
 }
 
-/** Parses the common flags, builds the target (live or fake), runs the suite and exits with its gate: 0 pass or advisory, 1 fail, 2 usage/setup error. */
 export async function runSuite(definition: SuiteDefinition): Promise<void> {
   try {
     const flags = parseFlags(process.argv.slice(2));
@@ -157,7 +155,6 @@ export async function runSuite(definition: SuiteDefinition): Promise<void> {
   }
 }
 
-/** Deletes a project the suite made unless the author asked to keep it; a failed delete is reported, never fatal. */
 export async function cleanup(context: SuiteContext, projectId: string): Promise<void> {
   if (context.keepProjects) return;
   try {

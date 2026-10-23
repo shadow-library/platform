@@ -25,17 +25,11 @@ export interface OpenApiDocument {
   [key: string]: unknown;
 }
 
-/** The running server every web app generates against during development, in non-`--check` single-target mode. */
 const DEFAULT_URL = 'http://localhost:8080/dev/api-docs/openapi.json';
 
-/**
- * Each backend's own entry for writing its OpenAPI document: it boots `AppModule` in-process over fakes
- * for Postgres, Redis, storage and identity, which only that server knows how to assemble. It lives in
- * the server so Bun resolves the workspace's own path aliases and `@shadow-library/*` copies.
- */
+// Lives in each server because only it knows how to assemble its fakes, and so Bun resolves the workspace's own path aliases and `@shadow-library/*` copies.
 const DUMP_ENTRY_RELATIVE_PATH = 'src/dump-openapi.ts';
 
-/** Booting takes about a second; anything near this long means a provider is waiting on a connection it should never open. */
 const DUMP_TIMEOUT_MS = 60_000;
 
 const USAGE = `Usage: bun scripts/gen-api-types.ts <web-app>|--all [url] [--check]
@@ -58,7 +52,6 @@ without a port for --all). With --check, nothing is ever written.`;
 
 const HTTP_METHODS = ['get', 'post', 'put', 'patch', 'delete', 'options', 'head'] as const;
 
-/** Narrows an unknown parsed JSON value to an OpenAPI document, rejecting anything without a `paths` object. */
 export function validateOpenApiDocument(value: unknown, sourceUrl: string): OpenApiDocument {
   if (typeof value !== 'object' || value === null) throw new ShadowError(`Malformed OpenAPI document fetched from ${sourceUrl}: not a JSON object`);
   const document = value as OpenApiDocument;
@@ -66,22 +59,12 @@ export function validateOpenApiDocument(value: unknown, sourceUrl: string): Open
   return document;
 }
 
-/**
- * Collapses every run of non-alphanumeric characters (`/`, `{`, `}`, `-`, …) in a path to a single `_` and
- * trims leading/trailing ones — e.g. `/internal/novels/{slug}/manifest` → `internal_novels_slug_manifest`.
- * Collapsing runs (not just replacing each character) matters: a raw path has adjacent separators
- * (`/{slug}` is `/` then `{`), and replacing them one-for-one would leave stray `_` behind.
- */
+// Collapses runs, not single characters: `/{slug}` has adjacent separators that one-for-one replacement would leave as stray `_`.
 function normalizePath(pathKey: string): string {
   return pathKey.replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
 }
 
-/**
- * Rewrites every operationId to `${method}_${normalizedPath}`. The framework this ecosystem's servers
- * are built on (`@shadow-library/fastify`) derives operationIds from controller method names
- * (list/create/remove/…), which collide across controllers; deriving instead from method + path is
- * unique by construction, so there is nothing left to detect — every operation gets a fresh id.
- */
+// `@shadow-library/fastify` derives operationIds from controller method names, which collide across controllers; method + path is unique by construction.
 function rewriteOperationIds(document: OpenApiDocument): void {
   for (const [pathKey, pathItem] of Object.entries(document.paths ?? {})) {
     for (const method of HTTP_METHODS) {
@@ -92,10 +75,7 @@ function rewriteOperationIds(document: OpenApiDocument): void {
   }
 }
 
-/**
- * Query parameters travel as strings on the wire (the client serialises everything through
- * `URLSearchParams`), so widen non-string GET query param schema types to also accept `string`.
- */
+// Query parameters travel as strings (the client serialises through `URLSearchParams`), so non-string GET query types are widened to accept `string`.
 function widenGetQueryParams(document: OpenApiDocument): void {
   for (const pathItem of Object.values(document.paths ?? {})) {
     const operation = pathItem.get;
@@ -109,12 +89,10 @@ function widenGetQueryParams(document: OpenApiDocument): void {
   }
 }
 
-/** A deterministic PascalCase-ish identifier derived from an operationId, used when a param-name source has no `summary`. */
 function toIdentifier(operationId: string): string {
   return operationId.replace(/(^|[^a-zA-Z0-9])([a-zA-Z0-9])/g, (_match, _sep, char: string) => char.toUpperCase());
 }
 
-/** Applies both fixes to a cloned document, leaving `document` untouched. */
 export function transformOpenApiDocument(document: OpenApiDocument): OpenApiDocument {
   const clone = structuredClone(document);
   rewriteOperationIds(clone);
@@ -122,7 +100,6 @@ export function transformOpenApiDocument(document: OpenApiDocument): OpenApiDocu
   return clone;
 }
 
-/** One GET operation's alias inputs, ahead of the collision check `buildTypeAliases` runs before naming anything. */
 interface AliasCandidate {
   pathKey: string;
   baseName: string;
@@ -130,23 +107,9 @@ interface AliasCandidate {
   hasPathParams: boolean;
 }
 
-/**
- * Builds the hand-written type aliases appended after the `openapi-typescript` output:
- *  - every named schema surfaced as a top-level alias (`MeResponse` instead of `components['schemas']['MeResponse']`)
- *  - a `<Name>QueryParams`/`<Name>PathParams` alias per GET operation that has query/path params, named
- *    from the operation's `summary` when present (falling back to its operationId so generation never
- *    breaks on a spec that omits summaries).
- *
- * `summary` comes from `@shadow-library/fastify`'s `@HttpRoute` decorator, which derives it from the
- * *controller method name* alone (`http-route.decorator.ts`) — not the path. Two controllers with same-named
- * handlers (`getManifest` on both the chapter-publish and wiki-publish controllers, say) produce identical
- * summaries and therefore identical `<Name>PathParams`/`<Name>QueryParams` aliases, even though their paths
- * differ. Since an OpenAPI document's path keys are themselves unique by construction, any alias name whose
- * summary-derived form collides with another route's is deterministically replaced — for every route sharing
- * that name, not just the newcomer, so the rule never depends on object-iteration order — with one derived
- * from the *full path* instead, which can't collide. Non-colliding routes keep their existing, already-committed
- * names untouched, so this never churns a web app's `api-types.gen.ts` beyond the routes that actually collide.
- */
+// `@HttpRoute` derives `summary` from the controller method name alone, so same-named handlers on different controllers would yield identical alias names.
+// Every colliding route (not just the newcomer, so the result is iteration-order independent) is renamed from its full path; non-colliding names stay untouched
+// so the committed api-types.gen.ts does not churn.
 export function buildTypeAliases(document: OpenApiDocument): string {
   let output = '';
 
@@ -166,8 +129,7 @@ export function buildTypeAliases(document: OpenApiDocument): string {
     });
   }
 
-  // Tally how many routes would land on the same summary-derived name for each suffix, independently —
-  // a route can share its `QueryParams` name with one route and its `PathParams` name with a different one.
+  // Tallied per suffix: a route can share its `QueryParams` name with one route and its `PathParams` name with another.
   const occurrences = new Map<string, number>();
   const tally = (name: string) => occurrences.set(name, (occurrences.get(name) ?? 0) + 1);
   for (const candidate of candidates) {
@@ -179,9 +141,7 @@ export function buildTypeAliases(document: OpenApiDocument): string {
   const resolveName = (candidate: AliasCandidate, suffix: 'QueryParams' | 'PathParams'): string => {
     const preferred = `${candidate.baseName}${suffix}`;
     const name = (occurrences.get(preferred) ?? 0) > 1 ? `${toIdentifier(normalizePath(candidate.pathKey))}${suffix}` : preferred;
-    // Path keys are unique OpenAPI document keys, so a path-derived name can only collide with another
-    // path-derived name if two candidates were generated from identical paths, which cannot happen — this
-    // check exists to fail loudly instead of silently emitting a duplicate identifier if that ever changes.
+    // Path keys are unique, so this cannot fire today; it fails loudly rather than emitting a duplicate identifier if the rule ever changes.
     if (usedNames.has(name))
       throw new ShadowError(`buildTypeAliases produced a duplicate alias "${name}" for ${candidate.pathKey} — this is a bug in the disambiguation rule itself.`);
     usedNames.add(name);
@@ -198,18 +158,11 @@ export function buildTypeAliases(document: OpenApiDocument): string {
   return output;
 }
 
-/**
- * Renders a validated+transformed OpenAPI document into the formatted contents of a workspace's
- * `api-types.gen.ts` — the one step both the write path and the `--check` drift path need, so the two
- * can never diverge on what "generated" means. `outputPath` only steers prettier's config resolution
- * (its own upward search from the file's directory); nothing is written here.
- */
+// Shared by the write and `--check` paths so they cannot diverge; `outputPath` only steers prettier's config resolution.
 export async function generateApiTypesContents(document: OpenApiDocument, outputPath: string): Promise<string> {
   const ast = await openapiTS(document as any); // openapi-typescript's input type is narrower than our validated document shape
   const rawContents = `${astToString(ast)}${buildTypeAliases(document)}`;
 
-  // Format the generated file with the repo's own `.prettierrc.json` (resolved by prettier), so it lands
-  // formatted exactly as `verify` and the editor expect — no separate ruleset to drift.
   const prettierOptions = await prettier.resolveConfig(outputPath);
   try {
     return await prettier.format(rawContents, { ...prettierOptions, parser: 'typescript' });
@@ -218,10 +171,6 @@ export async function generateApiTypesContents(document: OpenApiDocument, output
   }
 }
 
-/**
- * The `apps/*-server` workspace paired with `webApp` by naming convention — the same convention the
- * server↔web contract and AGENTS.md already assume.
- */
 function pairedServer(webApp: Workspace, workspaces: Workspace[]): Workspace {
   if (!webApp.dir.startsWith('apps/') || !webApp.dir.endsWith('-web')) throw new ShadowError(`${webApp.dir} is not an apps/*-web workspace`);
   const serverDir = webApp.dir.replace(/-web$/, '-server');
@@ -230,7 +179,6 @@ function pairedServer(webApp: Workspace, workspaces: Workspace[]): Workspace {
   return server;
 }
 
-/** Every `apps/*-web` workspace that has a paired `apps/*-server` — the full `--all` target set. */
 function webAppTargets(workspaces: Workspace[]): Workspace[] {
   return workspaces.filter(workspace => {
     if (!workspace.dir.startsWith('apps/') || !workspace.dir.endsWith('-web')) return false;
@@ -238,11 +186,7 @@ function webAppTargets(workspaces: Workspace[]): Workspace[] {
   });
 }
 
-/**
- * Runs `server`'s dump entry and returns the OpenAPI document it wrote. `--no-env-file` keeps a
- * developer's local `.env` from changing the contract, so a local run and CI capture the same document.
- * Always removes the dump, even on failure.
- */
+// `--no-env-file` keeps a developer's local `.env` from changing the contract, so local and CI capture the same document.
 export async function captureOpenApiDocument(server: Workspace): Promise<unknown> {
   const entryPath = path.join(server.path, DUMP_ENTRY_RELATIVE_PATH);
   if (!fs.existsSync(entryPath)) throw new ShadowError(`${server.dir} has no ${DUMP_ENTRY_RELATIVE_PATH} — every paired server needs one to capture its OpenAPI document`);
@@ -252,7 +196,7 @@ export async function captureOpenApiDocument(server: Workspace): Promise<unknown
 
   try {
     log.info(`boot   ${server.dir} (bun ${DUMP_ENTRY_RELATIVE_PATH})`);
-    /** `@shadow-library/common` reads `NODE_ENV` on import, before the entry can set anything, and a production value makes deployment-only config mandatory */
+    // `@shadow-library/common` reads `NODE_ENV` on import, and a production value makes deployment-only config mandatory.
     const child = Bun.spawn(['bun', '--no-env-file', DUMP_ENTRY_RELATIVE_PATH, dumpPath], {
       cwd: server.path,
       env: { ...stripGitEnv(process.env), NODE_ENV: 'development' },
@@ -282,7 +226,6 @@ export async function captureOpenApiDocument(server: Workspace): Promise<unknown
   }
 }
 
-/** Fetches and validates+transforms an OpenAPI document from a running server. */
 async function fetchOpenApiDocument(url: string): Promise<OpenApiDocument> {
   const response = await fetch(url);
   if (!response.ok) throw new ShadowError(`Failed to fetch OpenAPI spec from ${url}: ${response.status} ${response.statusText}`);
@@ -297,7 +240,6 @@ async function fetchOpenApiDocument(url: string): Promise<OpenApiDocument> {
   return transformOpenApiDocument(validateOpenApiDocument(rawDocument, url));
 }
 
-/** Writes `contents` to `webApp`'s `api-types.gen.ts` atomically, via a temp file, so a failure mid-write never leaves a truncated file behind. */
 function writeApiTypes(webApp: Workspace, contents: string): void {
   const outputPath = path.join(webApp.path, API_TYPES_PATH);
   const tempPath = `${outputPath}.tmp`;
@@ -307,11 +249,6 @@ function writeApiTypes(webApp: Workspace, contents: string): void {
   log.success(`Generated API types at ${webApp.dir}/${API_TYPES_PATH}`);
 }
 
-/**
- * Regenerates `webApp`'s API types in-process from its paired server's live document and diffs the
- * result against the committed file, without ever writing to it. Returns a human-readable failure
- * message, or `null` on a clean match.
- */
 export async function checkOne(webApp: Workspace, workspaces: Workspace[]): Promise<string | null> {
   const server = pairedServer(webApp, workspaces);
   const rawDocument = await captureOpenApiDocument(server);
@@ -329,7 +266,6 @@ export async function checkOne(webApp: Workspace, workspaces: Workspace[]): Prom
   return `${webApp.dir}/${API_TYPES_PATH} is out of date with ${server.dir}'s OpenAPI contract — run \`${regenCommand}\` (against a running server) and commit the result.`;
 }
 
-/** Checks every target web app in turn, reporting a combined failure list instead of aborting on the first. */
 export async function checkApiTypes(targets: Workspace[], workspaces: Workspace[]): Promise<void> {
   if (targets.length === 0) throw new ShadowError('No apps/*-web workspaces with a paired apps/*-server found — nothing to check.');
 
@@ -347,10 +283,6 @@ export async function checkApiTypes(targets: Workspace[], workspaces: Workspace[
   if (failures.length > 0) throw new ShadowError(`${failures.length} of ${targets.length} web app(s) have drifted API types.`);
 }
 
-/**
- * Regenerates `webApp`'s API types in-process (its paired server booted hermetically, no dev server
- * needed) and writes them — the `--all` write path, and the same acquisition `--check` uses.
- */
 async function genOneInProcess(webApp: Workspace, workspaces: Workspace[]): Promise<void> {
   const server = pairedServer(webApp, workspaces);
   const rawDocument = await captureOpenApiDocument(server);
@@ -360,11 +292,6 @@ async function genOneInProcess(webApp: Workspace, workspaces: Workspace[]): Prom
   writeApiTypes(webApp, contents);
 }
 
-/**
- * Fetches an OpenAPI document from a running server and generates the workspace's single API types file —
- * the one implementation every Shadow web app shares. The server↔web contract is not atomic, so this is
- * run deliberately as part of a coordinated server change, never as a build step.
- */
 export async function genApiTypes(workspace: Workspace, url: string): Promise<void> {
   const document = await fetchOpenApiDocument(url);
   const outputPath = path.join(workspace.path, API_TYPES_PATH);
@@ -372,7 +299,6 @@ export async function genApiTypes(workspace: Workspace, url: string): Promise<vo
   writeApiTypes(workspace, contents);
 }
 
-/** Parses argv and either writes or checks the requested target(s)' API types. */
 async function main(): Promise<number> {
   const args = process.argv.slice(2);
   if (args.includes('--help') || args.includes('-h')) {

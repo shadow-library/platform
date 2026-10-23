@@ -5,28 +5,20 @@ on:
     branches: [main]
   push:
     branches: [main]
-  # Manual re-run at any commit without needing a new push -- e.g. to re-verify main after an
-  # infra-only flake, with no code change to trigger a fresh run otherwise.
   workflow_dispatch: {}
 
 permissions:
   contents: read
 
-# Superseded pushes to the same PR branch cancel their in-flight run. Main runs are never
-# cancelled mid-flight; note the group still queues at most one pending main run, so a rapid
-# burst of main pushes serializes and intermediate pending runs get superseded (loudly — the
-# ci gate treats cancelled as failure).
+# Main runs are never cancelled mid-flight, but the group keeps one pending run, so a burst of main pushes supersedes the intermediate ones
+# (the ci gate treats cancelled as failure).
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
-  # Computes which workspaces a change actually touches, from a plain `git diff` against the
-  # merge-base — not dorny/paths-filter — because the rule set below isn't a static path→label
-  # table (an `apps/<x>/**` change must resolve to *that app's own workspace name*, and a
-  # packages/**|scripts/**|root-config change must expand to *every* workspace enumerated from
-  # the filesystem). That's a few lines of shell either way; doing it by hand avoids a
-  # third-party action and keeps the whole selection rule in one auditable place.
+  # Plain `git diff` instead of dorny/paths-filter: apps/<x>/** must resolve to that app's workspace name and shared paths must expand
+  # to every workspace found on the filesystem, which is not a static path-to-label table.
   changes:
     name: Detect affected workspaces
     runs-on: ubuntu-latest
@@ -36,8 +28,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          # Full history: merge-base and diff need to reach arbitrarily far back, especially for
-          # `push` events where `github.event.before` can be an old commit.
+          # merge-base and diff must reach arbitrarily far back, as `github.event.before` on a push can be an old commit.
           fetch-depth: 0
 
       - name: Detect affected workspaces
@@ -49,14 +40,9 @@ jobs:
           PUSH_BEFORE_SHA: ${{ github.event.before }}
           PUSH_AFTER_SHA: ${{ github.event.after }}
         run: |
-          # No `-u`: an entirely-empty `declare -A SELECTED` (the legitimate "nothing affected"
-          # outcome, e.g. a root-README-only change) trips bash's "unbound variable" on
-          # `${#SELECTED[@]}` under `set -u` — a known bash gotcha, not a real bug here.
+          # No `-u`: `${#SELECTED[@]}` on an empty `declare -A` ("nothing affected") trips bash's unbound-variable error.
           set -eo pipefail
 
-          # ---------------------------------------------------------------
-          # 1. Resolve the diff range for this event.
-          # ---------------------------------------------------------------
           if [ "$EVENT_NAME" = "pull_request" ]; then
             BASE_SHA="$PR_BASE_SHA"
             HEAD_SHA="$PR_HEAD_SHA"
@@ -77,24 +63,16 @@ jobs:
             echo "$CHANGED_FILES"
           fi
 
-          # ---------------------------------------------------------------
-          # 2. Enumerate every workspace from the filesystem, not a
-          #    hardcoded list, so a new app/package needs no workflow edit.
-          # ---------------------------------------------------------------
+          # Enumerated from the filesystem so a new app or package needs no workflow edit.
           ALL_WORKSPACES=()
           for d in apps/*/; do ALL_WORKSPACES+=("apps/$(basename "$d")"); done
           for d in packages/*/; do ALL_WORKSPACES+=("packages/$(basename "$d")"); done
           ALL_WORKSPACES+=("e2e")
-          # Not a workspace -- the root tooling (scripts/ + the root configs), which `verify.ts` accepts
-          # as a target so the thing that verifies everything else is itself format/lint/type-checked.
+          # Not a workspace: root tooling, which `verify.ts` accepts as a target so it is itself checked.
           ALL_WORKSPACES+=("scripts")
 
-          # ---------------------------------------------------------------
-          # 3. Apply the affected-path rules:
-          #      packages/**, scripts/**, or root config -> every workspace
-          #      apps/<x>/**                              -> apps/<x> only
-          #      e2e/**                                    -> e2e only
-          # ---------------------------------------------------------------
+          # packages/**, scripts/** and root config change every workspace; apps/<x>/** only that app; e2e/** only e2e.
+          # A new root config that verify or build reads must be added to the first pattern.
           declare -A SELECTED
           if [ "$ALL_CHANGED" = true ]; then
             for w in "${ALL_WORKSPACES[@]}"; do SELECTED["$w"]=1; done
@@ -127,16 +105,8 @@ jobs:
           fi
           echo "Affected workspaces: $SELECTED_JSON"
 
-          # ---------------------------------------------------------------
-          # 4. The one piece of per-workspace CI metadata that isn't purely
-          #    structural: which backends have a migrations check at all.
-          #    Every apps/*-server has one except pulse-server, whose
-          #    migrations are hand-managed via src/migrate.ts rather than
-          #    `drizzle-kit generate` (check-migrations.ts requires a
-          #    "db:generate" script and errors without one).
-          #    It also holds the opt-out from checkApiTypes (step 5) for a
-          #    server whose paired web app does not exist yet.
-          # ---------------------------------------------------------------
+          # Per-workspace metadata that is not structural: checkMigrations opts a server out of the migrations check (pulse-server today),
+          # and "checkApiTypes": false opts out a server whose paired web app does not exist yet.
           cat > /tmp/workspace-metadata.json <<'JSON'
           {
             "apps/identity-server": { "checkMigrations": true },
@@ -148,26 +118,9 @@ jobs:
           }
           JSON
 
-          # ---------------------------------------------------------------
-          # 5. Build matrix.include directly (one fully-specified object per
-          #    affected workspace) instead of a plain `workspace` array plus
-          #    a static `include:` block in the workflow. GitHub Actions
-          #    folds any `include` entry that doesn't match an existing
-          #    combination in as a *new* combination — with a static include
-          #    keyed by workspace name, every unaffected workspace would
-          #    silently reappear as its own job. Emitting the complete,
-          #    pre-filtered list here sidesteps that entirely.
-          #
-          #    checkApiTypes is structural, not mined metadata: every
-          #    apps/*-server and apps/*-web is paired one-to-one by naming
-          #    convention, and the check is infra-free and fast (~0.7s per
-          #    server), so both sides of every pair run it — a server leg
-          #    checks its own paired web app, a web leg checks itself. That
-          #    also covers a web-only hand edit of the committed
-          #    api-types.gen.ts, which a server-legs-only check would miss.
-          #    A workspace whose pair does not exist yet opts out with
-          #    "checkApiTypes": false in the metadata above.
-          # ---------------------------------------------------------------
+          # Emit matrix.include directly: a static `include:` keyed by workspace name would re-add every unaffected workspace as its own job,
+          # because unmatched include entries become new combinations.
+          # checkApiTypes runs on both legs of every apps/*-server and apps/*-web pair, so a web-only hand edit of api-types.gen.ts is caught too.
           MATRIX="$(jq -cn --argjson meta "$(cat /tmp/workspace-metadata.json)" --argjson selected "$SELECTED_JSON" '
             $selected | map(
               . as $w
@@ -184,7 +137,6 @@ jobs:
           echo "Resolved matrix:"
           echo "$MATRIX" | jq .
 
-  # One job per affected workspace.
   verify:
     name: verify (${{ matrix.workspace }})
     needs: changes
@@ -192,8 +144,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      # No max-parallel: the repo is public, where GitHub-hosted runners allow far more concurrent
-      # jobs than this matrix ever produces — the full 18-leg fan-out runs in a single wave.
+      # No max-parallel: the repo is public, so GitHub-hosted runners allow more concurrent jobs than the matrix produces.
       matrix:
         include: ${{ fromJSON(needs.changes.outputs.matrix) }}
 
@@ -206,9 +157,6 @@ jobs:
         with:
           bun-version: 1.3.14
 
-      # Bun's global download cache, keyed on the lockfile — turns each job's install into mostly
-      # cache-hits instead of registry downloads. restore-keys lets a lockfile change still start
-      # from the previous cache rather than cold.
       - name: Cache Bun downloads
         uses: actions/cache@v4
         with:
@@ -220,11 +168,7 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      # Package dists are content-cached under one key covering every input that can affect any
-      # package's build output. On a hit the build is skipped entirely. On a miss the job builds
-      # the FULL package set — not just this workspace's closure — so the cache saved under the
-      # shared key is complete for every other job and run; a closure-only build here would poison
-      # the key with a partial dist set.
+      # The key covers every input of every package build, so a miss must build the FULL package set; a closure-only build would save a partial dist set under the shared key.
       - name: Restore built package dists
         id: pkgdist
         if: matrix.workspace != 'scripts' && matrix.workspace != 'e2e'
@@ -237,26 +181,18 @@ jobs:
         if: matrix.workspace != 'scripts' && matrix.workspace != 'e2e' && steps.pkgdist.outputs.cache-hit != 'true'
         run: bun scripts/build.ts 'packages/*'
 
-      # `check-migrations.ts` only diffs `drizzle-kit generate`'s output against the committed
-      # migrations directory — schema-to-file, no live database — so this needs no Postgres service.
+      # Diffs `drizzle-kit generate` output against the committed migrations; no live database needed.
       - name: Check migrations
         if: matrix.checkMigrations
         run: bun scripts/check-migrations.ts ${{ matrix.workspace }}
 
-      # verify = format + lint + type-check + test. The test step runs only where the workspace opts in
-      # via `"shadow": { "verifyTest": true }` in its own package.json — every apps/* and packages/*
-      # library does today; e2e (a Playwright suite needing a live deployment) does not. `--ci` fails an
-      # apps/* workspace's test step on any test over the 50ms hard cap instead of only warning.
+      # The test step runs only where the workspace opts in via `"shadow": { "verifyTest": true }`; e2e needs a live deployment and does not.
+      # `--ci` fails an apps/* test over the 50ms hard cap instead of only warning.
       - name: Verify
         run: bun scripts/verify.ts ${{ matrix.workspace }} --ci
 
-      # The server↔web API contract is not atomic (AGENTS.md) — a server DTO change with no matching
-      # `api-types.gen.ts` regeneration in its paired web app, or a web-only hand edit of that
-      # committed file, is a silent break nothing else here would catch. `gen-api-types.ts --check`
-      # boots the relevant server through its `src/dump-openapi.ts` entry over fakes (no port, no dev
-      # server, no Postgres/Redis/IdP) and only reads the web app's committed file — infra-free and
-      # ~0.7s per server, so both a server leg (checking its own paired web app) and a web leg
-      # (checking itself) run it unconditionally rather than skipping web-only changes.
+      # The server-web contract is not atomic, so drift in a committed api-types.gen.ts is otherwise silent;
+      # --check boots the server's `src/dump-openapi.ts` over fakes, with no infra.
       - name: Check API types
         if: matrix.checkApiTypes
         run: bun scripts/gen-api-types.ts "$(echo '${{ matrix.workspace }}' | sed 's/-server$/-web/')" --check
@@ -265,9 +201,7 @@ jobs:
         if: matrix.workspace != 'scripts'
         run: bun scripts/build.ts ${{ matrix.workspace }}
 
-  # Single required-status-check target. A matrix job with zero legs (nothing affected) reports
-  # as "skipped", not "success" — a required check pinned directly to `verify` would then hang
-  # forever waiting for a status that will never post. This job always runs and normalizes that.
+  # Required-status-check target: a zero-leg matrix reports "skipped", so a check pinned to `verify` would wait forever. This job always runs and normalizes that.
   ci:
     name: CI
     needs: [changes, verify]

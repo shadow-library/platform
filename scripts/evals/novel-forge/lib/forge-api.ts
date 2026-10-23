@@ -42,7 +42,6 @@ export interface ProjectUpdate {
   contentMode?: ContentMode;
 }
 
-/** The slice of the Novel Forge public API an author-driven eval touches; `FakeForgeApi` implements the same surface offline. */
 export interface ForgeApi {
   readonly target: string;
   whoami(): Promise<void>;

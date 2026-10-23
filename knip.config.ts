@@ -13,11 +13,7 @@ function workspaceDirs(parent: string, suffix: string): string[] {
   return globSync(`${parent}/*${suffix}`, { cwd: ROOT }).sort();
 }
 
-/**
- * Every package publishes from `dist/`, so knip cannot follow its `exports` map back to source. Each
- * package therefore lists the `src/` file behind every subpath export — anything else in the package is
- * reachable only through one of these, which is exactly the reachability question knip is being asked.
- */
+// Packages export from `dist/`, so knip cannot follow `exports` back to source; list the `src/` file behind each subpath export.
 const PACKAGE_ENTRIES: Record<string, string[]> = {
   'packages/app': ['src/index.ts'],
   'packages/auth': ['src/index.ts', 'src/module/index.ts', 'src/rp/index.ts', 'src/testing/index.ts'],
@@ -50,24 +46,16 @@ const PACKAGE_ENTRIES: Record<string, string[]> = {
   ],
 };
 
-/**
- * `declare module` augments a package without importing it, so knip sees no reference and reports the
- * dependency as unused. Dropping it breaks the augmentation: TS2664 with every augmented member gone.
- */
+// `declare module` augments without importing, so knip reports the dependency unused; removing it fails with TS2664.
 const PACKAGE_IGNORED_DEPENDENCIES: Record<string, string[]> = {
   'packages/modules': ['fastify'],
 };
 
-/** `packages/web` and `packages/ui` colocate their unit tests beside the source rather than under `tests/`. */
 const COLOCATED_TESTS = ['src/**/*.{test,spec}.{ts,tsx}'];
 
-/** Reached by the runtime or the build, never by an import: bun entrypoints, vite configs, and the test tree. */
 const SERVER_ENTRIES = ['src/main.ts', 'src/worker.ts', 'src/migrate.ts', 'src/dump-openapi.ts', 'tests/**/*.ts', 'drizzle.config.ts'];
 
-/**
- * Route modules are discovered by TanStack Router's generator, service workers by a second vite build, and
- * `main.ts`/`serve.ts` by `bun start` — none of them appear in any import graph knip can walk.
- */
+// Route modules are discovered by TanStack Router's generator and service workers by a second vite build, so no import graph reaches them.
 const WEB_ENTRIES = ['src/routes/**/*.tsx', 'src/routes/**/*.ts', 'src/service-worker.ts', 'src/sw.ts', 'vitest.config.ts', 'tests/**/*.{ts,tsx}'];
 
 const config: KnipConfig = {
@@ -75,10 +63,7 @@ const config: KnipConfig = {
     '.': {
       entry: ['scripts/*.ts', 'scripts/utils/*.ts', 'scripts/evals/*/*.ts', '*.config.ts'],
       project: ['scripts/**/*.ts', '*.config.ts'],
-      /**
-       * `scripts/build.ts` loads the whole bundler toolchain through `import(name)` over a string array, and
-       * `scripts/code-health.ts` resolves its analyzers as binaries — neither is an import knip can follow.
-       */
+      // `scripts/build.ts` loads the bundler toolchain through `import(name)` and `scripts/code-health.ts` resolves its analyzers as binaries.
       ignoreDependencies: [
         'jscpd',
         'madge',
@@ -128,7 +113,7 @@ const config: KnipConfig = {
     e2e: { entry: ['tests/**/*.ts', 'seed/**/*.ts'], project: ['**/*.ts'] },
   },
   ignoreExportsUsedInFile: true,
-  /** Spawned by path from another workspace's directory, never imported: `scripts/*.ts` and the e2e seed entry. */
+  // Spawned by path from another workspace's directory, never imported.
   ignoreUnresolved: [/^scripts\//, 'seed/seed.ts'],
 };
 

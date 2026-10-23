@@ -72,7 +72,6 @@ export function assertSafeOutDir(dir: string): string {
   return resolved;
 }
 
-/** One suite invocation's output: `<out>/<suite>/<stamp>/{result.json,summary.md}`, plus the shared samples every suite appends to for (e). */
 export class OutputSink {
   readonly suiteDir: string;
 

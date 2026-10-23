@@ -6,17 +6,12 @@ const USAGE = `Usage: bun scripts/check-migrations.ts <workspace>
 
   workspace   repo-relative directory (apps/identity-server) or package name`;
 
-/**
- * Runs the workspace's `generate` command (`scripts/db.ts`, `drizzle-kit` under the hood) and fails if it
- * leaves the migrations directory dirty — a schema change was made without committing the migration it
- * requires. Checks both modified *and* untracked files (`git status --porcelain`, not just `git diff`),
- * since a genuinely new migration is a new file `git diff` alone would never flag.
- */
 export function checkMigrations(workspace: Workspace): void {
   log.info(`run    generate (bun scripts/db.ts ${workspace.dir} generate)`);
   const generateStatus = runDbCommand(workspace, 'generate');
   if (generateStatus !== 0) throw new ShadowError(`"bun scripts/db.ts ${workspace.dir} generate" failed (exit code ${generateStatus})`);
 
+  // `git diff` alone would miss a newly generated, untracked migration file.
   const status = run('git', ['status', '--porcelain', '--', MIGRATIONS_DIR], { cwd: workspace.path, stream: false });
   if (status.status !== 0) throw new ShadowError(`Could not check git status for ${workspace.dir}/${MIGRATIONS_DIR} — is this a git repository?`);
 
@@ -35,7 +30,6 @@ export function checkMigrations(workspace: Workspace): void {
   throw new ShadowError(`"bun scripts/db.ts ${workspace.dir} generate" produced uncommitted changes — run it locally and commit the result`);
 }
 
-/** Parses argv and checks the target workspace for migration drift. */
 function main(): number {
   const args = process.argv.slice(2);
   if (args.includes('--help') || args.includes('-h')) {

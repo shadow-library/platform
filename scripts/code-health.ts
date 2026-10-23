@@ -2,7 +2,6 @@ import { formatDuration, log, reportError, resolveBin, run, ShadowError } from '
 import { REPO_ROOT } from './workspaces.ts';
 
 interface Check {
-  /** Label, and the identifier accepted on the command line. */
   name: string;
   description: string;
   bin: string;
@@ -24,10 +23,6 @@ const USAGE = `Usage: bun scripts/code-health.ts [check ...]
 Runs every check when given no arguments. Each check runs to completion and reports independently —
 a failing one never hides the others — and the exit code is non-zero if any of them failed.`;
 
-/**
- * Every package resolves its workspace dependencies to their built `dist`, where madge would re-report
- * each source cycle a second time as its compiled `.d.ts` echo — {@link CYCLE_EXCLUDE} drops those.
- */
 const CYCLE_ROOTS = [
   'packages/app/src',
   'packages/auth/src',
@@ -39,6 +34,7 @@ const CYCLE_ROOTS = [
   'packages/web/src',
 ];
 
+// Packages resolve workspace dependencies to built `dist`, where madge would report each source cycle again as its `.d.ts` echo.
 const CYCLE_EXCLUDE = '(^|/)dist/';
 
 const DUPLICATION_IGNORE = ['**/node_modules/**', '**/dist/**', '**/*.gen.ts', '**/generated/**', '**/coverage/**', '**/logs/**', '**/scratch-pad/**'].join(',');

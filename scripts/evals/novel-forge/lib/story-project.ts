@@ -35,7 +35,6 @@ export function assertFixtureClean(story: Story, baseline: readonly BaselineChap
   if (leaks.length > 0) throw new EvalError(`Story fixture reveals secrets early: ${leaks.join('; ')}`);
 }
 
-/** Creates the invented story's project with its cast, milestones and milestone-gated secrets, exactly as an author would type them in. */
 export async function seedStoryProject(context: SuiteContext, story: Story, label: string, options: SeedOptions = {}): Promise<{ projectId: string; sessionId: string }> {
   const { projectId, sessionId } = await context.api.createNovel(`[eval ${label}] ${story.title}`, story.notes);
   if (context.tier) await context.api.updateProject(projectId, { costTier: context.tier });
@@ -63,7 +62,6 @@ export async function seedStoryBible(context: SuiteContext, projectId: string, s
   }
 }
 
-/** Plans (by hand or through the chat), writes, approves and finalizes one chapter; a failure is recorded on the chapter, never thrown. */
 export async function writeStoryChapter(
   author: Author,
   projectId: string,

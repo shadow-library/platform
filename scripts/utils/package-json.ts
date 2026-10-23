@@ -3,7 +3,6 @@ import path from 'node:path';
 
 import { ShadowError } from './errors.ts';
 
-/** An `exports` entry: either a raw asset path (`"./dist/styles.css"`) or a conditions map. */
 export type PackageExport = string | Record<string, string>;
 
 export interface PackageJson {
@@ -21,7 +20,6 @@ export interface PackageJson {
   [key: string]: unknown;
 }
 
-/** Reads and parses `<dir>/package.json`, failing with a diagnostic message rather than a raw JSON parse error. */
 export function readPackageJson(dir: string): PackageJson {
   const filePath = path.join(dir, 'package.json');
   if (!fs.existsSync(filePath)) throw new ShadowError(`No package.json found at ${filePath}`);
@@ -34,10 +32,6 @@ export function readPackageJson(dir: string): PackageJson {
   }
 }
 
-/**
- * Returns the first script (in `names` order) that exists in `scripts`. Lets callers accept
- * naming drift (e.g. `type-check` vs `typecheck`) without guessing which one wins.
- */
 export function findScript(scripts: Record<string, string> | undefined, names: string[]): { name: string; command: string } | undefined {
   if (!scripts) return undefined;
   for (const name of names) {

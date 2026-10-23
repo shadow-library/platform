@@ -9,36 +9,26 @@ import { findScript, log, reportError, reportTestBudget, resolveBin, run, Shadow
 import { findWorkspace, findWorkspaces, REPO_ROOT, type Workspace } from './workspaces.ts';
 
 interface VerifyOptions {
-  /** Apply fixes in place (prettier `--write`, eslint `--fix`) instead of only reporting. */
   fix: boolean;
-  /** Stop after format + lint, skipping type-check/test — the pre-commit hook's speed budget. */
+  /** Stops after format and lint, the pre-commit speed budget. */
   fast: boolean;
-  /** Run only the test step — the fast unit-test dev loop. */
+  /** Runs the test step only. */
   unit: boolean;
-  /** For an `apps/*` workspace, fail the test step on any test over the 50ms hard cap instead of only warning. */
+  /** Fails an `apps/*` test over the 50ms hard cap instead of only warning. */
   ci: boolean;
 }
 
-/**
- * What a single verify pass runs against. Every workspace maps to one, and so does the root tooling
- * (`scripts/` plus the root-level configs), which is not a workspace but still has to be held to the
- * same format and lint rules as the code it checks.
- */
 interface VerifyTarget {
-  /** Label, and the identifier accepted on the command line. */
   dir: string;
-  /** ESLint's cwd — decides which flat config applies via its own upward lookup. */
+  /** ESLint's cwd; decides which flat config applies. */
   path: string;
-  /** Repo-relative paths or globs handed to prettier. */
   formatPaths: string[];
-  /** Paths or globs handed to ESLint, relative to {@link path}. */
+  /** Relative to {@link path}. */
   lintPaths: string[];
-  /** Absolute path to the tsconfig the type-check step points `tsc` at. */
   tsconfigPath: string;
-  /** The package.json `test` script, when the workspace defines one — preferred over the `bun test` fallback. */
   scripts: Record<string, string> | undefined;
   verifyTest: boolean;
-  /** Whether `--ci` may fail this target's test step on the 50ms budget — `apps/*` only; everything else stays warn-only. */
+  /** `apps/*` only: `--ci` can fail its test step; elsewhere the budget is warn-only. */
   ciScoped: boolean;
 }
 
@@ -57,17 +47,9 @@ const USAGE = `Usage: bun scripts/verify.ts [workspace | scripts | --all] [--fix
               offenders — without it, a test over budget only warns; applies to --unit and to the normal
               test step alike. packages/* and other non-app workspaces stay warn-only regardless`;
 
-/**
- * Ignore files prettier is pointed at, repo-relative. Passed explicitly (rather than relying on prettier's
- * cwd-relative defaults) because verify runs prettier from the repo root against a workspace subdirectory,
- * where a workspace-local ignore file would never be discovered.
- */
+// Passed explicitly: prettier runs from the repo root, so a workspace-local ignore file would never be discovered.
 const IGNORE_FILES = ['.gitignore', '.prettierignore'];
 
-/**
- * The root tooling: `scripts/` and the root-level configs. Not a workspace, so `--all` would otherwise
- * leave the tooling that verifies everything else as the one thing nothing verifies.
- */
 const TOOLING_TARGET: VerifyTarget = {
   dir: 'scripts',
   path: REPO_ROOT,
@@ -79,7 +61,6 @@ const TOOLING_TARGET: VerifyTarget = {
   ciScoped: false,
 };
 
-/** Adapts a workspace to a verify target: prettier gets the whole directory, ESLint runs inside it. */
 function toTarget(workspace: Workspace): VerifyTarget {
   return {
     dir: workspace.dir,
@@ -93,12 +74,6 @@ function toTarget(workspace: Workspace): VerifyTarget {
   };
 }
 
-/**
- * Formats a workspace with prettier, which resolves the root `.prettierrc.json` itself — so `verify` and a
- * bare `prettier` run (editor format-on-save, `bunx prettier`) format identically, with no second ruleset
- * to drift. The CLI (not the Node API) owns file discovery, so the ignore files are the single definition
- * of what is off limits.
- */
 function runFormat(target: VerifyTarget, fix: boolean): boolean {
   const ignoreArgs = IGNORE_FILES.filter(file => fs.existsSync(path.join(REPO_ROOT, file))).flatMap(file => ['--ignore-path', file]);
   const args = [fix ? '--write' : '--check', '--log-level', 'warn', ...ignoreArgs, ...target.formatPaths];
@@ -113,11 +88,7 @@ function runFormat(target: VerifyTarget, fix: boolean): boolean {
   return true;
 }
 
-/**
- * Lints a workspace with no explicit config: ESLint runs with the workspace as its cwd, so flat config's
- * own upward lookup picks the workspace's `eslint.config.ts` when it has one and the root config otherwise.
- * Rules, ignores and overrides therefore live entirely in ESLint's own files.
- */
+// ESLint's flat-config upward lookup from the workspace cwd finds the single root config.
 async function runLint(target: VerifyTarget, fix: boolean): Promise<boolean> {
   const eslint = new ESLint({ cwd: target.path, fix, errorOnUnmatchedPattern: false });
   const results = await eslint.lintFiles(target.lintPaths);
@@ -136,13 +107,6 @@ async function runLint(target: VerifyTarget, fix: boolean): Promise<boolean> {
   return true;
 }
 
-/**
- * Type-checks a workspace by running `tsc` directly against its own `tsconfig.json` — every workspace
- * tsconfig extends `tsconfig.base.json`, which sets `noEmit: true`, so this is identical to what each
- * workspace's old, since-deleted `"type-check"` package.json script did (`tsc`, `tsc -p tsconfig.json`,
- * or `tsc --noEmit` were all the same command in disguise). Driving it here — like format and lint —
- * means every workspace is type-checked unconditionally, with no per-workspace script to keep in sync.
- */
 function runTypeCheck(target: VerifyTarget): boolean {
   const result = run(resolveBin('tsc', [target.path, REPO_ROOT]), ['-p', target.tsconfigPath, '--noEmit'], { cwd: target.path });
   if (result.status !== 0) {
@@ -154,15 +118,8 @@ function runTypeCheck(target: VerifyTarget): boolean {
   return true;
 }
 
-/**
- * Runs `bun test` directly against `target`, with the junit reporter feeding the 10ms budget report.
- * `--timeout 1000` is a hang safety net only — genuinely stuck tests still get killed rather than hanging
- * for the default 5s — and is deliberately well above the 50ms `--ci` cap, so the budget's warn-vs-fail
- * split is enforced solely by {@link reportTestBudget} rather than by bun's own timeout pre-empting it.
- * `--ci` can only fail a `ciScoped` (apps/*) target; elsewhere the report stays a warning. A workspace
- * with zero matching test files exits non-zero without writing the report, so the budget is only read
- * when it exists.
- */
+// `--timeout 1000` is only a hang guard, kept well above the 50ms `--ci` cap so the budget split is enforced by reportTestBudget, not bun's timeout.
+// A workspace with no test files exits non-zero without writing the junit report.
 function runBunTestWithBudget(target: VerifyTarget, ci: boolean): boolean {
   const ciGate = ci && target.ciScoped;
   const outfile = path.join(os.tmpdir(), `shadow-verify-junit-${randomUUID()}.xml`);
@@ -183,12 +140,7 @@ function runBunTestWithBudget(target: VerifyTarget, ci: boolean): boolean {
   return true;
 }
 
-/**
- * Runs the workspace's own `test` package.json script when it declares one (a Playwright/vitest suite,
- * or a composed sequence like `packages/app`'s `test:unit && test:integration` — none of these are
- * restatements of a default, so they stay workspace-owned scripts). Otherwise falls back to `bun test`
- * directly, the one path the junit budget reporter and `--ci` gate can apply to.
- */
+// Only the `bun test` fallback gets the junit budget reporter and the `--ci` gate.
 function runTest(target: VerifyTarget, ci: boolean): boolean {
   const script = findScript(target.scripts, ['test']);
   if (!script) return runBunTestWithBudget(target, ci);
@@ -203,12 +155,7 @@ function runTest(target: VerifyTarget, ci: boolean): boolean {
   return true;
 }
 
-/**
- * The `--unit` dev loop: only the test step. An `apps/*` workspace always runs `bun test` directly, bypassing
- * any composed `test` script, since only that is the fast, DB-free unit run this flag exists for. Any other
- * workspace runs its own `test` script when it has one, because that script is how the package runs at all:
- * `packages/fastify`'s specs leak `mock.module` across files without `--isolate`, and `packages/ui` is vitest.
- */
+// Non-app workspaces keep their own `test` script: packages/fastify needs `--isolate` against leaking `mock.module`, and packages/ui is vitest.
 function runUnitTarget(target: VerifyTarget, ci: boolean): boolean {
   log.info(`\nverifying ${target.dir} (unit)`);
 
@@ -220,13 +167,6 @@ function runUnitTarget(target: VerifyTarget, ci: boolean): boolean {
   return target.dir.startsWith('apps/') ? runBunTestWithBudget(target, ci) : runTest(target, ci);
 }
 
-/**
- * Runs format → lint → type-check → test for one workspace, stopping at the first failure. Format and
- * lint are driven here (prettier and ESLint, each resolving its own config); type-check always runs
- * directly against the workspace's tsconfig; test runs the workspace's own script when it has one,
- * otherwise `bun test` directly — and only for workspaces that opt into `verify` running tests at all.
- * A local pre-commit convenience, not a CI replacement — CI keeps its steps granular for per-step visibility.
- */
 export async function verifyTarget(target: VerifyTarget, options: VerifyOptions): Promise<boolean> {
   log.info(`\nverifying ${target.dir}`);
 
@@ -245,11 +185,6 @@ export async function verifyTarget(target: VerifyTarget, options: VerifyOptions)
   return true;
 }
 
-/**
- * Verifies every workspace and reports a combined result. Unlike `build --all` there is no dependency
- * ordering to respect, so workspaces run in declaration order and each one's failure is collected rather
- * than aborting the run — a single pass tells you everything that needs fixing.
- */
 async function verifyAll(options: VerifyOptions): Promise<number> {
   const failures: string[] = [];
   for (const target of [TOOLING_TARGET, ...findWorkspaces().map(toTarget)]) {
@@ -265,7 +200,6 @@ async function verifyAll(options: VerifyOptions): Promise<number> {
   return 0;
 }
 
-/** `--unit --all`: the test step alone for every target, skipping any that hasn't opted into `verifyTest`. */
 function verifyUnitAll(ci: boolean): number {
   const failures: string[] = [];
   for (const target of [TOOLING_TARGET, ...findWorkspaces().map(toTarget)]) {
@@ -281,14 +215,12 @@ function verifyUnitAll(ci: boolean): number {
   return 0;
 }
 
-/** Resolves the workspace, or `scripts`, an identifier on the command line names — the shared lookup behind every mode. */
 function resolveTarget(args: string[]): VerifyTarget {
   const identifier = args.find(arg => !arg.startsWith('-'));
   if (!identifier) throw new ShadowError(`A workspace, "scripts", or --all is required.\n\n${USAGE}`);
   return identifier === TOOLING_TARGET.dir ? TOOLING_TARGET : toTarget(findWorkspace(identifier));
 }
 
-/** Parses argv, verifies either one workspace or all of them, and returns the process exit code. */
 async function main(): Promise<number> {
   const args = process.argv.slice(2);
   if (args.includes('--help') || args.includes('-h')) {

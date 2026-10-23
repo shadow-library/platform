@@ -54,7 +54,6 @@ export interface TurnRequest {
   costTier?: CostTier;
 }
 
-/** A turn as the author experienced it: the result plus when each lookup round landed, in ms from the POST. */
 export interface TurnTrace {
   result: ChatTurnResult;
   totalMs: number;
