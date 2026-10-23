@@ -29,7 +29,7 @@ import {
 } from '@server/common';
 import { type Ai, type Generation, type Job, type Project } from '@server/database';
 
-import { EndingContractSchema, KnowledgeContractSchema } from '../ai/schemas';
+import { type ContinuityOutput, EndingContractSchema, KnowledgeContractSchema } from '../ai/schemas';
 import { JobUsageResponse } from '../jobs/jobs.dto';
 
 const RATING_DESCRIPTION = 'Content rating level; an omitted dimension is unrated — never send "none" to say it.';
@@ -821,7 +821,7 @@ export class ContinuityProposalResponse {
   status: string;
 
   @Field(() => Object, { additionalProperties: true })
-  proposal: Record<string, unknown>;
+  proposal: ContinuityOutput;
 
   @Field({ optional: true, nullable: true })
   model?: string | null;

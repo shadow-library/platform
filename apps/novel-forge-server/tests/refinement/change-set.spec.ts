@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'bun:test';
 
+import { AppErrorCode } from '@server/classes';
 import {
   ACTION_TYPES,
   actionDecisionKeys,
   type ChangeOp,
   changeSetRefs,
   isActionOp,
+  opFields,
+  parseChangeSet,
+  parseOptionalChangeSet,
   renderActionVocabulary,
   renderOpVocabulary,
   validateChangeSet,
@@ -340,5 +344,48 @@ describe('actionDecisionKeys', () => {
     ];
 
     expect(actionDecisionKeys(ops)).toEqual(['action.plan_chapter', 'action.approve_draft:3', 'action.advance_volume:v1', 'action.audit_bible']);
+  });
+});
+
+describe('parseChangeSet', () => {
+  it('should return the same ops when the change-set is well-formed', () => {
+    expect(parseChangeSet(validOps)).toBe(validOps);
+  });
+
+  it('should throw RFN_004 for whatever validateChangeSet rejects', () => {
+    const rejected: unknown[] = [{}, [], [{ op: 'chapter.delete', chapter: 1 }], [{ op: 'volume.remove', volumeKey: 'vol_1', extra: true }], [null]];
+    for (const raw of rejected) {
+      expect(validateChangeSet(raw).length).toBeGreaterThan(0);
+      expect(() => parseChangeSet(raw)).toThrow(AppErrorCode.RFN_004.create().message);
+    }
+  });
+
+  it('should enforce the allowed ops and the entity materialization option it is given', () => {
+    expect(() => parseChangeSet(validOps, ['premise.update'])).toThrow();
+    const prose = [{ op: 'bible_document.upsert', section: 'power', slug: 'system-and-limits', body: 'A long backstory.' }];
+    expect(validateChangeSet(prose)).not.toEqual([]);
+    expect(() => parseChangeSet(prose)).toThrow();
+    expect(parseChangeSet(prose, undefined, { entityMaterialization: false })).toBe(prose as unknown as ChangeOp[]);
+  });
+});
+
+describe('parseOptionalChangeSet', () => {
+  it('should treat a missing or empty change-set as no ops', () => {
+    expect(parseOptionalChangeSet(undefined)).toEqual([]);
+    expect(parseOptionalChangeSet(null)).toEqual([]);
+    expect(parseOptionalChangeSet([])).toEqual([]);
+  });
+
+  it('should validate a non-empty change-set', () => {
+    expect(parseOptionalChangeSet(validOps)).toBe(validOps);
+    expect(() => parseOptionalChangeSet([{ op: 'nope' }])).toThrow();
+  });
+});
+
+describe('opFields', () => {
+  it('should read declared fields and give undefined for ones the op lacks', () => {
+    const op: ChangeOp = { op: 'volume.remove', volumeKey: 'vol_1' };
+    expect(opFields(op)['volumeKey']).toBe('vol_1');
+    expect(opFields(op)['objective']).toBeUndefined();
   });
 });

@@ -94,7 +94,7 @@ function recordingRouter(calls: RecordedCall[], extracted?: unknown) {
     if (key === 'chapter-expand') return { body: LONG_BODY };
     if (key === 'title') return { title: 'Low Water' };
     if (key === 'continuity') return { newEntities: [], relationships: [], characterStates: [] };
-    if (key === 'chapter-extract') return { summary: 'Canon.', changeSet: [{ op: 'entity.upsert', entityKey: 'keeper' }] };
+    if (key === 'chapter-extract') return { summary: 'Canon.', changeSet: [{ op: 'entity.upsert', entityKey: 'keeper', type: 'character' }] };
     drafts += 1;
     return { title: drafts === 1 ? '' : 'Low Water', body: SHORT_BODY, summary: 'Done.', state: {} };
   };

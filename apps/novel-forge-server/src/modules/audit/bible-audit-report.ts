@@ -2,9 +2,10 @@ import { revealTermPattern } from '@server/common';
 import { type BibleAuditEvidence, type BibleAuditFinding, type BibleAuditGroup } from '@server/database';
 
 import { isWriterExcludedBibleDoc } from '../ai/context/bible-docs';
+import { AUDIT_OPS, CANON_REFRESH_OPS, CONTRADICTION_OPS } from '../ai/prompts';
 import { type BibleAuditOutput, type BibleContradictionOutput, type ChapterCanonRefreshOutput } from '../ai/schemas';
 import { type FactLike } from '../bible/fact/knowledge-view';
-import { type ChangeOp, changeSetRefs } from '../refinement/change-set';
+import { type ChangeOp, changeSetRefs, parseOptionalChangeSet } from '../refinement/change-set';
 import { contentTokens, normaliseForQuote, quoteFoundIn } from '../refinement/write-policy';
 
 export interface AuditReportInput {
@@ -210,14 +211,14 @@ export function buildAuditReport(input: AuditReportInput): BuiltAuditReport {
   for (const item of input.contradictions?.contradictions ?? []) {
     const evidence = evidenceFor(item.evidence, input.sources);
     if (!evidence.some(entry => entry.quote !== null)) continue;
-    const ops = item.changeSet as unknown as ChangeOp[];
+    const ops = parseOptionalChangeSet(item.changeSet, CONTRADICTION_OPS, { entityMaterialization: false });
     const ref = ops[0] ? refOf(ops[0]) : ((evidence.find(entry => !entry.ref.startsWith('chapter:')) ?? evidence[0])?.ref ?? '');
     const staged = showsBothSides(evidence, input.sources) ? stageAll(ops) : { opIndexes: [], withheld: ops.length > 0 ? EVIDENCE_WITHHELD : null };
     drafts.push({ group: 'contradiction', ref, text: item.finding, evidence, ...staged });
   }
 
   if (input.coverage) {
-    const coverageOps = input.coverage.changeSet as unknown as ChangeOp[];
+    const coverageOps = parseOptionalChangeSet(input.coverage.changeSet, AUDIT_OPS, { entityMaterialization: false });
     const claimed = new Set<ChangeOp>();
     for (const finding of input.coverage.findings) {
       if (finding.action === 'keep') continue;
@@ -255,7 +256,7 @@ export function buildCanonRefreshReport(input: CanonRefreshReportInput): BuiltAu
   for (const item of input.refresh.updates) {
     const evidence = evidenceFor(item.evidence, input.sources);
     if (!evidence.some(entry => entry.ref === input.chapterRef && entry.quote !== null)) continue;
-    const ops = item.changeSet as unknown as ChangeOp[];
+    const ops = parseOptionalChangeSet(item.changeSet, CANON_REFRESH_OPS, { entityMaterialization: false });
     const first = ops[0];
     if (!first) continue;
     const ref = refOf(first);

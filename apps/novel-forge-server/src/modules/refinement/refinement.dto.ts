@@ -214,7 +214,7 @@ export class ProposalResponse {
   sessionId?: string | null;
 
   @Field(() => String, { optional: true, nullable: true })
-  messageId?: bigint | null;
+  messageId?: string | null;
 
   @Field(() => ChatScope)
   scopeType: Refinement.ChatScope;

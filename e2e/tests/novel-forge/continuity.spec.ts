@@ -72,7 +72,7 @@ const EMPTY_DELTA = {
   knowledgeChanges: [],
   timeline: [],
   power: [],
-  chapterSummary: '',
+  chapterSummary: 'The chapter, in brief.',
 };
 
 const EVIDENCE = 'Quoted from the chapter.';

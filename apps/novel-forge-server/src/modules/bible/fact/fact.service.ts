@@ -6,7 +6,7 @@ import { DatabaseService } from '@shadow-library/modules';
 import { AppErrorCode } from '@server/classes';
 import { changedCluesNamingTerms, lockProjectPlan, normalizeStringList, reconcilePlanState, validateUnlockCondition } from '@server/common';
 import { APP_NAME } from '@server/constants';
-import { type Knowledge, type PrimaryDatabase, schema, type UnlockCondition } from '@server/database';
+import { type DbExecutor, type Knowledge, type PrimaryDatabase, schema, type UnlockCondition } from '@server/database';
 
 import { type RevealFactBody, type UpsertFactBody } from './fact.dto';
 
@@ -64,13 +64,13 @@ export class FactService {
     await this.assertProject(projectId);
     await this.db.transaction(async tx => {
       await lockProjectPlan(tx, projectId);
-      await this.writeFact(tx as unknown as PrimaryDatabase, projectId, factKey, body);
+      await this.writeFact(tx, projectId, factKey, body);
       await reconcilePlanState(tx, projectId);
     });
     return this.get(projectId, factKey);
   }
 
-  private async writeFact(db: PrimaryDatabase, projectId: bigint, factKey: string, body: UpsertFactBody): Promise<void> {
+  private async writeFact(db: DbExecutor, projectId: bigint, factKey: string, body: UpsertFactBody): Promise<void> {
     const existing = await db.query.canonFacts.findFirst({ where: and(eq(schema.canonFacts.projectId, projectId), eq(schema.canonFacts.factKey, factKey)) });
     const merged = {
       text: body.text,

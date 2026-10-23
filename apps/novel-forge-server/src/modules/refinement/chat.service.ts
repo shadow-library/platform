@@ -34,7 +34,7 @@ import { NotesStoreService } from '../notes/notes-store.service';
 import { ORGANISE_MIN_WORDS } from '../notes/organise-plan';
 import { type ForgeCallPolicy, PluginPolicyService } from '../plugins/plugin-policy.service';
 import { ActionExecutorRegistry } from './action-registry';
-import { type ChangeOp } from './change-set';
+import { type ChangeOp, parseChangeSet, parseOptionalChangeSet } from './change-set';
 import { ChatCompactionService, type ChatConversation } from './chat-compaction.service';
 import { contextUpdate, playbookDigest, toExchangeMessage } from './chat-exchange';
 import { type ChatTurnEmitter, EmitterRelay } from './chat-turn-emitter';
@@ -824,7 +824,7 @@ export class ChatService {
     warnings: string[],
     staging: StagingContext,
   ): Promise<TurnStaging & { replyNote?: string }> {
-    const proposed = (output.changeSet ?? []) as unknown as ChangeOp[];
+    const proposed = parseOptionalChangeSet(output.changeSet, HUB_ALLOWED_OPS);
     if (proposed.length === 0) return { appliedProposal: null, cardProposal: null };
     const { ops, dropped } = await anchorPassageRewrites(this.db, projectId, proposed, staging.contexts);
     if (dropped.length > 0) this.logger.info('chat turn: left out passage rewrites it could not place', { projectId, runId, dropped });
@@ -934,7 +934,7 @@ export class ChatService {
   private async negationWarnings(projectId: bigint, output: ChatRefineOutput, exempt: ReadonlySet<string>): Promise<string[]> {
     if (!output.changeSet?.length) return [];
     try {
-      return await findNegationEchoWarnings(this.db, projectId, output.changeSet as unknown as ChangeOp[], { exempt });
+      return await findNegationEchoWarnings(this.db, projectId, parseChangeSet(output.changeSet, HUB_ALLOWED_OPS), { exempt });
     } catch (err) {
       this.logger.warn('chat turn: negation check failed — staging without warnings', { projectId, err });
       return [];

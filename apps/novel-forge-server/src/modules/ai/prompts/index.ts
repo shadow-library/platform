@@ -77,7 +77,10 @@ export {
   renderTurnRules,
   type TurnMessageParts,
 } from './chat-refine.prompt';
+export { AUDIT_OPS } from './bible-audit.prompt';
 export { CONTRADICTION_OPS } from './bible-contradiction.prompt';
+export { CHAPTER_EXTRACT_OPS } from './chapter-extract.prompt';
+export { PREMISE_OPS } from './premise-enhance.prompt';
 export { CANON_REFRESH_OPS } from './chapter-canon-refresh.prompt';
 export { buildOutlinePrompt, outlineWordTargetVars } from './outline.prompt';
 export { chapterPlanPrompt } from './chapter-plan.prompt';

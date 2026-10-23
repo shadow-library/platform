@@ -3,7 +3,7 @@ import { type Refinement } from '@server/database';
 import { isWriterExcludedBibleDoc } from '../ai/context/bible-docs';
 import { requiredEntityTypesForSlug } from '../bible/bible-manifest';
 import { type RecordFields } from './artifact-state';
-import { ACTION_TYPES, type ActionType, type ChangeOp, changeSetRefs, declaredOpFields, type EntityUpsertOp, isActionOp, type OpType } from './change-set';
+import { ACTION_TYPES, type ActionType, type ChangeOp, changeSetRefs, declaredOpFields, type EntityUpsertOp, isActionOp, opFields, type OpType } from './change-set';
 
 export type OpSide = 'direct' | 'card';
 /**
@@ -291,7 +291,7 @@ interface FieldTokens {
 }
 
 function fieldTokens(op: ChangeOp, current: RecordFields | undefined): FieldTokens[] {
-  const fields = op as unknown as Record<string, unknown>;
+  const fields = opFields(op);
   const own = new Set([
     ...DISPLAY_KEY_FIELDS.flatMap(field => contentTokens(textOf(fields[field] ?? current?.[field]))),
     ...IDENTIFIER_KEY_FIELDS.flatMap(field => contentTokens(textOf(current?.[field]))),
@@ -338,7 +338,7 @@ function isFilled(value: unknown): boolean {
 
 function clearsField(op: ChangeOp, current: RecordFields | undefined): boolean {
   if (!current) return false;
-  const fields = op as unknown as Record<string, unknown>;
+  const fields = opFields(op);
   return declaredOpFields(op.op).some(field => fields[field] !== undefined && !isFilled(fields[field]) && isFilled(current[field]));
 }
 
@@ -355,7 +355,7 @@ export function alwaysCardRule(op: ChangeOp, state: WritePolicyState): AlwaysCar
   const kindRule = ALWAYS_CARD[op.op];
   if (kindRule) return kindRule;
   if (clearsField(op, current)) return 'removal';
-  const fields = op as unknown as Record<string, unknown>;
+  const fields = opFields(op);
 
   if (op.op === 'premise.update') return STORY_FIELDS.some(field => fields[field] !== undefined && isFilled(current?.[field])) ? 'replaces_story' : undefined;
   if (op.op === 'bible_document.upsert') return isWriterExcludedBibleDoc({ section: op.section, slug: op.slug }) ? 'planner_only_page' : undefined;

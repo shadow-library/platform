@@ -1,3 +1,4 @@
+import { AppErrorCode } from '@server/classes';
 import { validateBriefScenes, validateUnlockCondition } from '@server/common';
 import { type Bible, type BriefScene, type Generation, type Knowledge, type Project, type UnlockCondition } from '@server/database';
 
@@ -769,6 +770,21 @@ export function validateChangeSet(value: unknown, allowedOps?: readonly OpType[]
   if (errors.length === 0 && options?.entityMaterialization !== false) errors.push(...validateEntityMaterialization(value, allowedOps));
 
   return errors;
+}
+
+export function parseChangeSet(raw: unknown, allowedOps?: readonly OpType[], options?: ChangeSetValidationOptions): ChangeOp[] {
+  if (validateChangeSet(raw, allowedOps, options).length > 0) throw AppErrorCode.RFN_004.create();
+  return raw as ChangeOp[];
+}
+
+/** An empty change-set is how a model says it has nothing to change; anything else must pass `parseChangeSet`. */
+export function parseOptionalChangeSet(raw: unknown, allowedOps?: readonly OpType[], options?: ChangeSetValidationOptions): ChangeOp[] {
+  if (raw === undefined || raw === null || (Array.isArray(raw) && raw.length === 0)) return [];
+  return parseChangeSet(raw, allowedOps, options);
+}
+
+export function opFields(op: ChangeOp): Readonly<Record<string, unknown>> {
+  return op as unknown as Record<string, unknown>;
 }
 
 /** What a plugin may propose: what the novel contains, never its structure — a brief's volume, mode, milestones and ending are the book's shape, which only the author rearranges. */

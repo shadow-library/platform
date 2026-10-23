@@ -65,9 +65,7 @@ export class NovelImportService {
     const genre = bundle.novel.genre?.trim() ? matchGenre(bundle.novel.genre) : undefined;
     if (bundle.novel.genre?.trim() && !genre) warnings.push(`novel.genre '${bundle.novel.genre}' is not one of the platform genres and was not stored`);
 
-    const { projectId, jobId } = await this.db.transaction(async rawTx => {
-      const tx = rawTx as unknown as PrimaryDatabase;
-
+    const { projectId, jobId } = await this.db.transaction(async tx => {
       const [project] = await tx
         .insert(schema.projects)
         .values({

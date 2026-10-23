@@ -11,11 +11,11 @@ import { ContextAssembler, NOVEL_CHAT_HISTORY_ALLOWANCE } from '../ai/context/co
 import { CHAPTER_PACK_CONSUMERS } from '../ai/graphs/chapter-generation.graph';
 import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { ModelRouterService, type ProjectConfig } from '../ai/model-router.service';
-import { chatPromptTokens, chatScopeInstructions, PROMPT_REGISTRY } from '../ai/prompts';
+import { chatPromptTokens, chatScopeInstructions, PREMISE_OPS, PROMPT_REGISTRY } from '../ai/prompts';
 import { type PremiseEnhanceOutput } from '../ai/schemas';
 import { toolsForNode } from '../ai/tools';
 import { PluginPolicyService } from '../plugins/plugin-policy.service';
-import { type ChangeOp } from './change-set';
+import { parseChangeSet } from './change-set';
 import { ProposalService } from './proposal.service';
 import { type ContextPreviewResponse } from './refine.dto';
 
@@ -82,8 +82,8 @@ export class RefineService {
         scopeType: 'novel',
         kind: 'premise_enhance',
         summary: output.hook.slice(0, 300),
-        changeSet: output.changeSet as unknown as ChangeOp[],
-        allowedOps: ['premise.update', 'bible_document.upsert'],
+        changeSet: parseChangeSet(output.changeSet, PREMISE_OPS),
+        allowedOps: PREMISE_OPS,
         runId,
       });
       const rationale = { ...output };

@@ -326,7 +326,7 @@ describe('ChapterAmendService', () => {
     const modelRouter = {
       structured: async (_module: unknown, vars: { chapterProse?: string }) => {
         prompts.push(vars);
-        return { summary: 'Two ships', changeSet: [{ op: 'entity.upsert', entityKey: 'keeper' }] };
+        return { summary: 'Two ships', changeSet: [{ op: 'entity.upsert', entityKey: 'keeper', type: 'character' }] };
       },
       resolveModel: () => ({ model: 'fake-extractor' }),
     };

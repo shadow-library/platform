@@ -28,7 +28,7 @@ import {
   volumeContentHash,
 } from '@server/common';
 import { APP_NAME } from '@server/constants';
-import { type Generation, type PrimaryDatabase, type PrimaryTransaction, type Project, type Refinement, schema, type Story } from '@server/database';
+import { type DbExecutor, type Generation, type PrimaryDatabase, type PrimaryTransaction, type Project, type Refinement, schema, type Story } from '@server/database';
 
 import { defaultChapterMode } from '../ai/chapter-route';
 import { runWithCostTier } from '../ai/cost-tier-scope';
@@ -212,7 +212,7 @@ function keptOr<T>(value: T | null | undefined, existing: T | null | undefined):
 }
 
 interface ApplyContext {
-  tx: PrimaryDatabase;
+  tx: PrimaryTransaction;
   projectId: bigint;
   applied: AppliedArtifact[];
   staleMarked: string[];
@@ -302,14 +302,14 @@ function applyOrder(ops: readonly ChangeOp[], indexes: readonly number[]): numbe
 }
 
 /** Plans, and the facts, volumes and milestones their reveal rule reads, are checked as the whole change-set leaves them, so one op may rely on another. */
-async function enforcePlanOps(tx: PrimaryDatabase, projectId: bigint, ops: readonly ContentOp[]): Promise<void> {
+async function enforcePlanOps(tx: DbExecutor, projectId: bigint, ops: readonly ContentOp[]): Promise<void> {
   if (!ops.some(op => PLAN_STATE_OPS.has(op.op))) return;
   const written = ops.flatMap(op => (op.op === 'brief.update' ? [op.chapter] : []));
   await enforcePlanWrite(tx, projectId, written);
 }
 
 /** A plan pass plans only the next chapter, so its card goes out of date once a draft moves the story past the chapter it planned. */
-async function assertPlanCardCurrent(tx: PrimaryDatabase, projectId: bigint, ops: readonly ContentOp[]): Promise<void> {
+async function assertPlanCardCurrent(tx: DbExecutor, projectId: bigint, ops: readonly ContentOp[]): Promise<void> {
   const planned = ops.flatMap(op => (op.op === 'brief.update' ? [op.chapter] : []));
   if (planned.length === 0) return;
   const next = await nextWritableChapter(tx, projectId);
@@ -382,7 +382,7 @@ export class ProposalApplyService {
 
       const baseline = proposal.baseline as Record<string, ArtifactState>;
       const mismatches = await this.findBaselineMismatches(
-        tx as unknown as PrimaryDatabase,
+        tx,
         projectId,
         contentOps.map(c => c.op),
         baseline,
@@ -403,7 +403,7 @@ export class ProposalApplyService {
 
       if (options?.opSources && options.opSources.length !== ops.length) throw AppError.internal('an automatic apply carries one source per op of its change-set');
 
-      const ctx: ApplyContext = { tx: tx as unknown as PrimaryDatabase, projectId, applied: [], staleMarked: [] };
+      const ctx: ApplyContext = { tx, projectId, applied: [], staleMarked: [] };
       const inverseOps: ContentOp[] = [];
       const perOpUndo = options?.autoApplied === true && PER_OP_UNDO_KINDS.has(proposal.kind);
       const opUndo: (OpUndoRecord | null)[] = ops.map(() => null);
@@ -548,7 +548,7 @@ export class ProposalApplyService {
     return isCostTier(run?.costTier) ? run.costTier : undefined;
   }
 
-  private async findBaselineMismatches(tx: PrimaryDatabase, projectId: bigint, ops: ChangeOp[], baseline: Record<string, ArtifactState>): Promise<BaselineMismatch[]> {
+  private async findBaselineMismatches(tx: DbExecutor, projectId: bigint, ops: ChangeOp[], baseline: Record<string, ArtifactState>): Promise<BaselineMismatch[]> {
     const refs = changeSetRefs(ops);
     const current = await loadArtifactStates(tx, projectId, refs);
     const passageOnly = new Set(refs.filter(ref => ops.every(op => !changeSetRefs([op]).includes(ref) || isPassageRewrite(op))));
@@ -1103,7 +1103,7 @@ export class ProposalApplyService {
     if (!project) throw AppErrorCode.PRJ_001.create();
     if (chapter <= (project.storyCurrentChapter ?? 0)) throw AppErrorCode.RFN_010.create();
 
-    const tx = ctx.tx as unknown as PrimaryTransaction;
+    const tx = ctx.tx;
     const current = await lockDraft(tx, ctx.projectId, chapter);
     if (current.status === 'final') throw AppErrorCode.RFN_010.create();
     if (current.isolated) throw AppErrorCode.RFN_012.create();
@@ -1381,7 +1381,7 @@ export class ProposalApplyService {
       // rollback chain must keep walking backward through exactly that state.
       const postState = (proposal.postState ?? {}) as Record<string, ArtifactState>;
       const refs = Object.keys(postState);
-      const current = await loadArtifactStates(tx as unknown as PrimaryDatabase, projectId, refs);
+      const current = await loadArtifactStates(tx, projectId, refs);
       const mismatches: BaselineMismatch[] = [];
       for (const ref of refs) {
         const expected = postState[ref] as ArtifactState;
@@ -1391,7 +1391,7 @@ export class ProposalApplyService {
       }
       if (mismatches.length > 0) return { outcome: 'conflicted' as const, mismatches };
 
-      const ctx: ApplyContext = { tx: tx as unknown as PrimaryDatabase, projectId, applied: [], staleMarked: [] };
+      const ctx: ApplyContext = { tx, projectId, applied: [], staleMarked: [] };
       if (inverseOps.some(op => PLAN_STATE_OPS.has(op.op))) await lockProjectPlan(tx, projectId);
       for (const op of removalsLast(inverseOps)) await this.applyOp(ctx, op);
       await enforcePlanOps(ctx.tx, projectId, inverseOps);
@@ -1432,7 +1432,7 @@ export class ProposalApplyService {
       const refs = changeSetRefs([turn.op]);
       if (!(await this.statesMatch(tx, projectId, refs, turn.proposal.postState))) throw AppErrorCode.RFN_006.create();
 
-      const ctx: ApplyContext = { tx: tx as unknown as PrimaryDatabase, projectId, applied: [], staleMarked: [] };
+      const ctx: ApplyContext = { tx, projectId, applied: [], staleMarked: [] };
       const { inverse } = turn.record;
       if (PLAN_STATE_OPS.has(inverse.op)) await lockProjectPlan(tx, projectId);
       await this.applyOp(ctx, inverse);
@@ -1469,7 +1469,7 @@ export class ProposalApplyService {
       const refs = changeSetRefs([turn.op]);
       if (!(await this.statesMatch(tx, projectId, refs, turn.record.undoneState))) throw AppErrorCode.RFN_003.create();
 
-      const ctx: ApplyContext = { tx: tx as unknown as PrimaryDatabase, projectId, applied: [], staleMarked: [] };
+      const ctx: ApplyContext = { tx, projectId, applied: [], staleMarked: [] };
       if (PLAN_STATE_OPS.has(turn.op.op)) await lockProjectPlan(tx, projectId);
       const beforeState = await loadArtifactStates(ctx.tx, projectId, refs);
       const inverse = await this.captureInverse(ctx, turn.op);
@@ -1524,7 +1524,7 @@ export class ProposalApplyService {
   }
 
   private async statesMatch(tx: PrimaryTransaction, projectId: bigint, refs: string[], expected: unknown): Promise<boolean> {
-    const current = await loadArtifactStates(tx as unknown as PrimaryDatabase, projectId, refs);
+    const current = await loadArtifactStates(tx, projectId, refs);
     return sameContent(refs, (expected ?? {}) as Record<string, ArtifactState>, current);
   }
 

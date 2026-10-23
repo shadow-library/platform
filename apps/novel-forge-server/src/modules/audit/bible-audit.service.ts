@@ -21,7 +21,7 @@ import {
 import { ContextAssembler } from '../ai/context/context-assembler.service';
 import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { ModelRouterService, type ProjectConfig } from '../ai/model-router.service';
-import { CONTRADICTION_OPS, PROMPT_REGISTRY } from '../ai/prompts';
+import { AUDIT_OPS, CONTRADICTION_OPS, PROMPT_REGISTRY } from '../ai/prompts';
 import { type BibleAuditOutput, type BibleContradictionOutput } from '../ai/schemas';
 import { type InventoryDoc, renderDocInventory, renderEntityInventory } from '../bible/bible-inventory';
 import { renderManifest } from '../bible/bible-manifest';
@@ -84,8 +84,7 @@ type PassResult<T> = { ok: true; output: T } | { ok: false; error: string };
 const AUDIT_GRAPH = 'bible-audit';
 const AUDIT_TARGET = 'bible';
 const HISTORY_LIMIT = 50;
-const COVERAGE_OPS: readonly OpType[] = ['bible_document.upsert', 'bible_document.remove', 'entity.upsert', 'entity.remove'];
-const STAGED_OPS: readonly OpType[] = [...new Set([...COVERAGE_OPS, ...CONTRADICTION_OPS])];
+const STAGED_OPS: readonly OpType[] = [...new Set([...AUDIT_OPS, ...CONTRADICTION_OPS])];
 const SETTLED_CARD: ReadonlySet<Refinement.ProposalStatus> = new Set(['applied', 'reverted', 'conflicted']);
 const RESTAGEABLE_CARD: ReadonlySet<Refinement.ProposalStatus> = new Set(['discarded', 'superseded']);
 

@@ -356,14 +356,14 @@ export class ChatMessageResponse {
   content: string;
 
   @Field(() => String, { optional: true, nullable: true, description: "The turn's suggestion cards: a pending proposal the author accepts or declines op by op." })
-  proposalId?: bigint | null;
+  proposalId?: string | null;
 
   @Field(() => String, {
     optional: true,
     nullable: true,
     description: "The turn's changes taken from the author's own words, applied in the turn and undone by reverting this proposal.",
   })
-  appliedProposalId?: bigint | null;
+  appliedProposalId?: string | null;
 
   @Field({ optional: true, nullable: true })
   runId?: string | null;

@@ -2,6 +2,7 @@ import { InferEnum, InferSelectModel, relations } from 'drizzle-orm';
 import { bigint, bigserial, boolean, index, integer, pgEnum, pgTable, text, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
 import { type ContentRating } from '@shadow-library/sdk';
 
+import { type ContinuityOutput } from '../../modules/ai/schemas/continuity.schema';
 import { jsonb } from './jsonb';
 import { contentGenerator, contentMode, projects } from './projects';
 
@@ -20,6 +21,7 @@ export namespace Generation {
   export type Draft = InferSelectModel<typeof drafts>;
   export type ChapterImage = InferSelectModel<typeof chapterImages>;
   export type Brief = InferSelectModel<typeof briefs>;
+  export type ContinuityProposalPayload = ContinuityOutput & { sourceIsolated?: true };
   export type ContinuityProposal = InferSelectModel<typeof continuityProposals>;
   export type DraftStatus = InferEnum<typeof draftStatus>;
   export type JudgeVerdict = InferEnum<typeof judgeVerdict>;
@@ -142,7 +144,7 @@ export const continuityProposals = pgTable(
       .references(() => projects.id, { onDelete: 'cascade' }),
     chapter: integer('chapter').notNull(),
     status: continuityProposalStatus('status').notNull().default('pending'),
-    proposal: jsonb('proposal').$type<Record<string, unknown>>().notNull(),
+    proposal: jsonb('proposal').$type<Generation.ContinuityProposalPayload>().notNull(),
     model: varchar('model'),
     appliedAt: timestamp('applied_at'),
     createdAt: timestamp('created_at').notNull().defaultNow(),

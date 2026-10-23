@@ -44,14 +44,15 @@ import { expandShortDraft } from '../ai/graphs/draft-expansion';
 import { bibleHashOf, keptBackOf } from '../ai/graphs/writer-snapshot-capture';
 import { type RunTrace, splitRunTrace, type WorkflowRunResult, WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { ModelRouterService, type ProjectConfig } from '../ai/model-router.service';
-import { PROMPT_REGISTRY } from '../ai/prompts';
+import { CHAPTER_EXTRACT_OPS, PROMPT_REGISTRY } from '../ai/prompts';
 import { generationWordTargetVars } from '../ai/prompts/generation.prompt';
 import { IndexingService } from '../ai/retrieval/indexing.service';
 import { RetrievalService } from '../ai/retrieval/retrieval.service';
+import { type ContinuityOutput, ContinuitySchema } from '../ai/schemas';
 import { type ChapterExtractOutput } from '../ai/schemas/chapter-extract.schema';
-import { type ContinuityOutput } from '../ai/schemas/continuity.schema';
 import { type EndingContractSchema } from '../ai/schemas/ending-contract.schema';
 import { type GenerationState } from '../ai/schemas/generation.schema';
+import { parseSchema, renderSchemaIssues } from '../ai/schemas/validate';
 import { isolatedContinuityProposal, isolatedExtractionContext, standardReadableExtraction } from '../ai/isolation-read-policy';
 import { type TelemetryContext, TelemetryHandler } from '../ai/telemetry.handler';
 import { type CallRoute } from '../ai/unrestricted-route';
@@ -68,7 +69,7 @@ import { JobExecutor } from '../jobs/job.executor';
 import { type JobOrigin, JobService } from '../jobs/job.service';
 import { PluginPolicyService } from '../plugins/plugin-policy.service';
 import { PluginProposalService } from '../plugins/plugin-proposal.service';
-import { type ChangeOp } from '../refinement/change-set';
+import { parseOptionalChangeSet } from '../refinement/change-set';
 import { ProposalService } from '../refinement/proposal.service';
 import { overrideOpenBlockingOnApproval } from '../review/review-records';
 import { ChapterImageService } from './chapter-image.service';
@@ -952,15 +953,15 @@ export class GenerationService {
       ctx,
       project,
       policy,
-    )) as object;
+    )) as ContinuityOutput;
     const proposal = draft.isolated ? isolatedContinuityProposal(extracted) : extracted;
 
     const [row] = await this.db
       .insert(schema.continuityProposals)
-      .values({ projectId, chapter, status: 'pending', proposal: proposal as never })
+      .values({ projectId, chapter, status: 'pending', proposal })
       .onConflictDoUpdate({
         target: [schema.continuityProposals.projectId, schema.continuityProposals.chapter],
-        set: { proposal: proposal as never, status: 'pending', appliedAt: null, updatedAt: new Date() },
+        set: { proposal, status: 'pending', appliedAt: null, updatedAt: new Date() },
       })
       .returning();
     if (!row) throw AppErrorCode.CNT_001.create();
@@ -992,7 +993,7 @@ export class GenerationService {
     )) as ChapterExtractOutput;
     const output = draft.isolated ? standardReadableExtraction(extracted) : extracted;
 
-    const changeSet = (output.changeSet ?? []) as unknown as ChangeOp[];
+    const changeSet = parseOptionalChangeSet(output.changeSet, CHAPTER_EXTRACT_OPS);
     this.logger.debug('extractChapterToBible: derived change-set', { projectId, chapter, ops: changeSet.length });
     if (changeSet.length === 0) throw AppErrorCode.DRF_005.create();
 
@@ -1002,7 +1003,7 @@ export class GenerationService {
       kind: 'chapter_extract',
       summary: output.summary?.trim() || `Canon from chapter ${chapter}`,
       changeSet,
-      allowedOps: ['entity.upsert', 'entity.remove', 'bible_document.upsert', 'bible_document.remove'],
+      allowedOps: CHAPTER_EXTRACT_OPS,
       model: this.modelRouter.resolveModel(promptModule.role ?? 'extraction', project, policy).model,
       sourceIsolated: draft.isolated,
     });
@@ -1025,11 +1026,11 @@ export class GenerationService {
 
   async updateContinuityProposal(projectId: bigint, chapter: number, body: UpdateContinuityBody): Promise<Generation.ContinuityProposal> {
     const existing = await this.getContinuityProposal(projectId, chapter);
-    const [updated] = await this.db
-      .update(schema.continuityProposals)
-      .set({ proposal: body.proposal as never, updatedAt: new Date() })
-      .where(eq(schema.continuityProposals.id, existing.id))
-      .returning();
+    const { sourceIsolated: _ignored, ...candidate } = body.proposal;
+    const parsed = parseSchema<ContinuityOutput>(ContinuitySchema, candidate);
+    if (!parsed.success) throw AppErrorCode.CNT_003.create({ reason: renderSchemaIssues(parsed.issues).replaceAll('\n', '; ') });
+    const proposal: Generation.ContinuityProposalPayload = existing.proposal.sourceIsolated ? { ...parsed.data, sourceIsolated: true } : parsed.data;
+    const [updated] = await this.db.update(schema.continuityProposals).set({ proposal, updatedAt: new Date() }).where(eq(schema.continuityProposals.id, existing.id)).returning();
     if (!updated) throw AppErrorCode.CNT_001.create();
     return updated;
   }
@@ -1037,7 +1038,7 @@ export class GenerationService {
   async applyContinuityProposal(projectId: bigint, chapter: number): Promise<Generation.ContinuityProposal> {
     this.logger.info('applyContinuityProposal: applying', { projectId, chapter });
     const proposalRow = await this.getContinuityProposal(projectId, chapter);
-    const delta = proposalRow.proposal as unknown as ContinuityOutput;
+    const delta = proposalRow.proposal;
 
     // Apply every canon mutation, mark the proposal applied, and flag the chapter in one transaction:
     // a partial application must never be recorded as `applied`.

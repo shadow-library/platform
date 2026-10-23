@@ -2,7 +2,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 
 import { type DbExecutor, schema } from '@server/database';
 
-import { type ChangeOp } from './change-set';
+import { type ChangeOp, opFields } from './change-set';
 import { findNegationEchoes, type NegationEchoOptions } from './negation-echo';
 
 type TextOpType = 'brief.update' | 'draft.update' | 'bible_document.upsert' | 'entity.upsert';
@@ -63,7 +63,7 @@ export function negationEchoWarnings(ops: readonly ChangeOp[], baselines: Readon
     const baseline = baselines.get(baselineKey(op));
     if (!baseline) return [];
     const fields = TEXT_FIELDS[op.op];
-    const proposed = op as unknown as Record<string, unknown>;
+    const proposed = opFields(op);
     const before = fields.map(field => baseline[field] ?? '').join('\n');
     const after = fields.map(field => (typeof proposed[field] === 'string' ? (proposed[field] as string) : (baseline[field] ?? ''))).join('\n');
     return findNegationEchoes(before, after, options).map(

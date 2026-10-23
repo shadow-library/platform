@@ -6,7 +6,7 @@ import { type BibleAuditOutput, BibleAuditSchema } from '../schemas/bible-audit.
 import { EDIT_BY_DELETION } from './authoring-preamble';
 import { type PromptModule } from './types';
 
-const AUDIT_OPS = ['bible_document.upsert', 'bible_document.remove', 'entity.upsert', 'entity.remove'] as const;
+export const AUDIT_OPS = ['bible_document.upsert', 'bible_document.remove', 'entity.upsert', 'entity.remove'] as const;
 
 const system =
   'You are a story-bible auditor for a serialized web novel. You receive the premise, the current bible document inventory, the current entity inventory, and the manifest of the chapters a web-novel bible can hold.\n\n' +

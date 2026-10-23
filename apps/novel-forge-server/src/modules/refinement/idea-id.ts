@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 
 import { isWriterExcludedBibleDoc } from '../ai/context/bible-docs';
-import { type ChangeOp, type ContentOp, declaredOpFields, isActionOp } from './change-set';
+import { type ChangeOp, type ContentOp, declaredOpFields, isActionOp, opFields } from './change-set';
 import { normaliseForQuote } from './write-policy';
 
 export const IDEA_ID_PATTERN = /^[0-9a-f]{24}$/;
@@ -26,7 +26,7 @@ function canonical(value: unknown): unknown {
  * (case, whitespace, typography) and metadata — rationale, quote, stamps — left out. Rewording the idea makes it a different one.
  */
 export function ideaIdOf(op: ChangeOp): string {
-  const fields = op as unknown as Record<string, unknown>;
+  const fields = opFields(op);
   const content = Object.fromEntries(declaredOpFields(op.op).map(field => [field, fields[field]]));
   const digest = createHash('sha256')
     .update(JSON.stringify(canonical({ op: op.op, ...content })))
