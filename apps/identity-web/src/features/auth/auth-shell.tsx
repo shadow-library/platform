@@ -1,7 +1,7 @@
 import { type ReactNode } from 'react';
-import { cn } from '@shadow-library/ui';
+import { CheckIcon, cn } from '@shadow-library/ui';
 
-import { CheckIcon, LockIcon } from '@/components/icons';
+import { LockIcon } from '@/components/icons';
 
 import styles from './auth-shell.module.css';
 

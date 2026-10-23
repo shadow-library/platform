@@ -1,7 +1,6 @@
 import { type ReactNode } from 'react';
-import { Button, Spinner } from '@shadow-library/ui';
+import { AlertTriangleIcon, Button, CheckIcon, Spinner } from '@shadow-library/ui';
 
-import { CheckIcon, WarningIcon } from '@/components/icons';
 import { type ChatJobStreamStatus } from '@/lib/apis';
 
 import { type JobView } from './chat-view';
@@ -31,7 +30,7 @@ export function JobProgress({ view, stream, cancelling, onCancel, children }: Jo
   return (
     <section className={styles.job} aria-label={view.title} data-tone={view.tone}>
       <div className={styles.jobHead}>
-        {view.tone === 'running' ? <Spinner size="sm" label={view.title} /> : <WarningIcon size={16} />}
+        {view.tone === 'running' ? <Spinner size="sm" label={view.title} /> : <AlertTriangleIcon size={16} />}
         <span className={styles.cardTitle}>{view.title}</span>
         {view.cancellable && (
           <Button size="sm" variant="ghost" className={styles.pushEnd} loading={cancelling} disabled={cancelling} onClick={onCancel}>

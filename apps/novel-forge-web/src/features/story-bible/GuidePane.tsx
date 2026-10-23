@@ -1,9 +1,9 @@
 import { Link } from '@tanstack/react-router';
 import { type ReactElement, useMemo, useState } from 'react';
 
-import { Button, toast } from '@shadow-library/ui';
+import { Button, CheckIcon, toast } from '@shadow-library/ui';
 
-import { CheckIcon, ChevronLeftIcon } from '@/components/icons';
+import { ChevronLeftIcon } from '@/components/icons';
 import { BibleDocumentSheet } from '@/components/nf/BibleDocumentSheet';
 import { Markdown, PaneError, PaneLoader, StatusChip } from '@/components/nf';
 import { type BibleDocListItem, type EntityResponse, useBibleDocQuery, useUpsertBibleDocMutation } from '@/lib/apis';

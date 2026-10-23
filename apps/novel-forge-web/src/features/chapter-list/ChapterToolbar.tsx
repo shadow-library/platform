@@ -1,7 +1,6 @@
 import { useId, useState } from 'react';
-import { Button, Input, SegmentedControl, Select } from '@shadow-library/ui';
+import { Button, Input, SearchIcon, SegmentedControl, Select } from '@shadow-library/ui';
 
-import { SearchIcon } from '@/components/icons';
 import { type ChapterShow } from '@/lib/chapter-list';
 
 import styles from './ChapterToolbar.module.css';

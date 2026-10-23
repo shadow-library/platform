@@ -1,7 +1,7 @@
 import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu';
 import { forwardRef } from 'react';
 
-import { CheckIcon, ChevronRightIcon } from '@/icons';
+import { CompactCheckIcon, CompactChevronRightIcon } from '@/icons';
 import { cn } from '@/lib';
 
 import styles from './DropdownMenu.module.css';
@@ -62,7 +62,7 @@ const DropdownMenuCheckboxItem = forwardRef<HTMLDivElement, DropdownMenuCheckbox
       {...props}
     >
       <span className={styles.indicator}>
-        <DropdownMenuPrimitive.ItemIndicator>{icon ?? <CheckIcon />}</DropdownMenuPrimitive.ItemIndicator>
+        <DropdownMenuPrimitive.ItemIndicator>{icon ?? <CompactCheckIcon />}</DropdownMenuPrimitive.ItemIndicator>
       </span>
       <span className={styles.itemLabel}>{children}</span>
       {shortcut != null ? (
@@ -114,7 +114,7 @@ const DropdownMenuSubTrigger = forwardRef<HTMLDivElement, DropdownMenuSubTrigger
       {icon != null ? <span className={styles.itemIcon}>{icon}</span> : null}
       <span className={styles.itemLabel}>{children}</span>
       <span className={styles.subChevron}>
-        <ChevronRightIcon />
+        <CompactChevronRightIcon />
       </span>
     </DropdownMenuPrimitive.SubTrigger>
   );

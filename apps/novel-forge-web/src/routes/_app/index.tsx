@@ -1,8 +1,8 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
-import { Button } from '@shadow-library/ui';
+import { Button, PlusIcon } from '@shadow-library/ui';
 
-import { BookIcon, PlusIcon, UploadIcon } from '@/components/icons';
+import { BookIcon, UploadIcon } from '@/components/icons';
 import { PageHeader, QueryState, StatusChip } from '@/components/nf';
 import { NewNovelModal } from '@/features/projects/NewNovelModal';
 import { listProjectsQueryOptions, type ProjectResponse, useListProjectsQuery, useProjectStatusQuery } from '@/lib/apis';

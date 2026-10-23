@@ -1,8 +1,7 @@
 import { Link } from '@tanstack/react-router';
 import { type ReactNode, useId, useState } from 'react';
-import { Button, DropdownMenu, Popover, SegmentedControl, toast } from '@shadow-library/ui';
+import { Button, ChevronDownIcon, DropdownMenu, Popover, SegmentedControl, toast } from '@shadow-library/ui';
 
-import { ChevronDownIcon } from '@/components/icons';
 import {
   type AiTierModel,
   type ChatMessageResponse,

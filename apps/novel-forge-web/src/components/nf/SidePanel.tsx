@@ -1,8 +1,8 @@
 import { type ReactElement, type ReactNode, useId, useState } from 'react';
 
-import { IconButton } from '@shadow-library/ui';
+import { ChevronRightIcon, IconButton } from '@shadow-library/ui';
 
-import { ChevronLeftIcon, ChevronRightIcon } from '@/components/icons';
+import { ChevronLeftIcon } from '@/components/icons';
 import { resolveCollectionView } from '@/lib/collection-page';
 import { type PanelState, panelToggleLabel, togglePanelState, toPanelState } from '@/lib/side-panel';
 

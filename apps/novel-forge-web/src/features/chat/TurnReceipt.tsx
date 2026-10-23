@@ -1,7 +1,6 @@
 import { useRef } from 'react';
-import { Button } from '@shadow-library/ui';
+import { Button, CheckIcon } from '@shadow-library/ui';
 
-import { CheckIcon } from '@/components/icons';
 import { type ApplyProposalResponse, type ProposalResponse, type TurnHoldReason, useProposalQuery } from '@/lib/apis';
 
 import chatStyles from './Chat.module.css';

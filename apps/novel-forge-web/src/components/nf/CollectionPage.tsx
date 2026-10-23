@@ -1,8 +1,7 @@
 import { cloneElement, type ReactElement, type ReactNode, useId } from 'react';
 
-import { Input, SegmentedControl } from '@shadow-library/ui';
+import { Input, SearchIcon, SegmentedControl } from '@shadow-library/ui';
 
-import { SearchIcon } from '@/components/icons';
 import { formatCount, resolveCollectionView, seeAllCount, shouldRenderSection, shouldRenderSegments } from '@/lib/collection-page';
 
 import styles from './CollectionPage.module.css';

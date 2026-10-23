@@ -1,8 +1,8 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
-import { Alert, Button, Dialog, EmptyState, FormField, IconButton, Input, Select, Skeleton, Spinner, toast, Tooltip } from '@shadow-library/ui';
+import { Alert, Button, CheckIcon, CopyIcon, Dialog, EmptyState, FormField, IconButton, Input, Select, Skeleton, Spinner, toast, Tooltip } from '@shadow-library/ui';
 
-import { CheckIcon, CloseIcon, CopyIcon, DownloadIcon, ResetIcon, SparkIcon } from '@/components/icons';
+import { CloseIcon, DownloadIcon, ResetIcon, SparkIcon } from '@/components/icons';
 import { PageContainer, SectionCard, StatusChip, StopButton } from '@/components/nf';
 import { ImageUpload } from '@/components/nf/ImageUpload';
 import { BreakdownTable, EstimateNote, StatCard, StatGrid, StatValue, UsageBars } from '@/features/usage';

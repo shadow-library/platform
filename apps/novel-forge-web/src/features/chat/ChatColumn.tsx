@@ -1,9 +1,9 @@
 import { useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Button, toast, useMediaQuery } from '@shadow-library/ui';
+import { Alert, Button, ChevronDownIcon, PlusIcon, toast, useMediaQuery } from '@shadow-library/ui';
 
-import { ChevronDownIcon, ClockIcon, CloseIcon, EditIcon, PlusIcon, ProposalsIcon } from '@/components/icons';
+import { ClockIcon, CloseIcon, EditIcon, ProposalsIcon } from '@/components/icons';
 import { PaneError, PaneLoader, StatusChip, TurnStatus } from '@/components/nf';
 import { ChatModelMenu, MessageModelTag } from '@/components/nf/ChatModel';
 import { Markdown } from '@/components/nf/Markdown';

@@ -1,9 +1,9 @@
 import { useLocation, useNavigate } from '@tanstack/react-router';
 import { type ReactNode, useEffect } from 'react';
-import { cn, IconButton, Spinner } from '@shadow-library/ui';
+import { BellIcon, cn, IconButton, Spinner } from '@shadow-library/ui';
 import { AppShell, type NavConfig } from '@shadow-library/ui/router';
 
-import { BellIcon, BrandGlyph, BuildingIcon, GridIcon, MailIcon, MonitorIcon, PlugIcon, ShieldCheckIcon, TerminalIcon, UserIcon } from '@/components/icons';
+import { BrandGlyph, BuildingIcon, GridIcon, MailIcon, MonitorIcon, PlugIcon, ShieldCheckIcon, TerminalIcon, UserIcon } from '@/components/icons';
 import { CrumbTrail, ThemeToggle } from '@/components/si';
 import { useAdminContextQuery, useMeQuery, useSignoutMutation } from '@/lib/apis';
 import { displayName } from '@/lib/format';

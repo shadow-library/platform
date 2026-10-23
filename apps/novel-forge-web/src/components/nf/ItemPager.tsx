@@ -1,8 +1,8 @@
 import { type ReactElement } from 'react';
 
-import { Button, IconButton } from '@shadow-library/ui';
+import { Button, ChevronRightIcon, IconButton } from '@shadow-library/ui';
 
-import { ChevronLeftIcon, ChevronRightIcon } from '@/components/icons';
+import { ChevronLeftIcon } from '@/components/icons';
 import { formatPagerPosition, resolvePagerPosition } from '@/lib/item-pager';
 
 import styles from './ItemPager.module.css';

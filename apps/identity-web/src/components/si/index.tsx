@@ -1,9 +1,8 @@
 import { type ApiError } from '@/lib/apis';
 import { type ReactElement, type ReactNode } from 'react';
 
-import { Alert, Badge, type BadgeIntent, copyText, EmptyState, IconButton, Spinner, toast, useTheme } from '@shadow-library/ui';
+import { Alert, Badge, type BadgeIntent, CopyIcon, copyText, EmptyState, IconButton, MoonIcon, Spinner, SunIcon, toast, useTheme } from '@shadow-library/ui';
 
-import { CopyIcon, MoonIcon, SunIcon } from '../icons';
 import styles from './si.module.css';
 
 export type ChipIntent = 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'accent';

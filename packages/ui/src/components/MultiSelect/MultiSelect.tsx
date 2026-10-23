@@ -2,7 +2,7 @@ import * as Popover from '@radix-ui/react-popover';
 import { type KeyboardEvent, type MouseEvent, type ReactElement, useId, useMemo, useRef, useState } from 'react';
 
 import { useControllableState } from '@/hooks';
-import { CheckIcon, ChevronDownIcon } from '@/icons';
+import { CompactCheckIcon, CompactChevronDownIcon } from '@/icons';
 import { cn } from '@/lib';
 
 import styles from './MultiSelect.module.css';
@@ -198,7 +198,7 @@ export function MultiSelect({
           {overflow > 0 ? <span className={styles.overflow}>+{overflow}</span> : null}
         </span>
         <span className={styles.chevron}>
-          <ChevronDownIcon />
+          <CompactChevronDownIcon />
         </span>
       </Popover.Trigger>
 
@@ -263,7 +263,7 @@ export function MultiSelect({
                 onClick={toggleSelectAll}
               >
                 <span className={styles.checkbox} data-checked={allSelected || undefined} data-indeterminate={!allSelected && someSelected ? 'true' : undefined}>
-                  {allSelected ? <CheckIcon strokeWidth={2.5} /> : !allSelected && someSelected ? <span className={styles.dash} /> : null}
+                  {allSelected ? <CompactCheckIcon strokeWidth={2.5} /> : !allSelected && someSelected ? <span className={styles.dash} /> : null}
                 </span>
                 <span className={styles.optionLabel}>Select all</span>
               </div>
@@ -292,7 +292,7 @@ export function MultiSelect({
                     onClick={() => !rowDisabled && toggle(option)}
                   >
                     <span className={styles.checkbox} data-checked={checked || undefined}>
-                      {checked ? <CheckIcon strokeWidth={2.5} /> : null}
+                      {checked ? <CompactCheckIcon strokeWidth={2.5} /> : null}
                     </span>
                     <span className={styles.optionLabel}>{option.label}</span>
                   </div>

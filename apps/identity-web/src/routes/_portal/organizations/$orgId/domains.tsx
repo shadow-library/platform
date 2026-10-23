@@ -1,8 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { useState } from 'react';
-import { Button, DescriptionList, Input, toast } from '@shadow-library/ui';
+import { Button, DescriptionList, Input, PlusIcon, toast } from '@shadow-library/ui';
 
-import { PlusIcon } from '@/components/icons';
 import { QueryState, StatusChip } from '@/components/si';
 import { useStepUpGate } from '@/features/portal';
 import { domainsQueryOptions, type DomainStatus, useDomainsQuery, useOrgAccess, useRegisterDomainMutation, useRemoveDomainMutation, useVerifyDomainMutation } from '@/lib/apis';

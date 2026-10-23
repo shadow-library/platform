@@ -1,7 +1,7 @@
 import * as SelectPrimitive from '@radix-ui/react-select';
 import { type ComponentPropsWithoutRef, forwardRef } from 'react';
 
-import { CheckIcon, ChevronDownIcon } from '@/icons';
+import { CompactCheckIcon, CompactChevronDownIcon } from '@/icons';
 import { cn } from '@/lib';
 
 import styles from './Select.module.css';
@@ -61,18 +61,18 @@ function SelectRoot({
           <span className={styles.value}>
             <SelectPrimitive.Value placeholder={placeholder} />
           </span>
-          <SelectPrimitive.Icon className={styles.chevron}>{loading ? <span className={styles.spinner} aria-hidden="true" /> : <ChevronDownIcon />}</SelectPrimitive.Icon>
+          <SelectPrimitive.Icon className={styles.chevron}>{loading ? <span className={styles.spinner} aria-hidden="true" /> : <CompactChevronDownIcon />}</SelectPrimitive.Icon>
         </SelectPrimitive.Trigger>
         <SelectPrimitive.Portal>
           <SelectPrimitive.Content className={cn(styles.content, contentClassName)} position="popper" sideOffset={6}>
             <SelectPrimitive.ScrollUpButton className={styles.scrollButton}>
               <span className={styles.scrollChevronUp}>
-                <ChevronDownIcon />
+                <CompactChevronDownIcon />
               </span>
             </SelectPrimitive.ScrollUpButton>
             <SelectPrimitive.Viewport className={styles.viewport}>{children}</SelectPrimitive.Viewport>
             <SelectPrimitive.ScrollDownButton className={styles.scrollButton}>
-              <ChevronDownIcon />
+              <CompactChevronDownIcon />
             </SelectPrimitive.ScrollDownButton>
           </SelectPrimitive.Content>
         </SelectPrimitive.Portal>
@@ -90,7 +90,7 @@ export const SelectItem = forwardRef<HTMLDivElement, SelectItemProps>(function S
         {description != null ? <span className={styles.itemDescription}>{description}</span> : null}
       </span>
       <SelectPrimitive.ItemIndicator className={styles.itemIndicator}>
-        <CheckIcon strokeWidth={1.5} />
+        <CompactCheckIcon strokeWidth={1.5} />
       </SelectPrimitive.ItemIndicator>
     </SelectPrimitive.Item>
   );

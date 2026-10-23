@@ -1,6 +1,8 @@
 import { useId, useState } from 'react';
 
-import { CheckIcon, ChevronRightIcon, SparkIcon, WarningIcon } from '@/components/icons';
+import { AlertTriangleIcon, CheckIcon, ChevronRightIcon } from '@shadow-library/ui';
+
+import { SparkIcon } from '@/components/icons';
 import { SLOW_TURN_NOTE, type TurnRow, type TurnSource, type TurnTail } from '@/lib/chat-turn-timeline';
 
 import styles from './Chat.module.css';
@@ -78,7 +80,7 @@ function TurnSourceItem({ source }: TurnSourceItemProps): React.JSX.Element {
     <li className={styles.turnSource} data-status={source.status}>
       <span className={styles.turnSourceMark} aria-hidden="true">
         {source.status === 'ok' && <CheckIcon size={12} />}
-        {source.status === 'error' && <WarningIcon size={12} />}
+        {source.status === 'error' && <AlertTriangleIcon size={12} />}
         {source.status === 'running' && <span className={styles.turnSourceDot} />}
       </span>
       {source.label}

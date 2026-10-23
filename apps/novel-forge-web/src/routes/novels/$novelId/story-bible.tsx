@@ -1,9 +1,9 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { type ReactNode, useId, useMemo, useState } from 'react';
-import { Alert, Button, Dialog, Input, Select, Tabs, toast, useMediaQuery } from '@shadow-library/ui';
+import { Alert, Button, Dialog, Input, SearchIcon, Select, Tabs, toast, useMediaQuery } from '@shadow-library/ui';
 
-import { ClockIcon, LockIcon, SearchIcon, SparkIcon } from '@/components/icons';
+import { ClockIcon, LockIcon, SparkIcon } from '@/components/icons';
 import { useCollectionJump } from '@/components/Layout';
 import { BibleHealth, EmptyState, PaneLoader } from '@/components/nf';
 import { BibleTidyDialog } from '@/components/nf/BibleTidyDialog';

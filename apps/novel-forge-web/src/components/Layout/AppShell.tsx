@@ -1,6 +1,6 @@
 import { useLocation, useNavigate, useParams } from '@tanstack/react-router';
 import { type PropsWithChildren, useCallback, useMemo, useState } from 'react';
-import { cn, type CommandItem, CommandPalette, IconButton, Kbd, toast, Tooltip, useHydrated, useSidebar, useTheme } from '@shadow-library/ui';
+import { cn, type CommandItem, CommandPalette, IconButton, Kbd, MoonIcon, SearchIcon, SunIcon, toast, Tooltip, useHydrated, useSidebar, useTheme } from '@shadow-library/ui';
 import { AppShell as Chrome, type NavConfig, type NavLeaf } from '@shadow-library/ui/router';
 import { userDisplayName } from '@shadow-library/web';
 
@@ -9,7 +9,7 @@ import { type JumpScope, type PaletteState, resolvePaletteView } from '@/lib/com
 import { type LifecyclePhase, lifecyclePhase, projectDotColor, projectKindTag, projectTitle, sharedOwnerTag } from '@/lib/format';
 import { useIsAdmin } from '@/lib/session';
 
-import { BookIcon, GridIcon, MoonIcon, SearchIcon, SettingsIcon, SunIcon, UsageIcon } from '../icons';
+import { BookIcon, GridIcon, SettingsIcon, UsageIcon } from '../icons';
 import styles from './AppShell.module.css';
 import { CommandScopeProvider } from './CommandScope';
 import { JobsTray } from './JobsTray';

@@ -2,7 +2,7 @@ import * as Popover from '@radix-ui/react-popover';
 import { type KeyboardEvent, type ReactElement, useEffect, useId, useMemo, useRef, useState } from 'react';
 
 import { useControllableState } from '@/hooks';
-import { CheckIcon, ChevronDownIcon } from '@/icons';
+import { CompactCheckIcon, CompactChevronDownIcon } from '@/icons';
 import { cn } from '@/lib';
 
 import styles from './Combobox.module.css';
@@ -261,7 +261,7 @@ export function Combobox({
               }
             }}
           >
-            <ChevronDownIcon />
+            <CompactChevronDownIcon />
           </button>
         </div>
       </Popover.Anchor>
@@ -318,7 +318,7 @@ export function Combobox({
                       <span className={styles.optionLabel}>{option.label}</span>
                       {option.description != null ? <span className={styles.optionDescription}>{option.description}</span> : null}
                     </span>
-                    <span className={styles.check}>{selected ? <CheckIcon strokeWidth={2.5} /> : null}</span>
+                    <span className={styles.check}>{selected ? <CompactCheckIcon strokeWidth={2.5} /> : null}</span>
                   </div>
                 );
               })

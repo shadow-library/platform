@@ -1,8 +1,7 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
-import { Avatar, Input, Pagination, Select, Table } from '@shadow-library/ui';
+import { Avatar, Input, Pagination, SearchIcon, Select, Table } from '@shadow-library/ui';
 
-import { SearchIcon } from '@/components/icons';
 import { PageHeader, StatusChip } from '@/components/si';
 import { type UserStatus, type UserSummaryItem, useUsersQuery } from '@/lib/apis';
 import { formatDate } from '@/lib/format';

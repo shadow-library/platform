@@ -1,7 +1,7 @@
 import { useId, useState } from 'react';
-import { Alert, Badge, Button, Checkbox, Dialog, Input, Select, Spinner, Tabs, toast } from '@shadow-library/ui';
+import { Alert, Badge, Button, Checkbox, Dialog, Input, PlusIcon, Select, Spinner, Tabs, toast } from '@shadow-library/ui';
 
-import { ImageIcon, PlusIcon, TrashIcon } from '@/components/icons';
+import { ImageIcon, TrashIcon } from '@/components/icons';
 import { RowAction } from '@/components/nf';
 import {
   type ApiError,

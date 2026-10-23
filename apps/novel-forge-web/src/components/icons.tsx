@@ -1,28 +1,4 @@
-import type { SVGProps } from 'react';
-
-export interface IconProps extends SVGProps<SVGSVGElement> {
-  size?: number;
-}
-
-function SvgIcon({ size = 16, children, strokeWidth = 1.8, ...props }: IconProps): React.JSX.Element {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={strokeWidth}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      focusable="false"
-      {...props}
-    >
-      {children}
-    </svg>
-  );
-}
+import { type IconProps, SvgIcon } from '@shadow-library/ui';
 
 export const OverviewIcon = (p: IconProps): React.JSX.Element => (
   <SvgIcon {...p}>
@@ -94,60 +70,9 @@ export const GridIcon = (p: IconProps): React.JSX.Element => (
   </SvgIcon>
 );
 
-export const SearchIcon = (p: IconProps): React.JSX.Element => (
-  <SvgIcon {...p}>
-    <circle cx="11" cy="11" r="7" />
-    <path d="M21 21l-4-4" />
-  </SvgIcon>
-);
-
-export const BellIcon = (p: IconProps): React.JSX.Element => (
-  <SvgIcon {...p}>
-    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-    <path d="M13.7 21a2 2 0 0 1-3.4 0" />
-  </SvgIcon>
-);
-
-export const MoonIcon = (p: IconProps): React.JSX.Element => (
-  <SvgIcon {...p}>
-    <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />
-  </SvgIcon>
-);
-
-export const SunIcon = (p: IconProps): React.JSX.Element => (
-  <SvgIcon {...p}>
-    <circle cx="12" cy="12" r="4" />
-    <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
-  </SvgIcon>
-);
-
-export const ChevronRightIcon = (p: IconProps): React.JSX.Element => (
-  <SvgIcon {...p}>
-    <path d="M9 6l6 6-6 6" />
-  </SvgIcon>
-);
-
 export const ChevronLeftIcon = (p: IconProps): React.JSX.Element => (
   <SvgIcon {...p}>
     <path d="M15 18l-6-6 6-6" />
-  </SvgIcon>
-);
-
-export const ChevronDownIcon = (p: IconProps): React.JSX.Element => (
-  <SvgIcon {...p}>
-    <path d="M6 9l6 6 6-6" />
-  </SvgIcon>
-);
-
-export const CheckIcon = (p: IconProps): React.JSX.Element => (
-  <SvgIcon {...p}>
-    <path d="M20 6L9 17l-5-5" />
-  </SvgIcon>
-);
-
-export const PlusIcon = (p: IconProps): React.JSX.Element => (
-  <SvgIcon {...p}>
-    <path d="M12 5v14M5 12h14" />
   </SvgIcon>
 );
 
@@ -160,13 +85,6 @@ export const CloseIcon = (p: IconProps): React.JSX.Element => (
 export const GripIcon = (p: IconProps): React.JSX.Element => (
   <SvgIcon {...p}>
     <path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01" strokeWidth={3} />
-  </SvgIcon>
-);
-
-export const CopyIcon = (p: IconProps): React.JSX.Element => (
-  <SvgIcon {...p}>
-    <rect x="9" y="9" width="11" height="11" rx="2" />
-    <path d="M5 15V5a2 2 0 0 1 2-2h10" />
   </SvgIcon>
 );
 
@@ -209,13 +127,6 @@ export const SparkIcon = ({ rayClassName, ...p }: IconProps & { rayClassName?: s
     {SPARK_RAYS.map(ray => (
       <path key={ray} d={ray} className={rayClassName} />
     ))}
-  </SvgIcon>
-);
-
-export const WarningIcon = (p: IconProps): React.JSX.Element => (
-  <SvgIcon {...p}>
-    <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
-    <path d="M12 9v4M12 17h.01" />
   </SvgIcon>
 );
 

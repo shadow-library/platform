@@ -1,7 +1,7 @@
 import * as ContextMenuPrimitive from '@radix-ui/react-context-menu';
 import { forwardRef } from 'react';
 
-import { CheckIcon, ChevronRightIcon } from '@/icons';
+import { CompactCheckIcon, CompactChevronRightIcon } from '@/icons';
 import { cn } from '@/lib';
 
 // The Context Menu shares Dropdown Menu (08)'s surface and item grammar entirely — reuse its module.
@@ -63,7 +63,7 @@ const ContextMenuCheckboxItem = forwardRef<HTMLDivElement, ContextMenuCheckboxIt
       {...props}
     >
       <span className={styles.indicator}>
-        <ContextMenuPrimitive.ItemIndicator>{icon ?? <CheckIcon />}</ContextMenuPrimitive.ItemIndicator>
+        <ContextMenuPrimitive.ItemIndicator>{icon ?? <CompactCheckIcon />}</ContextMenuPrimitive.ItemIndicator>
       </span>
       <span className={styles.itemLabel}>{children}</span>
       {shortcut != null ? (
@@ -115,7 +115,7 @@ const ContextMenuSubTrigger = forwardRef<HTMLDivElement, ContextMenuSubTriggerPr
       {icon != null ? <span className={styles.itemIcon}>{icon}</span> : null}
       <span className={styles.itemLabel}>{children}</span>
       <span className={styles.subChevron}>
-        <ChevronRightIcon />
+        <CompactChevronRightIcon />
       </span>
     </ContextMenuPrimitive.SubTrigger>
   );

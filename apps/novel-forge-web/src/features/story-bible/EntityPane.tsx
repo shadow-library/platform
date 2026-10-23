@@ -1,9 +1,9 @@
 import { Link, useNavigate } from '@tanstack/react-router';
 import { type ReactElement, useId, useMemo, useState } from 'react';
 
-import { Avatar, Button, IconButton, toast, Tooltip } from '@shadow-library/ui';
+import { Avatar, Button, IconButton, PlusIcon, toast, Tooltip } from '@shadow-library/ui';
 
-import { ChevronLeftIcon, LockIcon, PlusIcon, SparkIcon, TrashIcon } from '@/components/icons';
+import { ChevronLeftIcon, LockIcon, SparkIcon, TrashIcon } from '@/components/icons';
 import { Markdown, StatusChip } from '@/components/nf';
 import { ForgeBar } from '@/components/nf/ForgeBar';
 import { EntityImages } from '@/features/illustrations/EntityImages';

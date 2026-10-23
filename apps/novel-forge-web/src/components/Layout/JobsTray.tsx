@@ -1,8 +1,8 @@
-import { IconButton, Popover, Spinner, Tooltip } from '@shadow-library/ui';
+import { BellIcon, IconButton, Popover, Spinner, Tooltip } from '@shadow-library/ui';
 
 import { type GenerationJobItem, useJobStop, useListJobsQuery } from '@/lib/apis';
 
-import { BellIcon, StopIcon } from '../icons';
+import { StopIcon } from '../icons';
 import styles from './JobsTray.module.css';
 import { type NovelParams } from './routes';
 

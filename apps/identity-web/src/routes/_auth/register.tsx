@@ -1,8 +1,7 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
-import { Alert, Button, FormField, Input, Select } from '@shadow-library/ui';
+import { Alert, Button, CheckIcon, FormField, Input, Select } from '@shadow-library/ui';
 
-import { CheckIcon } from '@/components/icons';
 import { AuthCard, AuthMedallion, AuthScreen, OtpEntry, StepHeader, StepProgress, useFlow } from '@/features/auth';
 import parts from '@/features/auth/auth-parts.module.css';
 import { authApi, type FlowState, useRootDomain } from '@/lib/apis';

@@ -1,7 +1,6 @@
 import { useState } from 'react';
-import { DropdownMenu } from '@shadow-library/ui';
+import { ChevronDownIcon, DropdownMenu } from '@shadow-library/ui';
 
-import { ChevronDownIcon } from '@/components/icons';
 import modelStyles from '@/components/nf/ChatModel.module.css';
 
 import { COMPOSER_MODES, type ComposerMode } from './chat-view';

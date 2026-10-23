@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
-import { Button, Spinner } from '@shadow-library/ui';
+import { AlertTriangleIcon, Button, Spinner } from '@shadow-library/ui';
 
-import { AlertTriangleIcon, LockIcon } from '@/components/icons';
+import { LockIcon } from '@/components/icons';
 import { AuthCard, AuthMedallion, AuthScreen, StepHeader } from '@/features/auth';
 import parts from '@/features/auth/auth-parts.module.css';
 import { StepUpFields } from '@/features/portal';

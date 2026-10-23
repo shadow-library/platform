@@ -1,8 +1,7 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
-import { Avatar, Badge, Button, ConfirmDialog, Dialog, FormField, Input, toast } from '@shadow-library/ui';
+import { Avatar, Badge, Button, ConfirmDialog, Dialog, FormField, Input, PlusIcon, toast } from '@shadow-library/ui';
 
-import { PlusIcon } from '@/components/icons';
 import { PageHeader, QueryState } from '@/components/si';
 import { type MyOrganisation, myOrganisationsQueryOptions, useCreateOrganisationMutation, useLeaveOrganisationMutation, useMyOrganisationsQuery, useRootDomain } from '@/lib/apis';
 

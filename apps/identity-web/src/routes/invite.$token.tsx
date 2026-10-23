@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
-import { Avatar, Button } from '@shadow-library/ui';
+import { Avatar, Button, CheckIcon } from '@shadow-library/ui';
 
-import { CheckIcon, MailIcon, MinusIcon } from '@/components/icons';
+import { MailIcon, MinusIcon } from '@/components/icons';
 import { AuthCard, AuthMedallion, AuthScreen, StepHeader } from '@/features/auth';
 import parts from '@/features/auth/auth-parts.module.css';
 import { meQueryOptions, useAcceptInvitationMutation, useDeclineInvitationMutation, useMeQuery } from '@/lib/apis';

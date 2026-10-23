@@ -1,8 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { useState } from 'react';
-import { Button, Dialog, FormField, Input, OtpInput, toast } from '@shadow-library/ui';
+import { Button, Dialog, FormField, Input, OtpInput, PlusIcon, toast } from '@shadow-library/ui';
 
-import { PlusIcon } from '@/components/icons';
 import { PageHeader, QueryState, StatusChip } from '@/components/si';
 import {
   type ApiError,

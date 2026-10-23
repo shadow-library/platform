@@ -1,7 +1,6 @@
 import { type ReactNode } from 'react';
-import { Button } from '@shadow-library/ui';
+import { Button, ChevronDownIcon, ChevronRightIcon } from '@shadow-library/ui';
 
-import { ChevronDownIcon, ChevronRightIcon } from '@/components/icons';
 import { type ChipIntent, StatusChip } from '@/components/nf';
 import { type ChapterGroup, groupPages, pageCountOf, pageRangeLabel, volumeMeta, volumeStateLabel } from '@/lib/chapter-list';
 import { type VolumeState } from '@/lib/apis';

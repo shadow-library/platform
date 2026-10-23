@@ -1,7 +1,7 @@
 import { type KeyboardEvent, useEffect, useId, useRef, useState } from 'react';
-import { Alert, Button, DropdownMenu, EmptyState, IconButton, Input, Select, Spinner, Tag, Textarea } from '@shadow-library/ui';
+import { Alert, Button, DropdownMenu, EmptyState, IconButton, Input, PlusIcon, Select, Spinner, Tag, Textarea } from '@shadow-library/ui';
 
-import { CloseIcon, PlusIcon } from '@/components/icons';
+import { CloseIcon } from '@/components/icons';
 import { type ChipIntent, StatusChip } from '@/components/nf/StatusChip';
 import { type ApiError, type ChangeOpItem, type ContentMode, type ProposalResponse } from '@/lib/apis';
 import { HOOK_TYPE_LABELS, HOOK_TYPES } from '@/lib/chapter-brief';

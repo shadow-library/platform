@@ -1,8 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { useState } from 'react';
-import { Badge, Button, ConfirmDialog, Dialog, FormField, Input, Select, Spinner, toast } from '@shadow-library/ui';
+import { Badge, Button, ConfirmDialog, Dialog, FormField, Input, PlusIcon, Select, Spinner, toast } from '@shadow-library/ui';
 
-import { BuildingIcon, PlusIcon, ShieldCheckIcon, TerminalIcon, UserIcon } from '@/components/icons';
+import { BuildingIcon, ShieldCheckIcon, TerminalIcon, UserIcon } from '@/components/icons';
 import { Mono, PageHeader } from '@/components/si';
 import { useStepUpGate } from '@/features/portal';
 import {

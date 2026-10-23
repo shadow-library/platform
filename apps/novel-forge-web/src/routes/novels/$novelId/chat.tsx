@@ -1,8 +1,8 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Button, Dialog, Input, SegmentedControl, Spinner, toast } from '@shadow-library/ui';
+import { Button, Dialog, Input, SearchIcon, SegmentedControl, Spinner, toast } from '@shadow-library/ui';
 
-import { ArchiveIcon, ChatIcon, EditIcon, SearchIcon, TrashIcon } from '@/components/icons';
+import { ArchiveIcon, ChatIcon, EditIcon, TrashIcon } from '@/components/icons';
 import { CollectionPage, EmptyState, PaneError, PaneLoader, RowAction, StatusChip } from '@/components/nf';
 import { ChatColumn, RenameInput, type SessionMode } from '@/features/chat';
 import {

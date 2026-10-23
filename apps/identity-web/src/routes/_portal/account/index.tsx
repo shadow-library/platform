@@ -1,8 +1,8 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { type ReactNode } from 'react';
-import { Alert, Avatar, Button } from '@shadow-library/ui';
+import { Alert, Avatar, Button, ChevronRightIcon } from '@shadow-library/ui';
 
-import { BuildingIcon, ChevronRightIcon, MailIcon, MonitorIcon, PlugIcon, ShieldCheckIcon, UserIcon } from '@/components/icons';
+import { BuildingIcon, MailIcon, MonitorIcon, PlugIcon, ShieldCheckIcon, UserIcon } from '@/components/icons';
 import { PageHeader, StatusChip } from '@/components/si';
 import {
   mfaQueryOptions,

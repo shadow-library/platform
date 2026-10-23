@@ -1,9 +1,9 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { useEffect, useRef, useState } from 'react';
-import { Avatar, Button, Spinner } from '@shadow-library/ui';
+import { AlertTriangleIcon, Avatar, Button, Spinner } from '@shadow-library/ui';
 
-import { AlertTriangleIcon, BadgeCheckIcon, BuildingIcon, LockIcon, MailIcon, RefreshIcon, UserIcon, XCircleIcon } from '@/components/icons';
+import { BadgeCheckIcon, BuildingIcon, LockIcon, MailIcon, RefreshIcon, UserIcon, XCircleIcon } from '@/components/icons';
 import { AuthCard, AuthMedallion, AuthScreen, StepHeader } from '@/features/auth';
 import parts from '@/features/auth/auth-parts.module.css';
 import { StepUpFields } from '@/features/portal';

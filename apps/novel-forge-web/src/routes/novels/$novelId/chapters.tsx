@@ -7,6 +7,8 @@ import {
   Button,
   ButtonGroup,
   Checkbox,
+  ChevronDownIcon,
+  ChevronRightIcon,
   Dialog,
   Drawer,
   DropdownMenu,
@@ -14,6 +16,7 @@ import {
   IconButton,
   Input,
   Pagination,
+  PlusIcon,
   SegmentedControl,
   Spinner,
   Textarea,
@@ -21,7 +24,7 @@ import {
   Tooltip,
 } from '@shadow-library/ui';
 
-import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, DocIcon, EditIcon, PlusIcon, SparkIcon, TrashIcon, UploadIcon } from '@/components/icons';
+import { ChevronLeftIcon, DocIcon, EditIcon, SparkIcon, TrashIcon, UploadIcon } from '@/components/icons';
 import {
   type ChipIntent,
   ContentRatingPicker,

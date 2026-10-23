@@ -1,6 +1,6 @@
 import { forwardRef, type ReactNode, useRef, useState } from 'react';
 
-import { CheckIcon } from '@/icons';
+import { CompactCheckIcon } from '@/icons';
 import { cn } from '@/lib';
 
 import { IconButton } from '../IconButton';
@@ -95,7 +95,7 @@ function DescriptionListItem({ term, mono = false, copyable = false, masked = fa
                 className={cn(styles.action, styles.copy)}
                 size="sm"
                 variant="ghost"
-                icon={copied ? <CheckIcon width={14} height={14} /> : <CopyIcon />}
+                icon={copied ? <CompactCheckIcon width={14} height={14} /> : <CopyIcon />}
                 aria-label={copyLabel}
                 onClick={copy}
               />

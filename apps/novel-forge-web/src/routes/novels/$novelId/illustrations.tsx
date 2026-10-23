@@ -1,8 +1,8 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Badge, Button, Dialog, FormField, Input, Select, Spinner, Textarea, toast, Tooltip } from '@shadow-library/ui';
+import { Alert, Badge, Button, Dialog, FormField, Input, SearchIcon, Select, Spinner, Textarea, toast, Tooltip } from '@shadow-library/ui';
 
-import { ImageIcon, SearchIcon, SparkIcon, TrashIcon } from '@/components/icons';
+import { ImageIcon, SparkIcon, TrashIcon } from '@/components/icons';
 import { useCollectionJump } from '@/components/Layout';
 import { type ChipIntent, CollectionPage, DetailPage, EmptyState, ItemPager, type ItemPagerJump, PaneError, PaneLoader, RowAction, StatusChip } from '@/components/nf';
 import { CandidateReferences, IllustrationReferencesPanel, StartReferencesSection } from '@/features/illustrations/ReferenceImages';

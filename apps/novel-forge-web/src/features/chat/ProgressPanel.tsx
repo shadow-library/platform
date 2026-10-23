@@ -1,7 +1,7 @@
 import { type Ref, useEffect, useId, useRef, useState } from 'react';
-import { Button, Drawer, IconButton } from '@shadow-library/ui';
+import { AlertTriangleIcon, Button, CheckIcon, Drawer, IconButton } from '@shadow-library/ui';
 
-import { CheckIcon, CloseIcon, WarningIcon } from '@/components/icons';
+import { CloseIcon } from '@/components/icons';
 import { Markdown } from '@/components/nf/Markdown';
 import { type ApplyProposalResponse, isApiError, type ProposalResponse, useProposalOpMutation, useProposalQuery } from '@/lib/apis';
 
@@ -60,7 +60,7 @@ export function SourcesSection({ view }: SourcesSectionProps): React.JSX.Element
             <li key={source.key} className={styles.source} data-status={source.status}>
               <span className={styles.sourceMark} aria-hidden="true">
                 {source.status === 'ok' && <CheckIcon size={12} />}
-                {source.status === 'error' && <WarningIcon size={12} />}
+                {source.status === 'error' && <AlertTriangleIcon size={12} />}
                 {source.status === 'running' && <span className={styles.sourceDot} />}
               </span>
               {source.label}

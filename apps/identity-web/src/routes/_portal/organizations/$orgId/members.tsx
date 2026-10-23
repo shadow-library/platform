@@ -1,8 +1,24 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { useState } from 'react';
-import { Avatar, Badge, Button, Dialog, DropdownMenu, FormField, IconButton, Input, Select, Table, toast, TokenInput, type TokenValue } from '@shadow-library/ui';
+import {
+  Avatar,
+  Badge,
+  Button,
+  Dialog,
+  DropdownMenu,
+  FormField,
+  IconButton,
+  Input,
+  PlusIcon,
+  SearchIcon,
+  Select,
+  Table,
+  toast,
+  TokenInput,
+  type TokenValue,
+} from '@shadow-library/ui';
 
-import { MailIcon, MoreIcon, PlusIcon, SearchIcon } from '@/components/icons';
+import { MailIcon, MoreIcon } from '@/components/icons';
 import { QueryState } from '@/components/si';
 import {
   type InvitableRole,

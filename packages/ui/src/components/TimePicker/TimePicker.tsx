@@ -2,7 +2,7 @@ import * as Popover from '@radix-ui/react-popover';
 import { type KeyboardEvent, type PointerEvent, type ReactElement, useCallback, useId, useMemo, useRef, useState } from 'react';
 
 import { useControllableState } from '@/hooks';
-import { CheckIcon } from '@/icons';
+import { CompactCheckIcon } from '@/icons';
 import { cn, pad2 } from '@/lib';
 
 import styles from './TimePicker.module.css';
@@ -325,7 +325,7 @@ export function TimePicker({
                   onClick={() => selectMinutes(minutes)}
                 >
                   <span>{formatMinutes(minutes, hour12)}</span>
-                  <span className={styles.check}>{selected ? <CheckIcon strokeWidth={2.5} /> : null}</span>
+                  <span className={styles.check}>{selected ? <CompactCheckIcon strokeWidth={2.5} /> : null}</span>
                 </div>
               );
             })}

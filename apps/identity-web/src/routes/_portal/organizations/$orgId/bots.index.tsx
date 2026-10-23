@@ -1,8 +1,8 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { useMemo, useState } from 'react';
-import { Avatar, Badge, Button, ClientOnly, DropdownMenu, EmptyState, IconButton, Input, Select, Table, toast } from '@shadow-library/ui';
+import { AlertTriangleIcon, Avatar, Badge, Button, ClientOnly, DropdownMenu, EmptyState, IconButton, Input, PlusIcon, SearchIcon, Select, Table, toast } from '@shadow-library/ui';
 
-import { AlertTriangleIcon, BotIcon, ClockIcon, LayersIcon, MoreIcon, PlusIcon, SearchIcon, ShieldCheckIcon } from '@/components/icons';
+import { BotIcon, ClockIcon, LayersIcon, MoreIcon, ShieldCheckIcon } from '@/components/icons';
 import { QueryState, StatusChip } from '@/components/si';
 import { useStepUpGate } from '@/features/portal';
 import {

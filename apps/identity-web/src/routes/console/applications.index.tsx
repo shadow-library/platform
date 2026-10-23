@@ -1,8 +1,7 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
-import { Avatar, Button, Dialog, FormField, Input, Table, Textarea, toast, TokenInput, type TokenValue } from '@shadow-library/ui';
+import { Avatar, Button, Dialog, FormField, Input, PlusIcon, Table, Textarea, toast, TokenInput, type TokenValue } from '@shadow-library/ui';
 
-import { PlusIcon } from '@/components/icons';
 import { PageHeader, StatusChip } from '@/components/si';
 import { SecretDialog } from '@/features/console';
 import { useStepUpGate } from '@/features/portal';

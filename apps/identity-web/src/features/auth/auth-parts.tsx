@@ -1,7 +1,5 @@
 import { type ReactNode } from 'react';
-import { Button, FormField, OtpInput } from '@shadow-library/ui';
-
-import { ChevronRightIcon } from '@/components/icons';
+import { Button, ChevronRightIcon, FormField, OtpInput } from '@shadow-library/ui';
 
 import styles from './auth-parts.module.css';
 

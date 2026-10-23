@@ -1,7 +1,7 @@
 import * as CheckboxPrimitive from '@radix-ui/react-checkbox';
 import { forwardRef, useId } from 'react';
 
-import { CheckIcon } from '@/icons';
+import { CompactCheckIcon } from '@/icons';
 import { cn } from '@/lib';
 
 import styles from './Checkbox.module.css';
@@ -38,7 +38,7 @@ export const Checkbox = forwardRef<HTMLButtonElement, CheckboxProps>(function Ch
       aria-describedby={descriptionId}
       {...props}
     >
-      <CheckboxPrimitive.Indicator className={styles.indicator}>{isIndeterminate ? <DashIcon /> : <CheckIcon strokeWidth={2.5} />}</CheckboxPrimitive.Indicator>
+      <CheckboxPrimitive.Indicator className={styles.indicator}>{isIndeterminate ? <DashIcon /> : <CompactCheckIcon strokeWidth={2.5} />}</CheckboxPrimitive.Indicator>
     </CheckboxPrimitive.Root>
   );
 

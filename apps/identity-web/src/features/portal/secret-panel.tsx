@@ -1,7 +1,7 @@
 import { type ReactNode, useState } from 'react';
-import { Button, Checkbox, copyText, downloadTextFile } from '@shadow-library/ui';
+import { AlertTriangleIcon, Button, Checkbox, CopyIcon, copyText, downloadTextFile } from '@shadow-library/ui';
 
-import { AlertTriangleIcon, CopyIcon, DownloadIcon } from '@/components/icons';
+import { DownloadIcon } from '@/components/icons';
 import { CopyButton } from '@/components/si';
 
 import styles from './portal.module.css';

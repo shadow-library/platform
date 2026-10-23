@@ -1,8 +1,8 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { Fragment, type ReactNode } from 'react';
-import { Button } from '@shadow-library/ui';
+import { AlertTriangleIcon, Button } from '@shadow-library/ui';
 
-import { AlertTriangleIcon, PlugIcon } from '@/components/icons';
+import { PlugIcon } from '@/components/icons';
 import { AuthCard, AuthMedallion, AuthScreen, StepHeader } from '@/features/auth';
 import parts from '@/features/auth/auth-parts.module.css';
 

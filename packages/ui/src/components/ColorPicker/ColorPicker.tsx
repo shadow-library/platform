@@ -2,7 +2,7 @@ import * as Popover from '@radix-ui/react-popover';
 import { type KeyboardEvent, type PointerEvent, type ReactElement, useState } from 'react';
 
 import { useControllableState } from '@/hooks';
-import { CheckIcon, ChevronDownIcon } from '@/icons';
+import { CompactCheckIcon, CompactChevronDownIcon } from '@/icons';
 import { cn } from '@/lib';
 
 import styles from './ColorPicker.module.css';
@@ -280,7 +280,7 @@ export function ColorPicker({
           <span className={styles.triggerSwatch} style={{ background: current }} />
           <span className={styles.triggerHex}>{current}</span>
           <span className={styles.triggerChevron} aria-hidden="true">
-            <ChevronDownIcon />
+            <CompactChevronDownIcon />
           </span>
         </button>
       </Popover.Trigger>
@@ -306,7 +306,7 @@ export function ColorPicker({
                   >
                     {selected ? (
                       <span className={styles.swatchCheck} style={{ color: contrastColor(swatch.value) }}>
-                        <CheckIcon strokeWidth={2.5} />
+                        <CompactCheckIcon strokeWidth={2.5} />
                       </span>
                     ) : null}
                   </button>
