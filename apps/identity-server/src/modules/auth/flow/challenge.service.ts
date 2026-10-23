@@ -1,6 +1,6 @@
 import { createHash, randomInt } from 'node:crypto';
 
-import { and, desc, eq, isNull } from 'drizzle-orm';
+import { and, desc, eq, gt, isNull, lt, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 
@@ -17,7 +17,7 @@ export interface IssueChallenge {
   templateKey: string;
 }
 
-const CODE_TTL_MS = 10 * 60 * 1000;
+const CODE_TTL_MINUTES = 10;
 const MAX_ATTEMPTS = 3;
 const IDENTIFIER_SEND_LIMIT = 5;
 const IDENTIFIER_SEND_WINDOW_SECONDS = 3600;
@@ -54,7 +54,7 @@ export class ChallengeService {
         type: input.type,
         target: input.target,
         codeHash: this.hashCode(code),
-        expiresAt: new Date(Date.now() + CODE_TTL_MS),
+        expiresAt: sql`now() + make_interval(mins => ${CODE_TTL_MINUTES})`,
       });
       const recipients = input.type === 'SMS_OTP' ? { phone: input.target } : { email: input.target };
       await this.notificationService.enqueue({ templateKey: input.templateKey, recipients, payload: { code } }, tx);
@@ -66,23 +66,28 @@ export class ChallengeService {
     return (await this.verifyAndGet(flowId, code)) !== null;
   }
 
+  /** Reserving the attempt before comparing, and consuming only while `consumed_at IS NULL`, keeps concurrent submissions within budget and single-use. */
   async verifyAndGet(flowId: string, code: string): Promise<VerificationChallenge | null> {
+    const challenges = schema.verificationChallenges;
     const challenge = await this.db.query.verificationChallenges.findFirst({
-      where: and(eq(schema.verificationChallenges.flowId, flowId), isNull(schema.verificationChallenges.consumedAt)),
-      orderBy: desc(schema.verificationChallenges.createdAt),
+      where: and(eq(challenges.flowId, flowId), isNull(challenges.consumedAt)),
+      orderBy: desc(challenges.createdAt),
     });
     if (!challenge) return null;
-    if (challenge.expiresAt.getTime() <= Date.now() || challenge.attemptCount >= MAX_ATTEMPTS) return null;
 
-    if (this.hashCode(code) !== challenge.codeHash) {
-      await this.db
-        .update(schema.verificationChallenges)
-        .set({ attemptCount: challenge.attemptCount + 1 })
-        .where(eq(schema.verificationChallenges.id, challenge.id));
-      return null;
-    }
+    const reserved = await this.db
+      .update(challenges)
+      .set({ attemptCount: sql`${challenges.attemptCount} + 1` })
+      .where(and(eq(challenges.id, challenge.id), isNull(challenges.consumedAt), lt(challenges.attemptCount, MAX_ATTEMPTS), gt(challenges.expiresAt, sql`now()`)))
+      .returning({ id: challenges.id });
+    if (reserved.length === 0) return null;
+    if (this.hashCode(code) !== challenge.codeHash) return null;
 
-    await this.db.update(schema.verificationChallenges).set({ consumedAt: new Date() }).where(eq(schema.verificationChallenges.id, challenge.id));
-    return challenge;
+    const [consumed] = await this.db
+      .update(challenges)
+      .set({ consumedAt: sql`now()` })
+      .where(and(eq(challenges.id, challenge.id), isNull(challenges.consumedAt)))
+      .returning();
+    return consumed ?? null;
   }
 }

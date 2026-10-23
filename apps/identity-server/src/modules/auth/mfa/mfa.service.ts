@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 
-import { and, eq, isNotNull, isNull } from 'drizzle-orm';
+import { and, eq, isNotNull, isNull, lt, or } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Config, Logger } from '@shadow-library/common';
 
@@ -133,10 +133,12 @@ export class MfaService {
     const counter = verifyTotp(await this.decryptSecret(pending), code);
     if (counter === null) throw AppErrorCode.MFA_002.create();
 
-    await this.db
+    const activated = await this.db
       .update(schema.mfaEnrollments)
       .set({ verifiedAt: new Date(), lastUsedAt: new Date(), lastUsedCounter: BigInt(counter) })
-      .where(eq(schema.mfaEnrollments.id, pending.id));
+      .where(and(eq(schema.mfaEnrollments.id, pending.id), isNull(schema.mfaEnrollments.verifiedAt)))
+      .returning({ id: schema.mfaEnrollments.id });
+    if (activated.length === 0) throw AppErrorCode.MFA_001.create();
 
     await this.auditService.record({ action: 'auth.mfa.totp_enrolled', outcome: 'SUCCESS', actorType: 'USER', actorId: userId.toString() });
     await this.notify(userId, ENROLLED_TEMPLATE, 'TOTP');
@@ -149,13 +151,15 @@ export class MfaService {
 
     const counter = verifyTotp(await this.decryptSecret(enrollment), code);
     if (counter === null) return false;
-    if (enrollment.lastUsedCounter !== null && BigInt(counter) <= enrollment.lastUsedCounter) return false;
 
-    await this.db
+    const lastUsedCounter = schema.mfaEnrollments.lastUsedCounter;
+    // The replay check lives in the WHERE so two concurrent submissions of one code cannot both pass a stale read.
+    const accepted = await this.db
       .update(schema.mfaEnrollments)
       .set({ lastUsedAt: new Date(), lastUsedCounter: BigInt(counter) })
-      .where(eq(schema.mfaEnrollments.id, enrollment.id));
-    return true;
+      .where(and(eq(schema.mfaEnrollments.id, enrollment.id), or(isNull(lastUsedCounter), lt(lastUsedCounter, BigInt(counter)))))
+      .returning({ id: schema.mfaEnrollments.id });
+    return accepted.length > 0;
   }
 
   async disableTotp(userId: bigint): Promise<void> {

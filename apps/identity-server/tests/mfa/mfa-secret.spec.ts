@@ -40,7 +40,7 @@ function serviceOver(initial?: Partial<MfaEnrollment>) {
   const postgres = {
     transaction: (work: (handle: unknown) => Promise<unknown>) => work(tx),
     query: { mfaEnrollments: { findFirst: () => Promise.resolve(state.enrollment) } },
-    update: () => ({ set: () => ({ where: () => Promise.resolve() }) }),
+    update: () => ({ set: () => ({ where: () => ({ returning: () => Promise.resolve([{ id: state.enrollment?.id }]) }) }) }),
   };
   const none = {} as never;
   const userEmailService = { getPrimaryEmail: () => Promise.resolve('ada@example.com') } as never;
