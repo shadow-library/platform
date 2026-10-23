@@ -6,32 +6,17 @@ import { Provider, ProviderToken } from './provider.interface';
 export type Import = Class<unknown> | ForwardReference<Class<unknown>> | DynamicModule;
 
 export interface ModuleMetadata {
-  /**
-   * List of imported modules that export the providers which are required in this module.
-   */
+  /** Modules whose exported providers this module needs. */
   imports?: Import[];
 
-  /**
-   * List of controllers defined in this module which have to be instantiated.
-   */
   controllers?: Class<unknown>[];
 
-  /**
-   * List of providers that will be instantiated by the Shadow injector and that may be shared
-   * at least across this module.
-   */
   providers?: Provider[];
 
-  /**
-   * List of the subset of providers that are provided by this module and should be available
-   * in other modules which import this module.
-   */
+  /** Subset of `providers` that importing modules can inject. */
   exports?: ProviderToken[];
 }
 
 export interface DynamicModule extends ModuleMetadata {
-  /**
-   * A module reference
-   */
   module: Class<unknown>;
 }

@@ -81,7 +81,6 @@ export class Module {
     const providerMap = new Map<ProviderToken, InstanceWrapper>();
     const graph = new DependencyGraph();
 
-    /** Create instance wrapper for all the providers */
     for (const provider of providers) {
       const instance = new InstanceWrapper(provider, true);
       const token = instance.getToken();
@@ -90,7 +89,6 @@ export class Module {
       graph.addNode(token);
     }
 
-    /** Add the dependencies to the graph */
     for (const provider of providerMap.values()) {
       if (provider.isResolved()) continue;
       for (const dependency of provider.getDependencies()) {
@@ -99,7 +97,6 @@ export class Module {
       }
     }
 
-    /** Sort the providers based on the dependencies and insert the providers into the map */
     for (const token of graph.getInitOrder()) {
       const provider = providerMap.get(token);
       assert(provider, `Unexpected Provider '${token.toString()}' not found in the provider map`);
@@ -216,12 +213,6 @@ export class Module {
   async init(): Promise<void> {
     this.logger.debug(`Initializing module '${this.instance.getTokenName()}'`);
 
-    /**
-     * Loading the providers and controllers.
-     * If a provider is transient, it will be loaded after all other providers.
-     * This is to ensure that the transient provider instances are created only when they are needed.
-     */
-
     const instances = this.getAllInstances();
     this.logger.debug(`Module '${this.instance.getTokenName()}' Provider initialization order: ${instances.map(i => i.getTokenName()).join(' -> ')}`);
     for (const provider of instances) {
@@ -229,7 +220,6 @@ export class Module {
       else await provider.loadInstance();
     }
 
-    /** Setting up the interceptors */
     const moduleRefProvider = this.getInternalProvider<ModuleRef>(ModuleRef);
     const moduleRef = moduleRefProvider.getInstance();
     for (const provider of instances) provider.applyInterceptorsToAllInstances(moduleRef);
@@ -249,7 +239,6 @@ export class Module {
   }
 
   private getDispatchMetadata(controller: InstanceWrapper<Controller>): DispatchMetadata | null {
-    /* Extracting the handler methods present in the instance */
     const methods = new Set<() => any>();
     const instance = controller.getInstance();
     let prototype = instance;
@@ -261,7 +250,6 @@ export class Module {
       }
     } while ((prototype = Object.getPrototypeOf(prototype)));
 
-    /* Extracting the handler metadata from the handler methods */
     const metatype = controller.getMetatype() as Class<Controller>;
     const metadata = Reflect.getMetadata(CONTROLLER_METADATA, metatype);
     const controllerHandlerMetadata = Reflect.getMetadata(HANDLER_METADATA, metatype);

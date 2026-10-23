@@ -57,7 +57,6 @@ export class ModuleRegistry {
     const modules = new Map<TModule, Module>();
     const moduleMetadata = new Map<TModule, ParsedModuleMetadata>();
 
-    /** Scan all the imports to find all the modules, especially dynamic ones which could be configured later */
     const scanModule = (module: TParsedModule): void => {
       const isDynamic = isDynamicModule(module);
       const metadata = this.extractMetadata(module);
@@ -70,7 +69,7 @@ export class ModuleRegistry {
     };
     scanModule(module);
 
-    /** This ensures that the module initialized first will be loaded last since loading from root, while initialization should be from leaves */
+    /** Scanning runs root-first but initialization must run leaf-first, so the discovery order is reversed before graphing */
     const orderedMetadata = Array.from(moduleMetadata.entries()).reverse();
     for (const [ModuleClass, metadata] of orderedMetadata) {
       const module = modules.get(ModuleClass);

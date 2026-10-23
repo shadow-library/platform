@@ -8,10 +8,7 @@ import { Provider, ProviderToken, TokenValue } from './interfaces';
 export interface ShadowApplicationOptions {
   enableShutdownHooks?: false | NodeJS.Signals[];
 
-  /**
-   * Providers that replace existing providers by token, wherever they are declared.
-   * Intended for tests: swap a real provider for a fake without editing module metadata.
-   */
+  /** Providers that replace existing providers by token, wherever they are declared; intended for swapping in fakes in tests. */
   overrides?: Provider[];
 }
 

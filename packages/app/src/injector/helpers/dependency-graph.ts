@@ -41,7 +41,6 @@ export class DependencyGraph<T extends ProviderToken> {
     const metadata = new Map<T, NodeMetadata<T>>();
     const queue: T[] = [];
 
-    /** add the node, dependsOn and requiredBy data */
     for (const [node, deps] of this.nodeMap.entries()) {
       if (deps.size == 0) queue.push(node);
       const nodeMetadata = metadata.get(node);

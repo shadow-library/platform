@@ -1,15 +1,4 @@
-/**
- * Decorator that assigns metadata to the class/function using the
- * specified `key`.
- *
- * Requires two parameters:
- * - `key` - a value defining the key under which the metadata is stored
- * - `value` - metadata to be associated with `key`
- *
- * This metadata can be reflected using the `Reflector` class.
- *
- * Example: `@SetMetadata('roles', ['admin'])`
- */
+/** Stores `value` under `key` on the class or method; read it back with `Reflector`. */
 export function SetMetadata<K = string, V = any>(key: K, value: V): MethodDecorator & ClassDecorator {
   return function (target: object, _propertyKey?: string | symbol, descriptor?: PropertyDescriptor) {
     if (descriptor?.value) {

@@ -216,13 +216,7 @@ export class InstanceWrapper<T extends object = any> {
       throw DIErrors.unexpected(`The dependency at index ${index} of '${this.getTokenName()}' is undefined`);
     }
 
-    /**
-     * A factory provider has no prototype to hand out early for circular-dependency purposes — it
-     * produces a value, not a mutable instance `loadInstance` can later top up. When a module graph's
-     * topological order places a factory's dependent before the module that owns the factory (a real
-     * possibility once cycle-breaking picks a tie-break order), falling through to `loadInstance` here
-     * resolves the factory (and, recursively, its own dependencies) on demand instead of throwing.
-     */
+    /** A factory has no prototype to hand out early, and cycle-breaking can order its dependent first, so it is resolved on demand */
     if (!dependency.isResolved() && !dependency.isFactoryProvider()) return await dependency.loadPrototype(metadata.contextId);
     return await dependency.loadInstance(metadata.contextId);
   }
@@ -252,12 +246,7 @@ export class InstanceWrapper<T extends object = any> {
     let instance: T;
     if (this.isFactory) instance = await (this.metatype as Factory<T>)(...dependencies);
     else instance = new (this.metatype as Class<T>)(...dependencies);
-    /**
-     * When a prototype shell already exists for this context, it was handed to a circular
-     * dependency before this instance could be constructed. Copy the constructed instance's
-     * own properties into that shell and keep the shell as the canonical instance so the
-     * reference already held by the circular peer resolves to the fully-initialised instance.
-     */
+    /** A circular peer already holds the prototype shell, so the shell stays canonical and receives the constructed state */
     if (instancePerContext) instance = Object.assign(instancePerContext.instance, instance);
     this.instances.set(contextId, { instance, resolved: true });
     this.logger.debug(`Instance '${this.getTokenName()}' loaded`);
@@ -275,7 +264,6 @@ export class InstanceWrapper<T extends object = any> {
     assert(instancePerContext, `Instance of '${this.getTokenName()}' not found for context ID ${contextId.id}`);
     if (instancePerContext.intercepted) return;
 
-    /** Extracting all the intercepted methods from the class instance */
     const Class = this.metatype as Class<T>;
     const instance = instancePerContext?.instance as Record<string, unknown>;
     const methods = new Set<Fn>();
@@ -289,13 +277,11 @@ export class InstanceWrapper<T extends object = any> {
     } while ((prototype = Object.getPrototypeOf(prototype)));
 
     for (const method of methods) {
-      /** resolve the interceptors and validate the interceptors */
       const Interceptors: InterceptorConfig[] = Reflect.getMetadata(INTERCEPTOR_METADATA, method);
       const interceptors = Interceptors.map(i => moduleRef.get(i.token) as Interceptor);
       const invalidInterceptor = interceptors.find(i => typeof i.intercept !== 'function');
       if (invalidInterceptor) throw AppError.internal(`Interceptor '${invalidInterceptor.constructor.name}' does not implement 'intercept' method`);
 
-      /** create the interceptor context and intercept the original method */
       const returnType = Reflect.getMetadata(RETURN_TYPE_METADATA, method);
       const isPromise = returnType === Promise || method.constructor.name === 'AsyncFunction';
       const interceptorInvocations: InterceptorInvocation[] = [];

@@ -1,9 +1,7 @@
 import { INJECTABLE_METADATA } from '../constants';
 
 export interface InjectableOptions {
-  /**
-   * Whether to initiate a new private instance of the provider for every use
-   */
+  /** Creates a separate instance for every consumer; obtain one explicitly with `ModuleRef.resolve`. */
   transient?: boolean;
 }
 

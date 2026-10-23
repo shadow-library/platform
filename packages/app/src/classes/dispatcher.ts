@@ -19,22 +19,10 @@ export interface DispatchMetadata {
 
 @Injectable()
 export abstract class Dispatcher {
-  /**
-   * Called to register the controllers with their handlers.
-   * A dispatcher decides which handler runs when a trigger arrives — an HTTP request,
-   * a CLI command, a desktop screen change, a worker event, and so on.
-   */
+  /** Decides which handler runs for a trigger: an HTTP request, a CLI command, a worker event and so on. */
   abstract register(controllers: DispatchMetadata[]): any | Promise<any>;
 
-  /**
-   * Called to start the dispatcher.
-   * For a server this would listen on a port; for a CLI it would begin reading commands.
-   */
   abstract start(): any | Promise<any>;
 
-  /**
-   * Called to stop the dispatcher.
-   * For a server this would stop listening and close connections.
-   */
   abstract stop(): any | Promise<any>;
 }

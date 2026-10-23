@@ -4,14 +4,9 @@ import { ProviderToken, TokenValue } from '../interfaces';
 import { ContextId } from '../utils';
 
 export abstract class ModuleRef {
-  /**
-   * Retrieves an instance of a provider, otherwise throws an exception.
-   * The return type is inferred from the token when it is a class or a typed InjectionToken.
-   */
+  /** Throws when the provider is not found; the return type is inferred from class and `InjectionToken` tokens. */
   abstract get<Token extends ProviderToken>(token: Token): TokenValue<Token>;
 
-  /**
-   * Resolves a transient instance of a provider, otherwise throws an exception.
-   */
+  /** Throws when the provider is not transient. */
   abstract resolve<T>(typeOrToken: Class<T>, contextId?: ContextId): Promise<T>;
 }

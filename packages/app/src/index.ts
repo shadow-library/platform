@@ -1,8 +1,5 @@
 import 'reflect-metadata';
 
-/**
- * exporting modules
- */
 export * from './classes';
 export * from './decorators';
 export { ModuleRef } from './injector';
