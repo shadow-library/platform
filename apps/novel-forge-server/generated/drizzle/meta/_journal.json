@@ -120,6 +120,13 @@
       "when": 1792781451900,
       "tag": "0016_job_heartbeat",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1792782886939,
+      "tag": "0017_drop_dead_persistence",
+      "breakpoints": true
     }
   ]
 }

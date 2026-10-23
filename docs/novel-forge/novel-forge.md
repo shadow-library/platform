@@ -479,7 +479,6 @@
   and resets approval and marks later drafts stale as an edit does. Restoring the approved revision needs approving again; restoring text the draft already holds changes
   nothing. A final chapter refuses it (`VER_002`).
 - History is bounded to a draft's newest 50 revisions plus the approved one.
-- `passage_suggestions` rows remain only as dismissed history; nothing reads or writes them.
 
 ### Writer's context and snapshots
 

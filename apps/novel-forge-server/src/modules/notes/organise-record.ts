@@ -8,7 +8,7 @@ import { ledgerRow } from '../ledger/ledger.service';
 import { type OrganiseLedgerDelta, organiseReconciliation, type OrganiseRecord } from './organise-card';
 import { type OrganiseReconciliation } from './organise-reconcile';
 
-/** The marker migration 0008 left on organise cards staged before they carried a record: they record nothing, as they never did. */
+/** The marker on organise cards staged before they carried a record: they record nothing, as they never did. */
 export const LEGACY_ORGANISE_RECORD = { legacy: true } as const;
 
 const RETIRED_REASON = 'Replaced when the notes were organised again.';

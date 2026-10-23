@@ -141,7 +141,6 @@ const SUPPLIED_INPUTS: Readonly<Record<string, string>> = {
   feedback: 'The revision note',
   chapterBrief: 'The chapter plan',
   endingContract: 'The chapter plan',
-  volumePlan: 'The volume plan',
   instructions: 'The art instructions',
   note: 'The note',
   projectBrief: "The novel's brief",

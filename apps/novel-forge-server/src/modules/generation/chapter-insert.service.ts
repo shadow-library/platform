@@ -332,7 +332,7 @@ export class ChapterInsertService {
     const wordTarget = resolveWordTarget(project);
     const prompt = buildOutlinePrompt(chapter, chapter, wordTarget, guard.advised);
     const ctx = { projectId, runId, promptKey: prompt.key, promptVersion: prompt.version, role: prompt.key };
-    const vars = { catalog, volumePlan: '', startChapter: chapter, endChapter: chapter, extraContext, ...outlineWordTargetVars(wordTarget) };
+    const vars = { catalog, startChapter: chapter, endChapter: chapter, extraContext, ...outlineWordTargetVars(wordTarget) };
     const raw = (await this.modelRouter.structured(prompt, vars, ctx, project as never, policy)) as OutlineOutput;
     const { briefs: outlined, sanitised } = sanitiseBriefReveals(raw, guard.all);
     if (sanitised.length > 0) this.logger.warn('plan: sanitised a brief that surfaced facts before their reveal chapter', { projectId, chapter, sanitised });

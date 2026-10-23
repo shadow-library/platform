@@ -9,11 +9,10 @@ import { ProjectModule } from '../project/project.module';
 import { IllustrationController } from './illustration.controller';
 import { IllustrationReferenceService } from './illustration-reference.service';
 import { IllustrationService } from './illustration.service';
-import { LegacyIllustrationController } from './legacy-illustration.controller';
 
 @Module({
   imports: [DatabaseModule, StorageModule, AiModule, BibleModule, GenerationModule, PluginsModule, ProjectModule],
-  controllers: [IllustrationController, LegacyIllustrationController],
+  controllers: [IllustrationController],
   providers: [IllustrationService, IllustrationReferenceService],
   exports: [IllustrationService, IllustrationReferenceService],
 })

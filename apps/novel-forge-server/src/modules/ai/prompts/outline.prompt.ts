@@ -22,7 +22,7 @@ The catalog's CANON FACTS section lists every fact the story holds, revealed and
 
 export const outlinePrompt: PromptModule<OutlineOutput> = {
   key: 'outline',
-  version: '3.3.0',
+  version: '3.4.0',
   kind: 'authoring',
   system,
   template: ChatPromptTemplate.fromMessages([
@@ -31,7 +31,7 @@ export const outlinePrompt: PromptModule<OutlineOutput> = {
     new SystemMessage(system),
     [
       'human',
-      'Context catalog:\n{catalog}\n\nVolume plan:\n{volumePlan}\n\nChapters to outline: {startChapter}–{endChapter}\n\nLength target: {wordTargetMin}–{wordTargetMax} words of scene prose per chapter, aiming for about {wordTargetAim} — at least {minScenes} scenes each.\n\nAdditional guidance: {extraContext}',
+      'Context catalog:\n{catalog}\n\nChapters to outline: {startChapter}–{endChapter}\n\nLength target: {wordTargetMin}–{wordTargetMax} words of scene prose per chapter, aiming for about {wordTargetAim} — at least {minScenes} scenes each.\n\nAdditional guidance: {extraContext}',
     ],
   ]),
   schema: OutlineSchema,

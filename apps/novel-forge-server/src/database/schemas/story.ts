@@ -75,7 +75,6 @@ export const mysteries = pgTable(
     status: mysteryStatus('status').notNull(),
     openedChapter: integer('opened_chapter'),
     resolvedChapter: integer('resolved_chapter'),
-    knownTo: varchar('known_to'),
     // The canon_facts.factKey holding the mystery's answer — a loose key like every other entity/fact
     // reference here, deliberately not an FK so a mystery can name its truth before the fact exists.
     truthFactKey: varchar('truth_fact_key'),

@@ -110,7 +110,6 @@ export interface WorkflowRunRow {
 
 export interface ToolCallSeed {
   runId: string;
-  modelCallId?: string | null;
   node?: string;
   tool?: string;
   status?: ToolCallStatus;
@@ -567,8 +566,8 @@ export async function readWorkflowRun(runId: string): Promise<WorkflowRunRow | u
 
 export async function insertToolCall(seed: ToolCallSeed): Promise<string> {
   const [row] = await novelForgeDb()<{ id: string }[]>`
-    INSERT INTO tool_calls (run_id, model_call_id, node, tool, status, latency_ms)
-    VALUES (${seed.runId}, ${seed.modelCallId ?? null}, ${seed.node ?? 'e2e'}, ${seed.tool ?? 'e2e_lookup'}, ${seed.status ?? 'ok'}::tool_call_status, ${seed.latencyMs ?? null})
+    INSERT INTO tool_calls (run_id, node, tool, status, latency_ms)
+    VALUES (${seed.runId}, ${seed.node ?? 'e2e'}, ${seed.tool ?? 'e2e_lookup'}, ${seed.status ?? 'ok'}::tool_call_status, ${seed.latencyMs ?? null})
     RETURNING id::text
   `;
   if (!row) throw new ForgeDbError(`tool call insert on run ${seed.runId} returned no row`);

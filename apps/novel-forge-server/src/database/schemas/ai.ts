@@ -195,7 +195,6 @@ export const toolCalls = pgTable(
   {
     id: bigserial('id', { mode: 'bigint' }).primaryKey(),
     runId: varchar('run_id').notNull(),
-    modelCallId: bigint('model_call_id', { mode: 'bigint' }),
     node: varchar('node').notNull(),
     tool: varchar('tool').notNull(),
     args: jsonb('args').$type<Record<string, unknown>>(),

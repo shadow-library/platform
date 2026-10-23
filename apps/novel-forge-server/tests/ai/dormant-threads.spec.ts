@@ -32,7 +32,6 @@ function mystery(overrides: Partial<Story.Mystery> = {}): Story.Mystery {
     status: 'open',
     openedChapter: 1,
     resolvedChapter: null,
-    knownTo: null,
     truthFactKey: null,
     lastAdvancedChapter: null,
     payoffWindow: null,

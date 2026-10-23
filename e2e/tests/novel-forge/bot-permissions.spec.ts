@@ -163,7 +163,6 @@ test.describe('novel-forge bot permission matrix', () => {
       ['get', `${base}/publications/access`],
       ['put', `${base}/publications/access`, { visibility: 'PUBLIC' }],
       ['post', `${base}/publications/reconcile`, {}],
-      ['post', `${base}/entities/e2e-entity/illustration`, {}],
     ];
     for (const [method, path, data] of closed) await expectDenied(await call(bot.ctx, method, path, data), `${method.toUpperCase()} ${path}`);
 

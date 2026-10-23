@@ -72,7 +72,7 @@ async function seedRuns(owner: ForgeActor): Promise<SeededProject> {
     { projectId, runId: packed, role: 'generation', inputTokens: 1_000, outputTokens: 500, costUsd: 0.25, costSource: 'provider', rawOutput: RAW_OUTPUT, chapter: 1 },
     { projectId, runId: packed, role: 'judge', inputTokens: 300, outputTokens: 50, costUsd: 0.05, costSource: 'provider', rawOutput: RAW_OUTPUT, chapter: 1 },
   ]);
-  await insertToolCall({ runId: packed, modelCallId: callIds[0], tool: 'lookup_entity' });
+  await insertToolCall({ runId: packed, tool: 'lookup_entity' });
 
   const bare = await insertWorkflowRun({ projectId, graph: 'novel-validation', status: 'completed', startedAgoMs: 20_000, endedAgoMs: 10_000 });
   const orphan = await insertWorkflowRun({ projectId, graph: 'chapter-generation', target: 'chapter:2', status: 'running', startedAgoMs: 5_000 });

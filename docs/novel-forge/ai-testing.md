@@ -1291,7 +1291,7 @@ own withdrawal slip and realizes the handwriting is hers."}`
   `chapter_publications` is deliberately **not** shifted.
 - **Fails when:** `CHP_003` / `CHP_001` / `CHP_009` / `CHP_004`; `S003` (`briefBody` missing for `hand`, `intent` for
   `planner`).
-- **Cost:** 0 model calls for `hand`; 1 `outline@3.2.0` call for `planner`.
+- **Cost:** 0 model calls for `hand`; 1 `outline@3.4.0` call for `planner`.
 
 #### Unrestricted fill / `external` write mode
 
@@ -1534,7 +1534,7 @@ Cost basis: per-model prices are in `ai/models.ts` and the default model per gro
 
 ```sql
 select node,role,provider,model,prompt_key||'@'||prompt_version pk,attempt,status,input_tokens in_t,cached_input_tokens c_t,output_tokens out_t,latency_ms,cost_usd,plugins,policy_digest from model_calls where run_id='<run>' order by id;
-select tool,args,status,result_digest,model_call_id from tool_calls where run_id='<run>' order by id;
+select tool,args,status,result_digest from tool_calls where run_id='<run>' order by id;
 select prompt_key,prompt_version,model,count(*) filter(where attempt=0) calls,count(*) filter(where attempt>0) repairs,sum(input_tokens) in_t,sum(output_tokens) out_t from model_calls where project_id=<P> group by 1,2,3;
 select purpose,budget_tokens,used_tokens,sections,omitted,unresolved_refs,left(rendered,400) from context_packs where id=(select context_pack_id from workflow_runs where id='<run>');
 ```

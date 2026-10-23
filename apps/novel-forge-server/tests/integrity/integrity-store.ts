@@ -57,13 +57,7 @@ const UNIQUE_KEYS = new Map<Table, string[]>([
 
 /** Foreign keys declared `on delete cascade` among the tables a chapter's lifecycle touches. */
 const CASCADES = new Map<Table, [Table, string][]>([
-  [
-    schema.drafts,
-    [
-      [schema.draftRevisions, 'draftId'],
-      [schema.passageSuggestions, 'draftId'],
-    ],
-  ],
+  [schema.drafts, [[schema.draftRevisions, 'draftId']]],
   [schema.finalizeReviews, [[schema.finalizeReviewItems, 'reviewId']]],
   [schema.chapterReviews, [[schema.chapterReviewRemedies, 'reviewId']]],
   [

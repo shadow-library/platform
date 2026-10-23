@@ -493,7 +493,7 @@ describe('Prompt modules', () => {
     });
 
     it('should put the length target in the outline request', async () => {
-      const vars = { catalog: 'C', volumePlan: 'V', startChapter: 1, endChapter: 3, extraContext: '', ...outlineWordTargetVars(resolveWordTarget()) };
+      const vars = { catalog: 'C', startChapter: 1, endChapter: 3, extraContext: '', ...outlineWordTargetVars(resolveWordTarget()) };
       const messages = await PROMPT_REGISTRY.outline.template.formatMessages(vars);
       expect(String(messages.at(-1)?.content)).toContain('Length target: 1,800–2,600 words of scene prose per chapter, aiming for about 2,200 — at least 3 scenes each.');
     });
