@@ -36,15 +36,11 @@ export interface ServiceWorkerController {
   message(request: SwRequest, options?: MessageOptions): Promise<SwResponse>;
 }
 
-/** Whether the current runtime can host a service worker (false during SSR and in unsupported browsers). */
 export function isServiceWorkerSupported(): boolean {
   return typeof navigator !== 'undefined' && 'serviceWorker' in navigator;
 }
 
-/**
- * Post a protocol request to a worker over a fresh `MessageChannel` and resolve with its terminal reply.
- * Interim `progress` replies are streamed to `onProgress`; `error` replies reject; the channel closes once settled.
- */
+/** Resolves with the worker's terminal reply over a fresh `MessageChannel`; `progress` replies go to `onProgress` and `error` replies reject. */
 export function messageServiceWorker(target: ServiceWorker, request: SwRequest, options: MessageOptions = {}): Promise<SwResponse> {
   return new Promise<SwResponse>((resolve, reject) => {
     const channel = new MessageChannel();
@@ -71,13 +67,8 @@ export function messageServiceWorker(target: ServiceWorker, request: SwRequest, 
 }
 
 /**
- * Register the app's service worker and return a controller for updates and messaging. SSR- and
- * unsupported-safe: it no-ops and returns an inert controller when there is no `serviceWorker` API, so it can
- * be called unconditionally at module top level.
- *
- * The update model is prompt-then-reload: a newly installed worker waits, `onUpdate` fires so the app can show
- * a refresh prompt, and only an explicit `applyUpdate()` activates it — the one-time reload happens on
- * `controllerchange` and is gated on that opt-in, so a first-visit `clients.claim()` never reloads the page.
+ * Returns an inert controller when there is no `serviceWorker` API, so it is safe to call at module top level.
+ * Updates are prompt-then-reload: the reload fires on `controllerchange` only after `applyUpdate()`, so a first-visit `clients.claim()` never reloads the page.
  */
 export function registerServiceWorker(options: RegisterServiceWorkerOptions = {}): ServiceWorkerController {
   let registration: ServiceWorkerRegistration | null = null;

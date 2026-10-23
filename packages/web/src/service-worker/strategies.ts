@@ -3,7 +3,6 @@ import { type RuntimeCachingRule } from './types';
 /** Header stamped on cached responses so `maxAgeSeconds` freshness can be checked without extra bookkeeping. */
 const TIMESTAMP_HEADER = 'x-shadow-sw-cached-at';
 
-/** Fetch with an optional abort deadline (for `network-first`), always clearing the timer. */
 async function fetchWithTimeout(request: Request, seconds?: number): Promise<Response> {
   if (!seconds) return fetch(request);
   const controller = new AbortController();
@@ -15,7 +14,6 @@ async function fetchWithTimeout(request: Request, seconds?: number): Promise<Res
   }
 }
 
-/** Return a copy of the response carrying a cache-time header; opaque/bodyless responses are stamped-through as-is. */
 function stamp(response: Response): Response {
   if (response.type === 'opaque' || !response.body) return response;
   const headers = new Headers(response.headers);
@@ -30,7 +28,7 @@ function isFresh(response: Response, maxAgeSeconds?: number): boolean {
   return (Date.now() - cachedAt) / 1000 < maxAgeSeconds;
 }
 
-/** Evict oldest entries (Cache API preserves insertion order) down to the rule's `maxEntries` cap. */
+// Evicts oldest first: the Cache API preserves insertion order.
 async function trim(cache: Cache, maxEntries?: number): Promise<void> {
   if (!maxEntries) return;
   const keys = await cache.keys();
@@ -38,7 +36,6 @@ async function trim(cache: Cache, maxEntries?: number): Promise<void> {
   for (const key of keys.slice(0, keys.length - maxEntries)) await cache.delete(key);
 }
 
-/** Persist a response (skipping error responses), stamping it when the rule tracks age, then enforce the cap. */
 async function save(cache: Cache, request: Request, response: Response, rule: RuntimeCachingRule): Promise<void> {
   if (!response.ok && response.type !== 'opaque') return;
   await cache.put(request, rule.maxAgeSeconds ? stamp(response) : response);
@@ -82,7 +79,6 @@ async function cacheOnly(request: Request, cache: Cache): Promise<Response> {
   return (await cache.match(request)) ?? Response.error();
 }
 
-/** Dispatch a request to the rule's caching strategy against its resolved cache. */
 export async function runStrategy(request: Request, rule: RuntimeCachingRule, defaultCacheName: string): Promise<Response> {
   if (rule.strategy === 'network-only') return fetch(request);
   const cache = await caches.open(rule.cacheName ?? defaultCacheName);

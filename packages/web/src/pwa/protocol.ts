@@ -1,11 +1,4 @@
-/**
- * Defining types
- *
- * The message protocol shared by the client (`@shadow-library/web/pwa`) and the service worker
- * (`@shadow-library/web/service-worker`). Requests travel client → worker wrapped in an {@link SwEnvelope}
- * (so the worker ignores foreign `postMessage` traffic); replies travel back over the request's
- * `MessageChannel` port as an {@link SwResponse}, which lets a caller `await` a result and observe progress.
- */
+// Requests travel client to worker wrapped in an `SwEnvelope`; replies come back over the request's `MessageChannel` port.
 export type SwRequest =
   | { type: 'skip-waiting' }
   | { type: 'cache-urls'; cacheName?: string; urls: string[] }
@@ -21,5 +14,5 @@ export interface SwEnvelope {
   request: SwRequest;
 }
 
-/** Tag stamped on every request envelope so the worker only reacts to this library's protocol. */
+/** Stamped on every envelope so the worker ignores foreign `postMessage` traffic. */
 export const SW_PROTOCOL = 'shadow-pwa';

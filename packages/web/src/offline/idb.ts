@@ -1,10 +1,3 @@
-/**
- * Defining types
- *
- * A dependency-free promise wrapper over the handful of IndexedDB operations the offline layer needs. Kept
- * deliberately small — a full IDB abstraction is out of scope; this just spares every caller the
- * `onsuccess`/`onerror` event dance and centralizes the open/upgrade logic.
- */
 export interface IdbConfig {
   dbName: string;
   storeNames: string[];
@@ -22,7 +15,6 @@ function promisify<T>(request: IDBRequest<T>): Promise<T> {
   });
 }
 
-/** Open (and, on first use or a version bump, upgrade) the database, creating any missing object stores. */
 export function openDatabase(config: IdbConfig): Promise<IDBDatabase> {
   return new Promise<IDBDatabase>((resolve, reject) => {
     const request = indexedDB.open(config.dbName, config.version ?? 1);
@@ -37,11 +29,7 @@ export function openDatabase(config: IdbConfig): Promise<IDBDatabase> {
   });
 }
 
-/**
- * Delete a database outright. Resolves on `blocked` as well as `success`: a delete held up by a still-open
- * connection completes on its own once that connection closes, and the caller (a sign-out or account switch)
- * is tearing the session down either way — waiting on the block would only hang the page.
- */
+// Resolves on `blocked` too: the delete completes once the open connection closes, and waiting on it would hang a sign-out.
 export function deleteDatabase(name: string): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     const request = indexedDB.deleteDatabase(name);

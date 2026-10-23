@@ -1,12 +1,7 @@
 import { type IdbConfig, idbDelete, idbGet, idbSet, isIndexedDbAvailable, openDatabase } from './idb';
 
-/**
- * Defining types
- *
- * `PersistedClient`/`Persister` mirror the (stable) contract from `@tanstack/query-persist-client-core`,
- * declared locally so this helper adds no extra peer dependency. The returned object is structurally
- * compatible with `persistQueryClient({ persister })`.
- */
+// Mirrors `@tanstack/query-persist-client-core`'s contract so this helper adds no peer dependency.
+
 export interface PersistedClient {
   timestamp: number;
   buster: string;
@@ -28,13 +23,7 @@ export interface IDBPersisterOptions {
 
 const STORE_NAME = 'query-cache';
 
-/**
- * An IndexedDB persister for the TanStack Query cache, so query results survive reloads and are readable
- * offline. Wire it with `@tanstack/react-query-persist-client`'s `PersistQueryClientProvider` (or
- * `persistQueryClient`). No-ops safely when IndexedDB is unavailable (SSR), so it can be created unconditionally.
- *
- * This persists the *whole* cache; for selecting specific content to keep offline, use {@link OfflineStore}.
- */
+/** Persists the *whole* query cache (no-ops without IndexedDB, so safe under SSR); to keep specific content offline use {@link OfflineStore}. */
 export function createIDBPersister(options: IDBPersisterOptions = {}): Persister {
   const config: IdbConfig = { dbName: options.dbName ?? 'shadow-query-cache', storeNames: [STORE_NAME], version: 1 };
   const key = options.key ?? 'query-client';

@@ -10,15 +10,7 @@ export interface RequireAuthOptions {
   returnTo: string;
 }
 
-/**
- * The SSR-safe auth gate for protected route groups. Run from `beforeLoad`, it ensures `query` server-side
- * before any protected markup renders — so an unauthenticated visitor is redirected (302 on the initial
- * request, client navigation thereafter) with no flash of protected content, and the ensured data seeds the
- * cache the screens read. A non-401 failure propagates to the error boundary.
- *
- * The generics mirror `queryClient.ensureQueryData`, so a `queryOptions<T>()` value flows straight through and
- * the resolved data type is inferred — no `as Parameters<typeof requireAuth>[1]` cast at the call site.
- */
+/** Run from `beforeLoad`: ensures `query` server-side so an unauthenticated visitor is redirected with no flash of protected content. */
 export async function requireAuth<TQueryFnData = unknown, TError = unknown, TData = TQueryFnData, TQueryKey extends QueryKey = QueryKey>(
   queryClient: QueryClient,
   query: EnsureQueryDataOptions<TQueryFnData, TError, TData, TQueryKey>,

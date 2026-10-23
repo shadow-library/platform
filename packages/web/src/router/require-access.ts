@@ -13,17 +13,13 @@ export interface RequireAccessOptions<
 > extends RequireAuthOptions {
   /** The app's `accessQueryOptions()`. */
   access: EnsureQueryDataOptions<AuthAccess, TAccessError, AuthAccess, TAccessKey>;
-  /** The session query a private deployment gates on — the same one `requireAuth` takes. */
+  /** The session query a private deployment gates on. */
   session: EnsureQueryDataOptions<TQueryFnData, TError, TData, TQueryKey>;
 }
 
 export type AccessGate<TSession> = { mode: 'public' } | { mode: 'private'; session: TSession };
 
-/**
- * Fails closed: anything other than an exact `public` answer — a failed read (network, 5xx, endpoint missing) or an
- * unrecognised body — reads as `private`, because guessing `public` would expose a private deployment to guests.
- * Never rejects, so it is safe on routes that must render either way (a login page, a document-wide `noindex`).
- */
+/** Fails closed: anything but an exact `public` answer reads as `private`, because guessing `public` would expose a private deployment to guests. Never rejects. */
 export async function resolveAccessMode<TAccessError = unknown, TAccessKey extends QueryKey = QueryKey>(
   queryClient: QueryClient,
   access: EnsureQueryDataOptions<AuthAccess, TAccessError, AuthAccess, TAccessKey>,
@@ -34,7 +30,6 @@ export async function resolveAccessMode<TAccessError = unknown, TAccessKey exten
   );
 }
 
-/** Gates on the session only when {@link resolveAccessMode} reads the deployment as `private`. */
 export async function requireAccess<
   TQueryFnData = unknown,
   TError = unknown,

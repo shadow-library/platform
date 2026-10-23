@@ -43,12 +43,7 @@ function subscribeToIsInstalled(onStoreChange: () => void): () => void {
   };
 }
 
-/**
- * Drive a custom "Install app" affordance. The browser fires `beforeinstallprompt` (which we stash instead of
- * letting the mini-infobar show), and `promptInstall()` replays it on a user gesture. `canInstall` reflects
- * whether a prompt is pending, and `isInstalled` flips once the app runs standalone. SSR-safe — the install
- * state is an external store whose server snapshot is `false`, and the prompt listener runs in a mount effect.
- */
+/** Stashes `beforeinstallprompt` instead of letting the mini-infobar show, and replays it from `promptInstall()` on a user gesture. */
 export function usePwaInstall(): PwaInstall {
   const [promptEvent, setPromptEvent] = useState<BeforeInstallPromptEvent | null>(null);
   const isInstalled = useSyncExternalStore(subscribeToIsInstalled, getIsInstalled, getServerIsInstalled);

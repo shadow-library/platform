@@ -18,7 +18,6 @@ describe('parseAccessDeniedSearch', () => {
     expect(search).toEqual({ error: 'access_denied', error_description: 'Your trial ended', request_id: 'req-42', application: 'Pulse', client_id: 'pulse' });
   });
 
-  /** The SAML deny path carries no client, and a hand-edited URL carries anything at all. */
   it('should drop absent, empty and non-string values', () => {
     const search = parseAccessDeniedSearch({ error: ACCESS_DENIED, application: '', client_id: 42, request_id: null });
 
@@ -35,7 +34,6 @@ describe('isAccessDeniedSearch', () => {
 });
 
 describe('isAccessDeniedError', () => {
-  /** 401 is "sign in", which the auth gate already bounces; treating 403 the same way would loop. */
   it('should separate a refusal from a missing session', () => {
     expect(isAccessDeniedError(new ApiError(403, problem('IAM_002', 'Permission denied')))).toBe(true);
     expect(isAccessDeniedError(new ApiError(401, problem('IAM_001', 'Unauthenticated')))).toBe(false);

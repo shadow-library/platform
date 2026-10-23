@@ -5,15 +5,7 @@ interface RecordedFetch {
   init: RequestInit;
 }
 
-/**
- * Declaring the constants
- *
- * The server transport reaches for `@tanstack/react-start/server`'s request accessors, which only resolve
- * inside a Start request. These tests stub that module with a mutable inbound `Request` and a plain `Headers`
- * standing in for the response, plus a recording `fetch` — the whole of the server surface the transport
- * touches, which is what makes the SSR path testable without a running server. The module is mocked before it
- * is imported so the stub is what `server-fetch` binds to.
- */
+// `@tanstack/react-start/server`'s request accessors only resolve inside a Start request, so the module is stubbed before `server-fetch` is imported.
 let currentRequest: Request;
 let responseHeaders: Headers;
 let recorded: RecordedFetch[];
@@ -52,8 +44,7 @@ beforeEach(() => {
   recorded = [];
   responseHeaders = new Headers();
   nextResponse = Response.json({ ok: true });
-  // Clone per call: a loader firing several backend calls reuses one recorded `nextResponse`, and each read
-  // consumes its body — the clone hands every call an independent, unconsumed stream.
+  // Cloned per call: several backend calls reuse one `nextResponse` and each read consumes its body.
   globalThis.fetch = ((url: string, init: RequestInit) => {
     recorded.push({ url, init });
     return Promise.resolve(nextResponse.clone());

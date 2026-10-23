@@ -5,53 +5,26 @@ import { type ApiResult } from '../lib/api-result';
 import { type CsrfConfig, csrfSetCookie, ensureCsrfToken, resolveCsrfConfig } from '../lib/csrf';
 import { type ServerFetch, type ServerFetchSpec } from '../lib/transport';
 
-/**
- * Defining types
- *
- * The server-only half of the isomorphic transport. In the browser an app calls the same-origin `/api/*`
- * directly — the ingress routes that prefix to the backend, so cookies and the CSRF double-submit work
- * natively. On the SSR pass there is no browser to do either: relative URLs have nothing to resolve
- * against, and the caller's cookies live on the inbound request rather than on this process. So this is the
- * single place that (a) reaches the backend by absolute origin, (b) forwards the caller's cookies and
- * chosen request headers, (c) satisfies the CSRF double-submit, and (d) relays the backend's `Set-Cookie`
- * headers back to the browser.
- *
- * This module imports `@tanstack/react-start/server`, so it must stay out of the client graph:
- * `createApiClient` only ever reaches it through a dynamic import the browser branch never invokes.
- */
 export interface ServerFetchConfig {
-  /** Prefix every `spec.path` is appended to. Under `createApiClient` this is the bare backend origin — the surface contributes the path prefix. */
+  /** Prefix every `spec.path` is appended to; under `createApiClient` this is the bare backend origin, as the surface contributes the path prefix. */
   baseUrl: string;
   /** CSRF cookie/header/TTL overrides; the defaults match every Shadow backend. */
   csrf?: CsrfConfig;
   /**
-   * Inbound request headers relayed to the backend. Three are forwarded by default, each carrying request
-   * context the backend would otherwise attribute to this SSR runtime rather than to the real client:
-   * - `user-agent` — the backend records it as the session's device; without it every session it mints names
-   *   this SSR runtime as the device instead of the browser.
-   * - `accept-language` — the caller's locale context, so a backend that localises its answers speaks the
-   *   reader's language on the SSR pass, not this process's default.
-   * - `x-forwarded-for` — the ingress-appended client-IP chain, so a backend behind `trustProxy` resolves the
-   *   real client address rather than this web tier's, for rate-limiting and audit.
+   * Inbound request headers relayed to the backend so it attributes device, locale and client IP to the real client rather than this SSR runtime.
    * @default ['user-agent', 'accept-language', 'x-forwarded-for']
    */
   forwardHeaders?: string[];
 }
 
-/** The request/response contract is declared browser-side in `lib/transport` — see the note there for why — and surfaced here for apps that import it from `@shadow-library/web/server`. */
 export type { ServerFetch, ServerFetchSpec };
 
 const DEFAULT_FORWARD_HEADERS = ['user-agent', 'accept-language', 'x-forwarded-for'];
 
-/** The correlation header both this web tier and every Shadow backend propagate, so an SSR call stitches to the backend's logs for that request. */
+/** Propagated by this web tier and every backend so an SSR call joins the backend's logs for that request. */
 const CORRELATION_HEADER = 'x-correlation-id';
 
-/**
- * One correlation id per inbound request, not per backend call. A multi-query SSR loader fans out several
- * `serverFetch` calls against the same inbound `Request`; keying the id off that request object — weakly, so
- * it is collected with the request — lets every call in the pass share one id. An inbound `x-correlation-id`
- * (set by an upstream proxy that already opened the trace) always wins, so the whole chain agrees on one id.
- */
+/** One id per inbound request, shared by every `serverFetch` of a multi-query loader; weakly keyed so it is collected with the request. */
 const correlationIds = new WeakMap<Request, string>();
 
 function correlationId(request: Request): string {
@@ -64,17 +37,12 @@ function correlationId(request: Request): string {
   return minted;
 }
 
-/** The cookie name portion of a raw `Set-Cookie` string, lowercased for case-insensitive de-duping. */
 function cookieName(raw: string): string {
   const eq = raw.indexOf('=');
   return (eq === -1 ? raw : raw.slice(0, eq)).trim().toLowerCase();
 }
 
-/**
- * Relay the backend's `Set-Cookie` headers to the browser response, de-duped by cookie name (last wins) so
- * repeated CSRF refreshes across a multi-query loader don't bloat the response. Raw strings are used
- * verbatim to preserve `__Host-`/`Secure`/`HttpOnly`/`SameSite` attributes exactly.
- */
+// De-duped by cookie name (last wins) so repeated CSRF refreshes don't bloat the response; raw strings keep `__Host-`/`Secure`/`SameSite` attributes intact.
 function relaySetCookies(incoming: string[]): void {
   if (incoming.length === 0) return;
   const headers = getResponseHeaders();
@@ -84,7 +52,7 @@ function relaySetCookies(incoming: string[]): void {
   setResponseHeader('set-cookie', [...byName.values()]);
 }
 
-// Some action endpoints answer 200 with an empty or non-JSON body — treat that as a void result.
+// Some action endpoints answer 200 with an empty or non-JSON body; that is a void result.
 async function parseBody(response: Response): Promise<unknown> {
   if (response.status === 204) return undefined;
   const text = await response.text();
@@ -97,8 +65,8 @@ async function parseBody(response: Response): Promise<unknown> {
 }
 
 /**
- * Build a `serverFetch` bound to one backend. Apps do not call this directly — they hand it to
- * `createApiClient` as the SSR half of one transport, from a module the browser never imports.
+ * Server-only transport: reaches the backend by absolute origin, forwards the caller's cookies and headers, satisfies the CSRF double-submit and relays `Set-Cookie`.
+ * Imports `@tanstack/react-start/server`, so it must stay out of the client graph.
  */
 export function createServerFetch(config: ServerFetchConfig): ServerFetch {
   const csrf = resolveCsrfConfig(config.csrf);
@@ -108,10 +76,7 @@ export function createServerFetch(config: ServerFetchConfig): ServerFetch {
     const request = getRequest();
     const incomingCookie = request.headers.get('cookie') ?? '';
 
-    // The backend compares the CSRF cookie against the header (double-submit) and does not require a
-    // server-minted value. These requests originate here rather than in the browser, so the double-submit
-    // is satisfied here too: echo the token from the forwarded cookie, or mint a pair and append it to the
-    // cookie header we send, so both halves agree on this request as well as the next one.
+    // Double-submit: echo the token from the forwarded cookie, or mint one and append it to the cookie header so both halves agree.
     const token = ensureCsrfToken(incomingCookie, csrf);
     const cookieHeader = token.mintedValue ? [incomingCookie, `${csrf.cookie}=${token.mintedValue}`].filter(Boolean).join('; ') : incomingCookie;
 
@@ -143,15 +108,12 @@ export function createServerFetch(config: ServerFetchConfig): ServerFetch {
     try {
       response = await fetch(url, init);
     } catch (error) {
-      // A cancelled or timed-out request propagates as-is so the caller reads it as a cancellation rather
-      // than a failed request masquerading as a network error.
       if (error instanceof DOMException && (error.name === 'AbortError' || error.name === 'TimeoutError')) throw error;
       return { ok: false, failure: { status: -1, code: 'NETWORK_ERROR', type: 'NetworkError', message: 'Unable to reach the server' } };
     }
 
     const backendCookies = typeof response.headers.getSetCookie === 'function' ? response.headers.getSetCookie() : [];
     const relayed = [...backendCookies];
-    // If we minted a CSRF token the backend didn't echo back, persist it so the browser carries it next time.
     if (token.mintedValue && !relayed.some(cookie => cookieName(cookie) === csrf.cookie)) relayed.push(csrfSetCookie(token.mintedValue, csrf));
     relaySetCookies(relayed);
 

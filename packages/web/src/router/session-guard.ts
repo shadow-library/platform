@@ -21,22 +21,13 @@ export interface UseSessionGuardOptions<TQueryFnData = unknown, TError = unknown
   enabled?: boolean;
 }
 
-/** The default expiry test: the session read failed with the backend's 401. */
 function isSessionExpired(error: unknown): boolean {
   return isApiError(error) && error.status === 401;
 }
 
 /**
- * Keep an app's session gate live for as long as its authenticated shell is mounted. The route-level gate
- * (`requireAuth`/`requireSession`) only runs when the browser first enters the protected group: TanStack
- * reuses the layout match, so its `beforeLoad` never re-runs while navigating between pages inside the shell.
- * This hook closes that gap — it re-validates the session against the server on every in-app navigation and
- * whenever the tab regains focus, and bounces to `loginTo` (preserving the current URL as `returnTo`) the
- * moment the server reports the session is gone. The returned status lets the shell withhold its chrome while
- * the redirect is in flight, so a session that ends mid-use never keeps rendering the app.
- *
- * It carries no app-specific import: the session query and the login route are its two parameters, so every
- * app binds its own and shares the behaviour.
+ * TanStack reuses the layout match, so the route gate's `beforeLoad` does not re-run on in-app navigation; this re-validates the session on every
+ * navigation and tab focus and bounces to `loginTo` with the current URL as `returnTo`. The status lets the shell withhold its chrome while redirecting.
  */
 export function useSessionGuard<TQueryFnData = unknown, TError = unknown, TData = TQueryFnData, TQueryKey extends QueryKey = QueryKey>(
   options: UseSessionGuardOptions<TQueryFnData, TError, TData, TQueryKey>,
@@ -44,7 +35,7 @@ export function useSessionGuard<TQueryFnData = unknown, TError = unknown, TData 
   const { query, loginTo = '/login', isExpired = isSessionExpired, enabled = true } = options;
   const navigate = useNavigate();
   const location = useLocation();
-  /** `refetchOnMount` is off because the gate already fetched on entry; navigation and focus drive every later check. */
+  // `refetchOnMount` is off because the gate already fetched on entry.
   const { error, refetch } = useQuery({ ...query, enabled, refetchOnMount: false, refetchOnWindowFocus: 'always' });
 
   const isInitialRender = useRef(true);
@@ -57,11 +48,7 @@ export function useSessionGuard<TQueryFnData = unknown, TError = unknown, TData 
   }, [location.pathname, refetch, enabled]);
 
   const isUnauthenticated = enabled && isExpired(error);
-  /**
-   * Fire the bounce exactly once. The redirect moves through `loginTo`, which changes `location` and would
-   * otherwise re-run this effect and nest `loginTo` into its own `returnTo`; the ref also pins `returnTo` to
-   * the protected page the session died on, not the transient login URL.
-   */
+  // Once only: navigating to `loginTo` changes `location` and would re-run this effect, nesting `loginTo` into its own `returnTo`.
   const hasRedirected = useRef(false);
   useEffect(() => {
     if (!isUnauthenticated || hasRedirected.current) return;

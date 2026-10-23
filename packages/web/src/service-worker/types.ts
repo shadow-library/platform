@@ -39,11 +39,8 @@ export interface ServiceWorkerConfig {
   clientsClaim?: boolean;
 }
 
-/**
- * Minimal `ServiceWorkerGlobalScope` surface, declared locally so this file type-checks under the package's
- * single `DOM`-lib tsconfig — pulling in the `WebWorker` lib alongside `DOM` produces duplicate-global errors.
- * `self` is cast to this shape inside {@link createServiceWorker} rather than redeclared.
- */
+// Minimal `ServiceWorkerGlobalScope` surface declared locally: the `WebWorker` lib alongside `DOM` produces duplicate-global errors.
+
 export interface ExtendableEventLike extends Event {
   waitUntil(promise: Promise<unknown>): void;
 }

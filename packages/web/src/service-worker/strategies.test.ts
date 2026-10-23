@@ -3,12 +3,7 @@ import { beforeEach, describe, expect, it } from 'bun:test';
 import { runStrategy } from './strategies';
 import { type CacheStrategy, type RuntimeCachingRule } from './types';
 
-/**
- * Declaring the constants
- *
- * In-memory fakes for the Cache Storage + `fetch` the strategies use — Bun's test runtime ships neither, so we
- * stub the globals to exercise the real caching logic (hit/miss/offline transitions) without a browser.
- */
+// Bun's test runtime ships neither Cache Storage nor a usable `fetch` for this, so the globals are faked.
 class FakeCache {
   private readonly store = new Map<string, Response>();
 

@@ -1,14 +1,7 @@
 import { type ApiResult } from './api-result';
 
-/**
- * Defining types
- *
- * The contract between `createApiClient` and its server-only half. It lives here, beside the browser code,
- * rather than next to the implementation: importing it from `../server/server-fetch` would leave a bare
- * `import {} from '../server/server-fetch.js'` in the emitted browser module — type-only at the source
- * level, but a side-effectful module record after transpilation, which is enough to pull
- * `@tanstack/react-start/server` into the client bundle. Types have no runtime, so they cost nothing here.
- */
+// Declared here, not in `server/server-fetch`: importing from there would pull `@tanstack/react-start/server` into the client bundle.
+
 export interface ServerFetchSpec {
   method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   /** Path under the transport's configured `baseUrl`, e.g. `/api/v1/me`. */

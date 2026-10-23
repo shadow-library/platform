@@ -1,12 +1,4 @@
-/**
- * Defining types
- *
- * Every Shadow backend guards mutations with a CSRF double-submit: the request must carry a header whose
- * value equals the token half of an `expiry:token` cookie. The token is not server-minted-only, so a caller
- * that has no cookie yet may mint the pair itself. Both callers need that rule — the browser, which now
- * talks to the same-origin `/api/*` directly, and the SSR transport, which talks to the backend on the
- * caller's behalf — so it lives here once rather than being re-derived on each side.
- */
+/** Double-submit: the request header must equal the token half of an `expiry:token` cookie; a caller without a cookie may mint the pair. */
 export interface CsrfConfig {
   /** Cookie the backend reads the token from. @default 'csrf-token' */
   cookie?: string;
@@ -33,7 +25,6 @@ function randomHex(bytes: number): string {
   return Array.from(buffer, byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
-/** Resolve the effective CSRF settings once, so callers can hold on to the pattern instead of rebuilding it per request. */
 export function resolveCsrfConfig(config: CsrfConfig = {}): Required<CsrfConfig> & { pattern: RegExp } {
   const cookie = config.cookie ?? CSRF_COOKIE;
   return {
@@ -44,16 +35,12 @@ export function resolveCsrfConfig(config: CsrfConfig = {}): Required<CsrfConfig>
   };
 }
 
-/**
- * Reads the token out of a cookie header, or mints a fresh `expiry:token` pair when there is none or the
- * one present has expired. A cookie without the `expiry:` prefix is honoured as a bare token — older
- * backends issued that shape and rejecting it would sign those callers out of every mutation.
- */
 export function ensureCsrfToken(cookieHeader: string, config: ReturnType<typeof resolveCsrfConfig>, now = Date.now()): CsrfToken {
   const match = cookieHeader.match(config.pattern);
   if (match?.[1]) {
     const value = decodeURIComponent(match[1]);
     const colon = value.indexOf(':');
+    // A cookie without an `expiry:` prefix is honoured as a bare, non-expiring token; the expiry is base36 epoch milliseconds.
     const expiry = colon === -1 ? '' : value.slice(0, colon);
     const token = colon === -1 ? value : value.slice(colon + 1);
     if (token && (!expiry || parseInt(expiry, 36) > now)) return { token };

@@ -1,14 +1,5 @@
-/**
- * Defining types
- *
- * The wire contract of the browser-facing auth surface every non-identity backend inherits from
- * `@shadow-library/auth`'s `AuthController` — mounted at `/api/auth`, outside the versioned API. It is one
- * contract, so it is typed once here rather than re-declared by each web app.
- *
- * These mirror the server's `auth.dto.ts`. They are re-declared rather than imported because
- * `@shadow-library/auth` sits on the backend dependency chain (`app`, `class-schema`, `fastify`), and a
- * type-only import would still drag that whole `.d.ts` graph into every web app's type-check.
- */
+// Mirrors `@shadow-library/auth`'s `auth.dto.ts`; re-declared because even a type-only import would drag the backend `.d.ts` graph into every web app's type-check.
+
 export interface AuthPrincipal {
   /** The stable identity subject. The cookie carries an opaque handle, never a token — this is all the browser is told. */
   sub: string;

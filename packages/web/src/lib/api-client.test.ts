@@ -9,13 +9,7 @@ interface RecordedFetch {
   init: RequestInit;
 }
 
-/**
- * Declaring the constants
- *
- * The browser branch is selected by the presence of `window`, so these tests install a minimal one along
- * with a writable `document.cookie` and a stub `fetch`. That is the whole of the browser surface the client
- * touches — no DOM, no navigation — which is what makes the transport testable without a real browser.
- */
+// The browser branch is selected by `window`, so a minimal one is installed with a writable `document.cookie` and a stub `fetch`.
 const originalFetch = globalThis.fetch;
 
 let recorded: RecordedFetch[] = [];
@@ -92,7 +86,6 @@ describe('createApiClient (browser)', () => {
 
     const headers = recorded[0]?.init.headers as Record<string, string>;
     expect(headers['x-csrf-token']).toMatch(/^[0-9a-f]{32}$/);
-    // The minted pair is written back so the next request — and the SSR pass — agree on the same token.
     expect(document.cookie).toContain('csrf-token=');
     expect(decodeURIComponent(document.cookie)).toContain(headers['x-csrf-token'] as string);
   });

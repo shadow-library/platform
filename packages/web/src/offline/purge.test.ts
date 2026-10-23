@@ -3,12 +3,7 @@ import { beforeEach, describe, expect, it } from 'bun:test';
 import { type SwRequest } from '../pwa/protocol';
 import { purgeIfAccountChanged, purgeOfflineData } from './purge';
 
-/**
- * Declaring the constants
- *
- * In-memory fakes for the IndexedDB, Cache Storage and localStorage the purge touches — Bun's test runtime
- * ships none of them, so the globals are stubbed to record what the purge deletes without a browser.
- */
+// Bun's test runtime ships no IndexedDB, Cache Storage or localStorage, so the globals are faked to record what the purge deletes.
 const deletedDbs: string[] = [];
 const fakeIndexedDb = {
   deleteDatabase(name: string): IDBOpenDBRequest {

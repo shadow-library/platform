@@ -16,12 +16,7 @@ export interface UseOfflineDownload {
   refresh: () => Promise<void>;
 }
 
-/**
- * React binding over {@link OfflineContentManager}: exposes the list of downloaded content plus `download`/
- * `remove` actions with `isDownloading`/`progress` state for wiring a "Download for offline" button and a
- * downloads list. Pass a shared manager to reuse one IndexedDB database across the app; otherwise one is
- * created per hook instance.
- */
+/** React binding over {@link OfflineContentManager}; pass a shared manager to reuse one IndexedDB database, otherwise one is created per hook instance. */
 export function useOfflineDownload(manager?: OfflineContentManager): UseOfflineDownload {
   const contentManager = useMemo(() => manager ?? new OfflineContentManager(), [manager]);
   const [entries, setEntries] = useState<OfflineEntryMeta[]>([]);

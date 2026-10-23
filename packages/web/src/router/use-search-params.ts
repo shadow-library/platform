@@ -19,12 +19,10 @@ function cleanParams(params: SearchInput): SearchParams {
   return cleaned;
 }
 
-/** Read and update the URL query params through TanStack Router, dropping empty/undefined values. */
+/** `appendSearch` merges into the current params, `setSearch` replaces them; both drop empty and undefined values. */
 export function useSearchParams(): UseSearchParams {
   const router = useRouter();
-  // `router.state` is a plain snapshot read through non-reactive `useRouter()`; a search-only navigation
-  // (e.g. appendSearch) doesn't remount the matched route, so without subscribing here the caller would
-  // keep rendering with a stale `search` and never re-issue the query that depends on it.
+  // Subscribed because `useRouter()` state is a non-reactive snapshot and a search-only navigation doesn't remount the route, which would leave `search` stale.
   const search = useRouterState({ select: state => state.location.search as SearchParams });
   const appendSearch = useCallback((params: SearchInput) => router.navigate({ search: cleanParams({ ...search, ...params }) as never }), [router, search]);
   const setSearch = useCallback((params: SearchInput) => router.navigate({ search: cleanParams(params) as never }), [router]);

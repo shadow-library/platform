@@ -9,11 +9,7 @@ function subscribe(callback: () => void): () => void {
   };
 }
 
-/**
- * Track the browser's online/offline state. Backed by `useSyncExternalStore`, so it is tearing-free and
- * SSR-safe — the server snapshot is `true` (assume online) and the client corrects on hydration, so there is
- * no mismatch. Use it to gate optimistic writes, show an offline banner, or read from downloaded content.
- */
+/** The server snapshot assumes online; the client corrects on hydration. */
 export function useOnlineStatus(): boolean {
   return useSyncExternalStore(
     subscribe,

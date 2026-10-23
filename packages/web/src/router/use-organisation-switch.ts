@@ -33,10 +33,8 @@ export interface OrganisationSwitchSteps {
 const SWITCH_FAILED = { code: 'ORGANISATION_SWITCH_FAILED', type: 'ClientError', message: 'The organisation could not be switched' } as const;
 
 /**
- * Every cached response, the permissions included, was answered for the previous organisation, so the cache is dropped whole
- * rather than selectively invalidated: a stale list rendered against new permissions is exactly the confusion this avoids.
- * Once the session has switched there is no going back, so a failed in-app reload falls back to reloading the whole document
- * rather than leaving the previous organisation's screen live against the new session.
+ * Every cached response, permissions included, was answered for the previous organisation, so the cache is dropped whole rather than selectively invalidated.
+ * The session has already switched, so a failed in-app reload falls back to reloading the document rather than leaving the previous organisation's screen live.
  */
 export async function switchOrganisationAndReload(organisationId: string, steps: OrganisationSwitchSteps): Promise<ApiError | null> {
   try {

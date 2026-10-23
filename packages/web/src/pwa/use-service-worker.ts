@@ -72,13 +72,8 @@ function createServiceWorkerStore(options: RegisterServiceWorkerOptions): Servic
 }
 
 /**
- * Register the service worker for the lifetime of the app and expose its update state to React. Registers
- * exactly once, on first subscription (the worker deliberately outlives the component, so there is no
- * unregister on unmount) and flips `updateAvailable` when a new version is waiting so a "refresh to update"
- * prompt can call `applyUpdate`. Registration state is an external store, so the server and hydration render
- * both see the inert snapshot and the real one lands after mount — no hydration mismatch.
- *
- * `options` are read once, when the store is created; later changes are ignored.
+ * Registers once, on first subscription, and never unregisters on unmount (the worker outlives the component). State is an external store so the server and
+ * hydration render see the inert snapshot. `options` are read once, when the store is created.
  */
 export function useServiceWorker(options: RegisterServiceWorkerOptions = {}): UseServiceWorker {
   const [store] = useState(() => createServiceWorkerStore(options));

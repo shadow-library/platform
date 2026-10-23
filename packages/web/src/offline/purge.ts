@@ -8,22 +8,17 @@ export interface PurgeOfflineDataOptions {
   caches?: string[];
   /** Delete every Cache Storage cache whose name starts with one of these prefixes — tolerant of a version suffix. */
   cachePrefixes?: string[];
-  /**
-   * When set, also asks the active service worker to drop each resolved cache via `delete-cache`. Deleting
-   * from the page already clears the shared origin storage, so this is a belt-and-suspenders hop for callers
-   * that hold a controller — the purge is complete without it.
-   */
+  /** When set, also asks the active service worker to drop each resolved cache via `delete-cache`; the page-side delete already clears shared storage, so this is optional. */
   controller?: Pick<ServiceWorkerController, 'message'>;
 }
 
 export interface PurgeIfAccountChangedOptions extends PurgeOfflineDataOptions {
-  /** localStorage key under which the last-seen account marker lives; overwritten on every change, so it never holds stale cross-account state. */
+  /** localStorage key holding the last-seen account marker. */
   storageKey: string;
-  /** The signed-in account id, or `null` when signed out — signed-out is its own marked state, distinct from "never seen". */
+  /** The signed-in account id, or `null` when signed out, which is a marked state distinct from "never seen". */
   accountId: string | null;
 }
 
-/** Delete each named database, guarded: an SSR/unsupported runtime has no IndexedDB, and a database that never opened cannot leak. */
 async function deleteDatabases(names: string[]): Promise<void> {
   if (!names.length || !isIndexedDbAvailable()) return;
   for (const name of names) {
@@ -35,7 +30,6 @@ async function deleteDatabases(names: string[]): Promise<void> {
   }
 }
 
-/** Explicit names plus every cache matching a prefix — resolved from the live registry so version suffixes are covered. */
 async function resolveCacheNames(names: string[], prefixes: string[]): Promise<string[]> {
   const resolved = new Set(names);
   if (prefixes.length) {
@@ -86,25 +80,15 @@ function writeMarker(key: string, value: string): void {
   }
 }
 
-/**
- * Wipe an app's client-side persisted state: delete its IndexedDB databases, clear the named/prefixed Cache
- * Storage caches, and (when a controller is passed) post the worker's `delete-cache`. Safe to call with
- * nothing stored and in a non-browser/SSR context — every storage access is feature-detected and guarded.
- */
+/** Safe with nothing stored and in SSR: every storage access is feature-detected and guarded. */
 export async function purgeOfflineData(options: PurgeOfflineDataOptions = {}): Promise<void> {
   await deleteDatabases(options.databases ?? []);
   await deleteCaches(options.caches ?? [], options.cachePrefixes ?? [], options.controller);
 }
 
 /**
- * Guard an app's offline stores against account bleed on a shared device. When the signed-in account differs
- * from the one last seen here, purge first, then record the new one — so the next user never hydrates the
- * previous user's data. Call it before any account-scoped store hydrates or renders.
- *
- * The first observation on a device is adopted, not purged: pre-existing local data belongs to whoever is
- * signed in now (the owner who was using the device before this guard shipped), and its unsynced writes must
- * survive. Every subsequent change — including signed-in → a different user, or → signed out — purges.
- * Returns whether a purge ran.
+ * Purges when the signed-in account differs from the one last seen on this device, then records it; call before any account-scoped store hydrates.
+ * The first observation is adopted, not purged, so unsynced writes from before the guard shipped survive. Returns whether a purge ran.
  */
 export async function purgeIfAccountChanged(options: PurgeIfAccountChangedOptions): Promise<boolean> {
   const { storageKey, accountId, ...purge } = options;

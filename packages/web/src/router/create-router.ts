@@ -9,23 +9,14 @@ export interface CreateAppRouterOptions {
   router?: object;
 }
 
-/**
- * Build a router the Shadow way. TanStack Start calls this once per request on the server, so the
- * QueryClient is created here (never module-level) — that keeps each request's cache isolated and stops one
- * user's dehydrated data leaking into another's. `setupRouterSsrQueryIntegration` installs the
- * QueryClientProvider and wires dehydration/hydration, and `defaultPreloadStaleTime: 0` lets TanStack Query
- * — not the router — own staleness so the two caches never disagree.
- */
-// Annotated so the emitted declaration names only `@tanstack/react-router`: the inferred type spells out
-// `@tanstack/router-core` and `@tanstack/history`, which a consumer's clean install does not resolve from here.
+// TanStack Start calls this once per request on the server, so the QueryClient is created here, never at module level, to keep each request's cache isolated.
+// Return type annotated so the emitted declaration names only `@tanstack/react-router`, not `router-core`/`history`, which a consumer may not resolve.
 export function createAppRouter<TRouteTree extends AnyRoute>(routeTree: TRouteTree, options: CreateAppRouterOptions = {}): Router<TRouteTree, 'never', true> {
   const queryClient = new QueryClient({
     ...options.queryClient,
     defaultOptions: {
       ...options.queryClient?.defaultOptions,
       queries: {
-        // Session-scoped data changes rarely within a view; a short stale window keeps navigation snappy
-        // without serving stale state after a mutation invalidates its keys.
         staleTime: 30_000,
         retry: 1,
         refetchOnWindowFocus: false,
@@ -38,10 +29,11 @@ export function createAppRouter<TRouteTree extends AnyRoute>(routeTree: TRouteTr
     routeTree,
     context: { queryClient },
     defaultPreload: 'intent',
+    // Zero so TanStack Query, not the router, owns staleness and the two caches never disagree.
     defaultPreloadStaleTime: 0,
     scrollRestoration: true,
     defaultStructuralSharing: true,
-    // Instant navigations shouldn't flash a skeleton; once one shows, hold it briefly so it can't flicker.
+    // Instant navigations shouldn't flash a skeleton; once shown, it is held so it can't flicker.
     defaultPendingMs: 150,
     defaultPendingMinMs: 300,
     ...options.router,

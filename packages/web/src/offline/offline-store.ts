@@ -26,15 +26,7 @@ function estimateSize(value: unknown): number {
   }
 }
 
-/**
- * An IndexedDB-backed store for content downloaded for offline use — the SW-independent primary offline
- * mechanism. It works in any app (no service worker required) and holds anything structured-cloneable: JSON
- * documents, and `Blob`s for binary assets like cover images. Metadata (label, size, timestamp) is kept in a
- * sibling store so `list()`/`totalSize()` don't have to deserialize every value.
- *
- * Construction is side-effect-free (the database opens lazily on first use), so it is safe to instantiate at
- * module scope in an SSR app.
- */
+/** Holds anything structured-cloneable, needs no service worker, and opens lazily so it is safe at module scope under SSR. */
 export class OfflineStore {
   private readonly config: IdbConfig;
   private database: Promise<IDBDatabase> | null = null;
@@ -47,7 +39,7 @@ export class OfflineStore {
     return (this.database ??= openDatabase(this.config));
   }
 
-  /** Store a value (JSON or `Blob`) under `key`, replacing any existing entry; returns the recorded metadata. */
+  /** Replaces any existing entry under `key` and returns the recorded metadata. */
   async put<T>(key: string, value: T, meta: { label?: string } = {}): Promise<OfflineEntryMeta> {
     const db = await this.db();
     const entryMeta: OfflineEntryMeta = { key, label: meta.label, size: estimateSize(value), downloadedAt: Date.now() };
@@ -91,7 +83,6 @@ export class OfflineStore {
     return (await this.list()).reduce((sum, entry) => sum + entry.size, 0);
   }
 
-  /** The browser's storage usage/quota, if the Storage API is available — for showing how much room is left. */
   async estimate(): Promise<{ usage: number; quota: number } | null> {
     if (typeof navigator === 'undefined' || !navigator.storage?.estimate) return null;
     const { usage, quota } = await navigator.storage.estimate();

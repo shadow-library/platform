@@ -11,11 +11,7 @@ export interface ErrorResponse {
   fields?: ErrorField[] | null;
 }
 
-/**
- * The single error surface every transport raises on the client — the direct `APIRequest` client and the
- * server-function `call()` unwrap alike. Carries the machine `code` (for error pages / inline messages),
- * the field problems, and `retryAfterSeconds` for rate-limited responses.
- */
+/** The error every transport raises on the client; `retryAfterSeconds` is set for rate-limited responses. */
 export class ApiError extends Error {
   readonly status: number;
   readonly code: string;
@@ -24,8 +20,7 @@ export class ApiError extends Error {
   readonly retryAfterSeconds?: number;
 
   constructor(status: number, body: ErrorResponse, retryAfterSeconds?: number) {
-    // Validation errors carry the actual field problems; fold them into the message so a toast explains
-    // the rejection instead of the generic sentence.
+    // Folded into the message so a toast explains a validation rejection instead of the generic sentence.
     const fieldDetail = body.fields?.length ? ` — ${body.fields.map(field => `${field.field}: ${field.msg}`).join('; ')}` : '';
     super(`${body.message}${fieldDetail}`);
     this.name = 'ApiError';
@@ -36,18 +31,14 @@ export class ApiError extends Error {
     this.retryAfterSeconds = retryAfterSeconds;
   }
 
-  /** The field-level problems as a `{ field: message }` map for binding inline form errors; empty when there are none. */
+  /** Field problems as a `{ field: message }` map for inline form errors. */
   get fieldErrors(): Record<string, string> {
     const result: Record<string, string> = {};
     for (const { field, msg } of this.fields ?? []) result[field] = msg;
     return result;
   }
 
-  /**
-   * Narrows an unknown value to `ApiError`. Prefers `instanceof`, but falls back to a shape check so the guard
-   * still holds when the package is bundled more than once (a common SSR + client split), where `instanceof`
-   * across the two class identities would otherwise miss.
-   */
+  // The shape check covers the package being bundled twice (SSR + client), where `instanceof` misses across the two class identities.
   static isApiError(value: unknown): value is ApiError {
     if (value instanceof ApiError) return true;
     return (
@@ -60,7 +51,6 @@ export class ApiError extends Error {
   }
 }
 
-/** Type guard narrowing an unknown thrown value (a `catch` binding, a query/mutation error) to `ApiError`. */
 export function isApiError(value: unknown): value is ApiError {
   return ApiError.isApiError(value);
 }

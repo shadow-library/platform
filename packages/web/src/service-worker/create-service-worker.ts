@@ -11,28 +11,14 @@ function matchesRule(rule: RuntimeCachingRule, url: URL, request: Request): bool
   return typeof rule.pattern === 'function' ? rule.pattern(url, request) : rule.pattern.test(url.href);
 }
 
-/**
- * Install the Shadow service-worker runtime. Call it once from your worker entry (`src/sw.ts`), which your
- * bundler emits as the registered script:
- *
- * ```ts
- * import { createServiceWorker } from '@shadow-library/web/service-worker';
- * createServiceWorker({ navigationFallback: '/offline', precache: ['/offline'], runtimeCaching: [...] });
- * ```
- *
- * Caching is entirely runtime-driven (no build-time asset manifest), so the same worker fits any app. It
- * precaches the app shell, cleans up stale versioned caches on activate, applies the per-pattern
- * `runtimeCaching` rules (falling back to any cache offline — which transparently serves on-demand downloaded
- * content), and handles the client message protocol for downloading/removing offline content.
- */
+/** Installs the service-worker runtime; call once from the worker entry. Caching is runtime-driven, with no build-time manifest. */
 export function createServiceWorker(config: ServiceWorkerConfig = {}): void {
   const scope = self as unknown as ServiceWorkerScope;
   const prefix = config.cachePrefix ?? 'shadow';
   const version = config.version ?? 'v1';
   const precacheName = `${prefix}-precache-${version}`;
   const runtimeName = `${prefix}-runtime-${version}`;
-  // The offline-content cache is intentionally unversioned: a deploy that bumps `version` must not wipe what
-  // the user explicitly downloaded for offline use.
+  // Unversioned so a deploy that bumps `version` doesn't wipe content the user downloaded.
   const offlineName = config.offlineCacheName ?? `${prefix}-offline`;
   const rules = config.runtimeCaching ?? [];
   const managedCaches = new Set([precacheName, runtimeName, offlineName]);
@@ -81,8 +67,7 @@ export function createServiceWorker(config: ServiceWorkerConfig = {}): void {
       }
     }
 
-    // Default: hit the network, but fall back to any cache when offline — this is what transparently serves
-    // on-demand downloaded content (it lives in the offline cache under its own URL) with no per-route config.
+    // Downloaded content lives in the offline cache under its own URL, so the any-cache fallback serves it with no per-route config.
     try {
       return await fetch(request);
     } catch {

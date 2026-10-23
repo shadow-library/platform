@@ -1,4 +1,3 @@
-/** A precache URL answered with something other than the document itself, which fails the worker's install. */
 export class PrecacheError extends Error {
   constructor(
     readonly url: string,

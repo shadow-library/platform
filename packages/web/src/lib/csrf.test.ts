@@ -2,13 +2,6 @@ import { describe, expect, it } from 'bun:test';
 
 import { csrfSetCookie, ensureCsrfToken, resolveCsrfConfig } from './csrf';
 
-/**
- * Declaring the constants
- *
- * The double-submit rule used to live in each app; these cases came across with it when web-novel-web
- * stopped hand-rolling its own copy, because they cover the parts that are easy to get wrong — expiry, and
- * the two spellings a cookie value arrives in.
- */
 const config = resolveCsrfConfig();
 
 describe('ensureCsrfToken', () => {
@@ -70,8 +63,7 @@ describe('csrfSetCookie', () => {
 
     expect(cookie).toMatch(/^csrf-token=.+; Path=\/; Max-Age=3600; SameSite=Lax$/);
     expect(decodeURIComponent(cookie)).toContain(`:${csrf.token}`);
-    // Deliberately neither HttpOnly nor `__Host-`: the browser has to read this one back to satisfy the
-    // double-submit on its own direct calls.
+    // Deliberately neither HttpOnly nor `__Host-`: the browser must read it back for its own double-submit.
     expect(cookie).not.toContain('HttpOnly');
   });
 });

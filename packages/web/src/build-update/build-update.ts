@@ -18,16 +18,15 @@ export const DEFAULT_BUILD_CHECK_TIMING: BuildCheckTiming = { intervalMs: 5 * 60
 
 const MAX_BUILD_ID_LENGTH = 200;
 
-/* Chrome, Firefox and Safari phrase a failed dynamic import differently; Vite adds its own for CSS preloads. */
+// Chrome, Firefox and Safari phrase a failed dynamic import differently; Vite adds its own for CSS preloads.
 const CHUNK_LOAD_FAILURE = /^(?:Failed to fetch dynamically imported module|error loading dynamically imported module|Importing a module script failed|Unable to preload CSS)/;
 
-/** The id a build stamps into both its client bundle and its server: the deploy's version when one is given, otherwise the build's start time. */
+/** The deploy's version when one is given, otherwise `local-` plus the build's start time. */
 export function resolveBuildId(version: string | undefined, builtAt: number): string {
   const trimmed = version?.trim();
   return trimmed ? trimmed : `local-${builtAt.toString(36)}`;
 }
 
-/** The no-store JSON body a web app's build-id route answers with. */
 export function buildIdResponse(buildId: string): Response {
   return Response.json({ buildId }, { headers: { 'cache-control': 'no-store' } });
 }
@@ -50,7 +49,6 @@ export function retryDelay(failures: number, timing: BuildCheckTiming): number {
   return Math.min(timing.intervalMs * 2 ** (failures - 1), timing.maxBackoffMs);
 }
 
-/** Milliseconds until the next routine check is due. */
 export function nextCheckDelay(state: BuildCheckState, now: number, timing: BuildCheckTiming): number {
   return Math.max(0, state.lastAttemptAt + retryDelay(state.failures, timing) - now);
 }

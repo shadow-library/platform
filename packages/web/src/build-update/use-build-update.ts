@@ -40,12 +40,7 @@ async function fetchServedBuildId(endpoint: string, signal: AbortSignal): Promis
   }
 }
 
-/**
- * Watch for a newer deploy of this web app and say so, without ever reloading on the author's behalf. Checks
- * when the tab regains focus or visibility, on an interval while visible, and at once when a chunk fails to
- * load; failed checks back off exponentially. Everything runs in an effect, so the server render and
- * hydration both see `updateAvailable: false`.
- */
+/** Never reloads on the author's behalf. Runs only in an effect, so server render and hydration both see `updateAvailable: false`. */
 export function useBuildUpdate(options: UseBuildUpdateOptions): UseBuildUpdate {
   const { buildId, endpoint = BUILD_ID_ENDPOINT, timeoutMs = 10_000, enabled = true } = options;
   const intervalMs = options.intervalMs ?? DEFAULT_BUILD_CHECK_TIMING.intervalMs;
@@ -67,7 +62,7 @@ export function useBuildUpdate(options: UseBuildUpdateOptions): UseBuildUpdate {
       timer = setTimeout(() => void check(false), nextCheckDelay(state, Date.now(), timing));
     };
 
-    /* A hidden or offline tab lets its timer lapse; the visibilitychange or online event restarts it. */
+    // A hidden or offline tab lets its timer lapse; the visibilitychange or online event restarts it.
     const check = async (urgent: boolean): Promise<void> => {
       if (disposed || inFlight) return;
       if (document.visibilityState !== 'visible' || !navigator.onLine) return;

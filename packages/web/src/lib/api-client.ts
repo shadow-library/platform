@@ -4,47 +4,17 @@ import { type ApiResult } from './api-result';
 import { type CsrfConfig, csrfSetCookie, ensureCsrfToken, resolveCsrfConfig } from './csrf';
 import { type ServerFetch } from './transport';
 
-/**
- * Defining types
- *
- * One transport, two runtimes. Deployments front each app with a single origin whose ingress routes `/api/*`
- * to the backend and everything else to the web app, which makes the browser's call to `/api/v1/...`
- * same-origin: the session cookie is attached natively, the CSRF double-submit works natively, `AbortSignal`
- * cancels a real request, and HTTP caching and service-worker interception both still apply. The SSR pass
- * has none of that — no browser, no relative resolution, no cookie jar — so it goes out through
- * `createServerFetch`, which reaches the backend by absolute origin and forwards the inbound request's
- * cookies and headers.
- *
- * Call sites see neither: `api.get('/projects').execute()` is written once and does the right thing in both.
- */
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 /** Loads the server-only transport. Invoked lazily and only on the server, so the module never enters the client graph. */
 export type SsrTransportLoader = () => Promise<{ serverFetch: ServerFetch }>;
 
 export interface ApiClientConfig<TSurfaces extends Record<string, string>> {
-  /**
-   * The named base paths this app talks to, each rooted at the public origin — typically
-   * `{ v1: '/api/v1', auth: '/api/auth' }`. Surfaces are paths, not clients: they share one cookie jar, one
-   * CSRF policy, and one SSR transport, which is why an app needs exactly one `createApiClient` call.
-   */
+  /** Named base paths rooted at the public origin, e.g. `{ v1: '/api/v1', auth: '/api/auth' }`; all share one cookie jar, CSRF policy and SSR transport. */
   surfaces: TSurfaces;
   /**
-   * Dynamic import of the app's server-only transport module. It must be supplied behind Vite's
-   * `import.meta.env.SSR`, which the client build replaces with `false` so the branch — and with it the
-   * whole server module graph — is eliminated:
-   *
-   * ```ts
-   * ssr: import.meta.env.SSR ? () => import('./ssr-transport') : undefined,
-   * ```
-   *
-   * A bare `() => import(...)` is not enough: the thunk is never invoked in the browser, but Rollup still
-   * resolves and bundles the target for the client environment, which pulls `node:stream` and
-   * `node:async_hooks` in and fails the build. The guard has to live in app code, because that is what
-   * Vite transforms — this package ships prebuilt, so a guard written here would never be substituted.
-   *
-   * `@shadow-library/web/server` ships `createSsrTransport` so the target can be the shared factory rather
-   * than a per-app module — `() => import('@shadow-library/web/server').then(m => m.createSsrTransport({ fallback: '...' }))`.
+   * Dynamic import of the server-only transport, supplied behind Vite's `import.meta.env.SSR` so the client build eliminates it:
+   * `ssr: import.meta.env.SSR ? () => import('./ssr-transport') : undefined`. A bare `() => import(...)` still bundles `node:*` modules into the client.
    */
   ssr?: SsrTransportLoader;
   /** CSRF cookie/header/TTL overrides; the defaults match every Shadow backend. */
@@ -57,19 +27,13 @@ export interface ApiSurface {
   put(path: string): ApiRequest;
   patch(path: string): ApiRequest;
   delete(path: string): ApiRequest;
-  /** The surface's base path, for the handful of places that need a URL rather than a request — a full-page redirect into `/api/auth/login`, say. */
+  /** For callers that need a URL rather than a request, e.g. a full-page redirect into `/api/auth/login`. */
   readonly basePath: string;
 }
 
 export type ApiClient<TSurfaces extends Record<string, string>> = { [K in keyof TSurfaces]: ApiSurface };
 
-/**
- * Options for query hooks that poll — e.g. following a job or workflow run to completion. A static
- * interval polls forever; the function form reads the query's own last-fetched data (the same shape
- * React Query's own `refetchInterval` callback receives) to decide whether there is still anything
- * worth polling for and stop (`false`) once there isn't — a screen that lists background jobs so it
- * can watch one in flight shouldn't keep polling after that job (or every job) has settled.
- */
+/** Options for polling query hooks; the function form receives the query's last data (as React Query's `refetchInterval` does) and returns `false` to stop. */
 export interface PollingOptions<TData = unknown> {
   refetchInterval?: number | ((query: { state: { data?: TData } }) => number | false);
 }
@@ -91,19 +55,14 @@ interface RequestSpec {
   timeoutMs?: number;
 }
 
-/**
- * SSR is the absence of a browser, not the presence of Node — the check must hold under Bun, workers and
- * tests alike. It is evaluated per request rather than once at module load: a module-load snapshot would be
- * captured before a test (or any environment that installs a DOM late) had a `window` to find, and would
- * then route every browser call down the server branch for the lifetime of the process.
- */
+// Evaluated per request: a module-load snapshot would predate a late-installed DOM and pin every call to the server branch.
+
 function isServer(): boolean {
   return typeof window === 'undefined';
 }
 
 const NETWORK_FAILURE = { status: -1, code: 'NETWORK_ERROR', type: 'NetworkError', message: 'Unable to reach the server' } as const;
 
-/** A misconfigured client — raised where the mistake is, rather than surfacing later as an unexplained request failure. */
 export class ApiClientError extends Error {
   constructor(message: string) {
     super(message);
@@ -116,9 +75,7 @@ function isCancellation(error: unknown): boolean {
   return error instanceof DOMException && (error.name === 'AbortError' || error.name === 'TimeoutError');
 }
 
-/**
- * A chainable, thenable request. Identical to write on both runtimes; only `dispatch` differs.
- */
+/** A chainable, thenable request. The browser fetches same-origin; the SSR pass goes through `createServerFetch` by absolute origin with the inbound cookies. */
 export class ApiRequest {
   private readonly spec: RequestSpec;
 
@@ -136,17 +93,9 @@ export class ApiRequest {
   }
 
   query(key: string, value: QueryValue): this;
-  /**
-   * The params object is typed as a mapped type over its own keys rather than as `QueryParams`, because
-   * TypeScript withholds the implicit index signature from an `interface`: a declared `ListUsersParams`
-   * would not be assignable to `Record<string, QueryValue>`, and every caller holding a generated params
-   * interface would have to spread it (`.query({ ...params })`) to launder the type. This form accepts the
-   * interface directly and still checks each property's value type.
-   */
+  // Mapped over its own keys because an `interface` lacks the implicit index signature and would not be assignable to `Record<string, QueryValue>`.
   query<T extends object>(params: (T & { [K in keyof T]: QueryValue | undefined }) | undefined): this;
   query(keyOrParams: string | object | undefined, value?: QueryValue): this {
-    // An absent params object is a no-op, so a caller holding optional filters can pass them straight
-    // through instead of guarding every call site with `?? {}`.
     if (keyOrParams === undefined) return this;
 
     if (typeof keyOrParams === 'string') {
@@ -182,20 +131,13 @@ export class ApiRequest {
     return this;
   }
 
-  /**
-   * Non-2xx statuses whose typed body is part of the contract rather than a failure — an interactive auth
-   * flow answering 400 with the next step, say. They resolve as data instead of throwing.
-   */
+  /** Non-2xx statuses whose typed body is part of the contract (e.g. an auth flow answering 400 with the next step); they resolve as data instead of throwing. */
   modeled(...statuses: number[]): this {
     this.spec.modeled = statuses;
     return this;
   }
 
-  /**
-   * Binds an `AbortSignal` so the request is cancelled when the signal aborts. Pass the `signal` TanStack
-   * Query hands a `queryFn` to make queries cancel on unmount or when superseded — the abort propagates
-   * as-is instead of becoming an `ApiError`.
-   */
+  /** Cancels the request when the signal aborts; the abort propagates as-is instead of becoming an `ApiError`. */
   signal(signal: AbortSignal): this {
     this.spec.signal = signal;
     return this;
@@ -214,11 +156,7 @@ export class ApiRequest {
     throw new ApiError(result.failure.status, result.failure, result.failure.retryAfterSeconds);
   }
 
-  /**
-   * The result envelope rather than a throw, for the callers that treat a specific failure as a value —
-   * a 401 on the session endpoint means "signed out", which is a state a guest-browsable app renders
-   * rather than an error it reports.
-   */
+  /** The result envelope instead of a throw, for callers that treat a failure as a value (a 401 on the session endpoint means signed out). */
   result<T>(): Promise<ApiResult<T>> {
     return isServer() ? this.dispatchOnServer<T>() : this.dispatchInBrowser<T>();
   }
@@ -236,8 +174,7 @@ export class ApiRequest {
     const search = new URLSearchParams(query);
     const url = `${this.context.basePath}${path}${search.size ? `?${search.toString()}` : ''}`;
 
-    // The backend's double-submit compares a header against a cookie the browser holds. Reading and, when
-    // absent, minting it here is the same rule the SSR transport applies — one implementation, two callers.
+    // Double-submit CSRF: the backend compares this header with the cookie; minted when absent, same rule as the SSR transport.
     const requestHeaders: Record<string, string> = { accept: 'application/json', ...headers };
     if (method !== 'GET') {
       const token = ensureCsrfToken(document.cookie, this.context.csrf);
@@ -279,7 +216,6 @@ export class ApiRequest {
     };
   }
 
-  /** A caller `signal` and a `timeout` deadline abort the same request; combine them so whichever fires first wins. */
   private abortSignal(): AbortSignal | undefined {
     const { signal, timeoutMs } = this.spec;
     const timeoutSignal = timeoutMs !== undefined ? AbortSignal.timeout(timeoutMs) : undefined;
@@ -304,7 +240,7 @@ export class ApiRequest {
   }
 }
 
-// Some endpoints answer 200 with an empty or non-JSON body — treat that as a void result rather than a parse failure.
+// Some endpoints answer 200 with an empty or non-JSON body; that is a void result, not a parse failure.
 async function parseBody(response: Response): Promise<unknown> {
   if (response.status === 204) return undefined;
   const text = await response.text();
@@ -316,12 +252,7 @@ async function parseBody(response: Response): Promise<unknown> {
   }
 }
 
-/**
- * Builds an app's API client: one instance, one cookie and CSRF policy, one SSR transport, and a surface
- * per base path the app talks to. This is the whole of an app's transport configuration — everything that
- * used to be hand-rolled per app (the request builder, the environment split, the CSRF handling, the second
- * client for the un-versioned auth routes) is behind it.
- */
+/** Builds an app's single API client: one cookie/CSRF policy and SSR transport, one surface per base path. */
 export function createApiClient<TSurfaces extends Record<string, string>>(config: ApiClientConfig<TSurfaces>): ApiClient<TSurfaces> {
   const csrf = resolveCsrfConfig(config.csrf);
   const client = {} as ApiClient<TSurfaces>;
