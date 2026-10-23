@@ -66,7 +66,6 @@ function isRedirect(response: Response): boolean {
   return response.type === 'opaqueredirect' || (response.status >= 300 && response.status < 400);
 }
 
-/** The caller's signal, the request timeout and a local cancel as one signal, and the call's in-flight slot */
 class CallScope {
   readonly signal: AbortSignal;
   private readonly timeout = new AbortController();

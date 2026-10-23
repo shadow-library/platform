@@ -2,7 +2,6 @@ import { type CatalogTimers } from '@modules/catalog';
 
 export type SseHeaders = Record<string, number | string | string[] | undefined>;
 
-/** The slice of Node's `ServerResponse` a stream is written through */
 export interface SseTarget {
   readonly destroyed: boolean;
   readonly writableEnded: boolean;
@@ -14,7 +13,6 @@ export interface SseTarget {
   off(event: 'drain' | 'close', listener: () => void): unknown;
 }
 
-/** The slice of Fastify's reply a stream takes over */
 export interface SseReply {
   readonly raw: SseTarget;
   hijack(): unknown;

@@ -15,7 +15,6 @@ export type QueryAnswer = (query: ExecutedQuery) => unknown[] | Error;
 export interface FakePostgres {
   db: PrimaryDatabase;
   queries: ExecutedQuery[];
-  /** `begin`, `commit` and `rollback` around the statements each transaction ran */
   log: string[];
 }
 

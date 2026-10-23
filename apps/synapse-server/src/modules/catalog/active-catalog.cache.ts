@@ -9,7 +9,6 @@ import { type ActiveCatalog } from './catalog.types';
 import { CatalogVersionRepository } from './catalog-version.repository';
 
 export interface CatalogTimers {
-  /** Returns the function that stops the ticks */
   every(intervalMs: number, tick: () => void): () => void;
   after(delayMs: number): { elapsed: Promise<void>; cancel: () => void };
 }

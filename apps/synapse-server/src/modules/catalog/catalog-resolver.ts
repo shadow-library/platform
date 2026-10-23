@@ -18,13 +18,11 @@ import { ownEntry } from './catalog.utils';
 
 export interface ResolveNeeds {
   tools?: boolean;
-  /** The request carries image parts */
   vision?: boolean;
   streaming?: boolean;
 }
 
 export interface ResolveRequest {
-  /** The calling client id */
   app: string;
   task: string;
   selectors?: Selectors;

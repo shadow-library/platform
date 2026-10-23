@@ -9,7 +9,6 @@ export interface RecordedSettlement {
   listCostUsd: number;
 }
 
-/** An in-memory ledger: request ids claim once, and each admission answers with `refuse(request)` or admits */
 export class FakeMeteringRepository {
   readonly claimed = new Map<string, Ledger.NewEntry>();
   readonly admissions: BudgetAdmissionRequest[][] = [];

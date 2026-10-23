@@ -10,7 +10,6 @@ class FakeResponse implements SseTarget {
   status?: number;
   headers?: SseHeaders;
   readonly written: string[] = [];
-  /** Whether the next write fits in the socket buffer */
   accepts = true;
   private readonly listeners = new Map<string, Set<() => void>>();
 

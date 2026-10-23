@@ -3,7 +3,6 @@ import { type SynapseErrorBody } from '@shadow-library/synapse';
 
 export type SynapseErrorType = 'invalid_request_error' | 'authentication_error' | 'rate_limit_error' | 'server_error';
 
-/** The masked error the platform handler would have sent */
 export interface RenderedError {
   code: string;
   message: string;

@@ -103,7 +103,6 @@ export class FakeTimers implements CatalogTimers {
 
 export type Responder = (url: string, init: RequestInit) => Promise<Response> | Response;
 
-/** Answers each upstream call with the next responder queued for its URL prefix */
 export class ScriptedFetch {
   readonly calls: { url: string; body: Record<string, unknown>; authorization?: string }[] = [];
   private readonly queues = new Map<string, Responder[]>();
@@ -114,7 +113,6 @@ export class ScriptedFetch {
     return this;
   }
 
-  /** Resolves once the upstream has been called `count` times in all */
   untilCalled(count = 1): Promise<void> {
     if (this.calls.length >= count) return Promise.resolve();
     return new Promise(resolve => this.waiters.push({ count, resolve }));
