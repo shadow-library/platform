@@ -22,9 +22,8 @@ export class AiTaskService {
   ) {}
 
   /**
-   * Guard order (ARCHITECTURE §15.1): resolve tier → check quota under the account lock → paywall
-   * error before any row is written → dedupe on the client-minted id inside the same lock, so a
-   * duplicate tap and a fresh submission racing each other never both pass the quota check.
+   * Guard order: resolve tier, check quota under the account lock, raise the paywall error before any row is written, then dedupe on the client-minted id inside the same lock,
+   * so a duplicate tap racing a fresh submission never both pass the quota check.
    */
   async submit(dto: AiTaskSubmitDto): Promise<AiTask.Row> {
     const account = await this.requireAccount();
@@ -56,7 +55,7 @@ export class AiTaskService {
     });
   }
 
-  /** The cancel-vs-claim race (ARCHITECTURE §15.1): a claimed/running task rejects cancel because the guarded UPDATE matches zero rows. */
+  /** A claimed/running task rejects cancel because the guarded UPDATE matches zero rows. */
   async cancel(id: string): Promise<AiTask.Row> {
     const accountId = this.accountContext.getAccountId();
     if (accountId === null) throw AppError.internal('AiTaskService used without a resolved account context');

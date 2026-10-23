@@ -40,7 +40,7 @@ export interface ShieldGrantResult {
 
 export const EMPTY_STREAK_STATE: StreakState = { currentDays: 0, longestDays: 0, shields: 0, completionsTowardShield: 0, pendingShieldGrant: 0 };
 
-/** `late` is absent from PRD §4.6's hold and break lists; it is a completion that occurred, so it holds. */
+/** `late` is absent from the hold and break lists; it is a completion that occurred, so it holds. */
 const HOLD_STATES: readonly QuestLogState[] = ['completed', 'partial', 'late', 'recovery'];
 
 const BREAK_STATES: readonly QuestLogState[] = ['skipped', 'missed', 'postponed'];

@@ -8,7 +8,7 @@ export namespace QuestStreak {
   export type Row = InferSelectModel<typeof questStreaks>;
 }
 
-/** Incremental projection, rebuildable from `quest_logs` + `shield_consumptions` by a pure `rules` function (ARCHITECTURE §26). */
+/** Incremental projection, rebuildable from `quest_logs` + `shield_consumptions` by a pure `rules` function. */
 export const questStreaks = pgTable(
   'quest_streaks',
   {
@@ -24,7 +24,7 @@ export const questStreaks = pgTable(
     shieldsAvailable: smallint('shields_available').notNull().default(0),
     completionsTowardShield: smallint('completions_toward_shield').notNull().default(0),
     bestRunDays: integer('best_run_days').notNull().default(0),
-    /** A Returner shield held back because the Quest was already at cap (PRD §4.6); settles into `shields_available` the next time this run holds, bridges, or breaks. */
+    /** A Returner shield held back because the Quest was at cap; settles into `shields_available` the next time this run holds, bridges, or breaks. */
     pendingShieldGrant: smallint('pending_shield_grant').notNull().default(0),
     syncSeq: bigint('sync_seq', { mode: 'bigint' })
       .notNull()

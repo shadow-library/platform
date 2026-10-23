@@ -14,17 +14,15 @@ const MS_PER_MINUTE = 60_000;
 const BACKOFF_BASE_MS = 60_000;
 const BACKOFF_CAP_MS = 60 * MS_PER_MINUTE;
 
-/** Exponential backoff (1m, 2m, 4m, 8m, ... capped at 1h) keyed off the attempt just spent, matching the AI executor's own retry shape. */
+/** Exponential backoff (1m, 2m, 4m, 8m, ... capped at 1h) keyed off the attempt just spent. */
 function backoffFor(attempts: number): Date {
   const delay = Math.min(BACKOFF_BASE_MS * 2 ** (attempts - 1), BACKOFF_CAP_MS);
   return new Date(Date.now() + delay);
 }
 
 /**
- * ARCHITECTURE §17/§4.5's outbox-style retry: pulse is called from here alone, decoupled from whatever
- * enqueued the row, so a pulse outage never fails the AI completion or a sweep — it only slows this
- * drain down. Runs on T-22's in-process scheduler; the claim (`FOR UPDATE SKIP LOCKED`) is already
- * multi-replica-safe for when the worker split (ADR-0002) activates.
+ * Pulse is called from here alone, decoupled from whatever enqueued the row, so a pulse outage slows this drain but never fails the AI completion or a sweep.
+ * Rows are claimed under a lease on `next_attempt_at` with `FOR UPDATE SKIP LOCKED`, so concurrent replicas drain disjoint rows.
  */
 @Injectable()
 export class NotificationSenderService implements OnModuleInit {

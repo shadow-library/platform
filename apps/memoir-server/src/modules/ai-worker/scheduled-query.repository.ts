@@ -19,9 +19,8 @@ function uuidBytes(uuid: string): Buffer {
 }
 
 /**
- * RFC 4122 §4.3 name-based UUID. §15.7 needs the id of tonight's scheduled task to be derivable rather
- * than remembered: two workers, or one worker restarted mid-sweep, compute the same id and the second
- * insert conflicts away instead of running the query twice.
+ * RFC 4122 §4.3 name-based UUID: tonight's scheduled task id is derived rather than remembered, so two workers or a restart mid-sweep compute
+ * the same id and the second insert conflicts away.
  */
 export function scheduledTaskId(accountId: bigint, date: string): string {
   const digest = createHash('sha1').update(uuidBytes(SCHEDULED_TASK_NAMESPACE)).update(`${accountId}:${date}`).digest().subarray(0, 16);
@@ -31,10 +30,7 @@ export function scheduledTaskId(accountId: bigint, date: string): string {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
 }
 
-/**
- * The nightly sweep writes the scheduled row the same way the user's own submission does, and only ever
- * with `quota_consumed = false` (§15.7: a scheduled run never touches ad-hoc quota).
- */
+/** Written like the user's own submission, but always with `quota_consumed = false`: a scheduled run never touches ad-hoc quota. */
 @Injectable()
 export class ScheduledQueryRepository {
   private readonly db: PrimaryDatabase;

@@ -8,10 +8,9 @@ import { type DatabaseTransaction, type HeroEvent, schema } from '@server/databa
 import { pseudoAccountId, TelemetryService } from '@server/telemetry';
 
 export interface GrantIntent {
-  /** The deterministic natural key from PRD §3.4 — the same user action must always derive the same string. */
+  /** The deterministic natural key: the same user action must always derive the same string. */
   dedupeKey: string;
   type: HeroEvent.Type;
-  /** User-local calendar date the grant is attributed to. */
   date: string;
   xpDelta?: number;
   /** Negative only for `coin_spend`; a spend beyond the balance is refused rather than clamped. */
@@ -46,13 +45,9 @@ interface AppliedGrant {
 }
 
 /**
- * The single gate through which every Hero total moves (ARCHITECTURE §11.1). Callers hand it an open
- * transaction — the one their domain command already owns — so the `hero_events` append and the
- * `accounts` mirror update commit together or not at all, which is the PRD §3.4 atomicity requirement.
- *
- * `hero_events` is grant-frozen for every runtime role (§10.4), so `level_after` has to be right at
- * insert time: the account row is read `FOR UPDATE` first and the post-grant level computed from it,
- * rather than stamped by a follow-up UPDATE the role cannot issue.
+ * The single gate through which every Hero total moves. Callers pass the open transaction their command owns, so the `hero_events` append and
+ * `accounts` mirror update commit together.
+ * `hero_events` is grant-frozen for every runtime role, so `level_after` must be right at insert: the account row is read `FOR UPDATE` and the post-grant level computed from it.
  */
 @Injectable()
 export class HeroLedger {
@@ -68,7 +63,7 @@ export class HeroLedger {
     return outcomes;
   }
 
-  /** `deriveLevelUps` is false for the level-up events this method itself produced — that is §11.1's recursion depth of exactly 1. */
+  /** `deriveLevelUps` is false for the level-up events this method itself produces, so recursion is one level deep. */
   private async apply(tx: DatabaseTransaction, accountId: bigint, intent: GrantIntent, deriveLevelUps: boolean): Promise<AppliedGrant> {
     const ruleset = currentRuleset();
     const [account] = await tx

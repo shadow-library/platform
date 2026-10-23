@@ -14,10 +14,8 @@ import { ReadAssemblyService } from './read-assembly.service';
 import { ScheduledQueryRepository } from './scheduled-query.repository';
 
 /**
- * The `aiworker` module of ARCHITECTURE §15.2 — in-process on the scheduler today, its own Deployment
- * after the ADR-0002 split, unchanged either way because every claim is a Postgres claim. It imports
- * `BillingModule` so the execution-time entitlement re-check derives the tier through `EntitlementService`
- * rather than reading `entitlements` directly.
+ * In-process on the scheduler today; every claim is a Postgres claim, so it runs unchanged in a separate Deployment.
+ * Imports `BillingModule` so the execution-time entitlement re-check derives the tier through `EntitlementService` rather than reading `entitlements` directly.
  */
 @Module({
   imports: [DatabaseModule, DatastoreModule, SchedulerModule, BillingModule, InferenceModule, NotificationsModule],

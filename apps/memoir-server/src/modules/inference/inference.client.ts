@@ -30,10 +30,8 @@ const TEMPERATURE = 0.2;
 const TERMINAL_CODES: ReadonlySet<string> = new Set<SynapseErrorCode>(['SYN_INVALID_REQUEST', 'SYN_POLICY_DENIED']);
 
 /**
- * The single model seam for the whole service (ARCHITECTURE §15.6 and §14.3 step 2). A class token rather
- * than a TS interface for the same reason `OcrStructuringClient` is one: DI binds against something that
- * survives to runtime. It returns parsed JSON and the model that answered — each caller owns its own
- * response contract, and neither shape leaks into the transport.
+ * The single model seam. A class token rather than a TS interface so DI has something to bind at runtime; returns parsed JSON and the
+ * answering model, each caller owning its response contract.
  */
 export abstract class InferenceClient {
   abstract completeJson(request: InferenceRequest): Promise<InferenceResult>;

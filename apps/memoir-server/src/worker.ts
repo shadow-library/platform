@@ -11,7 +11,7 @@ const redaction = manifestLogRedactionFormat();
 if (Config.isProd()) Logger.attachTransport('console:json', redaction);
 else if (Config.isDev()) Logger.attachTransport('console:pretty', redaction).attachTransport('file:json', redaction);
 
-/** The ADR-0002 split seam: boots only the scheduler graph, no HTTP routes. Dormant until domain modules register sweeps on it. */
+/** Scheduler-only entrypoint: boots the scheduler graph with no HTTP routes. */
 @Module({ imports: [SchedulerModule] })
 class WorkerModule {}
 

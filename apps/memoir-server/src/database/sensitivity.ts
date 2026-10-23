@@ -11,13 +11,7 @@ export interface SensitiveColumn {
 
 const manifest: SensitiveColumn[] = [];
 
-/**
- * Marks a schema column as carrying sensitive data (ARCHITECTURE §23) and records it in a
- * machine-readable manifest — consumed by the telemetry canary test, the AI post-filter's
- * no-verbatim-quote list, the export assembler, and log redaction (T-28). Call after the owning
- * `pgTable(...)` so the column carries its real name and table reference; returns the column
- * unchanged so it composes with `table.column` call sites.
- */
+/** Records a column in the sensitivity manifest (telemetry canary test, AI no-verbatim-quote list, export assembler, log redaction); call after the owning `pgTable(...)`. */
 export function sensitive<T extends AnyPgColumn>(column: T, classification: SensitivityClass): T {
   manifest.push({ table: getTableName(column.table), column: column.name, classification });
   return column;

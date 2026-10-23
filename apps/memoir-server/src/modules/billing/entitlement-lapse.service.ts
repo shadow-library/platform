@@ -10,11 +10,9 @@ import { BillingRepository } from './billing.repository';
 const SWEEP_NAME = 'entitlement-lapse';
 
 /**
- * Writes down the lapse the read path already reports (ARCHITECTURE §16.2), so the client sees the tier
- * change in its next delta instead of only when the next webhook happens to arrive. Correctness never
- * depends on this sweep having run: `EntitlementService.get` derives the same state from server time on
- * every call, which is what makes a missed tick harmless and re-running one a no-op. Nothing is deleted
- * on lapse — only the tier moves.
+ * Writes down the lapse the read path already reports, so the client sees the tier change in its next delta instead of only when the next webhook arrives.
+ * Correctness never depends on this sweep: `EntitlementService.get` derives the same state from server time on every call, so a missed tick is
+ * harmless and a re-run is a no-op. Nothing is deleted on lapse, only the tier moves.
  */
 @Injectable()
 export class EntitlementLapseService implements OnModuleInit {

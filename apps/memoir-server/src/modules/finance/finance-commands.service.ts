@@ -96,7 +96,7 @@ function expenseChanges(before: Expense.Row, after: Expense.Row): ExpenseAudit.C
   return AUDITED_EXPENSE_FIELDS.map(field => ({ field, from: auditValue(before[field]), to: auditValue(after[field]) })).filter(change => change.from !== change.to);
 }
 
-/** Monthly-equivalent precompute (ARCHITECTURE §10.3): fast amortized reporting without re-deriving it per read. */
+/** Monthly-equivalent precompute for fast amortized reporting without re-deriving it per read. */
 function monthlyEquivalentMinor(amountMinor: bigint, frequency: string, customIntervalDays: number | null): bigint {
   if (frequency === 'weekly') return (amountMinor * 52n) / 12n;
   if (frequency === 'quarterly') return amountMinor / 3n;
@@ -106,11 +106,9 @@ function monthlyEquivalentMinor(amountMinor: bigint, frequency: string, customIn
 }
 
 /**
- * Registers the expense/subscription/category command handlers (ARCHITECTURE §14.1–14.2) on the shared
- * `CommandBus` and their delta sources on the sync assembler, mirroring `DeviceService`'s
- * `OnModuleInit` registration shape. Every handler runs inside the command's own transaction — the
- * account already serialized by `CommandBus.execute`'s advisory lock — so a category seed, an FX
- * capture, and the entity write commit atomically or not at all.
+ * Registers the expense/subscription/category handlers and their delta sources. Every handler runs inside the command's own transaction, with
+ * the account already serialized by `CommandBus.execute`'s advisory lock,
+ * so a category seed, an FX capture and the entity write commit atomically or not at all.
  */
 @Injectable()
 export class FinanceCommandsService implements OnModuleInit {
@@ -144,10 +142,9 @@ export class FinanceCommandsService implements OnModuleInit {
   }
 
   /**
-   * Capture-at-entry (ARCHITECTURE §14.1): reads the shared `fx_rates` cache the reconciliation sweep
-   * maintains for `occurredOn`'s date, never calls the provider itself — a live external call at write
-   * time would make entry blocking, which S3/S21 forbid outright. A same-currency expense needs no
-   * conversion at all.
+   * Capture-at-entry: reads the shared `fx_rates` cache the reconciliation sweep maintains and never calls the provider, since a live external
+   * call at write time would make entry blocking.
+   * A same-currency expense needs no conversion.
    */
   private async captureFx(tx: DatabaseTransaction, currency: string, defaultCurrency: string, occurredOn: string, amountMinor: bigint): Promise<FxCapture> {
     if (currency === defaultCurrency) return { fxRate: null, homeAmountMinor: null, fxRateDate: null };
@@ -231,7 +228,7 @@ export class FinanceCommandsService implements OnModuleInit {
     if ('merchant' in payload) values['merchant'] = optionalString(payload, 'merchant') ?? null;
     if ('note' in payload) values['note'] = optionalString(payload, 'note') ?? null;
 
-    /** The locked rate never re-fetches (ARCHITECTURE §14.1); an amount edit recomputes `home_amount_minor` under it, in place, without touching `fx_rate`/`fx_rate_date`. */
+    /** The locked rate never re-fetches; an amount edit recomputes `home_amount_minor` under it, in place, without touching `fx_rate`/`fx_rate_date`. */
     if (newAmountMinor !== undefined && existing.fxRate !== null) {
       values['homeAmountMinor'] = BigInt(Math.round(Number(newAmountMinor) * Number(existing.fxRate)));
     }
@@ -244,7 +241,7 @@ export class FinanceCommandsService implements OnModuleInit {
     return { status: 'applied', result: { id: updated.id } };
   }
 
-  /** Cascades to the receipt row + object (ARCHITECTURE §19.2 Lifecycle) — receipts are 1:1 with expenses, never shared. */
+  /** Cascades to the receipt row and object; receipts are 1:1 with expenses, never shared. */
   private async deleteExpense({ accountId, envelope, tx }: CommandContext): Promise<CommandResult> {
     const id = requireString(envelope.payload, 'id');
     const existing = await this.expenseRepository.findByIdInTx(tx, id);
@@ -344,12 +341,9 @@ export class FinanceCommandsService implements OnModuleInit {
   }
 
   /**
-   * Confirm-on-fire (ARCHITECTURE §14.2). The account is already serialized end to end by
-   * `CommandBus.execute`'s advisory lock, so two devices confirming the same cycle under different
-   * command ids never literally race inside Postgres — the second's transaction blocks behind the
-   * first's, then observes the first's committed expense row and converges via the partial unique
-   * constraint rather than duplicating it. `FOR UPDATE` on the subscription row is defense in depth for
-   * any future caller that reaches this outside the command path.
+   * Confirm-on-fire. `CommandBus.execute`'s advisory lock already serializes the account, so a second device confirming the same cycle blocks
+   * behind the first, then converges via the partial unique constraint rather than duplicating.
+   * `FOR UPDATE` on the subscription row is defense in depth for any caller outside the command path.
    */
   private async confirmSubscriptionCycle({ accountId, envelope, tx }: CommandContext): Promise<CommandResult> {
     const payload = envelope.payload;

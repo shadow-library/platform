@@ -23,11 +23,9 @@ function toMetricRow(metric: Metric.Row): Record<string, unknown> {
 }
 
 /**
- * Registers the `metrics`/`metric_entries`/`health_offers` domains on the sync assembler (ARCHITECTURE
- * §12.2). `metrics` is a snapshot source like `expense_categories` — a small, near-static per-account
- * catalogue. `health_offers` is also a snapshot: an offer is derived, not stored (ARCHITECTURE §18's
- * "no new tables, no snapshot machinery"), so a delta pull recomputes the account's current offer set
- * live rather than reading a table a pull cursor could ever fall behind on.
+ * Registers the `metrics`/`metric_entries`/`health_offers` sync domains. `metrics` is a snapshot like `expense_categories`; `health_offers` is
+ * also a snapshot because an offer is derived, not stored,
+ * so a pull recomputes the current offer set live rather than reading a table a cursor could fall behind on.
  */
 @Injectable()
 export class MetricsDeltaSources implements OnModuleInit {

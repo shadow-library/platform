@@ -27,10 +27,9 @@ export const FREE_PROJECTION: EntitlementProjection = {
 };
 
 /**
- * The projection's server-time reading (ARCHITECTURE §16.2). A stored `active`/`trial` whose period end
- * has passed without a renewal webhook is **not** silently granted grace — grace exists only where the
- * provider signalled dunning — so an unrenewed period reads as lapsed the moment it expires. A device
- * with a skewed clock cannot influence any of this: `now` is always the server's.
+ * The projection's server-time reading. A stored `active`/`trial` whose period end has passed without a renewal webhook is not silently
+ * granted grace (grace exists only where the provider signalled dunning),
+ * so an unrenewed period reads as lapsed the moment it expires. A device with a skewed clock cannot influence this: `now` is always the server's.
  */
 export function resolveEffectiveState(projection: Pick<EntitlementProjection, 'state' | 'expiresAt' | 'graceEndsAt'>, now: Date): Entitlement.State {
   if (projection.state === 'grace') return projection.graceEndsAt && now > projection.graceEndsAt ? 'lapsed' : 'grace';
@@ -43,10 +42,9 @@ export function tierFor(state: Entitlement.State): Entitlement.Tier {
 }
 
 /**
- * The monotonic apply (ARCHITECTURE §16.2): `null` means "record the event, move nothing" — either it
- * is older than what has already been applied, or it is a second trial the account is not entitled to
- * (PRD §6.9, one trial per account). Duplicate delivery never reaches here at all; the
- * `billing_events.provider_event_id` unique constraint absorbs it first.
+ * The monotonic apply: `null` means "record the event, move nothing", either because it is older than what has been applied or because it is a
+ * second trial the account is not entitled to.
+ * Duplicate delivery never reaches here; the `billing_events.provider_event_id` unique constraint absorbs it first.
  */
 export function applyBillingEvent(current: EntitlementProjection, event: NormalizedBillingEvent, provider: string, graceDays: number): EntitlementProjection | null {
   if (current.appliedEventAt && event.occurredAt <= current.appliedEventAt) return null;

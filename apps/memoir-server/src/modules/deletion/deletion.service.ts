@@ -53,7 +53,7 @@ export class DeletionService {
     return (await this.deletionRepository.findState(accountId)) ?? 'done';
   }
 
-  /** States the machine rests in rather than stalls in: without a machine-side identity close, `data_deleted` is §21.3's legitimate resting state and no sweep can move it. */
+  /** States the machine rests in rather than stalls in: without a machine-side identity close, `data_deleted` is a legitimate resting state and no sweep can move it. */
   parkedStates(): DeletionStatus[] {
     return this.identityCloseClient.isConfigured() ? [] : ['data_deleted'];
   }
@@ -99,7 +99,7 @@ export class DeletionService {
     return (await this.deletionRepository.findState(accountId)) ?? 'done';
   }
 
-  /** Step 3: both prefixes this account can own objects under — receipts (§19) and exports (§20). A missing key is not a failure, so re-entry is a no-op. */
+  /** Step 3: both prefixes this account can own objects under — receipts and exports. A missing key is not a failure, so re-entry is a no-op. */
   private async deleteBlobs(accountId: bigint): Promise<void> {
     let deleted = 0;
     for (const prefix of [`r/${accountId}/`, `exports/${accountId}/`]) {
@@ -122,7 +122,7 @@ export class DeletionService {
     return complete;
   }
 
-  /** Step 5; `false` halts the machine at `data_deleted` and raises the operator-runbook signal (§21.3 option 2). */
+  /** Step 5; `false` halts the machine at `data_deleted` and raises the operator-runbook signal. */
   private async closeIdentity(accountId: bigint): Promise<boolean> {
     const identitySub = await this.deletionRepository.findIdentitySub(accountId);
     if (!identitySub) return false;
@@ -141,7 +141,7 @@ export class DeletionService {
     return false;
   }
 
-  /** Step 6: the guarded row removal and the operator-audit line — a pseudonymous id and timestamps, never an identity subject or any user content (§23, §24). */
+  /** Step 6: the guarded row removal and the operator-audit line — a pseudonymous id and timestamps, never an identity subject or any user content. */
   private async finalize(accountId: bigint): Promise<void> {
     const remnant = await this.deletionRepository.removeAccount(accountId);
     if (!remnant) return;
@@ -155,9 +155,9 @@ export class DeletionService {
   }
 
   /**
-   * §21.2: the app session dies with the marker so the browser cannot keep spending a cached token
-   * against a half-deleted account. Identity-side revocation cascades from the close in step 5; a
-   * bearer caller has no app session here and nothing to revoke.
+   * The app session dies with the marker so the browser cannot keep spending a cached token against a half-deleted account. Identity-side
+   * revocation cascades from the close in step 5;
+   * a bearer caller has no app session here and nothing to revoke.
    */
   private async revokeSession(): Promise<void> {
     if (!this.sessions) return;

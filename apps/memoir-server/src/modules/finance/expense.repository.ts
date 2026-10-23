@@ -58,12 +58,15 @@ export class ExpenseRepository extends OwnerScopedRepository {
     return true;
   }
 
-  /** Machine path for the reconciliation sweep, which resolves nulls across every account (ARCHITECTURE §14.1), never scoped to one caller's own. */
+  /** Machine path for the reconciliation sweep, which resolves nulls across every account, never scoped to one caller's own. */
   async findNullRateAcrossAccounts(limit: number): Promise<Expense.Row[]> {
     return (await this.db.select().from(schema.expenses).where(isNull(schema.expenses.fxRate)).limit(limit)) as Expense.Row[];
   }
 
-  /** Fills a null rate under its own transaction, re-stamping `sync_seq` (§12.2) so the fix reaches every client on the next pull. Bypasses `OwnerScopedRepository`'s ambient scoping deliberately — the reconciliation sweep runs with no request context. */
+  /**
+   * Fills a null rate under its own transaction, re-stamping `sync_seq` so the fix reaches every client on the next pull. Bypasses
+   * `OwnerScopedRepository`'s ambient scoping deliberately — the reconciliation sweep runs with no request context.
+   */
   async resolveNullRate(id: string, fxRate: string, homeAmountMinor: bigint, fxRateDate: string): Promise<void> {
     await this.transaction(async tx => {
       await tx.update(schema.expenses).set(syncStamped(schema.expenses, { fxRate, homeAmountMinor, fxRateDate })).where(eq(schema.expenses.id, id));

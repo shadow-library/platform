@@ -4,11 +4,8 @@ import { NOTIFICATION_CATEGORIES, type NotificationCategory, type NotificationCa
 import { NotificationOutboxRepository } from './notification-outbox.repository';
 
 /**
- * The single choke point every notification producer (the AI-completion hook, the billing-due sweep,
- * the digest-assembly sweep) calls through — ARCHITECTURE §17's opt-out-by-default rule is enforced
- * here, once, rather than re-checked at each call site. `category` is typed against the closed
- * `NotificationCategoryVariables` union, so there is no method on this class a caller could use to send
- * a category outside the three T-05 templates.
+ * The single choke point every notification producer calls through; the opt-out-by-default rule is enforced here once. `category` is typed
+ * against the closed `NotificationCategoryVariables` union, so no method lets a caller send a category outside the three templates.
  */
 @Injectable()
 export class NotificationClient {

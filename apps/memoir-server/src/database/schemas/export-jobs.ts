@@ -11,11 +11,8 @@ export namespace ExportJob {
 export const exportJobStatus = pgEnum('export_job_status', ['pending', 'running', 'done', 'failed']);
 
 /**
- * ARCHITECTURE §20: one row per `RequestExport` call, claimed and assembled by the export sweep. Not a
- * synced table — the client polls `GET /account/export/:id` directly rather than pulling this through
- * the delta protocol. `objectKey` is the `memoir-receipts` bucket key the assembled JSON lands at
- * (`exports/{account_id}/{id}.json`); `expiresAt` is set only once the job reaches `done` and drives the
- * 7-day cleanup sweep — a `pending`/`running`/`failed` job has nothing to expire.
+ * One row per `RequestExport`, claimed and assembled by the export sweep. Not synced: the client polls `GET /account/export/:id`.
+ * `objectKey` is the `memoir-receipts` key (`exports/{account_id}/{id}.json`); `expiresAt` is set only once the job is `done` and drives the cleanup sweep.
  */
 export const exportJobs = pgTable(
   'export_jobs',

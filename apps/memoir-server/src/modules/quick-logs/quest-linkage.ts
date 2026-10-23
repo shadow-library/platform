@@ -18,11 +18,9 @@ export interface LinkageMatch {
 const COMPLETED_STATES: readonly string[] = ['completed', 'partial', 'late'];
 
 /**
- * PRD §2.6: a saved module entry that could satisfy an active, today-scheduled Quest with a matching
- * `module_link` either offers one-tap completion (nothing terminal there yet) or, if the Quest was
- * already completed today, reports that instead — both outcomes exist purely to suppress the quick-log's
- * own reward at the caller (no HeroLedger call for either case), never to write anything themselves. The
- * user's own `quest.complete` is what actually grants the Quest's reward — this never is.
+ * A saved module entry that could satisfy an active, today-scheduled Quest with a matching `module_link` either offers one-tap completion or,
+ * if already completed today, reports that;
+ * both exist only to suppress the quick-log's own reward at the caller. This never writes: the user's own `quest.complete` grants the Quest's reward.
  */
 export async function findLinkageMatch(executor: SqlExecutor, accountId: bigint, module: LinkableModule, date: string): Promise<LinkageMatch | null> {
   const occurrenceDate = parseLocalDate(date);

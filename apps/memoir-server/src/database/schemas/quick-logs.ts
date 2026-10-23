@@ -28,7 +28,10 @@ export namespace SideQuest {
 
 export const mealType = pgEnum('meal_type', ['cooked', 'ate_out']);
 
-/** Multiple per day (PRD §3.9); `rewarded` marks whichever entry landed the first-of-day grant (ARCHITECTURE §11.1's `journal_{date}` dedupe key). Plaintext by design (PRD §3.13) — client-side encryption would block the Phase 2 AI reader. */
+/**
+ * Multiple per day; `rewarded` marks the entry that landed the first-of-day grant (`journal_{date}` dedupe key).
+ * Plaintext by design: client-side encryption would block the AI reader.
+ */
 export const journalEntries = pgTable(
   'journal_entries',
   {
@@ -55,7 +58,10 @@ export const journalEntries = pgTable(
   ],
 );
 
-/** `presetId` is a historical reference, not a foreign key (same rationale as `metric_entries.quest_log_id`, ARCHITECTURE §10.3): deleting a preset must never cascade into, or be blocked by, meals already logged from it — the row already carries its own snapshot of the preset's values. */
+/**
+ * `presetId` is a historical reference, not a foreign key: deleting a preset must not cascade into, or be blocked by, meals already logged from it.
+ * The row carries its own snapshot of the preset's values.
+ */
 export const meals = pgTable(
   'meals',
   {
@@ -84,7 +90,7 @@ export const meals = pgTable(
   ],
 );
 
-/** No `sync_seq` (ARCHITECTURE §10.3): a small, closed per-account catalogue, cheaper synced as a snapshot domain than watermarked — mirrors `expense_categories`. */
+/** No `sync_seq`: a small closed per-account catalogue, cheaper synced as a snapshot domain than watermarked. */
 export const mealPresets = pgTable(
   'meal_presets',
   {
@@ -102,7 +108,7 @@ export const mealPresets = pgTable(
   t => [check('meal_presets_calories_check', sql`${t.calories} >= 0`)],
 );
 
-/** PK is the natural key itself (ARCHITECTURE §10.3): one canonical value per day, re-log is an UPDATE the client confirms. */
+/** PK is the natural key: one canonical value per day; a re-log is an UPDATE the client confirms. */
 export const weights = pgTable(
   'weights',
   {
@@ -122,7 +128,10 @@ export const weights = pgTable(
   t => [primaryKey({ name: 'weights_account_id_date_pk', columns: [t.accountId, t.date] }), index('weights_account_id_sync_seq_idx').on(t.accountId, t.syncSeq)],
 );
 
-/** A record of a completed one-off act, never a plan (PRD §2.6) — no `quest_id`, no recurrence, no streak/Crown/HP/Momentum/Comeback participation. `xp_awarded`/`coins_awarded`/`stat_ticked` are grant snapshots, zero for the 4th+ of a day. */
+/**
+ * A completed one-off act, never a plan: no `quest_id`, recurrence, or streak/Crown/HP/Momentum/Comeback participation.
+ * `xp_awarded`/`coins_awarded`/`stat_ticked` are grant snapshots, zero for the 4th+ of a day.
+ */
 export const sideQuests = pgTable(
   'side_quests',
   {

@@ -25,7 +25,6 @@ export class ExportAssemblyRepository {
     return account ?? null;
   }
 
-  /** One bounded page of `entry.table`'s rows for `accountId`, ordered by `entry.cursor` ascending and starting after `cursor` (`null` for the first page). */
   fetchPage(accountId: bigint, entry: ExportTableEntry, cursor: unknown, limit: number): Promise<unknown[]> {
     const conditions: (SQL | undefined)[] = [eq(entry.table.accountId, accountId)];
     if (cursor !== null) conditions.push(gt(entry.cursor, cursor as never));

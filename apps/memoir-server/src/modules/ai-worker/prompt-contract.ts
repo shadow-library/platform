@@ -4,11 +4,7 @@ import { AppErrorCode } from '@server/classes';
 import { type AssembledContext, type InferenceDraft } from './ai-worker.types';
 import { ALLOWED_SUGGESTION_KINDS } from './guardrails';
 
-/**
- * The prompt half of the §6.6 contract — the post-filter is the half that is enforced. Everything here
- * is asked of the model; nothing here is trusted, which is why every rule below also has a filter
- * behind it in `guardrails.ts`.
- */
+/** The prompt half of the response contract; the post-filter is the enforced half. Nothing here is trusted, so every rule also has a filter behind it in `guardrails.ts`. */
 const SYSTEM_PROMPT = [
   "You analyse one person's own life and habit-tracking data and answer the question they asked about it.",
   'The data is theirs; it was assembled under their explicit consent, and you are given only what the question needs.',

@@ -11,7 +11,7 @@ import { type AccountPatchDto, type NotificationPrefsDto, type OnboardingDto } f
 
 export type AccountView = Account.Row & { notificationPrefs: NotificationPrefsDto };
 
-/** ARCHITECTURE §10.3: the three account-level email categories, all default OFF; stored jsonb starts `{}`. */
+/** The three account-level email categories, all default OFF; stored jsonb starts `{}`. */
 function withDefaultNotificationPrefs(prefs: unknown): NotificationPrefsDto {
   const raw = (prefs ?? {}) as Partial<NotificationPrefsDto>;
   return { weeklyDigest: raw.weeklyDigest ?? false, aiReadiness: raw.aiReadiness ?? false, billingReminders: raw.billingReminders ?? false };
@@ -95,9 +95,8 @@ function toDeltaRow(account: Account.Row, standing: HeroStanding): DeltaRow {
 }
 
 /**
- * Owns `GET/PATCH /account` and `POST /account/onboarding` (T-17). `accounts` sits outside
- * `OwnerScopedRepository` (§9.1, §10.2 — keyed by `id`, no `account_id` self-column), so every read and
- * write here goes through `AccountRepository`, the one legitimate raw-`accounts`-table caller.
+ * Owns `GET/PATCH /account` and `POST /account/onboarding`. `accounts` sits outside `OwnerScopedRepository` (keyed by `id`, no `account_id`),
+ * so every access goes through `AccountRepository`.
  */
 @Injectable()
 export class AccountService implements OnModuleInit {
@@ -108,7 +107,6 @@ export class AccountService implements OnModuleInit {
     private readonly heroStanding: HeroStandingService,
   ) {}
 
-  /** Moved from `SyncDeltaSources` (T-16's note): the account snapshot domain is this module's own concern now, mirroring `DeviceService`'s self-registration. */
   onModuleInit(): void {
     const source: SnapshotDeltaSource = { domain: 'account', kind: 'snapshot', fetch: () => this.fetchSnapshot() };
     this.registry.register(source);

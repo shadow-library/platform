@@ -7,7 +7,7 @@ export namespace DeletedRecord {
   export type Row = InferSelectModel<typeof deletedRecords>;
 }
 
-/** Tombstone rows for deletable syncable entities (ARCHITECTURE §12.2) — written in the deleting transaction, read by the delta-pull cursor. */
+/** Tombstones for deletable syncable entities, written in the deleting transaction and read by the delta-pull cursor. */
 export const deletedRecords = pgTable(
   'deleted_records',
   {

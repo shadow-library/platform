@@ -13,13 +13,10 @@ export interface WebhookOutcome {
 }
 
 /**
- * `POST /billing/webhooks/{provider}` (ARCHITECTURE §16, §25). The route carries **no identity auth** —
- * the adapter's signature check is the whole authentication decision — and it writes only through
- * `BillingRepository`, never outside the entitlement tables.
- *
- * Everything past verification is acknowledged with 200: a duplicate, a stale event, an unmatched
- * purchase token. A provider retries anything else, and retrying a delivery the system deliberately
- * did nothing with buys nothing but noise.
+ * `POST /billing/webhooks/{provider}` carries no identity auth: the adapter's signature check is the whole authentication decision, and it
+ * writes only through `BillingRepository`, never outside the entitlement tables.
+ * Everything past verification is acknowledged with 200 (duplicate, stale event, unmatched purchase token): a provider retries anything else,
+ * and retrying a deliberately ignored delivery buys only noise.
  */
 @Injectable()
 export class BillingWebhookService {
@@ -60,7 +57,7 @@ export class BillingWebhookService {
     return { received: true };
   }
 
-  /** The purchase token is the primary match; `provider_ref` covers a provider that stops echoing the client reference after the first event of a subscription's life (§16.2). */
+  /** The purchase token is the primary match; `provider_ref` covers a provider that stops echoing the client reference after the first event of a subscription's life. */
   private async match(event: NormalizedBillingEvent): Promise<bigint | null> {
     if (event.purchaseToken) {
       const byToken = await this.repository.findAccountIdByPurchaseToken(event.purchaseToken);
@@ -70,7 +67,10 @@ export class BillingWebhookService {
     return null;
   }
 
-  /** A conflict is a `provider_ref` already bound to some OTHER account than the one this event matched; the ref on the matched account, or on none, is the ordinary bind/rebind path (§16.2). */
+  /**
+   * A conflict is a `provider_ref` already bound to some OTHER account than the one this event matched; the ref on the matched account, or on
+   * none, is the ordinary bind/rebind path.
+   */
   private async isProviderRefConflict(event: NormalizedBillingEvent, accountId: bigint): Promise<boolean> {
     if (!event.providerRef) return false;
     const owner = await this.repository.findAccountIdByProviderRef(this.adapter.provider, event.providerRef);

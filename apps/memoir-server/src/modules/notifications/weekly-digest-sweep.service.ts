@@ -16,9 +16,8 @@ const MISS_STATES = ['missed', 'skipped', 'postponed'] as const;
 const DIGEST_WEEKDAY = 1;
 
 /**
- * ARCHITECTURE §17's weekly review email: aggregates only, assembled fresh from `quest_logs` and
- * `expenses` every run — adherence counts and a money total, never free text, never a health-flagged
- * table (§18's `is_health` set is structurally unreachable: `WeeklyDigestRepository` never selects it).
+ * Aggregates only, assembled fresh each run from `quest_logs` and `expenses`: adherence counts and a money total, never free text or
+ * health-flagged tables (`WeeklyDigestRepository` never selects them).
  */
 @Injectable()
 export class WeeklyDigestSweepService implements OnModuleInit {

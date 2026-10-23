@@ -29,10 +29,7 @@ export const reasonTag = pgEnum('reason_tag', [
   'other',
 ]);
 
-/**
- * `updated_at` is the 7-day edit window's reference point alongside `created_at`; the window itself is
- * temporal and therefore command-layer enforced, not constraint-enforced (ARCHITECTURE §5.5).
- */
+/** `updated_at` anchors the 7-day edit window with `created_at`; the window is temporal, so the command layer enforces it, not a constraint. */
 export const questLogs = pgTable(
   'quest_logs',
   {

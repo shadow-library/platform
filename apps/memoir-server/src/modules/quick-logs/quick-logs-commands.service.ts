@@ -91,15 +91,11 @@ function requireKg(payload: Record<string, unknown>): string {
 }
 
 /**
- * Registers `LogJournal`/`LogMeal`/`LogWeight`/`LogSideQuest` and meal-preset CRUD (ARCHITECTURE §10.3,
- * PRD §2.6, §3.9, §4.12–4.13). Every reward path routes through {@link HeroLedger} with a first-of-day
- * dedupe key (`journal_{date}`, `meal_{date}`, `weight_{date}`, `sidequest_{date}_{ordinal}` — PRD §4.12
- * verbatim), so a replay or a second device racing the same day's first entry converges to exactly one
- * grant without any bespoke locking here — the unique `(account_id, dedupe_key)` constraint is the whole
- * mechanism. A backdated entry (`date` behind the account's local today) and an entry whose module links
- * to an eligible, not-yet-completed or already-completed Quest occurrence both skip the `HeroLedger.grant`
- * call entirely rather than granting and hoping to net it out later — `hero_events` is append-only, so
- * "never call it" is the only sound way to guarantee zero deltas or "no double grant" (PRD §2.6/§4.12).
+ * Registers `LogJournal`/`LogMeal`/`LogWeight`/`LogSideQuest` and meal-preset CRUD. Every reward routes through `HeroLedger` with a
+ * first-of-day dedupe key (`journal_{date}`, `meal_{date}`, `weight_{date}`, `sidequest_{date}_{ordinal}`),
+ * so a replay or a second device racing converges to one grant; the unique `(account_id, dedupe_key)` constraint is the whole mechanism.
+ * A backdated entry, or one whose module links to an eligible Quest occurrence, skips `HeroLedger.grant` entirely: `hero_events` is
+ * append-only, so never calling it is the only sound way to guarantee zero deltas.
  */
 @Injectable()
 export class QuickLogsCommandsService implements OnModuleInit {
@@ -124,10 +120,6 @@ export class QuickLogsCommandsService implements OnModuleInit {
     this.commandBus.registerHandler(WEIGHT_SAVE, ctx => this.saveWeight(ctx));
     this.commandBus.registerHandler(SIDEQUEST_LOG, ctx => this.logSideQuest(ctx));
   }
-
-  /*!
-   * Journal
-   */
 
   private async saveJournal({ accountId, envelope, tx }: CommandContext): Promise<CommandResult> {
     const draftPayload = requireObject(envelope.payload, 'draft');
@@ -162,10 +154,6 @@ export class QuickLogsCommandsService implements OnModuleInit {
       },
     };
   }
-
-  /*!
-   * Meals
-   */
 
   private async logMeal({ accountId, envelope, tx }: CommandContext): Promise<CommandResult> {
     const draftPayload = requireObject(envelope.payload, 'draft');
@@ -260,10 +248,6 @@ export class QuickLogsCommandsService implements OnModuleInit {
     return { status: 'applied', result: { id: String(preset.id) } };
   }
 
-  /*!
-   * Weight
-   */
-
   private async saveWeight({ accountId, envelope, tx }: CommandContext): Promise<CommandResult> {
     const payload = envelope.payload;
     const date = requireString(payload, 'date');
@@ -309,10 +293,6 @@ export class QuickLogsCommandsService implements OnModuleInit {
     };
   }
 
-  /*!
-   * Side quests
-   */
-
   private async logSideQuest({ accountId, envelope, tx }: CommandContext): Promise<CommandResult> {
     const draftPayload = requireObject(envelope.payload, 'draft');
     const draft: SideQuestDraft = {
@@ -349,15 +329,9 @@ export class QuickLogsCommandsService implements OnModuleInit {
     };
   }
 
-  /*!
-   * Shared helpers
-   */
-
   /**
-   * Journal/meal/weight all share this shape: one grant per day, keyed `{module}_{date}` (PRD §4.12).
-   * Never calls `HeroLedger` at all when the entry is backdated or module-linked to an eligible Quest
-   * occurrence — `hero_events` is append-only, so skipping the call is the only way to guarantee a zero
-   * delta rather than granting and trying to claw it back.
+   * One grant per day keyed `{module}_{date}`. Never calls `HeroLedger` when the entry is backdated or module-linked to an eligible Quest
+   * occurrence, since `hero_events` is append-only and a grant can't be clawed back.
    */
   private async grantFirstOfDay(
     tx: DatabaseTransaction,
@@ -377,7 +351,7 @@ export class QuickLogsCommandsService implements OnModuleInit {
     return { rewarded: applied, xpAwarded: applied ? grant.xpDelta : 0, coinsAwarded: applied ? grant.coinsDelta : 0 };
   }
 
-  /** The PRD §4.12 first-3 rule: `ordinal` (1–3) is this call's slot for the day, dedupe-keyed so a replay of the same command never re-grants a slot it already claimed. */
+  /** The first-3 rule: `ordinal` (1-3) is this call's slot for the day, dedupe-keyed so a replay never re-grants a claimed slot. */
   private async grantSideQuest(tx: DatabaseTransaction, accountId: bigint, draft: SideQuestDraft, ordinal: number): Promise<RewardOutcome> {
     const [grant] = await this.heroLedger.grant(tx, accountId, [
       {

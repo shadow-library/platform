@@ -27,7 +27,7 @@ export interface MetricCreate {
 
 export type MetricEdit = Partial<Pick<MetricCreate, 'name' | 'unit' | 'valueType' | 'direction' | 'defaultValue' | 'glyph'>>;
 
-/** The built-in health set (ARCHITECTURE §18, PRODUCT.md §6.1) — steps, calories burned, sleep, water — all `is_health: true`, none deletable through `metric.delete` (§9). */
+/** The built-in health set (steps, calories burned, sleep, water), all `is_health: true`. */
 const BUILTIN_METRICS: readonly BuiltinMetric[] = [
   { name: 'Steps', unit: 'steps', valueType: 'count', direction: 'higher', defaultValue: null, isHealth: true },
   { name: 'Calories burned', unit: 'kcal', valueType: 'number', direction: 'higher', defaultValue: null, isHealth: true },
@@ -51,7 +51,7 @@ export class MetricRepository extends OwnerScopedRepository {
     return row ?? null;
   }
 
-  /** Mirrors `ExpenseCategoryRepository.ensureSeeded` (T-25): one multi-row `ON CONFLICT DO NOTHING` insert, idempotent and race-safe under the account's `(account_id, name)` unique constraint. */
+  /** One multi-row `ON CONFLICT DO NOTHING` insert, idempotent and race-safe under the `(account_id, name)` unique constraint. */
   async ensureBuiltinsSeeded(tx: DatabaseTransaction, accountId: bigint): Promise<void> {
     await tx
       .insert(schema.metrics)

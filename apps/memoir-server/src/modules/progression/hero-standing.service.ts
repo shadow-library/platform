@@ -75,7 +75,7 @@ function crownWindow(period: CrownPeriod, today: LocalDate, days: DailyState.Row
   };
 }
 
-/** The Returner ritual frames the whole day (PRD §4.10 suppresses Comeback under it), so it outranks a Recovery that the same return spawned. */
+/** The Returner ritual frames the whole day (it suppresses Comeback), so it outranks a Recovery that the same return spawned. */
 function personaFor(today: DailyState.Row | undefined, recoveryPending: boolean): HeroPersona {
   if (today?.returnerActive) return 'returner';
   return recoveryPending ? 'recovery' : 'active';

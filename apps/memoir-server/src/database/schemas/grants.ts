@@ -44,7 +44,7 @@ export const titlesEarned = pgTable(
   t => [unique('titles_earned_account_id_title_id_unique').on(t.accountId, t.titleId)],
 );
 
-/** `kind` is a denormalized copy of the catalogue entry's kind at unlock time — needed so the "one equipped per kind" invariant (T-21, PRD §2.9) can be enforced by the partial unique index below without a join back to the code-side catalogue. */
+/** `kind` is denormalized from the catalogue entry at unlock time so the partial unique index can enforce one equipped per kind without a join to the code-side catalogue. */
 export const cosmeticUnlocks = pgTable(
   'cosmetic_unlocks',
   {

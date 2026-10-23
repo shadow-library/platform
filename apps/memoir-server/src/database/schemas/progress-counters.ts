@@ -9,12 +9,8 @@ export namespace ProgressCountersRow {
 }
 
 /**
- * The incremental projection ARCHITECTURE §26 calls for: one row per account, holding exactly the
- * Achievement/Title counters that are not already mirrored on `accounts` (xp/level/stats live there
- * and are read from there instead of duplicated here). `counters` is jsonb rather than columns because
- * its shape is `rules/progress.ts -> ProgressCounters` minus the account-mirrored fields — a type this
- * table has no independent reason to also express relationally (ARCHITECTURE §10.3 jsonb-justification
- * convention).
+ * One row per account of the Achievement/Title counters not already mirrored on `accounts` (xp/level/stats live there).
+ * `counters` is jsonb because its shape is `rules/progress.ts -> ProgressCounters` minus the account-mirrored fields.
  */
 export const progressCounters = pgTable('progress_counters', {
   accountId: bigint('account_id', { mode: 'bigint' })

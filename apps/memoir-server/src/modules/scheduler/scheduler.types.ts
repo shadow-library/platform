@@ -13,7 +13,6 @@ export interface SweepRun {
   lastRunAt: Date;
 }
 
-/** A synchronous point-in-time reading (queue depth, orphan count, …) sampled once per heartbeat. */
 export type GaugeFn = () => number;
 
 export interface Gauge {

@@ -23,14 +23,8 @@ function requireCosmeticId(payload: Record<string, unknown>): string {
 }
 
 /**
- * Registers the `title.display` / `cosmetic.purchase` / `cosmetic.equip` command handlers (T-21, command
- * names aligned with `apps/memoir-web/src/lib/data/hero.types.ts -> HeroCommand`) and the
- * `achievements_earned` / `titles_earned` / `cosmetic_unlocks` snapshot delta sources. Snapshot, not
- * keyset (ARCHITECTURE §12.3): none of the three tables carries `sync_seq`, and each account's set is
- * bounded by the fixed catalogue sizes (17/17/9), so the authoritative full read is cheaper than a
- * watermark column three append-only, grant-frozen tables would otherwise need only for this.
- * `progress_counters` is one row per account and snapshots too; `hero_events` grows without bound, so it
- * alone is keyset-paged on its own `sync_seq`.
+ * Registers `title.display`/`cosmetic.purchase`/`cosmetic.equip` and the `achievements_earned`/`titles_earned`/`cosmetic_unlocks`/`progress_counters` snapshot delta sources:
+ * bounded by fixed catalogue sizes, so a full read is cheaper than a `sync_seq` watermark. `hero_events` grows without bound, so it alone is keyset-paged.
  */
 @Injectable()
 export class ProgressionCommandsService implements OnModuleInit {
@@ -69,7 +63,7 @@ export class ProgressionCommandsService implements OnModuleInit {
     };
   }
 
-  /** Titles are never user-selected into existence — only chosen for display among ones already earned (PRD §2.9). */
+  /** Titles are never user-selected into existence — only chosen for display among ones already earned. */
   private async displayTitle(ctx: CommandContext): Promise<CommandResult> {
     const value = ctx.envelope.payload['titleId'];
     if (value !== null && typeof value !== 'string') throw new ValidationError('titleId', "'titleId' must be a string or null");
@@ -83,7 +77,7 @@ export class ProgressionCommandsService implements OnModuleInit {
     return { status: 'applied', result: { displayedTitleId: value } };
   }
 
-  /** §11.3 race semantics: the loser of a concurrent purchase on the same cosmetic finds the unlock already there and converges without charging a second time. */
+  /** The loser of a concurrent purchase on the same cosmetic finds the unlock already there and converges without charging again. */
   private async purchaseCosmetic(ctx: CommandContext): Promise<CommandResult> {
     const cosmeticId = requireCosmeticId(ctx.envelope.payload);
     const cosmetic = findCosmetic(cosmeticId);

@@ -26,9 +26,8 @@ import { schema } from '@server/database';
 const HOLD_STATES: readonly QuestLogState[] = ['completed', 'partial', 'late', 'recovery'];
 
 /**
- * Registers `recovery.complete` and `plan.setLock` (ARCHITECTURE §10.3, PRD §2.4/§4.3/§4.6). Both
- * mutate `daily_states` outside the rollover walk, so every write goes through `RolloverRepository`'s
- * `rollover_at IS NULL` guard rather than a bespoke one here.
+ * Registers `recovery.complete` and `plan.setLock`. Both mutate `daily_states` outside the rollover walk, so every write goes through
+ * `RolloverRepository`'s `rollover_at IS NULL` guard.
  */
 @Injectable()
 export class CompassionCommandsService implements OnModuleInit {
@@ -44,7 +43,7 @@ export class CompassionCommandsService implements OnModuleInit {
     this.commandBus.registerHandler('plan.setLock', ctx => this.setLock(ctx));
   }
 
-  /** Pending-only (PRD §3.6): reward via the ledger, then a P6 second Comeback arming — this time via recovery, lifting the day's fire allowance to 2. */
+  /** Pending-only: reward via the ledger, then a second Comeback arming via recovery, lifting the day's fire allowance to 2. */
   private async completeRecovery(ctx: CommandContext): Promise<CommandResult> {
     const ruleset = currentRuleset();
     const { date } = await this.requireToday(ctx);
@@ -90,7 +89,7 @@ export class CompassionCommandsService implements OnModuleInit {
     };
   }
 
-  /** Open day only (`rollover_at IS NULL`); capacity thresholds are advisory in the result and never refuse the lock (PRD §4.11 — "never blocks"). */
+  /** Open day only (`rollover_at IS NULL`); capacity thresholds are advisory in the result and never refuse the lock. */
   private async setLock(ctx: CommandContext): Promise<CommandResult> {
     const ruleset = currentRuleset();
     const { date, timezone } = await this.requireToday(ctx);

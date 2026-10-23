@@ -6,12 +6,9 @@ import { BillingWebhookService, type WebhookOutcome } from './billing-webhook.se
 import { type CheckoutResult, EntitlementService } from './entitlement.service';
 
 /**
- * Two routes with deliberately different principals (ARCHITECTURE §25). Checkout is an ordinary user
- * route. The webhook is the platform's only unauthenticated write path, and it carries no
- * `@Authenticated()` on purpose: a payment provider has no identity token to present, so the adapter's
- * signature verification is what stands in its place — see `BillingWebhookService`.
- *
- * There is no route here through which a user token could write an entitlement, and that absence is the point.
+ * Two routes with deliberately different principals. Checkout is an ordinary user route. The webhook is the only unauthenticated write path
+ * and carries no `@Authenticated()` on purpose:
+ * the adapter's signature verification stands in (see `BillingWebhookService`). No route lets a user token write an entitlement, and that absence is the point.
  */
 @HttpController('/api/v1/billing')
 export class BillingController {

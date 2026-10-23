@@ -11,9 +11,8 @@ export namespace Receipt {
 export const receiptStatus = pgEnum('receipt_status', ['pending_upload', 'stored', 'deleted']);
 
 /**
- * PK `ref` is the object key itself (ARCHITECTURE §19.2: `r/{account_id}/{uuidv7}.{ext}`), minted
- * server-side at `POST /receipts` — never client-generated, unlike `expenses.id`. Not a synced table:
- * `expenses.receipt_ref` is the client-visible pointer, delta-synced as part of the expense row.
+ * PK `ref` is the object key (`r/{account_id}/{uuidv7}.{ext}`), minted server-side at `POST /receipts`, never client-generated.
+ * Not synced: `expenses.receipt_ref` is the client-visible pointer, delta-synced with the expense row.
  */
 export const receipts = pgTable(
   'receipts',
@@ -29,7 +28,7 @@ export const receipts = pgTable(
   },
   t => [
     index('receipts_account_id_idx').on(t.accountId),
-    /** Drives both orphan sweeps (§19.2): stale `pending_upload` rows by age, ordered by `status`. */
+    /** Drives both orphan sweeps: stale `pending_upload` rows by age, ordered by `status`. */
     index('receipts_status_created_at_idx').on(t.status, t.createdAt),
     check('receipts_size_bytes_check', sql`${t.sizeBytes} > 0 AND ${t.sizeBytes} <= 8388608`),
   ],

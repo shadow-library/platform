@@ -38,9 +38,8 @@ export interface StreakLogRow {
 }
 
 /**
- * Every method here reads or prunes across every account rather than one caller's own — the same
- * cross-account machine path `AccountRepository`/`ExpenseRepository` use for their own sweeps
- * (ARCHITECTURE §11.4, §26). Never an `OwnerScopedRepository`: reconciliation runs with no request context.
+ * Every method reads or prunes across all accounts, the same cross-account machine path `AccountRepository`/`ExpenseRepository` use for their sweeps.
+ * Never an `OwnerScopedRepository`: reconciliation runs with no request context.
  */
 @Injectable()
 export class ReconciliationRepository {
@@ -51,10 +50,8 @@ export class ReconciliationRepository {
   }
 
   /**
-   * One row per non-deleted account: its `accounts` mirror alongside the `SUM(hero_events)` the mirror
-   * is supposed to equal (§11.4). Sums travel as text — Postgres returns `bigint`/`numeric` aggregates
-   * as strings over the wire, and the caller parses with `BigInt`/`Number` rather than losing precision
-   * to an implicit JS-number cast here.
+   * One row per non-deleted account: its `accounts` mirror beside the `SUM(hero_events)` it should equal.
+   * Sums travel as text because Postgres returns `bigint`/`numeric` aggregates as strings; the caller parses with `BigInt`/`Number`.
    */
   async listAccountMirrors(): Promise<AccountMirrorRow[]> {
     const heroSums = this.db
@@ -95,7 +92,10 @@ export class ReconciliationRepository {
     return rows.map(row => ({ ...row, totalXp: BigInt(row.totalXp), sumXp: BigInt(row.sumXp) }));
   }
 
-  /** Accounts whose day-close walk looks stuck: `last_hp_date` lags the lag window, yet the account kept issuing commands past that window — activity a healthy account's lazy catch-up (§13.1) would have absorbed. */
+  /**
+   * Accounts whose day-close walk looks stuck: `last_hp_date` lags the lag window, yet the account kept issuing commands past that window —
+   * activity a healthy account's lazy catch-up would have absorbed.
+   */
   async findWedgedAccounts(lagDays: number, limit: number): Promise<bigint[]> {
     const lagInterval = sql`(${lagDays} || ' days')::interval`;
     const rows = await this.db
@@ -118,7 +118,7 @@ export class ReconciliationRepository {
     return rows.map(row => row.accountId);
   }
 
-  /** A fresh random sample every run (§26) — `ORDER BY random()` is fine at this scale and never repeats a fixed set of accounts week over week. */
+  /** A fresh random sample every run; `ORDER BY random()` is fine at this scale. */
   async sampleStreaks(limit: number): Promise<StreakSampleRow[]> {
     return this.db
       .select({

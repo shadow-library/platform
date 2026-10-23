@@ -4,10 +4,7 @@ import { DatabaseService } from '@shadow-library/modules';
 
 import { type DatabaseTransaction, type FxRate, type PrimaryDatabase, schema } from '@server/database';
 
-/**
- * `fx_rates` carries no `account_id` (ARCHITECTURE §14.1: a shared, date-scoped cache, not user-owned
- * data), so this is deliberately not an `OwnerScopedRepository` — the same reasoning as `AccountRepository`.
- */
+/** `fx_rates` has no `account_id` (a shared, date-scoped cache), so this is deliberately not an `OwnerScopedRepository`. */
 @Injectable()
 export class FxRateRepository {
   private readonly db: PrimaryDatabase;
@@ -28,7 +25,6 @@ export class FxRateRepository {
     return this.find(this.db, date, base, quote);
   }
 
-  /** Upserts the sweep's freshly fetched rate for today; a re-run before the next hour's tick just re-writes the same value. */
   async upsert(date: string, base: string, quote: string, rate: string | null): Promise<void> {
     await this.db
       .insert(schema.fxRates)

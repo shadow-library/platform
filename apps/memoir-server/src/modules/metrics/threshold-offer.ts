@@ -3,7 +3,7 @@ import { and, eq } from 'drizzle-orm';
 import { type SqlExecutor } from '@modules/auth';
 import { type Metric, type MetricEntry, type PrimaryDatabase, schema } from '@server/database';
 
-/** `quests.health_threshold`'s shape (ARCHITECTURE §18) — kept opaque at the schema layer (T-18), interpreted only here. */
+/** `quests.health_threshold`'s shape, kept opaque at the schema layer and interpreted only here. */
 interface HealthThreshold {
   metricId: string;
   value: number;
@@ -32,11 +32,9 @@ function crossed(threshold: HealthThreshold, currentValue: number): boolean {
 }
 
 /**
- * The offer computation ARCHITECTURE §18 describes: scan the account's active quests for a
- * `health_threshold` naming this metric, evaluate it against the just-registered value, and surface an
- * offer only where the threshold is crossed and no `quest_logs` row exists yet for (quest, date) — i.e.
- * nothing terminal has happened at that occurrence. Never writes anything; the client's own
- * `CompleteQuest` command is what actually grants the reward (never automatic).
+ * Scans the account's active quests for a `health_threshold` naming this metric and surfaces an offer only where the threshold is crossed and
+ * no `quest_logs` row exists for (quest, date).
+ * Never writes; the client's own `CompleteQuest` is what grants the reward.
  */
 export async function findThresholdOffers(executor: SqlExecutor, accountId: bigint, metric: Metric.Row, entry: MetricEntry.Row): Promise<ThresholdOffer[]> {
   const quests = await executor
@@ -69,12 +67,7 @@ export async function findThresholdOffers(executor: SqlExecutor, accountId: bigi
   return offers;
 }
 
-/**
- * The full current offer set for the account (ARCHITECTURE §18/§12.2 "derivable from delta"): every
- * `is_health` metric's latest entry per date it holds one, re-evaluated the same way — recomputed live
- * rather than stored, since an offer is a read over live state (quests, metric entries, quest logs),
- * never its own row.
- */
+/** The full current offer set, recomputed live from the latest entry of every `is_health` metric per date rather than stored, since an offer is a read over live state. */
 export async function currentThresholdOffers(db: PrimaryDatabase, accountId: bigint): Promise<ThresholdOffer[]> {
   const healthMetrics = await db
     .select()

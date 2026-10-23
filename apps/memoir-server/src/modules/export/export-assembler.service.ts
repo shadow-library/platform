@@ -32,10 +32,8 @@ const MS_PER_MINUTE = 60_000;
 const MS_PER_DAY = 86_400_000;
 
 /**
- * ARCHITECTURE §20: assembles the full-account export (every §10.3 table, incl. `hero_events`, sensitive
- * fields verbatim — export is the one path where the owner gets everything the platform holds) and the
- * 7-day cleanup that follows it. Both run as scheduler sweeps registered on `SchedulerService`, never
- * inline in a request — assembling a large `hero_events` history is unbounded work.
+ * Assembles the full-account export (every table, sensitive fields verbatim, since the owner gets everything) and the 7-day cleanup.
+ * Both run as scheduler sweeps, never inline: a large `hero_events` history is unbounded work.
  */
 @Injectable()
 export class ExportAssemblerService implements OnModuleInit {
@@ -130,7 +128,10 @@ export class ExportAssemblerService implements OnModuleInit {
     };
   }
 
-  /** Receipt bytes are never embedded (§20): a `stored` receipt gets a short-lived presigned `GET` in the manifest instead, minted at assembly time from the same driver the download endpoint uses. */
+  /**
+   * Receipt bytes are never embedded: a `stored` receipt gets a short-lived presigned `GET` in the manifest instead, minted at assembly time
+   * from the same driver the download endpoint uses.
+   */
   private async attachReceiptDownloadUrls(rows: unknown[] | undefined): Promise<void> {
     if (!rows) return;
     const expiresSeconds = Config.get('export.download-presign-seconds');
@@ -139,7 +140,7 @@ export class ExportAssemblerService implements OnModuleInit {
     }
   }
 
-  /** Bounded per-query memory regardless of a table's history length (`hero_events` foremost) — the whole point of the §20 "keyset pagination per table" requirement. */
+  /** Bounds per-query memory regardless of a table's history length (`hero_events` foremost). */
   private async paginateTable(accountId: bigint, entry: ExportTableEntry, pageSize: number): Promise<unknown[]> {
     const rows: unknown[] = [];
     let cursor: unknown = null;

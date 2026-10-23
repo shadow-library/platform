@@ -21,11 +21,8 @@ export class MetricEntryRepository extends OwnerScopedRepository {
   }
 
   /**
-   * The §10.3 uniqueness, split by source: a quest-sourced entry is one-per-(quest log, metric) and
-   * never overwrites another quest log's entry (`onConflictDoNothing`, converging on whichever landed
-   * first — matching the `quest_logs` occurrence convergence philosophy); a non-quest source is
-   * one-per-(metric, date, source) and a same-day re-log overwrites in place (`onConflictDoUpdate`,
-   * PRD §3.8/ARCHITECTURE §18's "Weight rule generalized").
+   * Uniqueness is split by source: a quest-sourced entry is one-per-(quest log, metric) and `onConflictDoNothing` converges on whichever landed first;
+   * a non-quest source is one-per-(metric, date, source) and a same-day re-log overwrites in place (`onConflictDoUpdate`).
    */
   async register(tx: DatabaseTransaction, accountId: bigint, entry: MetricEntryRegister): Promise<MetricEntry.Row> {
     if (entry.source === 'quest_log') {

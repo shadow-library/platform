@@ -61,7 +61,7 @@ interface ResolvedTiming {
   performedAt: Date | null;
 }
 
-/** PRD §2.2: the reschedule cap is a command-layer policy, not a versioned reward number, so it does not live in `Ruleset`. */
+/** The reschedule cap is command-layer policy, not a versioned reward number, so it does not live in `Ruleset`. */
 const RESCHEDULE_CAP_PER_WINDOW = 2;
 const RESCHEDULE_WINDOW_DAYS = 7;
 const EDIT_WINDOW_DAYS = 7;
@@ -83,11 +83,7 @@ function logStateFor(completion: CompletionKind, band: TimingBand): QuestLog.Sta
   return band === 'on_time' ? 'completed' : 'late';
 }
 
-/**
- * Registers the quest CRUD, occurrence-action, and log-edit command handlers (ARCHITECTURE §9.3, §11.2)
- * and the `quests`/`quest_logs`/`quest_streaks` delta sources (moved here from T-16's placeholder in
- * `sync-delta-sources.service.ts` now that this module exists).
- */
+/** Registers the quest CRUD, occurrence-action and log-edit handlers and the `quests`/`quest_logs`/`quest_streaks` delta sources. */
 @Injectable()
 export class QuestCommandsService implements OnModuleInit {
   constructor(
@@ -126,10 +122,6 @@ export class QuestCommandsService implements OnModuleInit {
     return { domain, kind: 'keyset', fetch: ({ since, limit }) => this.deltaRepository.fetchSince(table, since, limit) };
   }
 
-  /*!
-   * Quest CRUD
-   */
-
   private async createQuest(ctx: CommandContext): Promise<CommandResult> {
     const draft = parseQuestDraft(ctx.envelope.payload);
     if (draft.strictness === 'anchor' && draft.startTimeMinutes === null) throw AppErrorCode.QST_003.create();
@@ -163,10 +155,6 @@ export class QuestCommandsService implements OnModuleInit {
     return { status: 'applied', result: { id: String(quest.id), active: false } };
   }
 
-  /*!
-   * Occurrence actions — the full CompleteQuest/PartialCompleteQuest transaction (ARCHITECTURE §11.2)
-   */
-
   private async resolveCompletion(ctx: CommandContext, completion: CompletionKind): Promise<CommandResult> {
     const ruleset = currentRuleset();
     const occurrence = await this.loadOccurrence(ctx);
@@ -175,7 +163,7 @@ export class QuestCommandsService implements OnModuleInit {
     const timing = this.resolveTiming(ctx, ruleset, occurrence, account);
     const state = logStateFor(completion, timing.band);
 
-    /** §12.5's effect boundary: mid-day mechanics read the occurrence date's own `daily_states` snapshot, never the account's live (possibly already-staged-forward) mode. */
+    /** Mid-day mechanics read the occurrence date's own `daily_states` snapshot, never the account's live (possibly staged-forward) mode. */
     const dailyState = await this.rolloverRepository.lockDailyState(ctx.tx, ctx.accountId, occurrence.ref.date);
     const intensityMode = dailyState?.intensityMode ?? account.intensityMode;
 
@@ -403,10 +391,6 @@ export class QuestCommandsService implements OnModuleInit {
     };
   }
 
-  /*!
-   * Quest-log edits (PRD §3.3 — 7-day window, terminal fields immutable)
-   */
-
   private async attachReason(ctx: CommandContext): Promise<CommandResult> {
     const payload = ctx.envelope.payload;
     const reasonTag = parseReasonTag('reasonTag', payload['reasonTag']);
@@ -433,7 +417,7 @@ export class QuestCommandsService implements OnModuleInit {
     return { status: 'applied', result: { logId: String(updated.id), reasonTag: updated.reasonTag, reasonNote: updated.reasonNote, reflectionText: updated.reflectionText } };
   }
 
-  /** Deletion carries no time window — a deliberate data-ownership stance (ARCHITECTURE §10.3) — and never touches `hero_events`. */
+  /** Deletion carries no time window, a deliberate data-ownership stance, and never touches `hero_events`. */
   private async deleteQuestLog(ctx: CommandContext): Promise<CommandResult> {
     const ref = parseOccurrenceId(ctx.envelope.payload);
     const log = await this.questLogRepository.findByOccurrence(ref.questId, ref.date);
@@ -443,10 +427,6 @@ export class QuestCommandsService implements OnModuleInit {
     await this.rolloverService.resettleOpenDayCrown(ctx.tx, ctx.accountId, log.date);
     return { status: 'applied', result: { logId: String(log.id), deleted: true } };
   }
-
-  /*!
-   * Compassion mechanics (T-20): lock bonus, Comeback consumption, Returner shield placement
-   */
 
   private isLockActive(dailyState: DailyState.Row | null, questId: bigint): boolean {
     if (!dailyState || dailyState.committedAt === null || dailyState.lockBrokenAt !== null) return false;
@@ -491,7 +471,7 @@ export class QuestCommandsService implements OnModuleInit {
     });
   }
 
-  /** O-6: a Returner shield with no pre-absence Quest to target waits on the account until the owner creates one. */
+  /** A Returner shield with no pre-absence Quest to target waits on the account until the owner creates one. */
   private async claimPendingReturnerShield(tx: DatabaseTransaction, accountId: bigint, questId: bigint, date: string): Promise<void> {
     const [account] = await tx.select({ pending: schema.accounts.pendingReturnerShields }).from(schema.accounts).where(eq(schema.accounts.id, accountId)).for('update');
     if (!account || account.pending <= 0) return;
@@ -499,10 +479,6 @@ export class QuestCommandsService implements OnModuleInit {
     const granted = grantStreakShield(currentRuleset(), EMPTY_STREAK_STATE, account.pending);
     await this.questStreakRepository.write(tx, questId, date, granted.state);
   }
-
-  /*!
-   * Shared helpers
-   */
 
   private requireQuestId(payload: Record<string, unknown>): bigint {
     const value = payload['questId'];
@@ -547,10 +523,8 @@ export class QuestCommandsService implements OnModuleInit {
   }
 
   /**
-   * §12.5: online commands ignore client time and use server `now()`; an offline `performedAt` is
-   * clamped to `[occurrenceDateStart, serverNow]` (`lastAckedSyncAt` is left `null`, i.e. the clamp's
-   * lower bound falls back to the occurrence's own start of day — see the module report on why the
-   * device's exact last-sync instant isn't threaded in yet).
+   * Online commands ignore client time and use server `now()`; an offline `performedAt` is clamped to `[occurrenceDateStart, serverNow]`.
+   * `lastAckedSyncAt` is left `null`, so the lower bound falls back to the occurrence's own start of day.
    */
   private resolveTiming(ctx: CommandContext, ruleset: Ruleset, occurrence: OccurrenceContext, account: AccountSnapshot): ResolvedTiming {
     let daysElapsed: number;
@@ -585,7 +559,7 @@ export class QuestCommandsService implements OnModuleInit {
     return { band, daysElapsed, performedAt };
   }
 
-  /** §11.3: the second of two racing terminal actions reads back whatever actually won and reports it as `superseded`, never erroring. */
+  /** The second of two racing terminal actions reads back whatever won and reports it as `superseded`, never erroring. */
   private async convergedResult(occurrence: OccurrenceContext): Promise<CommandResult> {
     const existing = await this.questLogRepository.findByOccurrence(occurrence.quest.id, occurrence.ref.date);
     if (!existing) throw AppErrorCode.QST_002.create();

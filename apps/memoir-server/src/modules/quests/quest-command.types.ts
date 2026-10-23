@@ -3,7 +3,6 @@ import { ValidationError } from '@shadow-library/common';
 import { type LocalDate, type MonthlyPattern, parseLocalDate, type ReasonTag, type RecurrenceEnd, type RecurrenceRule, type Weekday } from '@modules/rules';
 import { type Quest, type QuestLog } from '@server/database';
 
-/** The command-layer shape a `quest.create`/`quest.update` payload carries; validated by {@link parseQuestDraft}. */
 export interface QuestDraftInput {
   name: string;
   notes: string | null;
@@ -114,7 +113,7 @@ function parseMonthlyPattern(field: string, value: unknown): MonthlyPattern {
   return { kind: 'nth_weekday', weekday, ordinal };
 }
 
-/** Accepts the `rules` module's own `RecurrenceRule` shape (ARCHITECTURE §10.3's closed rule object) rather than a flattened one, so it feeds `expandRecurrence`/`occursOn` unchanged. */
+/** Accepts the `rules` module's own `RecurrenceRule` shape rather than a flattened one, so it feeds `expandRecurrence`/`occursOn` unchanged. */
 function parseRecurrence(value: unknown): RecurrenceRule {
   const body = record('recurrence', value);
   const frequency = oneOf('recurrence.frequency', body['frequency'], ['daily', 'weekly', 'monthly', 'yearly'] as const);

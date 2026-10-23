@@ -7,10 +7,8 @@ import { schema } from '@server/database';
 import { EXPORT_TABLE_EXCLUSIONS, EXPORT_TABLE_REGISTRY } from '@server/modules/export';
 
 /**
- * ARCHITECTURE §20's "hard to forget" requirement: every table in the schema barrel must be either
- * exported (in `EXPORT_TABLE_REGISTRY`) or explicitly excluded with a reason (`EXPORT_TABLE_EXCLUSIONS`).
- * Adding a new user-owned table without wiring it into the registry fails this test, not silently ships
- * an incomplete export.
+ * Every table in the schema barrel must be in `EXPORT_TABLE_REGISTRY` or explicitly excluded in `EXPORT_TABLE_EXCLUSIONS`, so a new user-owned
+ * table not wired in fails here instead of silently shipping an incomplete export.
  */
 describe('Export table registry completeness (T-29)', () => {
   it('should account for every table in the schema barrel', () => {

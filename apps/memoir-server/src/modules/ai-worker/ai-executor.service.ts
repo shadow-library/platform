@@ -40,17 +40,10 @@ function inWindow(now: Date, start: number, end: number): boolean {
 }
 
 /**
- * The AI batch executor of ARCHITECTURE §15.2–§15.7, running on T-22's in-process scheduler. Four sweeps, each doing one thing:
- *
- * - the nightly window materializes scheduled queries and then drains the pending backlog;
- * - the retry poll picks up only tasks a previous attempt requeued, so a transient inference failure
- *   does not wait for the next night;
- * - the stuck sweep returns a claim whose worker died to `pending` (or fails it once attempts run out);
- * - the resume sweep releases `held_upgrade` tasks whose entitlement came back.
- *
- * §15.3's rule is the one that shapes everything else: the task row is a request, not an authorization.
- * Deletion, entitlement, consent, and tier scope are all re-derived here at execution time, from the
- * account's current state, never from anything the submission recorded.
+ * The AI batch executor on the in-process scheduler. Four sweeps: the nightly window materializes scheduled queries then drains the backlog;
+ * the retry poll picks up only requeued tasks;
+ * the stuck sweep returns a dead worker's claim to `pending` (or fails it at the attempt limit); the resume sweep releases `held_upgrade` tasks whose entitlement came back.
+ * The task row is a request, not an authorization: deletion, entitlement, consent and tier scope are re-derived at execution time from the account's current state.
  */
 @Injectable()
 export class AiExecutorService implements OnModuleInit {
@@ -112,9 +105,8 @@ export class AiExecutorService implements OnModuleInit {
   }
 
   /**
-   * §15.3's revalidation, in its stated order. Each step is a reason the task cannot run *now*, and each
-   * has its own terminal shape: deletion drops (and refunds), a lapse holds for upgrade, everything else
-   * proceeds under the consent snapshot and tier window taken at this instant.
+   * Revalidation in order; each step is a reason the task cannot run now, with its own terminal shape: deletion drops (and refunds), a lapse
+   * holds for upgrade, everything else proceeds under the consent snapshot and tier window taken now.
    */
   async execute(task: AiTask.Row): Promise<Outcome> {
     await this.repository.recordAudit(task.accountId, task.id, 'claimed');
@@ -171,16 +163,15 @@ export class AiExecutorService implements OnModuleInit {
     });
     await this.repository.recordAudit(task.accountId, task.id, 'finished');
 
-    /** Content-free by construction (T-34): only the result's id and suggestion count ever leave this process, never the answer/patterns/suggestions text itself. Enqueue-only — a pulse outage never fails a completed AI task. */
+    /** Content-free: only the result's id and suggestion count leave this process. Enqueue-only, so a pulse outage never fails a completed AI task. */
     const suggestionCount = Array.isArray(aiResult.suggestions) ? aiResult.suggestions.length : 0;
     await this.notifications.enqueue(task.accountId, 'aiResultReady', `ai-result-${aiResult.id}`, { resultId: String(aiResult.id), suggestionCount });
     return 'done';
   }
 
   /**
-   * §15.7. The task id is derived, so the sweep is idempotent across restarts without reading what it
-   * already wrote, and eligibility is re-derived per account from server time rather than trusted from
-   * the projection column — a subscription that expired an hour ago must not get tonight's run.
+   * The task id is derived, so the sweep is idempotent across restarts, and eligibility is re-derived per account from server time rather than
+   * the projection column: a subscription that expired an hour ago must not get tonight's run.
    */
   async materializeScheduledQueries(now = new Date()): Promise<number> {
     const date = now.toISOString().slice(0, 10);
@@ -198,7 +189,7 @@ export class AiExecutorService implements OnModuleInit {
     return materialized;
   }
 
-  /** §15.2's crashed-claim recovery, with the same attempt ceiling a live failure obeys. */
+  /** Crashed-claim recovery, with the same attempt ceiling a live failure obeys. */
   async recoverStuck(now = new Date()): Promise<number> {
     const cutoff = new Date(now.getTime() - Config.get('ai.task-timeout-minutes') * MS_PER_MINUTE);
     const stuck = await this.repository.findStuck(cutoff, Config.get('ai.claim-batch-size'));
@@ -207,10 +198,7 @@ export class AiExecutorService implements OnModuleInit {
     return stuck.length;
   }
 
-  /**
-   * The restore side of §15.1's `held_upgrade`. It lives here rather than on the billing webhook so the
-   * worker stays the only code path that moves a task back to `pending`.
-   */
+  /** The restore side of `held_upgrade`. It lives here rather than on the billing webhook so the worker is the only code path that moves a task back to `pending`. */
   async resumeHeld(): Promise<number> {
     const held = await this.repository.listHeld(HELD_PAGE_SIZE);
     let resumed = 0;
@@ -227,11 +215,10 @@ export class AiExecutorService implements OnModuleInit {
   }
 
   /**
-   * "Lapsed at claim" is not a flag anyone wrote down — the task row records no tier (§15.3: it is a
+   * "Lapsed at claim" is not a flag anyone wrote down — the task row records no tier (it is a
    * request, not an authorization), so eligibility is recomputed: a scheduled run is paid-only, and an
    * ad-hoc task still runs on the free tier as long as it sits inside the free monthly allowance. A paid
-   * user's eleventh question of the month therefore holds for upgrade when they lapse, while a free
-   * user's own two never do.
+   * user's third question of the month therefore holds for upgrade when they lapse, while a free user's own two never do.
    */
   private async requiresUpgrade(task: AiTask.Row, tier: string): Promise<boolean> {
     if (tier === 'paid') return false;

@@ -69,7 +69,7 @@ export class RolloverRepository {
     this.db = databaseService.getPostgresClient();
   }
 
-  /** The same per-account advisory lock the command bus takes (§11.2), so a rollover day and a command can never interleave inside one another. */
+  /** The same per-account advisory lock the command bus takes, so a rollover day and a command can never interleave inside one another. */
   async runSerialized<T>(accountId: bigint, operation: (tx: DatabaseTransaction) => Promise<T>): Promise<T> {
     return this.db.transaction(async tx => {
       await tx.execute(sql`SELECT pg_advisory_xact_lock(${accountId})`);
@@ -130,7 +130,7 @@ export class RolloverRepository {
       .orderBy(asc(schema.dailyStates.date));
   }
 
-  /** Every writer of a terminalized day carries `WHERE rollover_at IS NULL` (§10.4): the guard is the marker's whole point, so the upsert can never rewrite a closed day. */
+  /** Every writer of a terminalized day carries `WHERE rollover_at IS NULL`: the guard is the marker's whole point, so the upsert can never rewrite a closed day. */
   async upsertDailyState(tx: DatabaseTransaction, values: typeof schema.dailyStates.$inferInsert): Promise<void> {
     const { accountId: _accountId, date: _date, ...mutable } = values;
     await tx
@@ -171,7 +171,7 @@ export class RolloverRepository {
     return { firstLogDate: log?.date ?? null, firstQuestAt: quest?.createdAt ?? null };
   }
 
-  /** A system miss never displaces a user's own outcome: the occurrence unique constraint absorbs the collision (§13.3, PRD §4.10 step 3). */
+  /** A system miss never displaces a user's own outcome: the occurrence unique constraint absorbs the collision. */
   async insertMiss(tx: DatabaseTransaction, values: typeof schema.questLogs.$inferInsert): Promise<QuestLog.Row | null> {
     const [log] = await tx
       .insert(schema.questLogs)
@@ -242,7 +242,7 @@ export class RolloverRepository {
   }
 
   /**
-   * PRD §4.10 step 4: expiry is silent to the user — no penalty, no cascade, no reopening — but still lands its own `hero_events` audit row (I-7).
+   * Expiry is silent to the user (no penalty, cascade or reopening) but still lands its own `hero_events` audit row.
    * Bounded above only, so a Recovery whose own day the walk skipped (the catch-up bound) still expires at the next close.
    */
   async expirePendingRecovery(tx: DatabaseTransaction, accountId: bigint, date: string): Promise<RecoveryQuest.Row[]> {
@@ -271,7 +271,7 @@ export class RolloverRepository {
     return event ?? null;
   }
 
-  /** `(account, date, kind)` is the natural key (PRD §3.6): arming, re-arming, firing, and re-firing are each recorded at most once per day. */
+  /** `(account, date, kind)` is the natural key: arming, re-arming, firing, and re-firing are each recorded at most once per day. */
   async insertComebackEvent(tx: DatabaseTransaction, accountId: bigint, date: string, draft: ComebackEventDraft): Promise<boolean> {
     const [event] = await tx
       .insert(schema.comebackEvents)
@@ -291,7 +291,10 @@ export class RolloverRepository {
     return Boolean(event);
   }
 
-  /** Every open-day mutation of `daily_states` outside the rollover walk itself — locking the plan, breaking a lock, consuming Comeback — carries the same `rollover_at IS NULL` guard the day-close upsert does (§10.4). */
+  /**
+   * Every open-day mutation of `daily_states` outside the rollover walk itself — locking the plan, breaking a lock, consuming Comeback — carries
+   * the same `rollover_at IS NULL` guard the day-close upsert does.
+   */
   async updateDailyStateIfOpen(tx: DatabaseTransaction, accountId: bigint, date: string, values: Partial<typeof schema.dailyStates.$inferInsert>): Promise<boolean> {
     const updated = await tx
       .update(schema.dailyStates)
@@ -310,7 +313,7 @@ export class RolloverRepository {
     return recovery ?? null;
   }
 
-  /** Pending-only, guarded by the natural-key `WHERE state = 'pending'` — a second attempt (replay or a race) converges to `null` rather than double-completing (PRD §3.6). */
+  /** Pending-only, guarded by the natural-key `WHERE state = 'pending'` — a second attempt (replay or a race) converges to `null` rather than double-completing. */
   async completeRecoveryQuest(tx: DatabaseTransaction, accountId: bigint, date: string, reflectionText: string | null): Promise<RecoveryQuest.Row | null> {
     const [recovery] = await tx
       .update(schema.recoveryQuests)

@@ -10,7 +10,7 @@ export namespace DailyState {
 
 export const momentumBucket = pgEnum('momentum_bucket', ['cold', 'steady', 'warm']);
 
-/** `rollover_at` is the terminalization marker: once set the day is closed, and every writer carries `WHERE rollover_at IS NULL` (ARCHITECTURE §10.4). */
+/** `rollover_at` marks the day closed; every writer carries `WHERE rollover_at IS NULL`. */
 export const dailyStates = pgTable(
   'daily_states',
   {

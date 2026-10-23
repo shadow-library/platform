@@ -15,11 +15,7 @@ import { HttpPulseTransport, PulseTransport } from './pulse-transport';
 import { WeeklyDigestSweepService } from './weekly-digest-sweep.service';
 import { WeeklyDigestRepository } from './weekly-digest.repository';
 
-/**
- * `AuthModule` is imported as a bare class, not a second `forRoot` call — `MemoirAuthModule` already
- * binds it (`identity-close.client.ts`'s note applies identically here): a dynamic module is configured
- * once per application graph, and this module sits outside the HTTP tree that configures it.
- */
+/** `AuthModule` is imported as a bare class, not a second `forRoot` call: `MemoirAuthModule` already binds it, and a dynamic module is configured once per graph. */
 @Module({
   imports: [AuthModule, DatabaseModule, DatastoreModule, MemoirAuthModule, SchedulerModule],
   providers: [

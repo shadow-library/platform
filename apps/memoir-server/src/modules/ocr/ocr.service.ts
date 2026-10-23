@@ -26,7 +26,7 @@ export class OcrService {
     return this.quotaView(account);
   }
 
-  /** Quota is consumed before structuring so a failed parse still costs an attempt [PRD §2.5/§4.14: "counted per attempt"]. */
+  /** Quota is consumed before structuring so a failed parse still costs an attempt. */
   async parse(body: OcrParseDto): Promise<OcrStructuringResult> {
     const account = await this.requireAccount();
     const cap = Config.get('quotas.ocr-daily');

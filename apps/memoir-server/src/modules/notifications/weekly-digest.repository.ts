@@ -16,10 +16,8 @@ export interface WeekQuestLog {
 }
 
 /**
- * ARCHITECTURE §17's weekly review email, read side: every query here is aggregate-shaped by
- * construction — `quest_logs.state`/`reason_tag` (an enum, never `reason_note`) and a `sum()` over
- * `expenses`' minor-unit columns. `metrics`/`metric_entries` (the `is_health` set, §18) and every
- * free-text column are structurally unreachable: this class simply never selects from them.
+ * The weekly review email's read side: every query is aggregate-shaped (`quest_logs.state`/`reason_tag`, never `reason_note`; `sum()` over `expenses`' minor-unit columns);
+ * `metrics`/`metric_entries` and free-text columns are never selected.
  */
 @Injectable()
 export class WeeklyDigestRepository {

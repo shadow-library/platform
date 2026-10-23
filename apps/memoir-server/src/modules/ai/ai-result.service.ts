@@ -35,10 +35,8 @@ function suggestionAt(result: { suggestions: unknown }, index: number): Suggesti
 }
 
 /**
- * `POST /ai/results/{id}/apply` only records that the offer was taken (ARCHITECTURE §15.7) — the AI path
- * never mutates the quest itself; the client still issues a separate, normal `quest.update` command with
- * the pre-filled edit the deep-link opened. Idempotent under replay: a second apply of the same
- * `(resultId, suggestionIndex)` returns the row the first call already wrote.
+ * `POST /ai/results/{id}/apply` only records that the offer was taken; the client issues a separate `quest.update` with the pre-filled edit.
+ * Idempotent: a second apply of the same `(resultId, suggestionIndex)` returns the row the first wrote.
  */
 @Injectable()
 export class AiResultService {

@@ -24,14 +24,9 @@ export interface CheckoutResult {
 const FREE_VIEW: EntitlementView = { tier: 'free', state: 'free', expiresAt: null, trialUsed: false };
 
 /**
- * The entitlement **read** surface every gate consumes — `getTier` is what T-32/T-33 call before
- * admitting an AI task, and it resolves against server time on every call, so a lapse re-applies those
- * gates the instant the period ends without anything having to be swept first. Nothing here writes:
- * the billing webhook is the sole writer (ARCHITECTURE §16.2), enforced at the grant layer.
- *
- * `rules` never sees any of this. Paid state is not an input to a single progression computation
- * (Invariant 2), and the absence of an import path from `rules` into this module is what makes that
- * structural rather than a habit.
+ * The entitlement read surface every gate consumes; `getTier` resolves against server time on every call, so a lapse re-applies gates the instant the period ends without a sweep.
+ * The billing webhook is the sole writer, enforced at the grant layer. `rules` never sees paid state, and the absence of an import path from
+ * `rules` into this module keeps that structural.
  */
 @Injectable()
 export class EntitlementService implements OnModuleInit {
@@ -61,9 +56,9 @@ export class EntitlementService implements OnModuleInit {
   }
 
   /**
-   * The hosted session is minted server-side with the account's own purchase token as client reference
-   * (ARCHITECTURE §16.2) — the client never names an account, never talks to the provider's API, and
-   * never handles card data. `trial` is offered only while the account still has its one trial.
+   * The hosted session is minted server-side with the account's purchase token as client reference: the client never names an account, talks to
+   * the provider API or handles card data.
+   * `trial` is offered only while the account still has its one trial.
    */
   async createCheckout(plan: CheckoutPlan): Promise<CheckoutResult> {
     const accountId = this.accountContext.getAccountId();

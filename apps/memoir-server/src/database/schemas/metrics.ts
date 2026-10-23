@@ -19,7 +19,7 @@ export const metricValueType = pgEnum('metric_value_type', ['number', 'duration'
 export const metricDirection = pgEnum('metric_direction', ['higher', 'lower', 'range', 'neutral']);
 export const metricEntrySource = pgEnum('metric_entry_source', ['quest_log', 'manual', 'food']);
 
-/** Built-ins (incl. the `is_health` set — steps, calories burned, sleep, water) are seeded per account, not shared rows (ARCHITECTURE §18) — every account owns its own catalogue row, deletable/renameable like a custom metric would be. */
+/** Built-ins (including the `is_health` set) are seeded per account rather than shared; each account owns its catalogue rows, but `metric.update`/`metric.delete` refuse them. */
 export const metrics = pgTable(
   'metrics',
   {
@@ -34,7 +34,7 @@ export const metrics = pgTable(
     defaultValue: numeric('default_value'),
     glyph: varchar('glyph', { length: 16 }),
     builtin: boolean('builtin').notNull().default(false),
-    /** Drives the §18/§23 analytics-exclusion and AI-consent gating; set only by built-in seeding, never by `metric.create`. */
+    /** Drives analytics exclusion and AI-consent gating; set only by built-in seeding, never by `metric.create`. */
     isHealth: boolean('is_health').notNull().default(false),
     active: boolean('active').notNull().default(true),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -44,11 +44,8 @@ export const metrics = pgTable(
 );
 
 /**
- * `quest_log_id` is a historical reference, not a foreign key — same rationale as `hero_events`
- * (ARCHITECTURE §10.3): an owner may delete a `quest_logs` row, and that deletion must never cascade
- * into (or be blocked by) the metric value it once wrote. `metrics.ts` would otherwise import
- * `quest-logs.ts`, which imports `quests.ts`, which needs `metrics.ts` for `quest_consequences.metric_id`
- * — a real FK here would close that cycle.
+ * `quest_log_id` is a historical reference, not a foreign key: deleting a `quest_logs` row must not cascade into, or be blocked by, the metric value it wrote.
+ * A real FK would also close an import cycle: `metrics.ts` -> `quest-logs.ts` -> `quests.ts` -> `metrics.ts`.
  */
 export const metricEntries = pgTable(
   'metric_entries',

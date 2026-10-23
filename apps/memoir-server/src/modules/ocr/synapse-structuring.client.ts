@@ -29,9 +29,8 @@ function toLineItems(raw: unknown): OcrLineItem[] | null {
 }
 
 /**
- * A model answering off-contract is an unavailable structuring service, never a partially-trusted one:
- * the OCR flow's whole safety property is that nothing is fabricated (PRD §6.2-A), and the user confirms
- * a sheet the model actually produced or no sheet at all.
+ * A model answering off-contract is an unavailable service, never a partially-trusted one: nothing is fabricated, the user confirms a sheet
+ * the model actually produced or none.
  */
 export function toStructuringResult(raw: unknown): OcrStructuringResult {
   if (!raw || typeof raw !== 'object') throw AppErrorCode.OCR_002.create();

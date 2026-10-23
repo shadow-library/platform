@@ -18,10 +18,8 @@ export const entitlementTier = pgEnum('entitlement_tier', ['free', 'paid']);
 export const entitlementState = pgEnum('entitlement_state', ['free', 'trial', 'active', 'grace', 'lapsed']);
 
 /**
- * One row per account, written **only** by the billing module (ARCHITECTURE §16.2). `applied_event_at` is the monotonic apply guard: an out-of-order webhook whose
- * effective instant is not later than this never moves the projection. §16.2 phrases that guard as
- * `updated_at` vs event time, but `updated_at` also moves on writes that carry no provider event
- * (the lapse sweep), which would let a genuinely newer event be mistaken for a stale one.
+ * One row per account, written only by the billing module. `applied_event_at` is the monotonic apply guard: an out-of-order webhook not later than it never moves the projection.
+ * `updated_at` can't be the guard because it also moves on writes that carry no provider event (the lapse sweep).
  */
 export const entitlements = pgTable(
   'entitlements',
@@ -44,8 +42,7 @@ export const entitlements = pgTable(
       .default(sql`nextval('sync_seq')`),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  // Partial so a provider binding lands on at most one account (§16.2): the many free/unbilled accounts keep
-  // both columns NULL and are excluded from the index entirely rather than relying on NULL-distinctness to keep them apart.
+  // Partial so a provider binding lands on at most one account; free accounts keep both columns NULL and are excluded from the index.
   t => [
     uniqueIndex('entitlements_provider_provider_ref_unique')
       .on(t.provider, t.providerRef)
@@ -54,9 +51,8 @@ export const entitlements = pgTable(
 );
 
 /**
- * Append-only webhook audit (ARCHITECTURE §10.3, §10.4). `provider_event_id` is unique on its own —
- * the replay/idempotency spine — and `account_id` stays nullable so an event whose purchase token
- * matches nothing is still retained for the reconciliation runbook rather than dropped.
+ * Append-only webhook audit. `provider_event_id` is unique on its own (the replay/idempotency spine); `account_id` stays nullable so an event matching no purchase token
+ * is still retained for the reconciliation runbook.
  */
 export const billingEvents = pgTable(
   'billing_events',

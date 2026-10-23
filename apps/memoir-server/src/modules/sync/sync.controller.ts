@@ -9,9 +9,8 @@ import { type BatchOutcome, SyncService } from './sync.service';
 const SYNC_EPOCH_HEADER = 'x-sync-epoch';
 
 /**
- * The two endpoints the offline client lives on (ARCHITECTURE §12.2, §25). Both carry the sync epoch:
- * a client that sees a value different from the one its cursor was issued under discards its cursor and
- * pulls from `since=0` (§12.4), which is the escape hatch for any change that invalidates local state.
+ * The two endpoints the offline client lives on. Both carry the sync epoch: a client seeing a different value than its cursor was issued under
+ * discards the cursor and pulls from `since=0`.
  */
 @HttpController('/api/v1/sync')
 @Authenticated()

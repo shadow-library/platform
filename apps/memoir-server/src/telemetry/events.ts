@@ -1,10 +1,7 @@
 import { type StatAffinity } from '@modules/rules';
 import { type Expense, type HeroEvent, type Metric, type MetricEntry, type Subscription } from '@server/database';
 
-/**
- * Opaque per-account key (ARCHITECTURE §23): an HMAC of the account id, never the id itself. Only
- * {@link pseudoAccountId} may construct one, so a raw string can never be passed off as one.
- */
+/** Opaque per-account key: an HMAC of the account id; only `pseudoAccountId` may construct one, so a raw string can't be passed off as one. */
 export type PseudoId = string & { readonly __brand: 'PseudoId' };
 
 interface TelemetryEventBase {
@@ -12,11 +9,7 @@ interface TelemetryEventBase {
   occurredAtMs: number;
 }
 
-/**
- * A Hero-progression grant landed (quest completion, level-up, coin grant, achievement, …) — mirrors
- * `hero_events.type` (ARCHITECTURE §11.1). `note`/free-text fields never appear here; only the mechanical
- * deltas the ledger itself computed.
- */
+/** A Hero-progression grant landed; mirrors `hero_events.type`. `note`/free-text fields never appear here, only the mechanical deltas the ledger computed. */
 interface HeroEventRecordedEvent extends TelemetryEventBase {
   name: 'hero_event_recorded';
   eventType: HeroEvent.Type;
@@ -36,17 +29,12 @@ interface ExpenseRecordedEvent extends TelemetryEventBase {
   hasFxConversion: boolean;
 }
 
-/** A subscription billing cycle was confirmed (a coin grant, distinct from the underlying `hero_event_recorded`). */
 interface SubscriptionCycleConfirmedEvent extends TelemetryEventBase {
   name: 'subscription_cycle_confirmed';
   frequency: Subscription.Frequency;
 }
 
-/**
- * A `metric.register` command landed a value against a non-health metric (ARCHITECTURE §18): health-class
- * entries never reach this event at all — the caller checks `isHealth` before emitting, so there is no
- * conditional field here for a leak to hide behind.
- */
+/** A `metric.register` landed a value against a non-health metric; health entries never reach this event, the caller checks `isHealth` before emitting. */
 interface MetricEntryRecordedEvent extends TelemetryEventBase {
   name: 'metric_entry_recorded';
   valueType: Metric.ValueType;
@@ -70,10 +58,6 @@ interface SyncBatchSubmittedEvent extends TelemetryEventBase {
   replayedCount: number;
 }
 
-/**
- * The closed analytics taxonomy (ARCHITECTURE §23–24): every member's payload is typed to ids, enums, and
- * numbers only, so a free-text value is structurally unrepresentable — there is no string-bag escape
- * hatch. Adding an event means adding a member here, not widening an existing one.
- */
+/** The closed analytics taxonomy: every payload is ids, enums and numbers only, so free text is unrepresentable. Adding an event means adding a member here. */
 export type TelemetryEvent =
   HeroEventRecordedEvent | ExpenseRecordedEvent | SubscriptionCycleConfirmedEvent | MetricEntryRecordedEvent | QuickLogRecordedEvent | SyncBatchSubmittedEvent;

@@ -10,10 +10,8 @@ function toPresetRow(preset: MealPreset.Row): Record<string, unknown> {
 }
 
 /**
- * Registers the `journal_entries`/`meals`/`weights`/`side_quests` keyset domains and the `meal_presets`
- * snapshot domain (ARCHITECTURE §12.2) — `meal_presets` carries no `sync_seq`, mirroring
- * `FinanceDeltaSources`'s `expense_categories` snapshot for the same reason: a small, closed per-account
- * set is cheaper synced whole than watermarked.
+ * Registers the `journal_entries`/`meals`/`weights`/`side_quests` keyset domains and the `meal_presets` snapshot domain, which carries no
+ * `sync_seq`: a small closed per-account set is cheaper synced whole than watermarked.
  */
 @Injectable()
 export class QuickLogsDeltaSources implements OnModuleInit {

@@ -11,14 +11,9 @@ import { ReceiptService } from './receipt.service';
 import { ReceiptSweepService } from './receipt-sweep.service';
 
 /**
- * A dedicated private bucket, not the platform's shared public `storage` bucket (ADR-0008): explicit
- * `bucket` override so this never falls back to `storage.s3.bucket`'s ('storage') default, and a
- * `publicOrigin` placeholder that is never actually resolved — no public URL exists for `memoir-receipts`,
- * every read goes through `getPresignedDownloadUrl`. Endpoint/region/credentials resolve from the
- * `STORAGE_S3_*` env at `StorageService.onModuleInit`, per environment (ADR-0008 Consequences). This is
- * the one place `memoir-receipts` is registered (`StorageModule.forRoot()` may only be called once per
- * app graph) — `ExportModule` (T-29) reuses it by importing this module and its re-exported
- * `StorageService` rather than registering the bucket a second time.
+ * A dedicated private bucket, not the shared public `storage` bucket: the explicit `bucket` override avoids `storage.s3.bucket`'s default, and
+ * `publicOrigin` is a placeholder never resolved, since every read is presigned.
+ * This is the one place `memoir-receipts` is registered (`StorageModule.forRoot()` may be called once per app graph); other modules import this module instead.
  */
 const ReceiptStorageModule = StorageModule.forRoot({
   driver: 's3',

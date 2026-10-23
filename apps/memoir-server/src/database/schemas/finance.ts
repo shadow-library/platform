@@ -60,7 +60,7 @@ export const subscriptionFrequency = pgEnum('subscription_frequency', ['weekly',
 export const reminderLead = pgEnum('reminder_lead', ['on_day', '1_day', '2_day', '3_day', '1_week']);
 export const expenseAuditAction = pgEnum('expense_audit_action', ['created', 'updated', 'deleted', 'receipt_confirmed']);
 
-/** [Recommendation resolving ARCHITECTURE §10.3 O-5] user-scoped rows seeded from the 9 PRD §2.5 built-ins on first finance touch, not a code constant. */
+/** User-scoped rows seeded from the 9 built-in categories on first finance touch, not a code constant. */
 export const expenseCategories = pgTable(
   'expense_categories',
   {
@@ -80,7 +80,7 @@ export const expenseCategories = pgTable(
   t => [unique('expense_categories_account_id_key_unique').on(t.accountId, t.key)],
 );
 
-/** Due state (`none`/`upcoming`/`due`/`overdue`) is derived at read time from `nextDueDate`/`lastConfirmedDate`, never stored (PRD §3.7). */
+/** Due state (`none`/`upcoming`/`due`/`overdue`) is derived at read time from `nextDueDate`/`lastConfirmedDate`, never stored. */
 export const subscriptions = pgTable(
   'subscriptions',
   {
@@ -117,7 +117,7 @@ export const subscriptions = pgTable(
   ],
 );
 
-/** Client-generated UUIDv7 PK (ARCHITECTURE §12.4) — one of the entity classes the client mints ids for, so an offline-created expense already carries its permanent identity. */
+/** Client-generated UUIDv7 PK, so an offline-created expense already carries its permanent identity. */
 export const expenses = pgTable(
   'expenses',
   {
@@ -128,7 +128,7 @@ export const expenses = pgTable(
     amountMinor: bigint('amount_minor', { mode: 'bigint' }).notNull(),
     amountText: varchar('amount_text', { length: 40 }).notNull(),
     currency: char('currency', { length: 3 }).notNull(),
-    /** Locked permanently once set (ARCHITECTURE §14.1); null means the reconciliation sweep has not resolved it yet. Enforced in the command layer — edits never touch a non-null value. */
+    /** Locked permanently once set; null means the reconciliation sweep has not resolved it yet. Enforced in the command layer. */
     fxRate: numeric('fx_rate', { precision: 18, scale: 8 }),
     homeAmountMinor: bigint('home_amount_minor', { mode: 'bigint' }),
     fxRateDate: date('fx_rate_date'),
@@ -180,10 +180,8 @@ export const expenseAudits = pgTable(
 );
 
 /**
- * Not user-owned (ARCHITECTURE §14.1): one shared, date-scoped cache of public FX rates the
- * reconciliation sweep refreshes, never touched through `OwnerScopedRepository`. `rate` is nullable so
- * a fetched-but-unavailable pair can still be recorded as attempted, distinguishing "never asked" from
- * "asked, source had nothing" for the 48h alert.
+ * Not user-owned: a shared, date-scoped cache of public FX rates refreshed by the reconciliation sweep, never touched through `OwnerScopedRepository`.
+ * `rate` is nullable so a fetched-but-unavailable pair is recorded as attempted, distinguishing "never asked" from "source had nothing".
  */
 export const fxRates = pgTable(
   'fx_rates',

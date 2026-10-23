@@ -40,11 +40,9 @@ export const aiConsentDataClass = pgEnum('ai_consent_data_class', ['journal_refl
 export const aiTaskAuditAction = pgEnum('ai_task_audit_action', ['claimed', 'read_scope', 'finished', 'refunded']);
 
 /**
- * The client-written request, not an authorization (ARCHITECTURE §15.3, PRD §3.10): the worker
- * independently re-validates entitlement/quota/consent at claim time. `id` is client-minted so a
- * duplicate submission tap converges on `ON CONFLICT DO NOTHING` rather than double-charging quota.
- * `quota_month` is null for `kind = 'scheduled'` rows — scheduled runs never consume ad-hoc quota
- * (§15.7) — and for any row whose quota bookkeeping does not apply.
+ * The client-written request, not an authorization: the worker re-validates entitlement, quota and consent at claim time.
+ * `id` is client-minted so a duplicate tap converges on `ON CONFLICT DO NOTHING` instead of double-charging quota; `quota_month` is null for
+ * scheduled runs, which never consume ad-hoc quota.
  */
 export const aiTasks = pgTable(
   'ai_tasks',
@@ -77,7 +75,7 @@ export const aiTasks = pgTable(
   ],
 );
 
-/** Append-only, worker-written only (§10.4). One row per task — `task_id` is unique rather than the primary key so the domain reads like every other bigserial-keyed table. */
+/** Append-only, worker-written only. `task_id` is unique rather than the primary key so the table is shaped like the other bigserial-keyed ones. */
 export const aiResults = pgTable(
   'ai_results',
   {
@@ -103,7 +101,7 @@ export const aiResults = pgTable(
   t => [unique('ai_results_task_id_unique').on(t.taskId), index('ai_results_account_id_sync_seq_idx').on(t.accountId, t.syncSeq)],
 );
 
-/** One standing question per account, paid-only (§15.7); materialized into an `ai_tasks(kind='scheduled')` row nightly by the worker. */
+/** One standing question per account, paid-only; the worker materializes it nightly into an `ai_tasks(kind='scheduled')` row. */
 export const aiScheduledQueries = pgTable('ai_scheduled_queries', {
   accountId: bigint('account_id', { mode: 'bigint' })
     .primaryKey()
@@ -117,7 +115,7 @@ export const aiScheduledQueries = pgTable('ai_scheduled_queries', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
-/** Current state = `withdrawn_at IS NULL`; a re-grant after withdrawal upserts the same row rather than inserting a new one, so grant/withdraw history is only ever the latest transition, not a full log (PRD §6.7 needs "how to withdraw", not a ledger). */
+/** Current state is `withdrawn_at IS NULL`; a re-grant after withdrawal upserts the same row, so only the latest transition is kept, not a ledger. */
 export const aiConsents = pgTable(
   'ai_consents',
   {
@@ -135,9 +133,8 @@ export const aiConsents = pgTable(
 );
 
 /**
- * Append-only (§10.4). Powers the 14-day before/after adherence metric (PRD §6.10) — the AI path never
- * mutates the quest itself; the user confirms a separate, normal `EditQuest` command and this row only
- * records that the offer was taken (§15.7).
+ * Append-only. Powers the 14-day before/after adherence metric: the AI path never mutates the quest, the user confirms a separate `EditQuest`,
+ * and this row only records that the offer was taken.
  */
 export const appliedSuggestions = pgTable(
   'applied_suggestions',
@@ -159,7 +156,7 @@ export const appliedSuggestions = pgTable(
   t => [unique('applied_suggestions_result_id_suggestion_index_unique').on(t.resultId, t.suggestionIndex)],
 );
 
-/** Append-only (§10.4), worker-written only: read-scope summary as data-class names + row counts, never content (§24 auditability). */
+/** Append-only, worker-written only: read-scope summary as data-class names and row counts, never content. */
 export const aiTaskAudit = pgTable('ai_task_audit', {
   id: bigserial('id', { mode: 'bigint' }).primaryKey(),
   accountId: bigint('account_id', { mode: 'bigint' })

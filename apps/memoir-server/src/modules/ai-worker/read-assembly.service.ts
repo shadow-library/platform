@@ -39,10 +39,8 @@ function trailingWindowStart(now: Date, months: number): string {
 }
 
 /**
- * Consent gates reads, tier gates the window (ARCHITECTURE §15.3, PRD §6.4/§6.7). Both are applied
- * before a single row is fetched, and what actually came back is reported as data-class names and row
- * counts for the `ai_task_audit` row — the audit answers "what kind of data, how much of it", and there
- * is no field on it that could hold an answer to "which rows".
+ * Consent gates reads and tier gates the window, both applied before a single row is fetched. What came back is reported as data-class names and row counts for `ai_task_audit`,
+ * which has no field that could answer "which rows".
  */
 @Injectable()
 export class ReadAssemblyService {
@@ -107,7 +105,7 @@ export class ReadAssemblyService {
     };
   }
 
-  /** PRD §6.4: free reads the trailing window, paid reads everything — a null start is "no lower bound", the paid case. */
+  /** Free reads the trailing window, paid everything; a null start means no lower bound, the paid case. */
   windowStartFor(tier: Entitlement.Tier, now: Date, freeHistoryMonths: number): string | null {
     return tier === 'paid' ? null : trailingWindowStart(now, freeHistoryMonths);
   }

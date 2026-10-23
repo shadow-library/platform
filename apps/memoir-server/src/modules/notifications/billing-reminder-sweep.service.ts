@@ -22,11 +22,8 @@ function toDateOnly(value: Date): string {
 }
 
 /**
- * The account's *own* Memoir billing state (`entitlements`, T-31) — trial ending, grace window,
- * lapse, or an approaching renewal — never the personal recurring-expense `subscriptions` finance
- * tracks. That reading is forced by the wire contract itself: T-05's `memoir-billing-reminder` template
- * carries a single `state` variable shaped exactly like `entitlement_state` (free/trial/active/grace/
- * lapsed) and no subscription name/id field at all, so it can only ever describe one thing per account.
+ * The account's own Memoir billing state (`entitlements`): trial ending, grace, lapse, approaching renewal; never the personal `subscriptions` finance tracks.
+ * The `memoir-billing-reminder` template carries one `state` variable shaped like `entitlement_state` and no subscription name/id, so it can only describe one thing per account.
  */
 @Injectable()
 export class BillingReminderSweepService implements OnModuleInit {

@@ -15,7 +15,10 @@ export interface AiTaskDraft {
 
 @Injectable()
 export class AiTaskRepository extends OwnerScopedRepository {
-  /** `ON CONFLICT DO NOTHING` on the client-minted id is the whole dedupe mechanism (ARCHITECTURE §15.1) — a resubmitted id returns no row here, and the caller falls back to reading the row the first submission already wrote. */
+  /**
+   * `ON CONFLICT DO NOTHING` on the client-minted id is the whole dedupe mechanism — a resubmitted id returns no row here, and the caller falls
+   * back to reading the row the first submission already wrote.
+   */
   async insertPending(tx: DatabaseTransaction, draft: AiTaskDraft): Promise<AiTask.Row | null> {
     const accountId = this.requireAccountId();
     const [row] = await tx
@@ -44,7 +47,7 @@ export class AiTaskRepository extends OwnerScopedRepository {
     return (row as AiTask.Row) ?? null;
   }
 
-  /** The whole cancel-vs-claim race (ARCHITECTURE §15.1): zero rows back means the worker already claimed it — cancel is rejected, the task will complete. */
+  /** The whole cancel-vs-claim race: zero rows back means the worker already claimed it — cancel is rejected, the task will complete. */
   async cancelIfPending(tx: DatabaseTransaction, id: string): Promise<AiTask.Row | null> {
     const [row] = await this.using(tx)
       .update(schema.aiTasks, { status: 'cancelled', quotaConsumed: false }, eq(schema.aiTasks.id, id), eq(schema.aiTasks.status, 'pending'))
@@ -52,7 +55,7 @@ export class AiTaskRepository extends OwnerScopedRepository {
     return (row as AiTask.Row) ?? null;
   }
 
-  /** Free-tier monthly count (ARCHITECTURE §15.1): consumed ad-hoc tasks stamped with this calendar month. */
+  /** Free-tier monthly count: consumed ad-hoc tasks stamped with this calendar month. */
   async countConsumedInMonth(tx: DatabaseTransaction, quotaMonth: string): Promise<number> {
     const accountId = this.requireAccountId();
     const [row] = await tx
@@ -62,7 +65,7 @@ export class AiTaskRepository extends OwnerScopedRepository {
     return Number(row?.count ?? 0);
   }
 
-  /** Paid-tier daily soft cap (ARCHITECTURE §15.1, PRD §6.8): consumed ad-hoc tasks submitted since local midnight. */
+  /** Paid-tier daily soft cap: consumed ad-hoc tasks submitted since local midnight. */
   async countConsumedSince(tx: DatabaseTransaction, since: Date): Promise<number> {
     const accountId = this.requireAccountId();
     const [row] = await tx

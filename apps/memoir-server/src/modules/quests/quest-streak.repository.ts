@@ -24,7 +24,7 @@ export class QuestStreakRepository extends OwnerScopedRepository {
     };
   }
 
-  /** Unifies the command path's streak break with rollover's miss path (T-19's gap): both must record the same audit row when a shield bridges. */
+  /** Unifies the command path's streak break with rollover's miss path: both record the same audit row when a shield bridges. */
   async insertShieldConsumption(tx: DatabaseTransaction, questId: bigint, date: string): Promise<void> {
     const accountId = this.requireAccountId();
     await tx

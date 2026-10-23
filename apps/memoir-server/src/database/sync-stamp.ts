@@ -1,7 +1,6 @@
 import { type SQL, sql } from 'drizzle-orm';
 import { type AnyPgColumn } from 'drizzle-orm/pg-core';
 
-/** Any table whose rows carry a `sync_seq` drawn from the global sequence (ARCHITECTURE §10.1). */
 export interface SyncSeqTable {
   syncSeq: AnyPgColumn;
 }
@@ -15,10 +14,8 @@ function isSyncSeqTable(table: object): table is SyncSeqTable {
 }
 
 /**
- * A row's `sync_seq` only defaults on INSERT, so an UPDATE that did not re-stamp it would mutate the
- * row below every cursor that has already passed it — the change would reach no client, ever. There is
- * deliberately no trigger doing this (ARCHITECTURE §12.2): it belongs to the repository layer, which is
- * why `OwnerScopedRepository.scopedUpdate` is the only sanctioned way to update a user-owned table.
+ * A row's `sync_seq` only defaults on INSERT, so an UPDATE that doesn't re-stamp it lands behind every cursor already past it and never reaches a client.
+ * No trigger does this on purpose: `OwnerScopedRepository.scopedUpdate` is the only sanctioned way to update a user-owned table.
  */
 export function syncStamped<T extends Record<string, unknown>>(table: object, values: T): T {
   return isSyncSeqTable(table) ? { ...values, syncSeq: nextSyncSeq() } : values;

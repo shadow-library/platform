@@ -33,14 +33,9 @@ export interface QuestCompletionSignal {
 const RESCHEDULE_REASON_WINDOW_DAYS = 90;
 
 /**
- * The incremental Achievement/Title evaluator ARCHITECTURE §26 calls for: every trigger method reads the
- * account's counters row `FOR UPDATE`, folds in one event's worth of state, persists it, and checks the
- * two catalogues against the merged snapshot — all inside the caller's own command transaction, which is
- * already serialized per-account (§11.1), so this needs no locking beyond that row read.
- *
- * Achievements and Titles are checked together because they share the same merged `ProgressCounters`
- * input; `achievements_earned`/`titles_earned` are natural-key `U`s (ARCHITECTURE §10.4), so a predicate
- * re-checked on every later trigger is harmless — it just re-derives "already granted" and no-ops.
+ * The incremental Achievement/Title evaluator: every trigger reads the account's counters row `FOR UPDATE`, folds in one event, persists it
+ * and checks both catalogues against the merged snapshot, inside the caller's per-account-serialized command transaction.
+ * `achievements_earned`/`titles_earned` are natural-key unique, so re-checking a predicate on every later trigger is harmless.
  */
 @Injectable()
 export class ProgressionService {
@@ -82,7 +77,7 @@ export class ProgressionService {
     }));
   }
 
-  /** OCR scanning has no command transaction of its own (ARCHITECTURE §14.3's endpoint is a plain authenticated route) — this opens a short-lived one just for the counter/grant write. */
+  /** OCR scanning has no command transaction, so this opens a short-lived one just for the counter/grant write. */
   async onReceiptScanned(accountId: bigint, date: string): Promise<void> {
     await this.counters.transaction(tx =>
       this.mutate(tx, accountId, date, envelope => ({ ...envelope, counters: { ...envelope.counters, receiptsScanned: envelope.counters.receiptsScanned + 1 } })),
@@ -93,13 +88,13 @@ export class ProgressionService {
     await this.mutate(tx, accountId, date, envelope => ({ ...envelope, counters: { ...envelope.counters, crownsBanked: envelope.counters.crownsBanked + 1 } }));
   }
 
-  /** Called once per terminalized day (rollover `closeDay`); `first_full_hp_day` (PRD §4.7 #12) is "no missed Quests across a full day" — a day with at least one scheduled occurrence and zero misses. */
+  /** Called once per terminalized day (rollover `closeDay`); `first_full_hp_day` is "no missed Quests across a full day": at least one scheduled occurrence and zero misses. */
   async onDayClosed(tx: DatabaseTransaction, accountId: bigint, date: string, scheduledCount: number, missedCount: number): Promise<void> {
     if (scheduledCount === 0 || missedCount > 0) return;
     await this.mutate(tx, accountId, date, envelope => ({ ...envelope, counters: { ...envelope.counters, fullHpDays: envelope.counters.fullHpDays + 1 } }));
   }
 
-  /** Fires alongside the Returner ritual (rollover `fireReturner`); arms `completionsAfterReturner` for the next hold-state quest completion (the `returner` title, PRD §4.8). */
+  /** Fires alongside the Returner ritual; arms `completionsAfterReturner` for the next hold-state completion (the `returner` title). */
   async onReturnerFired(tx: DatabaseTransaction, accountId: bigint, date: string): Promise<void> {
     await this.mutate(tx, accountId, date, envelope => ({
       ...envelope,
@@ -108,12 +103,12 @@ export class ProgressionService {
     }));
   }
 
-  /** A reason tag or note landed on any event — reschedule, skip/postpone, or a quest-log edit (the `reflective_practitioner` title, PRD §4.8). */
+  /** A reason tag or note landed on any event: reschedule, skip/postpone or a quest-log edit (the `reflective_practitioner` title). */
   async onReasonTagged(tx: DatabaseTransaction, accountId: bigint, date: string): Promise<void> {
     await this.mutate(tx, accountId, date, envelope => ({ ...envelope, counters: { ...envelope.counters, reasonTaggedEvents: envelope.counters.reasonTaggedEvents + 1 } }));
   }
 
-  /** `honest_planner`'s 90-day window is not a monotonic total (T-12's note), so it re-evaluates the catalogues without changing any stored counter. */
+  /** `honest_planner`'s 90-day window is not a monotonic total, so it re-evaluates the catalogues without changing any stored counter. */
   async onRescheduleReasonLogged(tx: DatabaseTransaction, accountId: bigint, date: string): Promise<void> {
     await this.evaluate(tx, accountId, date);
   }

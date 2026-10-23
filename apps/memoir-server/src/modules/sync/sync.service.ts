@@ -39,15 +39,13 @@ export class SyncService {
   ) {}
 
   /**
-   * Strict batch order, one transaction per command (§12.2), so a later command observes everything the
-   * commands before it committed. Types are checked against the registry before the first command runs:
-   * an outbox carrying a type this server has no handler for is a client-version problem, and failing
-   * the whole batch up front is cleaner than half-applying it and leaving the client to reconcile.
+   * Strict batch order, one transaction per command, so a later command observes everything the commands before it committed.
+   * Types are checked against the registry before the first command runs: an unknown type is a client-version problem, and failing the
+   * whole batch up front beats half-applying it.
    *
-   * A command whose handler raises a domain error stops the batch instead of being skipped. Its
-   * transaction — the `command_log` claim included — rolled back, so the client resends it under the
-   * same id; letting the commands behind it proceed would apply them against a state their author never
-   * intended. An internal error is not an outcome at all and propagates as a 500.
+   * A command whose handler raises a domain error stops the batch instead of being skipped. Its transaction (the `command_log` claim
+   * included) rolled back, so the client resends it under the same id; letting later commands proceed would apply them against a state
+   * their author never intended. An internal error is not an outcome and propagates as a 500.
    */
   async submitBatch(commands: CommandEnvelope[]): Promise<BatchOutcome[]> {
     const accountId = this.requireAccountId();
@@ -90,7 +88,7 @@ export class SyncService {
    * Every registered domain is read at `sync_seq > since`, and the cursor advances only as far as the
    * least-complete keyset domain, so a truncated page never strands rows behind an advanced cursor.
    * Once the pull has drained, the cursor is additionally held `sync.cursor-overlap` behind the highest
-   * sequence observed (§12.2), which re-serves rows whose sequence value was drawn before a concurrent
+   * sequence observed, which re-serves rows whose sequence value was drawn before a concurrent
    * transaction's but committed after it. The overlap is skipped while `hasMore` is set, because a page
    * spanning fewer sequence values than the overlap could otherwise never advance the cursor at all.
    */

@@ -163,11 +163,14 @@ export class AccountResponseDto {
 
 @Schema()
 export class AccountPatchDto {
-  /** Never writable through this route (§5.5); declared only so the field survives AJV's `removeAdditional` and the service can reject it with a typed, named error instead of silently dropping it. */
+  /**
+   * Never writable through this route; declared only so the field survives AJV's `removeAdditional` and the service can reject it with a typed,
+   * named error instead of silently dropping it.
+   */
   @Field({ optional: true })
   authProvider?: string;
 
-  /** Never writable through this route — locked by `POST /account/onboarding` (§5.5); see {@link authProvider} for why it is declared here at all. */
+  /** Never writable through this route — locked by `POST /account/onboarding`; see {@link authProvider} for why it is declared here at all. */
   @Field({ optional: true })
   defaultCurrency?: string;
 

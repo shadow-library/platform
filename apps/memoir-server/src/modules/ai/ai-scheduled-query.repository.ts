@@ -10,7 +10,7 @@ export class AiScheduledQueryRepository extends OwnerScopedRepository {
     return (row as AiScheduledQuery.Row) ?? null;
   }
 
-  /** `account_id` is the primary key (§10.3: one standing question per account), so the upsert target is the row itself. */
+  /** `account_id` is the primary key (one standing question per account), so the upsert target is the row itself. */
   async upsert(queryText: string, active: boolean): Promise<AiScheduledQuery.Row> {
     const accountId = this.requireAccountId();
     const now = new Date();

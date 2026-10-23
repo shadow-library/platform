@@ -15,11 +15,7 @@ import { EntitlementRepository } from './entitlement.repository';
 import { EntitlementService } from './entitlement.service';
 import { GenericHmacBillingAdapter } from './generic-hmac.adapter';
 
-/**
- * Binding `BillingProviderAdapter` to one concrete class is the whole provider choice (ARCHITECTURE
- * §16.1). Owner decision A-6 has not named a payment provider yet, so it resolves to
- * `GenericHmacBillingAdapter`; naming one replaces this single line.
- */
+/** Binding `BillingProviderAdapter` to one concrete class is the whole provider choice; no provider is chosen yet, so it resolves to `GenericHmacBillingAdapter`. */
 @Module({
   imports: [DatabaseModule, DatastoreModule, MemoirAuthModule, SyncModule, SchedulerModule],
   controllers: [BillingController],

@@ -37,10 +37,8 @@ export interface NotificationCategoryDefinition {
 }
 
 /**
- * The complete, closed set of notification categories this app may ever send (ARCHITECTURE §17, T-34).
- * `NotificationClient.enqueue` accepts only a key of this object, so a category outside the PRD's
- * three-item allow-list is unrepresentable at the call site, not merely undocumented — the forbidden
- * list (re-engagement, "we miss you", streak-loss framing) never gets a code path to attach to.
+ * The closed set of notification categories this app may send. `NotificationClient.enqueue` accepts only a key of this object,
+ * so a category outside the three-item allow-list (re-engagement, "we miss you", streak-loss framing) is unrepresentable at the call site.
  */
 export const NOTIFICATION_CATEGORIES: Readonly<Record<NotificationCategory, NotificationCategoryDefinition>> = {
   aiResultReady: { dbCategory: 'ai_result_ready', templateKey: 'memoir-ai-result-ready', prefKey: 'aiReadiness' },

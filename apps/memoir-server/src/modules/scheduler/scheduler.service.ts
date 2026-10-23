@@ -27,12 +27,7 @@ export class SchedulerService implements OnApplicationReady, OnApplicationStop {
     this.sweeps.push({ name, cadenceMs, fn, seeded: false, lastRunAt: 0 });
   }
 
-  /**
-   * Registers a gauge sampled once per heartbeat and logged in the standard `metric`-tagged format
-   * (T-28). The registration point exists independently of any sweep so a subsystem that only lands
-   * later (queue depths, rollover failures, orphan counts) can wire its counter in without waiting on
-   * this service to change.
-   */
+  /** Registers a gauge sampled once per heartbeat and logged in the standard `metric`-tagged format. */
   registerGauge(metric: string, fn: GaugeFn): void {
     if (this.gauges.some(gauge => gauge.metric === metric)) throw AppError.internal(`Gauge "${metric}" is already registered`);
     this.gauges.push({ metric, fn });

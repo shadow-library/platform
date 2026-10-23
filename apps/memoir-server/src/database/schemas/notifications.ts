@@ -10,17 +10,13 @@ export namespace NotificationOutbox {
   export type Status = InferEnum<typeof notificationOutboxStatus>;
 }
 
-/** T-34's closed category set (ARCHITECTURE §17) — mirrors `NotificationCategory` in the notifications module 1:1; the two are kept in a structural test rather than one deriving the other, since a DB enum cannot import a TS type. */
+/** Mirrors `NotificationCategory` in the notifications module 1:1; kept in sync by a structural test since a DB enum cannot import a TS type. */
 export const notificationCategory = pgEnum('notification_category', ['ai_result_ready', 'billing_reminder', 'weekly_digest']);
 export const notificationOutboxStatus = pgEnum('notification_outbox_status', ['pending', 'sent', 'failed']);
 
 /**
- * T-34's send-side of ARCHITECTURE §17/§4.5: every email a sweep or a hook wants sent lands here first,
- * so a pulse failure never fails the triggering AI completion / sweep — only this row's own retry does.
- * `variables` carries only what the closed T-05 template set accepts (ids/numbers/dates/enum codes,
- * never free text), so the row is never a sensitivity-manifest concern. `dedupe_key` plus the unique
- * constraint is what makes re-enqueuing for the same fact (a result, a billing state+date, a digest
- * week) a no-op rather than a duplicate send.
+ * Every email a sweep or hook wants sent lands here first, so a pulse failure never fails the triggering AI completion or sweep, only this row's own retry.
+ * `variables` carries only ids/numbers/dates/enum codes, never free text; the `dedupe_key` unique constraint makes re-enqueuing the same fact a no-op.
  */
 export const notificationOutbox = pgTable(
   'notification_outbox',

@@ -43,7 +43,7 @@ export class QuestRepository extends OwnerScopedRepository {
     return quest;
   }
 
-  /** Future-only per PRD §2.2: the patch never rewrites a past `quest_logs` snapshot — those carry their own `strictness`/`statAffinity` at log time. */
+  /** Future-only: the patch never rewrites a past `quest_logs` snapshot, which carries its own `strictness`/`statAffinity`. */
   async update(tx: DatabaseTransaction, questId: bigint, patch: Partial<QuestDraftInput>): Promise<Quest.Row | null> {
     const values: Record<string, unknown> = {};
     if (patch.name !== undefined) values['name'] = patch.name;
@@ -65,7 +65,7 @@ export class QuestRepository extends OwnerScopedRepository {
     return quest ?? null;
   }
 
-  /** Deletion is soft — deactivation only (PRD §2.2); historical `quest_logs` rows keep referencing the quest. */
+  /** Deletion is soft (deactivation only); historical `quest_logs` rows keep referencing the quest. */
   async softDelete(tx: DatabaseTransaction, questId: bigint): Promise<Quest.Row | null> {
     const [quest] = (await this.using(tx).update(schema.quests, { active: false, updatedAt: new Date() }, eq(schema.quests.id, questId)).returning()) as Quest.Row[];
     return quest ?? null;

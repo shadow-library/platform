@@ -6,9 +6,8 @@ import { type Subscription } from '@server/database';
 const DEFAULT_CUSTOM_INTERVAL_DAYS = 30;
 
 /**
- * The month-end clamping ARCHITECTURE §14.2 names lives entirely in `rules/time.addMonths`: it rebuilds
- * the target date from `billingDay` every cycle (rather than carrying `from`'s own day forward) so a
- * user editing `billingDay` mid-series takes effect on the very next advance.
+ * Month-end clamping lives entirely in `rules/time.addMonths`, which rebuilds the target date from `billingDay` every cycle so an edit to
+ * `billingDay` mid-series takes effect on the next advance.
  */
 export function advanceDueDate(subscription: Pick<Subscription.Row, 'frequency' | 'billingDay' | 'customIntervalDays'>, from: string): string {
   const anchor = parseLocalDate(from);

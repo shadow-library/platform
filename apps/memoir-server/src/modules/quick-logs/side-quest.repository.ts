@@ -34,7 +34,7 @@ export class SideQuestRepository extends OwnerScopedRepository {
     return entry;
   }
 
-  /** Count of already-rewarded side quests on `date` — the PRD §4.12 first-3-per-day input, read `FOR UPDATE` so a serialized command sequence sees a consistent ordinal. */
+  /** Count of already-rewarded side quests on `date`, the first-3-per-day input, read `FOR UPDATE` so a serialized command sequence sees a consistent ordinal. */
   async countRewardedOn(tx: DatabaseTransaction, date: string): Promise<number> {
     const accountId = this.requireAccountId();
     const rows = await tx
@@ -45,7 +45,7 @@ export class SideQuestRepository extends OwnerScopedRepository {
     return rows.length;
   }
 
-  /** Count of side quests logged in `[from, to]` (inclusive, ISO dates) — the PRD §4.13 monthly cap's input. */
+  /** Count of side quests logged in `[from, to]` (inclusive, ISO dates), the monthly cap's input. */
   async countInRange(tx: DatabaseTransaction, from: string, to: string): Promise<number> {
     const accountId = this.requireAccountId();
     const [row] = await tx

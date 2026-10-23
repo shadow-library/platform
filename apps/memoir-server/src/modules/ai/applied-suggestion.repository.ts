@@ -6,7 +6,7 @@ import { type AppliedSuggestion, schema } from '@server/database';
 
 @Injectable()
 export class AppliedSuggestionRepository extends OwnerScopedRepository {
-  /** Append-only; `ON CONFLICT DO NOTHING` on `(result_id, suggestion_index)` is the whole replay guard (§28.6 "apply records applied_suggestions exactly once"). */
+  /** Append-only; `ON CONFLICT DO NOTHING` on `(result_id, suggestion_index)` is the whole replay guard. */
   async insertIfAbsent(resultId: bigint, suggestionIndex: number, questId: bigint, questSnapshotBefore: unknown): Promise<AppliedSuggestion.Row | null> {
     const accountId = this.requireAccountId();
     const [row] = await this.db

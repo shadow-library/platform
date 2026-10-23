@@ -4,10 +4,8 @@ import { AppError } from '@shadow-library/common';
 import { type DeltaSource } from './sync.types';
 
 /**
- * The extension seam for `GET /sync/delta`: a module owning a syncable table registers its own
- * `DeltaSource` at init, and the assembler never learns the domain's name or row shape. That is the
- * whole point — the delta payload grows with T-17, T-18, T-23…T-25 without any of them editing
- * `SyncService`, and a domain's projection stays with the module that understands what may be exposed.
+ * The extension seam for `GET /sync/delta`: a module owning a syncable table registers its own `DeltaSource` at init, and the assembler never learns the
+ * domain's name or row shape, so new domains need no edit to `SyncService` and a domain's projection stays with the module that knows what may be exposed.
  */
 @Injectable()
 export class DeltaSourceRegistry {

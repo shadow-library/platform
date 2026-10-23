@@ -13,10 +13,8 @@ const SWEEP_PAGE_SIZE = 50;
 const MS_PER_MINUTE = 60_000;
 
 /**
- * Crash resumability (ARCHITECTURE §21): an account parked in a non-terminal deletion state since
- * before the resume threshold has lost its driver — the process that started it died mid-step, or a
- * purge pass returned short on its batch budget — so the sweep re-enters the machine at whatever state
- * the row records. Every step is idempotent, so re-driving a step that already ran costs nothing.
+ * Crash resumability: an account parked in a non-terminal deletion state past the resume threshold has lost its driver (the process died mid-step, or a purge pass returned short),
+ * so the sweep re-enters the machine at the recorded state. Every step is idempotent, so re-driving one that already ran costs nothing.
  */
 @Injectable()
 export class DeletionSweepService implements OnModuleInit {

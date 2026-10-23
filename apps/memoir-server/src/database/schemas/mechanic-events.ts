@@ -62,7 +62,7 @@ export const rescheduleEvents = pgTable(
   ],
 );
 
-/** `state` is the one mutable column and only while `pending`; `source_quest_name` is a required denormalization so an expired Recovery still reads correctly after the quest is renamed. */
+/** `state` is mutable only while `pending`; `source_quest_name` is denormalized so an expired Recovery still reads correctly after the quest is renamed. */
 export const recoveryQuests = pgTable(
   'recovery_quests',
   {
@@ -87,7 +87,7 @@ export const recoveryQuests = pgTable(
   t => [unique('recovery_quests_account_id_date_unique').on(t.accountId, t.date), index('recovery_quests_state_expires_at_idx').on(t.state, t.expiresAt)],
 );
 
-/** The quest-log references are historical ids, not foreign keys: an owner log deletion must not cascade into this append-only audit (ARCHITECTURE §10.4). */
+/** Quest-log references are historical ids, not foreign keys: an owner log deletion must not cascade into this append-only audit. */
 export const comebackEvents = pgTable(
   'comeback_events',
   {

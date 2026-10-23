@@ -17,16 +17,14 @@ export type GuardrailOutcome =
   | { status: 'blocked'; violations: GuardrailViolation[] };
 
 /**
- * The closed set of things a suggestion may propose (PRD §6.6.4): every member maps onto a field the
- * user can already edit on a Quest by hand. A suggestion outside this set is dropped rather than
- * shipped, so "the AI changed a mechanic" has no representable form to arrive in.
+ * The closed set of things a suggestion may propose; each maps to a field the user can already edit on a Quest. Anything outside it is
+ * dropped, so "the AI changed a mechanic" has no representable form.
  */
 export const ALLOWED_SUGGESTION_KINDS = ['shift_time', 'adjust_duration', 'adjust_strictness', 'adjust_reminder', 'pause_quest', 'split_quest'] as const;
 
 /**
- * PRD §6.6.3 leaves the wording to the implementation — the requirement is a short supportive
- * non-clinical response plus regional crisis resources, and no coaching content attached. Regional
- * numbers rather than one country's, because the product ships to a single global origin.
+ * The crisis handoff wording: a short supportive non-clinical response plus regional crisis resources, with no coaching content attached.
+ * Regional numbers because the product ships to a single global origin.
  */
 export const CRISIS_RESPONSE_ANSWER = [
   "I'm not able to answer this one as a coaching question, and I don't want to.",
@@ -96,7 +94,7 @@ const CRISIS_PATTERNS: RegExp[] = [
   /\b(?:hurt|harm|cut) (?:myself|my self)\b/i,
 ];
 
-/** Output claiming the AI itself changed game state (PRD §6.6.4) — nothing in this path can, so such a claim is a lie to the user, not merely a style problem. */
+/** Output claiming the AI itself changed game state; nothing in this path can, so the claim is a lie to the user, not a style problem. */
 const MECHANIC_MUTATION_PATTERNS: RegExp[] = [
   /\bI(?:'ve| have)? ?(?:already )?(?:updated|changed|adjusted|rescheduled|set|moved|paused|deleted|completed|awarded|granted|unlocked|applied)\b/i,
   /\b(?:I|we) (?:have )?(?:added|removed) (?:\d+ )?(?:xp|coins?|hp|crown)\b/i,
@@ -115,7 +113,7 @@ function draftText(draft: InferenceDraft): string {
 }
 
 /**
- * A verbatim quote is a run of the user's own words reproduced unchanged (PRD §6.6.1). Matching on
+ * A verbatim quote is a run of the user's own words reproduced unchanged. Matching on
  * word shingles rather than whole strings is what makes paraphrase pass and copy-paste fail; a source
  * shorter than the shingle is compared whole, down to a floor below which a "match" would just be a
  * common phrase.
@@ -152,13 +150,10 @@ function isApplicable(suggestion: DraftSuggestion, allowedQuestIds: string[]): b
 }
 
 /**
- * The PRD §6.6 post-filter, release-gated by `tests/ai/guardrails.spec.ts`. Pure by construction: it
- * takes the model's draft and the exact sources the read assembly showed it, and returns what may ship
- * — it reads nothing, writes nothing, and therefore cannot be bypassed by a data path.
- *
- * Crisis is evaluated first and terminates the filter: the handoff answer replaces the draft entirely so
- * no coaching content can ride along with it, and the outcome carries no violation to record, because
- * §6.6.3 forbids marking the event in the user's data at all.
+ * The post-filter, release-gated by `tests/ai/guardrails.spec.ts`. Pure: it takes the model's draft and the exact sources shown to it and
+ * returns what may ship, so no data path can bypass it.
+ * Crisis is evaluated first and terminates the filter: the handoff replaces the draft entirely and the outcome records no violation, because
+ * the event must never be marked in the user's data.
  */
 export function applyGuardrails(input: GuardrailInput): GuardrailOutcome {
   const output = draftText(input.draft);

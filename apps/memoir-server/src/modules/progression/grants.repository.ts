@@ -6,10 +6,9 @@ import { type AchievementId } from '@modules/rules';
 import { type CosmeticUnlock, type DatabaseTransaction, type PrimaryDatabase, schema } from '@server/database';
 
 /**
- * `achievements_earned`/`titles_earned`/`cosmetic_unlocks` are grant-frozen (ARCHITECTURE §10.4: INSERT
- * + SELECT only), so this repository never updates or deletes them — every write is an `onConflictDoNothing`
- * insert against the natural-key `U`, which is what makes every grant idempotent under replay. The one
- * exception is `cosmetic_unlocks.equipped`, the sole mutable column on that table (T-21, `EquipCosmetic`).
+ * `achievements_earned`/`titles_earned`/`cosmetic_unlocks` are grant-frozen (INSERT + SELECT only), so every write is an `onConflictDoNothing`
+ * insert against the natural key, which makes grants idempotent under replay.
+ * The one exception is `cosmetic_unlocks.equipped`, the sole mutable column.
  */
 @Injectable()
 export class GrantsRepository {

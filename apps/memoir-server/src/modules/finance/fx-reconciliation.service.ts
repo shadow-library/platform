@@ -23,15 +23,8 @@ function todayIso(): string {
 }
 
 /**
- * The hourly worker sweep (ARCHITECTURE §14.1) registered on T-22's `SchedulerService`. Two jobs, one
- * tick, both pairs-only against the provider — never account data:
- *
- * 1. Warm today's rate cache for the pairs currently unresolved, so an expense entered today whose rate
- *    was momentarily unavailable resolves without waiting on a dated lookup.
- * 2. For every expense still carrying a null `fx_rate`, price its own pair at its own `occurred_on`
- *    date (historical fidelity — never today's rate, which would misattribute a past purchase's
- *    conversion) and cache that dated rate in `fx_rates` so a later sweep or another expense on the
- *    same date reuses it without a second provider call.
+ * The hourly worker sweep, pairs-only against the provider and never account data: (1) warm today's rate cache for unresolved pairs;
+ * (2) price every expense with a null `fx_rate` at its own `occurred_on` date, never today's rate, and cache it in `fx_rates` so later expenses on that date reuse it.
  */
 @Injectable()
 export class FxReconciliationService implements OnModuleInit {

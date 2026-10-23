@@ -6,17 +6,12 @@ export interface CosmeticDefinition {
   readonly id: string;
   readonly name: string;
   readonly kind: CosmeticKind;
-  /** `null` for an achievement-only cosmetic — PRD §2.9: coins and achievements are the only two acquisition paths, never both for the same item. */
+  /** `null` for an achievement-only cosmetic; coins and achievements are the only two acquisition paths, never both for one item. */
   readonly priceCoins: number | null;
   readonly unlockedByAchievementId?: AchievementId;
 }
 
-/**
- * Reference data, not user data (ADR-0009) — a code-side constant rather than a seeded table, mirroring
- * how `rules/achievement.ts` and `rules/title.ts` hold their own catalogues. Lives in this module, not
- * `rules`, because `rules` is pure and already carries its own purity test; the coin price is a product
- * lever the way rewards are, but the catalogue itself has no rule-evaluation shape to speak of.
- */
+/** Reference data, a code-side constant rather than a seeded table, like `rules/achievement.ts` and `rules/title.ts`. Lives here, not in `rules`, because `rules` is pure. */
 const COSMETIC_CATALOGUE: readonly CosmeticDefinition[] = [
   { id: 'badge_bronze', name: 'Bronze Badge', kind: 'badge', priceCoins: 50 },
   { id: 'badge_silver', name: 'Silver Badge', kind: 'badge', priceCoins: 150 },

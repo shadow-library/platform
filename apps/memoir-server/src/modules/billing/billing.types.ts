@@ -1,4 +1,4 @@
-/** The provider-agnostic vocabulary every adapter normalizes its own event names into (ARCHITECTURE §16.1). */
+/** The provider-agnostic vocabulary every adapter normalizes its own event names into. */
 export type BillingEventType = 'trial.started' | 'subscription.activated' | 'subscription.renewed' | 'subscription.past_due' | 'subscription.cancelled' | 'subscription.expired';
 
 export type CheckoutPlan = 'monthly' | 'yearly';
@@ -25,7 +25,7 @@ export interface NormalizedBillingEvent {
 export interface CheckoutSessionRequest {
   purchaseToken: string;
   plan: CheckoutPlan;
-  /** False once the account has used its one trial (PRD §6.9); the adapter must not offer a trial when it is. */
+  /** False once the account has used its one trial; the adapter must not offer a trial when it is. */
   trial: boolean;
 }
 
@@ -36,10 +36,8 @@ export interface CheckoutSession {
 }
 
 /**
- * The one seam the concrete payment provider lives behind (ARCHITECTURE §16.1): cryptographic
- * verification of an inbound webhook, normalization into a {@link NormalizedBillingEvent}, and
- * creation of a hosted checkout session carrying the account's purchase token. Nothing above this
- * interface knows a provider's wire format, and swapping providers is one new implementation.
+ * The one seam the payment provider lives behind: webhook verification, normalization into a `NormalizedBillingEvent`, and hosted checkout
+ * creation. Swapping providers is one new implementation.
  */
 export abstract class BillingProviderAdapter {
   /** Matches the `{provider}` path segment of the webhook route and is stored on every event and entitlement row. */

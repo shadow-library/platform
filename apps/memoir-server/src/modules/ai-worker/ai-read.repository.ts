@@ -7,9 +7,8 @@ import { type PrimaryDatabase, schema } from '@server/database';
 export type Rows = Record<string, unknown>[];
 
 /**
- * The §15.5 read scope, expressed one class at a time. `includeText` and the health/journal split exist so
- * consent decides what is read, not merely what is readable. Every select names its columns so Hero mirror
- * and receipt columns never reach a prompt.
+ * The AI read scope, one data class at a time. `includeText` and the health/journal split exist so consent decides what is read, not merely what is readable.
+ * Every select names its columns so Hero mirror and receipt columns never reach a prompt.
  */
 @Injectable()
 export class AiReadRepository {
@@ -19,7 +18,7 @@ export class AiReadRepository {
     this.db = databaseService.getPostgresClient();
   }
 
-  /** Free tier reads a trailing window, paid reads everything (PRD §6.4); a null start is the paid case, not "no filter configured". */
+  /** Free tier reads a trailing window, paid everything; a null start is the paid case, not "no filter configured". */
   private window(column: SQL | Parameters<typeof gte>[0], windowStart: string | null): SQL | undefined {
     return windowStart === null ? undefined : gte(column, windowStart);
   }
@@ -100,9 +99,8 @@ export class AiReadRepository {
   }
 
   /**
-   * The compassion-mechanic trail (§15.5's `recovery_quests`, `comeback_events`, `returner_events`,
-   * `shield_consumptions`) plus the earned catalogues, read as one class because they answer one
-   * question — how the account behaved around its breaks.
+   * The compassion-mechanic trail (`recovery_quests`, `comeback_events`, `returner_events`, `shield_consumptions`) plus the earned catalogues,
+   * read as one class: how the account behaved around its breaks.
    */
   async listProgressionEvents(accountId: bigint, windowStart: string | null, includeReflection: boolean): Promise<Rows> {
     const recoveryColumns = {
@@ -149,7 +147,7 @@ export class AiReadRepository {
     ];
   }
 
-  /** `receipt_ref` is absent by grant as well as by selection (§15.5): the worker has no reason to know an image exists. */
+  /** `receipt_ref` is absent by grant as well as by selection: the worker has no reason to know an image exists. */
   async listFinance(accountId: bigint, windowStart: string | null): Promise<Rows> {
     const [expenses, subscriptions] = await Promise.all([
       this.db
@@ -181,8 +179,8 @@ export class AiReadRepository {
   }
 
   /**
-   * Health-flagged metrics are a separate consent class (PRD §6.7, §18), so the split happens in the
-   * query rather than after it — an un-consented health entry is never fetched, not fetched and filtered.
+   * Health-flagged metrics are a separate consent class, so the split happens in the query rather than after it: an un-consented health entry is
+   * never fetched, not fetched and filtered.
    */
   async listMetrics(accountId: bigint, windowStart: string | null, health: boolean): Promise<Rows> {
     const metrics = await this.db
@@ -229,7 +227,7 @@ export class AiReadRepository {
       .where(and(eq(schema.sideQuests.accountId, accountId), this.window(schema.sideQuests.date, windowStart)));
   }
 
-  /** Called only when `journal_reflection_reason` consent is live (PRD §6.7's listed acceptance criterion). */
+  /** Called only when `journal_reflection_reason` consent is live. */
   async listJournal(accountId: bigint, windowStart: string | null): Promise<Rows> {
     return this.db
       .select({ date: schema.journalEntries.date, text: schema.journalEntries.text, mood: schema.journalEntries.mood, tags: schema.journalEntries.tags })

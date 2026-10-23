@@ -3,7 +3,7 @@ import { Injectable, type OnModuleInit } from '@shadow-library/app';
 import { DeltaRepository, DeltaSourceRegistry, type KeysetDeltaSource } from '@modules/sync';
 import { schema } from '@server/database';
 
-/** Registers the four AI delta domains (ARCHITECTURE §10.3): `applied_suggestions` and `ai_task_audit` are not synced — the client never needs its own copy of either (§28.6 covers auditability server-side). */
+/** Registers the four AI delta domains; `applied_suggestions` and `ai_task_audit` are not synced, since the client never needs its own copy. */
 @Injectable()
 export class AiDeltaSources implements OnModuleInit {
   constructor(

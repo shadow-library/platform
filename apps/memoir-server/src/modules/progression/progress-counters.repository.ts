@@ -6,10 +6,8 @@ import { EMPTY_PROGRESS_COUNTERS, type ProgressCounters } from '@modules/rules';
 import { type DatabaseTransaction, type PrimaryDatabase, schema } from '@server/database';
 
 /**
- * The counters this table actually stores — everything `ProgressCounters` needs except the fields
- * already mirrored on `accounts` (`totalXp`, `level`, `stats`) and `reschedulesWithReasonIn90Days`,
- * which is a rolling window computed live off `reschedule_events` rather than an incremental total
- * (ARCHITECTURE §26, T-21 module report).
+ * The counters this table stores: everything `ProgressCounters` needs except fields mirrored on `accounts` (`totalXp`, `level`, `stats`) and
+ * `reschedulesWithReasonIn90Days`, a rolling window computed live off `reschedule_events`.
  */
 type IncrementalCounters = Omit<ProgressCounters, 'totalXp' | 'level' | 'stats' | 'reschedulesWithReasonIn90Days'>;
 
@@ -31,12 +29,11 @@ const EMPTY_INCREMENTAL_COUNTERS: IncrementalCounters = {
   activeDays: EMPTY_PROGRESS_COUNTERS.activeDays,
 };
 
-/** Internal-only bookkeeping alongside the counters that isn't part of the rules catalogue's input shape. */
 interface CountersEnvelope {
   counters: IncrementalCounters;
   /** The most recent calendar date `activeDays` already counted, so a second hold-state completion on the same day is a no-op. */
   lastActiveCountedDate: string | null;
-  /** Set when a Returner ritual fires and cleared by the first quest completion after it — the `returner` title's trigger (PRD §4.8). */
+  /** Set when a Returner ritual fires and cleared by the first quest completion after it; the `returner` title's trigger. */
   returnerPending: boolean;
 }
 
@@ -58,10 +55,9 @@ function normalize(raw: unknown): CountersEnvelope {
 }
 
 /**
- * One row per account (ARCHITECTURE §26's incremental Title/Achievement projection). Every call takes
- * `accountId` explicitly, like `HeroLedger`. Writes and `readForUpdate` also take the caller's command
- * transaction, whose per-account serialization is the only race guard they need; `read` is the lock-free
- * snapshot the `progress_counters` delta domain serves.
+ * One row per account. Every call takes `accountId` explicitly, like `HeroLedger`. Writes and `readForUpdate` also take the caller's command
+ * transaction, whose per-account serialization is the only race guard they need;
+ * `read` is the lock-free snapshot the `progress_counters` delta domain serves.
  */
 @Injectable()
 export class ProgressCountersRepository {
@@ -71,7 +67,7 @@ export class ProgressCountersRepository {
     this.db = databaseService.getPostgresClient();
   }
 
-  /** The one call site outside a command transaction (OCR scanning, ARCHITECTURE §14.3) that still needs to write through this projection. */
+  /** The one call site outside a command transaction (OCR scanning) that still writes through this projection. */
   transaction<T>(operation: (tx: DatabaseTransaction) => Promise<T>): Promise<T> {
     return this.db.transaction(operation);
   }

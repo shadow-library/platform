@@ -9,7 +9,7 @@ import { type AiScheduledQuery } from '@server/database';
 import { AiScheduledQueryRepository } from './ai-scheduled-query.repository';
 import { type AiScheduledQueryUpsertDto } from './ai.dto';
 
-/** Paid-gated end to end (ARCHITECTURE §25: "memoir:account + paid" on both PUT and DELETE) — a lapsed account's existing row is simply never materialized by the worker (§15.7), but managing it still requires the subscription. */
+/** Paid-gated on both PUT and DELETE: a lapsed account's existing row is never materialized by the worker, but managing it still requires the subscription. */
 @Injectable()
 export class AiScheduledQueryService {
   constructor(

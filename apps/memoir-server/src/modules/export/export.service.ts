@@ -21,9 +21,8 @@ export interface ExportJobView {
 const MS_PER_DAY = 86_400_000;
 
 /**
- * ARCHITECTURE §20: the request-path half of account export — `RequestExport` (enqueue, guarded 1/day)
- * and status polling. The assembly itself never runs here; `ExportAssemblerService`'s sweep claims and
- * streams the job. Export is not entitlement-gated (§20) — every account, free or paid, can request one.
+ * The request-path half of account export: `RequestExport` (enqueue, guarded 1/day) and status polling. The assembly never runs here;
+ * `ExportAssemblerService`'s sweep claims and streams the job. Export is not entitlement-gated: every account, free or paid, can request one.
  */
 @Injectable()
 export class ExportService {

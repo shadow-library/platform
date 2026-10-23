@@ -7,10 +7,8 @@ import { APP_NAME } from '@server/constants';
 export type IdentityCloseOutcome = 'closed' | 'unconfigured' | 'unavailable';
 
 /**
- * Step 5's seam (ARCHITECTURE §21.3). A class token rather than a TS interface so DI has something to
- * bind against, mirroring `OcrStructuringClient`. Identity has no hard delete anywhere; `closed` means
- * the identity record reached the soft-close (`anonymize` + `CLOSED` + `revokeAllAccess`) that is the
- * platform's deletion semantic.
+ * Step 5's seam. A class token rather than a TS interface so DI has something to bind. Identity has no hard delete: `closed` means the record
+ * reached the soft-close (`anonymize` + `CLOSED` + `revokeAllAccess`).
  */
 export abstract class IdentityCloseClient {
   abstract isConfigured(): boolean;
@@ -19,12 +17,9 @@ export abstract class IdentityCloseClient {
 }
 
 /**
- * Config-gated M2M close. `identity.close-path` is empty until identity grants this client a
- * machine-side close scope — T-03 shipped `DELETE /api/v1/me`, which is self-service and needs the
- * user's own session, so it is unreachable from here (§21.3 option 1's `users:close` variant is the
- * one that fits). Until then every call reports `unconfigured` and the state machine rests at
- * `data_deleted`, which §21.3 names a legitimate resting state — it never reports a close that did not
- * happen.
+ * Config-gated machine close. `identity.close-path` is empty until identity grants this client a machine-side close scope (`DELETE /api/v1/me`
+ * is self-service and needs the user's own session).
+ * Until then every call reports `unconfigured` and the state machine rests at `data_deleted`; it never reports a close that did not happen.
  */
 @Injectable()
 export class HttpIdentityCloseClient extends IdentityCloseClient {

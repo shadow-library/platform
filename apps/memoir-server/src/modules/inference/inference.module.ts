@@ -5,7 +5,7 @@ import { SynapseClient } from '@shadow-library/synapse';
 
 import { InferenceClient, SynapseInferenceClient } from './inference.client';
 
-/** The model boundary, shared by the AI batch executor (§15.6) and receipt-OCR structuring (§14.3): every call goes to Synapse, which owns provider choice. */
+/** The model boundary shared by the AI batch executor and receipt-OCR structuring: every call goes to Synapse, which owns provider choice. */
 @Module({
   imports: [AuthModule],
   providers: [

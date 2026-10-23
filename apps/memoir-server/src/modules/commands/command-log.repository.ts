@@ -20,10 +20,8 @@ export class CommandLogRepository {
   }
 
   /**
-   * Opens the command's one transaction and serializes the account inside it (ARCHITECTURE §11.2). The
-   * account id is the advisory-lock key directly rather than §11.2's `hashint8` of it: `hashint8` folds
-   * a bigserial into 32 bits, so two accounts could block each other for no reason, while the id itself
-   * is already unique and already a bigint. Daily rollover catch-up takes this same lock.
+   * Opens the command's one transaction and serializes the account inside it. The account id is the advisory-lock key directly, not a `hashint8` of it:
+   * `hashint8` folds a bigserial into 32 bits, so unrelated accounts could block each other. Daily rollover catch-up takes this same lock.
    */
   async runSerialized<T>(accountId: bigint, operation: (tx: DatabaseTransaction) => Promise<T>): Promise<T> {
     return this.db.transaction(async tx => {

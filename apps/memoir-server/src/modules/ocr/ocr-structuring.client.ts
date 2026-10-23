@@ -15,7 +15,7 @@ export interface OcrStructuringRequest {
   plan: InferencePlan;
 }
 
-/** ARCHITECTURE §14.3 step 2's structuring response shape; `lineItems` mirrors the jsonb the client later hands back on `expense.create` (T-25 `lineItems: jsonb`, display-structured, never aggregated relationally). */
+/** The structuring response shape; `lineItems` mirrors the jsonb the client later hands back on `expense.create`, display-structured and never aggregated relationally. */
 export interface OcrStructuringResult {
   amount: string;
   merchant: string | null;
@@ -26,10 +26,8 @@ export interface OcrStructuringResult {
 }
 
 /**
- * The structuring seam (ARCHITECTURE §14.3): a class token, not a TS interface, because interfaces
- * vanish at runtime and DI needs something to bind against (`{ token: OcrStructuringClient, useClass: ... }`,
- * mirroring `apps/identity-server`'s `KeyProvider`/`EnvKeyProvider`). `OcrModule` binds it to
- * `SynapseOcrStructuringClient` (§14.3 step 2); specs swap in the deterministic double below.
+ * The structuring seam: a class token, not a TS interface, so DI has something to bind; `OcrModule` binds `SynapseOcrStructuringClient`, specs
+ * swap in the deterministic double.
  */
 export abstract class OcrStructuringClient {
   abstract parse(request: OcrStructuringRequest): Promise<OcrStructuringResult>;
@@ -38,12 +36,7 @@ export abstract class OcrStructuringClient {
 /** Sentinel `extractedText` that makes {@link DeterministicOcrStructuringClient} throw, so specs can exercise the failed-parse-still-consumes-quota path without a flaky fake. */
 export const OCR_STRUCTURING_FORCED_FAILURE = '__ocr_structuring_forced_failure__';
 
-/**
- * Deterministic double for tests: swapped in for `OcrStructuringClient` via
- * `ShadowFactory.create(TestAppModule, { overrides: [{ token: OcrStructuringClient, useClass: DeterministicOcrStructuringClient }] })`.
- * Same input always produces the same output — no randomness, no network — and {@link OCR_STRUCTURING_FORCED_FAILURE}
- * lets a spec simulate a structuring failure deterministically.
- */
+/** Deterministic double for tests: the same input always produces the same output, and `OCR_STRUCTURING_FORCED_FAILURE` lets a spec simulate a structuring failure. */
 @Injectable()
 export class DeterministicOcrStructuringClient extends OcrStructuringClient {
   async parse({ extractedText }: OcrStructuringRequest): Promise<OcrStructuringResult> {

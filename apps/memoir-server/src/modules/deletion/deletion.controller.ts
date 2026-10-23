@@ -7,12 +7,9 @@ import { DeletionStatusDto } from './deletion.dto';
 import { DeletionService } from './deletion.service';
 
 /**
- * The one destructive surface (ARCHITECTURE §4.4, §21). `@RequireElevation()` and
- * `@RequireScope('memoir:destructive')` merge into one route metadata entry, so an `AAL1` caller is
- * answered `IAM_003` (browser: bounced through step-up by the SDK) and a caller without the sensitive
- * scope is refused outright. `@AllowDuringDeletion()` exempts only this controller from the `ACC_002`
- * refusal the marker imposes everywhere else — a started deletion still has to be observable, and a
- * repeat start has to answer with the state already in flight.
+ * The one destructive surface. `@RequireElevation()` and `@RequireScope('memoir:destructive')` merge into one route metadata entry: an `AAL1`
+ * caller gets `IAM_003`, a caller without the scope is refused.
+ * `@AllowDuringDeletion()` exempts only this controller from `ACC_002`, so a started deletion stays observable and a repeat start answers with the state in flight.
  */
 @HttpController('/api/v1/account/deletion')
 @RequireElevation()

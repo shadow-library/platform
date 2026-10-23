@@ -12,13 +12,9 @@ interface DeltaFetchContext {
   limit: number;
 }
 
-/**
- * A domain backed by a table carrying `sync_seq`: keyset-paged, and the only kind that moves the cursor.
- */
 export interface KeysetDeltaSource {
   domain: string;
   kind: 'keyset';
-  /** Rows with `sync_seq > since` for the requesting account, ascending by `sync_seq`, at most `limit` of them. */
   fetch(context: DeltaFetchContext): Promise<DeltaRecord[]>;
 }
 

@@ -9,7 +9,7 @@ export interface EntryCapAdvisory {
   ratio: number;
   level: EntryCapLevel;
   message: string | null;
-  /** Structural, not incidental (PRD §4.13): the cap is advisory, so no caller can read a blocking value here. */
+  /** Structural, not incidental: the cap is advisory, so no caller can read a blocking value here. */
   blocksSave: false;
 }
 
@@ -25,9 +25,8 @@ const MODULE_NOUNS: Record<LoggableModule, string> = {
 };
 
 /**
- * The PRD §4.13 soft-cap read: 100 entries/module/calendar month, user-local, never blocking. `used`
- * counts every entry logged this month, the just-written one included, so the caller's own write always
- * shows up in its own advisory.
+ * The soft-cap read: 100 entries/module/calendar month, user-local, never blocking. `used` counts every entry this month including the
+ * just-written one, so the caller's own write shows in its own advisory.
  */
 export function deriveCapAdvisory(module: LoggableModule, used: number, limit: number = MONTHLY_ENTRY_CAP): EntryCapAdvisory {
   const ratio = limit > 0 ? used / limit : 0;

@@ -44,9 +44,8 @@ function requireNumberString(payload: Record<string, unknown>, field: string): s
 }
 
 /**
- * Registers the metric CRUD + `RegisterMetricEntry` command handlers (ARCHITECTURE §18, §10.3) and the
- * threshold-offer computation that rides along with a health entry's registration — never a separate
- * command, since an offer is a read derived from the write that just happened, not a mutation of its own.
+ * Registers the metric CRUD and `RegisterMetricEntry` handlers; the threshold offer rides along with a health entry's registration
+ * because it is a read derived from that write, not a command of its own.
  */
 @Injectable()
 export class MetricsCommandsService implements OnModuleInit {
@@ -99,10 +98,8 @@ export class MetricsCommandsService implements OnModuleInit {
   }
 
   /**
-   * Delete warns/detaches per PRD S6: a metric still declared on some quest's `quest_consequences` is
-   * not silently deactivated — the caller must pass `detach: true` to acknowledge unlinking those
-   * quests. Detaching removes the consequence rows (the quest no longer writes this metric on
-   * completion) and then deactivates the metric; `metric_entries` history is never touched either way.
+   * Delete requires `detach: true` while a quest's `quest_consequences` still declare the metric: detaching removes those rows, then deactivates the metric.
+   * `metric_entries` history is never touched.
    */
   private async deleteMetric({ accountId, envelope, tx }: CommandContext): Promise<CommandResult> {
     const payload = envelope.payload;

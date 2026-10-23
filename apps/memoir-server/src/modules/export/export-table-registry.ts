@@ -4,11 +4,9 @@ import { type OwnedTable } from '@modules/auth';
 import { schema } from '@server/database';
 
 /**
- * One entry per user-owned table the export assembler streams (ARCHITECTURE §20). `cursor` is a column
- * that, once scoped to one account, is both unique and totally orderable — `id` for every table that has
- * one, and the other half of a composite natural key (`date`, `questId`, `ref`, or `accountId` itself for
- * a one-row-per-account table) everywhere else — so a single generic keyset paginator (`export-assembler
- * .service.ts -> paginateTable`) works unmodified across every shape in the catalogue.
+ * One entry per user-owned table the export assembler streams. `cursor` is a column that, scoped to one account, is unique and totally
+ * orderable (`id`, the other half of a composite natural key, or `accountId` for one-row-per-account tables),
+ * so one generic keyset paginator works across the catalogue.
  */
 export interface ExportTableEntry {
   key: string;
@@ -54,16 +52,13 @@ export const EXPORT_TABLE_REGISTRY: readonly ExportTableEntry[] = [
   { key: 'ai_scheduled_queries', table: schema.aiScheduledQueries, cursor: schema.aiScheduledQueries.accountId, cursorKey: 'accountId' },
   { key: 'ai_consents', table: schema.aiConsents, cursor: schema.aiConsents.dataClass, cursorKey: 'dataClass' },
   { key: 'applied_suggestions', table: schema.appliedSuggestions, cursor: schema.appliedSuggestions.id, cursorKey: 'id' },
-  /** Worker bookkeeping (data-class names + row counts, never content, §24) rather than user-authored content — included anyway per PRD §2.10's "owner gets everything" posture. */
+  /** Worker bookkeeping (data-class names and row counts, never content), included because the owner gets everything. */
   { key: 'ai_task_audit', table: schema.aiTaskAudit, cursor: schema.aiTaskAudit.id, cursorKey: 'id' },
 ];
 
 /**
- * Every schema-barrel table the registry above deliberately omits, with why — read by the completeness
- * test (`tests/export/export-completeness.spec.ts`), which otherwise fails on any table neither listed
- * nor excluded here. `accounts` itself is excluded from this map because the assembler reads it directly
- * as the export's `account` snapshot section rather than through the generic table loop (its own `id`
- * column is the account, not an `account_id` foreign key, so it does not fit `OwnedTable`).
+ * Every schema-barrel table the registry omits, with why; the completeness test (`tests/export/export-completeness.spec.ts`) fails on any table neither listed nor excluded.
+ * `accounts` is read directly as the export's `account` section, since its `id` is the account rather than an `account_id` foreign key.
  */
 export const EXPORT_TABLE_EXCLUSIONS: Readonly<Record<string, string>> = {
   fx_rates: 'global market data — no account_id, not account-owned',

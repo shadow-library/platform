@@ -176,7 +176,7 @@ const firstInstantAtOrAfterWall = (low: number, high: number, wallMillis: number
   return lower;
 };
 
-/** Spring-forward policy (ARCHITECTURE §12.5): a wall time swallowed by the gap resolves to the first instant at or after it, i.e. the transition itself. */
+/** Spring-forward policy: a wall time swallowed by the gap resolves to the first instant at or after it, i.e. the transition itself. */
 export const instantAtLocalMinute = (date: LocalDate, minuteOfDay: number, timeZone: TimeZone): ResolvedLocalMinute => {
   const wallMillis = epochDayOf(date) * MS_PER_DAY + minuteOfDay * MS_PER_MINUTE;
   const before = wallMillis - offsetMinutesAt(wallMillis - MS_PER_DAY, timeZone) * MS_PER_MINUTE;

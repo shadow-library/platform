@@ -20,11 +20,7 @@ function toDeltaRow(device: Device.Row): DeltaRow {
   };
 }
 
-/**
- * The push-token registry (§25). It registers its own delta domain rather than being wired into the
- * sync assembler — the projection below drops `push_subscription`, which the account's other devices
- * have no reason to hold, and only this module knows that.
- */
+/** The push-token registry. It registers its own delta domain because the projection drops `push_subscription`, which the account's other devices have no reason to hold. */
 @Injectable()
 export class DeviceService implements OnModuleInit {
   constructor(

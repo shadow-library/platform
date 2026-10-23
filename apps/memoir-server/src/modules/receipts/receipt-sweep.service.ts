@@ -16,13 +16,8 @@ const ACCOUNT_PAGE_SIZE = 500;
 const MS_PER_MINUTE = 60_000;
 
 /**
- * The two orphan sweeps ARCHITECTURE §19.2 requires, registered on T-22's `SchedulerService`:
- *
- * (a) a `pending_upload` row older than `storage.orphan-sweep.pending-upload-max-age-minutes` never got
- *     confirmed — its object (if the client never PUT, there is none) and its row are both deleted.
- * (b) a weekly belt sweep: for every account, list its `r/{account_id}/` prefix and delete any object
- *     with no matching `receipts` row — the backstop for a cascade whose object delete failed (§19.2
- *     Lifecycle) or any other interrupted flow.
+ * Two orphan sweeps: (a) a `pending_upload` row older than `storage.orphan-sweep.pending-upload-max-age-minutes` never got confirmed, so its object (if any) and row are deleted;
+ * (b) weekly, delete objects under each account's `r/{account_id}/` prefix with no `receipts` row (backstop for a failed cascade delete).
  */
 @Injectable()
 export class ReceiptSweepService implements OnModuleInit {

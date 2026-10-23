@@ -16,11 +16,7 @@ const PULSE_SERVICE = 'pulse-server';
 const PULSE_RESOURCE = 'api://pulse';
 const PULSE_SCOPE = 'notifications:send';
 
-/**
- * The seam between the outbox drain loop and pulse (ARCHITECTURE §4.5, §17). A class token — not a TS
- * interface — so DI has something to bind against and tests can substitute a fake transport that
- * records calls without a real pulse deployment, mirroring `IdentityCloseClient` (T-30).
- */
+/** The seam between the outbox drain loop and pulse. A class token so DI has something to bind and tests can substitute a fake transport that records calls. */
 export abstract class PulseTransport {
   abstract send(request: PulseNotificationRequest): Promise<PulseSendOutcome>;
 }

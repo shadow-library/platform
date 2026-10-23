@@ -31,7 +31,7 @@ export const accounts = pgTable(
     defaultCurrency: char('default_currency', { length: 3 }).notNull(),
     enabledCurrencies: char('enabled_currencies', { length: 3 }).array().notNull(),
     timezone: text('timezone').notNull(),
-    /** Staged by T-17's `PATCH /account`; applied and cleared by T-19's rollover at the start of "today" prep (ARCHITECTURE §12.5, §13.2) — a change is never live mid-day and never reopens a closed day. */
+    /** Staged by `PATCH /account`; applied and cleared by rollover at the start of "today" prep, so a change is never live mid-day and never reopens a closed day. */
     pendingTimezone: text('pending_timezone'),
     scheduleStartMin: smallint('schedule_start_min').notNull().default(360),
     scheduleEndMin: smallint('schedule_end_min').notNull().default(1380),
@@ -41,7 +41,7 @@ export const accounts = pgTable(
     /** Same deferred-apply contract as {@link pendingTimezone}, for intensity mode. */
     pendingIntensityMode: intensityMode('pending_intensity_mode'),
     returnerThresholdDays: integer('returner_threshold_days').notNull().default(7),
-    /** A Returner shield with no pre-absence Quest to target (PRD §4.6/O-6); consumed the next time the owner creates a Quest. */
+    /** A Returner shield with no pre-absence Quest to target; consumed the next time the owner creates a Quest. */
     pendingReturnerShields: smallint('pending_returner_shields').notNull().default(0),
     monthlyBudgetMinor: bigint('monthly_budget_minor', { mode: 'number' }),
 
@@ -71,7 +71,7 @@ export const accounts = pgTable(
     ocrQuotaCount: smallint('ocr_quota_count').notNull().default(0),
     notificationPrefs: jsonb('notification_prefs').notNull().default({}),
 
-    /** The opaque handle the hosted checkout session carries as client reference and the provider echoes on every webhook (ARCHITECTURE §16.2) — server-minted, never the identity sub. */
+    /** The opaque handle the hosted checkout session carries as client reference and the provider echoes on every webhook; server-minted, never the identity sub. */
     purchaseToken: uuid('purchase_token').notNull().defaultRandom(),
 
     onboardingCompletedAt: timestamp('onboarding_completed_at', { withTimezone: true }),

@@ -24,7 +24,7 @@ interface DownloadIssued {
 
 const PRESIGN_EXPIRES_SECONDS = 900;
 
-/** ARCHITECTURE §19.2: content-type allowlist and its ref extension, independent of `packages/modules`' content-addressed extension map. */
+/** Content-type allowlist and its ref extension, independent of `packages/modules`' content-addressed extension map. */
 const ALLOWED_CONTENT_TYPES: Record<string, string> = {
   'image/jpeg': 'jpg',
   'image/png': 'png',
@@ -32,11 +32,7 @@ const ALLOWED_CONTENT_TYPES: Record<string, string> = {
   'image/heic': 'heic',
 };
 
-/**
- * The presign upload/confirm/download flow (ARCHITECTURE §19.2, ADR-0008). Every read/write is owner-
- * scoped through `ReceiptRepository`, so a foreign ref reads exactly like a nonexistent one — the
- * cross-user 404 the accept criteria call for falls out of that scoping rather than a bespoke check here.
- */
+/** Presign upload/confirm/download flow. Every read/write is owner-scoped through `ReceiptRepository`, so a foreign ref reads exactly like a nonexistent one. */
 @Injectable()
 export class ReceiptService {
   private readonly logger = Logger.getLogger(APP_NAME, ReceiptService.name);
@@ -64,8 +60,8 @@ export class ReceiptService {
   }
 
   /**
-   * Idempotent: a re-confirm of an already-`stored` receipt just returns it. `stat` is the HEAD verify
-   * (§19.2) — an oversize or wrong-type upload is deleted here rather than left `pending_upload` forever.
+   * Idempotent: re-confirming a `stored` receipt returns it. `stat` is the HEAD verify; an oversize or wrong-type upload is deleted here rather
+   * than left `pending_upload` forever.
    */
   async confirm(ref: string): Promise<Receipt.Row> {
     const receipt = await this.receiptRepository.findByRef(ref);
@@ -97,9 +93,8 @@ export class ReceiptService {
   }
 
   /**
-   * The expense-deletion cascade (ARCHITECTURE §19.2 Lifecycle): the receipt row is removed in the same
-   * transaction as the expense row, but the object delete is best-effort — a storage fault here must
-   * never fail the expense-deletion command, since the object-orphan sweep is the backstop.
+   * Expense-deletion cascade: the receipt row goes in the expense's transaction, but the object delete is best-effort, since the object-orphan
+   * sweep is the backstop for a storage fault.
    */
   async deleteForExpense(tx: DatabaseTransaction, ref: string): Promise<void> {
     const removed = await this.receiptRepository.removeInTx(tx, ref);

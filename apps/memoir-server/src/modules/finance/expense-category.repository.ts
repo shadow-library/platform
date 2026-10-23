@@ -9,7 +9,7 @@ interface BuiltinCategory {
   label: string;
 }
 
-/** The 9 fixed categories (PRD §2.5); user-scoped rows rather than a code constant so a later product change to custom categories needs no migration (ARCHITECTURE §10.3 O-5). */
+/** The 9 fixed categories, as user-scoped rows rather than a code constant so a later move to custom categories needs no migration. */
 const BUILTIN_CATEGORIES: readonly BuiltinCategory[] = [
   { key: 'food', label: 'Food' },
   { key: 'groceries', label: 'Groceries' },
@@ -40,11 +40,8 @@ export class ExpenseCategoryRepository extends OwnerScopedRepository {
   }
 
   /**
-   * Called at the top of every finance command (idempotent, U-converged): a single multi-row INSERT with
-   * `ON CONFLICT DO NOTHING` against `expense_categories_account_id_key_unique` — the account's first
-   * finance touch seeds all 9 rows, and every touch after that finds them already there. Two concurrent
-   * first touches from different devices both issue this insert; Postgres's unique index resolves the
-   * race, so neither observes a partial seed.
+   * Called at the top of every finance command: one multi-row `ON CONFLICT DO NOTHING` insert against `expense_categories_account_id_key_unique`.
+   * The first touch seeds all 9 rows; concurrent first touches from different devices are resolved by the unique index, so neither observes a partial seed.
    */
   async ensureSeeded(tx: DatabaseTransaction, accountId: bigint): Promise<void> {
     await tx

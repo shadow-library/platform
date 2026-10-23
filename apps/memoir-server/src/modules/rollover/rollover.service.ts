@@ -76,11 +76,9 @@ const isHold = (state: QuestLog.State): boolean => HOLD_STATES.includes(state);
 const isBreak = (state: QuestLog.State): boolean => BREAK_STATES.includes(state);
 
 /**
- * The day-closing engine of ARCHITECTURE §13. One transaction per elapsed day — bounded work.
- * `accounts.last_hp_date` names the last day the walk touched, closed or merely prepared as today, so
- * the walk resumes at that day while its `daily_states.rollover_at` is unset and at the day after once
- * it is. Idempotence rests on that marker plus the natural key behind every write the day performs, so
- * re-running a closed day is a no-op twice over.
+ * The day-closing engine: one transaction per elapsed day. `accounts.last_hp_date` names the last day the walk touched; the walk resumes at it
+ * while its `daily_states.rollover_at` is unset, else at the day after.
+ * Idempotence rests on that marker plus the natural key behind every write the day performs.
  */
 @Injectable()
 export class RolloverService implements OnModuleInit {
@@ -98,7 +96,6 @@ export class RolloverService implements OnModuleInit {
     private readonly scheduler: SchedulerService,
   ) {}
 
-  /** `daily_states` moves here from the sync spine, which held its delta source only until this — its owning — module existed (T-16's note). */
   onModuleInit(): void {
     this.gate.register(accountId => this.ensureCurrent(accountId));
     this.scheduler.registerGauge(FAILURE_GAUGE, () => this.failedAccounts.size);
@@ -111,10 +108,8 @@ export class RolloverService implements OnModuleInit {
   }
 
   /**
-   * The lazy entry point (§13.1). Quiet to the user and loud to the operator per §13.3: a failed day
-   * aborts its own transaction, stops the walk where it failed, and is reported through `rollover_failed`
-   * — the caller's command or delta pull still proceeds, against a state whose last day is honestly
-   * still open rather than falsely closed.
+   * The lazy entry point. A failed day aborts its own transaction, stops the walk there and is reported through `rollover_failed`;
+   * the caller's command or delta pull still proceeds against a state whose last day is honestly still open.
    */
   async ensureCurrent(accountId: bigint): Promise<void> {
     try {
@@ -173,9 +168,8 @@ export class RolloverService implements OnModuleInit {
   }
 
   /**
-   * §13.3's catch-up bound: days older than `rollover.catchup-max-days` are never terminalized, so an
-   * absence of any length costs a fixed amount of work. The walk skips straight to the bound's first day,
-   * which then opens at full HP because the day before it was never closed and carries no `hp_end`.
+   * Days older than `rollover.catchup-max-days` are never terminalized, so an absence of any length costs fixed work. The walk skips to the bound's first day,
+   * which opens at full HP because the day before it was never closed and carries no `hp_end`.
    */
   private async nextDay(tx: DatabaseTransaction, accountId: bigint, lastHpDate: LocalDate | null, today: LocalDate): Promise<LocalDate> {
     if (lastHpDate === null) return today;
@@ -184,10 +178,6 @@ export class RolloverService implements OnModuleInit {
     const last = await this.repository.findDailyState(tx, accountId, formatLocalDate(lastHpDate));
     return last?.rolloverAt ? addDays(lastHpDate, 1) : lastHpDate;
   }
-
-  /*!
-   * Closing an elapsed day (§13.2, PRD §4.10 steps 1-7)
-   */
 
   private async closeDay(tx: DatabaseTransaction, context: DayContext): Promise<void> {
     const { account, date } = context;
@@ -246,7 +236,7 @@ export class RolloverService implements OnModuleInit {
     await this.repository.updateAccount(tx, account.id, { lastHpDate: date, ...(lastActiveDate ? { lastActiveDate } : {}) });
   }
 
-  /** PRD §4.7 #15: a locked day is "fully cleared" when the lock survived the day unbroken and every Quest it named ended in a hold state. */
+  /** A locked day is "fully cleared" when the lock survived the day unbroken and every Quest it named ended in a hold state. */
   private lockedDayCleared(existing: DailyState.Row | null, resolved: Map<bigint, QuestLog.Row>): boolean {
     if (!existing || existing.committedAt === null || existing.lockBrokenAt !== null || existing.lockedQuestIds.length === 0) return false;
     return existing.lockedQuestIds.every(questId => {
@@ -255,7 +245,10 @@ export class RolloverService implements OnModuleInit {
     });
   }
 
-  /** Recovery-strictness quests are excluded here rather than filtered later: a Recovery that lapses expires silently, and a missed Recovery must never be able to spawn another (PRD Invariant 6). */
+  /**
+   * Recovery-strictness quests are excluded here rather than filtered later: a Recovery that lapses expires silently, and a missed Recovery must
+   * never be able to spawn another.
+   */
   private scheduledOn(quests: Quest.Row[], day: LocalDate): Quest.Row[] {
     return quests.filter(quest => quest.strictness !== 'recovery' && occursOn(quest.recurrence as RecurrenceRule, day));
   }
@@ -298,11 +291,7 @@ export class RolloverService implements OnModuleInit {
     return inserted;
   }
 
-  /**
-   * §13.2's "costs never double-count": every break of the day is charged through one `occurrenceKey`
-   * per (quest, date), so a miss the engine wrote and the break it represents collapse into a single
-   * deduction rather than two.
-   */
+  /** Every break of the day is charged through one `occurrenceKey` per (quest, date), so an engine-written miss and the break it represents collapse into a single deduction. */
   private async computeHp(tx: DatabaseTransaction, context: DayContext, dayLogs: QuestLog.Row[]): Promise<{ hpStart: number; hpEnd: number; hpMax: number }> {
     const { account, day, date } = context;
     const previous = await this.repository.findDailyState(tx, account.id, formatLocalDate(addDays(day, -1)));
@@ -323,9 +312,8 @@ export class RolloverService implements OnModuleInit {
   }
 
   /**
-   * Crown is endowed per day from the day's own scheduled weight and forfeited slice by slice; under the
-   * weekly cadence the daily remainders accumulate and bank once, on the period's closing day, keyed
-   * `crownbanked_{periodStart}` so a re-close can never bank twice (§11.3, PRD §4.4).
+   * Crown is endowed per day from the day's scheduled weight and forfeited slice by slice; under the weekly cadence the remainders bank once on the period's closing day,
+   * keyed `crownbanked_{periodStart}` so a re-close can never bank twice.
    */
   private async settleCrown(tx: DatabaseTransaction, context: DayContext, scheduled: Quest.Row[], dayLogs: QuestLog.Row[]): Promise<CrownDayOutcome> {
     const { ruleset, account, day, date } = context;
@@ -366,10 +354,6 @@ export class RolloverService implements OnModuleInit {
     const prior = priorDays.reduce((total, state) => ({ xp: total.xp + state.crownXpRemaining, coins: total.coins + state.crownCoinsRemaining }), { xp: 0, coins: 0 });
     return { xp: prior.xp + crownDay.remainingXp, coins: prior.coins + crownDay.remainingCoins };
   }
-
-  /*!
-   * Preparing today (§13.2's second phase, PRD §4.10's "then, for today")
-   */
 
   private async prepareToday(tx: DatabaseTransaction, context: DayContext): Promise<void> {
     const promoted = this.inNewZone(await this.promotePending(tx, context));
@@ -427,9 +411,8 @@ export class RolloverService implements OnModuleInit {
   }
 
   /**
-   * §12.5's deferred-apply contract: a staged timezone or intensity change lands here, after every
-   * elapsed day has closed under the settings it was actually lived under, and before any of today's
-   * state is derived. Ordering is the whole guarantee — promoting earlier would re-date closed days.
+   * A staged timezone or intensity change is promoted here: after every elapsed day has closed under the settings it was lived under, and before any of today's state is derived.
+   * Promoting earlier would re-date closed days.
    */
   private async promotePending(tx: DatabaseTransaction, context: DayContext): Promise<DayContext> {
     const { account } = context;
@@ -508,9 +491,8 @@ export class RolloverService implements OnModuleInit {
   }
 
   /**
-   * PRD §4.6: the target is chosen on the run each Quest carried *before* the absence, which the walk
-   * has by now broken — so the run is recounted backwards from the last active date rather than read off
-   * the (already reset) `quest_streaks` projection.
+   * The Returner target is chosen on the run each Quest carried before the absence, which the walk has already broken, so the run is recounted
+   * backwards from the last active date rather than read off the reset `quest_streaks`.
    */
   private async returnerCandidates(
     tx: DatabaseTransaction,
@@ -557,7 +539,7 @@ export class RolloverService implements OnModuleInit {
     return true;
   }
 
-  /** `recovery_quests (account, date)` is the one-per-day cap (PRD §3.6); the spawn is announced to `hero_events` only when the insert actually landed, so a replay grants nothing. */
+  /** `recovery_quests (account, date)` is the one-per-day cap ; the spawn is announced to `hero_events` only when the insert actually landed, so a replay grants nothing. */
   private async spawnRecovery(tx: DatabaseTransaction, context: DayContext, quests: Quest.Row[], history: QuestLog.Row[], returnerFired: boolean): Promise<void> {
     const { ruleset, account, day, date } = context;
     const yesterday = formatLocalDate(addDays(day, -1));

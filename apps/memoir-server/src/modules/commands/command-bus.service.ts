@@ -9,15 +9,9 @@ import { type CommandEnvelope, type CommandHandler, type CommandOutcome } from '
 import { RolloverGate } from './rollover-gate';
 
 /**
- * Every Hero-affecting write enters here (ARCHITECTURE §9.3, §11.2). One command is one transaction:
- * serialize the account, claim the client's command id, dispatch, record the response snapshot — so a
- * replay of a committed command reads its recorded body back instead of running the handler twice, and
- * a failed command leaves the claim behind with it.
- *
- * The account is an explicit argument, never read from the envelope: request-scoped callers pass the
- * one `AccountContext` resolved, and system commands pass the account they were scheduled for.
- *
- * The handler registry is populated at module init from code, so it is identical in every replica.
+ * Every Hero-affecting write enters here. One command is one transaction: serialize the account, claim the client's command id, dispatch, record the response snapshot,
+ * so a replay of a committed command reads its recorded body back and a failed command leaves the claim behind with it.
+ * The account is an explicit argument, never read from the envelope. The handler registry is populated at module init from code, so it is identical in every replica.
  */
 @Injectable()
 export class CommandBus {
@@ -42,7 +36,7 @@ export class CommandBus {
     const handler = this.handlers.get(envelope.type);
     if (!handler) throw AppErrorCode.CMD_001.create({ type: envelope.type });
 
-    /** §13.1: elapsed days close before the command applies, in their own transactions ahead of this one — a 90-day walk cannot be nested inside a command's tx and still be resumable. */
+    /** Elapsed days close in their own transactions ahead of the command's: a 90-day walk cannot nest inside it and stay resumable. */
     await this.rolloverGate.ensureCurrent(accountId);
 
     try {

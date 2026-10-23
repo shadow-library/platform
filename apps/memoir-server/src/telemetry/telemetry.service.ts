@@ -6,11 +6,7 @@ import { APP_NAME } from '@server/constants';
 import { type TelemetryEvent } from './events';
 import { assertTelemetryPseudoIdSecret } from './pseudo-id';
 
-/**
- * The single emitter for the closed analytics taxonomy (ARCHITECTURE §23–24). `TelemetryEvent`'s payload
- * types make a free-text field unrepresentable, so this service needs no field-level scrubbing of its
- * own — it only has to log what it was handed, structurally.
- */
+/** The single emitter for the closed analytics taxonomy; `TelemetryEvent` payload types make free text unrepresentable, so it only logs what it is handed. */
 @Injectable()
 export class TelemetryService implements OnModuleInit {
   private readonly logger = Logger.getLogger(APP_NAME, TelemetryService.name);

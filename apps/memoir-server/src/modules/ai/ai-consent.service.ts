@@ -15,11 +15,7 @@ export interface AiConsentView {
 
 const CONSENT_DATA_CLASSES: AiConsent.DataClass[] = ['journal_reflection_reason', 'health'];
 
-/**
- * A class absent from the account's `ai_consents` rows has never been granted (PRD §6.7): the view
- * always carries every known class, synthesizing the ungranted state rather than letting the client
- * infer "no row" as "granted".
- */
+/** A class with no `ai_consents` row has never been granted: the view synthesizes the ungranted state so the client can't read "no row" as granted. */
 @Injectable()
 export class AiConsentService {
   constructor(private readonly consentRepository: AiConsentRepository) {}

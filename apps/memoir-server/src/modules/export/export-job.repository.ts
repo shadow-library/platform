@@ -24,10 +24,8 @@ export class ExportJobRepository extends OwnerScopedRepository {
   }
 
   /**
-   * The assembler sweep's claim (ARCHITECTURE §20): `FOR UPDATE SKIP LOCKED` lets N replicas each grab a
-   * disjoint batch of `pending` jobs concurrently rather than serializing on the row lock, which is what
-   * makes this safe ahead of the worker split (ADR-0002) with zero code change later. Marking `running`
-   * inside the same transaction that took the lock is what makes a claim exclusive.
+   * The assembler sweep's claim: `FOR UPDATE SKIP LOCKED` lets N replicas each grab a disjoint batch of `pending` jobs without serializing on the row lock.
+   * Marking `running` inside the same transaction that took the lock makes the claim exclusive.
    */
   async claimPending(limit: number): Promise<ExportJob.Row[]> {
     return this.db.transaction(async tx => {
@@ -60,7 +58,7 @@ export class ExportJobRepository extends OwnerScopedRepository {
       .where(eq(schema.exportJobs.id, id));
   }
 
-  /** The 7-day cleanup sweep's candidate set (ARCHITECTURE §20): every `done` job past its `expiresAt`. */
+  /** The 7-day cleanup sweep's candidate set: every `done` job past its `expiresAt`. */
   async findExpired(now: Date, limit: number): Promise<ExportJob.Row[]> {
     return this.db
       .select()

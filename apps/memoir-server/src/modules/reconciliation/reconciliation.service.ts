@@ -21,15 +21,10 @@ const DETAIL_LOG_CAP = 20;
 const MS_PER_DAY = 86_400_000;
 
 /**
- * ARCHITECTURE §11.4/§26/§30: three independent weekly sweeps, all read-only against the mirrors they
- * check — a detected drift or divergence is an alert, never a write. `hero_events`/`quest_logs` stay the
- * authoritative recomputation source; nothing here ever repairs `accounts`/`quest_streaks` in place.
- *
- * `logMetric`'s `value` field is unreadable in the shipped log stream — `manifestLogRedactionFormat`
- * redacts any top-level `value` key to defend `metric_entries.value` (T-23's numeric health data), and
- * that redaction is name-based, not call-site-aware (`tests/privacy/canary.spec.ts`'s formatter-level
- * case). Every alert here is therefore occurrence-based (the line is only emitted when there's something
- * to page on) rather than a `value > N` comparison.
+ * Three independent weekly sweeps, all read-only: a detected drift is an alert, never a write. `hero_events`/`quest_logs` stay the
+ * authoritative source; nothing repairs `accounts`/`quest_streaks` in place.
+ * `logMetric`'s `value` is redacted in shipped logs (`manifestLogRedactionFormat` redacts any top-level `value` key by name), so every alert
+ * is occurrence-based, not a `value > N` comparison.
  */
 @Injectable()
 export class ReconciliationService implements OnModuleInit {
@@ -47,10 +42,7 @@ export class ReconciliationService implements OnModuleInit {
     this.scheduler.registerSweep(PRUNE_SWEEP, cadenceMs, () => this.runCommandLogPrune());
   }
 
-  /**
-   * §11.4's weekly mirror check plus the wedged-rollover surface (T-19's note): both read `accounts`
-   * fleet-wide, so they share one sweep tick rather than two passes over the same table.
-   */
+  /** The weekly mirror check and the wedged-rollover surface both read `accounts` fleet-wide, so they share one sweep tick. */
   async runDriftSweep(): Promise<void> {
     const ruleset = currentRuleset();
     const rows = await this.repository.listAccountMirrors();
@@ -78,7 +70,6 @@ export class ReconciliationService implements OnModuleInit {
     }
   }
 
-  /** Every mismatch this account carries, named for the alert line rather than left as a boolean — the operator's first triage question is always "which field". */
   private mismatchedFields(ruleset: ReturnType<typeof currentRuleset>, row: AccountMirrorRow): string[] {
     const fields: string[] = [];
     if (row.totalXp !== row.sumXp) fields.push('total_xp');
@@ -92,13 +83,9 @@ export class ReconciliationService implements OnModuleInit {
   }
 
   /**
-   * §26's "pure rebuild function in `rules` + weekly reconciliation compare-and-alert" for
-   * `quest_streaks`: a random sample is rebuilt from `quest_logs` history via `recomputeStreak` and
-   * compared to the live projection. `intensityModeAtLog`/`strictness` come off each log row rather than
-   * the quest's current settings, so a later edit to the quest never manufactures a false divergence;
-   * `optionalStreakOptIn` has no per-log snapshot and is read at its current value — a quest whose
-   * opt-in flag changed after some of its history could show a stale-flag false positive, a known
-   * narrower gap than the alternative of rebuilding against nothing at all.
+   * Rebuilds a random sample of `quest_streaks` from `quest_logs` via `recomputeStreak` and compares it to the live projection.
+   * `intensityModeAtLog`/`strictness` come from each log row, so later quest edits cause no false divergence;
+   * `optionalStreakOptIn` has no per-log snapshot and is read at its current value, so a changed opt-in can yield a stale-flag false positive.
    */
   async runStreakSampleSweep(): Promise<void> {
     const ruleset = currentRuleset();
@@ -135,10 +122,8 @@ export class ReconciliationService implements OnModuleInit {
   }
 
   /**
-   * §11.3: `command_log` beyond retention carries no correctness weight — every grant key is
-   * deterministic, so a pruned-and-replayed command still converges through `hero_events`' own
-   * dedupe. Batch-limited and bounded per run (`…prune-max-batches`) so a large backlog drains over
-   * several sweeps rather than holding row locks for one unbounded delete.
+   * `command_log` beyond retention carries no correctness weight: grant keys are deterministic, so a pruned-and-replayed command converges through `hero_events` dedupe.
+   * Pruning is batch-limited and bounded per run (`…prune-max-batches`) so a large backlog drains over several sweeps.
    */
   async runCommandLogPrune(): Promise<void> {
     const retentionDays = Config.get('reconciliation.command-log-retention-days');

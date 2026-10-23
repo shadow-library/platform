@@ -5,7 +5,6 @@ import { OwnerScopedRepository } from '@modules/auth';
 import { type DeltaRecord, serializeDeltaRow } from '@modules/sync';
 import { type Account, type DatabaseTransaction, type Quest, type QuestLog, schema, syncStamped } from '@server/database';
 
-/** The terminal snapshot every `quest_logs` write carries, per ARCHITECTURE §10.3's snapshot columns. */
 export interface QuestLogWrite {
   questId: bigint;
   date: string;
@@ -24,7 +23,7 @@ export interface QuestLogWrite {
   performedAt?: Date | null;
 }
 
-/** States that never occupy the (account, quest, date) row against a genuine user action: a system miss (T-19) and a bare reschedule marker both yield to the real outcome. */
+/** States that never occupy the (account, quest, date) row against a genuine user action: a system miss and a bare reschedule marker both yield to the real outcome. */
 const YIELDING_STATES: readonly QuestLog.State[] = ['missed', 'rescheduled'];
 
 @Injectable()
@@ -55,10 +54,8 @@ export class QuestLogRepository extends OwnerScopedRepository {
   }
 
   /**
-   * The T-13 convergence upsert: a fresh row always lands; a conflicting row only takes the new terminal
-   * outcome when it currently holds a system miss or a bare reschedule marker (`YIELDING_STATES`) — a
-   * genuine prior action (or another concurrent winner) is left untouched, and the caller reads `null` as
-   * "converge to what's already there" (ARCHITECTURE §11.2/§11.3, PRD §3.3).
+   * Convergence upsert: a fresh row always lands; a conflicting row takes the new terminal outcome only when it holds a system miss or bare reschedule marker (`YIELDING_STATES`).
+   * A genuine prior action or concurrent winner is left untouched, and the caller reads `null` as "converge to what's already there".
    */
   async upsertTerminal(tx: DatabaseTransaction, write: QuestLogWrite): Promise<QuestLog.Row | null> {
     const accountId = this.requireAccountId();
@@ -138,7 +135,7 @@ export class QuestLogRepository extends OwnerScopedRepository {
     return log ?? null;
   }
 
-  /** Attaches a reason tag/note or a Recovery reflection post-hoc, within the 7-day window; terminal fields are never touched here (PRD §3.3). */
+  /** Attaches a reason tag/note or a Recovery reflection post-hoc, within the 7-day window; terminal fields are never touched here. */
   async attachReason(
     tx: DatabaseTransaction,
     questLogId: bigint,
@@ -171,7 +168,7 @@ export class QuestLogRepository extends OwnerScopedRepository {
       .then(rows => rows[0] ?? null);
   }
 
-  /** Count of reschedules for this quest in the window `[fromDate, toDate]` (inclusive), the PRD §2.2 cap's input. */
+  /** Count of reschedules for this quest in the window `[fromDate, toDate]` (inclusive), the reschedule cap's input. */
   async rescheduleCountInWindow(tx: DatabaseTransaction, questId: bigint, fromDate: string, toDate: string): Promise<number> {
     const accountId = this.requireAccountId();
     const [row] = await tx

@@ -11,10 +11,8 @@ function toCategoryRow(category: ExpenseCategory.Row): Record<string, unknown> {
 }
 
 /**
- * Registers the `expenses`/`expense_audits`/`subscriptions`/`categories` domains on the sync assembler (ARCHITECTURE
- * §12.2), mirroring `DeltaRepository`'s keyset shape. `expense_categories` carries no `sync_seq` — a
- * closed, near-static 9-row set per account, small enough that a snapshot (à la `devices`) is cheaper
- * than a watermark column.
+ * Registers the `expenses`/`expense_audits`/`subscriptions`/`categories` sync domains. `expense_categories` carries no `sync_seq`: a closed
+ * 9-row set per account is cheaper as a snapshot than a watermark.
  */
 @Injectable()
 export class FinanceDeltaSources implements OnModuleInit {

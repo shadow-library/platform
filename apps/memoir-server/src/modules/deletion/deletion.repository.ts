@@ -17,14 +17,10 @@ export interface StalledDeletion {
 }
 
 /**
- * FK-safe relational purge order (ARCHITECTURE §21, step 4). Children precede parents, so a batch never
- * trips a referencing row. Seven FKs in this schema carry no `ON DELETE` action, which is what makes the
- * order load-bearing rather than cosmetic — `applied_suggestions` → `ai_results`/`quests`,
- * `ai_results`/`ai_task_audit` → `ai_tasks`, `expenses` → `subscriptions`, and
- * `metric_entries`/`quest_consequences` → `metrics`. The AI block leads because
- * `applied_suggestions.quest_id` is the longest backwards edge in the graph. `accounts` is deliberately
- * absent: the state machine lives on that row and step 6 removes it. `fx_rates` is absent because it is
- * global reference data with no `account_id`, owned by nobody.
+ * FK-safe relational purge order: children precede parents. Seven FKs carry no `ON DELETE` action, which makes the order load-bearing:
+ * `applied_suggestions` -> `ai_results`/`quests`,
+ * `ai_results`/`ai_task_audit` -> `ai_tasks`, `expenses` -> `subscriptions`, `metric_entries`/`quest_consequences` -> `metrics`.
+ * `accounts` is absent because the state machine lives on that row (step 6 removes it); `fx_rates` is global reference data with no `account_id`.
  */
 const PURGE_ORDER = [
   'applied_suggestions',
@@ -155,7 +151,7 @@ export class DeletionRepository {
     return { accountId: BigInt(row.id), identitySub: row.identity_sub, createdAt: row.created_at, deletionStartedAt: row.deletion_started_at };
   }
 
-  /** One page, after `afterId`, of accounts parked since before `staleBefore` in a state that is neither terminal nor `resting` — the resumption sweep's work queue (§21, step 3–6 crash resumability). */
+  /** One page, after `afterId`, of accounts parked since before `staleBefore` in a state that is neither terminal nor `resting` — the resumption sweep's work queue. */
   async findStalled(staleBefore: Date, afterId: bigint, limit: number, resting: Account.DeletionState[]): Promise<StalledDeletion[]> {
     const rows = await this.db
       .select({ accountId: schema.accounts.id, deletionState: schema.accounts.deletionState })

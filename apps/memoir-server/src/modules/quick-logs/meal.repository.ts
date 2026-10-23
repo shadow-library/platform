@@ -37,7 +37,7 @@ export class MealRepository extends OwnerScopedRepository {
     return meal;
   }
 
-  /** Count of meals in `[from, to]` (inclusive, ISO dates) — the PRD §4.13 monthly cap's input. */
+  /** Count of meals in `[from, to]` (inclusive, ISO dates), the monthly cap's input. */
   async countInRange(tx: DatabaseTransaction, from: string, to: string): Promise<number> {
     const accountId = this.requireAccountId();
     const [row] = await tx

@@ -5,7 +5,7 @@ import { DatabaseService } from '@shadow-library/modules';
 
 import { type Account, type PrimaryDatabase, schema } from '@server/database';
 
-/** Captured once, at first contact, from identity's userinfo (ARCHITECTURE §9.1, §10.2); never re-fetched. */
+/** Captured once, at first contact, from identity's userinfo; never re-fetched. */
 export interface ProfileSnapshot {
   email?: string | null;
   displayName?: string | null;
@@ -56,22 +56,17 @@ export class AccountRepository {
     return map;
   }
 
-  /** Keyset-paginated account ids, for a machine sweep that has to visit every account (the receipts object-orphan sweep, §19.2) rather than one caller's own. */
+  /** Keyset-paginated account ids, for a machine sweep that has to visit every account (the receipts object-orphan sweep) rather than one caller's own. */
   async findAllIds(afterId: bigint, limit: number): Promise<bigint[]> {
     const rows = await this.db.select({ id: schema.accounts.id }).from(schema.accounts).where(gt(schema.accounts.id, afterId)).orderBy(asc(schema.accounts.id)).limit(limit);
     return rows.map(row => row.id);
   }
 
   /**
-   * Insert-on-first-contact only: the caller (`AccountContext`) does its own `findByIdentitySub` first
-   * and only reaches this when that came back empty, so profile capture (T-17) happens at most once per
-   * account. `ON CONFLICT DO NOTHING` then re-select still guards the race between two concurrent
-   * first-contact requests for the same `sub` — whichever insert wins, the loser's re-select observes it.
-   *
-   * Defaults are placeholders pending onboarding (T-17): `authProvider` records `google` because it is
-   * the only live provider (ARCHITECTURE §3.3 — Apple is not yet implemented at identity); currency and
-   * timezone are the account's own onboarding-editable fields, seeded to values a first sync can run
-   * against immediately, overridden by `profile` where identity's userinfo answered.
+   * Insert-on-first-contact: the caller (`AccountContext`) does its own `findByIdentitySub` first, so profile capture happens at most once per
+   * account. `ON CONFLICT DO NOTHING` then re-select guards two concurrent first-contact requests for the same `sub`.
+   * Defaults are placeholders pending onboarding: `authProvider` is `google`, the only live provider; currency and timezone are
+   * onboarding-editable, overridden by `profile` where userinfo answered.
    */
   async create(identitySub: string, profile: ProfileSnapshot = {}): Promise<Account.Row> {
     const [inserted] = await this.db
@@ -87,9 +82,9 @@ export class AccountRepository {
   }
 
   /**
-   * The only sanctioned path for `PATCH /account` and `POST /account/onboarding` (T-17): `accounts` is
-   * keyed by `id`, not `account_id`, so it sits outside `OwnerScopedRepository`'s scoping and carries no
-   * `sync_seq` to re-stamp — the snapshot `DeltaSource` reads the fresh row on every pull instead.
+   * The only sanctioned path for `PATCH /account` and `POST /account/onboarding`: `accounts` is keyed by `id`, so it sits outside
+   * `OwnerScopedRepository` and carries no `sync_seq` to re-stamp;
+   * the snapshot `DeltaSource` reads the fresh row on every pull.
    */
   async update(accountId: bigint, values: Partial<typeof schema.accounts.$inferInsert>): Promise<Account.Row> {
     const [account] = await this.db
@@ -112,11 +107,9 @@ export class AccountRepository {
   }
 
   /**
-   * The atomic consume-before-work OCR quota guard (ARCHITECTURE §14.3): one `UPDATE ... RETURNING`
-   * resets the counter on a new local day or increments it on the same one, gated by the same WHERE
-   * clause that decides whether the row moves at all — so two concurrent requests against the same
-   * account serialize on Postgres's row lock and never both pass. An empty result means the cap was
-   * already reached for `today`; the caller reads that as quota-exhausted rather than retrying.
+   * The atomic consume-before-work OCR quota guard: one `UPDATE ... RETURNING` resets the counter on a new local day or increments it
+   * on the same one, gated by the same WHERE clause that decides whether the row moves at all, so two concurrent requests for the same account
+   * serialize on the row lock and never both pass. An empty result means the cap was already reached for `today`: quota-exhausted, not a retry.
    */
   async consumeOcrQuota(accountId: bigint, today: string, cap: number): Promise<Account.Row | null> {
     const [account] = await this.db

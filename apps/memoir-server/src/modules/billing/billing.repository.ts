@@ -20,7 +20,7 @@ function toProjection(row: Entitlement.Row | undefined): EntitlementProjection {
 }
 
 /**
- * The only writer of `entitlements` (ARCHITECTURE §16.2). Deliberately not an `OwnerScopedRepository`: a
+ * The only writer of `entitlements`. Deliberately not an `OwnerScopedRepository`: a
  * webhook has no request account to scope to, it discovers one from the purchase token the provider echoes.
  */
 @Injectable()
@@ -73,11 +73,10 @@ export class BillingRepository {
   }
 
   /**
-   * One transaction covering the whole webhook (ARCHITECTURE §16.2). The event row is inserted first
-   * and `ON CONFLICT DO NOTHING` on `provider_event_id` — a duplicate or replayed delivery lands zero
-   * rows and returns before any projection work, which is what makes replay a no-op rather than a
-   * converging re-application. An unmatched purchase token still persists its event, flagged for the
-   * reconciliation runbook, and the delivery is acknowledged rather than failed.
+   * One transaction covering the whole webhook. The event row is inserted first with `ON CONFLICT DO NOTHING` on
+   * `provider_event_id`, so a duplicate or replayed delivery lands zero rows and returns before any projection work: replay is a no-op, not a
+   * converging re-application. An unmatched purchase token still persists its event, flagged for the reconciliation runbook, and the delivery
+   * is acknowledged rather than failed.
    */
   async recordAndApply(event: NormalizedBillingEvent, provider: string, accountId: bigint | null, graceDays: number): Promise<WebhookApplyResult> {
     return this.db.transaction(async tx => {

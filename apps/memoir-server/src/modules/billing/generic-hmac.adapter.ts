@@ -63,12 +63,9 @@ function asString(value: unknown): string | null {
 }
 
 /**
- * The one concrete {@link BillingProviderAdapter} shipped today, for a web payment provider of the
- * Paddle/LemonSqueezy/Stripe shape: an `x-billing-signature: t=<unix>,v1=<hex>` header carrying an
- * HMAC-SHA256 over `${timestamp}.${rawBody}`, a timestamp tolerance that bounds replay, and a hosted
- * checkout session addressed by URL. **Owner decision A-6 — which payment provider Memoir
- * actually uses — is unresolved**, so this stands in until it is; binding a real provider replaces
- * this file and nothing else.
+ * The one shipped `BillingProviderAdapter`, for a Paddle/LemonSqueezy/Stripe-shaped web provider: an `x-billing-signature: t=<unix>,v1=<hex>`
+ * header carrying an HMAC-SHA256 over `${timestamp}.${rawBody}`,
+ * a replay-bounding timestamp tolerance and a hosted checkout addressed by URL. No payment provider is chosen yet; binding a real one replaces this file and nothing else.
  */
 @Injectable()
 export class GenericHmacBillingAdapter extends BillingProviderAdapter {
