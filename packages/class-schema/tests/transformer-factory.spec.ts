@@ -786,7 +786,6 @@ describe('TransformerFactory', () => {
         const factory = new TransformerFactory(schema => !!schema.tagged);
         const transformer = factory.compile(schema as any);
 
-        /** Since enums overlap at 3, no discriminator is used, all transformers apply */
         const data = { value: 3, aField: 'a', bField: 'b' };
         expect(transformer(data, () => 'xxx')).toStrictEqual({ value: 3, aField: 'xxx', bField: 'xxx' });
       });

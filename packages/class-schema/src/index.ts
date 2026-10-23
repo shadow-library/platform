@@ -1,8 +1,5 @@
 import 'reflect-metadata';
 
-/**
- * exporting modules
- */
 export * from './decorators';
 export * from './interfaces';
 export * from './type-helpers';

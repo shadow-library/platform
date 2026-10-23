@@ -5,28 +5,22 @@ import { getCounterId, METADATA_KEYS } from '@lib/constants';
 import { JSONSchema } from '@lib/interfaces';
 
 export interface SchemaOptions {
-  /** ID of the schema */
   $id?: string;
 
-  /** Title of the schema */
   title?: string;
 
-  /** Description of the schema */
   description?: string;
 
-  /** Maximum number of properties in the object */
   maxProperties?: number;
 
-  /** Minimum number of properties in the object */
   minProperties?: number;
 
-  /** Properties having key in a particular pattern and the value of the type */
+  /** Classes that values of properties whose key matches each regex pattern must conform to */
   patternProperties?: Record<string, Class<unknown>>;
 
-  /** Additional Properties of the object */
+  /** `false` by default; a class validates unknown properties against its schema */
   additionalProperties?: boolean | Class<unknown>;
 
-  /** Conditional schema - if */
   if?: JSONSchema;
   then?: JSONSchema;
   else?: JSONSchema;

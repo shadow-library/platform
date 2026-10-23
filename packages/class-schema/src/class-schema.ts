@@ -16,7 +16,6 @@ export interface ClassSchemaOptions {
 
 const primitiveTypes: Class<unknown>[] = [String, Number, Boolean, Object, Array];
 
-/** Maps the runtime type tokens to their JSON Schema `type`, including the library-defined `Integer` marker */
 const primitiveSchemaTypes = new Map<unknown, JSONSchemaType>([
   [String, 'string'],
   [Number, 'number'],
@@ -114,7 +113,6 @@ export class ClassSchema<T extends SchemaClass = SchemaClass> {
     this.applyFields(schema, Class);
   }
 
-  /** Resolves the class-valued `additionalProperties`/`patternProperties` schema options into their JSON Schema form */
   private applyExtraProperties(schema: ParsedSchema, Class: Class<unknown>): void {
     const extraProperties = Reflect.getMetadata(METADATA_KEYS.SCHEMA_EXTRA_PROPERTIES, Class) as Pick<SchemaOptions, 'additionalProperties' | 'patternProperties'> | undefined;
     if (!extraProperties) return;
@@ -131,7 +129,6 @@ export class ClassSchema<T extends SchemaClass = SchemaClass> {
     }
   }
 
-  /** Expands a composed (`anyOf`/`oneOf`/discriminator) class into its keyword and discriminator mapping */
   private applyComposition(schema: ParsedSchema, Class: Class<unknown>): void {
     const composedMetadata = Reflect.getMetadata(METADATA_KEYS.COMPOSED_CLASS, Class) as SchemaComposerMetadata | undefined;
     if (!composedMetadata) return;
@@ -148,7 +145,6 @@ export class ClassSchema<T extends SchemaClass = SchemaClass> {
     schema.discriminator = { propertyName: composedMetadata.discriminatorKey, mapping };
   }
 
-  /** Builds the object `properties`, `required` list and `dependencies` from the decorated fields */
   private applyFields(schema: ParsedSchema, Class: Class<unknown>): void {
     const fields: string[] = Reflect.getMetadata(METADATA_KEYS.SCHEMA_FIELDS, Class.prototype) ?? [];
     if (fields.length === 0) return;
@@ -177,7 +173,7 @@ export class ClassSchema<T extends SchemaClass = SchemaClass> {
     }
   }
 
-  /** Applies the unified nullability rule: typed schemas gain a `null` type member, while `$ref`s become a nullable `anyOf` since a `$ref` cannot carry its own type */
+  /** A `$ref` cannot carry its own type, so a nullable ref becomes `anyOf` with a `null` branch */
   private applyNullable(schema: JSONSchema): void {
     if (schema.$ref) {
       schema.anyOf = [{ $ref: schema.$ref }, { type: 'null' }];

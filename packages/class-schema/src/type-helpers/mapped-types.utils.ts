@@ -10,7 +10,6 @@ export function cloneClassSchema(sourceClass: Class<unknown>, fieldSchema: Field
   /* eslint-disable-next-line @typescript-eslint/no-extraneous-class */
   const TargetClass = class {};
 
-  /** Copying the schema related metadata */
   Reflector.cloneMetadata(TargetClass, sourceClass);
   Reflector.cloneMetadata(TargetClass.prototype, sourceClass.prototype);
 

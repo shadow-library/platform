@@ -118,7 +118,6 @@ export class TransformerFactory {
   private getDiscriminatorConditions(variants: ParsedSchema[]): VariantCondition[] | null {
     const discriminator: VariantCondition[] = [];
 
-    /** Converting the variants into field definitions */
     const fields: FieldDefinition[] = [];
     for (const variant of variants) {
       for (const key in variant.properties) {
@@ -135,7 +134,6 @@ export class TransformerFactory {
       }
     }
 
-    /** Trying to find a valid const discriminator */
     const validConstDiscriminator = fields.find(fieldDef => this.hasUniqueFieldValues(fieldDef, 'const'));
     if (validConstDiscriminator) {
       for (const variant of variants) {
@@ -149,7 +147,6 @@ export class TransformerFactory {
       return discriminator;
     }
 
-    /** Trying to find a valid type discriminator */
     const typeDiscriminators = new Map<string, string>();
     const uniqueTypeFields = fields.filter(fieldDef => this.hasUniqueFieldValues(fieldDef, 'type'));
     for (const typeField of uniqueTypeFields) {
@@ -165,7 +162,6 @@ export class TransformerFactory {
       return discriminator;
     }
 
-    /** Trying to find a valid enum discriminator */
     const validEnumDiscriminator = fields.find(fieldDef => this.hasUniqueFieldValues(fieldDef, 'enum'));
     if (validEnumDiscriminator) {
       const access = member('data', validEnumDiscriminator.name);
@@ -190,7 +186,6 @@ export class TransformerFactory {
     let ops = '';
     if (this.filter(schema)) ops += `data = action(data, ${member('this.schemas', schema.$id)}, ctx);`;
 
-    /** Handling root array schema */
     if (schema.type === 'array' && schema.items) {
       const isFilter = this.filter(schema.items);
       if (!isFilter && !schema.items.$ref) return (this.context.transformers[schema.$id] = null);
@@ -214,7 +209,6 @@ export class TransformerFactory {
       }
     }
 
-    /** Handling discriminators */
     if (schema.type === 'object' && (schema.anyOf || schema.oneOf)) {
       const variantIds = schema.anyOf ?? schema.oneOf ?? [];
       const variants = variantIds.map(variant => (variant.$ref ? this.context.schemas[variant.$ref] : variant)) as ParsedSchema[];

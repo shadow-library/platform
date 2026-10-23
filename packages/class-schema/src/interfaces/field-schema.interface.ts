@@ -1,79 +1,59 @@
 export interface BaseFieldSchema<T> {
-  /** Allowed values */
   enum?: T[];
 
-  /** Example values */
   examples?: T[];
 
-  /** Whether this field is optional, false by default */
+  /** Whether this field may be omitted; fields are required unless this is true */
   optional?: boolean;
 
-  /** Determines this field is required if the fields mentioned in the value is present */
+  /** Makes this field required only when the named sibling field is present, instead of always */
   requiredIf?: string;
 
-  /** Description about this field */
   description?: string;
 
-  /** Constant value of the field */
   const?: T;
 
-  /** Whether null is allowed */
+  /** Adds `null` to the accepted types */
   nullable?: boolean;
 
-  /** Default value of the field */
   default?: T;
 }
 
 export interface ArrayFieldSchema extends BaseFieldSchema<any[]> {
-  /** Minimum number of items in the array */
   minItems?: number;
 
-  /** Maximum number of items in the array */
   maxItems?: number;
 
-  /** Whether all items in the array should be unique */
   uniqueItems?: boolean;
 }
 
 export interface StringFieldSchema extends BaseFieldSchema<string> {
-  /** Minimum length of the string */
   minLength?: number;
 
-  /** Maximum length of the string */
   maxLength?: number;
 
-  /** Regular expression pattern to match the string */
   pattern?: string;
 
-  /** Format of the string, e.g., date, email, etc. */
   format?: string;
 }
 
 export interface NumberFieldSchema extends BaseFieldSchema<number> {
-  /** Minimum value of the number */
   minimum?: number;
 
-  /** Maximum value of the number */
   maximum?: number;
 
-  /** Minimum value of the number, exclusive */
   exclusiveMinimum?: number;
 
-  /** Maximum value of the number, exclusive */
   exclusiveMaximum?: number;
 
-  /** Value should be multiple of */
   multipleOf?: number;
 }
 
 export interface ObjectFieldSchema extends BaseFieldSchema<object> {
-  /** Whether additional properties are allowed */
   additionalProperties?: boolean;
 
-  /** Properties of the object */
   properties?: Record<string, FieldSchema>;
 
-  /** Properties matching the pattern */
   patternProperties?: Record<string, FieldSchema>;
 }
 
