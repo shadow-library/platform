@@ -87,10 +87,7 @@ function opWireSchema(op: OpType, options: OpVocabularyOptions): WireSchema {
   return wireObject(properties, ['op', ...Object.keys(spec.required)]);
 }
 
-/**
- * Every allowed op as a typed JSON Schema variant, for a grammar-constrained change-set. Derived from `OP_SPECS` and never looser than it; the
- * rules left to `validateChangeSet` — a draft.update with no field, `someday` beside a payoff, canon without its records — still reach repair.
- */
+/** Typed JSON Schema variant per allowed op for grammar-constrained change-sets, derived from `OP_SPECS` and never looser; rules left to `validateChangeSet` still reach repair. */
 export function changeSetItemSchema(ops: readonly OpType[], options: OpVocabularyOptions = {}): WireSchema {
   return { anyOf: ops.map(op => opWireSchema(op, options)) };
 }

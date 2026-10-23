@@ -10,15 +10,7 @@ import { type DbExecutor, type PrimaryDatabase, type Publishing, schema } from '
 import { type PublicationAccessBody, type PublicationAccessResponse } from './publishing.dto';
 import { PublishingService } from './publishing.service';
 
-/**
- * The forge owns who may read a published novel; the reader holds a projection of that decision and
- * never writes it. Everything here is therefore about producing a record that converges: the reader
- * can be wiped and re-pushed from these rows alone.
- *
- * Addresses are resolved to identity subjects **here**, at share time, rather than at read time in
- * the reader. That keeps every address on this side of the boundary, and it means the read path —
- * which runs on every chapter fetch — never needs to ask identity anything.
- */
+/** The forge owns who may read; addresses resolve to identity subjects at share time so reads never ask identity. */
 
 @Injectable()
 export class PublicationAccessService {
@@ -38,16 +30,7 @@ export class PublicationAccessService {
     return this.present(publication, await this.loadGrants(publication.id));
   }
 
-  /**
-   * Replaces the whole access record. `accessRevision` is bumped only when something actually
-   * changed, so a UI that saves an unedited panel does not make the reader re-apply an identical
-   * record — the same "no-op if nothing moved" rule the metadata publish follows. The comparison runs
-   * under the publication's row lock and the bump is an increment, so two concurrent saves never share
-   * a revision: a narrowing written second always outranks the widening before it on the reader.
-   *
-   * A re-resolution runs on every save, which is also how a `pending` grant becomes `resolved` once
-   * its owner finally signs up: the author does not have to remember to come back and re-add them.
-   */
+  /** Replaces the record; `accessRevision` bumps only on a real change, compared under the row lock. Each save re-resolves, so `pending` grants resolve once the owner signs up. */
   async setAccess(projectId: bigint, body: PublicationAccessBody, organisationId: string | undefined): Promise<PublicationAccessResponse> {
     const publication = await this.publishingService.getPublication(projectId);
     if (body.visibility === 'ORGANISATION' && !organisationId) throw AppErrorCode.PUB_006.create();
@@ -98,12 +81,7 @@ export class PublicationAccessService {
     return grants.filter(grant => grant.state === 'resolved' && grant.subjectId).map(grant => grant.subjectId as string);
   }
 
-  /**
-   * The addresses identity could name, keyed by the caller's own lowercased spelling. The SDK owns
-   * the batching and the `users:resolve` grant, so the forge no longer keeps a directory client of
-   * its own — an address that resolves to nothing is simply missing, which the caller records as a
-   * pending grant rather than an error.
-   */
+  /** Addresses identity could name, keyed by the caller's lowercased spelling; an unresolved address is missing and becomes a pending grant, not an error. */
   private async resolveEmails(emails: string[]): Promise<Map<string, string>> {
     if (emails.length === 0) return new Map();
     const resolved = await this.authClient.resolveUsersByEmail(emails).catch(error => throwError(AppErrorCode.PUB_005.create({ reason: (error as Error).message })));
@@ -114,10 +92,7 @@ export class PublicationAccessService {
     return db.select().from(schema.publicationGrants).where(eq(schema.publicationGrants.publicationId, publicationId)).orderBy(schema.publicationGrants.email);
   }
 
-  /**
-   * Compares intent, not rows: a re-resolution that turns a pending grant into a resolved one is a
-   * change the reader must see, whereas re-saving the same list with the same outcome is not.
-   */
+  /** Compares intent, not rows: a pending grant turning resolved is a change the reader must see. */
   private hasChanged(
     publication: Publishing.Publication,
     existing: Publishing.Grant[],

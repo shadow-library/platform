@@ -14,15 +14,10 @@ import { ActorService } from '@modules/actor';
 import { ProjectAccessService, type ProjectOwnership } from './project-access.service';
 
 /**
- * Object-level authorization for every project-scoped route (audit finding NF-BOLA-01). The class-level
- * `@Authenticated()` on each controller proves *who* the caller is; this guard proves the caller may reach
- * the project the route addresses. It runs after the package `AuthGuard`, which authenticates a stage
- * earlier on `preValidation`, and, for any route that carries a project identifier in its path, loads that
- * project's owner and rejects the request unless the caller owns it — or is an organisation curator on a
- * project its bot owner shared. A missing project or a null `owner_id` is treated as a denial — the
- * response is always a 404 (`PRJ_001`) so a probing caller cannot distinguish "not yours" from "does not
- * exist". Routes without a project param (project create/list, jobs, ai) generate no handler and are
- * scoped by their own services instead.
+ * Object-level authorization for project-scoped routes: loads the addressed project's owner and rejects unless the caller owns it or is an organisation curator on a project its
+ * owner shared.
+ * A missing project and a null `owner_id` both answer 404 (`PRJ_001`), so a probe cannot tell "not yours" from "does not exist". Runs after `AuthGuard`; routes with no project
+ * param are scoped by their own services.
  */
 
 @Middleware({ type: 'preHandler', weight: 50 })

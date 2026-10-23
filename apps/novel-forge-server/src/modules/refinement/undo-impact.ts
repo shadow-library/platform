@@ -132,9 +132,8 @@ function candidates(changed: ReadonlySet<string>, rows: ImpactRows): Candidate[]
 }
 
 /**
- * What undoing a change would leave standing on records it no longer backs. A created record vanishes, so everything that names it is
- * listed: plans, the drafts written from them, knowledge about it and pending suggestions. An updated record only returns to its earlier
- * value, so finalized plans and drafts are counted rather than listed, and what a character knows is unaffected by a character's field.
+ * What undoing a change leaves standing on records it no longer backs. A created record vanishes, so everything naming it is listed;
+ * an updated one only reverts, so finalized plans and drafts are counted, not listed.
  */
 export function undoImpact(change: UndoneChange, rows: ImpactRows): UndoImpact {
   const created = new Set(change.created);

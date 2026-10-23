@@ -23,12 +23,10 @@ export function firstUnwrittenChapter(started: ReadonlySet<number>, finalized: R
 }
 
 /**
- * Truncates — never skips — at an unfilled `external` slot: that chapter is filled by hand
- * (`generate-unrestricted` or `drafts/:n/import`), and drafting past it would write the next
- * chapter against a gap it cannot see, leaving a permanent hole no later run has reason to notice. A batch
- * of 20 with an external slot at chapter 4 therefore yields 3 chapters; that cost is the deliberate trade. Once the slot has a draft it counts
- * exactly like a generated chapter — a hand-written draft is as much a written chapter as a generated one. A chapter is also drafted only once
- * every chapter before it has a draft or finalized prose, so a hole further back — a draft imported ahead of empty chapters — stops the batch too.
+ * Truncates — never skips — at an unfilled `external` slot: that chapter is filled by hand (`generate-unrestricted` or `drafts/:n/import`),
+ * and drafting past it would write the next chapter against a gap it cannot see.
+ * A batch of 20 with an external slot at chapter 4 therefore yields 3 chapters, the deliberate trade. Once the slot has a draft it counts like a generated chapter.
+ * A chapter is also drafted only once every chapter before it has a draft or finalized prose, so a hole further back stops the batch too.
  */
 export function selectGenerationBatch(briefs: readonly BatchBrief[], started: ReadonlySet<number>, finalized: ReadonlySet<number>, limit: number): GenerationBatch {
   const written = (chapter: number): boolean => started.has(chapter) || finalized.has(chapter);

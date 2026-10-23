@@ -41,11 +41,7 @@ function uniqueSpan(body: string, quote: string): PassageSpan | null {
   return { start: found, end: found + quote.length };
 }
 
-/**
- * Where a quote no longer at its offsets now sits. When the revision the author read survives, only the copy still between the words that surrounded it
- * there counts, so a sentence cut from one paragraph and written into another is not taken for the one they commented on. Without it — an autosave
- * folded into the same revision, or a pruned snapshot — the quote's one occurrence is the best evidence left.
- */
+/** Where a quote no longer at its offsets now sits: with the read revision, only a copy between the words that surrounded it; without it, the quote's one occurrence. */
 export function relocateQuote(body: string, input: PassageContextInput, earlierBody: string | undefined): PassageSpan | null {
   if (earlierBody === undefined || earlierBody.slice(input.start, input.end) !== input.quote) return uniqueSpan(body, input.quote);
   const anchor = { start: input.start, end: input.end, passageHash: input.passageHash, passage: input.quote, ...anchorContext(earlierBody, input.start, input.end) };
@@ -92,11 +88,7 @@ async function anchorInDraft(db: DraftReader, draft: Generation.Draft, input: Pa
   };
 }
 
-/**
- * Anchors each passage to its chapter's draft as it stands now, so the message carries current offsets. A draft that is gone or was replaced, or a quote
- * that can no longer be found, refuses the turn: a stale quote would have the model work on words the chapter no longer holds. An isolated chapter's prose
- * never reaches a chat model, on any route, so its passages are refused outright.
- */
+/** Anchors each passage to the draft as it stands now; a gone or replaced draft, an unfindable quote or an isolated chapter (never sent to a chat model) refuses the turn. */
 export async function resolvePassageContexts(db: DraftReader, projectId: bigint, inputs: readonly PassageContextInput[]): Promise<Refinement.ChatPassageContext[]> {
   if (inputs.length === 0) return [];
   inputs.forEach(assertWellFormed);

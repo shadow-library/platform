@@ -23,10 +23,7 @@ export const PLANS_WITHHELD_NOTE =
 
 type OpLike = Record<string, unknown>;
 
-/**
- * What a turn does with the organise action: `none` when the author did not ask to organise notes long enough for it, `start` when they
- * did under Edit freely and are not just discussing, so it starts at turn end without a card, and `card` otherwise.
- */
+/** What a turn does with the organise action; it starts at turn end without a card only under Edit freely when the author asked and is not just discussing. */
 export type OrganiseRouting = 'none' | 'card' | 'start';
 
 interface TurnOutput {
@@ -81,10 +78,7 @@ export function laterPlanIssues(changeSet: readonly OpLike[] | undefined, organi
   );
 }
 
-/**
- * The turn as staged: a request to organise the notes stages the organise action alone, and a page of plans for later never reaches a
- * page the chapter writer reads. Each says so in the reply when it changed what the model proposed.
- */
+/** The turn as staged: an organise request stages the organise action alone, and a page of plans for later never reaches a page the chapter writer reads. */
 export function withLaterPlansRouted<T extends TurnOutput>(output: T, organise: OrganiseRouting): T {
   const { changeSet = [], ...rest } = output;
   if (organise !== 'none') {

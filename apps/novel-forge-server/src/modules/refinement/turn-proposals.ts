@@ -123,11 +123,7 @@ function failureNote(err: unknown): string {
   return AppError.is(err) ? err.message : APPLY_FAILED_NOTE;
 }
 
-/**
- * Stages a turn's split as at most two proposals. The applied side goes first so the cards' baseline is taken after it — a card may name a
- * record the applied side created. Anything that stops the applied side (a warning of its own, a conflict, a refused write) turns the whole
- * change-set back into cards, so the author never loses an op to a failed apply.
- */
+/** Stages a turn's split as at most two proposals, applied side first so the cards' baseline includes its records; anything that stops it turns the whole change-set into cards. */
 export async function stageTurnChangeSet(port: TurnProposalPort, split: ChangeSetSplit, warnings: string[]): Promise<TurnStaging> {
   const whole: StageOptions = { entityMaterialization: true };
   const half: StageOptions = { entityMaterialization: split.direct.length === 0 || split.cards.length === 0 };
@@ -183,11 +179,7 @@ function organiseWaitsNote(reason: AppError | string | undefined): string {
   return message ? `${ORGANISE_REFUSED_NOTE} ${message.replace(/\.?$/, '.')}` : ORGANISE_REFUSED_NOTE;
 }
 
-/**
- * Starts the organise action the author's own message asked for by accepting its card on their behalf, so the job is queued exactly as
- * their accept would queue it, with the card's origin. Anything that would refuse it leaves a pending card instead; an action that fails
- * after the accept committed leaves that card applied and failed, so a fresh one is staged in its place.
- */
+/** Accepts the organise card on the author's behalf so the job queues as their accept would; a refusal leaves a pending card, a failure after commit stages a fresh one. */
 export async function startNotesOrganise(port: OrganiseStartPort, warnings: string[]): Promise<OrganiseStart> {
   const op: ActionOp = { op: ORGANISE_NOTES_OP };
   const whole: StageOptions = { entityMaterialization: true };

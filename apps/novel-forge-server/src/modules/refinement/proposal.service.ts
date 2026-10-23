@@ -79,10 +79,7 @@ type ApproveDraftOp = Extract<ChangeOp, { op: 'action.approve_draft' }>;
 /** What a chat stages itself. A card brought into the chat from elsewhere (an audit, a plugin, a premise review) is not the chat's own work to replace. */
 const CHAT_STAGED_KINDS: readonly Refinement.Kind[] = ['chat', 'hub', 'chapter_plan', 'organise'];
 
-/**
- * Who a new proposal supersedes its own stale pending work for: a chat session, or — for a plugin, which
- * has no session and restages the same decision on every run — the plugin's own scope.
- */
+/** A new proposal supersedes stale pending work of its chat session or, for a plugin (no session, restages each run), of the plugin's own scope. */
 function supersessionOwner(input: CreateProposalInput): SQL | undefined {
   if (input.sessionId) return and(eq(schema.refinementProposals.sessionId, input.sessionId), inArray(schema.refinementProposals.kind, CHAT_STAGED_KINDS));
   if (input.kind !== 'plugin' || !input.scopeRef) return undefined;
@@ -95,10 +92,7 @@ function validateOps(kind: Refinement.Kind, changeSet: unknown, allowedOps?: rea
   return validateChangeSet(changeSet, allowedOps, options);
 }
 
-/**
- * `startedEmpty` is the server's mark on a plan card it opened empty, never a model's or a client's to set: it is dropped from whatever
- * arrives, and an edited card keeps the mark its stored plan carried for the same chapter.
- */
+/** `startedEmpty` is server-only: dropped from whatever arrives, and an edited card keeps the mark its stored plan carried for that chapter. */
 function stampStartedEmpty(ops: readonly ChangeOp[], stamped: readonly ChangeOp[] = []): ChangeOp[] {
   const marked = new Set(stamped.flatMap(op => (op.op === 'brief.update' && op.startedEmpty === true ? [op.chapter] : [])));
   return ops.map(op => {
@@ -107,11 +101,7 @@ function stampStartedEmpty(ops: readonly ChangeOp[], stamped: readonly ChangeOp[
   });
 }
 
-/**
- * An approval binds to the draft revision current when it was staged — the prose the author could read beside the card — so a card
- * applied after the prose changed is refused. A model never knows the revision, so staging overwrites whatever it sent; a hand edit
- * keeps a revision it carries.
- */
+/** An approval binds to the draft revision at staging, so a card applied after the prose changed is refused; staging overwrites a model's revision, a hand edit keeps its own. */
 async function stampApprovalRevisions(executor: DbExecutor, projectId: bigint, ops: ChangeOp[], keepSupplied: boolean): Promise<ChangeOp[]> {
   const unstamped = (op: ChangeOp): op is ApproveDraftOp =>
     op.op === 'action.approve_draft' && !(keepSupplied && typeof op.revision === 'number' && typeof op.saveSeq === 'number' && typeof op.draftId === 'string');
@@ -141,9 +131,8 @@ export class ProposalService {
   }
 
   /**
-   * Persists a new pending proposal with a freshly captured baseline, and supersedes any prior
-   * pending proposal of the same session that touches an overlapping artifact. Cross-session
-   * pending proposals are left alone — the baseline check catches them at apply time.
+   * Persists a pending proposal with a freshly captured baseline and supersedes the session's pending proposals touching overlapping artifacts; other sessions' are left to the
+   * apply-time baseline check.
    */
   async create(projectId: bigint, input: CreateProposalInput, executor: DbExecutor = this.db): Promise<Refinement.Proposal> {
     const errors = validateOps(input.kind, input.changeSet, input.allowedOps, { entityMaterialization: input.entityMaterialization });
@@ -221,10 +210,7 @@ export class ProposalService {
     }
   }
 
-  /**
-   * Replaces the owner's pending cards the new one revises: those touching the same artifacts, or staging the same action decision. A card
-   * rewriting other passages of the same chapter is kept: only one whose passages the new card touches, or that no longer stand, is replaced.
-   */
+  /** Pending cards touching the same artifacts or action decision; a card rewriting other passages of a chapter is kept unless the new card touches them. */
   private async supersedeOverlapping(projectId: bigint, owner: SQL, newProposalId: bigint, changeSet: ChangeOp[], executor: DbExecutor): Promise<void> {
     const pending = await executor.query.refinementProposals.findMany({
       where: and(eq(schema.refinementProposals.projectId, projectId), owner, eq(schema.refinementProposals.status, 'pending'), ne(schema.refinementProposals.id, newProposalId)),
@@ -267,10 +253,7 @@ export class ProposalService {
     return utils.pagination.createResult(query, items, total);
   }
 
-  /**
-   * The project-wide change history: every applied/reverted proposal, newest
-   * apply first — the feed the UI timeline renders with per-change revert and rollback-to-here.
-   */
+  /** The project-wide change history of applied and reverted proposals, newest apply first. */
   async listChanges(projectId: bigint, filter: Partial<ListChangesQuery>): Promise<OffsetPaginationResult<ChangeItem>> {
     // The feed's order is fixed — newest apply first — so the query DTO offers no sort fields and the
     // sortBy/sortOrder defaults only satisfy the normaliser's shape; limit and offset are read below.
@@ -362,10 +345,7 @@ export class ProposalService {
     return undoImpact(undoneChange(refs, [record.inverse]), await loadImpactRows(this.db, proposal.projectId, proposal.id, refs));
   }
 
-  /**
-   * Moves a pending card into a chat so it is answered there, and an action it starts reports to that chat. It keeps the message it answered,
-   * so a plan it starts still reads the author's words where they were written. A card the chat already holds comes back as it is.
-   */
+  /** A pending card keeps the message it answered so a plan it starts reads the author's words where written; a card the chat already holds comes back as is. */
   async adopt(projectId: bigint, proposalId: bigint, sessionId: string): Promise<Refinement.Proposal> {
     const session = await this.db.query.chatSessions.findFirst({
       columns: { status: true },

@@ -47,11 +47,7 @@ export class RefineService {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
 
-  /**
-   * Upgrades a rough overview into a serialized-web-novel premise. The improvements are
-   * staged as a premise_enhance proposal; the rationale fields come back so the author sees WHY
-   * before applying, and refinement continues in a novel-scoped chat.
-   */
+  /** Stages the premise upgrade as a premise_enhance proposal; rationale fields come back so the author sees why before applying. */
   async enhancePremise(projectId: bigint, overview?: string): Promise<PremiseEnhanceResult> {
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
     if (!project) throw AppErrorCode.PRJ_001.create();

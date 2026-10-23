@@ -50,12 +50,7 @@ function isValidAnswer(answer: unknown): answer is { title: string; why?: unknow
   return typeof answer === 'object' && answer !== null && typeof (answer as { title?: unknown }).title === 'string' && (answer as { title: string }).title.trim().length > 0;
 }
 
-/**
- * The model's question card is schema-loose on purpose (see chat-refine.schema.ts) so a bad shape can never
- * fail ajv validation and take the reply or change-set down with it. This is where the real shape rules live:
- * a question without 2-4 titled answers is dropped whole, and a progressKey outside the checklist is dropped
- * on its own, keeping the rest of the card.
- */
+/** The card is schema-loose on purpose so a bad shape never fails ajv; here fewer than 2-4 titled answers drops the card and an unknown progressKey drops itself. */
 export function sanitizeChatQuestion(candidate: unknown, allowedProgressKeys: readonly string[]): ChatQuestion | undefined {
   if (!candidate || typeof candidate !== 'object') return undefined;
   const raw = candidate as { question?: unknown; why?: unknown; answers?: unknown; progressKey?: unknown };
@@ -80,11 +75,7 @@ export function sanitizeChatQuestion(candidate: unknown, allowedProgressKeys: re
   };
 }
 
-/**
- * A short line for chat history so a later turn can refer to "the second option" without the whole card
- * riding every prompt. The stored value already went through sanitizeChatQuestion before it was written, but
- * this stays defensive since it reads straight off the jsonb column.
- */
+/** A short line for chat history so a later turn can refer to "the second option"; defensive because it reads straight off the jsonb column. */
 export function renderQuestionForHistory(question: unknown): string | null {
   if (!question || typeof question !== 'object') return null;
   const raw = question as { question?: unknown; answers?: unknown };

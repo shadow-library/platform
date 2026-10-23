@@ -107,10 +107,7 @@ export interface DraftRemoveOp {
   chapter: number;
 }
 
-/**
- * Where a rewrite's passage sat in the draft when it was staged: offsets are UTF-16 code units into that revision's body, `paragraph` counted from
- * 1, and the text either side is what finds the passage again once an edit elsewhere has moved it.
- */
+/** Where a staged rewrite's passage sat: offsets are UTF-16 code units into that revision's body, `paragraph` from 1; the surrounding text re-finds it after an edit elsewhere. */
 export interface PassageRewriteAnchor {
   draftId: string;
   revision: number;
@@ -123,10 +120,7 @@ export interface PassageRewriteAnchor {
   contextAfter: string;
 }
 
-/**
- * Rewrites one passage of a draft in place. The model names the words by `passage`, never by offsets; staging finds them and stamps `anchor`,
- * so apply rewrites exactly the words the author saw on the card.
- */
+/** Rewrites one passage in place; the model names words by `passage`, staging stamps `anchor`, so apply rewrites exactly what the card showed. */
 export interface DraftRewritePassageOp {
   op: 'draft.rewrite_passage';
   chapter: number;
@@ -154,11 +148,9 @@ export interface EntityRemoveOp {
 }
 
 /**
- * Spoiler-grade canon. `body` is the truth itself and never reaches a drafter who has not ledgered
- * it; `constraintNote` is author-only, `writerNote` is the writer-safe instruction shown while the fact
- * is hidden (omitted keeps the current one, blank clears it), and `terms` are the tell-tale strings the leak scan hunts for. Reveals are deliberately absent —
- * a fact enters the ledger through a brief's knowledgeContract and draft approval, nowhere else.
- * `revealChapter` is the schedule, not the ledger: omitted keeps it, a number sets it (1 is open canon), explicit `null` undates the fact, which no plan may reveal until it has an unlock condition.
+ * `body` never reaches a drafter who has not ledgered it; `constraintNote` is author-only; `writerNote` is the writer-safe instruction while hidden (blank clears).
+ * `terms` are what the leak scan hunts for. Reveals are absent: a fact enters the ledger only through a brief's knowledgeContract and draft approval.
+ * `revealChapter`: omitted keeps, a number sets (1 is open canon), `null` undates the fact, which no plan may reveal until it has an unlock condition.
  */
 export interface FactUpsertOp {
   op: 'fact.upsert';
@@ -203,10 +195,7 @@ export interface PromiseCreateOp {
   openedChapter?: number;
 }
 
-/**
- * Rewords a promise or records that continuity moved it forward. `status` closes it as paid off or reopens it — dropping one goes through
- * `promise.drop` instead, so a removal-shaped change is always a card.
- */
+/** Rewords a promise or records continuity moving it; `status` closes or reopens it, while dropping goes through `promise.drop` so a removal is always a card. */
 export interface PromiseUpdateOp {
   op: 'promise.update';
   kind: PromiseKind;
@@ -216,11 +205,7 @@ export interface PromiseUpdateOp {
   status?: 'open' | 'paid_off';
 }
 
-/**
- * What a promise pays off by — a milestone, a volume, a chapter, or `someday` (explicitly, not by omission) — and whether it is dormant on
- * purpose. Bundled together because both describe the same disposition: how, or whether, this promise is expected to resolve. Omitting a
- * payoff field leaves it as it stands; an explicit `null` clears just that one; `someday: true` clears all three at once.
- */
+/** Payoff target (milestone, volume, chapter or explicit `someday`) and dormancy; omitted keeps a field, `null` clears it, `someday: true` clears all three. */
 export interface PromiseSetPayoffOp {
   op: 'promise.set_payoff';
   kind: PromiseKind;
@@ -240,19 +225,14 @@ export interface PromiseDropOp {
   key: string;
 }
 
-/**
- * A hard rule an organise card offers from the notes. It writes no artifact: applying it is the author keeping the rule, which the organise
- * decision recorded in the same transaction turns into a Notebook direction, and undoing the card takes back.
- */
+/** A hard rule an organise card offers: writes no artifact; applying is the author keeping it as a Notebook direction, undoing the card takes it back. */
 export interface OrganiseRuleOp {
   op: 'organise.rule';
   rule: string;
   optionId: string;
 }
 
-// Action ops drive the pipeline through existing service code. They carry no
-// artifact refs, no baseline, and no inverse — they execute post-commit and their outcome lands in
-// the proposal's opResults, never in domain tables directly.
+// Action ops carry no artifact refs, baseline or inverse: they execute post-commit and their outcome lands in the proposal's opResults.
 interface GenerateChapterAction {
   op: 'action.generate_chapter';
   chapter: number;
@@ -358,10 +338,8 @@ export type ActionOp =
   | AdvanceVolumeAction;
 
 /**
- * Rationale and quote are metadata about the change, not part of it: they reach the author beside the op and are stripped before any
- * applier sees them, so `ContentOp` — the shape inverses are captured as — deliberately lacks them. `quote` is the author's own words
- * the op rests on; only a quote the server finds in the author's message lets the op apply without review. `ideaId` is stamped by the server
- * when the op is staged, so a turned-down suggestion is recognised when it comes back.
+ * Rationale and quote are metadata stripped before any applier, so `ContentOp` (the shape inverses are captured as) lacks them.
+ * Only a `quote` the server finds in the author's message lets an op apply without review; `ideaId` is server-stamped so a turned-down suggestion is recognised on return.
  */
 export type ChangeOp = (ContentOp | ActionOp) & { rationale?: string; quote?: string; startedEmpty?: boolean; ideaId?: string };
 export type OpType = ChangeOp['op'];

@@ -11,11 +11,7 @@ export interface OpUndoResult extends OpToggleResult<Ledger.Entry | null> {
 
 const REDONE_REASON = 'The author brought the change back after undoing it.';
 
-/**
- * Per-change undo and redo of a chat turn, with the Notebook side a declined suggestion card has: an undone idea is turned down, a redone
- * one adopted. The Notebook write commits in the same transaction as the change, so the Story Bible and the Notebook never disagree; a
- * repeated call that moves nothing writes nothing.
- */
+/** Per-change undo/redo of a chat turn; the Notebook write (an undone idea is turned down, a redone one adopted) commits in the same transaction, and a no-op writes nothing. */
 @Injectable()
 export class ProposalOpUndoService {
   constructor(

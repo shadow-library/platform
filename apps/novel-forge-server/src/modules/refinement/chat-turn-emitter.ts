@@ -13,11 +13,7 @@ export interface ChatLookupEvent {
 /** Where a change sits in the Story Bible progress list: people are characters and factions, threads are promises. */
 export type ChatChangeGroup = 'premise' | 'pages' | 'people' | 'places' | 'power' | 'threads' | 'other';
 
-/**
- * One change of the reply being written, sent the moment the model finishes writing it — display-only, never its body. It is provisional:
- * the turn's `done` decides what was applied or carded, and a `reset` voids every change event before it, because the reply they belonged to
- * was replaced. `index` counts the current reply's changes from 0 and restarts after each `reset`.
- */
+/** One change of the reply being written, display-only and provisional: `done` decides what applied or carded, `reset` voids earlier changes and restarts `index` at 0. */
 export interface ChatChangeEvent {
   index: number;
   op: string;
@@ -25,10 +21,7 @@ export interface ChatChangeEvent {
   group: ChatChangeGroup;
 }
 
-/**
- * Progress a caller can observe while a turn runs. Its members are the events the turn itself produces — `ready`, `done` and `error`
- * belong to the transport, which knows things the turn does not — so the SSE route relays rather than translates.
- */
+/** Progress observable while a turn runs; `ready`, `done` and `error` belong to the transport, so the SSE route relays rather than translates. */
 export interface ChatTurnEmitter {
   /** The run this turn was given, reported as soon as it exists — long before the turn settles. */
   onRunId: (runId: string) => void;
@@ -105,11 +98,7 @@ export function describeStreamedChange(index: number, element: ChangeSetElement)
   return { index, op: element.op, label: label(element), group: group(element) };
 }
 
-/**
- * Failure-isolated view of the caller's emitter. The first throw — an SSE write to a browser that has
- * already gone — retires it and the turn runs on unobserved, because the turn persists its exchange
- * whether or not anyone is still listening.
- */
+/** Failure-isolated emitter: the first throw (an SSE write to a gone browser) retires it and the turn runs on unobserved, since it persists regardless. */
 export class EmitterRelay {
   private retired = false;
   private shown = false;
@@ -146,11 +135,7 @@ export class EmitterRelay {
     this.send(() => this.emitter.onLookup(event));
   }
 
-  /**
-   * A lookup round re-invokes the model for a reply that replaces the one already displayed, but the
-   * replacement is only worth a blank composer once its own text or changes start arriving: a round that
-   * streams nothing would otherwise leave the author staring at nothing until the turn lands.
-   */
+  /** A lookup round's replacement reply blanks the composer only once its own text or changes arrive. */
   supersedeOnNextDelta(): void {
     this.supersede = this.shown;
   }

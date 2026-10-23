@@ -10,13 +10,8 @@ import { PublishingService } from './publishing.service';
 import { ReaderPushClient } from './reader-push.client';
 import { WikiPublishingService } from './wiki-publishing.service';
 
-// The reader-push client injects an AuthClient built from the SDK's own config resolver — the same
-// `AUTH_ISSUER`/`AUTH_APP_ID`/credential the guard's client uses, so it discovers the same
-// registration and authenticates as the same client, but as a module-owned provider rather than a
-// cross-module re-export (the framework imports a dynamic module once and resolves dependencies
-// eagerly, which makes re-exporting the guard's exact instance order-dependent). No JobsModule import
-// here — JobsModule imports THIS module for the publish executor, and the publishing controller lives
-// in PublishingHttpModule (the HTTP-wiring seam), keeping the module graph acyclic.
+// JobsModule imports this module for the publish executor, so the controller lives in PublishingHttpModule to keep the graph acyclic.
+// The AuthClient is module-owned rather than re-exported from the guard: re-exporting a dynamic module's instance is order-dependent.
 @Module({
   // FastifyModule supplies the ContextService the attribution gate reads the request principal from.
   imports: [DatabaseModule, FastifyModule],

@@ -1,7 +1,4 @@
-/**
- * `delta` (`{ text }`) and `change` (a `ChatChangeEvent`) belong to the reply being written; `reset` voids both, as the reply they built
- * was replaced, and a `change` index restarts after it. Both are provisional: `done` alone says what the turn applied and carded.
- */
+/** `delta` and `change` belong to the reply being written and `reset` voids both; all are provisional, `done` alone says what the turn applied and carded. */
 export type TurnStreamEventName = 'user' | 'lookup' | 'delta' | 'change' | 'reset' | 'done' | 'error';
 
 export interface TurnStreamFrame {

@@ -75,12 +75,7 @@ export class TurnEventRepository {
     return run ?? null;
   }
 
-  /**
-   * Deletes every frame of a run whose terminal frame is older than `endedBefore`, and of a run that never wrote one but whose newest
-   * frame, and the run itself, have shown no life since `abandonedBefore` — settled without its end, or its replica died. A live turn
-   * heartbeats, so it is never swept mid-stream. Null when another replica's sweep holds the lock. The lock is transaction-scoped: a
-   * session lock taken on a pooled connection would be released, or left held, on whichever connection the pool hands out next.
-   */
+  /** Null when another replica's sweep holds the lock, which is transaction-scoped: a session lock on a pooled connection could be released or left held on another connection. */
   prune(endedBefore: Date, abandonedBefore: Date): Promise<number | null> {
     const { turnEvents, workflowRuns } = schema;
     return this.db.transaction(async tx => {

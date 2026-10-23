@@ -43,10 +43,7 @@ export function strandedReveals(items: readonly MilestoneItem[]): { milestone: s
   return stranded ? { milestone: stranded.subjectKey, facts: stranded.dependents ?? [] } : null;
 }
 
-/**
- * Why finalize must refuse this revision's review, or null when it may apply it. `reviews` are every review the chapter has: none at all means
- * the chapter was approved before reviews existed and finalizes on the direct continuity path.
- */
+/** Why finalize must refuse this revision's review, or null when it may apply it; no reviews at all means the chapter finalizes on the direct continuity path. */
 export function reviewRefusal(reviews: readonly ReviewWithItems[], draft: ReviewedRevision): AppError | null {
   if (reviews.length === 0) return null;
   const review = reviews.find(candidate => !candidate.bridgeOnly && candidate.draftRevision === draft.revision);

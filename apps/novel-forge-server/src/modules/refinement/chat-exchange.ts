@@ -37,11 +37,7 @@ function held(section: Pick<ContextSection, 'rendered'>): Refinement.ChatHeldSec
   return { digest: digest(section.rendered), heading: section.rendered.split('\n', 1)[0] ?? '' };
 }
 
-/**
- * A segment's opening turn sends the whole volatile context; every later turn sends only the sections, stable or volatile, that changed
- * since the conversation last received them. A held section that is gone says so; one the budget left out this turn is flagged as possibly
- * stale and forgotten, so it is sent whole when it returns.
- */
+/** The opening turn sends the whole volatile context, later turns only changed sections; a section the budget left out is flagged stale and sent whole on return. */
 export function contextUpdate(
   pack: Pick<AssembledPack, 'sections' | 'omitted' | 'renderedVolatile'>,
   holding?: Readonly<Record<string, Refinement.ChatHeldSection>>,
@@ -58,10 +54,7 @@ export function contextUpdate(
   return { text: `${CHANGED}\n\n${[...changed, ...dropped].join(SECTION_SEPARATOR)}`, sections };
 }
 
-/**
- * The segment the window's latest reply belongs to, while it can still be continued: no compaction since it opened and the same playbook.
- * A reply without an exchange — a turn the gateway kept no session for — leaves nothing to continue.
- */
+/** The segment the latest reply belongs to while it can be continued: no compaction since, same playbook, and the reply has an exchange. */
 export function heldSegment(rows: readonly Refinement.ChatMessage[], through: number, playbook: string): ChatSegment | null {
   const latest = rows.filter(row => row.role === 'assistant').at(-1)?.exchange;
   if (!latest) return null;
@@ -70,10 +63,7 @@ export function heldSegment(rows: readonly Refinement.ChatMessage[], through: nu
   return { id: latest.segment, stableContext: opening.stableContext, sections: latest.sections };
 }
 
-/**
- * The window as the segment's turns sent it: each of its turns as its exchange recorded, everything else as `render` writes it. A turn's own
- * message carries the author's, so the author's row is not sent again beside it.
- */
+/** The window as the segment's turns sent it; a turn's own message carries the author's, so the author's row is not sent again. */
 export function replayWindow(rows: readonly Refinement.ChatMessage[], segment: string, render: (row: Refinement.ChatMessage) => BaseMessage[]): BaseMessage[] {
   const replayed = new Set(rows.flatMap(row => (row.role === 'assistant' && row.runId && row.exchange?.segment === segment ? [row.runId] : [])));
   return rows.flatMap(row => {

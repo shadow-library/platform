@@ -46,12 +46,7 @@ function parseRefs(refs: string[]): ParsedRefs {
   return parsed;
 }
 
-/**
- * Loads the current versioning state of every referenced artifact — the shared read used both to
- * capture a proposal's baseline and to detect conflicts at apply time. Unknown refs resolve to
- * "missing" rather than throwing, so a stale ref surfaces as a baseline mismatch, not a crash.
- * Works on a transaction handle as well as the root client.
- */
+/** Versioning state of every referenced artifact, for baselines and conflict checks; an unknown ref resolves to "missing" so staleness is a mismatch, not a crash. */
 const STORY_FIELDS = ['theme', 'readerPromise', 'protagonistKey', 'opposition', 'endingQuestion', 'ending'] as const;
 
 type PremiseRow = Pick<typeof schema.projects.$inferSelect, 'premise' | 'brief' | 'themes' | 'instructions' | (typeof STORY_FIELDS)[number]>;
@@ -206,10 +201,7 @@ function promiseFields(row: PromiseRow, label: string | null): RecordFields {
   };
 }
 
-/**
- * Every ref that exists, mapped to the fields an op of its kind writes — spelled as the op spells them — for the kinds a chat turn may
- * apply without review or could empty; the other kinds map to no fields, since only their existence matters there.
- */
+/** Existing refs mapped to the fields an op of their kind writes, for kinds a turn may apply without review or could empty; other kinds need only existence. */
 export async function loadCurrentRecords(db: DbExecutor, projectId: bigint, refs: string[]): Promise<Map<string, RecordFields>> {
   const states = await loadArtifactStates(db, projectId, refs);
   const existing = refs.filter(ref => states[ref]?.exists);

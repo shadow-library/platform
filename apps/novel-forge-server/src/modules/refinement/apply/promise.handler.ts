@@ -10,9 +10,7 @@ import { type ApplyContext, type ContentOpHandlers } from './apply.types';
 // The union of both promise tables' `status` columns — 'closed' is a thread's paid-off value, 'resolved' a mystery's.
 type PromiseDbStatus = 'open' | 'closed' | 'resolved' | 'dropped';
 
-// promise.update's public vocabulary can neither null a progress chapter, a paid-off chapter, or a label, nor name "dropped" (dropping goes
-// through promise.drop) — only a captured inverse needs any of those, so each rides in on its own field rather than widening the ones a
-// model or author can set.
+// promise.update cannot null a progress chapter, paid-off chapter or label, nor set "dropped"; only a captured inverse needs those, so each rides on its own field.
 type PromiseUpdateRestoreOp = PromiseUpdateOp & {
   restoreLabel?: string | null;
   restoreLastAdvancedChapter?: number | null;
@@ -80,7 +78,6 @@ async function latestChapterNumber(ctx: ApplyContext): Promise<number> {
   return Math.max(chapter?.number ?? 0, draft?.chapter ?? 0);
 }
 
-/** A dropped promise's row is kept (drop never deletes), so only a create's inverse ever hard-deletes — nothing existed before it. */
 async function inversePromise(ctx: ApplyContext, op: PromiseCreateOp | PromiseUpdateOp | PromiseSetPayoffOp | PromiseDropOp): Promise<ContentOp | null> {
   const row = await findPromiseRow(ctx, op.kind, op.key);
   if (!row) {
@@ -192,7 +189,6 @@ async function applyPromiseSetPayoff(ctx: ApplyContext, op: PromiseSetPayoffOp):
   ctx.applied.push({ artifactRef: `promise:${op.kind}:${op.key}`, newRevision: null });
 }
 
-/** A drop is a status change, not a delete — the row (and its history) stays; only a captured inverse of a create hard-deletes. */
 async function applyPromiseDrop(ctx: ApplyContext, op: PromiseDropRestoreOp): Promise<void> {
   const existing = await findPromiseRow(ctx, op.kind, op.key);
   if (!existing) throw AppErrorCode.PMS_001.create();

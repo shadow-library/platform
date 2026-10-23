@@ -76,10 +76,7 @@ export class OpGraph {
   }
 }
 
-/**
- * Drops each model-authored op whose idea the author turned down and whose scope still holds, then every op that cannot stand
- * without a dropped one. An op the author's own words back is never dropped, and neither is anything it leans on — the author re-raised it.
- */
+/** Drops model-authored ops whose idea the author turned down while its scope holds, and ops that lean on them; an op the author's words back is never dropped. */
 export function dropRejectedIdeas(split: ChangeSetSplit, rejected: ReadonlySet<string>, current: ReadonlyMap<string, RecordFields>): IdeaFilterResult {
   const indexes = split.ops.map((_, index) => index);
   const rejectedIndexes = indexes.filter(index => isFilterable(split, index) && rejected.has(ideaIdOf(split.ops[index] as ChangeOp)));

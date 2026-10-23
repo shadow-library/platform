@@ -21,10 +21,7 @@ function sameState(recorded: Ledger.TargetState, current: ArtifactState = MISSIN
   return recorded.exists === current.exists && recorded.revision === current.revision && recorded.contentHash === current.contentHash;
 }
 
-/**
- * `never` holds until the author withdraws it; `not_now` holds while the volume active when it was recorded is still the active one; and
- * `not_this_version` holds while every record the idea would change is exactly as it was when the author turned it down.
- */
+/** `never` holds until withdrawn; `not_now` while the volume active at recording is still active; `not_this_version` while every record the idea would change is unchanged. */
 export function rejectionInScope(entry: IdeaRejectionEntry, context: RejectionContext): boolean {
   if (entry.ideaId === null) return false;
   switch (entry.rejectionScope) {

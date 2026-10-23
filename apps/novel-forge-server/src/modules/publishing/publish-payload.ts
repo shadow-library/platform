@@ -3,10 +3,7 @@ import { chapterContentHash } from '@shadow-library/sdk/publishing';
 
 import { type Chapter } from '@server/database';
 
-/**
- * The complete reader-facing chapter payload — nothing forge-internal may ever be added here. A rating level is
- * metadata about the content rather than the content, so it is reader-safe and crosses; nothing else has been readmitted.
- */
+/** The complete reader-facing chapter payload; a rating level is the one non-prose field that crosses. */
 export interface ReaderChapterPayload {
   title: string;
   content: string;
@@ -21,12 +18,7 @@ function countWords(content: string): number {
   return content.split(/\s+/).filter(Boolean).length;
 }
 
-/**
- * Renders the reader-clean payload for a canonical chapter row. Only reviewer-approved prose columns
- * are read — state jsonb, summaries, refs, and judge output never cross the boundary. The hash covers
- * exactly the fields the reader stores, so an unchanged payload always re-hashes identically and every
- * republish/no-op decision is deterministic.
- */
+/** Reader-clean payload from reviewer-approved prose columns only; the hash covers exactly the fields the reader stores. */
 export function renderChapterPayload(chapter: Pick<Chapter.Row, 'number' | 'title' | 'content' | 'note' | 'wordCount' | 'contentRating'>): ReaderChapterPayload {
   const title = chapter.title?.trim() || `Chapter ${chapter.number}`;
   const content = (chapter.content ?? '').trim();

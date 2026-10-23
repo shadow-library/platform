@@ -60,21 +60,13 @@ export class PublishingController {
     return row;
   }
 
-  /*!
-   * Access
-   */
-
   @Get('/publications/access')
   @RespondFor(200, PublicationAccessResponse)
   getAccess(@Params() params: PublishingProjectParams): Promise<PublicationAccessResponse> {
     return this.accessService.getAccess(params.projectId);
   }
 
-  /**
-   * The organisation comes from the session, never the body: a caller may only share into the
-   * organisation they are currently acting in, and letting the client name one would make this an
-   * endpoint for sharing a novel into an organisation you merely know the id of.
-   */
+  /** The organisation comes from the session, never the body, so a caller can only share into the organisation they are acting in. */
   @Put('/publications/access')
   @RespondFor(200, PublicationAccessResponse)
   async setAccess(@Params() params: PublishingProjectParams, @Body() body: PublicationAccessBody): Promise<PublicationAccessResponse> {
@@ -99,9 +91,7 @@ export class PublishingController {
     return result;
   }
 
-  // Low-latency path: dispatch the reader push right away, with the janitor sweep as the fallback. A
-  // reader outage or revoked grant surfaces as a ledgered per-row failure the janitor retries. Deploys
-  // that prefer batch-only pushing (or a test with no reader) set `PUBLISHING_AUTO_PUSH=false`.
+  // Dispatches the reader push right away with the janitor sweep as fallback; `PUBLISHING_AUTO_PUSH=false` opts into batch-only pushing.
   private async enqueuePublish(projectId: bigint): Promise<void> {
     if (!Config.get('publishing.auto-push')) return;
     const jobId = await this.jobService.enqueue(projectId, 'publish', `publish-${projectId}`);

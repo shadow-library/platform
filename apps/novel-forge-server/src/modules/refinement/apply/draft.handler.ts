@@ -11,7 +11,7 @@ import { rewrittenBody } from '../passage-rewrite';
 import { keptOr } from './apply-rules';
 import { type ApplyContext, type ContentOpHandlers, type Restorable } from './apply.types';
 
-// The same for a removed draft's containment: reverting a removal must bring an isolated draft back isolated, whatever the op's author wrote.
+// A restore carries the draft's containment (`isolated`, `generator`) so reverting a removal brings an isolated draft back isolated, whatever the op's author wrote.
 type DraftRestoreOp = Restorable<DraftUpdateOp, 'title' | 'summary'> & { isolated?: boolean; generator?: Project.ContentGenerator };
 
 function draftRestoreOp(draft: Generation.Draft): ContentOp {
@@ -33,11 +33,7 @@ async function inverseDraft(ctx: ApplyContext, op: DraftUpdateOp | DraftRemoveOp
   return draftRestoreOp(draft);
 }
 
-/**
- * Draft prose is chat-editable only while it is still a draft (chat-hub design decision 2): a final
- * draft or a chapter at/behind the story cursor is locked canon. Every edit lands as a
- * draft_revisions row (source chat_edited), so prose history survives independent of proposal revert.
- */
+/** Draft prose is chat-editable only while a draft: a final draft, or a chapter at/behind the story cursor, is locked canon. */
 async function applyDraftUpdate(ctx: ApplyContext, op: DraftRestoreOp): Promise<void> {
   const project = await ctx.tx.query.projects.findFirst({ where: eq(schema.projects.id, ctx.projectId) });
   if (!project) throw AppErrorCode.PRJ_001.create();
@@ -112,10 +108,8 @@ async function applyDraftRemove(ctx: ApplyContext, op: DraftRemoveOp): Promise<v
 }
 
 /**
- * A chapter's selected rewrites, written through the hand-save path as one `passage_rewritten` revision under the draft's row lock, each where
- * its passage stands now. Refused naming the rewrite whose passage can no longer be found (`RFN_021`), when two of them change the same words, and
- * on a final, isolated or being-written draft. Returns the inverse, read from the locked row: an autosave committed before the lock is part of
- * what the rewrite applied onto, so a revert must keep it.
+ * Writes selected rewrites as one revision under the row lock; refused (`RFN_021`) for a missing passage, overlapping rewrites, or a final, isolated or being-written draft.
+ * The inverse is read from the locked row, so a revert keeps an autosave committed before the lock.
  */
 export async function applyPassageRewrites(ctx: ApplyContext, ops: readonly DraftRewritePassageOp[]): Promise<ContentOp | null> {
   const [first] = ops;

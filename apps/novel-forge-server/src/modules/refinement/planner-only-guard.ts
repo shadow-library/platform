@@ -3,11 +3,7 @@ import { isPlannerOnlyBibleDoc } from '../ai/context/bible-docs';
 export const PLANNER_ONLY_LOOKUP_TOOL = 'get_bible_document';
 export const AUTHOR_NOTES_LOOKUP_TOOL = 'get_notes';
 
-/**
- * The warning a chat turn's cards carry when it read the author's notes, organised timeline or open questions. They name what happens
- * later in the book, and nothing backs them with a scheduled canon fact the writer's scrub could withhold, so a change drawn from them to
- * anything the chapter writer or a reader can see is reviewed by the author rather than applied on its own; only planner-side records still apply.
- */
+/** Planner-only sources are unbacked by a scheduled canon fact the writer's scrub could withhold, so changes drawn from them to writer- or reader-visible records are carded. */
 export const PLANNER_ONLY_WARNING = [
   'This turn drew on your notes, organised timeline or open questions, which only planning steps read, so its changes to what the chapter writer or your readers could see wait for you.',
   'Check none carries later-story material into the story, a brief or a page they read.',

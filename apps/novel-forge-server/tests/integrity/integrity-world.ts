@@ -763,7 +763,7 @@ export class IntegrityWorld {
     };
   }
 
-  /** P4-8: a plan change to what an approved, unfinished chapter teaches or claims takes its approval away. */
+  /** A plan change to what an approved, unfinished chapter teaches or claims takes its approval away. */
   private expectPlanChangeResets(chapter: number, draft: Row | undefined, brief: Row | undefined): void {
     const now = this.store.rows(schema.briefs).find(row => row['chapter'] === chapter);
     const claims = (row: Row | undefined) => stable([...((row?.['claimedMilestones'] as string[] | null) ?? [])].sort());

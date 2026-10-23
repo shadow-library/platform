@@ -32,10 +32,7 @@ function errorFrame(code: AppErrorCode): TurnStreamFrame {
   return { event: 'error', data: JSON.stringify(code.create().toResponse()) };
 }
 
-/**
- * Why a stream ended without its own terminal frame. A settled run cannot be answered with `done`, which needs the reply the frame was
- * to carry, so each settled status gets an error that says what happened to the turn.
- */
+/** Why a stream ended without its own terminal frame; a settled run cannot be answered with `done` (it needs the reply), so each status gets an error saying what happened. */
 function endingOf(run: TurnRunLiveness | null): AppErrorCode {
   if (!run) return AppErrorCode.CHT_007;
   if (run.status === 'running') return AppErrorCode.CHT_013;
@@ -43,12 +40,7 @@ function endingOf(run: TurnRunLiveness | null): AppErrorCode {
   return run.status === 'failed' ? AppErrorCode.CHT_015 : AppErrorCode.CHT_014;
 }
 
-/**
- * The reading half of one client's turn stream, on whichever replica it connected to. With no cursor it replays from the start behind a
- * leading `reset` — a client without a cursor may already hold a partial reply from a connection that never got an id — and with one it
- * resumes after it. It reads until a terminal frame, or until the run's replica has gone silent, when it ends the stream with an `error`
- * of its own rather than leave the client waiting on frames nobody will write.
- */
+/** Reads one client's turn stream on any replica: no cursor replays behind a leading `reset`, a cursor resumes; ends with its own `error` once the run's replica goes silent. */
 export class TurnEventFollower {
   private readonly logger = Logger.getLogger(APP_NAME, TurnEventFollower.name);
   private readonly pollMs: number;

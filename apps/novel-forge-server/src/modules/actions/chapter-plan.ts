@@ -71,7 +71,7 @@ interface PromiseCandidate {
   payoffWindow: number | null;
   due: boolean;
   dueBy: PromiseDueBy;
-  /** P4-41b: a payoff volume's goal being met is past due, not merely due — ranked with an authored chapter window rather than below it. */
+  /** A payoff volume's goal being met is past due, not merely due — ranked with an authored chapter window rather than below it. */
   overdue: boolean;
 }
 
@@ -90,8 +90,8 @@ function hookObligation(chapter: number, ending: unknown): PlanObligation | null
 }
 
 /**
- * Overdue (an authored chapter window passed, or a payoff volume's goal was already met) outranks merely due (a payoff milestone reached,
- * or a payoff volume now active — P4-41b), which outranks not due; ties break by longest-quiet, then by ref.
+ * Overdue (an authored chapter window passed, or a payoff volume's goal was already met) outranks merely due (a payoff milestone reached, or a payoff volume now active), which
+ * outranks not due; ties break by longest-quiet, then by ref.
  */
 function byUrgency(left: PromiseCandidate, right: PromiseCandidate): number {
   const rank = (candidate: PromiseCandidate): number => (candidate.overdue ? 0 : candidate.due ? 1 : 2);
@@ -117,8 +117,7 @@ function candidate(
   const standing = resolvePromiseDueStanding(row, chapter, milestoneStates, volumeStates);
   const dueByChapter = row.payoffWindow !== null && row.payoffWindow <= chapter;
   const dueByMilestone = row.payoffMilestoneKey !== null && milestoneStates?.get(row.payoffMilestoneKey) === 'reached';
-  // P4-41b: the payoff volume being the one now underway is the reminder to close the promise before it wraps; the volume already having
-  // met its goal is the promise having missed that window — overdue, not merely due.
+  // A payoff volume now underway is the reminder to close the promise before it wraps; one that already met its goal means the window was missed — overdue, not merely due.
   const dueBy: PromiseDueBy = dueByChapter ? 'chapter' : dueByMilestone ? 'milestone' : standing !== 'not_due' ? 'volume' : null;
   return {
     ref: `${kind}:${key}`,
@@ -279,9 +278,8 @@ export function emptyPlanOp(input: PlanOpInput): PlanCardOp {
 }
 
 /**
- * The whole plan, every field explicit so a replan leaves nothing of the plan it replaces. The writer's knowledge is pooled over exactly the
- * scenes' points of view (§4.4); only a plan whose scenes name none falls back to the planner's own list. Never carries a content mode: the
- * chapter keeps its own, or starts from the project's, until the author changes it on the card.
+ * The whole plan, every field explicit so a replan leaves nothing of the plan it replaces. The writer's knowledge is pooled over exactly the scenes' points of view;
+ * only a plan whose scenes name none falls back to the planner's own list. Never carries a content mode: the chapter keeps its own, or starts from the project's.
  */
 export function chapterPlanOp(input: PlanOpInput & { existing: ExistingPlan | null; vetted: VettedPlan; contextRefs: string[] }): PlanCardOp {
   const { plan, claimedMilestones } = input.vetted;

@@ -29,11 +29,7 @@ export class BibleTidyService {
     return items;
   }
 
-  /**
-   * Re-analyses the bible and stages only the chosen items as one proposal, then applies it — so the result sits in the
-   * change history and one revert undoes it. An id the fresh analysis no longer yields means its content moved since the
-   * preview, and nothing is applied.
-   */
+  /** Re-analyses and applies the chosen items as one proposal (one revert undoes it); an id the fresh analysis no longer yields means its content moved, so nothing applies. */
   async apply(projectId: bigint, selections: readonly TidySelection[]): Promise<ApplyResult> {
     const unique = [...new Map(selections.map(selection => [selection.id, selection])).values()];
     // One snapshot for the analysis and the proposal baseline: an edit landing in between would otherwise enter the

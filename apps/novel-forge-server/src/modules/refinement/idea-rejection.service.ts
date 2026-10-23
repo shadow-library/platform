@@ -32,11 +32,7 @@ export class IdeaRejectionService {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
 
-  /**
-   * Records the author turning down one op of a card as a Notebook rejection keyed by its idea, anchored to what the scope is measured
-   * against now. Turning the same idea down again replaces the earlier scope rather than stacking a second entry. With `tx` it records
-   * inside the caller's transaction, anchored to what that transaction has written so far.
-   */
+  /** Records a declined op as a Notebook rejection keyed by its idea; repeating replaces the earlier scope; with `tx` it anchors to that transaction's writes. */
   async reject(projectId: bigint, proposalId: bigint, opIndex: number, input: IdeaRejectionInput, tx?: PrimaryTransaction): Promise<Ledger.Entry> {
     const proposal = await this.proposalService.get(projectId, proposalId);
     const op = (proposal.changeSet as ChangeOp[])[opIndex];

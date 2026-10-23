@@ -203,12 +203,7 @@ export class ChatService {
     return (await this.notesStore.read(projectId)).text;
   }
 
-  /**
-   * The turn currently running for this session — the recovery signal a refresh or a second tab uses to
-   * show that Forge is working (the user message is already persisted, the reply is not yet). `graph`
-   * and `startedAt` are what let the client name the phase and count the wait rather than showing a bare
-   * spinner. Bounded by a generous cutoff so an orphaned run can never pin the indicator on.
-   */
+  /** The running turn, the recovery signal for a refresh or second tab; bounded by a cutoff so an orphaned run never pins the indicator. */
   async pendingTurn(projectId: bigint, sessionId: string): Promise<PendingTurn | null> {
     const cutoff = new Date(Date.now() - PENDING_TURN_MAX_AGE_MS);
     const row = await this.db.query.workflowRuns.findFirst({
@@ -234,13 +229,7 @@ export class ChatService {
     return { pendingTurn, failedTurn, lastOrdinal };
   }
 
-  /**
-   * The turn that died or was stopped, for a session whose transcript ends on an unanswered user message.
-   * Without this the transcript is a mystery on reload — a `cancelled` run is the author stopping the turn
-   * deliberately (terminal, not a failure, never auto-retried) and must read as that, not as a generic
-   * failure or a phantom pending state. Reported only while it is the last thing that happened — any
-   * assistant message written after the run ended means the author has already moved past it.
-   */
+  /** The turn that died or was stopped, for a transcript ending on an unanswered user message; `cancelled` is deliberate and never auto-retried. */
   async failedTurn(projectId: bigint, sessionId: string): Promise<FailedTurn | null> {
     const run = await this.db.query.workflowRuns.findFirst({
       where: and(
@@ -276,14 +265,6 @@ export class ChatService {
     };
   }
 
-  /**
-   * One chat turn: guard, compact if needed, assemble the hub pack, one structured
-   * call through the repair ladder, then persist the exchange and stage any proposed change-set —
-   * all correlated under a fresh workflow run.
-   *
-   * With an `emitter` the reply streams as it decodes and the declared lookups are reported as they run;
-   * without one the turn is byte-for-byte what it was, down to going through `modelRouter.structured`.
-   */
   async turn(projectId: bigint, sessionId: string, content: string, emitter?: ChatTurnEmitter, options: ChatTurnOptions = {}): Promise<ChatTurnResult> {
     const trace = new TurnTraceCollector();
     const session = await this.sessions.getSession(projectId, sessionId);
@@ -341,9 +322,7 @@ export class ChatService {
       // Compaction, when it ran, always precedes this run's creation — it cannot name this run as its
       // parent at its own creation time, so the link is completed here instead, as soon as the id exists.
       if (compactionRunId) await this.workflowRunService.setParentRun(compactionRunId, runId);
-      // Persist the user's message before the model call: the running chat-turn run plus this
-      // as-yet-unanswered message is what lets a refresh or a second tab recover the in-flight turn
-      // (design recovery). The reply lands in persistAssistantTurn once the model returns.
+      // Persist the user's message before the model call: the running run plus this unanswered message lets a refresh or second tab recover the in-flight turn.
       const userMessage = await this.persistUserMessage(projectId, session, { content, contexts, rendered: message }, runId);
       relay?.userMessage(userMessage);
       // Not awaited: must overlap the turn, not delay it. Its own workflow run, not this one — this
@@ -430,10 +409,7 @@ export class ChatService {
     return { ...result, runId };
   }
 
-  /**
-   * Routes the reply under the turn's selection: the chat's own model pin, then the tier's route. An unrestricted reply goes through the
-   * unrestricted route, which reaches an unrestricted model only where the catalog routes `content_mode: unrestricted` for the tier.
-   */
+  /** An unrestricted reply reaches an unrestricted model only where the catalog routes `content_mode: unrestricted` for the tier. */
   private async routeChatReply(projectId: bigint, session: Refinement.ChatSession, project: ProjectConfig | undefined, selection: ChatSelection): Promise<ChatReplyRoute> {
     const call = { role: 'chat' as const };
     const base = aliasRoutedProject(project, session, selection, await this.catalog?.offeredChatAliases(selection));

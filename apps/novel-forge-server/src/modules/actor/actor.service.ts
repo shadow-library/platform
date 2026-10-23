@@ -25,11 +25,9 @@ export interface ProjectOwnerColumns {
 }
 
 /**
- * A bot works on its organisation's behalf and nobody can hand a record back to it — the ownership guard's
- * sharing branch admits users only — so anything a bot creates is shared with its organisation from the
- * start. Unshared, a bot-owned project would be reachable by that one bot and by no person at all. The rule
- * lives here rather than at each call site so every create path agrees: create, clone and novel import.
- * A user-owned project carries no organisation, so sharing it would share it with nobody.
+ * A bot works on its organisation's behalf and the ownership guard's sharing branch admits users only, so bot-created projects are shared with the organisation from the start,
+ * or no person could reach them.
+ * Centralised so create, clone and import agree; a user-owned project has no organisation to share with.
  */
 export function projectOwnerColumns(actor: Actor): ProjectOwnerColumns {
   const isBot = actor.kind === 'bot';
@@ -45,11 +43,7 @@ function toId(value: string | undefined): bigint | null {
   }
 }
 
-/**
- * Resolves the caller into the owner every record is attributed to. A bot's `sub` is its OAuth client id
- * (`bot_…`), so its numeric identity is the `bot_id` claim instead — which is the whole reason the derivation
- * lives here rather than as a `BigInt(principal.sub)` in each service.
- */
+/** Resolves the caller into the owner every record is attributed to; a bot's `sub` is its OAuth client id (`bot_…`), so its numeric identity is the `bot_id` claim instead. */
 @Injectable()
 export class ActorService {
   constructor(private readonly context: ContextService) {}

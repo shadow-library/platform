@@ -16,13 +16,10 @@ export interface AmendRepublishPayload {
 }
 
 /**
- * Decides whether amending a finalized chapter's prose owes the reader a republish. The rendered
- * `contentHash` is the only signal: an amendment that leaves it where it was is invisible past the
- * publish boundary, and rescheduling on it would churn every reader's feed for nothing.
- *
- * An `unpublished` row is left completely alone — status is the author's withdrawal decision, and
- * scheduling it would push a chapter back to readers who were meant to lose it. Its stale
- * `contentHash` is deliberate too: a later `publishChapter` compares against it and sees the move.
+ * Decides whether amending a finalized chapter's prose owes the reader a republish. The rendered `contentHash` is the only signal: an amendment that leaves it where it was is
+ * invisible past the publish boundary.
+ * An `unpublished` row is left completely alone — status is the author's withdrawal decision — and its stale `contentHash` is deliberate: a later `publishChapter` compares
+ * against it and sees the move.
  */
 export function decideAmendRepublish(ledger: AmendLedgerRow | null, contentHash: string): AmendRepublishDecision {
   if (!ledger) return { republish: false, reason: 'never-published' };
@@ -31,12 +28,7 @@ export function decideAmendRepublish(ledger: AmendLedgerRow | null, contentHash:
   return { republish: true, revision: ledger.revision + 1 };
 }
 
-/**
- * Applies that decision to the ledger.
- *
- * `publishedOrdinal` is absent from the set clause on purpose: it is the reader's URL, frozen the moment
- * the chapter first published.
- */
+/** Applies that decision to the ledger; `publishedOrdinal` is absent from the set clause on purpose, since it is the reader's URL, frozen when the chapter first published. */
 export async function applyAmendRepublish(tx: DbExecutor, projectId: bigint, chapter: number, payload: AmendRepublishPayload): Promise<AmendRepublishDecision> {
   const ledger = await tx.query.chapterPublications.findFirst({
     where: and(eq(schema.chapterPublications.projectId, projectId), eq(schema.chapterPublications.chapter, chapter)),

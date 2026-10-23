@@ -13,11 +13,10 @@ function isEmptyState(state: Record<string, unknown> | null | undefined): boolea
 }
 
 /**
- * An isolated chapter's own summary and state are what the unrestricted route reads for the *next* isolated chapter
- * (standard calls read its approved bridge instead). A null/missing summary, a blank or whitespace-only one, and a `{}`
- * state all render a section indistinguishable from empty, so the gate refuses every one of those — not only the null
- * case. A non-isolated draft is never gated on `state` — only an isolated one carries continuation state at all — but
- * every draft's summary is gated in `finalizeRefusals` (`CHP_010`), not here.
+ * An isolated chapter's own summary and state are what the unrestricted route reads for the next isolated chapter (standard calls read its approved bridge instead), so the gate
+ * refuses a null, blank or whitespace-only summary and a `{}` state,
+ * all of which render a section indistinguishable from empty. A non-isolated draft is never gated on `state`; every draft's summary is gated in `finalizeRefusals` (`CHP_010`),
+ * not here.
  */
 export function isFinalizable(draft: FinalizableDraft): boolean {
   if (!draft.isolated) return true;

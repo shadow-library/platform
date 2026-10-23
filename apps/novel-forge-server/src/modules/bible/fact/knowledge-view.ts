@@ -169,8 +169,8 @@ export async function loadKnowledgeView(
 }
 
 /**
- * The reader-knows label (§4.2): what the reader already read that the POV cast has not learned, so the writer can play on it without the
- * cast acting on it. The fact's writer note is the behaviour it still constrains.
+ * The reader-knows label: what the reader already read that the POV cast has not learned, so the writer can play on it without the cast acting on it; the fact's writer note is
+ * the behaviour it still constrains.
  */
 export function renderReaderKnows(facts: FactLike[], pov: readonly PovMember[]): string {
   const cast = pov.length > 0 ? pov.map(member => member.name).join(', ') : 'the point-of-view cast';

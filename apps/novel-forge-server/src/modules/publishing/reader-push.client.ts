@@ -121,11 +121,7 @@ export class StaleRevisionError extends Error {
   }
 }
 
-/**
- * A 409 the reader attributed to no error code. Handled exactly as a stale revision is — fatal,
- * ledgered, never swept — because retrying a conflict nobody has read is the outcome that must not
- * happen; it claims no cause, since which of the reader's conflicts fired is precisely what is unknown.
- */
+/** A 409 with no error code: handled as a stale revision (fatal, ledgered, never swept), since retrying a conflict nobody has read is the outcome to avoid. */
 export class UnknownConflictError extends Error {
   constructor(
     readonly slug: string,
@@ -183,14 +179,7 @@ function describeRejection(data: unknown): string {
   return parts.length > 0 ? ` (${parts.join(': ')})` : '';
 }
 
-/**
- * The one-way HTTP client for the reader's `/internal/*` surface. Every
- * call rides an identity-issued M2M token addressed to `api://web-novel` and carrying the
- * cross-application scope `web-novel:publish`, minted by the DI-injected `AuthClient` — built from the
- * forge's own `AUTH_*` registration, no separate credential to configure. A mint or transport failure
- * (reader unreachable, a revoked cross-application grant) fails the push soft, ledgered as an error,
- * while every non-publishing feature stays untouched. The request-timeout budget is `AUTH_TIMEOUT`.
- */
+/** One-way client for the reader's `/internal/*` surface; a mint or transport failure of the M2M token fails the push soft, ledgered as an error. */
 @Injectable()
 export class ReaderPushClient {
   private readonly logger = Logger.getLogger(APP_NAME, ReaderPushClient.name);

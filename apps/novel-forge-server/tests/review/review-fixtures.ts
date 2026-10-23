@@ -49,7 +49,6 @@ export interface ReviewFakeOptions {
   draftMoved?: boolean;
   /** An autosave folds new text into the revision while the model reads it: same revision, next save sequence. */
   foldWhileReading?: boolean;
-  /** The model the unrestricted route resolves, to try one off the allowlist. */
   /** The writer's required material is over its limits, so an enforcing pack request fails. */
   overCaps?: boolean;
   /** What the run's telemetry recorded for its model call. */

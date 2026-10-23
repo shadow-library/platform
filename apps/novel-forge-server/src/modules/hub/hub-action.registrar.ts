@@ -18,9 +18,8 @@ function pendingChainProposal(proposal: Refinement.Proposal, runId: string, summ
 }
 
 /**
- * Wires every chat action to the service that performs it. Lives outside the
- * refinement module because GenerationModule imports RefinementModule — this module sits above both
- * and pushes closures down into the dependency-free registry at bootstrap.
+ * Wires every chat action to the service that performs it; lives outside RefinementModule because GenerationModule imports it, and pushes closures down into the dependency-free
+ * registry at bootstrap.
  */
 @Injectable()
 export class HubActionRegistrar {

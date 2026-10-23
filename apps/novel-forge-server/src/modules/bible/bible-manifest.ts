@@ -129,10 +129,7 @@ export const BIBLE_MANIFEST: readonly BibleChapterSpec[] = [
   },
 ];
 
-/**
- * Where the builder wrote each stage before the manifest existed. The slugs never overlapped the
- * auditor's, so a built bible read as entirely missing; migration 0040 rewrites these in place.
- */
+/** Where the builder wrote each stage before the manifest existed; its slugs never overlapped the auditor's, so a bible built there read as entirely missing. */
 export const LEGACY_CHAPTER_SLUGS: readonly { section: string; slug: string; stage: BibleStage }[] = [
   { section: 'project', slug: 'foundation', stage: 'foundation' },
   { section: 'world', slug: 'world-power', stage: 'world' },

@@ -93,12 +93,7 @@ export interface BuildWikiProjectionsInput {
 /** The reader's wiki entry-key route pattern; a key that cannot satisfy it can never be pushed, so it is skipped. */
 const ENTRY_KEY_PATTERN = /^[A-Za-z0-9._-]{1,128}$/;
 
-/**
- * Translates a forge chapter number to its reader ordinal for spoiler gating. A `null`/`undefined` chapter
- * is pre-story knowledge, visible from ordinal 0. A chapter with no **published** ordinal returns `null` —
- * the caller drops that fragment entirely (absence, not gating): it reappears automatically once the chapter
- * publishes and the next converge re-derives the projection.
- */
+/** Forge chapter number to reader ordinal; null/undefined is pre-story (0), and an unpublished chapter yields `null` so the caller drops the fragment until a later converge. */
 function ordinalOf(chapter: number | null | undefined, ordinalByChapter: Map<number, number>): number | null {
   if (chapter === null || chapter === undefined) return 0;
   return ordinalByChapter.get(chapter) ?? null;
@@ -154,11 +149,7 @@ interface RawFacet {
   visibleFromOrdinal: number;
 }
 
-/**
- * One facet per related target, its observations rendered in chapter order. An observation whose chapter has
- * no published ordinal is dropped; the facet becomes visible at the earliest **published** observation's
- * ordinal (relationship existence is established at first sighting — the incremental notes ride with it).
- */
+/** One facet per related target in chapter order, visible from the earliest published observation; observations in unpublished chapters are dropped. */
 function buildRelationshipFacets(relationships: WikiRelationshipInput[], ordinalByChapter: Map<number, number>, nameByKey: Map<string, string>): RawFacet[] {
   const byTarget = new Map<string, WikiRelationshipInput[]>();
   for (const relationship of relationships) {
@@ -184,11 +175,7 @@ function buildRelationshipFacets(relationships: WikiRelationshipInput[], ordinal
   return facets;
 }
 
-/**
- * One facet per canon fact whose subjects include this entity. A fact with no ledger rows is never revealed —
- * pure spoiler, never included. A fact is stamped at its earliest reveal chapter's ordinal; if that specific
- * chapter is not yet published the whole fact is withheld (absence, not gating), reappearing on a later converge.
- */
+/** One facet per canon fact naming this entity, at its earliest reveal ordinal; withheld if never revealed or that chapter is unpublished. */
 function buildFactFacets(entityKey: string, facts: WikiFactInput[], ordinalByChapter: Map<number, number>): RawFacet[] {
   const facets: RawFacet[] = [];
   for (const fact of [...facts].sort((a, b) => a.factKey.localeCompare(b.factKey))) {
@@ -208,8 +195,7 @@ function projectEntity(
   nameByKey: Map<string, string>,
   headlineGate: boolean,
 ): WikiEntryProjection | null {
-  // The entity's own first-visible ordinal. `null` means it is first seen in an unpublished chapter, so its
-  // profile/alias facets (and any fragment gated on that first sighting) are withheld until the chapter lands.
+  // First-visible ordinal; `null` means first seen in an unpublished chapter, so facets gated on that sighting are withheld.
   const baseOrdinal = ordinalOf(entity.firstSeenChapter, ordinalByChapter);
 
   const raw: RawFacet[] = [];
@@ -226,17 +212,15 @@ function projectEntity(
   const facets: WikiFacet[] = raw.map((facet, index) => ({ facetKey: facet.facetKey, content: facet.content, sortOrder: index, visibleFromOrdinal: facet.visibleFromOrdinal }));
 
   const firstVisibleOrdinal = Math.min(...facets.map(facet => facet.visibleFromOrdinal));
-  // Rows written before images were dated keep the visibility they always had, so an author never finds a published thumbnail gone:
-  // the portrait heads the entry and the gallery shares the entity's first-visible ordinal.
+  // Images written before dating keep their old visibility: the portrait heads the entry and the gallery shares the entity's first-visible ordinal.
   const legacyOrdinal = Math.max(0, baseOrdinal ?? 0);
   const depictedOrdinal = (depictsChapter: number | null | undefined): number | null => {
     if (depictsChapter === null || depictsChapter === undefined) return legacyOrdinal;
     return depictsChapter === 0 ? 0 : ordinalOf(depictsChapter, ordinalByChapter);
   };
 
-  // A dated portrait later than its entry heads it under its own gate, so a caught-up reader keeps the list thumbnail. A reader that cannot
-  // gate the headline would show it to everyone, so for one the portrait joins the per-image gated gallery instead. Only a gate later than the
-  // entry is ever sent: an earlier-dated or undated portrait keeps the payload, and so the hash, it always had.
+  // A dated portrait later than its entry heads it under its own gate; a reader that cannot gate the headline gets it in the gated gallery instead.
+  // Earlier or undated portraits keep the payload, and so the hash, they always had.
   const portraitOrdinal = entity.imageRef ? depictedOrdinal(entity.imageDepictsChapter) : null;
   const datedPortrait = entity.imageDepictsChapter !== null && entity.imageDepictsChapter !== undefined;
   const latePortraitOrdinal = datedPortrait && portraitOrdinal !== null && portraitOrdinal > firstVisibleOrdinal ? portraitOrdinal : undefined;
@@ -270,12 +254,7 @@ function projectEntity(
   return { entryKey: entity.entityKey, contentHash: wikiEntryContentHash(payload), payload };
 }
 
-/**
- * The pure, deterministic wiki projection: given a project's entities (+aliases/images/relationships), canon
- * facts with their reveal ledger, and the published chapter→ordinal map, produce one spoiler-gated payload per
- * visible entity. Same input always yields the same payloads and hashes. `hidden` entities, invalid-key entities,
- * and zero-facet entities are omitted — the ledger diff turns each omission into a reader-side delete.
- */
+/** Hidden, invalid-key and zero-facet entities are omitted; the ledger diff turns each omission into a delete. */
 export function buildWikiProjections(input: BuildWikiProjectionsInput): WikiEntryProjection[] {
   const nameByKey = new Map(input.entities.map(entity => [entity.entityKey, entity.name]));
   const projections: WikiEntryProjection[] = [];

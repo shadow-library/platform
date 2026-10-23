@@ -190,10 +190,7 @@ function excerpt(text: string): string {
 
 const STATEMENT_REQUEST = /\b(?:say|says|saying|state|states|stating|rule|spell out|make (?:it )?clear|write that|note that|add a line)\b/i;
 
-/**
- * The terms an author asked to be written as absent ("add a line saying no X appears"): only a message that asks for a
- * statement counts, because "make him a mender instead of the Ashen Hand" asks for a removal, not for a denial.
- */
+/** Terms the author asked to be written as absent; only a message asking for a statement counts, since "instead of X" asks for a removal, not a denial. */
 export function requestedNegations(message: string): Set<string> {
   const terms = new Set<string>();
   if (!STATEMENT_REQUEST.test(message)) return terms;
@@ -201,11 +198,7 @@ export function requestedNegations(message: string): Set<string> {
   return terms;
 }
 
-/**
- * A term the old text stated plainly and the new text keeps only under a negation ("no X", "without X", "X is not…")
- * was removed by writing its absence, which re-primes every later reader with the idea the edit meant to drop.
- * A term the new text still states plainly anywhere, or that the old text only ever negated, is never an echo.
- */
+/** A term the old text stated plainly and the new keeps only under a negation was removed by writing its absence, which re-primes later readers with the dropped idea. */
 export function findNegationEchoes(before: string, after: string, options: NegationEchoOptions = {}): NegationEcho[] {
   const beforePlain = plainTerms(parseClauses(before));
   const afterClauses = parseClauses(after);

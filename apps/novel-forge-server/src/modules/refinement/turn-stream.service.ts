@@ -21,10 +21,8 @@ export function resumeCursorOf(lastEventId: unknown): number | null {
 }
 
 /**
- * The turn stream's server half: the POST starts a turn and answers with its run id, the GET follows that run. The two are separate
- * requests that may reach different replicas, so every frame a turn emits is stored under its run and read back from there. The turn
- * itself is owned by the replica that took the POST, not by either request, so neither a client that never connects nor one that closes
- * its tab mid-reply can abort it.
+ * POST starts the turn and returns its run id; GET follows it. Frames are stored per run because the two requests may hit different replicas,
+ * and the turn is owned by the POST's replica, not either request.
  */
 @Injectable()
 export class TurnStreamService {

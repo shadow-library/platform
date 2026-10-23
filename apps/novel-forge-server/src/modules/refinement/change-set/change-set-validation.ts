@@ -85,13 +85,7 @@ function validatePassageRewrite(record: Record<string, unknown>): string[] {
   return errors;
 }
 
-/**
- * Local models routinely emit the whole doc ref in the section and/or slug field of bible_document
- * ops (`{"section": "project/premise", "slug": "project/premise"}`, sometimes `doc:`-prefixed).
- * The intent is unambiguous, so repair it deterministically instead of burning a model retry:
- * strip a `doc:` prefix, split an embedded `section/slug`, and de-duplicate a section-prefixed slug.
- * Anything that doesn't match a known section is left untouched for validation to reject.
- */
+/** Repairs a whole doc ref emitted into `section`/`slug` of bible_document ops (optional `doc:` prefix, embedded `section/slug`) instead of burning a model retry. */
 function normalizeBibleDocumentOp(record: Record<string, unknown>): void {
   let section = record['section'];
   let slug = record['slug'];
@@ -109,13 +103,7 @@ function normalizeBibleDocumentOp(record: Record<string, unknown>): void {
   record['slug'] = slug;
 }
 
-/**
- * The Story Bible screen lists `entities`, never document bodies, so canon written only as prose into an
- * entity-bearing section is invisible to the author and to every downstream step that reads records.
- * `requiredEntityTypesForSlug` decides what a given address owes, which is what catches an author-named
- * document like `power/supers-and-rifts`. Frontmatter-only edits are exempt, and the rule stays silent for a
- * scope whose vocabulary cannot express `entity.upsert` at all — that scope could never satisfy it.
- */
+/** Prose-only canon in an entity-bearing section is invisible to the Bible, so the edit must carry `entity.upsert`; frontmatter-only edits and scopes lacking it are exempt. */
 function validateEntityMaterialization(ops: readonly unknown[], allowedOps?: readonly OpType[]): string[] {
   if (allowedOps && !allowedOps.includes('entity.upsert')) return [];
 
@@ -147,12 +135,7 @@ export interface ChangeSetValidationOptions {
   entityMaterialization?: boolean;
 }
 
-/**
- * Validates an untrusted change-set structurally, optionally against a scope's allowed-op vocabulary.
- * Returns human-readable errors; an empty array means `value` is a well-formed `ChangeOp[]`.
- * Obviously-malformed-but-unambiguous bible_document refs are normalized in place first (see above),
- * so every staging and apply path repairs them consistently.
- */
+/** Structural validation of an untrusted change-set, optionally against a scope's allowed ops, after normalising bible_document refs in place; empty means well-formed. */
 export function validateChangeSet(value: unknown, allowedOps?: readonly OpType[], options?: ChangeSetValidationOptions): string[] {
   const errors: string[] = [];
   if (!Array.isArray(value)) return ['changeSet must be an array of operations'];

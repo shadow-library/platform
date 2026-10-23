@@ -22,11 +22,7 @@ export type ActionExecutor = (projectId: bigint, action: ActionOp, context: Acti
 /** Why the action would be refused if it ran now, read without starting anything; nothing when it would start. */
 export type ActionRefusal = (projectId: bigint, action: ActionOp) => Promise<AppError | undefined>;
 
-/**
- * Maps action ops to the service calls that perform them. The registry lives here (dependency-free)
- * because GenerationModule already imports RefinementModule — the executors, which need the
- * generation/bible services, are registered by HubActionsModule at bootstrap.
- */
+/** Maps action ops to service calls; dependency-free because GenerationModule already imports RefinementModule, so HubActionsModule registers the executors at bootstrap. */
 @Injectable()
 export class ActionExecutorRegistry {
   private readonly executors = new Map<ActionType, ActionExecutor>();

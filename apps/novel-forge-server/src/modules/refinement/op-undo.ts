@@ -11,9 +11,8 @@ export interface OpUndoRecord {
 }
 
 /**
- * The dependency rule for undoing one change of an applied turn. A change depends on another when it cannot stand without it — it names
- * a record only the other created, or is a page owing the other's entity type — or when it wrote a record the other wrote before it. Undo
- * and redo keep every record's changes a stack: the latest goes first and comes back last.
+ * A change depends on another when it cannot stand without it (names a record only the other created, or is a page owing its entity type) or wrote a record after it.
+ * Undo and redo keep each record's changes a stack: the latest goes first and comes back last.
  */
 export class AppliedOpGraph {
   private readonly graph: OpGraph;

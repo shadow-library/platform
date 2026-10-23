@@ -30,11 +30,7 @@ export class TurnStreamController {
     return { runId };
   }
 
-  /**
-   * Served by any replica, whichever runs the turn. Each stored frame carries its `seq` as the SSE id, so a reconnect resumes after
-   * `Last-Event-ID`; without one the whole turn replays behind a `reset`. The run is resolved before the response is hijacked, so an
-   * unknown or foreign run answers 404 rather than an empty stream.
-   */
+  /** Any replica serves it; each `seq` is the SSE id so a reconnect resumes after `Last-Event-ID`, else the turn replays behind a `reset`. Unknown runs 404 before hijack. */
   @Get('/turns/:runId/stream')
   async streamTurn(@Params() params: TurnStreamParams, @Headers() headers: Record<string, unknown>, @Res() response: HttpResponse): Promise<void> {
     await this.turnStreams.assertRun(params.projectId, params.runId);

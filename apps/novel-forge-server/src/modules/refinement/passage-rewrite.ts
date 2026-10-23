@@ -65,10 +65,7 @@ function occurrences(body: string, passage: string): Span[] {
   return spans;
 }
 
-/**
- * Where a staged rewrite's passage stands in the draft now: at its offsets, or moved by an edit elsewhere when the passage and the text either side
- * of it still occur exactly once. `null` when it is gone, was edited in or around, can no longer be told apart, or the draft was replaced.
- */
+/** Where a staged passage stands now: at its offsets, or moved if it and its surrounding text still occur once; `null` when gone, edited, ambiguous or the draft was replaced. */
 export function locateRewrite(draft: Generation.Draft, op: DraftRewritePassageOp): Span | null {
   const { anchor } = op;
   if (!anchor || anchor.draftId !== String(draft.id)) return null;
@@ -138,11 +135,7 @@ function wholeChapterEdits(ops: readonly ChangeOp[]): Set<number> {
   return new Set(ops.flatMap(op => (op.op === 'draft.update' || op.op === 'draft.remove' ? [op.chapter] : [])));
 }
 
-/**
- * A chat turn's rewrites anchored to the drafts as they stand: each passage must occur once in its chapter, or once within the passage comment it
- * answers, and its anchor is the server's, whatever the model sent. A rewrite that cannot be placed is dropped with its reason rather than guessed
- * at, as is an exact repeat; a `contextIndex` naming no comment on the chapter is dropped from the op.
- */
+/** Anchors a turn's rewrites: each passage must occur once in its chapter (or comment); an unplaceable one is dropped with its reason, never guessed. */
 export async function anchorPassageRewrites(
   db: DraftReader,
   projectId: bigint,
@@ -175,11 +168,7 @@ export async function anchorPassageRewrites(
   return { ops: kept, dropped };
 }
 
-/**
- * Staging's own check, for every route that stages a change-set: a rewrite keeps the occurrence its anchor still finds, moved or not, is anchored
- * afresh when its passage occurs once, and is otherwise refused — never placed by a guess. A chapter rewritten whole in the same change-set refuses
- * its rewrites, so no change-set mixes the two.
- */
+/** Staging check for every route: a rewrite keeps the occurrence its anchor finds, is anchored afresh if its passage occurs once, else refused, never guessed. */
 export async function stampPassageAnchors(db: DraftReader, projectId: bigint, ops: ChangeOp[]): Promise<ChangeOp[]> {
   const rewrites = ops.filter(isPassageRewrite);
   if (rewrites.length === 0) return ops;
@@ -197,11 +186,7 @@ export async function stampPassageAnchors(db: DraftReader, projectId: bigint, op
   });
 }
 
-/**
- * The chapter's body with every selected rewrite in place, each where its passage stands now — an edit elsewhere in the chapter only moves it —
- * written from the end of the text back so each span still holds. Refused whole, naming the rewrite, when a passage can no longer be found
- * (`RFN_021`, so the author can uncheck it and apply the rest), and when two rewrites change the same words (`RFN_020`).
- */
+/** Body with every selected rewrite in place; refused whole, naming the rewrite, for a missing passage (`RFN_021`) or two rewrites changing the same words (`RFN_020`). */
 export function rewrittenBody(draft: Generation.Draft, rewrites: readonly DraftRewritePassageOp[]): string {
   const located = rewrites
     .map(op => {
@@ -230,11 +215,7 @@ export async function rewriteDrafts(db: DraftReader, projectId: bigint, ops: rea
   return new Map(drafts.map(draft => [draft.chapter, draft]));
 }
 
-/**
- * Whether a newer card leaves an older one standing although they share refs: every shared ref is a draft both rewrite only passage by passage,
- * and each of the older card's passages still stands in it, apart from every newer one. A whole-chapter edit on either side, or a passage of
- * either that can no longer be found, does not.
- */
+/** Whether a newer card leaves an older one standing despite shared refs: both rewrite those drafts passage by passage and each older passage still stands. */
 export function rewritesApart(older: readonly ChangeOp[], newer: readonly ChangeOp[], shared: readonly string[], drafts: ReadonlyMap<number, Generation.Draft>): boolean {
   return shared.every(ref => {
     const olderRewrites = rewritesOn(older, ref);

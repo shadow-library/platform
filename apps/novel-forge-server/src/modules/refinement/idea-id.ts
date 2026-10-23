@@ -21,10 +21,7 @@ function canonical(value: unknown): unknown {
   );
 }
 
-/**
- * The same change proposed twice gets the same id: a hash of the op kind and its declared fields, with text normalised as quotes are
- * (case, whitespace, typography) and metadata — rationale, quote, stamps — left out. Rewording the idea makes it a different one.
- */
+/** The same change proposed twice gets the same id: a hash of op kind and declared fields, text normalised, metadata left out; rewording makes a different idea. */
 export function ideaIdOf(op: ChangeOp): string {
   const fields = opFields(op);
   const content = Object.fromEntries(declaredOpFields(op.op).map(field => [field, fields[field]]));
@@ -52,10 +49,7 @@ function withText(head: string, ...texts: (string | null | undefined)[]): string
   return text ? `${head}: ${clip(text)}` : head;
 }
 
-/**
- * How a turned-down idea reads in the Notebook and to the chat model. A secret's truth, its tells and a planner-only page's body never
- * appear — only what names the record — so the label can ride in any prompt.
- */
+/** How a turned-down idea reads in the Notebook and to the model; never a secret's truth, tells or a planner-only body, so it can ride in any prompt. */
 export function ideaLabel(op: ContentOp): string {
   switch (op.op) {
     case 'premise.update':

@@ -59,10 +59,7 @@ export function bindApprovalRevision(op: ActionOp, applied: readonly AppliedArti
   return typeof written?.newRevision === 'number' ? { ...op, revision: written.newRevision, saveSeq: written.newSaveSeq, draftId: written.newDraftId?.toString() } : op;
 }
 
-/**
- * The one-way doors: finalize locks prose, so it is not covered by the revert guarantee. A blanket apply refuses them, so the author must
- * select the op's own index to walk through the door.
- */
+/** The one-way doors: finalize locks prose and is not covered by the revert guarantee, so a blanket apply refuses them and the author selects the op's own index. */
 const ONE_WAY_DOORS: Partial<Record<ActionOp['op'], ErrorCode>> = {
   'action.finalize': AppErrorCode.RFN_009,
   'action.approve_draft': AppErrorCode.DRF_009,
@@ -71,10 +68,7 @@ const ONE_WAY_DOORS: Partial<Record<ActionOp['op'], ErrorCode>> = {
   'action.advance_volume': AppErrorCode.VOL_004,
 };
 
-/**
- * Every selected rewrite of a chapter lands as one revision, so they are written together where the first of them stands. Staging refuses a
- * change-set that also rewrites one of those chapters whole, which the baseline check would otherwise wave through.
- */
+/** Selected rewrites of a chapter land as one revision; staging refuses a change-set that also rewrites the chapter whole, which the baseline check would wave through. */
 function rewritesByChapter(ops: readonly ContentOp[]): Map<number, DraftRewritePassageOp[]> {
   const byChapter = new Map<number, DraftRewritePassageOp[]>();
   for (const op of ops) if (isPassageRewrite(op)) byChapter.set(op.chapter, [...(byChapter.get(op.chapter) ?? []), op]);
@@ -105,16 +99,9 @@ export class ProposalApplyService {
   }
 
   /**
-   * Applies a pending proposal: lock, per-op selection (cherry-pick),
-   * baseline conflict check over the selected refs, guarded op dispatch with inverse capture,
-   * staleness propagation, audit. Content ops are transactional; selected actions execute after
-   * commit, sequentially, with their outcomes folded into opResults. An automatic apply carries content ops only, and a blanket apply
-   * refuses the one-way doors. On its own transaction, a
-   * baseline mismatch commits only the `conflicted` status flip and surfaces as HTTP 409; any other
-   * failure rolls the whole transaction back and leaves the proposal pending. With `options.tx`
-   * everything runs inside the caller's transaction instead: the 409 is thrown with the flip still
-   * uncommitted, so it persists only if the caller catches the error and commits anyway, and action
-   * ops are refused because nothing has committed for them to run after.
+   * Content ops are transactional; selected actions run after commit, sequentially, outcomes folded into opResults. A blanket apply refuses the one-way doors.
+   * On its own transaction a baseline mismatch commits only the `conflicted` flip and surfaces as 409; any other failure rolls back and leaves the proposal pending.
+   * With `options.tx` the 409 is thrown with the flip uncommitted, and actions are refused since nothing has committed for them to follow.
    */
   async apply(projectId: bigint, proposalId: bigint, options?: ApplyOptions): Promise<ApplyResult> {
     this.logger.debug('apply: starting', { projectId, proposalId, opIndexes: options?.opIndexes, autoApplied: options?.autoApplied });
@@ -255,11 +242,7 @@ export class ProposalApplyService {
     return unique;
   }
 
-  /**
-   * Runs the selected actions after the content transaction committed (they enqueue jobs and run AI
-   * chains — no DB transaction can span them). Sequential and fail-fast: a failed action records its
-   * error and stops the rest; already-applied content stays applied.
-   */
+  /** Runs selected actions after the content commit (they enqueue jobs and run AI chains); sequential and fail-fast, already-applied content stays applied. */
   private async executeActions(
     projectId: bigint,
     proposal: Refinement.Proposal,
@@ -302,10 +285,7 @@ export class ProposalApplyService {
     return { proposal: updated ?? proposal, opResults: results };
   }
 
-  /**
-   * The tier of the chat turn that staged the proposal, so the actions it proposed run at the tier the author chose for that turn — also
-   * when the author applies them later. Anything else leaves the caller's scope, and failing that the project's tier, in charge.
-   */
+  /** The tier of the chat turn that staged the proposal, so its actions run at the tier chosen then, even if applied later; else the caller's scope, then the project's. */
   private async turnCostTier(proposal: Refinement.Proposal): Promise<Project.CostTier | undefined> {
     if (!proposal.runId) return undefined;
     const [run] = await this.db

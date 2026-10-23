@@ -41,7 +41,7 @@ export class PromiseService {
           updatedAt: true,
         },
       }),
-      // Never fetch `truthFactKey` here — P4-38: a promise never carries a mystery's truth, key or otherwise.
+      // Never fetch `truthFactKey` here: a promise never carries a mystery's truth, key or otherwise.
       this.db.query.mysteries.findMany({
         where: eq(schema.mysteries.projectId, projectId),
         columns: {

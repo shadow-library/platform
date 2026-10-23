@@ -8,11 +8,8 @@ import { ImportNovelBody, ImportNovelResponse } from './novel-import.dto';
 import { NovelImportService } from './novel-import.service';
 import { NOVEL_IMPORT_BODY_LIMIT_BYTES } from './novel-import.validator';
 
-// `RouteOptions` only declares `method`/`path`, but `@shadow-library/fastify` forwards every extra key
-// on the object straight through to Fastify's native `instance.route(...)` (verified in
-// `fastify-router.js`: only `path/method/schemas/rawBody/cookies/status/headers/redirect/render` are
-// stripped before the spread). `bodyLimit` is Fastify's own per-route override (`route.js`), so this is
-// a real, supported per-route mechanism — not a workaround.
+// `RouteOptions` only declares `method`/`path`, but `@shadow-library/fastify` forwards every other key to Fastify's native `instance.route(...)`, so `bodyLimit` is a supported
+// per-route override.
 interface RouteOptionsWithBodyLimit extends RouteOptions {
   bodyLimit?: number;
 }

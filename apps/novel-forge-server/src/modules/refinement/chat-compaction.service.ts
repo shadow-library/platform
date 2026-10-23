@@ -21,9 +21,7 @@ import { renderQuestionForHistory } from './chat-question';
 import { type ChatSegment, heldSegment, replayWindow } from './chat-exchange';
 import { renderTurnContent, turnScreens } from './passage-context';
 
-// Compaction thresholds: fold history once the verbatim window outgrows its token
-// budget or trails the watermark by more than MAX_VERBATIM_TURNS messages; the newest
-// KEEP_VERBATIM_TURNS messages always stay verbatim.
+// Fold history once the verbatim window outgrows its token budget or trails the watermark by MAX_VERBATIM_TURNS; the newest KEEP_VERBATIM_TURNS stay verbatim.
 const MAX_VERBATIM_TURNS = 12;
 const KEEP_VERBATIM_TURNS = 6;
 const CHAT_COMPACT_GRAPH = 'chat-compact';
@@ -66,20 +64,13 @@ export class ChatCompactionService {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
 
-  /**
-   * Summary + post-watermark verbatim turns as real prompt messages. A standard turn never sees what the unrestricted model wrote: its
-   * replies and a summary it produced are replaced by placeholders, while the author's own messages stay.
-   */
+  /** Summary plus post-watermark turns as prompt messages; a standard turn never sees what the unrestricted model wrote (replies and its summary become placeholders). */
   async buildHistory(session: Refinement.ChatSession, project: ProjectConfig | undefined, turnMode: Project.ContentMode): Promise<BaseMessage[]> {
     const window = await this.window(session, project, turnMode);
     return [...window.opening, ...window.rows.flatMap(window.render)];
   }
 
-  /**
-   * A standard turn's history when the gateway keeps a session for it: the open segment's turns exactly as they were sent, so the request only
-   * appends to the one before. With no segment to continue — a compaction since, another playbook, a reply the gateway kept no session for, or
-   * a segment grown past its budget — the history is the plain window and this turn opens a new segment.
-   */
+  /** A standard turn's history when the gateway keeps a session: the open segment's turns as sent, so requests only append; otherwise the plain window, opening a new segment. */
   async continueConversation(session: Refinement.ChatSession, project: ProjectConfig | undefined, playbook: string): Promise<ChatConversation> {
     const window = await this.window(session, project, 'standard');
     const plain = [...window.opening, ...window.rows.flatMap(window.render)];
@@ -112,15 +103,11 @@ export class ChatCompactionService {
   }
 
   /**
-   * Folds everything up to the newest KEEP_VERBATIM_TURNS messages into the rolling summary once the
-   * verbatim window exceeds `historyBudget` or MAX_VERBATIM_TURNS. Messages are never deleted — the
-   * watermark is a read-time window over the intact transcript. The passed session is advanced in
-   * place so a caller that already loaded it reads the new watermark without a second query.
-   *
-   * The model type only ever rises: the fold runs unrestricted when the novel, the chat, this turn, the prior summary or any folded
-   * reply is unrestricted, and the summary it writes is recorded as unrestricted so standard turns never read it.
+   * Folds older messages into the rolling summary once the window exceeds `historyBudget` or MAX_VERBATIM_TURNS;
+   * messages are never deleted, the watermark is a read-time window over the intact transcript. Advances the passed session in place.
+   * The fold runs unrestricted if the novel, chat, turn, prior summary or any folded reply is, and the summary is then recorded unrestricted so standard turns never read it.
+   * Returns the compaction run's id (undefined if nothing needed folding) so the caller can link it to the turn run once that run exists — compaction always runs before it.
    */
-  /** Returns the compaction run's id (undefined if nothing needed folding) so the caller can link it to the turn run once that run exists — compaction always runs before it. */
   async compactIfNeeded(
     projectId: bigint,
     session: Refinement.ChatSession,

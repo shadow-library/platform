@@ -256,11 +256,7 @@ function stripBrackets(text: string): string {
     .replace(/\s*[)\]]$/, '');
 }
 
-/**
- * Author-only notes addressed to the model rather than the story, found by pattern alone: a whole section under a
- * "Notes for the AI"-style heading, a paragraph or list item that talks about brief fields or the schema, or an inline
- * `(note: …)` aside. Each comes back as the exact span of the body it occupies.
- */
+/** Author-only notes addressed to the model, found by pattern: a "Notes for the AI" section, paragraphs about brief fields or schema, or `(note: …)` asides. */
 export function findAiNotes(body: string): { text: string; start: number; end: number }[] {
   const lines = splitLines(body);
   const notes: { text: string; start: number; end: number }[] = [];
@@ -438,10 +434,7 @@ function aiNotesSlug(section: Bible.Section): string {
   return `${section}-notes`;
 }
 
-/**
- * Everything the tidy-up would change, one reviewable item per change and each with an id that pins the content it
- * was computed from — a document edited after the preview no longer yields the same id, so a stale selection is caught.
- */
+/** One reviewable item per change, each id pinning the content it was computed from, so a document edited after the preview no longer matches a stale selection. */
 export function analyseBibleForTidy(docs: readonly TidyDoc[], entities: readonly TidyEntity[]): TidyItem[] {
   const items: TidyItem[] = [];
   const takenKeys = new Set(entities.map(entity => entity.entityKey));
@@ -513,10 +506,7 @@ interface DocEdit {
   reasons: string[];
 }
 
-/**
- * The selected items as a change-set. Everything aimed at one document — including the notes page that moved notes land
- * on — folds into a single upsert, so no two ops rewrite the same page and each page's revert restores it exactly.
- */
+/** Everything aimed at one document, notes page included, folds into one upsert so no two ops rewrite a page and each page's revert restores it exactly. */
 export function composeTidyChangeSet(docs: readonly TidyDoc[], selected: readonly (TidyItem & { entityTypeOverride?: TidyEntityType })[]): ChangeOp[] {
   const byAddress = new Map(docs.map(doc => [docAddress(doc), doc]));
   const removals: ChangeOp[] = [];

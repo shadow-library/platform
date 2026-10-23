@@ -98,23 +98,14 @@ function isUnsweepable(error: string | null | undefined): boolean {
   return UNSWEEPABLE_ERROR_PREFIXES.some(prefix => error?.startsWith(prefix) === true);
 }
 
-/**
- * A pushed entry the reader no longer serves as ledgered. A matching hash is not enough on a gate-capable reader: a rollback's old code
- * rewrites entries without touching the stored gate column, so after the next upgrade an entry can carry the right hash and a stale gate.
- */
+/** A matching hash is not enough on a gate-capable reader: a rollback's old code rewrites entries without touching the gate column, leaving the right hash and a stale gate. */
 export function isWikiDrifted(row: Publishing.WikiPublication, served: WikiManifestItem | undefined, projection: WikiEntryProjection | undefined, headlineGate: boolean): boolean {
   if (row.state !== 'pushed') return false;
   if (!served || served.contentHash !== row.contentHash) return true;
   return headlineGate && (served.imageVisibleFromOrdinal ?? undefined) !== projection?.payload.imageVisibleFromOrdinal;
 }
 
-/**
- * The convergence engine behind the `publish` job, the janitor sweep, and the reconcile endpoint.
- * One pass: push the novel metadata, fetch the reader manifest, then
- * walk the ledger — PUT every due or drifted chapter, DELETE every ledgered-unpublished ordinal the
- * reader still serves, and record per-row failures on the ledger (the row IS the outbox). Every
- * reader call is idempotent, so overlapping runs and replays are always safe.
- */
+/** Convergence engine behind the `publish` job, janitor sweep and reconcile endpoint; reader calls are idempotent, so overlapping runs and replays are safe. */
 @Injectable()
 export class PublishRunner {
   private readonly logger = Logger.getLogger(APP_NAME, PublishRunner.name);
@@ -144,8 +135,7 @@ export class PublishRunner {
       wiki: { pushed: [], deleted: [], skipped: [], failed: [], unknownEntries: [] },
     };
 
-    // Missing credentials fail soft: every due row gets an actionable ledger error and the caller a
-    // clear PUB_004, while boot and every non-publishing feature stay untouched.
+    // Missing credentials fail soft: due rows get an actionable ledger error and the caller a PUB_004.
     let manifest: Map<number, ManifestItem>;
     try {
       const header = await this.convergeHeader(publication, options, result);
@@ -187,9 +177,7 @@ export class PublishRunner {
       else result.skipped.push(row.publishedOrdinal);
     }
 
-    // Wiki converges after the chapters so it reads their just-updated `published` ordinals in the same pass —
-    // a fact revealed in a chapter published this run becomes visible immediately. It never throws: the chapters
-    // already landed, so a reader hiccup here is ledgered soft and swept, exactly like a failed chapter push.
+    // Wiki converges after the chapters so it reads their fresh `published` ordinals; it never throws — a reader hiccup is ledgered soft and swept.
     await this.convergeWiki(projectId, publication.novelSlug, options, result);
     await this.convergeLateAccess(publication, result);
 
@@ -211,15 +199,7 @@ export class PublishRunner {
     return result;
   }
 
-  /**
-   * Pushes the novel metadata, then the access list, then reads the manifest — the three calls that
-   * must land before any chapter, and the only ones that can discover the slug belongs to someone
-   * else. A `WBN_010` is resolved rather than ledgered: the publication moves to the next free slug
-   * near the one it entered with and the whole header replays under it. Slugs the reader has already
-   * refused in this pass are carried forward, so within a pass the ladder only ever climbs. The push
-   * carries our `sourceRef`, so replaying under a new slug renames the reader's row — chapters, wiki
-   * and access ride along — rather than leaving a populated novel behind at the refused slug.
-   */
+  /** Metadata, access, manifest: must land before any chapter and can reveal a slug conflict; `WBN_010` climbs to the next free slug and replays, renaming via `sourceRef`. */
   private async convergeHeader(
     publication: Publishing.Publication,
     options: ConvergeOptions,
@@ -251,11 +231,7 @@ export class PublishRunner {
         });
         result.novel = novelResult.outcome;
 
-        /**
-         * Access goes second, and always before any chapter. The metadata push carries the tier, so a
-         * novel is created already restricted; the window between the two pushes is one in which
-         * nobody can read it. The reverse order would open a window in which everybody could.
-         */
+        // Access first: the metadata push carries the tier, so the novel is created restricted.
         result.access = await this.convergeAccess(current, options);
 
         const items = await this.pushClient.getManifest(current.novelSlug);
@@ -276,11 +252,7 @@ export class PublishRunner {
     return this.abandonSlugLadder(current, entrySlug);
   }
 
-  /**
-   * The DTO already rejects duplicates and unknown terms on the way in, so this guards the other
-   * direction: retiring a term from the sdk vocabulary leaves stored rows holding it, and the reader
-   * 422s the whole push over one — dropping it keeps the publication convergent until it is re-edited.
-   */
+  /** Drops stored terms the sdk vocabulary no longer has: the DTO rejects them on the way in, but the reader 422s the whole push over one. */
   private vocabulary<T extends Genre | Tag>(stored: unknown, isMember: (value: unknown) => value is T, field: string, projectId: bigint): T[] | undefined {
     if (!Array.isArray(stored) || stored.length === 0) return undefined;
     const kept = [...new Set(stored.filter(isMember))];
@@ -329,17 +301,10 @@ export class PublishRunner {
     }
   }
 
-  /**
-   * One wiki convergence pass, mirroring the chapter loop. Recompute every entity's spoiler-gated projection,
-   * reconcile the outbox ledger against it, then walk the ledger: PUT every due or drifted entry, DELETE every
-   * tombstoned one the reader still serves, and record per-row results. Unlike chapters, the wiki payload is
-   * fully derived (no editorial decision), so the freshly recomputed projection is pushed as-is — there is no
-   * "prose drifted, republish" guard. Never throws: failures are ledgered soft and the job fails on their count.
-   */
+  /** Never throws; the projection is fully derived, so there is no prose-drift guard. */
   private async convergeWiki(projectId: bigint, slug: string, options: ConvergeOptions, result: ConvergeResult): Promise<void> {
-    // The manifest comes first because the projection depends on what the reader can gate: a capability that appears or disappears with a
-    // reader upgrade or rollback changes the affected entries' hashes, so the ledger re-pends and re-pushes exactly those. Without a manifest
-    // the capability is unknown, so the ledger is left as it stands rather than reconciled against a guess.
+    // Manifest first: the projection depends on what the reader can gate and a capability change re-hashes entries; with no manifest the ledger is left alone rather than
+    // reconciled against a guess.
     let manifest: WikiManifest;
     try {
       manifest = await this.pushClient.getWikiManifest(slug);
@@ -417,11 +382,7 @@ export class PublishRunner {
       .where(eq(schema.wikiPublications.id, row.id));
   }
 
-  /**
-   * Re-renders the payload from the canonical chapter and insists it still matches the ledgered
-   * hash: publication is an editorial decision, so silently pushing prose that drifted after the
-   * decision would bypass the author — the row fails with a "republish" hint instead.
-   */
+  /** Drifted prose fails the row with a "republish" hint instead of pushing silently. */
   private async renderLedgeredPayload(projectId: bigint, row: Publishing.ChapterPublication): Promise<Omit<ChapterPushBody, 'revision' | 'publishedAt'> | string> {
     const chapter = await this.db.query.chapters.findFirst({ where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, row.chapter)) });
     if (!chapter || !chapter.content?.trim()) return `canonical chapter ${row.chapter} not found — republish from the current chapter numbering`;
@@ -448,11 +409,7 @@ export class PublishRunner {
       .where(eq(schema.chapterPublications.id, row.id));
   }
 
-  /**
-   * Pushes the share list when it has moved. Reconcile mode reads the reader's copy first and
-   * pushes whenever the two disagree — the access counterpart of the chapter manifest diff, so a
-   * reader rebuilt from empty regains its ACL rather than serving a novel with no grants at all.
-   */
+  /** Pushes the share list when it moved; reconcile reads the reader's copy first and pushes on any disagreement, so a rebuilt reader regains its ACL. */
   private async convergeAccess(publication: Publishing.Publication, options: ConvergeOptions): Promise<'applied' | 'noop'> {
     const subjectIds = await this.accessService.getPushPayload(publication.id);
     const body = {
@@ -475,11 +432,7 @@ export class PublishRunner {
     return result.outcome;
   }
 
-  /**
-   * A share-list change that committed after this pass read the publication row is pushed before the pass ends rather than on the
-   * janitor's next sweep. A failure here is left to that sweep, which converges while the recorded revision trails, because the
-   * chapters of this pass already landed.
-   */
+  /** Pushes a share-list change committed after this pass read the publication; a failure is left to the janitor sweep since the chapters already landed. */
   private async convergeLateAccess(publication: Publishing.Publication, result: ConvergeResult): Promise<void> {
     const latest = await this.db.query.publications.findFirst({ where: eq(schema.publications.id, publication.id) });
     if (!latest || latest.accessRevision === publication.accessRevision) return;

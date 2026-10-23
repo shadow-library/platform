@@ -388,8 +388,8 @@ export async function loadWriterDisclosureSources(db: DisclosureDb, projectId: b
 }
 
 /**
- * What reader-facing art drawn as of `chapter` may carry (P4-51): the writer policy of that chapter, with the ending and the ending question
- * withheld even at or after the ending chapter, since an image prompt never needs them.
+ * What reader-facing art drawn as of `chapter` may carry: that chapter's writer policy, with the ending and the ending question withheld even at or after the ending chapter,
+ * since an image prompt never needs them.
  */
 export async function loadArtDisclosurePolicy(db: DisclosureDb, projectId: bigint, chapter: number): Promise<WriterDisclosurePolicy> {
   const sources = await loadWriterDisclosureSources(db, projectId, chapter);

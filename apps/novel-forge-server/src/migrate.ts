@@ -9,11 +9,8 @@ import { APP_NAME } from '@server/constants';
 import { backfillChatAliasKeys } from '@server/database/chat-alias-backfill';
 
 /**
- * Applies the Drizzle SQL migrations shipped alongside the bundle and provisions
- * the LangGraph checkpointer tables. It reads the same `DATABASE_POSTGRES_URL` the server uses, so the
- * migration job and the app container share one connection contract. `MIGRATIONS_FOLDER` overrides the
- * default `generated/drizzle` — the folder `shadow build` copies next to this entry, resolved from the
- * working directory (the repo root in dev, `/app` in the image).
+ * Applies the Drizzle SQL migrations shipped beside the bundle (`MIGRATIONS_FOLDER` overrides `generated/drizzle`, resolved from the working directory) and provisions the
+ * LangGraph checkpointer tables.
  */
 const url = process.env['DATABASE_POSTGRES_URL'] ?? 'postgresql://postgres:postgres@localhost/novel_forge';
 const migrationsFolder = process.env['MIGRATIONS_FOLDER'] ?? 'generated/drizzle';

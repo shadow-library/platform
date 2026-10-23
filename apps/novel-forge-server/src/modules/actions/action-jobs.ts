@@ -72,9 +72,8 @@ export async function stageOnce(db: PrimaryDatabase, projectId: bigint, jobId: s
 }
 
 /**
- * A pending organise card still holds the last round: a second run would stage beside it a card written over the same pages. An applied
- * card records what it wrote as it applies, except one staged before cards carried their record: its pages cannot be told apart from
- * the author's, so organising waits until it is undone.
+ * A pending organise card still holds the last round, so a second run would stage a card over the same pages beside it. An applied card records what it wrote, except a legacy
+ * one (staged without a record): its pages cannot be told from the author's, so organising waits until it is undone.
  */
 export async function assertNotesUnorganised(db: Pick<DbExecutor, 'select'>, projectId: bigint): Promise<void> {
   const table = schema.refinementProposals;

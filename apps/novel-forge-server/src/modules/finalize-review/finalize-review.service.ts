@@ -147,7 +147,7 @@ export function appliedRevision(reviews: readonly Pick<FinalizeReview.Row, 'brid
   return reviews.find(review => !review.bridgeOnly && review.status === 'applied')?.draftRevision ?? null;
 }
 
-/** Decision P4-39's rule for the finalize review: an isolated chapter's excerpts never leave it, whichever way isolation has moved since. */
+/** An isolated chapter's excerpts never leave it, whichever way isolation has moved since. */
 export function presentFinalizeReview(
   review: ReviewWithItems,
   draft: Pick<Draft, 'revision' | 'body' | 'isolated'> | null,

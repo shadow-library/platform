@@ -8,16 +8,7 @@ export interface RatingViolation {
   chapter: string;
 }
 
-/**
- * The novel-level rating must be at least the maximum over its published chapters, per dimension,
- * so a reader filtering on the novel never opens a chapter that
- * exceeds what the catalog promised.
- *
- * Unrated is not `'none'` in either direction: an unrated *chapter* dimension contributes nothing to
- * the maximum, while an unrated *novel* dimension satisfies nothing — it is a violation as soon as any
- * chapter asserts a level there. A level that belongs to no dimension is reported rather than ranked;
- * `ratingRank` would throw on it and `-1` would silently pass it as the safest possible rating.
- */
+/** An unrated novel dimension is a violation once any chapter asserts a level; an unrecognised level is reported because `ratingRank` throws on it. */
 export function findRatingViolations(novel: ContentRating | null | undefined, chapters: readonly (ContentRating | null | undefined)[]): RatingViolation[] {
   const violations: RatingViolation[] = [];
 

@@ -58,11 +58,7 @@ async function applyFactUpsert(ctx: ApplyContext, op: FactRestoreOp): Promise<vo
   ctx.applied.push({ artifactRef: `fact:${op.factKey}`, newRevision: null });
 }
 
-/**
- * Deleting a fact cascades its knowledge ledger, and the inverse op restores only the fact row — so
- * a ledgered fact is refused rather than silently breaking the revert guarantee.
- * Retract the reveals first through the fact endpoints.
- */
+/** The inverse restores only the fact row but deleting cascades its knowledge ledger, so a ledgered fact is refused: retract its reveals first. */
 async function applyFactRemove(ctx: ApplyContext, op: FactRemoveOp): Promise<void> {
   const existing = await ctx.tx.query.canonFacts.findFirst({ where: and(eq(schema.canonFacts.projectId, ctx.projectId), eq(schema.canonFacts.factKey, op.factKey)) });
   if (!existing) throw AppErrorCode.FCT_001.create();

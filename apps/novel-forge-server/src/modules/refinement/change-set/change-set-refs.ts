@@ -1,10 +1,7 @@
 import { type ChangeOp } from './change-set.types';
 import { isActionOp } from './op-specs';
 
-/**
- * The decisions a change-set's actions stage. Actions touch no artifact refs, so without these a restaged plan or approval would sit beside the
- * card it revises; a plan is one decision per chat whatever chapter it names, any other action is one per action and target.
- */
+/** The decisions a change-set's actions stage, so a restaged plan or approval replaces its card: one per chat for a plan, else one per action and target. */
 export function actionDecisionKeys(ops: ChangeOp[]): string[] {
   const keys = ops.filter(isActionOp).map(op => {
     if (op.op === 'action.plan_chapter') return op.op;

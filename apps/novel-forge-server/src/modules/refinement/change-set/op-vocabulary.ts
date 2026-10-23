@@ -31,10 +31,7 @@ const RATIONALE_NOTE =
 const QUOTE_NOTE =
   "quote, on any op, is the exact words from the author's message in this turn that the op records — copied character for character, never paraphrased, shortened with an ellipsis, or taken from an earlier message or your own reply. The server decides whether an op with a quote the author really wrote applies: it must only record what they said, stated rather than asked or hedged. Every other op becomes a suggestion card the author accepts or declines. Give a quote only when the op states what the author said, and leave it out of your own ideas.";
 
-/**
- * Renders the exact JSON shape of each allowed op for prompt use — weak local models return
- * malformed change-sets when the vocabulary is named but never shown.
- */
+/** Renders each allowed op's exact JSON shape for prompts; weak local models return malformed change-sets when the vocabulary is named but never shown. */
 export function renderOpVocabulary(ops: readonly OpType[], options: OpVocabularyOptions = {}): string {
   const lines = ops.map(op => {
     const spec = OP_SPECS[op];

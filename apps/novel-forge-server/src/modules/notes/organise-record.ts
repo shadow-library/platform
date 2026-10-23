@@ -8,7 +8,7 @@ import { ledgerRow } from '../ledger/ledger.service';
 import { type OrganiseLedgerDelta, organiseReconciliation, type OrganiseRecord } from './organise-card';
 import { type OrganiseReconciliation } from './organise-reconcile';
 
-/** The marker on organise cards staged before they carried a record: they record nothing, as they never did. */
+/** The marker on organise cards staged without a record: they record nothing on apply. */
 export const LEGACY_ORGANISE_RECORD = { legacy: true } as const;
 
 const RETIRED_REASON = 'Replaced when the notes were organised again.';
@@ -25,7 +25,7 @@ export function organiseRecordOf(value: unknown): OrganiseRecord | undefined {
   return record.version === 1 && Array.isArray(record.ops) && Array.isArray(record.settled) && record.receipt !== undefined ? (record as OrganiseRecord) : undefined;
 }
 
-/** The record an organise proposal must carry, or undefined for a legacy card; a new card without one is refused rather than applied blind. */
+/** The record an organise proposal must carry; undefined for a card marked legacy, while any other card without one is refused rather than applied blind. */
 function recordFor(proposal: OrganiseProposal): OrganiseRecord | undefined {
   if (proposal.kind !== 'organise' || isLegacy(proposal.organiseRecord)) return undefined;
   const record = organiseRecordOf(proposal.organiseRecord);

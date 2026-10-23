@@ -9,11 +9,7 @@ export function keptOr<T>(value: T | null | undefined, existing: T | null | unde
   return value === undefined ? (existing ?? null) : value;
 }
 
-/**
- * A volume can be removed only once no brief names it, and a milestone only once no plan claims it and no fact's unlock names it; a
- * change-set may list the op that lets go of either after the removal, as may the inverse of one that listed the new record after the op
- * that took it up. Removals therefore run last, volumes then milestones, every other op in its listed order.
- */
+/** Removals run last (volumes, then milestones) because the op that releases a brief, plan claim or fact unlock may be listed after the removal. */
 export function removalsLast<T extends { op: string }>(ops: readonly T[]): T[] {
   const removal = (kind: string) => ops.filter(op => op.op === kind);
   return [...ops.filter(op => op.op !== 'volume.remove' && op.op !== 'milestone.remove'), ...removal('volume.remove'), ...removal('milestone.remove')];

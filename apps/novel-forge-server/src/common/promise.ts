@@ -26,9 +26,8 @@ export interface PromiseItem extends PromisePayoff {
 }
 
 /**
- * P4-41b: overdue once an authored chapter window has passed or the payoff volume already met its goal;
- * merely due once the payoff milestone is reached or the payoff volume is the one now active. Shared by the
- * chapter-plan obligation selector and the promises list so the two never drift.
+ * Overdue once an authored chapter window has passed or the payoff volume already met its goal; merely due once the payoff milestone is reached or the payoff volume is active.
+ * Shared so the plan obligations and promises list never drift.
  */
 export function resolvePromiseDueStanding(
   payoff: PromisePayoff,
@@ -101,7 +100,7 @@ export function threadPromiseItem(
   };
 }
 
-/** Never carries the mystery's truth fact — only its key ever leaves the server, and this item does not even take that (P4-38). */
+/** Never carries the mystery's truth fact — only its key ever leaves the server, and this item does not even take that. */
 export function mysteryPromiseItem(
   mystery: MysteryRow,
   chapter: number,

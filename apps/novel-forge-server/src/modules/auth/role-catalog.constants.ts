@@ -10,23 +10,14 @@ import {
 } from '@server/constants';
 
 /**
- * Pushed to identity on boot as the complete truth for this application, so a permission or role
- * dropped from here is deleted there, cascading into its assignments.
+ * Pushed to identity on boot as the complete truth for this application, so a permission or role dropped from here is deleted there, cascading into its assignments.
  *
- * `NovelForgeAuthor` is the default role because an organisation admin may only grant a bot what they
- * themselves hold: without it, every admin would need an explicit assignment before they could hand a
- * bot the everyday permissions people already exercise. It is deliberately not bot-grantable — a bot
- * is granted one resource at a time, never the whole everyday set.
- *
- * Each bot-grantable role is the sole claimant of its (resource, level) pair, and the `projects` write
- * role carries the read role's permissions, both of which identity enforces server-side.
- *
- * `NovelForgeIllustrator` and `NovelForgeGenerator` are add-ons, not standalone grants: every content route
- * takes `novel-forge:projects:read` as its floor, so a bot holding either one alone reaches nothing until it
- * is paired with a projects role.
- *
- * `NovelForgeAdmin` opens run inspection — prompts, raw model output, cost — so it is neither default nor
- * bot-grantable: a platform role admin assigns it to a person, in the organisation their session acts in.
+ * `NovelForgeAuthor` is the default role because an organisation admin may only grant a bot what they hold themselves; it is not bot-grantable, since a bot is granted one
+ * resource at a time.
+ * Each bot-grantable role is the sole claimant of its (resource, level) pair and the `projects` write role carries the read role's permissions, both enforced by identity.
+ * `NovelForgeIllustrator` and `NovelForgeGenerator` are add-ons: every content route takes `novel-forge:projects:read` as its floor, so either alone reaches nothing without a
+ * projects role.
+ * `NovelForgeAdmin` opens run inspection (prompts, raw model output, cost), so it is neither default nor bot-grantable.
  */
 const EVERYDAY_PERMISSIONS = [PROJECTS_READ_PERMISSION, PROJECTS_WRITE_PERMISSION, ILLUSTRATIONS_WRITE_PERMISSION, GENERATION_RUN_PERMISSION];
 

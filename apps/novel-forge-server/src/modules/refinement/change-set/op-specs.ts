@@ -139,9 +139,7 @@ const DECLARED_OP_SPECS: Record<OpType, OpSpec> = {
   'action.advance_volume': { required: { volumeKey: 'string' }, optional: {} },
 };
 
-// Metadata about an op rather than a field of the artifact, so it rides on every op and apply drops it — derived, so a newly declared op cannot be the one that refuses it.
-// `startedEmpty` marks a plan card staged as an empty plan for the author to fill in, and `ideaId` names a content op's idea: the server
-// stamps both, so no model is shown them.
+// Metadata rather than artifact fields, so it rides on every op and apply drops it; `startedEmpty` and `ideaId` are server-stamped, so no model is shown them.
 export const OP_METADATA_FIELDS = ['rationale', 'quote', 'startedEmpty', 'ideaId'] as const;
 const SERVER_METADATA_FIELDS: readonly string[] = ['startedEmpty', 'ideaId'];
 /** Fields the server stamps when a proposal is staged, whatever the model sent — so no model is ever shown them, and they are no part of an idea. */

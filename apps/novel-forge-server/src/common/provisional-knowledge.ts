@@ -114,7 +114,7 @@ export async function revokeProvisionalReveals(db: KnowledgeLedger, projectId: b
   await revokeProvisionalCharacterEvents(db, projectId, revoked);
 }
 
-/** `revokeProvisionalReveals`'s counterpart for `character_events` (T27), dropped at the same reset points. A no-op today — nothing yet writes `provisional` events — but the hook T26's event-apply service will need. */
+/** `revokeProvisionalReveals`'s counterpart for `character_events`, dropped at the same reset points. */
 export async function revokeProvisionalCharacterEvents(db: KnowledgeLedger, projectId: bigint, chapters: number | readonly number[]): Promise<void> {
   const revoked = typeof chapters === 'number' ? [chapters] : [...chapters];
   if (revoked.length === 0) return;

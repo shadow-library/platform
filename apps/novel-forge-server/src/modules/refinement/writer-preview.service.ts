@@ -152,10 +152,7 @@ function keptFrom(sources: WriterDisclosureSources, disclosure: WriterDisclosure
   ];
 }
 
-/**
- * What the card changes about which secrets' unlock conditions hold at its chapter, against the plan stored there now: a claimed
- * milestone, the ending mark or a move to another volume can unlock a secret, and dropping one can lock it again.
- */
+/** Which secrets' unlock conditions the card changes at its chapter, against the stored plan: a milestone claim, ending mark or volume move can unlock, dropping one re-locks. */
 async function loadUnlockChanges(db: Reader, projectId: bigint, plan: StagedPlan): Promise<Pick<WriterPreview, 'unlocks' | 'relocks'>> {
   const state = await loadPlanState(db, projectId);
   const stored: PlanClaims = state.plans.find(candidate => candidate.chapter === plan.chapter) ?? {
@@ -180,10 +177,7 @@ async function loadUnlockChanges(db: Reader, projectId: bigint, plan: StagedPlan
   };
 }
 
-/**
- * What the chapter writer would receive if a pending plan card were applied as it stands: the card's plan is merged over the stored one in
- * memory and judged by the writer's own disclosure policy and ref resolution. Only names and keys leave here, never withheld text.
- */
+/** What the writer would receive if the pending card applied; only names and keys leave here, never withheld text. */
 @Injectable()
 export class WriterPreviewService {
   private readonly db: PrimaryDatabase;

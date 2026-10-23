@@ -7,17 +7,7 @@ import { type ChatTurnResult } from './chat.service';
 import { type OpResult } from './apply';
 import { type AppliedActionJobItem, type ProposalResponse } from './refinement.dto';
 
-/**
- * Response serialisation for the refinement module. Every helper here **projects** its row onto the
- * declared response fields rather than spreading it: over HTTP the compiled schema would drop whatever
- * the DTO does not declare, but the turn stream writes these objects straight to the wire with no schema
- * in front of them, and a spread row would put `refinement_proposals.inverse_ops` — the full rollback
- * payload the DTO reduces to the derived `revertible` flag — in front of the client.
- *
- * Bigints are left as bigints: a field typed `@Field(() => String)` is coerced by the response
- * serialiser, except on the nullable path (a message's `proposalId` and `appliedProposalId`, a proposal's `messageId`), where a
- * raw bigint fails its `string | null` schema — so those are coerced here instead.
- */
+/** Projects onto the declared fields instead of spreading (the stream writes raw objects; a spread would leak inverse_ops). Nullable-path bigints are coerced to strings. */
 
 interface ChatMessageRow {
   id: bigint;

@@ -391,9 +391,8 @@ export class ProjectService {
     const project = await this.get(id);
     if (!project) throw AppErrorCode.PRJ_001.create();
 
-    // Single-row aggregate queries with conditional counts, rather than concurrent `$count` calls: fewer
-    // connections under load (drizzle's `$count` intermittently crashed on `res[0].count` when the pool was
-    // contended by in-flight generation writes), and each `?? 0` is crash-proof.
+    // Single-row aggregates with conditional counts rather than concurrent `$count` calls: fewer connections, and drizzle's `$count`
+    // intermittently crashed on `res[0].count` when the pool was contended by generation writes.
     const [chapterRow, draftRow, volumeRow] = await Promise.all([
       this.db
         .select({

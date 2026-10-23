@@ -75,13 +75,7 @@ export class ProposalRevertService {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
 
-  /**
-   * Undoes an applied proposal by executing its stored inverse ops through the same appliers —
-   * same hashing, revision bumps, and staleness propagation as any apply. Guarded
-   * strictly: every artifact must still be exactly as the apply left it (postState); anything moved
-   * on → 409 RFN_006, nothing touched. Revisions only ever move forward — a revert bumps them again
-   * with the restored content, so later baselines stay coherent.
-   */
+  /** Undoes an applied proposal through its stored inverse ops; every artifact must be exactly as the apply left it (postState) or 409 `RFN_006` with nothing touched. */
   async revert(projectId: bigint, proposalId: bigint): Promise<RevertResult> {
     this.logger.debug('revert: starting', { projectId, proposalId });
     const result = await this.db.transaction(async tx => {
@@ -94,9 +88,7 @@ export class ProposalRevertService {
       const inverseOps = (proposal.inverseOps ?? []) as ContentOp[];
       if (proposal.status !== 'applied' || (inverseOps.length === 0 && !hasOrganiseUndo(proposal))) throw AppErrorCode.RFN_007.create();
 
-      // Content identity (exists + contentHash) is the guard — NOT revision: reverting a newer change
-      // on the same artifact restores this proposal's content but bumps the revision counter, and a
-      // rollback chain must keep walking backward through exactly that state.
+      // The guard is content identity (exists + contentHash), not revision: reverting a newer change bumps it, and a rollback chain must still walk back.
       const postState = (proposal.postState ?? {}) as Record<string, ArtifactState>;
       const refs = Object.keys(postState);
       const current = await loadArtifactStates(tx, projectId, refs);
@@ -132,12 +124,7 @@ export class ProposalRevertService {
     return { proposal: result.proposal, reverted: result.reverted, staleMarked: result.staleMarked };
   }
 
-  /**
-   * Undoes one change of a chat turn's applied proposal through the inverse its apply captured, under the whole revert's conflict guard
-   * over the records that change wrote. Refused while another applied change of the turn relies on it (RFN_015), listing them: undoing
-   * them too would take back changes the author did not choose. The proposal stays applied; its `inverse_ops` and `post_state` narrow to
-   * what is still applied, so undoing the rest as a whole keeps working.
-   */
+  /** Undoes one change via its captured inverse; refused (`RFN_015`) while another applied change relies on it, since undoing those would take back unchosen changes. */
   async undoOp<T = never>(projectId: bigint, proposalId: bigint, opIndex: number, onUndone?: OpToggleHook<T>): Promise<OpToggleResult<T>> {
     const result = await this.db.transaction(async (tx): Promise<OpToggleResult<T>> => {
       const turn = await this.lockTurnOp(tx, projectId, proposalId, opIndex);
@@ -171,10 +158,7 @@ export class ProposalRevertService {
     return result;
   }
 
-  /**
-   * Applies again one change a per-change undo took back, capturing a fresh inverse, only while the rest of its turn stays applied (RFN_017),
-   * the changes it relies on are back (RFN_016) and its records are exactly as the undo left them (RFN_003).
-   */
+  /** Re-applies an undone change only while its turn stays applied (RFN_017), its dependencies are back (RFN_016) and its records are as the undo left them (RFN_003). */
   async redoOp<T = never>(projectId: bigint, proposalId: bigint, opIndex: number, onRedone?: OpToggleHook<T>): Promise<OpToggleResult<T>> {
     const result = await this.db.transaction(async (tx): Promise<OpToggleResult<T>> => {
       const turn = await this.lockTurnOp(tx, projectId, proposalId, opIndex);
@@ -275,10 +259,8 @@ export class ProposalRevertService {
   }
 
   /**
-   * Rolls the project back to the state right after `afterProposalId` was applied: every applied
-   * proposal newer than the anchor is reverted, newest first, each in its own transaction. Action-only
-   * proposals (nothing to invert) are skipped. Stops at the first conflict and reports how far it got.
-   * Cross-session changes are included by design — the history is project-wide.
+   * Reverts each applied proposal newer than `afterProposalId`, newest first, one transaction each, cross-session changes included; skips action-only ones, stops at the first
+   * conflict.
    */
   async rollbackAfter(projectId: bigint, afterProposalId: bigint): Promise<RollbackResult> {
     const anchor = await this.db.query.refinementProposals.findFirst({
@@ -287,9 +269,7 @@ export class ProposalRevertService {
     if (!anchor) throw AppErrorCode.RFN_001.create();
     if (!anchor.appliedAt) throw AppErrorCode.RFN_007.create();
 
-    // The anchor's appliedAt stays in SQL — round-tripping it through a JS Date shifts timestamps
-    // (timezone serialization) and corrupts the comparison. Ties on the same instant break by id.
-    // Raw identifiers on purpose: drizzle column refs would leak the outer query's alias into the subquery.
+    // appliedAt stays in SQL (a JS Date round-trip shifts timestamps; ties break by id); raw identifiers because drizzle column refs would leak the outer alias into the subquery.
     const anchorAppliedAt = sql`(select applied_at from refinement_proposals where id = ${afterProposalId})`;
     const newer = await this.db.query.refinementProposals.findMany({
       where: and(

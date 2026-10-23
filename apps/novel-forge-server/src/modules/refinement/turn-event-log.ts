@@ -42,10 +42,7 @@ function wellFormed(text: string): string {
   return text.replace(LONE_SURROGATE, '\uFFFD').replaceAll('\u0000', '\uFFFD');
 }
 
-/**
- * `bigint`s become strings, which `JSON.stringify` alone would throw on. A NUL or a lone surrogate, in a value or a key, becomes U+FFFD:
- * jsonb rejects both escapes, and a frame it rejects — a `done` above all — would never reach a reader.
- */
+/** `bigint`s become strings; a NUL or lone surrogate becomes U+FFFD because jsonb rejects both and a rejected `done` frame would never reach a reader. */
 export function encodeFrameData(data: unknown): string {
   return JSON.stringify(data, (_key, value: unknown) => {
     if (typeof value === 'bigint') return value.toString();
@@ -63,9 +60,8 @@ function toRecord(frame: PendingFrame): TurnEventRecord {
 }
 
 /**
- * The writing half of one turn's stream, held by the replica running the turn: the only writer of its run's frames, so it numbers them
- * itself and writes each batch only after the one before it, and a reader that has seen `seq` n has seen everything below it. Frames
- * gather for `coalesceMs` and go as one insert, consecutive deltas merged into one frame; a terminal frame flushes at once.
+ * The writing half of a turn's stream on the replica running it, sole writer of its frames: it numbers them and writes batches in order, so a reader at `seq` n has seen all below.
+ * Frames gather for `coalesceMs` and go as one insert with consecutive deltas merged; a terminal frame flushes at once.
  */
 export class TurnEventLog {
   private readonly logger = Logger.getLogger(APP_NAME, TurnEventLog.name);

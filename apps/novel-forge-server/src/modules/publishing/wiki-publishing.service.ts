@@ -8,13 +8,7 @@ import { type PrimaryDatabase, type Publishing, schema } from '@server/database'
 
 import { buildWikiProjections, type WikiEntryProjection } from './wiki-projection';
 
-/**
- * Loads the domain data a wiki projection needs and keeps the `wiki_publications` ledger in step with it.
- * Projection is pure (`wiki-projection.ts`); this service is the impure edge — it reads entities, facts, and
- * the published-chapter ordinal map from Postgres, and reconciles the outbox ledger (insert new, bump-and-repend
- * changed, tombstone vanished) so the runner has only to walk rows and push. The reader push itself lives in the
- * runner, which owns the reader client (mirrors how `PublishingService` prepares chapter rows for `PublishRunner`).
- */
+/** The impure edge of the wiki projection: loads entities, facts and published ordinals and reconciles the outbox ledger, so the runner only walks rows and pushes. */
 @Injectable()
 export class WikiPublishingService {
   private readonly logger = Logger.getLogger(APP_NAME, WikiPublishingService.name);
@@ -73,13 +67,7 @@ export class WikiPublishingService {
     return this.db.query.wikiPublications.findMany({ where: eq(schema.wikiPublications.projectId, projectId), orderBy: asc(schema.wikiPublications.entryKey) });
   }
 
-  /**
-   * Diffs freshly computed projections against the ledger and writes the outbox rows the runner then pushes:
-   * a new entry is inserted `pending`; a changed (or resurrected) entry bumps `revision`, re-stamps its hash,
-   * and re-pends; an entry that no longer projects (hidden, deleted, or fallen to zero facets) becomes a
-   * `deleted` tombstone the runner DELETEs from the reader. An unchanged entry is left exactly as it is — so a
-   * converged wiki never churns a revision. Returns the reconciled ledger in reader order.
-   */
+  /** New entries insert pending; changed or resurrected ones re-pend; vanished ones tombstone. */
   async reconcileLedger(projectId: bigint, projections: WikiEntryProjection[]): Promise<Publishing.WikiPublication[]> {
     const existing = await this.loadLedger(projectId);
     const byKey = new Map(existing.map(row => [row.entryKey, row]));

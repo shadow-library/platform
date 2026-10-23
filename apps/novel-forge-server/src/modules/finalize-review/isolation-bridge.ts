@@ -51,7 +51,7 @@ export type BridgeLoader = (subjects: readonly BridgeSubject[]) => Promise<Map<n
 
 type BridgeReader = Pick<PrimaryDatabase, 'select'>;
 
-/** A revert undoes the Story Bible rows a finalize wrote, not the summary and positions the author approved (P4-48). */
+/** A reverted review still crosses: a revert undoes the Story Bible rows a finalize wrote, not the summary and positions the author approved. */
 const CROSSING_STATUSES: readonly FinalizeReview.Status[] = ['ready', 'applied', 'reverted'];
 const MAX_BRIDGE_LINE = 60;
 

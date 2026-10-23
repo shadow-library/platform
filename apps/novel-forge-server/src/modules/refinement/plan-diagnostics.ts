@@ -63,10 +63,7 @@ export function isPlanSecret(fact: SecretFact, chapter: number): boolean {
   return fact.disclosedInChapter === null || fact.disclosedInChapter >= chapter;
 }
 
-/**
- * The writer's knowledge is pooled across the chapter's points of view (§4.4): a secret one scene's point of view knows, or learns on the
- * page, and another's does not reaches every scene. Diagnostics for the author, never a block.
- */
+/** The writer's knowledge is pooled across a chapter's points of view, so a secret one scene's POV knows reaches every scene; diagnostics, never a block. */
 export function findPoolingDiagnostics(input: PoolingInput): PlanDiagnostic[] {
   const { scenes } = input;
   const povs = [...new Set(scenes.flatMap(scene => (scene.pov ? [scene.pov] : [])))];

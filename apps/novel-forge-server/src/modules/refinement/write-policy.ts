@@ -6,10 +6,7 @@ import { type RecordFields } from './artifact-state';
 import { ACTION_TYPES, type ActionType, type ChangeOp, changeSetRefs, declaredOpFields, type EntityUpsertOp, isActionOp, opFields, type OpType } from './change-set';
 
 export type OpSide = 'direct' | 'card';
-/**
- * What a turn's warnings hold for review: `turn` every op, `writer_read` every op whose records the chapter writer or a reader can see, so a
- * turn that drew on planner-only material still lands what only planning reads.
- */
+/** What a turn's warnings hold for review: `turn` every op, `writer_read` every op whose records the writer or a reader sees, so planner-only material still lands the rest. */
 export type WriteHold = 'none' | 'turn' | 'writer_read';
 export type CardReason =
   | 'just_discussing'
@@ -114,10 +111,7 @@ export const ALWAYS_CARD: Readonly<Partial<Record<OpType, AlwaysCardRule>>> = {
   ...(Object.fromEntries(ACTION_TYPES.map(action => [action, 'action'])) as Record<ActionType, AlwaysCardRule>),
 };
 
-/**
- * What Edit freely does with an op the author's words do not back: apply it as an `idea`, or keep it a card under the named rule. Keyed by
- * every kind, so a new kind does not compile until it is classified here. A secret's truth, tells and scope are never the model's to settle.
- */
+/** What Edit freely does with an op the author's words do not back: apply as an `idea` or card it under the named rule; keyed by every kind so new kinds must be classified. */
 export const IDEA_POLICY: Readonly<Record<OpType, 'idea' | AlwaysCardRule>> = {
   'premise.update': 'idea',
   'bible_document.upsert': 'idea',
@@ -153,9 +147,8 @@ const BUDGET_SHARE = 0.25;
 const STORY_FIELDS = declaredOpFields('premise.update');
 const PAYOFF_FIELDS = ['payoffMilestoneKey', 'payoffVolumeKey', 'payoffWindow'] as const;
 const FACT_DIRECT_FIELDS: ReadonlySet<string> = new Set(['factKey', 'body', 'subjects', 'constraintNote', 'terms']);
-// A record's identifying key is exempt from the novelty budget once the record exists — but on the op that creates it (P4-41), the key
-// is itself unreviewed written content: a model or author could smuggle a secret into a fresh key and repeat it verbatim in a text field
-// for free. `DISPLAY_KEY_FIELDS` (a page's own ref, an entity's display name) stay exempt either way.
+// A record's key is exempt from the novelty budget once it exists, but on the op that creates it the key is unreviewed content: a model could smuggle a secret into a fresh key
+// and repeat it in a text field for free. `DISPLAY_KEY_FIELDS` stay exempt either way.
 const IDENTIFIER_KEY_FIELDS = ['entityKey', 'factKey', 'volumeKey', 'milestoneKey', 'key'] as const;
 const DISPLAY_KEY_FIELDS = ['section', 'slug', 'name'] as const;
 const TEXT_FIELDS: Readonly<Partial<Record<OpType, readonly string[]>>> = {
@@ -244,10 +237,7 @@ export function quoteFoundIn(quote: string, text: string): boolean {
   return normaliseForQuote(text).includes(needle);
 }
 
-/**
- * The author asked, wondered or denied rather than stated: the quote's sentence is a question or hedged, its clause negates before the
- * quote, or the sentence turns the idea down after it. Rejection cues only count after the quote — "instead, X" states X.
- */
+/** The author asked, wondered or denied rather than stated: a question or hedge, a clause negating before the quote, or a rejection after it ("instead, X" states X). */
 export function quoteIsTentative(quote: string, text: string): boolean {
   const needle = normaliseForQuote(trimQuoteMarks(quote));
   const sentence = [...splitSentences(text), normaliseForQuote(text)].find(candidate => candidate.includes(needle));
@@ -314,10 +304,7 @@ export function launders(op: ChangeOp, current: RecordFields | undefined, vocabu
   return novelTokens(fieldTokens(op, current), words).some(token => words.hedged.has(token));
 }
 
-/**
- * The novelty budget, over the whole op: across its text fields it may carry at most max(4, 25%) distinct content words found neither in
- * the author's stated sentences nor in the field's current value — the record's own key and name never count.
- */
+/** Novelty budget: an op may carry at most max(4, 25%) distinct content words found neither in the author's stated sentences nor the field's current value. */
 export function exceedsNoveltyBudget(op: ChangeOp, current: RecordFields | undefined, vocabulary: string): boolean {
   const tokens = fieldTokens(op, current);
   const written = new Set(tokens.flatMap(field => [...field.written]));
@@ -460,11 +447,7 @@ function awaitsCardEntities(op: ChangeOp, directTypes: ReadonlySet<string>, card
   return required.length > 0 && !required.some(type => directTypes.has(type)) && required.some(type => cardTypes.has(type));
 }
 
-/**
- * An op that writes or names a record only a card op would create cannot apply before that card is accepted, so it joins the card —
- * transitively, since the op it joins may create records of its own. A card that names a record a direct op creates stays a card: the
- * direct side applies first and the cards are staged after it, so their baseline already holds the record.
- */
+/** An op that writes or names a record only a card op creates joins that card, transitively; a card naming a direct op's record stays a card, as the direct side applies first. */
 function moveDependentsToCards(ops: readonly ChangeOp[], judged: Judged[], current: ReadonlyMap<string, RecordFields>): void {
   const created = (op: ChangeOp) => changeSetRefs([op]).filter(ref => !current.has(ref));
   const opOf = ({ disposition }: Judged) => ops[disposition.index] as ChangeOp;
@@ -487,10 +470,7 @@ function moveDependentsToCards(ops: readonly ChangeOp[], judged: Judged[], curre
   }
 }
 
-/**
- * A held op is judged as if ideas did not apply, so a quoted one waits as `held_for_review` and an idea keeps the quote rule's reason — a
- * turned-down idea is still filtered out. The hold lands before the dependency pass, so an op that names a record only a held op creates waits with it.
- */
+/** A held op is judged as if ideas did not apply: a quoted one waits as `held_for_review`, an idea keeps the quote rule's reason; the hold lands before the dependency pass. */
 function judge(ops: readonly ChangeOp[], input: WritePolicyInput, appliesIdeas: boolean, hold: WriteHold): Judged[] {
   const judged = ops.map((op, index): Judged => {
     const held = hold === 'turn' || (hold === 'writer_read' && !isPlannerSide(op));
@@ -502,11 +482,8 @@ function judge(ops: readonly ChangeOp[], input: WritePolicyInput, appliesIdeas: 
 }
 
 /**
- * The write policy: an op applies without review only when no always-card rule holds, it depends on no card, the author is not just
- * discussing, the session lands changes on its own and no hold on the turn covers it. There it applies as `quoted` when its kind is
- * allowlisted, its quote is found in the author's message this turn and stated rather than asked, and it adds little the author did not
- * say; a chat turn applies anything else `IDEA_POLICY` admits as an `idea` the author can undo, unless it truncates what a field held.
- * Everything else is a card. An idea that has to wait on a card keeps the quote rule's reason, so a turned-down idea can still be filtered out.
+ * An op applies without review only when no always-card rule holds, it depends on no card, the author is not just discussing, changes land on their own and no hold covers it.
+ * It is `quoted` when its kind is allowlisted and its quote is stated in the author's message and adds little; a chat turn applies other `IDEA_POLICY` ops as an undoable `idea`.
  */
 export function splitChangeSet(input: WritePolicyInput): ChangeSetSplit {
   const ops = [...input.ops];

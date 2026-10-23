@@ -47,11 +47,7 @@ export class ChatLookupService {
     return this.toolRegistry.getRaw(CHAT_HUB_NODE, webMode);
   }
 
-  /**
-   * Runs declared lookups through the registry handlers with the same audit and budgets as the tool loop.
-   * `callCounts` is threaded in by the caller so `maxCallsPerRun` is enforced across every round of one turn,
-   * not reset per round — the map lives on the turn's call stack, never on the (singleton, cross-project) service.
-   */
+  /** Runs declared lookups with the tool loop's audit and budgets; `callCounts` is passed in so `maxCallsPerRun` holds across a turn's rounds, not on the singleton service. */
   async executeLookups(
     projectId: bigint,
     runId: string,

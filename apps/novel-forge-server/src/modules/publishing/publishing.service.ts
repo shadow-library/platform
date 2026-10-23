@@ -74,25 +74,15 @@ export class PublishingService {
   }
 
   /**
-   * Creates or updates the novel's publication record — metadata plus go-live. An
-   * omitted `novelSlug` is derived from the title and walked past collisions on a suffix ladder; a
-   * supplied one is taken verbatim — the only way out for a publication every candidate slug has
-   * been refused for. Supplying a different one later renames the novel: the converge push carries
-   * the project's `sourceRef`, so the reader moves the row it already holds — chapters and wiki
-   * included — and nothing is left serving at the old URL, which stops resolving. Any reader-facing
-   * metadata change bumps the forge-assigned `revision` that drives the reader's optimistic
-   * concurrency.
+   * An omitted `novelSlug` is derived from the title up a suffix ladder; a supplied one is verbatim (the only way out of a fully refused ladder). Changing it renames the novel
+   * on the reader via `sourceRef`.
    */
   async publishNovel(projectId: bigint, body: PublishNovelBody): Promise<Publishing.Publication> {
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
     if (!project) throw AppErrorCode.PRJ_001.create();
 
     const stored = await this.db.query.publications.findFirst({ where: eq(schema.publications.projectId, projectId) });
-    /**
-     * The body always wins, including an explicit null; anything else falls back to what the row already
-     * holds, or — on the create only — to what the novel-import bundle claimed. The import seeds a publication
-     * once and is never re-consulted: a null on an existing row is the author's decision.
-     */
+    /** The body wins, including explicit null; else the row's value, or on create only the import bundle's (the import seeds once). */
     const adopt = <T>(supplied: T | null | undefined, fallback: T | undefined): T | null => (supplied !== undefined ? supplied : (fallback ?? null));
 
     if (!stored) {
@@ -168,12 +158,7 @@ export class PublishingService {
     return updated;
   }
 
-  /**
-   * Publishes (or schedules, or republishes) a chapter. Gates: the canonical chapter must be
-   * finalized (`PUB_002`) and the release sequence contiguous (`PUB_003`). A first publish assigns
-   * the next `publishedOrdinal` — once, never re-derived; a republish reuses the row,
-   * bumping `revision` only when the rendered payload's hash actually changed.
-   */
+  /** Gates: chapter finalized (`PUB_002`) and release sequence contiguous (`PUB_003`); `publishedOrdinal` is assigned once, `revision` bumps only when the payload hash changed. */
   async publishChapter(projectId: bigint, chapterNumber: number, body: PublishChapterBody): Promise<Publishing.ChapterPublication> {
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId), columns: { id: true } });
     if (!project) throw AppErrorCode.PRJ_001.create();
@@ -238,14 +223,8 @@ export class PublishingService {
   }
 
   /**
-   * Moves the publication onto the next free slug near `base`, skipping the ones a caller already
-   * knows are unusable. Published chapters no longer bar the move: the converge push carries the
-   * project's `sourceRef`, so the reader resolves by it and re-slugging renames the row it already
-   * holds — chapters, wiki and access included. The one refusal that survives that is an ownership
-   * change (a rotated forge `clientId`, or a reader row deleted and re-claimed), where the ref
-   * lookup misses too and the ladder builds a second novel; refusing the move would not recover the
-   * first one, which is unaddressable either way, only leave the project unable to publish at all.
-   * Answers `undefined` whenever no move is available, so the caller decides how to give up.
+   * Next free slug near `base` or `undefined`; published chapters don't block it, only an ownership change does — refusing would not recover the first novel, only block
+   * publishing.
    */
   async reassignSlug(publication: Publishing.Publication, base: string, unusable: ReadonlySet<string>): Promise<Publishing.Publication | undefined> {
     for (let attempt = 1; attempt <= SLUG_ATTEMPT_LIMIT; attempt++) {
@@ -265,11 +244,7 @@ export class PublishingService {
     return undefined;
   }
 
-  /**
-   * Walks the publication back onto the slug a spent ladder started from: every rung committed on
-   * its own, so giving up must undo them — only the ladder's success is meaningful, and a row parked
-   * on a slug the reader explicitly refused sits further from recovery than where it began.
-   */
+  /** Every ladder rung committed on its own, so a spent ladder must walk back: a row parked on a slug the reader refused is further from recovery than where it began. */
   async restoreSlug(publication: Publishing.Publication, novelSlug: string): Promise<void> {
     if (publication.novelSlug === novelSlug) return;
     const restored = await this.databaseService
@@ -312,11 +287,7 @@ export class PublishingService {
     return publication ?? AppErrorCode.PUB_001.throw();
   }
 
-  /**
-   * Returns the publication's reader publish token, minting and persisting one the first time. The write is
-   * conditional on the column still being null so two concurrent converges converge on a single token rather
-   * than each binding a different one on the reader (the reader would then refuse the second).
-   */
+  /** Mints the reader publish token on first use; the write is conditional on the column still being null so concurrent converges settle on one token. */
   async ensurePublishToken(publication: Publishing.Publication): Promise<string> {
     if (publication.publishToken) return publication.publishToken;
     const candidate = generatePublishToken();
@@ -371,12 +342,7 @@ export class PublishingService {
     throw AppErrorCode.PUB_008.create({ base });
   }
 
-  /**
-   * PUB_010: naming someone outside the platform as the work's author is a curation claim, so it is
-   * gated on `novel-forge:curate`. Only a *move* to a non-null name is gated: clearing needs nothing,
-   * and neither does a publish that leaves the stored attribution exactly as it stands, so an ordinary
-   * author can still save metadata on a novel a curator attributed.
-   */
+  /** `PUB_010`: naming a non-platform author is a curation claim gated on `novel-forge:curate`; only a move to a different non-null name is gated. */
   private async assertAttributionPermitted(projectId: bigint, next: string | null, held: string | null): Promise<void> {
     if (!next || next === held) return;
 

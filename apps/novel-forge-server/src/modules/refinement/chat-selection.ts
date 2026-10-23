@@ -30,11 +30,7 @@ export function chatSelection(turn: ChatSelectionOverride, session: Pick<Refinem
   };
 }
 
-/**
- * The project a chat reply is routed with: the selection applied, and the chat's alias pin only while the catalog `offered` it for the reply's
- * selectors, else the reply falls to the routes. `offered` is undefined when the catalog could not be read, and the pin is then sent as stored
- * for Synapse to judge.
- */
+/** The project a chat reply is routed with: the selection applied, and the alias pin only while the catalog `offered` it (sent as stored when the catalog is unreadable). */
 export function aliasRoutedProject(project: ProjectConfig | undefined, session: SessionAliasPin, selection: ChatSelection, offered?: readonly string[]): ProjectConfig {
   const routed: ProjectConfig = { ...project, contentMode: selection.contentMode, costTier: selection.costTier };
   const alias = session.aliasKey;

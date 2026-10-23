@@ -75,11 +75,8 @@ export function volumeToAutoActivate(volumes: readonly VolumeOrdinalRow[]): stri
 }
 
 /**
- * Runs after every volume insert, in the same transaction: activates `volumeToAutoActivate`'s pick if the project still
- * has none active. Locks every volume row for the project first (the same `for('update')` pattern `lockProjectPlan`
- * uses), so a concurrent insert racing on the same project blocks until this commits rather than both activating —
- * the "no active volume" and ordinal checks stay true for the update that follows because nothing else can touch
- * these rows meanwhile.
+ * Runs after every volume insert in the same transaction: activates `volumeToAutoActivate`'s pick if none is active, after locking the project's volume rows so a racing insert
+ * blocks until this commits rather than both activating.
  */
 export async function autoActivateVolume(tx: Pick<DbExecutor, 'select' | 'update'>, projectId: bigint): Promise<void> {
   // Locking the project, not just its volume rows: two concurrent first inserts cannot see each other's uncommitted rows.
