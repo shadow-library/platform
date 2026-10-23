@@ -5,7 +5,6 @@ import { cn, mergeRefs } from '@/lib';
 import styles from './Textarea.module.css';
 import { type TextareaProps } from './Textarea.types';
 
-/** Clamp the element's height to its content between minRows and maxRows, toggling internal scroll. */
 function fitToContent(el: HTMLTextAreaElement, twin: HTMLTextAreaElement, minRows: number, maxRows: number): void {
   const style = getComputedStyle(el);
   const lineHeight = Number.parseFloat(style.lineHeight) || 20;
@@ -23,13 +22,7 @@ function fitToContent(el: HTMLTextAreaElement, twin: HTMLTextAreaElement, minRow
   el.style.overflowY = contentHeight > maxHeight ? 'auto' : 'hidden';
 }
 
-/**
- * Multi-line text entry — the Input field surface stretched vertically. Adds only what multi-line
- * requires: row-based height, auto-grow between `minRows`/`maxRows`, and an optional character
- * counter that appears in the last 20% of the limit. Label and error text live in Form Field.
- *
- * `className`/`style` target the wrapper; other props flow to the `<textarea>`.
- */
+/** `className`/`style` target the wrapper; other props flow to the `<textarea>`. The counter appears in the last 20% of `maxLength`. */
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function Textarea(
   {
     size = 'md',
@@ -65,8 +58,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function 
     if (el && twin && autoGrow) fitToContent(el, twin, minRows, maxRows);
   }, [autoGrow, minRows, maxRows]);
 
-  // Re-fit whenever the value or bounds change (covers controlled updates and programmatic resets).
-  // currentValue is an intentional re-fit trigger; resize reads the DOM, not the value.
+  // `currentValue` is an intentional re-fit trigger; resize reads the DOM, not the value.
   useEffect(resize, [resize, currentValue]);
 
   function handleChange(event: ChangeEvent<HTMLTextAreaElement>): void {

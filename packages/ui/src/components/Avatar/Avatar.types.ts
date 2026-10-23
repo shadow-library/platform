@@ -17,7 +17,6 @@ export interface AvatarProps extends Omit<ComponentPropsWithoutRef<'span'>, 'chi
   shape?: AvatarShape;
   /** Live presence dot — announced in words, collaboration surfaces only. */
   presence?: AvatarPresence;
-  /** Fallback glyph when there is no name (anonymous / pending invite). */
   icon?: ReactNode;
 }
 

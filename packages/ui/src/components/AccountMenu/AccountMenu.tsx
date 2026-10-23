@@ -18,13 +18,8 @@ function SignOutIcon(): ReactElement {
 }
 
 /**
- * The one place a product shows who is signed in. It lives in the top bar's utility cluster and nowhere
- * else — an identity repeated in a sidebar footer is a second source of truth that drifts, and on a phone
- * it costs the nav its most reachable row.
- *
- * Signed-out is a distinct surface, not an empty menu: a reader who is only browsing gets a sign-in call
- * to action instead of an avatar with nothing behind it. Absence of `name` alone never triggers it, since
- * a profile fetch can fail while the session is perfectly valid.
+ * The one place a product shows who is signed in (top bar only; a sidebar copy drifts). Signed-out is a distinct surface, and a missing `name`
+ * alone never triggers it because a profile fetch can fail while the session is valid.
  */
 export const AccountMenu = forwardRef<HTMLDivElement, AccountMenuProps>(function AccountMenu(
   { name, email, src, items, onSignOut, signOutLabel = 'Sign out', signedOut, className, ...props },

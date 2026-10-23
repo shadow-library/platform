@@ -48,7 +48,6 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-/** Interactive — the group's `variant`/`size` flow to every member. */
 export const Playground: Story = {
   args: { 'aria-label': 'Zoom', variant: 'secondary', size: 'md' },
   render: args => (
@@ -60,7 +59,6 @@ export const Playground: Story = {
   ),
 };
 
-/** Symmetric peer actions fused into one control — Secondary, shared 1px borders. */
 export const Attached: Story = {
   render: () => (
     <ButtonGroup aria-label="History">
@@ -89,7 +87,6 @@ export const Sizes: Story = {
   ),
 };
 
-/** The outer corners follow the axis; inner corners stay square. */
 export const Vertical: Story = {
   render: () => (
     <ButtonGroup aria-label="Alignment" orientation="vertical">
@@ -100,7 +97,6 @@ export const Vertical: Story = {
   ),
 };
 
-/** Ghost icon buttons at a 4px gap with `role="toolbar"` — one tab stop, arrow keys move within. */
 export const Toolbar: Story = {
   render: () => (
     <ButtonGroup role="toolbar" aria-label="Row actions" attached={false}>
@@ -111,7 +107,6 @@ export const Toolbar: Story = {
   ),
 };
 
-/** The container dims once and the whole subtree becomes inert. */
 export const Disabled: Story = {
   render: () => (
     <ButtonGroup aria-label="History" disabled>

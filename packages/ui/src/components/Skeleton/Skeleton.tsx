@@ -5,11 +5,7 @@ import { cn } from '@/lib';
 import styles from './Skeleton.module.css';
 import { type SkeletonCardProps, type SkeletonListProps, type SkeletonProps, type SkeletonTableProps } from './Skeleton.types';
 
-/**
- * A ghost placeholder that reserves the exact space of the content it stands in for, so its arrival
- * shifts nothing. Purely decorative (`aria-hidden`) — the loading region carries `aria-busy`, so
- * screen readers hear "busy", not the ghosts. Match its dimensions to the real element.
- */
+/** Decorative (`aria-hidden`): the loading region carries `aria-busy`. Match its dimensions to the real element so arrival shifts nothing. */
 const SkeletonRoot = forwardRef<HTMLSpanElement, SkeletonProps>(function Skeleton({ shape = 'line', width, height, radius, className, style, ...props }, ref) {
   const resolvedHeight = height ?? (shape === 'circle' ? width : undefined);
   return (
@@ -24,7 +20,6 @@ const SkeletonRoot = forwardRef<HTMLSpanElement, SkeletonProps>(function Skeleto
   );
 });
 
-/** Prebuilt table ghost — a grid of line skeletons in a busy region. */
 function SkeletonTable({ rows = 5, columns = 4, className, ...props }: SkeletonTableProps) {
   return (
     <div className={cn(styles.table, className)} aria-busy="true" {...props}>
@@ -39,7 +34,6 @@ function SkeletonTable({ rows = 5, columns = 4, className, ...props }: SkeletonT
   );
 }
 
-/** Prebuilt card ghost — a media block over two text lines. */
 function SkeletonCard({ className, ...props }: SkeletonCardProps) {
   return (
     <div className={cn(styles.card, className)} aria-busy="true" {...props}>
@@ -50,7 +44,6 @@ function SkeletonCard({ className, ...props }: SkeletonCardProps) {
   );
 }
 
-/** Prebuilt list ghost — rows of avatar + two text lines. */
 function SkeletonList({ rows = 3, className, ...props }: SkeletonListProps) {
   return (
     <div className={cn(styles.list, className)} aria-busy="true" {...props}>

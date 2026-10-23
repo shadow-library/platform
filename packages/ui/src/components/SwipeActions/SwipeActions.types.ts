@@ -1,9 +1,7 @@
 import { type ButtonHTMLAttributes, type ComponentPropsWithoutRef, type ReactNode } from 'react';
 
-/** Which action rail is revealed — `leading` sits at the start edge, `trailing` at the end edge. */
 export type SwipeActionsSide = 'leading' | 'trailing';
 
-/** Rail action emphasis, mapped to the solid intent fills. */
 export type SwipeActionIntent = 'neutral' | 'info' | 'success' | 'warning' | 'danger';
 
 export interface SwipeActionsProps extends ComponentPropsWithoutRef<'div'> {
@@ -18,7 +16,6 @@ export interface SwipeActionsProps extends ComponentPropsWithoutRef<'div'> {
   onOpenChange?: (open: SwipeActionsSide | null) => void;
   /** Swiping past 60% of the row width commits the rail's first action outright. @default false */
   fullSwipe?: boolean;
-  /** The row surface. */
   children: ReactNode;
 }
 

@@ -113,7 +113,6 @@ describe('MultiSelect', () => {
     const selectAllRow = await screen.findByRole('option', { name: 'Select all' });
     expect(selectAllRow).toHaveAttribute('aria-selected', 'false');
     await user.click(selectAllRow);
-    // design + platform + growth become selected (security is disabled and skipped)
     expect(await screen.findByRole('option', { name: 'Select all' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByRole('button', { name: 'Teams' })).toHaveTextContent('Growth');
   });

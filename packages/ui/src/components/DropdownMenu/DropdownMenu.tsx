@@ -46,7 +46,6 @@ const DropdownMenuItem = forwardRef<HTMLDivElement, DropdownMenuItemProps>(funct
   );
 });
 
-// Toggle items keep the menu open on select (per the design) by preventing the default close.
 const DropdownMenuCheckboxItem = forwardRef<HTMLDivElement, DropdownMenuCheckboxItemProps>(function DropdownMenuCheckboxItem(
   { icon, shortcut, className, children, onSelect, ...props },
   ref,
@@ -128,11 +127,6 @@ const DropdownMenuSubContent = forwardRef<HTMLDivElement, DropdownMenuSubContent
   );
 });
 
-/**
- * A list of actions behind a trigger — a thin wrapper over Radix DropdownMenu that reuses Select's
- * overlay surface with action semantics (icons, shortcut hints, destructive items, checkbox/radio
- * items, and one level of submenu). `Select stores, Menu performs.`
- */
 export const DropdownMenu = Object.assign(DropdownMenuPrimitive.Root, {
   Trigger: DropdownMenuPrimitive.Trigger,
   Group: DropdownMenuPrimitive.Group,

@@ -12,7 +12,6 @@ describe('matchPath', () => {
   });
 
   it('only matches on a segment boundary', () => {
-    // The bug a bare startsWith produces.
     expect(matchPath('/librarything', '/library')).toBe(false);
   });
 

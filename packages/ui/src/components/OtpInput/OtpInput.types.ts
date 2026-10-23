@@ -2,7 +2,6 @@ import { type HTMLAttributes } from 'react';
 
 import { type InputSize } from '../Input';
 
-/** Preset character allow-lists. A custom `allowedPattern` overrides the preset. */
 export type OtpAllowed = 'numeric' | 'alphanumeric' | 'alphabetic';
 
 export interface OtpInputProps extends Omit<HTMLAttributes<HTMLFieldSetElement>, 'onChange' | 'defaultValue'> {
@@ -26,14 +25,10 @@ export interface OtpInputProps extends Omit<HTMLAttributes<HTMLFieldSetElement>,
   mask?: boolean;
   /** Danger border/ring + `aria-invalid`; the message lives in Form Field. */
   invalid?: boolean;
-  /** Disable every box. */
   disabled?: boolean;
-  /** Make every box read-only. */
   readOnly?: boolean;
-  /** Focus the first box on mount. */
   autoFocus?: boolean;
   /** Name for the hidden input that carries the joined value in a form submit. */
   name?: string;
-  /** Placeholder glyph shown in empty boxes. */
   placeholder?: string;
 }

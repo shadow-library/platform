@@ -30,7 +30,6 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-/** Names an icon-only control. */
 export const Label: Story = {
   render: () => (
     <Tooltip content="Duplicate">
@@ -39,7 +38,6 @@ export const Label: Story = {
   ),
 };
 
-/** Label plus the keyboard shortcut in mono. */
 export const WithShortcut: Story = {
   render: () => (
     <Tooltip content="Duplicate" shortcut="⌘D">
@@ -48,7 +46,6 @@ export const WithShortcut: Story = {
   ),
 };
 
-/** A one-sentence definition wraps at 240px. */
 export const Definition: Story = {
   render: () => (
     <Tooltip content="Rotates every 90 days. Admins are notified before expiry.">

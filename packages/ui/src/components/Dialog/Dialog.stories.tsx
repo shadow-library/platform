@@ -15,7 +15,6 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-/** Task dialog — a form the user finishes or abandons. */
 export const Task: Story = {
   render: () => (
     <Dialog>
@@ -35,7 +34,6 @@ export const Task: Story = {
   ),
 };
 
-/** Destructive confirm — Danger primary, gated by typing the resource name. */
 export const DestructiveConfirm: Story = {
   render: () => (
     <ConfirmDialog
@@ -50,7 +48,6 @@ export const DestructiveConfirm: Story = {
   ),
 };
 
-/** A plain confirm without typed gating. */
 export const Confirm: Story = {
   render: () => (
     <ConfirmDialog

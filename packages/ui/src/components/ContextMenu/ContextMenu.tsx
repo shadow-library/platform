@@ -4,7 +4,6 @@ import { forwardRef } from 'react';
 import { CompactCheckIcon, CompactChevronRightIcon } from '@/icons';
 import { cn } from '@/lib';
 
-// The Context Menu shares Dropdown Menu (08)'s surface and item grammar entirely — reuse its module.
 import styles from '../DropdownMenu/DropdownMenu.module.css';
 import {
   type ContextMenuCheckboxItemProps,
@@ -47,7 +46,6 @@ const ContextMenuItem = forwardRef<HTMLDivElement, ContextMenuItemProps>(functio
   );
 });
 
-// Toggle items keep the menu open on select by preventing the default close.
 const ContextMenuCheckboxItem = forwardRef<HTMLDivElement, ContextMenuCheckboxItemProps>(function ContextMenuCheckboxItem(
   { icon, shortcut, className, children, onSelect, ...props },
   ref,
@@ -132,12 +130,7 @@ const ContextMenuSubContent = forwardRef<HTMLDivElement, ContextMenuSubContentPr
   );
 });
 
-/**
- * Actions on the thing under the pointer — the pointer-anchored sibling of Dropdown Menu (08). Same
- * surface, same item grammar, same ARIA menu pattern; what it adds is the interaction model (right-click
- * / long-press opening at the cursor, and nesting). Wraps Radix ContextMenu 1:1. Right-click is a power
- * path, never the only path — every action here must also exist in visible UI.
- */
+/** Pointer-anchored sibling of DropdownMenu, opening on right-click or long-press; every action here must also exist in visible UI. */
 export const ContextMenu = Object.assign(ContextMenuPrimitive.Root, {
   Trigger: ContextMenuPrimitive.Trigger,
   Group: ContextMenuPrimitive.Group,

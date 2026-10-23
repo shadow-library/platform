@@ -22,7 +22,6 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-/** Interactive — type a code, or paste `123456` (separators are stripped and distributed). */
 export const Playground: Story = {};
 
 export const Sizes: Story = {
@@ -35,12 +34,10 @@ export const Sizes: Story = {
   ),
 };
 
-/** A wider allow-list — letters and digits; input is upper/lowercase as typed. */
 export const Alphanumeric: Story = {
   args: { type: 'alphanumeric', length: 5, defaultValue: 'A1B2C' },
 };
 
-/** Masked boxes hide the characters as dots, for sensitive codes. */
 export const Masked: Story = {
   args: { mask: true, defaultValue: '482913' },
 };
@@ -53,7 +50,6 @@ export const Disabled: Story = {
   args: { disabled: true, defaultValue: '123456' },
 };
 
-/** Controlled — `onComplete` fires once the last box is filled. */
 export const WithOnComplete: Story = {
   render: args => {
     const [value, setValue] = useState('');

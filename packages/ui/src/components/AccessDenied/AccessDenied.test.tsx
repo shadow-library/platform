@@ -17,7 +17,6 @@ describe('AccessDenied', () => {
     expect(screen.getByText(/don’t have permission to use this application/)).toBeInTheDocument();
   });
 
-  /** The provider's own wording beats the derived copy — it knows why in a way this component cannot. */
   it('prefers an explicit title and description', () => {
     render(<AccessDenied application="Pulse" title="Not for you" description="Your trial ended." />);
     expect(screen.getByText('Not for you')).toBeInTheDocument();

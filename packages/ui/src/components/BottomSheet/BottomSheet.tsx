@@ -21,12 +21,7 @@ interface DragState {
 
 const SNAP_LABEL: Record<BottomSheetSnap, string> = { content: 'content height', half: 'half height', full: 'full height' };
 
-/**
- * The touch-native overlay: a surface that rises from the bottom edge with snap points, drag-to-dismiss,
- * and a grabber. Drag is never the only path — the grabber is a focusable button that cycles the snap
- * points, so the gesture has a keyboard twin. Modal sheets reuse Dialog's focus trap, scrim, and scroll
- * lock. Above md, prefer a Dialog or Popover; this is the thumb-reachable projection target below it.
- */
+/** Drag is never the only path: the grabber is a focusable button that cycles the snap points. Modal sheets reuse Dialog's focus trap, scrim and scroll lock. */
 export function BottomSheet({
   open,
   onOpenChange,

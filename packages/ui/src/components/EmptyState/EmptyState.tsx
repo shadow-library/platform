@@ -6,12 +6,7 @@ import { Button } from '../Button';
 import styles from './EmptyState.module.css';
 import { type EmptyStateProps } from './EmptyState.types';
 
-/**
- * The message shown when a region has resolved to nothing: fact (title), way forward (description),
- * and one verb (action). It is itself a state — it has none of its own, appearing only after loading
- * resolves and leaving the moment content exists. Illustrations are decorative (page/first-use only);
- * the title carries the meaning. Pure text tokens — no surface.
- */
+/** Appears only after loading resolves. The illustration is decorative; the title carries the meaning. */
 export const EmptyState = forwardRef<HTMLDivElement, EmptyStateProps>(function EmptyState(
   { title, description, illustration, action, secondaryAction, size = 'page', className, ...props },
   ref,

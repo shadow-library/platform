@@ -24,7 +24,6 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-/** Header + body + footer, separated by hairlines. */
 export const Default: Story = {
   render: args => (
     <Card {...args}>
@@ -42,7 +41,6 @@ export const Default: Story = {
   ),
 };
 
-/** The whole card is a link (asChild + a real `<a>`); hover raises a border and e1 shadow. */
 export const Interactive: Story = {
   render: () => (
     <Card asChild interactive>
@@ -56,7 +54,6 @@ export const Interactive: Story = {
   ),
 };
 
-/** Selected card (card-radio / picker): accent border, color does the work. */
 export const Selected: Story = {
   render: () => (
     <Card selected padding="md">
@@ -68,7 +65,6 @@ export const Selected: Story = {
   ),
 };
 
-/** A plain padded container — just a Body. */
 export const BodyOnly: Story = {
   render: args => (
     <Card {...args}>

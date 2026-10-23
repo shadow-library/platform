@@ -39,12 +39,7 @@ function isEmptyValue(children: ReactNode): boolean {
   return children === undefined || children === null || children === false || children === '';
 }
 
-/**
- * One key–value fact — a `<dt>`/`<dd>` pair. Empty children render the em-dash policy automatically, so
- * call sites never carry a `?? '—'` ternary. `copyable` reveals a copy button on hover/focus; `masked`
- * hides the value behind a reveal toggle whose state never persists. Both affordances read the value's
- * real text, so they compose with any value type.
- */
+/** Empty children render the em-dash policy. `copyable` and `masked` read the value's real text; the reveal state never persists. */
 function DescriptionListItem({ term, mono = false, copyable = false, masked = false, className, children, ...props }: DescriptionListItemProps) {
   const empty = isEmptyValue(children);
   const valueRef = useRef<HTMLSpanElement>(null);
@@ -107,12 +102,7 @@ function DescriptionListItem({ term, mono = false, copyable = false, masked = fa
   );
 }
 
-/**
- * The standard rendering of key–value facts in three layouts. `row` is the detail-panel default (fixed
- * term column + hairline dividers); `column` stacks term over value for narrow contexts; `grid` tiles
- * facts across columns and degrades as width narrows. Semantic `<dl>` in every layout — the arrangement
- * is CSS, the term–detail association is markup. It renders facts; it is not a form.
- */
+/** Semantic `<dl>` in every layout; the arrangement is CSS. `grid` degrades to fewer columns as width narrows. */
 const DescriptionListRoot = forwardRef<HTMLDListElement, DescriptionListProps>(function DescriptionList(
   { layout = 'row', termWidth = 150, columns = 2, title, action, className, children, style, ...props },
   ref,

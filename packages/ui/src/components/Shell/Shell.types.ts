@@ -3,41 +3,25 @@ import { type ComponentPropsWithoutRef, type ReactNode } from 'react';
 export type ShellContentPadding = 'none' | 'sm' | 'md' | 'lg';
 
 export interface ShellProps extends ComponentPropsWithoutRef<'div'> {
-  /** The sidebar landmark (e.g. `Sidebar`), rendered first in the layout. */
   sidebar?: ReactNode;
-  /** The top bar landmark (e.g. `TopNavigation`), pinned above the content. */
   topbar?: ReactNode;
-  /**
-   * Pin `topbar` to the viewport top below md too, where the shell itself does not scroll (the document
-   * does). Off by default: a product with no content that needs the top bar to stay reachable mid-scroll
-   * opts in explicitly rather than every consumer's phone layout shifting at once.
-   */
+  /** Pin `topbar` to the viewport top below md too, where the document scrolls rather than the shell. Opt-in so no phone layout shifts unasked. */
   stickyTopbar?: boolean;
-  /**
-   * Phone-only primary navigation (e.g. `BottomNavigation`), pinned to the viewport bottom and hidden
-   * from md up. Opt-in: the content region only reserves room for it when it is passed.
-   */
+  /** Phone-only primary navigation (e.g. `BottomNavigation`), hidden from md up; the content region reserves room for it only when passed. */
   bottomNav?: ReactNode;
-  /** Mount the dark theme app-wide from the shell root. */
   theme?: 'light' | 'dark';
-  /** Mount compact density app-wide from the shell root. */
   density?: 'comfortable' | 'compact';
   /** Reading-column max-width for the content region; `'fluid'` fills it. @default 1200 */
   contentWidth?: number | 'fluid';
   /** Gutter scale around the content region; each step is responsive. `'none'` for full-bleed. @default 'md' */
   contentPadding?: ShellContentPadding;
-  /** Main content (usually `Page`s). */
   children?: ReactNode;
 }
 
 export interface PageProps extends Omit<ComponentPropsWithoutRef<'div'>, 'title'> {
-  /** Page title (heading-1). */
   title?: ReactNode;
-  /** Supporting description under the title. */
   description?: ReactNode;
-  /** Breadcrumb trail above the title. */
   breadcrumbs?: ReactNode;
-  /** Header actions (one primary Button max). */
   actions?: ReactNode;
   /**
    * Content max-width; `'fluid'` fills. Inside a `Shell` this narrows the page below the shell's
@@ -47,10 +31,7 @@ export interface PageProps extends Omit<ComponentPropsWithoutRef<'div'>, 'title'
 }
 
 export interface ShellNav {
-  /** Whether an enclosing shell has a sidebar to project into the mobile nav drawer. */
   hasSidebar: boolean;
-  /** Whether the mobile nav drawer is open — mirror it onto the trigger's `aria-expanded`. */
   open: boolean;
-  /** Opens or closes the mobile nav drawer. */
   setOpen: (open: boolean) => void;
 }

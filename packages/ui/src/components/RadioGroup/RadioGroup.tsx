@@ -7,11 +7,7 @@ import { RadioGroupContext, useRadioGroupContext } from './RadioGroup.context';
 import styles from './RadioGroup.module.css';
 import { type RadioGroupProps, type RadioItemProps } from './RadioGroup.types';
 
-/**
- * One choice from a small, always-visible set — the circular sibling of Checkbox with exclusive
- * semantics, built on Radix RadioGroup. The group is one tab stop; arrows move and select in a
- * single gesture (native roving tabindex). Compose with `RadioGroup.Item`.
- */
+/** One tab stop; arrows move and select in a single gesture (native roving tabindex). */
 const RadioGroupRoot = forwardRef<HTMLDivElement, RadioGroupProps>(function RadioGroup({ label, invalid = false, className, children, ...props }, ref) {
   const labelId = useId();
   return (
@@ -59,7 +55,6 @@ const RadioItem = forwardRef<HTMLButtonElement, RadioItemProps>(function RadioIt
   );
 });
 
-/** Compound RadioGroup: the root plus `.Item`. */
 export const RadioGroup = Object.assign(RadioGroupRoot, { Item: RadioItem });
 
 export { RadioItem };

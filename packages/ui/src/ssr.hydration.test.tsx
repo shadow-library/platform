@@ -11,7 +11,6 @@ import { Statistic } from '@/components/Statistic';
 
 const HYDRATION_NOISE = /hydrat|did not match|server (rendered|HTML|-rendered)|text content does not match|tree hydrated/i;
 
-/** Render on the "server", hydrate on the "client", and fail if React reports any hydration mismatch. */
 async function expectHydrationClean(element: ReactElement): Promise<void> {
   const html = renderToString(element);
   const container = document.createElement('div');

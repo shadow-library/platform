@@ -7,7 +7,6 @@ import { AvatarGroupContext } from './Avatar.context';
 import styles from './Avatar.module.css';
 import { type AvatarGroupProps, type AvatarProps } from './Avatar.types';
 
-/** Stable tint per name — a char-code sum picks one of the two muted palettes. */
 function getTint(name: string): 'indigo' | 'neutral' {
   let sum = 0;
   for (const char of name) sum += char.charCodeAt(0);
@@ -22,12 +21,7 @@ function DefaultIcon() {
   );
 }
 
-/**
- * Represents a person, team, or workspace. Falls back image → deterministic initials → generic icon
- * via Radix Avatar (which delays the fallback ~300ms so fast networks never flash initials). Initials
- * are hashed to a fixed muted palette so a name always renders the same tint; the accessible name
- * comes from `alt ?? name` and folds in `presence`, while the visible glyph stays `aria-hidden`.
- */
+/** Image, then deterministic initials, then a generic icon (Radix delays the fallback ~300ms). The accessible name is `alt ?? name` plus `presence`; the glyph is `aria-hidden`. */
 export const Avatar = forwardRef<HTMLSpanElement, AvatarProps>(function Avatar(
   { name = '', src, alt, size: sizeProp, shape = 'circle', presence, icon, className, ...props },
   ref,
@@ -59,10 +53,7 @@ export const Avatar = forwardRef<HTMLSpanElement, AvatarProps>(function Avatar(
   );
 });
 
-/**
- * Stacks 3–5 avatars with a shared size, overlapping them left-over-right, and collapses the rest
- * into a "+N" counter. Order children by relevance (assignee first).
- */
+/** Stacks avatars with a shared size and collapses the rest into a "+N" counter; order children by relevance. */
 export const AvatarGroup = forwardRef<HTMLDivElement, AvatarGroupProps>(function AvatarGroup({ max = 5, size = 'md', className, children, ...props }, ref) {
   const items = Children.toArray(children).filter(isValidElement);
   const visible = items.slice(0, max);

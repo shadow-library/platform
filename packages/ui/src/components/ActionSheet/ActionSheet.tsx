@@ -13,12 +13,7 @@ interface ActionSheetContextValue {
 
 const ActionSheetContext = createContext<ActionSheetContextValue | null>(null);
 
-/**
- * The touch replacement for an anchored menu: a modal sheet of full-width action rows rising from
- * the bottom edge, where DropdownMenu/ContextMenu placement has no anchor worth pointing at. Radix
- * Dialog owns the focus trap, scrim, Esc, and scroll lock; every row is a ≥44px tap target and a
- * separated cancel row always offers an explicit way out. Above md, prefer the anchored menus.
- */
+/** Touch replacement for an anchored menu: Radix Dialog owns focus trap, scrim, Esc and scroll lock; rows are >=44px and a cancel row is always offered. */
 function ActionSheetRoot({ open, onOpenChange, title, description, cancelLabel = 'Cancel', 'aria-label': ariaLabel, children, className }: ActionSheetProps): ReactElement {
   const close = useCallback(() => onOpenChange(false), [onOpenChange]);
   const context = useMemo(() => ({ close }), [close]);
@@ -61,7 +56,6 @@ const ActionSheetItem = forwardRef<HTMLButtonElement, ActionSheetItemProps>(func
 
   const shared = { className: cn(styles.item, className), 'data-intent': intent, onClick: handleClick };
 
-  // asChild delegates rendering to the consumer's element (e.g. a router link); the child owns its content.
   if (asChild) {
     return (
       <Slot ref={ref} {...shared} {...props}>

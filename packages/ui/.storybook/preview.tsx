@@ -3,7 +3,6 @@ import { useEffect } from 'react';
 
 import '@/styles/index.css';
 
-/** Applies the toolbar-selected theme to the preview root, exactly as a consumer would. */
 const withTheme: Decorator = (Story, context) => {
   const theme = context.globals.theme === 'dark' ? 'dark' : 'light';
   useEffect(() => {
@@ -45,9 +44,6 @@ export const preview = definePreview({
     },
 
     a11y: {
-      // 'todo' - show a11y violations in the test UI only
-      // 'error' - fail CI on a11y violations
-      // 'off' - skip a11y checks entirely
       test: 'todo',
     },
   },

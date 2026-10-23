@@ -22,7 +22,6 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-/** The case worth designing for: the application is named, so the ask is concrete. */
 export const NamedApplication: Story = {
   args: {
     application: 'Pulse',
@@ -38,7 +37,6 @@ export const UnknownApplication: Story = {
   },
 };
 
-/** What a user pastes into a support ticket when the copy has not helped them. */
 export const WithDiagnostics: Story = {
   args: {
     application: 'Pulse',

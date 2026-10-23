@@ -46,22 +46,18 @@ function Interactive(args: React.ComponentProps<typeof MultiSelect>) {
   return <MultiSelect {...args} value={value} onValueChange={setValue} />;
 }
 
-/** Interactive — check several, remove via tag ×, overflow past 3, clear all. */
 export const Playground: Story = {
   render: args => <Interactive {...args} value={['design', 'platform']} />,
 };
 
-/** A pinned search filters options while preserving checked state. */
 export const Searchable: Story = {
   render: args => <Interactive {...args} searchable value={['design']} />,
 };
 
-/** A leading “Select all” row with an indeterminate partial state. */
 export const SelectAll: Story = {
   render: args => <Interactive {...args} selectAll value={['design', 'growth']} />,
 };
 
-/** Remaining options disable once the cap is reached; the footer explains why. */
 export const MaxSelected: Story = {
   render: args => <Interactive {...args} maxSelected={2} value={['design', 'platform']} />,
 };

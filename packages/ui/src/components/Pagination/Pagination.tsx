@@ -24,7 +24,6 @@ function ChevronRight() {
   );
 }
 
-/** Windowed page list — first + last + current ± siblingCount, with ellipses filling the gaps. */
 function getPageSlots(page: number, totalPages: number, siblingCount: number): PageSlot[] {
   const totalSlots = siblingCount * 2 + 5;
   if (totalPages <= totalSlots) return Array.from({ length: totalPages }, (_, index) => index + 1);
@@ -47,12 +46,7 @@ function getPageSlots(page: number, totalPages: number, siblingCount: number): P
   return slots;
 }
 
-/**
- * Table-footer pagination with the windowing math built in (siblingCount, ellipses) so products never
- * reimplement it. Page mode renders the numbered window with a range summary; cursor mode (no `total`)
- * renders only Prev/Next. The current page is a position marker — `aria-current="page"`, accent-soft,
- * not a disabled or clickable-looking control. Wrapped in `<nav aria-label="Pagination">`.
- */
+/** Cursor mode (no `total`) renders only Prev/Next. The current page is a position marker (`aria-current="page"`), not a clickable-looking control. */
 export const Pagination = forwardRef<HTMLElement, PaginationProps>(function Pagination(
   {
     page = 1,

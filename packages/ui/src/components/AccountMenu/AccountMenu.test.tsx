@@ -82,8 +82,7 @@ describe('AccountMenu', () => {
   it('should give the account menu trigger the touch target size', () => {
     render(<AccountMenu name="Ada Lovelace" />);
     expect(screen.getByRole('button', { name: 'Account menu' })).toBeInTheDocument();
-    // The trigger must scale with --sh-control-height-md (32px comfortable, 44px touch density) like the
-    // bell/toggle/hamburger IconButtons, not stay pinned to the 24px avatar itself.
+    // The trigger must scale with --sh-control-height-md like the other IconButtons, not stay pinned to the 24px avatar.
     expect(css).toMatch(/\.trigger\s*{[^}]*width:\s*var\(--sh-control-height-md\)/);
     expect(css).toMatch(/\.trigger\s*{[^}]*height:\s*var\(--sh-control-height-md\)/);
     expect(css).toContain('pointer: coarse');

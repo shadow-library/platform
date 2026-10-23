@@ -13,13 +13,7 @@ interface BottomNavigationContextValue {
 
 const BottomNavigationContext = createContext<BottomNavigationContextValue | null>(null);
 
-/**
- * The mobile app-shell's primary navigation: a bottom-pinned bar of 3–5 top-level destinations,
- * each an icon over an always-visible label. It is a `nav` landmark of plain tab stops (not a
- * tablist) — the selected item carries `aria-current="page"`. The bar pads itself past the home
- * indicator; pair `asChild` items with router links so destinations are real navigations.
- * The desktop siblings are `Sidebar` and `TopNavigation`; render this below the md breakpoint.
- */
+/** A `nav` landmark of plain tab stops, not a tablist: the selected item carries `aria-current="page"`. Render below the md breakpoint. */
 const BottomNavigationRoot = forwardRef<HTMLElement, BottomNavigationProps>(function BottomNavigation(
   { value, defaultValue, onValueChange, fixed = true, 'aria-label': ariaLabel = 'Primary', className, children, ...props },
   ref,
@@ -75,7 +69,6 @@ const BottomNavigationItem = forwardRef<HTMLButtonElement, BottomNavigationItemP
     onClick: handleClick,
   };
 
-  // asChild renders the consumer's element (e.g. a router link) and slots the icon/label into it.
   if (asChild) {
     return (
       <Slot ref={ref} {...shared} {...props}>

@@ -1,19 +1,13 @@
-/**
- * Small, dependency-free date helpers for the calendar components. Values cross the component API as
- * ISO date strings (YYYY-MM-DD); Date objects stay internal.
- */
 import { DEFAULT_LOCALE } from './locale';
 
 export function pad2(value: number): string {
   return String(value).padStart(2, '0');
 }
 
-/** Format a Date as a local YYYY-MM-DD string. */
 export function toISODate(date: Date): string {
   return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
 }
 
-/** Parse a strict YYYY-MM-DD string to a local Date, or null if invalid. */
 export function parseISODate(value: string): Date | null {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
   if (!match) return null;
@@ -46,7 +40,6 @@ export function isSameDay(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
-/** A 6×7 matrix of Dates covering `month`, padded with adjacent-month days. */
 export function buildMonthMatrix(year: number, month: number, weekStartsOn = 0): Date[][] {
   const first = new Date(year, month, 1);
   const offset = (first.getDay() - weekStartsOn + 7) % 7;

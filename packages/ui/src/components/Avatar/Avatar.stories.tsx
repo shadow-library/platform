@@ -32,7 +32,6 @@ export const Sizes: Story = {
   ),
 };
 
-/** Circle for people, radius-6 square for workspaces/orgs. */
 export const Shapes: Story = {
   render: () => (
     <div style={{ display: 'flex', gap: 12 }}>
@@ -53,7 +52,6 @@ export const Presence: Story = {
   ),
 };
 
-/** Stacked group with a "+N" overflow counter. */
 export const Group: Story = {
   render: () => (
     <AvatarGroup max={4}>

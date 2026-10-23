@@ -48,7 +48,6 @@ function splitClock(core: string): ClockParts | null {
   return { hours: Number(core.slice(0, split)), minutes: Number(core.slice(split)) };
 }
 
-/** Loosely parse "9:30", "930", "9.30pm", "21:30" to minutes of day, or null. */
 function parseTime(input: string): number | null {
   const clean = input.trim().toLowerCase().replace(/\s+/g, '');
   if (!clean) return null;
@@ -92,11 +91,8 @@ function ClockIcon() {
 }
 
 /**
- * A time field with a suggestion menu, on 24-hour `HH:MM` strings at the API boundary. Typing is the
- * accessible fast path — loose input ("930", "9.30pm", "21:30") parses on blur or Enter, out-of-range/invalid
- * surfaces then, and the field reverts rather than storing an impossible value. The suggestion list
- * follows Combobox's listbox pattern: it opens on the current value, arrows move the highlight, and Enter
- * picks the highlighted time only after arrow navigation — otherwise it keeps what was typed.
+ * Input parses on blur or Enter and reverts rather than store an impossible value. Enter picks the highlighted suggestion only after arrow navigation; otherwise it keeps
+ * what was typed.
  */
 export function TimePicker({
   value,

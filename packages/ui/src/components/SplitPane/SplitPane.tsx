@@ -26,7 +26,6 @@ function isHandle(node: ReactNode): node is ReactElement<SplitPaneHandleProps> {
   return isValidElement(node) && node.type === SplitPaneHandle;
 }
 
-/** Resolve a px/percent size against the container length; `undefined` falls back. */
 function resolveSize(size: SplitSize | undefined, containerLen: number, fallback: number): number {
   if (size === undefined) return fallback;
   if (typeof size === 'number') return size;
@@ -34,11 +33,8 @@ function resolveSize(size: SplitSize | undefined, containerLen: number, fallback
 }
 
 /**
- * Two regions, one negotiable boundary. Where App Shell and Sidebar fix the layout, the Split Pane
- * hands the boundary to the user — resize, collapse, and remember — and owns nothing else; pane content
- * is opaque. The handle follows the WAI-ARIA window-splitter pattern (role=separator with valuenow/
- * min/max) and is a real tab stop: every outcome (resize, collapse, reset) is reachable from the
- * keyboard. Nest by placing a Split Pane inside a Pane; each container owns its own handle and key.
+ * Hands the boundary to the user: the handle follows the WAI-ARIA window-splitter pattern and is a real tab stop. Nest by placing a SplitPane inside a Pane; each container
+ * owns its handle and key.
  */
 function SplitPaneRoot({ direction = 'horizontal', autoSaveId, onResize, children, className }: SplitPaneProps) {
   const nodes = Children.toArray(children);
@@ -49,7 +45,7 @@ function SplitPaneRoot({ direction = 'horizontal', autoSaveId, onResize, childre
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerLen, setContainerLen] = useState(0);
-  const [size, setSize] = useState<number | null>(null); // px of the first pane
+  const [size, setSize] = useState<number | null>(null);
   const [collapsed, setCollapsed] = useState(false);
   const [dragging, setDragging] = useState(false);
   const lastSize = useRef(0);
@@ -68,8 +64,6 @@ function SplitPaneRoot({ direction = 'horizontal', autoSaveId, onResize, childre
     return Math.max(min, Math.min(max, value));
   }
 
-  // Measure the container along the split axis, and size the first pane on the first non-zero
-  // measurement — same layout pass, so the pane never paints at a placeholder size.
   useIsomorphicLayoutEffect(() => {
     const node = containerRef.current;
     if (!node) return;

@@ -10,7 +10,7 @@ export interface RangePreset {
 export interface DateRangePickerProps {
   /** Controlled `{ start, end }` (ISO strings). */
   value?: DateRange;
-  /** Uncontrolled initial value. */
+  /** Uncontrolled initial `{ start, end }` (ISO strings). */
   defaultValue?: DateRange;
   /** Fires with the next range. */
   onValueChange?: (value: DateRange) => void;
@@ -18,7 +18,9 @@ export interface DateRangePickerProps {
   presets?: RangePreset[];
   /** Months shown side by side. @default 2 */
   months?: 1 | 2;
+  /** Earliest selectable ISO date (inclusive). */
   min?: string;
+  /** Latest selectable ISO date (inclusive). */
   max?: string;
   /** Defer onValueChange until Apply (dashboards where each change costs queries). @default false */
   confirm?: boolean;

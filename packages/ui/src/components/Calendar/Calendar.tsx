@@ -31,12 +31,7 @@ function asRange(value: CalendarValue | undefined): DateRange {
   return { start: null, end: null };
 }
 
-/**
- * An inline ARIA grid of dates with a roving day cursor (arrows cross month boundaries, turning the
- * page — one continuous plane of days). Single, multiple, and range selection on ISO strings; range
- * clicks before the start swap roles so users are never scolded for clicking backwards. Reuses the
- * shared date helpers and the Date Picker's day-state tokens.
- */
+/** ARIA grid of dates with a roving day cursor; arrows cross month boundaries. Range clicks before the start swap roles instead of erroring. */
 export function Calendar({
   mode = 'single',
   value,
@@ -53,7 +48,6 @@ export function Calendar({
   className,
   'aria-label': ariaLabel = 'Calendar',
 }: CalendarProps): ReactElement {
-  // Multi-month views hide adjacent-month days by default so a boundary date never appears in both grids.
   const renderOutsideDays = showOutsideDays ?? months === 1;
   const [current, setCurrent] = useControllableState<CalendarValue>({
     value,
@@ -76,9 +70,7 @@ export function Calendar({
   // "today", so the tab stop is identical on the server and the first client render.
   const [focusedDate, setFocusedDate] = useState(() => firstSelected ?? today ?? startOfMonth(new Date()));
   const [hoverDate, setHoverDate] = useState<Date | null>(null);
-  // "Today" reads the wall clock, which differs between the server and the client. Withhold it until
-  // hydration so the current-day marker is absent on the server and the first client render alike,
-  // then appears once hydrated. A caller-supplied `today` pins it deterministically.
+  // "Today" reads the wall clock, which differs between server and client, so it is withheld until hydration unless the caller supplies `today`.
   const [clockToday] = useState(() => new Date());
   const hydrated = useHydrated();
   const resolvedToday = today ?? (hydrated ? clockToday : null);
@@ -169,7 +161,6 @@ export function Calendar({
     return date > lo && date < hi;
   }
 
-  // The trailing/leading half-band the endpoint cell paints so its pill connects to the in-range strip.
   function rangeEdge(date: Date): 'start' | 'end' | undefined {
     if (mode !== 'range' || !rangeStart) return undefined;
     const end = rangeEnd ?? (hoverDate && !rangeEnd ? hoverDate : null);
@@ -185,7 +176,6 @@ export function Calendar({
   const weekdays = weekdayLabels(weekStartsOn, locale);
 
   return (
-    // keyboard grid navigation is handled here and delegated to the day buttons
     <div className={cn(styles.root, className)} onKeyDown={handleKeyDown}>
       <div className={styles.months} data-count={months}>
         {Array.from({ length: months }, (_, offset) => {

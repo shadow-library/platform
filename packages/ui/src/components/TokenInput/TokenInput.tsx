@@ -14,12 +14,7 @@ function RemoveIcon() {
   );
 }
 
-/**
- * A field that collects typed or pasted values — emails, domains, IPs, environment names — as tokens.
- * Pasting a spreadsheet column splits on the separators into many tokens at once; invalid ones stay in
- * place (marked, counted, editable), never silently dropped. Backspace removes the last token and
- * arrow-left selects tokens for keyboard removal. Values cross the API as `{ value, valid }[]`.
- */
+/** Invalid tokens stay in place (marked, counted, editable), never silently dropped; pasting splits on the separators. */
 export const TokenInput = forwardRef<HTMLInputElement, TokenInputProps>(function TokenInput(
   {
     value,
@@ -154,7 +149,6 @@ export const TokenInput = forwardRef<HTMLInputElement, TokenInputProps>(function
   const anyInvalid = tokens.some(token => !token.valid);
 
   return (
-    // clicking the field chrome focuses the real input inside it
     // the click only forwards focus to the real input, which owns all keyboard behavior
     <div
       className={cn(styles.root, className)}

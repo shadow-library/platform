@@ -9,7 +9,6 @@ export interface TreeNode {
 }
 
 export interface TreeViewProps {
-  /** The hierarchy. */
   nodes: TreeNode[];
   /** Controlled expanded node ids. */
   expanded?: string[];

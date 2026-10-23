@@ -37,7 +37,6 @@ const clamp = (value: number, min: number, max: number): number => Math.min(max,
 const clamp01 = (value: number): number => clamp(value, 0, 1);
 const round = (value: number): number => Math.round(value);
 
-/** Normalize loose hex input to `#rrggbb`, or null when it doesn't parse. */
 function normalizeHex(input: string): string | null {
   const raw = input.trim().replace(/^#/, '').toLowerCase();
   if (/^[0-9a-f]{3}$/.test(raw)) {
@@ -94,7 +93,6 @@ function hsvToRgb({ h, s, v }: Hsv): [number, number, number] {
 const hexToHsv = (hex: string): Hsv => rgbToHsv(...hexToRgb(hex));
 const hsvToHex = (hsv: Hsv): string => rgbToHex(...hsvToRgb(hsv));
 
-/** Relative-luminance WCAG contrast ratio between two hex colors. */
 function contrastRatio(a: string, b: string): number {
   const luminance = (hex: string): number => {
     const channel = (c: number): number => {
@@ -110,20 +108,12 @@ function contrastRatio(a: string, b: string): number {
   return (hi + 0.05) / (lo + 0.05);
 }
 
-/** Black or white check color by the swatch's perceived luminance. */
 function contrastColor(hex: string): string {
   const [r, g, b] = hexToRgb(hex);
   return 0.299 * r + 0.587 * g + 0.114 * b > 140 ? '#000000' : '#ffffff';
 }
 
-/**
- * A swatch trigger opening a palette-first surface. Curated swatches are a radiogroup, each named by its
- * meaning ("Indigo", "Team purple"), never a bare hex. When `allowCustom`, a "Custom…" disclosure reveals
- * the spectrum — a 2-D saturation/brightness field plus a hue slider, both pointer- and keyboard-driven —
- * with the hex field as the guaranteed non-pointer path. Color math runs in HSV and serializes to hex; the
- * value only ever holds a valid color. Committed custom colors join a deduped, last-8 recent row.
- * (Alpha and RGB/HSL text formats are documented follow-ups.)
- */
+/** Curated swatches are a radiogroup named by meaning, never a bare hex; the hex field is the guaranteed non-pointer path to a custom colour. */
 export function ColorPicker({
   value,
   defaultValue = '#4f46e5',
@@ -198,7 +188,6 @@ export function ColorPicker({
     apply(hsvToHex(next));
   }
 
-  // Pointer drag on the 2-D field (saturation ← x, brightness ← y) or the hue track (hue ← x).
   function startDrag(event: PointerEvent<HTMLDivElement>, axis: 'field' | 'hue'): void {
     if (disabled) return;
     event.preventDefault();

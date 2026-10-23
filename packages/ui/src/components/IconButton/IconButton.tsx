@@ -6,11 +6,7 @@ import { cn } from '@/lib';
 import styles from './IconButton.module.css';
 import { type IconButtonProps } from './IconButton.types';
 
-/**
- * A square, icon-only specialization of Button for scarce space and conventional actions.
- * Requires an `aria-label` (and mirrors it into a native `title` until Tooltip lands); pass
- * `pressed` to switch to toggle semantics.
- */
+/** Requires an `aria-label` (mirrored into a native `title`); pass `pressed` for toggle semantics. */
 export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(function IconButton(
   { icon, variant = 'ghost', size = 'md', loading = false, pressed, asChild = false, type, disabled, title, className, children, ...props },
   ref,
@@ -27,7 +23,6 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
   };
   const content = loading ? <span className={styles.spinner} aria-hidden="true" /> : <span className={styles.icon}>{icon}</span>;
 
-  // asChild renders the consumer's element (e.g. a link) as the button, with the icon injected.
   if (asChild) {
     return (
       <Slot ref={ref} className={cn(styles.root, className)} {...dataProps} aria-pressed={pressed} title={title ?? ariaLabel} {...props}>

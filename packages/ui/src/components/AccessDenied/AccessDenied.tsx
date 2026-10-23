@@ -7,15 +7,8 @@ import styles from './AccessDenied.module.css';
 import { type AccessDeniedProps } from './AccessDenied.types';
 
 /**
- * The wall a user meets when they are authenticated but the application is not theirs to enter.
- *
- * Distinct from a 404 and from a sign-in prompt: the user is known, the page exists, and signing in
- * again will not help — someone has to grant them access. The copy therefore points at an
- * administrator rather than offering a retry, and names the application whenever the caller knows it,
- * because "ask for access to Pulse" is actionable in a way that "access denied" is not.
- *
- * Presentational only. Detecting the denial and deciding where the actions lead belong to the
- * application; this renders the outcome.
+ * Wall for an authenticated user who lacks access to the application. Presentational: copy points at an administrator rather than a retry,
+ * and names the application when known; detecting the denial and routing the actions belong to the app.
  */
 export const AccessDenied = forwardRef<HTMLDivElement, AccessDeniedProps>(function AccessDenied(
   { application, title, description, illustration, action, secondaryAction, error, requestId, footer, className, ...props },

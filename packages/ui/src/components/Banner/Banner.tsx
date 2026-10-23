@@ -52,12 +52,7 @@ function DismissIcon() {
   );
 }
 
-/**
- * The app-scoped message strip — full-width chrome pinned above the shell content for facts affecting
- * the whole session (outages, expiring trials, unpaid invoices, impersonation). One sentence, one
- * optional action. Danger is `role="alert"` (announced assertively on arrival); the rest are polite
- * `role="status"`. The strip itself is never clickable — the action is the action.
- */
+/** App-scoped message strip. Danger is `role="alert"`; the rest are polite `role="status"`. The strip itself is never clickable, only its action. */
 export const Banner = forwardRef<HTMLDivElement, BannerProps>(function Banner(
   { intent = 'info', message, lead, action, dismissable = false, onDismiss, className, ...props },
   ref,

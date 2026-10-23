@@ -13,7 +13,6 @@ export interface SelectProps extends RootProps {
   placeholder?: string;
   /** Trigger height/typography scale — matches Input/Button. @default 'md' */
   size?: SelectSize;
-  /** Presentation-only invalid state: danger border/ring + `aria-invalid` on the trigger. */
   invalid?: boolean;
   /** Swap the chevron for a spinner while options load. */
   loading?: boolean;
@@ -25,19 +24,16 @@ export interface SelectProps extends RootProps {
   triggerId?: string;
   'aria-label'?: string;
   'aria-labelledby'?: string;
-  /** `Select.Item` / `Select.Group` / `Select.Separator` children. */
   children?: ReactNode;
 }
 
 export interface SelectItemProps extends ComponentPropsWithoutRef<typeof SelectPrimitive.Item> {
-  /** Leading 16px icon (status dot, flag, avatar) mirrored into the trigger when selected. */
+  /** Leading 16px icon mirrored into the trigger when selected. */
   icon?: ReactNode;
-  /** Secondary line beneath the label for consequential choices (plan tiers, etc.). */
   description?: ReactNode;
 }
 
 export interface SelectGroupProps extends ComponentPropsWithoutRef<typeof SelectPrimitive.Group> {
-  /** Section heading rendered above the group's items. */
   label?: ReactNode;
 }
 

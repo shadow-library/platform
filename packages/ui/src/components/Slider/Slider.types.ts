@@ -12,11 +12,9 @@ export interface SliderProps {
   min?: number;
   max?: number;
   step?: number;
-  /** Unit appended to the value display (e.g. `%`). */
   unit?: string;
   /** Custom value formatter (overrides `unit`). */
   formatValue?: (value: number) => string;
-  /** Label shown in the mandatory value row. */
   label?: ReactNode;
   /** Show the value display (mandatory by design; disable only when a paired stepper shows it). @default true */
   showValue?: boolean;

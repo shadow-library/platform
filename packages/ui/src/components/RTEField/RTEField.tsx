@@ -16,7 +16,6 @@ import {
 
 const RTEFieldContext = createContext<RTEFieldContextValue | null>(null);
 
-/** Access the field's a11y ids and state to wire an engine's editable element (aria-labelledby, etc.). */
 export function useRTEField(): RTEFieldContextValue {
   const context = useContext(RTEFieldContext);
   if (!context) throw new Error('useRTEField must be used within an RTEField');
@@ -31,13 +30,7 @@ function FullscreenIcon({ active }: { active: boolean }) {
   );
 }
 
-/**
- * The field chrome around a rich-text engine — TipTap, Lexical, or ProseMirror mounts inside and the
- * wrapper makes it behave like every other Shadow UI form control (label, validation, focus, counter).
- * Its boundary of ownership is everything outside the engine's content element; it never reaches into
- * the document model. The whole frame takes the focus-field ring whenever focus is anywhere inside —
- * one field, one boundary. The editable element wires its own ARIA via `useRTEField`.
- */
+/** Field chrome around a rich-text engine; it never reaches into the document model. The editable element wires its own ARIA via `useRTEField`. */
 const RTEFieldRoot = forwardRef<HTMLDivElement, RTEFieldProps>(function RTEField(
   {
     label,
@@ -73,7 +66,6 @@ const RTEFieldRoot = forwardRef<HTMLDivElement, RTEFieldProps>(function RTEField
     onFullscreenChange?.(next);
   }
 
-  // Esc leaves fullscreen.
   useEffect(() => {
     if (!isFullscreen) return;
     const onKey = (event: globalThis.KeyboardEvent) => {
@@ -162,7 +154,6 @@ const RTEFieldRoot = forwardRef<HTMLDivElement, RTEFieldProps>(function RTEField
   );
 });
 
-/** Toolbar region — one tab stop; arrow keys rove between the toggle buttons (ARIA toolbar pattern). */
 const RTEFieldToolbar = forwardRef<HTMLDivElement, RTEFieldToolbarProps>(function RTEFieldToolbar({ className, onKeyDown, ...props }, ref) {
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>): void {
     onKeyDown?.(event);

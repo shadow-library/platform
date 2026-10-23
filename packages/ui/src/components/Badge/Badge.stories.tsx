@@ -21,7 +21,6 @@ type Story = StoryObj<typeof meta>;
 
 export const Playground: Story = {};
 
-/** The closed intent set, soft variant with dots. */
 export const Intents: Story = {
   render: () => (
     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -44,7 +43,6 @@ export const Intents: Story = {
   ),
 };
 
-/** Outline (version/env labels) and count (notifications). */
 export const OutlineAndCount: Story = {
   render: () => (
     <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -59,7 +57,6 @@ export const OutlineAndCount: Story = {
   ),
 };
 
-/** Dot-only — the calmest marker for dense table cells. */
 export const DotOnly: Story = {
   render: () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>

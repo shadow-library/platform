@@ -18,12 +18,7 @@ function SortArrow({ direction }: { direction: 'asc' | 'desc' | undefined }) {
 
 const ARIA_SORT: Record<'asc' | 'desc', 'ascending' | 'descending'> = { asc: 'ascending', desc: 'descending' };
 
-/**
- * Rows of homogeneous records with sorting, single-column and range selection, and bulk actions. A
- * real semantic `<table>` — low-contrast chrome, high-contrast content. Sorting and selection are
- * controlled (server- or consumer-driven); navigation (row click) and selection (checkbox) are
- * distinct gestures that never collide. Chrome reads only neutral tokens, so dark mode is automatic.
- */
+/** Sorting and selection are controlled; row click (navigation) and the checkbox (selection) are distinct gestures that never collide. */
 export function Table<T>({
   data,
   columns,
@@ -193,5 +188,4 @@ function renderCell<T>(column: TableColumn<T>, row: T): ReactElement | string {
   return value == null ? '' : String(value);
 }
 
-/** Re-export for consumers who want the alignment union at a call site. */
 export type { TableAlign };

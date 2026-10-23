@@ -4,8 +4,6 @@ import { type ComponentPropsWithoutRef, type ReactNode } from 'react';
 export interface SwitchProps extends Omit<ComponentPropsWithoutRef<typeof SwitchPrimitive.Root>, 'asChild'> {
   /** Feature name (never the state). Renders the settings-row: label left, switch right. */
   label?: ReactNode;
-  /** Secondary line beneath the label, linked via `aria-describedby`. */
   description?: ReactNode;
-  /** Async in-flight treatment: the thumb moves optimistically while the track dims. */
   pending?: boolean;
 }

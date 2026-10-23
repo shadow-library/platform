@@ -17,9 +17,7 @@ const DEFAULT_DURATION: Record<ToastIntent, number> = {
 
 const GLYPH: Record<ToastIntent, string> = { neutral: '•', info: 'i', success: '✓', warning: '!', danger: '!' };
 
-// A single stable empty snapshot for the server render — a fresh `[]` per call would violate the
-// useSyncExternalStore contract (React warns and re-renders), which is what made consumers wrap the
-// Toaster in a ClientOnly boundary.
+// Stable empty server snapshot: a fresh `[]` per call violates the useSyncExternalStore contract.
 const EMPTY_TOASTS: readonly ToastData[] = [];
 
 function DismissIcon() {
@@ -30,7 +28,6 @@ function DismissIcon() {
   );
 }
 
-/** A single toast card — calm neutral surface, one colored glyph, timer paused on hover/focus. */
 function ToastItem({ toast }: { toast: ToastData }): ReactElement {
   const [paused, setPaused] = useState(false);
   const duration = toast.duration ?? DEFAULT_DURATION[toast.intent];
@@ -84,15 +81,8 @@ function ToastItem({ toast }: { toast: ToastData }): ReactElement {
 }
 
 /**
- * The toast viewport — render one at the app root. Subscribes to the toast store and portals the
- * stack into `document.body`, newest nearest the anchored corner, capped at `max`. Toasts never steal
- * focus; each carries its own live-region role (assertive for danger, polite otherwise).
- *
- * The portal mounts only once hydrated: in a full-document SSR app React is hydrating `document.body`
- * itself, and portaling a viewport into it mid-walk desyncs hydration — React then discards the entire
- * server render. A `typeof document` guard can't catch that, because the document exists while React
- * hydrates; `useHydrated` stays `false` until hydration has finished (and is `true` immediately in
- * client-only apps, so SPA consumers see no behavior change).
+ * Never steals focus; each toast carries its own live-region role (assertive for danger, polite otherwise). The portal mounts only once hydrated:
+ * portaling into `document.body` while React is hydrating it desyncs hydration and discards the server render, which a `typeof document` guard can't catch.
  */
 export function Toaster({ placement = 'top-end', max = 3 }: ToasterProps): ReactElement | null {
   const toasts = useSyncExternalStore(toastStore.subscribe, toastStore.getSnapshot, () => EMPTY_TOASTS as ToastData[]);

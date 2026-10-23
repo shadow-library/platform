@@ -14,7 +14,6 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-/** A small form popover — the page stays interactive behind it. */
 export const Default: Story = {
   render: () => (
     <Popover>
@@ -34,7 +33,6 @@ export const Default: Story = {
   ),
 };
 
-/** Headerless — pass aria-label so the dialog has an accessible name. */
 export const Headerless: Story = {
   render: () => (
     <Popover>

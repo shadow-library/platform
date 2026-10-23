@@ -12,6 +12,5 @@ export interface OrganisationSwitcherProps extends ComponentPropsWithoutRef<'div
   activeId?: string;
   /** Fires with the newly chosen organisation; the caller switches the session and reloads what was fetched under the old one. */
   onSwitch: (organisationId: string) => void;
-  /** Locks the control behind a spinner while a switch is in flight. */
   switching?: boolean;
 }

@@ -23,13 +23,7 @@ function matchesFilter(item: NotificationItem, filterId: string): boolean {
   return item.category === filterId;
 }
 
-/**
- * The persistent inbox behind the bell — a Popover panel of notifications with read/unread state,
- * filter tabs, day grouping, and inline actions. Toast is the moment; this is the record. Opening the
- * panel does not mark items read (reading does); the bell announces its unread count politely only
- * while closed, so it never double-announces. The list body ships as `NotificationList` for the
- * full-page inbox — one renderer, two hosts.
- */
+/** Opening the panel does not mark items read (reading does). The list body ships as `NotificationList` for full-page hosts. */
 export function NotificationCenter({
   items,
   unreadCount,

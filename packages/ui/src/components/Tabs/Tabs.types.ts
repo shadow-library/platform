@@ -11,7 +11,7 @@ export type TabsListProps = ComponentPropsWithoutRef<typeof TabsPrimitive.List>;
 export interface TabsTabProps extends ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger> {
   /** Optional leading 16px icon. */
   icon?: ReactNode;
-  /** Optional trailing count badge (Logs 12). */
+  /** Optional trailing count badge. */
   count?: ReactNode;
 }
 

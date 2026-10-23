@@ -16,11 +16,7 @@ function CloseIcon() {
   );
 }
 
-/**
- * Several values from one list. Built on Radix Popover + an ARIA multi-select listbox (Radix has no
- * multi-select primitive). Differs from Select in three behaviors: items are checkboxes, the list
- * stays open across picks, and the trigger shows values as removable tags with a `+N` overflow.
- */
+/** Radix has no multi-select primitive, so this is Popover plus an ARIA multi-select listbox that stays open across picks. */
 export function MultiSelect({
   options,
   value,
@@ -63,7 +59,6 @@ export function MultiSelect({
   const someSelected = enabledFiltered.some(option => selected.includes(option.value));
   const limitReached = maxSelected != null && selected.length >= maxSelected;
 
-  // Rows the keyboard walks: an optional select-all row followed by the filtered options.
   const rows = useMemo(() => {
     const optionRows = filtered.map(option => ({ kind: 'option' as const, option }));
     return selectAll ? [{ kind: 'all' as const, option: null }, ...optionRows] : optionRows;

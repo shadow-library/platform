@@ -5,11 +5,8 @@ export type StepperOrientation = 'horizontal' | 'vertical';
 export type StepState = 'completed' | 'current' | 'upcoming' | 'error' | 'skipped';
 
 export interface StepperStepProps {
-  /** Stable step id — referenced by `invalidates`. */
   id: string;
-  /** Step name — a noun ("Payment"), not an instruction. */
   label: ReactNode;
-  /** Optional 11px descriptor under the label. */
   hint?: ReactNode;
   /** Optional steps can be skipped; skipping marks a neutral dash, and Finish reports it. */
   optional?: boolean;
@@ -17,9 +14,7 @@ export interface StepperStepProps {
   validate?: () => boolean | Promise<boolean>;
   /** Downstream step ids reset to upcoming when this step's answer changes (revisit). */
   invalidates?: string[];
-  /** Terminal action on the last step — may open a confirmation for irreversible flows. */
   onFinish?: () => void | Promise<void>;
-  /** The step's form/page. */
   children?: ReactNode;
 }
 
@@ -34,13 +29,11 @@ export interface StepperProps {
   linear?: boolean;
   /** Indicator layout. @default 'horizontal' */
   orientation?: StepperOrientation;
-  /** Footer status text (defaults to "Step n of m"). */
   status?: ReactNode;
   /** Label for the Continue button. @default 'Continue' */
   continueLabel?: ReactNode;
   /** Label for the terminal button on the last step. @default 'Finish' */
   finishLabel?: ReactNode;
-  /** `Stepper.Step` children. */
   children: ReactNode;
   className?: string;
 }

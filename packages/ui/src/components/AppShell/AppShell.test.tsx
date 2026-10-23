@@ -8,10 +8,7 @@ import { type AppShellProps } from './AppShell.types';
 
 const PATHS = ['/', '/account', '/account/security', '/account/sessions', '/console', '/novels/$novelId/overview', '/novels/$novelId/chat'];
 
-/**
- * Mounts the shell inside a real router at `initialPath`, so active state is resolved the way it is in an
- * app — by the router's own location — rather than by a stub the component could disagree with.
- */
+/** Mounts inside a real router so active state comes from the router's own location, not a stub. */
 async function renderShell(props: Partial<AppShellProps> & Pick<AppShellProps, 'nav'>, initialPath = '/account'): Promise<void> {
   const rootRoute = createRootRoute({
     component: () => (

@@ -64,7 +64,6 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-/** Interactive — adjust props from the controls panel. */
 export const Playground: Story = {};
 
 export const Variants: Story = {
@@ -88,7 +87,6 @@ export const Sizes: Story = {
   ),
 };
 
-/** Pass `pressed` to switch to toggle semantics — the icon may also swap outline → filled. */
 export const Toggle: Story = {
   render: () => {
     const [pinned, setPinned] = useState(false);
@@ -104,7 +102,6 @@ export const Disabled: Story = {
   args: { variant: 'secondary', disabled: true },
 };
 
-/** A toolbar row — ghost buttons stay quiet against content. */
 export const Toolbar: Story = {
   render: () => (
     <div style={{ display: 'flex', gap: 4, alignItems: 'center', padding: 4, border: '1px solid var(--sh-border-default)', borderRadius: 'var(--sh-radius-lg)' }}>

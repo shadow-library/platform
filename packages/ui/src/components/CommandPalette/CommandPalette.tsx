@@ -23,7 +23,6 @@ function SearchIcon() {
   );
 }
 
-/** Match the fold of the label + keywords against the query. */
 function matches(command: CommandItem, query: string): boolean {
   if (!query) return true;
   const haystack = fold([command.label, ...(command.keywords ?? [])].join(' '));
@@ -33,11 +32,8 @@ function matches(command: CommandItem, query: string): boolean {
 }
 
 /**
- * The ⌘K accelerator: a Radix Dialog shell (focus trap, Esc, return focus) with a combobox inside
- * (DOM focus stays in the field, highlight moves virtually via aria-activedescendant). Commands are
- * grouped in first-seen order, fuzzy-filtered per keystroke with the first result always highlighted,
- * and run on select — one Enter, one consequence. Kbd hints teach the same shortcuts as the menus. An
- * accelerator, never the only route.
+ * Radix Dialog shell around a combobox (DOM focus stays in the field, highlight moves via `aria-activedescendant`). Runs a command on select; an accelerator, never the only
+ * route.
  */
 export function CommandPalette({
   commands,
@@ -63,7 +59,6 @@ export function CommandPalette({
     }
   }
 
-  // Global hotkey (mod+k by default).
   useEffect(() => {
     if (hotkey == null) return;
     const key = hotkey.split('+').pop()?.toLowerCase();

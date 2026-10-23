@@ -50,7 +50,6 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-/** The full menu: actions with shortcuts, a disabled item, a checkbox section, and a destructive zone. */
 export const Playground: Story = {
   render: () => {
     const [compact, setCompact] = useState(true);
@@ -84,7 +83,6 @@ export const Playground: Story = {
   },
 };
 
-/** The common “···” more menu behind an Icon Button. */
 export const IconTrigger: Story = {
   render: () => (
     <DropdownMenu>
@@ -102,7 +100,6 @@ export const IconTrigger: Story = {
   ),
 };
 
-/** A radio group for an exclusive choice (sort order); the menu stays open on select. */
 export const RadioGroup: Story = {
   render: () => {
     const [sort, setSort] = useState('name');
@@ -124,7 +121,6 @@ export const RadioGroup: Story = {
   },
 };
 
-/** One level of submenu, opening at the parent edge. */
 export const Submenu: Story = {
   render: () => (
     <DropdownMenu>

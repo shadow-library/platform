@@ -31,7 +31,6 @@ export const TwentyFourHour: Story = {
   },
 };
 
-/** The suggestion list sits on the popover layer, above the modal it was opened from. */
 export const InsideDialog: Story = {
   render: () => {
     const [value, setValue] = useState<string | null>('18:30');

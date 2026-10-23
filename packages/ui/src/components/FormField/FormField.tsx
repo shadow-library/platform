@@ -15,7 +15,6 @@ function AlertIcon() {
   );
 }
 
-/** Props injected into the wrapped control so consumers avoid prop drilling. */
 interface InjectedProps {
   id: string;
   invalid?: boolean;
@@ -23,12 +22,7 @@ interface InjectedProps {
   'aria-describedby'?: string;
 }
 
-/**
- * The contract between form controls and forms. Renders the label, optionality marker, helper text,
- * and error message, and wires `htmlFor`/`id`, `aria-describedby`, and the invalid/disabled state
- * into the single control it wraps — which is why Input through Switch stay bare. Error replaces
- * helper in the same slot, so the layout never grows a second row of small text.
- */
+/** Wires `htmlFor`/`id`, `aria-describedby` and invalid/disabled state into the single control it wraps; error replaces helper in the same slot. */
 export const FormField = forwardRef<HTMLDivElement, FormFieldProps>(function FormField(
   { label, helper, error, required = false, optional = false, invalid, disabled = false, className, children, ...props },
   ref,

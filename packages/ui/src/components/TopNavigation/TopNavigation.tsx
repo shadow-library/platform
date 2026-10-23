@@ -18,10 +18,6 @@ function MenuIcon() {
   );
 }
 
-/**
- * A destination link; the active one draws a 2px accent underline over the bar's bottom border and
- * carries aria-current (the underline is presentation only).
- */
 const TopNavigationItem = forwardRef<HTMLAnchorElement, TopNavigationItemProps>(function TopNavigationItem(
   { active = false, asChild = false, className, children, ...props },
   ref,
@@ -38,12 +34,8 @@ const TopNavigationItem = forwardRef<HTMLAnchorElement, TopNavigationItemProps>(
 });
 
 /**
- * A flat top navigation bar for shallow IA (≤ 7 destinations, no groups — use Sidebar when nesting
- * appears). The bar itself is the banner landmark and only the destinations sit in the nav landmark, so
- * the brand and the utility cluster (account, theme, notifications) stay out of it. One active underline;
- * links past `maxVisible` collapse, order preserved, into a "More" menu that keeps every destination in
- * the accessibility tree. Bar is surface-card with a border-default bottom edge (App Shell's header
- * recipe).
+ * The bar is the banner landmark; only the destinations sit in the nav landmark. Links past `maxVisible` collapse, order preserved, into a "More" menu that keeps every
+ * destination in the accessibility tree.
  */
 const TopNavigationRoot = forwardRef<HTMLElement, TopNavigationProps>(function TopNavigation(
   { brand, search, utility, maxVisible, className, children, 'aria-label': ariaLabel = 'Top', ...props },

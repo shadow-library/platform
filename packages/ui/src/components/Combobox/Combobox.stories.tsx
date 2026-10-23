@@ -29,7 +29,6 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-/** Rich rows with avatar + description. */
 export const Default: Story = {
   render: () => {
     const [value, setValue] = useState<string | null>(null);
@@ -37,7 +36,6 @@ export const Default: Story = {
   },
 };
 
-/** Plain options, no media. */
 export const Plain: Story = {
   render: () => {
     const [value, setValue] = useState<string | null>('2');
@@ -46,7 +44,6 @@ export const Plain: Story = {
   },
 };
 
-/** Creatable taxonomy picker. */
 export const Creatable: Story = {
   render: () => {
     const [options, setOptions] = useState<ComboboxOption[]>([

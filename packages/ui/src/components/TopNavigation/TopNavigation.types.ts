@@ -1,14 +1,9 @@
 import { type ComponentPropsWithoutRef, type ReactNode } from 'react';
 
 export interface TopNavigationProps extends Omit<ComponentPropsWithoutRef<'header'>, 'title'> {
-  /** Brand / product identity at the left. */
   brand?: ReactNode;
-  /**
-   * Search or command-palette trigger. Takes the space left between the destinations and the utility
-   * cluster and centres its child, so it doesn't have to fight the destinations' layout.
-   */
+  /** Search or command-palette trigger; takes the space between the destinations and the utility cluster and centres its child. */
   search?: ReactNode;
-  /** Right-aligned utility cluster (notifications, theme, account). */
   utility?: ReactNode;
   /** Collapse links past this count into a "More" menu (order preserved). Omit to show all. */
   maxVisible?: number;
@@ -22,6 +17,5 @@ export interface TopNavigationItemProps extends ComponentPropsWithoutRef<'a'> {
    * slotted router link already marks itself active: the same treatment keys off `data-status="active"`.
    */
   active?: boolean;
-  /** Render as the single child (router link) via Slot. */
   asChild?: boolean;
 }

@@ -29,11 +29,8 @@ const SwipeActionsContext = createContext<SwipeActionsContextValue | null>(null)
 const SwipeActionsSideContext = createContext<SwipeActionsSide | null>(null);
 
 /**
- * The list-row swipe: dragging the row horizontally reveals a leading/trailing rail of solid
- * action buttons, settling open past half the rail's width (optionally committing the first
- * action on a full swipe). The gesture is never the only path — the row is a tab stop where
- * ArrowLeft/ArrowRight open the rails (moving focus onto the first action) and Escape closes.
- * A closed rail is out of the accessibility tree; the row surface covers it visually.
+ * The gesture is never the only path: the row is a tab stop where ArrowLeft/ArrowRight open the rails (focusing the first action) and Escape closes. A closed rail is out of
+ * the accessibility tree.
  */
 const SwipeActionsRoot = forwardRef<HTMLDivElement, SwipeActionsProps>(function SwipeActions(
   { leading, trailing, open: openProp, defaultOpen = null, onOpenChange, fullSwipe = false, className, style, children, ...props },
@@ -117,7 +114,6 @@ const SwipeActionsRoot = forwardRef<HTMLDivElement, SwipeActionsProps>(function 
     const dy = event.clientY - state.startY;
 
     if (!state.swiping) {
-      // Direction lock: mostly-vertical travel is a scroll, not a swipe.
       if (Math.abs(dy) > DIRECTION_SLOP && Math.abs(dy) > Math.abs(dx)) {
         state.active = false;
         return;

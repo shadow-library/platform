@@ -7,18 +7,14 @@ export interface BannerAction {
   label: string;
   href?: string;
   onClick?: () => void;
-  /** Swaps the underline for a spinner during an immediate operation ("Retry connection"). */
   loading?: boolean;
 }
 
 export interface BannerProps extends Omit<ComponentPropsWithoutRef<'div'>, 'title' | 'onClick'> {
   /** Intent vocabulary shared with Alert. @default 'info' */
   intent?: BannerIntent;
-  /** The one-sentence message. */
   message: ReactNode;
-  /** Optional 600-weight lead ("Payment failed"). */
   lead?: ReactNode;
-  /** The single action. */
   action?: BannerAction;
   /** Show a dismiss button. System-state banners omit it and leave when the state does. @default false */
   dismissable?: boolean;
@@ -26,9 +22,7 @@ export interface BannerProps extends Omit<ComponentPropsWithoutRef<'div'>, 'titl
   onDismiss?: () => void;
 }
 
-/** Declarative registration passed to `useBanner`; the provider enforces the one-visible queue. */
 export interface BannerConfig {
-  /** Stable identity — dismissal state and the queue key hang off this. */
   id: string;
   intent?: BannerIntent;
   message: ReactNode;

@@ -12,17 +12,14 @@ export interface RTEFieldContextValue {
 }
 
 export interface RTEFieldProps extends Omit<ComponentPropsWithoutRef<'div'>, 'onChange'> {
-  /** Field label — associated with the editor via `aria-labelledby` (exposed through context). */
   label: ReactNode;
   /** Required marker + `aria-required` on the field. @default false */
   required?: boolean;
-  /** Helper text above the frame. */
   description?: ReactNode;
   /** `string` shows the error line and sets the danger hue; `true` sets the hue without a message. */
   error?: string | boolean;
   /** Current content length (the wrapper is engine-agnostic — the product supplies this). */
   length?: number;
-  /** Enforced limit; drives the counter's warn/error crossings. */
   maxLength?: number;
   /** Count characters or words. @default 'characters' */
   countMode?: RTECountMode;
@@ -34,18 +31,14 @@ export interface RTEFieldProps extends Omit<ComponentPropsWithoutRef<'div'>, 'on
   fullscreenEnabled?: boolean;
   /** Controlled fullscreen state. */
   fullscreen?: boolean;
-  /** Fullscreen open/close callback. */
   onFullscreenChange?: (fullscreen: boolean) => void;
-  /** `RTEField.Toolbar`, `.Content`, `.Attachments`, `.Footer`. */
   children: ReactNode;
 }
 
 export type RTEFieldToolbarProps = ComponentPropsWithoutRef<'div'>;
 
 export interface RTEFieldToolbarButtonProps extends Omit<ComponentPropsWithoutRef<'button'>, 'aria-label'> {
-  /** Required accessible name — a bare icon toggle without one is a defect. */
   'aria-label': string;
-  /** Toggle state — sets `aria-pressed` and the accent-soft pressed fill. */
   pressed?: boolean;
 }
 

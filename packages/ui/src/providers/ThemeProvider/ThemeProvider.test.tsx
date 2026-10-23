@@ -187,7 +187,6 @@ describe('themeInitScript', () => {
     expect(themeInitScript({ legacyStorageKey: 'custom-key' })).toContain("localStorage.getItem('custom-key')");
   });
 
-  /** The script is what runs pre-paint, so asserting on its text is not enough — execute it and read the DOM. */
   it('should apply the cookie theme to <html> when executed', () => {
     setCookie('shadow-theme', 'dark');
     new Function(themeInitScript())();

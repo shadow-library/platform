@@ -61,7 +61,6 @@ describe('addDays', () => {
 
 describe('addMonths', () => {
   it('anchors to the first of the month so month-end days never overflow', () => {
-    // Jan 31 + 1 month must land on Feb 1, not the naive "Mar 3" overflow.
     expect(toISODate(addMonths(new Date(2026, 0, 31), 1))).toBe('2026-02-01');
   });
 
@@ -94,7 +93,6 @@ describe('buildMonthMatrix', () => {
   });
 
   it('pads the leading week with the previous month when the week starts on Sunday', () => {
-    // June 1 2026 is a Monday; a Sunday-start grid opens on May 31.
     const weeks = buildMonthMatrix(2026, 5, 0);
     expect(toISODate(weeks[0]?.[0] as Date)).toBe('2026-05-31');
   });

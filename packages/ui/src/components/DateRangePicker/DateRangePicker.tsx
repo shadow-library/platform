@@ -29,10 +29,8 @@ function sameRange(a: DateRange, b: DateRange): boolean {
 }
 
 /**
- * A range field + preset rail + two-month Calendar, on `{ start, end }` ISO strings. Grid picking is
- * Calendar's range grammar (click start, click end, backwards clicks swap — the value shape can't
- * represent an invalid range). Presets store the rule and highlight on reopen; any manual edit flips
- * the rail to Custom. `confirm` mode defers commit until Apply for query-expensive dashboards.
+ * Grid picking follows Calendar's range grammar (backwards clicks swap). Presets store the rule; any manual edit flips the rail to Custom. `confirm` mode defers commit
+ * until Apply.
  */
 export function DateRangePicker({
   value,

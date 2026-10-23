@@ -9,14 +9,9 @@ export interface ButtonGroupProps extends HTMLAttributes<HTMLDivElement> {
   variant?: ButtonVariant;
   /** Size applied to every member; overrides each child's own `size`. @default 'md' */
   size?: ButtonSize;
-  /**
-   * Fuse members into one control — shared 1px borders, outer corners rounded, inner corners
-   * square. Set `false` for a spaced cluster (4px gap) of related-but-separate buttons.
-   * @default true
-   */
+  /** Fuse members into one control with shared borders; `false` gives a spaced cluster of separate buttons. @default true */
   attached?: boolean;
   /** Lay members out in a row or a column. @default 'horizontal' */
   orientation?: ButtonGroupOrientation;
-  /** Disable the whole group at once — dims the container once and makes the subtree inert. */
   disabled?: boolean;
 }

@@ -80,11 +80,6 @@ export const Default: Story = {
   ),
 };
 
-/**
- * Below the md breakpoint (768px) the shell hides the persistent sidebar automatically and
- * TopNavigation surfaces a hamburger that opens the same sidebar as a modal nav drawer.
- * Narrow the viewport (or use the viewport toolbar) to see the swap.
- */
 export const ResponsiveNavigation: Story = {
   parameters: { viewport: { defaultViewport: 'mobile1' } },
   render: () => (
@@ -131,11 +126,6 @@ export const ResponsiveNavigation: Story = {
   ),
 };
 
-/**
- * The shell frames whatever it is given — no `Page` required. Raw children land in the same centered
- * column with the same responsive gutters, so an app never re-implements content spacing. Resize the
- * viewport: gutters step 16 → 24 → 32px and the column centers once the region outgrows `contentWidth`.
- */
 export const ContentFraming: Story = {
   render: () => (
     <Shell contentWidth={880} sidebar={SidebarDemo} topbar={TopBarDemo}>
@@ -146,7 +136,6 @@ export const ContentFraming: Story = {
   ),
 };
 
-/** `contentPadding="none"` with a fluid column hands the whole region to the page — full-bleed tables, maps, canvases. */
 export const FullBleed: Story = {
   render: () => (
     <Shell contentWidth="fluid" contentPadding="none" sidebar={SidebarDemo} topbar={TopBarDemo}>
@@ -179,11 +168,6 @@ export const Dark: Story = {
   ),
 };
 
-/**
- * Phone-only primary navigation. The bar is always in the markup and CSS alone removes it from md up,
- * so the server render already carries it — narrow the viewport to see it, and note the content region
- * reserves exactly the bar's height plus one safe-area inset.
- */
 export const WithBottomNavigation: Story = {
   render: () => (
     <Shell

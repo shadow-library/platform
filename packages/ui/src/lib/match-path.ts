@@ -1,5 +1,4 @@
 export interface MatchPathOptions {
-  /** Match the destination only, never its descendants. Always true for the root path. @default false */
   exact?: boolean;
 }
 
@@ -10,15 +9,8 @@ function normalize(path: string): string {
 }
 
 /**
- * Whether a destination is the current one — the segment-aware prefix test every navigation needs, so
- * products stop re-deriving it per sidebar. A naive `pathname.startsWith(to)` reports `/librarything`
- * as `/library`; this only matches on a segment boundary.
- *
- * `to` of `'/'` is always exact, since every path is prefixed by the root.
- *
- * Prefer a router link's own active state where there is one (Sidebar.Item and TopNavigation.Item both
- * key off `data-status="active"`). Reach for this when a *parent* has to know which child is current —
- * a bottom bar's `value`, or an overflow menu deciding whether it holds the active destination.
+ * Segment-aware prefix test: `/librarything` is not `/library`. A `to` of `'/'` is always exact.
+ * Prefer a router link's own active state (`data-status="active"`); use this when a parent needs to know which child is current.
  */
 export function matchPath(pathname: string, to: string, options: MatchPathOptions = {}): boolean {
   const current = normalize(pathname);

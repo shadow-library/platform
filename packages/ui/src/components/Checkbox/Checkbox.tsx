@@ -15,11 +15,6 @@ function DashIcon() {
   );
 }
 
-/**
- * Independent on/off choice that commits with the form (use Switch for instant effects, Radio for
- * exclusive ones). Built on Radix Checkbox — the 16px box, 4px radius, and accent fill defined here
- * are reused by Multi Select, table row selection, and Tree checkboxes. Supports `indeterminate`.
- */
 export const Checkbox = forwardRef<HTMLButtonElement, CheckboxProps>(function Checkbox({ label, description, invalid = false, id, className, disabled, checked, ...props }, ref) {
   const generatedId = useId();
   const boxId = id ?? generatedId;

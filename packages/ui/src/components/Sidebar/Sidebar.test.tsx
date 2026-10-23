@@ -135,7 +135,6 @@ describe('Sidebar', () => {
     );
     await user.click(screen.getByRole('button', { name: 'Settings' }));
     expect(onOpenChange).toHaveBeenCalledWith(true);
-    // The caller owns the state, so nothing opens until it says so.
     expect(screen.queryByRole('link', { name: 'Alpha' })).not.toBeInTheDocument();
   });
 
@@ -160,7 +159,6 @@ describe('Sidebar', () => {
       return <span data-testid="mark">{collapsed ? 'A' : 'acme-prod'}</span>;
     }
     render(<Sidebar collapsed workspace={<Mark />} onCollapsedChange={() => {}} />);
-    // The logo mark stays mounted (icon-only) rather than being dropped when minimised.
     expect(screen.getByTestId('mark')).toHaveTextContent('A');
     expect(screen.getByRole('button', { name: 'Expand navigation' })).toBeInTheDocument();
   });
@@ -200,7 +198,6 @@ describe('Sidebar', () => {
     expect(link).toHaveAttribute('href', '/services');
     expect(link).toHaveAttribute('aria-current', 'page');
     expect(link).toHaveAttribute('data-active');
-    // The caller's own children are rewrapped in the label span, so both branches emit the same markup.
     expect(link.querySelector('svg')).toBeInTheDocument();
   });
 
@@ -228,8 +225,6 @@ describe('Sidebar', () => {
     expect(link).toHaveTextContent('');
   });
 
-  // A regression net for the additive group props: a group that asks for neither a destination nor a
-  // header action must emit what it emitted before they existed — one disclosure button, no header row.
   it('renders a plain group as a single disclosure button with no header row', () => {
     const { container } = render(
       <Sidebar>
@@ -285,7 +280,6 @@ describe('Sidebar', () => {
     );
     await user.click(screen.getByRole('button', { name: 'New chat' }));
     expect(onNew).toHaveBeenCalledOnce();
-    // Starting a chat is not opening a disclosure — the group stays exactly as it was.
     expect(screen.getByRole('button', { name: 'Refinement Chat' })).toHaveAttribute('aria-expanded', 'false');
   });
 

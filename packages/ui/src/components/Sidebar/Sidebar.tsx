@@ -11,7 +11,6 @@ import { SidebarContext } from './Sidebar.context';
 import styles from './Sidebar.module.css';
 import { type SidebarGroupProps, type SidebarItemProps, type SidebarProps, type SidebarSectionProps, type SidebarSwitcherOption, type SidebarSwitcherProps } from './Sidebar.types';
 
-/** Read the sidebar's collapsed state — lets a custom header/footer mark render icon-only in rail. */
 export function useSidebar(): { collapsed: boolean } {
   return useContext(SidebarContext);
 }
@@ -42,7 +41,6 @@ function ChevronDown() {
   );
 }
 
-/** The switcher's affordance: up/down carets that read as "change this", not "expand a list". */
 function ChevronsUpDown() {
   return (
     <svg className={styles.switcherChevron} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -59,13 +57,11 @@ function CheckMark() {
   );
 }
 
-/** A project's thumbnail, or a colored dot standing in for one. Decorative — the label carries the name. */
 function SwitcherMark({ option }: { option?: SidebarSwitcherOption }) {
   if (option?.imageUrl != null) return <img className={styles.switcherThumb} src={option.imageUrl} alt="" />;
   return <span className={styles.switcherDot} style={option?.color != null ? { background: option.color } : undefined} aria-hidden="true" />;
 }
 
-/** Chevron for the collapse toggle — points left to collapse, right to expand back out. */
 function CollapseChevron({ collapsed }: { collapsed: boolean }) {
   return (
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -74,19 +70,12 @@ function CollapseChevron({ collapsed }: { collapsed: boolean }) {
   );
 }
 
-/**
- * The navigation region's behavior: a single managed active state, collapsible groups, an expanded↔rail
- * transition that keeps every destination reachable, and the accessibility contract (a nav landmark of
- * links, aria-current on the active item, group buttons with aria-expanded). Items, badges, and tooltips
- * are the existing components — the Sidebar contributes the state machine. Chrome is surface-card, one
- * step up from the content region so the rail reads as chrome rather than as part of the page.
- */
+/** A nav landmark of links with `aria-current` on the active item and `aria-expanded` group buttons; the rail transition keeps every destination reachable. */
 const SidebarRoot = forwardRef<HTMLElement, SidebarProps>(function Sidebar(
   { workspace, footer, collapsed: collapsedProp, defaultCollapsed, storageKey, onCollapsedChange, className, children, 'aria-label': ariaLabel = 'Main', ...props },
   ref,
 ) {
-  // Inside the shell's mobile nav drawer the sidebar is always expanded — rail mode and its toggle
-  // are desktop furniture; the drawer's own dismissal replaces them.
+  // Inside the shell's mobile nav drawer the sidebar is always expanded: rail mode and its toggle are desktop furniture.
   const mobileNav = useContext(ShellMobileNavAreaContext);
   const [collapsedState, setCollapsedState] = useControllableState({
     value: collapsedProp,
@@ -95,10 +84,8 @@ const SidebarRoot = forwardRef<HTMLElement, SidebarProps>(function Sidebar(
   });
   const restored = useRef(false);
 
-  // The persisted choice is adopted in a mount effect, never resolved during render: the server has no
-  // localStorage, so reading it inline would make the first client render disagree with the server
-  // markup. Same contract as ThemeProvider. Guarded by a ref so a fresh onChange identity can't re-apply
-  // the stored value over a toggle the user just made.
+  // The persisted choice is adopted in a mount effect, never during render (no localStorage on the server), as in ThemeProvider. The ref stops a fresh onChange identity re-
+  // applying it over a user toggle.
   useEffect(() => {
     if (restored.current || storageKey == null || collapsedProp !== undefined) return;
     restored.current = true;
@@ -107,9 +94,7 @@ const SidebarRoot = forwardRef<HTMLElement, SidebarProps>(function Sidebar(
   }, [storageKey, collapsedProp, setCollapsedState]);
 
   const collapsed = mobileNav != null ? false : collapsedState;
-  // Opting in means asking for collapse: a handler, a persisted key, or an explicit starting state. A
-  // bare <Sidebar> stays toggle-free, and a controlled `collapsed` with no handler is a fixed rail by
-  // construction — React's own semantics, not a special case.
+  // Opting in means a handler, a persisted key or an explicit starting state; a controlled `collapsed` with no handler is a fixed rail.
   const collapsible = onCollapsedChange != null || storageKey != null || defaultCollapsed !== undefined;
   const showCollapseToggle = collapsible && mobileNav == null;
 
@@ -147,7 +132,6 @@ const SidebarRoot = forwardRef<HTMLElement, SidebarProps>(function Sidebar(
   );
 });
 
-/** A labelled group of items; the label hides in rail mode. */
 const SidebarSection = forwardRef<HTMLDivElement, SidebarSectionProps>(function SidebarSection({ label, className, children, ...props }, ref) {
   const { collapsed } = useContext(SidebarContext);
   return (
@@ -158,7 +142,6 @@ const SidebarSection = forwardRef<HTMLDivElement, SidebarSectionProps>(function 
   );
 });
 
-/** A navigation destination — a real link with active state, icon, and optional badge. */
 const SidebarItem = forwardRef<HTMLAnchorElement, SidebarItemProps>(function SidebarItem(
   { icon, badge, active = false, asChild = false, label, indent = false, clamp = false, className, onClick, children, ...props },
   ref,
@@ -168,7 +151,6 @@ const SidebarItem = forwardRef<HTMLAnchorElement, SidebarItemProps>(function Sid
   const Comp = asChild ? Slot : 'a';
   const name = label ?? (typeof children === 'string' ? children : undefined);
 
-  // Choosing a destination inside the shell's mobile nav drawer dismisses the drawer.
   function handleClick(event: MouseEvent<HTMLAnchorElement>): void {
     onClick?.(event);
     if (!event.defaultPrevented) mobileNav?.close();
@@ -206,11 +188,7 @@ const SidebarItem = forwardRef<HTMLAnchorElement, SidebarItemProps>(function Sid
   );
 });
 
-/**
- * A collapsible group — a disclosure button over a nested list of items. In rail mode the same trigger
- * opens that list in a side flyout instead: collapsing the sidebar must not strand a destination, and a
- * disclosure whose panel can never render is a dead control.
- */
+/** In rail mode the trigger opens the nested list in a side flyout, so collapsing the sidebar never strands a destination. */
 const SidebarGroup = forwardRef<HTMLDivElement, SidebarGroupProps>(function SidebarGroup(
   { label, icon, link, action, open: openProp, defaultOpen = false, onOpenChange, active = false, className, children, ...props },
   ref,
@@ -222,7 +200,6 @@ const SidebarGroup = forwardRef<HTMLDivElement, SidebarGroupProps>(function Side
   const listId = useId();
   const name = typeof label === 'string' ? label : undefined;
 
-  // Items are anchors, so they need the li wrapper to make the list valid — and to keep list semantics.
   const list = (
     <ul id={collapsed ? undefined : listId} className={styles.groupList} data-rail={collapsed || undefined}>
       {Children.map(children, child => (child != null ? <li>{child}</li> : null))}
@@ -290,14 +267,7 @@ const SidebarGroup = forwardRef<HTMLDivElement, SidebarGroupProps>(function Side
   );
 });
 
-/**
- * The workspace switcher that sits directly under the brand: what a console is *currently scoped to*,
- * and the shortest path to another scope. It is deliberately not a nav item — the thing being switched
- * is the context every destination below it resolves against, so it reads as a header, not a link.
- *
- * In rail mode it shrinks to its avatar alone; the flyout still carries the full list, because
- * collapsing the sidebar must never strand the only way to change scope.
- */
+/** Not a nav item: it names the scope every destination below it resolves against. In rail mode it shrinks to its avatar and the flyout still carries the full list. */
 const SidebarSwitcher = forwardRef<HTMLDivElement, SidebarSwitcherProps>(function SidebarSwitcher(
   { current, options, emptyLabel = 'All projects', menuLabel = 'Switch project', onSelect, footerAction, loading = false, className, ...props },
   ref,

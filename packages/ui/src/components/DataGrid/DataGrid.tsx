@@ -11,12 +11,7 @@ function cellValue<T>(column: GridColumn<T>, row: T): string {
   return value == null ? '' : String(value);
 }
 
-/**
- * Table's editable-grid extension: the ARIA grid pattern (role grid/gridcell, one tab stop, arrow-key
- * cell navigation) layered with resizable columns, per-cell inline editing (Enter/type to edit, Esc
- * reverts, Tab commits + moves), and multi-column sort with ordinal superscripts. The Grid inherits
- * Table's tokens; virtualization, pinning, and grouping are further layers not enabled here.
- */
+/** Editable extension of Table: ARIA grid with one tab stop and arrow-key cell navigation (Enter/type to edit, Esc reverts, Tab commits and moves). */
 export function DataGrid<T>({ data, columns, rowKey, onCellEdit, onSortChange, density = 'comfortable', caption, 'aria-label': ariaLabel }: DataGridProps<T>): ReactElement {
   const keyOf = (row: T): string => (typeof rowKey === 'function' ? rowKey(row) : String(row[rowKey]));
 

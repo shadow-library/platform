@@ -23,7 +23,6 @@ export interface AccordionProps {
 }
 
 export interface AccordionItemProps {
-  /** Unique value identifying the item. */
   value: string;
   /** Scannable header label (a table-of-contents entry, not a sentence). */
   title: ReactNode;

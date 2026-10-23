@@ -28,9 +28,8 @@ function groupByDay(items: NotificationItem[], now: Date | null, locale: string)
     const key = date ? date.toDateString() : 'undated';
     let group = index.get(key);
     if (!group) {
-      // "Today"/"Yesterday" depend on the wall clock, so they resolve only once `now` is known (after
-      // mount, or supplied by the caller). Until then — and for undated items — fall back to an absolute
-      // label so the server and the first client render produce the same headers.
+      // "Today"/"Yesterday" depend on the wall clock, so they resolve only once `now` is known; before that, and for undated items, an absolute label keeps server and
+      // client headers equal.
       const label = !date ? null : now && isSameDay(date, now) ? 'Today' : yesterday && isSameDay(date, yesterday) ? 'Yesterday' : formatLongDate(date, locale);
       group = { key, label, items: [] };
       index.set(key, group);
@@ -58,12 +57,7 @@ function itemName(item: NotificationItem): string {
   return item.unread ? `${base}, unread` : base;
 }
 
-/**
- * The feed body — a labelled `role="feed"` of `role="article"` notifications, day-grouped by timestamp.
- * Ships separately from the panel so the full-page inbox and the bell popover share one renderer. Row
- * click navigates (and marks read); inline action buttons stop propagation, because deciding and
- * visiting are separate acts.
- */
+/** `role="feed"` of `role="article"` notifications. Row click navigates and marks read; inline action buttons stop propagation. */
 export const NotificationList = forwardRef<HTMLDivElement, NotificationListProps>(function NotificationList(
   {
     items,
@@ -81,8 +75,7 @@ export const NotificationList = forwardRef<HTMLDivElement, NotificationListProps
   },
   ref,
 ) {
-  // Withhold "now" until hydration unless the caller pins it, so relative day headers never differ
-  // between the server and the first client render.
+  // Withhold "now" until hydration unless the caller pins it, so relative day headers never differ between server and client.
   const [clockNow] = useState(() => new Date());
   const hydrated = useHydrated();
   const now = nowProp ?? (hydrated ? clockNow : null);

@@ -6,18 +6,13 @@ import { ButtonGroupContext, type ButtonGroupContextValue } from './ButtonGroup.
 import styles from './ButtonGroup.module.css';
 import { type ButtonGroupProps } from './ButtonGroup.types';
 
-/** Direct children that participate in roving focus — enabled buttons/links only. */
 function getRovingItems(container: HTMLElement): HTMLElement[] {
   return Array.from(container.children).filter(
     (el): el is HTMLElement => el instanceof HTMLElement && el.matches('button, a, [role="button"]') && !el.hasAttribute('disabled') && el.getAttribute('aria-disabled') !== 'true',
   );
 }
 
-/**
- * Fuses related Buttons into a single control through border and radius arithmetic — no new tokens.
- * The group sets one `variant`/`size` that every member inherits (a child's own props are ignored).
- * Pass `role="toolbar"` for a spaced icon cluster with roving-tabindex arrow-key navigation.
- */
+/** Members inherit the group's `variant`/`size` (a child's own props are ignored). `role="toolbar"` adds roving-tabindex arrow-key navigation. */
 export const ButtonGroup = forwardRef<HTMLDivElement, ButtonGroupProps>(function ButtonGroup(
   { variant = 'secondary', size = 'md', attached = true, orientation = 'horizontal', disabled = false, role, className, children, onKeyDown, onFocus, ...props },
   ref,
@@ -32,7 +27,6 @@ export const ButtonGroup = forwardRef<HTMLDivElement, ButtonGroupProps>(function
     containerRef.current?.toggleAttribute('inert', disabled);
   }, [disabled]);
 
-  // Toolbar clusters are one tab stop: the first member is tabbable, the rest wait for the arrows.
   useEffect(() => {
     const container = containerRef.current;
     if (!container || !isToolbar) return;

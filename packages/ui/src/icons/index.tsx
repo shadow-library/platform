@@ -1,15 +1,8 @@
 import { type ReactElement, type SVGProps } from 'react';
 
-/**
- * Internal, shared glyph set. These are not part of the public API — components import them so a
- * single path definition backs every use (a glyph redesign is one edit, not one per component). Each
- * icon spreads `...props`, so a host control can tune presentational attributes (`strokeWidth`, size)
- * without forking the markup. Decorative by default (`aria-hidden`); the surrounding control owns the
- * accessible name.
- */
+/** Internal glyph set, spreading `...props` onto the SVG. Decorative (`aria-hidden`); the host control owns the accessible name. */
 type IconProps = SVGProps<SVGSVGElement>;
 
-/** Checkmark — selection controls and menu indicators. `strokeWidth` matches the host control's weight. */
 export function CompactCheckIcon(props: IconProps): ReactElement {
   return (
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
@@ -18,7 +11,6 @@ export function CompactCheckIcon(props: IconProps): ReactElement {
   );
 }
 
-/** Downward chevron — the open affordance on selects and comboboxes. */
 export function CompactChevronDownIcon(props: IconProps): ReactElement {
   return (
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
@@ -27,7 +19,6 @@ export function CompactChevronDownIcon(props: IconProps): ReactElement {
   );
 }
 
-/** Rightward chevron — the submenu affordance on menus. */
 export function CompactChevronRightIcon(props: IconProps): ReactElement {
   return (
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>

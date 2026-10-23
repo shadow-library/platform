@@ -29,7 +29,6 @@ describe('useControllableState', () => {
     const { result, rerender } = renderHook(({ value }) => useControllableState<number>({ value, defaultValue: 0, onChange }), { initialProps: { value: 1 } });
     expect(result.current[0]).toBe(1);
 
-    // Setting fires onChange but the resolved value stays owned by the prop.
     act(() => result.current[1](9));
     expect(onChange).toHaveBeenCalledWith(9);
     expect(result.current[0]).toBe(1);

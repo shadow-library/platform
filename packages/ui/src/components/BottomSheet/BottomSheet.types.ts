@@ -16,15 +16,12 @@ export interface BottomSheetProps {
   modal?: boolean;
   /** Whether drag-down, Esc, and scrim tap dismiss the sheet. @default true */
   dismissable?: boolean;
-  /** Header title — labels the dialog. */
   title?: ReactNode;
-  /** Optional trailing header action (e.g. Reset). */
   headerAction?: ReactNode;
   /** Pinned footer actions — safe-area padded, never scroll away. */
   footer?: ReactNode;
   /** Accessible name when there is no visible `title`. */
   'aria-label'?: string;
-  /** Sheet body — the scroll region. */
   children: ReactNode;
   className?: string;
 }

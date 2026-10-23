@@ -7,12 +7,8 @@ import { type HoverCardProps } from './HoverCard.types';
 type LoadState<T> = { status: 'idle' } | { status: 'loading' } | { status: 'loaded'; data: T } | { status: 'error' };
 
 /**
- * A rich, pointer-traversable preview that appears when the pointer rests on an entity reference —
- * filling the gap between Tooltip (which forbids interactive content) and Popover (which demands a
- * click). It is supplementary by contract: everything inside must exist one click away at the
- * trigger's destination, because touch and screen-reader users never see one. Wraps Radix HoverCard
- * for the shared hover-intent timing and Popover's collision positioning; the async loader fires once
- * at hover-intent so the card opens at its final size.
+ * Supplementary by contract: everything inside must exist one click away at the trigger's destination, because touch and screen-reader users never see it.
+ * The async loader fires once at hover-intent so the card opens at its final size.
  */
 export function HoverCard<T = unknown>({
   children,

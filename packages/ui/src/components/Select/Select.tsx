@@ -7,12 +7,7 @@ import { cn } from '@/lib';
 import styles from './Select.module.css';
 import { type SelectGroupProps, type SelectItemProps, type SelectProps } from './Select.types';
 
-/**
- * Single choice from an enumerable list, built on Radix Select. The trigger inherits the Input
- * field surface; the listbox defines the overlay surface (radius 8, e2 shadow, 4px inset, 32px
- * items) reused by every menu and picker. Compose with `Select.Group`, `Select.Item`,
- * `Select.Separator`.
- */
+/** The trigger inherits Input's field surface; the listbox defines the overlay surface reused by every menu and picker. */
 function SelectRoot({
   placeholder,
   size = 'md',
@@ -109,7 +104,6 @@ export const SelectSeparator = forwardRef<HTMLDivElement, ComponentPropsWithoutR
   return <SelectPrimitive.Separator ref={ref} className={cn(styles.separator, className)} {...props} />;
 });
 
-/** Compound Select: the root plus `.Item`, `.Group`, and `.Separator` parts. */
 export const Select = Object.assign(SelectRoot, {
   Item: SelectItem,
   Group: SelectGroup,

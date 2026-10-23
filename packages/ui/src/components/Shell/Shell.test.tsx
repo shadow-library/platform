@@ -122,9 +122,7 @@ describe('Shell · content region', () => {
 
   it('should let a consumer reserve extra bottom clearance for floating chrome above the bottom nav', () => {
     const css = readFileSync(path.join(import.meta.dirname, 'Shell.module.css'), 'utf-8');
-    // A consumer (e.g. a phone FAB) sets --sh-shell-bottom-extra on the shell root to grow the content
-    // region's bottom padding past the bottom nav + safe-area reservation, defaulting to 0 so it is a
-    // no-op for every consumer that never sets it.
+    // A consumer (e.g. a phone FAB) sets --sh-shell-bottom-extra on the shell root to grow the content region's bottom padding; it defaults to 0.
     expect(css).toMatch(/--sh-shell-bottom-inset:\s*calc\([\s\S]*?--sh-shell-bottom-extra,\s*0px\)[\s\S]*?\);/);
     expect(css).toMatch(/padding-bottom:\s*calc\([\s\S]*?--sh-shell-bottom-extra,\s*0px\)[\s\S]*?\);/);
   });

@@ -9,7 +9,6 @@ const distDir = path.join(rootDir, 'dist');
 const srcDir = path.join(rootDir, 'src');
 const distEntry = path.join(distDir, 'index.js');
 
-/** Newest mtime across the inputs the build reads, so we only rebuild when the artifact is stale. */
 function newestInputMtime(): number {
   let newest = 0;
   const walk = (dir: string): void => {
@@ -39,8 +38,6 @@ describe('built package (dist) SSR safety', () => {
   beforeAll(() => ensureFreshBuild(), 180_000);
 
   it('imports, server-renders, and stays deterministic in plain Node', () => {
-    // The smoke script asserts import safety, render safety, locale/platform determinism, and no
-    // store-state leakage; it exits non-zero (throwing here) with details on the first failure.
     const output = execFileSync('node', ['tests/ssr-smoke.mjs'], { cwd: rootDir, encoding: 'utf-8' });
     expect(output).toContain('SSR-SMOKE-OK');
   });

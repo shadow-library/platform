@@ -10,19 +10,16 @@ export interface SplitPanePaneProps {
   defaultSize?: SplitSize;
   /** Smallest honest size — the width/height at which the content still works, not 0. */
   minSize?: SplitSize;
-  /** Largest size. */
   maxSize?: SplitSize;
   /** Allow drag-past-min collapse, leaving a labeled restore rail. Auxiliary panes only. */
   collapsible?: boolean;
   /** Label for the collapsed pane's restore control. @default 'panel' */
   collapseLabel?: string;
-  /** Pane content — opaque to the container. */
   children?: ReactNode;
   className?: string;
 }
 
 export interface SplitPaneHandleProps {
-  /** Names what the handle resizes ("Resize explorer") for the window-splitter pattern. */
   'aria-label'?: string;
 }
 

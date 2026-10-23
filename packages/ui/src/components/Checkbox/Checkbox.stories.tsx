@@ -18,15 +18,12 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-/** Interactive — adjust props from the controls panel. */
 export const Playground: Story = {};
 
-/** Label plus a secondary description; the whole label is a click target. */
 export const WithDescription: Story = {
   args: { label: 'Deployment emails', description: 'Success and failure notifications' },
 };
 
-/** A parent “some children checked” state. Click checks all; click again clears. */
 export const Indeterminate: Story = {
   render: () => {
     const [checked, setChecked] = useState<boolean | 'indeterminate'>('indeterminate');
@@ -34,7 +31,6 @@ export const Indeterminate: Story = {
   },
 };
 
-/** A vertical group — 12px gap with descriptions. */
 export const Group: Story = {
   render: () => {
     const [state, setState] = useState({ emails: true, digest: false, mentions: true });
@@ -61,7 +57,6 @@ export const Disabled: Story = {
   args: { label: 'Enterprise only', description: 'Upgrade to enable', disabled: true, checked: true },
 };
 
-/** A bare box for tables and Multi Select — requires an `aria-label`. */
 export const Standalone: Story = {
   args: { label: undefined, 'aria-label': 'Select row' },
 };

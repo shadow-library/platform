@@ -4,11 +4,9 @@ import { type ComponentPropsWithoutRef, type ReactNode } from 'react';
 export type ContextMenuContentProps = ComponentPropsWithoutRef<typeof ContextMenuPrimitive.Content>;
 
 export interface ContextMenuItemProps extends ComponentPropsWithoutRef<typeof ContextMenuPrimitive.Item> {
-  /** Leading 16px icon — use icons on all rows or none. */
   icon?: ReactNode;
   /** Right-aligned shortcut hint; visual only (`aria-hidden`), bindings live globally. */
   shortcut?: ReactNode;
-  /** Danger styling for destructive actions; place last, below a separator. */
   destructive?: boolean;
 }
 

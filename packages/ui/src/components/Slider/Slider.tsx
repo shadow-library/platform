@@ -6,12 +6,7 @@ import { cn } from '@/lib';
 import styles from './Slider.module.css';
 import { type SliderProps } from './Slider.types';
 
-/**
- * A control for bounded, felt magnitudes (thresholds, weights, opacity). Wraps Radix Slider —
- * role="slider" with aria-valuenow/min/max and aria-valuetext for unit-bearing values, keyboard as a
- * first-class input. The value display is mandatory (a slider without a number is a mood, not a
- * control). Track/fill are the Progress pair; the thumb reads surface-card + border-strong + e1.
- */
+/** Radix Slider with `aria-valuetext` for unit-bearing values. The value display is mandatory: a slider without a number is a mood, not a control. */
 export const Slider = forwardRef<HTMLSpanElement, SliderProps>(function Slider(
   {
     value,

@@ -29,7 +29,6 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-/** Interactive — label, helper, and markers wrap any control. */
 export const Playground: Story = {
   args: { helper: 'Shown in the sidebar and invoices.' },
   render: args => (
@@ -39,7 +38,6 @@ export const Playground: Story = {
   ),
 };
 
-/** Error replaces the helper in the same slot and propagates invalid to the control. */
 export const WithError: Story = {
   args: { label: 'Workspace URL', required: true, error: 'Only lowercase letters, numbers, and hyphens.' },
   render: args => (
@@ -49,7 +47,6 @@ export const WithError: Story = {
   ),
 };
 
-/** Live validation: the error appears on blur and clears as the value becomes valid. */
 export const LiveValidation: Story = {
   render: () => {
     const [value, setValue] = useState('acme corp!');
@@ -63,7 +60,6 @@ export const LiveValidation: Story = {
   },
 };
 
-/** The wrapper is control-agnostic — Select, Textarea, anything. */
 export const AnyControl: Story = {
   render: () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>

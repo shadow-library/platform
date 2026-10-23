@@ -31,13 +31,7 @@ function EyeOffIcon() {
   );
 }
 
-/**
- * Single-line text entry — the field-surface reference every other form control inherits. The
- * bordered wrapper owns the focus-within ring and adornments; the inner `<input>` is transparent
- * and border-less. Label, helper text, and error messages belong to Form Field, not here.
- *
- * `className`/`style` target the wrapper (layout/width); all other props flow to the `<input>`.
- */
+/** The bordered wrapper owns the focus ring and adornments. `className`/`style` target the wrapper; all other props flow to the `<input>`. */
 export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
   {
     type = 'text',

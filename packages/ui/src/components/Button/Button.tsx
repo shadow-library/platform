@@ -7,10 +7,6 @@ import { useButtonGroupContext } from '../ButtonGroup/ButtonGroup.context';
 import styles from './Button.module.css';
 import { type ButtonProps } from './Button.types';
 
-/**
- * The atomic unit of action. Renders a native `<button>` (or, with `asChild`, the child element),
- * from which every other interactive control inherits sizing, radius, focus, and motion.
- */
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
   { variant: variantProp, size: sizeProp, loading = false, loadingText, fullWidth = false, prefix, suffix, asChild = false, type, disabled, className, children, ...props },
   ref,
@@ -37,8 +33,6 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
     );
   }
 
-  // Two loading modes: with loadingText the label is swapped for the spinner + new label;
-  // without it the spinner overlays and the original content is hidden to preserve width.
   const showLoadingText = loading && loadingText != null;
 
   return (

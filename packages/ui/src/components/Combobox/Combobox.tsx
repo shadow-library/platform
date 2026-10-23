@@ -23,13 +23,7 @@ function ClearIcon() {
   );
 }
 
-/**
- * A typeahead single-select: Input's field + Select's listbox, and the only novelty is that typing
- * filters. Implements the ARIA 1.2 combobox pattern on Radix Popover (no Radix combobox primitive) —
- * DOM focus stays in the field while the highlight moves virtually via aria-activedescendant. Enter
- * always commits the highlighted (first-matched) row; blur reverts to the last committed label so
- * free text never persists silently. `onSearch` swaps the list for debounced async results.
- */
+/** ARIA 1.2 combobox on Radix Popover: DOM focus stays in the field and the highlight moves via `aria-activedescendant`. Blur reverts to the last committed label. */
 export function Combobox({
   options = [],
   value,
@@ -74,7 +68,6 @@ export function Combobox({
   // shut unless typing keeps reopening it.
   const isInsideField = (target: EventTarget | null): boolean => target instanceof Node && (fieldRef.current?.contains(target) ?? false);
 
-  // Keep the field's committed label in sync with a value we can resolve from static options.
   const [syncedLabel, setSyncedLabel] = useState({ value: selectedValue, label: resolvedLabel });
   if (!open && (syncedLabel.value !== selectedValue || syncedLabel.label !== resolvedLabel)) {
     setSyncedLabel({ value: selectedValue, label: resolvedLabel });
@@ -87,7 +80,6 @@ export function Combobox({
     }
   }
 
-  // Debounced async search.
   useEffect(() => {
     if (!isAsync || !open) return;
     let cancelled = false;

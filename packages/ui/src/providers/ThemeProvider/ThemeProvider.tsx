@@ -6,7 +6,6 @@ import { type ThemeContextValue, type ThemeInitScriptOptions, type ThemeProvider
 
 const DEFAULT_COOKIE_NAME = 'shadow-theme';
 
-/** A year — long enough that the choice outlives any realistic gap between visits to two of the apps. */
 const COOKIE_MAX_AGE = 31536000;
 
 /** Cookie names are RFC 6265 tokens; this is the safe subset, and it is also regex- and script-injection-safe. */
@@ -19,12 +18,7 @@ function assertSafeKey(key: string): string {
   return key;
 }
 
-/**
- * The blocking snippet to inline in the document `<head>` (before the app script) so the persisted (or
- * OS-preferred) theme is on `<html>` before first paint — no flash of the wrong palette, and React never
- * renders a `data-theme`/`dark` that could mismatch the server HTML. Kept dependency-free and stringified.
- * Pass the same options you give `ThemeProvider`.
- */
+/** Blocking `<head>` snippet applying the persisted or OS theme to `<html>` before first paint. Pass the same options as `ThemeProvider`. */
 export function themeInitScript({ cookieName = DEFAULT_COOKIE_NAME, legacyStorageKey }: ThemeInitScriptOptions = {}): string {
   const legacy = legacyStorageKey ? `if(t!=='light'&&t!=='dark'){t=localStorage.getItem('${assertSafeKey(legacyStorageKey)}');}` : '';
   return (
@@ -60,14 +54,8 @@ function setCookie(name: string, mode: ThemeMode, domain: string | undefined): v
 }
 
 /**
- * The domain that spans every app on this host's parent — `identity.shadow-apps.test` → `.shadow-apps.test`.
- *
- * Derived rather than configured because the alternative is a build-time variable, which bakes one
- * environment's domain into the image and does nothing when omitted: the preference then silently stops
- * crossing apps, which is exactly how this last broke.
- *
- * Returns nothing where there is no parent worth widening to — an IP literal, `localhost`, or a bare
- * registrable domain, whose parent would be a public suffix.
+ * Parent domain shared by sibling apps (`identity.shadow-apps.test` → `.shadow-apps.test`). Derived because a build-time variable bakes in one
+ * environment's domain and silently stops the preference crossing apps when omitted. Undefined for an IP literal, `localhost` or a bare registrable domain.
  */
 function sharedDomain(hostname: string): string | undefined {
   if (hostname.includes(':') || /^\d+(\.\d+)*$/.test(hostname)) return undefined;
@@ -77,13 +65,8 @@ function sharedDomain(hostname: string): string | undefined {
 }
 
 /**
- * Persist an explicit choice, or erase it (`system`), in the widest scope the browser will accept.
- *
- * Two failure modes are handled here rather than left to the caller. A host-only cookie written by an
- * earlier build shares this one's name but has a narrower scope, and `document.cookie` exposes no way to
- * tell the two apart — so it is cleared before the shared one is written, or it would shadow it forever.
- * And a domain the browser refuses (a public suffix such as `.co.uk`) is dropped with no error at all, so
- * the write is read back and retried host-only rather than losing the preference outright.
+ * A host-only cookie from an earlier build shares the name but not the scope, and `document.cookie` can't tell them apart, so it is cleared first
+ * or it would shadow the shared one. A domain the browser refuses (public suffix) is dropped silently, so the write is read back and retried host-only.
  */
 function writeCookie(name: string, mode: ThemeMode, domain: string | undefined): void {
   const scope = domain ?? sharedDomain(window.location.hostname);
@@ -110,10 +93,7 @@ function readLegacyStorage(key: string | undefined): Theme | null {
   }
 }
 
-/**
- * The persisted preference — the same resolution `themeInitScript` performs before paint. `promote` marks a
- * choice that came from this app's own legacy storage and so is not yet visible to the other apps.
- */
+/** `promote` marks a choice from this app's legacy storage, not yet visible to the other apps. */
 function resolveClientMode(cookieName: string, legacyStorageKey: string | undefined): { mode: ThemeMode; promote: boolean } {
   const shared = readCookie(cookieName);
   if (shared) return { mode: shared, promote: false };
@@ -124,24 +104,15 @@ function resolveClientMode(cookieName: string, legacyStorageKey: string | undefi
   return { mode: 'system', promote: false };
 }
 
-/** Read the active theme and the setters. Returns the light default outside a `ThemeProvider`. */
 export function useTheme(): ThemeContextValue {
   return useContext(ThemeContext);
 }
 
 /**
- * Owns the theme choice for a Shadow UI app. Styling flips purely on `data-theme` (and the `dark` class)
- * at the document root, so this provider mounts no visual chrome — it reconciles React state and the DOM.
- * The server and the first client render both use the deterministic `defaultTheme`, so hydration matches;
- * a mount effect then adopts the persisted/OS theme (never during render). `themeInitScript` should apply
- * the same theme pre-hydration so there is no flash. Re-applying in the effect is idempotent and self-heals
- * the case where a hydration fallback re-creates `<html>` and wipes what the script set.
- *
- * The choice lives in a **cookie**, not `localStorage`, so that every Shadow app shares it: `localStorage` is
- * partitioned per origin and the apps are separate origins — distinct subdomains in production, distinct
- * ports in development. A cookie scoped to the parent domain crosses subdomains, and cookie scope ignores
- * the port, so one switch in one app is the theme every other app opens with. Since that can happen while a
- * tab sits in the background, the theme is re-read whenever the page becomes visible again.
+ * Styling flips on `data-theme` and the `dark` class at the document root. Server and first client render use `defaultTheme`; a mount effect then adopts
+ * the persisted or OS theme, and re-applying also recovers when a hydration fallback re-creates `<html>`.
+ * The choice is a cookie, not `localStorage`, because the apps are separate origins (subdomains, or ports in development) and cookie scope crosses both;
+ * the theme is re-read when the page becomes visible again since another app may have changed it.
  */
 export function ThemeProvider(props: ThemeProviderProps): ReactElement {
   const { children, defaultTheme = 'light', cookieName = DEFAULT_COOKIE_NAME, cookieDomain, legacyStorageKey } = props;
@@ -158,12 +129,7 @@ export function ThemeProvider(props: ThemeProviderProps): ReactElement {
   useEffect(() => {
     const adopt = (): void => {
       const { mode: resolved, promote } = resolveClientMode(cookieName, legacyStorageKey);
-      /*
-       * A choice carried over from this app's own pre-cookie storage is invisible to the others, so publish it —
-       * otherwise the apps stay split until the user happens to toggle. `system` is deliberately never published:
-       * it is the absence of a choice, and must keep tracking the OS rather than freeze at whatever it resolved
-       * to on one visit. Only the first app opened after the upgrade promotes; the cookie governs from then on.
-       */
+      /* `system` is never published: it is the absence of a choice and must keep tracking the OS. */
       if (promote) writeCookie(cookieName, resolved, cookieDomain);
       commit(resolved);
     };
@@ -181,7 +147,6 @@ export function ThemeProvider(props: ThemeProviderProps): ReactElement {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `commit` is re-created every render; its inputs are listed.
   }, [cookieName, cookieDomain, legacyStorageKey, defaultTheme]);
 
-  /** While no explicit choice is stored, the OS stays live — flipping it at the OS repaints the app immediately. */
   useEffect(() => {
     if (mode !== 'system' || typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
     const media = window.matchMedia('(prefers-color-scheme: dark)');

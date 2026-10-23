@@ -67,8 +67,7 @@ describe('TopNavigation', () => {
       </TopNavigation>,
     );
     await user.click(screen.getByRole('button', { name: 'More links' }));
-    // Rebuilding the anchor from item.props.href dropped the href entirely for asChild items, which
-    // also stripped the link role.
+    // Rebuilding the anchor from item.props.href dropped the href and the link role for asChild items.
     const overflowed = screen.getByRole('link', { name: 'Bravo' });
     expect(overflowed).toHaveAttribute('href', '/b');
     expect(overflowed).toHaveAttribute('aria-current', 'page');

@@ -23,7 +23,6 @@ function computeCurrent(): BannerConfig | null {
   let bestRank = -1;
   registry.forEach((config, index) => {
     if (config.when === false || dismissed.has(keyOf(config))) return;
-    // Higher severity wins; ties break by recency (later registration index).
     const rank = severity(config) * 1000 + index;
     if (rank > bestRank) {
       best = config;
@@ -64,7 +63,6 @@ export const bannerStore = {
   getSnapshot(): BannerConfig | null {
     return current;
   },
-  /** Test/reset helper — clears the registry and dismissal memory. */
   reset(): void {
     registry = [];
     dismissed.clear();

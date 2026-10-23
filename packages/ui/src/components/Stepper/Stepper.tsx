@@ -27,11 +27,8 @@ function CheckGlyph() {
 }
 
 /**
- * Multi-step flow progress with a validation-gated state machine — the indicator, content region, and
- * wizard footer shipped together so the grammar can't drift between flows. Forward movement is gated on
- * per-step validation; backward movement is always free and preserves step data. Revisiting a step
- * resets its declared downstream dependencies to upcoming (the invalidation contract). State is carried
- * by glyphs (check / number / ! / dash), never color alone. A headless `useStepper` is a follow-up.
+ * Forward movement is gated on per-step validation; backward is always free and preserves step data. Revisiting a step resets its declared `invalidates` dependents to
+ * upcoming.
  */
 function StepperRoot({
   current,
@@ -103,7 +100,6 @@ function StepperRoot({
       next.delete(step.id);
       return next;
     });
-    // Invalidation contract — revisiting this step resets its declared dependents.
     if (step.invalidates?.length) {
       setCompleted(prev => {
         const next = new Set(prev);

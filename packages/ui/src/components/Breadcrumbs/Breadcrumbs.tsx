@@ -16,7 +16,6 @@ function SeparatorIcon() {
   );
 }
 
-/** A single crumb — a ghost-pill link, or plain text with aria-current when `current`. */
 const BreadcrumbsItem = forwardRef<HTMLAnchorElement, BreadcrumbsItemProps>(function BreadcrumbsItem({ current = false, asChild = false, className, children, ...props }, ref) {
   // Inside the "…" popover the same crumb skins itself as a menu row, so collapsing an ancestor never
   // rebuilds it — asChild router links keep their href and client-side navigation.
@@ -36,12 +35,7 @@ const BreadcrumbsItem = forwardRef<HTMLAnchorElement, BreadcrumbsItemProps>(func
   );
 });
 
-/**
- * The WAI-ARIA breadcrumb pattern: a `<nav aria-label="Breadcrumb">` around an ordered list, current
- * page carrying aria-current. Separators are decorative aria-hidden chevrons (never text "/"). Past
- * `maxVisible` levels the middle collapses into a "…" button that opens a menu of the hidden ancestors,
- * always preserving the first crumb and the last two.
- */
+/** `<nav aria-label="Breadcrumb">` around an ordered list; past `maxVisible` the middle collapses into a "…" menu, always keeping the first crumb and the last two. */
 const BreadcrumbsRoot = forwardRef<HTMLElement, BreadcrumbsProps>(function Breadcrumbs({ maxVisible = 4, className, children, ...props }, ref) {
   const items = Children.toArray(children).filter(isValidElement) as ReactElement<BreadcrumbsItemProps>[];
 

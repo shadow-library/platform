@@ -12,7 +12,6 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-/** Compose primitives to ghost any layout. */
 export const Primitives: Story = {
   render: () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: 280 }}>

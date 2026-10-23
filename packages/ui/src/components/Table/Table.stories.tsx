@@ -49,7 +49,6 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-/** Full table with selection, single-column sort, and a bulk actions bar. */
 export const Default: Story = {
   render: () => {
     const [selected, setSelected] = useState<string[]>(['2']);

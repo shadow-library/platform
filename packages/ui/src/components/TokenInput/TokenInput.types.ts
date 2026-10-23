@@ -23,11 +23,8 @@ export interface TokenInputProps {
   size?: TokenInputSize;
   disabled?: boolean;
   readOnly?: boolean;
-  /** Force the danger field grammar. */
   invalid?: boolean;
-  /** Cap the number of tokens. */
   maxTokens?: number;
-  /** Leading icon adornment. */
   prefix?: ReactNode;
   id?: string;
   className?: string;

@@ -39,7 +39,6 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-/** Interactive — adjust props from the controls panel. */
 export const Playground: Story = {};
 
 export const Variants: Story = {
@@ -84,12 +83,10 @@ export const WithIcons: Story = {
   ),
 };
 
-/** Spinner-only — the label is hidden while the button's width is preserved. */
 export const Loading: Story = {
   args: { variant: 'primary', loading: true, children: 'Save changes' },
 };
 
-/** With `loadingText` — the label is swapped for the spinner and a status label. */
 export const LoadingWithLabel: Story = {
   args: { variant: 'primary', loading: true, loadingText: 'Saving…', children: 'Save changes' },
 };
@@ -109,7 +106,6 @@ export const FullWidth: Story = {
   ],
 };
 
-/** `asChild` renders the child element (here an anchor) with the button's styling. */
 export const AsChild: Story = {
   render: () => (
     <Button asChild variant="primary">

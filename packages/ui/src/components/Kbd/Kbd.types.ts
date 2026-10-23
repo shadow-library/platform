@@ -1,10 +1,10 @@
 import { type ComponentPropsWithoutRef } from 'react';
 
 export interface KbdProps extends ComponentPropsWithoutRef<'kbd'> {
-  /** Binding string like `mod+shift+K` — parsed to platform glyphs (mod → ⌘ on macOS, Ctrl elsewhere). */
+  /** Binding like `mod+shift+K`; mod → ⌘ on macOS, Ctrl elsewhere. */
   keys?: string;
-  /** Bare glyphs on the host surface, no keycap box (menu rows, tooltips). @default false */
+  /** No keycap box (menu rows, tooltips). */
   bare?: boolean;
-  /** Force macOS glyphs; defaults to auto-detection. */
+  /** Force macOS glyphs; auto-detected otherwise. */
   mac?: boolean;
 }

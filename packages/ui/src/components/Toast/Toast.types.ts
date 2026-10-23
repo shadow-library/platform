@@ -12,7 +12,6 @@ export interface ToastData {
   id: string;
   intent: ToastIntent;
   title: ReactNode;
-  /** Optional second line (two lines max). */
   body?: ReactNode;
   /** A single optional action (Undo, View). */
   action?: ToastAction;

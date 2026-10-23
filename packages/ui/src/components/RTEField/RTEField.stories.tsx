@@ -15,7 +15,6 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-// A plain contenteditable stands in for a real engine's content element.
 function FakeEditor({ onInput }: { onInput?: (text: string) => void }) {
   const { labelId, descriptionId, errorId, disabled, invalid } = useRTEField();
   return (

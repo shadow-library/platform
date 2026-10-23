@@ -15,6 +15,5 @@ export interface PopoverContentProps extends ComponentPropsWithoutRef<typeof Pop
 export interface PopoverHeaderProps extends Omit<ComponentPropsWithoutRef<'div'>, 'title'> {
   /** Title (body-sm 600) — also labels the dialog via aria-labelledby. */
   title?: ReactNode;
-  /** Supporting description (caption). */
   description?: ReactNode;
 }

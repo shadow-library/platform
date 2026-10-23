@@ -19,7 +19,6 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-/** Interactive — exclusive selection with descriptions. */
 export const Playground: Story = {
   render: args => (
     <RadioGroup {...args}>
@@ -30,7 +29,6 @@ export const Playground: Story = {
   ),
 };
 
-/** With a group heading. */
 export const WithLabel: Story = {
   render: () => {
     const [value, setValue] = useState('team');
@@ -44,7 +42,6 @@ export const WithLabel: Story = {
   },
 };
 
-/** Compact rows without descriptions. */
 export const LabelsOnly: Story = {
   render: args => (
     <RadioGroup {...args} defaultValue="monthly">

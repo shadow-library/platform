@@ -19,15 +19,10 @@ export interface NavLeaf {
    * current location carries every one of them, so sibling rows on the same route stay distinct.
    */
   search?: Record<string, unknown>;
-  /** Step the row in one level, for a nested run inside a flat section. */
   indent?: boolean;
-  /**
-   * Let the label wrap to two lines rather than ellipsising, and hang the full string off a `title`.
-   * For rows named by the reader — a conversation — where a mid-word cut loses what identifies it.
-   */
+  /** Wrap the label to two lines instead of ellipsising and set the full string as `title`, for reader-named rows (conversations). */
   clamp?: boolean;
   label: string;
-  /** Leading 16px icon. Pass the element, not the component. */
   icon?: ReactNode;
   /** Trailing count. Zero is rendered as no badge — a "0" badge is noise, not information. */
   badge?: { count: number; intent?: BadgeIntent };
@@ -38,14 +33,10 @@ export interface NavLeaf {
   exact?: boolean;
   /** Leaves the SPA: renders a real anchor with `target="_blank"` and an external-link glyph. */
   external?: boolean;
-  /**
-   * Drop the item entirely. Hiding is expressed per item rather than by filtering at the call site so a
-   * capability gate reads next to the destination it guards.
-   */
+  /** Drop the item; per-item so a capability gate sits beside its destination. */
   hidden?: boolean;
 }
 
-/** A destination that owns sub-destinations — rendered as a disclosure group. */
 export interface NavBranch {
   label: string;
   icon?: ReactNode;
@@ -54,12 +45,9 @@ export interface NavBranch {
   /** Makes the group header a destination of its own; the disclosure moves to a chevron button beside it. */
   to?: string;
   params?: Record<string, string>;
-  /** A control pinned to the header row — "new chat". */
+  /** Control pinned to the item's header row, e.g. "new chat". */
   action?: ReactNode;
-  /**
-   * Starting disclosure state. Defaults to open when the branch owns the current route, so a deep link
-   * never lands on a collapsed group.
-   */
+  /** Starting disclosure state; defaults to open when the branch owns the current route. */
   defaultOpen?: boolean;
   /** Controlled disclosure state — pair with `onOpenChange`. */
   open?: boolean;
@@ -73,7 +61,6 @@ export interface NavBranch {
 export type NavNode = NavBranch | NavLeaf;
 
 export interface NavSection {
-  /** Uppercase group heading. Omit for an unlabelled run of items. */
   label?: string;
   items: NavNode[];
   hidden?: boolean;
@@ -90,17 +77,11 @@ export interface ProjectSwitcherConfig {
   footerAction?: { label: string; icon?: ReactNode; onSelect: () => void };
 }
 
-/**
- * What a product declares instead of writing chrome. A flat list is one unlabelled section; sub-children
- * are a property of a node, not of the config — so adding nesting to one item never restructures the rest.
- */
 export type NavConfig = { variant: 'project'; project: ProjectSwitcherConfig; sections: NavSection[] } | { variant: 'sections'; sections: NavSection[] };
 
 export interface AppShellBrand {
-  /** The product mark. */
   icon?: ReactNode;
   name: ReactNode;
-  /** Second line under the name — "Operator console", "Author workspace". */
   tagline?: ReactNode;
   /** Route the mark links to. Omit to render it as static text. */
   to?: string;
@@ -116,22 +97,15 @@ export interface AppShellProps {
    * @default 'default'
    */
   tone?: 'default' | 'warning';
-  /** Leading content in the top bar, left of the utility cluster. */
   breadcrumb?: ReactNode;
-  /** Centred top-bar slot — a search field or command-palette trigger. */
   search?: ReactNode;
   /** Status chips in the utility cluster (assurance level, environment). Hidden below 640px. */
   status?: ReactNode;
-  /** Utility controls left of the account menu — notifications, background jobs, a primary action. */
   actions?: ReactNode;
-  /** Theme switch and the like, pinned to the utility cluster's end before the account menu. */
   utility?: ReactNode;
-  /**
-   * Pinned below the sidebar's nav. For progress and context only — identity belongs in the account
-   * menu, and putting it here is what this shell exists to stop.
-   */
+  /** Pinned below the sidebar nav, for progress and context only; identity belongs in the account menu. */
   sidebarFooter?: ReactNode;
-  /** Offer the 56px icon rail. Off by default so the shell matches its reference design. */
+  /** Offer the 56px icon rail. @default false */
   collapsible?: boolean;
   /** Persist the rail choice across reloads. Implies `collapsible`. */
   storageKey?: string;
@@ -142,7 +116,6 @@ export interface AppShellProps {
   sidebarCollapsed?: boolean;
   /** Reports the author's toggle; passing it offers the toggle, as `collapsible` does. */
   onSidebarCollapsedChange?: (collapsed: boolean) => void;
-  /** Phone-only bottom navigation. */
   bottomNav?: ReactNode;
   /** Pin the top bar to the viewport below md too. @default false */
   stickyTopbar?: boolean;

@@ -30,17 +30,11 @@ function BangGlyph() {
   );
 }
 
-/**
- * A vertical chronology as a semantic ordered list — order is the meaning, and lists announce
- * position and count for free. The timeline is a document, not a widget: no roving focus or selection;
- * interactive elements inside entries are ordinary tab stops. Deliberately vertical-only (a horizontal
- * process is a Stepper). The marker vocabulary reads via a visually-hidden status prefix, never color.
- */
+/** A semantic ordered list, vertical-only (a horizontal process is a Stepper). No roving focus or selection; status reads via a visually-hidden prefix, never colour. */
 const TimelineRoot = forwardRef<HTMLOListElement, TimelineProps>(function Timeline({ className, ...props }, ref) {
   return <ol ref={ref} className={cn(styles.root, className)} {...props} />;
 });
 
-/** One chronological entry: a marker, a title with timestamp, and optional detail content. */
 export const TimelineItem = forwardRef<HTMLLIElement, TimelineItemProps>(function TimelineItem(
   { status = 'default', marker, title, timestamp, className, children, ...props },
   ref,

@@ -5,18 +5,13 @@ import styles from './Banner.module.css';
 import { bannerStore } from './Banner.store';
 import { type BannerConfig } from './Banner.types';
 
-/**
- * Declaratively register an app-level banner. The provider owns severity ordering, the one-visible
- * queue, and dismissal memory — call sites just describe the condition. `when` ties the banner's
- * lifetime to its condition; toggling it to `false` withdraws the banner and reveals the next in queue.
- */
+/** Registers an app-level banner for as long as `when` holds; the provider owns severity ordering, the one-visible queue and dismissal memory. */
 export function useBanner(config: BannerConfig): void {
   const { id, intent, message, lead, dismissable, when } = config;
   const actionLabel = config.action?.label;
   const actionHref = config.action?.href;
   const actionLoading = config.action?.loading;
 
-  // the config object is re-registered whenever any registered field changes; deps are spread to avoid churn on a fresh object literal each render
   useEffect(() => {
     bannerStore.register(config);
     return () => bannerStore.unregister(id);
@@ -24,11 +19,7 @@ export function useBanner(config: BannerConfig): void {
   }, [id, intent, message, lead, dismissable, when, actionLabel, actionHref, actionLoading]);
 }
 
-/**
- * Renders the highest-severity active banner into the App Shell's banner slot, expanding height to push
- * content down rather than cover it. Place one `<BannerOutlet />` above the header; the queue handles
- * the rest.
- */
+/** Renders the highest-severity active banner, pushing content down rather than covering it. Place one above the header. */
 export function BannerOutlet(): ReactElement {
   const current = useSyncExternalStore(bannerStore.subscribe, bannerStore.getSnapshot, () => null);
 

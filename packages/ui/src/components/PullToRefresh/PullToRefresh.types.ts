@@ -1,6 +1,5 @@
 import { type ComponentPropsWithoutRef, type ReactNode } from 'react';
 
-/** Gesture lifecycle: resting → finger-down travel → past-threshold → awaiting `onRefresh`. */
 export type PullToRefreshStatus = 'idle' | 'pulling' | 'armed' | 'refreshing';
 
 export interface PullToRefreshProps extends ComponentPropsWithoutRef<'div'> {
@@ -8,10 +7,8 @@ export interface PullToRefreshProps extends ComponentPropsWithoutRef<'div'> {
   onRefresh: () => void | Promise<void>;
   /** Pull distance (px, after resistance) that arms a refresh. @default 64 */
   threshold?: number;
-  /** Disables the gesture and the keyboard affordance. */
   disabled?: boolean;
   /** Label of the visually-hidden-until-focused keyboard affordance. @default 'Refresh' */
   refreshLabel?: ReactNode;
-  /** The scrollable content. */
   children: ReactNode;
 }

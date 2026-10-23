@@ -7,12 +7,7 @@ export interface DeferredLoadingOptions {
   minimum?: number;
 }
 
-/**
- * The 150ms-grace / 300ms-minimum timing rules from the loading family, in one hook so products can't
- * get them wrong. Returns whether the loading UI should be visible for a given `loading` flag: it
- * stays hidden until the wait crosses the grace window, then remains visible for at least the minimum
- * even if the work finishes sooner.
- */
+/** Whether loading UI should show: hidden until `grace` elapses, then visible for at least `minimum` even if the work finishes sooner. */
 export function useDeferredLoading(loading: boolean, options: DeferredLoadingOptions = {}): boolean {
   const { grace = 150, minimum = 300 } = options;
   const [visible, setVisible] = useState(false);

@@ -42,11 +42,8 @@ function ChevronDown() {
 }
 
 /**
- * A numeric field with step buttons for quantities adjusted in small increments (replicas, retries,
- * timeouts). The field is role="spinbutton" with aria-valuenow/min/max (+ aria-valuetext for units);
- * step buttons are labelled but removed from the tab order (ArrowUp/ArrowDown in the field do the same job).
- * Non-numeric keystrokes are rejected; typed values are clamped to the range on blur (unless `clampOnBlur` is off), never mid-edit.
- * Holding a step button repeats from the latest value until the bound.
+ * `role="spinbutton"` with aria-valuenow/min/max; step buttons are labelled but out of the tab order (arrows in the field do the same job).
+ * Typed values are clamped on blur (unless `clampOnBlur` is off), never mid-edit.
  */
 export const NumberStepper = forwardRef<HTMLInputElement, NumberStepperProps>(function NumberStepper(
   {

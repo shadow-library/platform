@@ -6,11 +6,7 @@ import { cn } from '@/lib';
 import styles from './Switch.module.css';
 import { type SwitchProps } from './Switch.types';
 
-/**
- * On/off with immediate effect — no Save button. Built on Radix Switch (`role="switch"`, announced
- * "on/off"). Use for live system state; use Checkbox for choices that commit on submit. With a
- * `label` it renders the settings-row (label left, switch right); `pending` shows the async flip.
- */
+/** Immediate effect, no Save button; use Checkbox for choices that commit on submit. `pending` shows the async flip. */
 export const Switch = forwardRef<HTMLButtonElement, SwitchProps>(function Switch({ label, description, pending = false, id, className, disabled, ...props }, ref) {
   const generatedId = useId();
   const switchId = id ?? generatedId;

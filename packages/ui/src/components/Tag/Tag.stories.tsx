@@ -24,7 +24,6 @@ export const WithSwatch: Story = {
   args: { color: '#4F46E5', children: 'design-system' },
 };
 
-/** Clickable tag renders a real link via asChild. */
 export const Clickable: Story = {
   render: () => (
     <Tag asChild>
@@ -33,7 +32,6 @@ export const Clickable: Story = {
   ),
 };
 
-/** A removable row that wraps with a small gap. */
 export const RemovableRow: Story = {
   render: () => {
     const [tags, setTags] = useState(['design', 'frontend', 'q3-launch', 'billing']);

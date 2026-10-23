@@ -3,11 +3,7 @@ import { type ComponentPropsWithoutRef, type ReactNode } from 'react';
 export type CardPadding = 'sm' | 'md' | 'lg';
 
 export interface CardProps extends ComponentPropsWithoutRef<'div'> {
-  /**
-   * The whole card is one link/button: hover raises `border-strong` + `shadow-e1`, pressed drops the
-   * shadow, focus shows the standard ring, cursor is a pointer. Pair with `asChild` + a real `<a>`/`<button>`
-   * so it is keyboard-operable — one interaction model per card. @default false
-   */
+  /** The whole card is one link or button; pair with `asChild` and a real `<a>`/`<button>` so it is keyboard-operable. @default false */
   interactive?: boolean;
   /** Selected state for card-radio / picker patterns: accent border (color does the work). @default false */
   selected?: boolean;
@@ -18,9 +14,7 @@ export interface CardProps extends ComponentPropsWithoutRef<'div'> {
 }
 
 export interface CardHeaderProps extends Omit<ComponentPropsWithoutRef<'div'>, 'title'> {
-  /** Title (body 600). Omit and pass `children` for full control of the header row. */
   title?: ReactNode;
-  /** Trailing action — an icon button, badge, or "···" menu. */
   action?: ReactNode;
 }
 

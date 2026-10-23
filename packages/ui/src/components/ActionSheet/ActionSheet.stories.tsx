@@ -56,7 +56,6 @@ export const Default: Story = {
   },
 };
 
-/** Destructive actions read the danger intent and sit apart from the safe ones. */
 export const Destructive: Story = {
   args: { open: false, onOpenChange: () => undefined, children: null },
   render: () => {
@@ -77,7 +76,6 @@ export const Destructive: Story = {
   },
 };
 
-/** Groups separate related rows under an optional caption. */
 export const Grouped: Story = {
   args: { open: false, onOpenChange: () => undefined, children: null },
   render: () => {

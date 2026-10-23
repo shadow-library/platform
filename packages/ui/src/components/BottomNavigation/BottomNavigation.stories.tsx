@@ -80,7 +80,6 @@ export const Default: Story = {
   ),
 };
 
-/** A count `Badge` overlays the destination icon. */
 export const WithBadge: Story = {
   render: args => (
     <div style={{ width: 360 }}>
@@ -93,7 +92,6 @@ export const WithBadge: Story = {
   ),
 };
 
-/** Controlled selection — the bar reports taps and the owner decides the active destination. */
 export const Controlled: Story = {
   render: args => {
     const [value, setValue] = useState('home');
@@ -110,7 +108,6 @@ export const Controlled: Story = {
   },
 };
 
-/** The default fixed bar pinned to the bottom edge — shown inside a containing frame. */
 export const Fixed: Story = {
   render: () => (
     <PhoneFrame>

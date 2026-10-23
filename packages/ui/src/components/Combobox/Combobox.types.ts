@@ -3,15 +3,11 @@ import { type ReactNode } from 'react';
 export type ComboboxSize = 'sm' | 'md' | 'lg';
 
 export interface ComboboxOption {
-  /** Committed value. */
   value: string;
   /** Field label — what the field renders and what blur reverts to (required per item). */
   label: string;
-  /** Secondary line (rich row). */
   description?: ReactNode;
-  /** Leading media (avatar/icon). */
   media?: ReactNode;
-  /** Non-selectable option. */
   disabled?: boolean;
 }
 
@@ -26,11 +22,10 @@ export interface ComboboxProps {
   onValueChange?: (value: string | null) => void;
   /** Async searcher (debounced 300ms); its results replace the list and drive the loading state. */
   onSearch?: (query: string) => Promise<ComboboxOption[]>;
-  /** Field placeholder. */
+  /** @default 'Search…' */
   placeholder?: string;
   /** Control height — matches Input. @default 'md' */
   size?: ComboboxSize;
-  /** Danger border/ring. */
   invalid?: boolean;
   disabled?: boolean;
   readOnly?: boolean;
@@ -40,11 +35,9 @@ export interface ComboboxProps {
   creatable?: boolean;
   /** Fires when the create row is chosen. */
   onCreate?: (query: string) => void;
-  /** Force skeleton rows (external loading). */
   loading?: boolean;
   /** Row shown when nothing matches. @default 'No results' */
   emptyMessage?: string;
-  /** Leading field adornment. */
   prefix?: ReactNode;
   id?: string;
   className?: string;

@@ -6,7 +6,6 @@ export type TooltipAlign = 'start' | 'center' | 'end';
 export interface TooltipProps {
   /** The label or definition. When `null`/`undefined` the trigger renders with no tooltip. */
   content?: ReactNode;
-  /** Optional keyboard shortcut shown in mono after the label (e.g. `⌘D`). */
   shortcut?: string;
   /** Preferred side; flips to stay in view. @default 'top' */
   side?: TooltipSide;

@@ -40,11 +40,8 @@ function RemoveIcon() {
 }
 
 /**
- * A dropzone that proxies a hidden file input (full keyboard + screen-reader path; drag is
- * enhancement). Constraints are printed up front and in the accessible name; files are validated at
- * selection and rejected in place with the rule named, never silently dropped. When an `upload`
- * transport is given, the component owns the queue (3 parallel), per-row Progress, cancel via
- * AbortSignal, and retry.
+ * Proxies a hidden file input, so drag is an enhancement over the keyboard path. Files are validated at selection and rejected in place; with `upload` the component owns
+ * the queue (3 parallel).
  */
 export function FileUpload({
   onValueChange,

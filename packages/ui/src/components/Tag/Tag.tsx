@@ -14,12 +14,6 @@ function RemoveIcon() {
   );
 }
 
-/**
- * User-defined metadata — categories, labels, topics. A quiet neutral rectangle (radius-4, vs the
- * Badge pill), optionally carrying a color swatch, a remove button, or (via `asChild`) a link. The
- * fill stays neutral by design; the swatch is the only color slot. This is the same tag the Multi
- * Select trigger renders.
- */
 export const Tag = forwardRef<HTMLSpanElement, TagProps>(function Tag({ size = 'md', color, onRemove, asChild = false, className, children, ...props }, ref) {
   if (asChild) {
     return (

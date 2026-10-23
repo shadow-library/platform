@@ -52,7 +52,6 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-/** Drag the row left (or focus it and press ArrowLeft) to reveal the trailing actions. */
 export const Default: Story = {
   args: { children: null },
   render: () => (
@@ -77,7 +76,6 @@ export const Default: Story = {
   ),
 };
 
-/** Leading and trailing rails together — ArrowRight reveals the leading rail. */
 export const BothRails: Story = {
   args: { children: null },
   render: () => (
@@ -102,7 +100,6 @@ export const BothRails: Story = {
   ),
 };
 
-/** `fullSwipe` commits the rail's first action when the swipe crosses 60% of the row. */
 export const FullSwipeToDelete: Story = {
   args: { children: null },
   render: () => {
@@ -128,7 +125,6 @@ export const FullSwipeToDelete: Story = {
   },
 };
 
-/** Controlled — the owner decides which rail is open. */
 export const Controlled: Story = {
   args: { children: null },
   render: () => {

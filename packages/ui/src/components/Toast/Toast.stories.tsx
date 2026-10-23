@@ -22,7 +22,6 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-/** Spawn toasts through the imperative API; the Toaster lives once at the app root. Change `placement` in the controls to anchor the stack to any corner. */
 export const Playground: Story = {
   render: args => (
     <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>

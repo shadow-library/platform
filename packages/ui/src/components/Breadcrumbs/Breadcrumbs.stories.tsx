@@ -23,7 +23,6 @@ export const Default: Story = {
   ),
 };
 
-/** Past maxVisible, the middle collapses into a "…" overflow menu. */
 export const Collapsed: Story = {
   render: () => (
     <Breadcrumbs maxVisible={4}>

@@ -4,10 +4,7 @@ import { type ReactElement } from 'react';
 import styles from './Tooltip.module.css';
 import { type TooltipProps, type TooltipProviderProps } from './Tooltip.types';
 
-/**
- * One provider per app gives every tooltip a shared hover-intent delay and the "open instantly once a
- * sibling is open" group behavior. Wraps Radix's provider with the Shadow UI defaults.
- */
+/** One provider per app shares the hover-intent delay and the "open instantly once a sibling is open" behaviour. */
 export function TooltipProvider({ delayDuration = 400, skipDelayDuration = 300, children }: TooltipProviderProps): ReactElement {
   return (
     <TooltipPrimitive.Provider delayDuration={delayDuration} skipDelayDuration={skipDelayDuration}>
@@ -16,12 +13,7 @@ export function TooltipProvider({ delayDuration = 400, skipDelayDuration = 300, 
   );
 }
 
-/**
- * A short label that appears on hover or focus and vanishes without a trace — the only inverted
- * surface in Shadow UI. Strictly non-interactive: names icon-only controls and defines truncated or
- * technical terms. Radix owns positioning (flip/shift, no arrow), the aria-describedby wiring, and
- * Esc-to-dismiss. Passing no `content` renders the trigger alone, so tooltips can be conditional.
- */
+/** Strictly non-interactive. Passing no `content` renders the trigger alone, so tooltips can be conditional. */
 export function Tooltip({
   content,
   shortcut,

@@ -16,7 +16,6 @@ function detectMac(): boolean {
   return /Mac|iPhone|iPad|iPod/.test(navigator.platform) || /Mac OS X/.test(navigator.userAgent);
 }
 
-/** Resolve one token to its glyph + spoken form; `rank` sorts modifiers into ⌃ ⌥ ⇧ ⌘ order before keys. */
 function resolveToken(token: string, mac: boolean): Cap {
   switch (token) {
     case 'mod':
@@ -70,17 +69,9 @@ function parseKeys(keys: string, mac: boolean): Cap[] {
     .sort((a, b) => a.rank - b.rank || a.index - b.index);
 }
 
-/**
- * A keyboard shortcut in a costume — static text, never interactive or focusable. Renders a semantic
- * `<kbd>`. The `keys` binding string maps to platform glyphs (⌘ on macOS, Ctrl elsewhere), modifiers
- * ordered ⌃ ⌥ ⇧ ⌘, symbols over words. Boxed by default; `bare` for tooltips and menu rows. A spoken
- * accessible name is supplied so ⌘ reads "Command", not "place of interest" — pass `aria-hidden` when
- * the host control already announces the shortcut.
- */
+/** Static `<kbd>`, never focusable. A spoken name is supplied so ⌘ reads "Command"; pass `aria-hidden` when the host control already announces the shortcut. */
 export const Kbd = forwardRef<HTMLElement, KbdProps>(function Kbd({ keys, bare = false, mac, className, children, ...props }, ref) {
-  // `detectMac` reads `navigator`, which is absent (or reflects the server OS) during SSR. Render the
-  // non-Mac glyphs on the server and the first client render, then resolve the real platform after
-  // mount so hydration always matches. Callers can pass `mac` to pin it deterministically.
+  // `detectMac` reads `navigator`, absent or the server's OS during SSR: render non-Mac glyphs first and resolve after mount so hydration matches. `mac` pins it.
   const [detectedMac, setDetectedMac] = useState(false);
   useEffect(() => {
     if (mac === undefined) setDetectedMac(detectMac());

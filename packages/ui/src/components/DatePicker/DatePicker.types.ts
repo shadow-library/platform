@@ -3,17 +3,17 @@ import { type ReactNode } from 'react';
 export type DatePickerSize = 'sm' | 'md' | 'lg';
 
 export interface DatePickerProps {
-  /** Controlled ISO value (YYYY-MM-DD), or `null`. */
+  /** Controlled ISO date (YYYY-MM-DD), or `null`. */
   value?: string | null;
-  /** Uncontrolled initial ISO value. */
+  /** Uncontrolled initial ISO date (YYYY-MM-DD). */
   defaultValue?: string | null;
-  /** Fires with the next ISO value (`null` when cleared). */
+  /** Fires with the next ISO date (`null` when cleared). */
   onValueChange?: (value: string | null) => void;
   /** Earliest selectable ISO date (inclusive). */
   min?: string;
   /** Latest selectable ISO date (inclusive). */
   max?: string;
-  /** Individually blacked-out ISO dates. */
+  /** ISO dates (YYYY-MM-DD) that cannot be selected. */
   disabledDates?: string[];
   /** Field height — matches Input. @default 'md' */
   size?: DatePickerSize;
@@ -21,7 +21,6 @@ export interface DatePickerProps {
   placeholder?: string;
   disabled?: boolean;
   readOnly?: boolean;
-  /** Force the danger field grammar. */
   invalid?: boolean;
   /** Show a clear (×) button when a date is set. @default true */
   clearable?: boolean;
@@ -32,6 +31,5 @@ export interface DatePickerProps {
   id?: string;
   className?: string;
   'aria-label'?: string;
-  /** Field prefix adornment. */
   prefix?: ReactNode;
 }

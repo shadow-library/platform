@@ -1,21 +1,15 @@
 import { type ButtonHTMLAttributes, type ReactNode } from 'react';
 
-/** Prominence — `primary` is the accent-filled default; `secondary` reads surface-card + border. */
 export type FabVariant = 'primary' | 'secondary';
 
 export type FabSize = 'md' | 'lg';
 
-/**
- * Where the FAB floats (safe-area aware). `static` renders in place for consumer-managed layouts. `fixed`
- * renders `position: fixed` with no offsets, so a consumer's own class can position it (e.g. above a bottom
- * nav) without fighting this component's `data-placement` selectors over specificity.
- */
+/** Where the FAB floats. `static` renders in place; `fixed` sets `position: fixed` with no offsets so a consumer class can position it. */
 export type FabPlacement = 'bottom-end' | 'bottom-center' | 'bottom-start' | 'static' | 'fixed';
 
 export interface FabProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'prefix'> {
   /** The action glyph. Marked decorative (`aria-hidden`) when a `label` names the action. */
   icon: ReactNode;
-  /** Extended-FAB label — when present the FAB widens into a pill with icon + text. */
   label?: ReactNode;
   /** Visual prominence. @default 'primary' */
   variant?: FabVariant;
@@ -23,6 +17,5 @@ export interface FabProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 
   size?: FabSize;
   /** Floating corner, offset past the device safe areas. @default 'bottom-end' */
   placement?: FabPlacement;
-  /** Render the single child element as the FAB (Radix Slot) — e.g. wrap a router link. */
   asChild?: boolean;
 }

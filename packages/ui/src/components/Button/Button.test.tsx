@@ -90,7 +90,6 @@ describe('Button', () => {
     expect(button).toHaveAttribute('aria-busy', 'true');
     expect(button).toBeDisabled();
     expect(button).toHaveTextContent('Loading');
-    // Label stays in the DOM so measured width is preserved.
     expect(button).toHaveTextContent('Saving');
     await user.click(button);
     expect(onClick).not.toHaveBeenCalled();

@@ -55,7 +55,6 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-/** Interactive — adjust props from the controls panel. */
 export const Playground: Story = {};
 
 export const Sizes: Story = {
@@ -68,17 +67,14 @@ export const Sizes: Story = {
   ),
 };
 
-/** A node prefix becomes a decorative in-field icon; a string suffix becomes a kbd hint. */
 export const WithAdornments: Story = {
   args: { prefix: <SearchIcon />, suffix: <Kbd>⌘K</Kbd>, placeholder: 'Search projects…' },
 };
 
-/** A string prefix/suffix fuses as a flat addon segment sharing the field border. */
 export const TextAddon: Story = {
   args: { prefix: 'https://', suffix: '.com', placeholder: 'shadow-apps' },
 };
 
-/** The × appears once the field has a value and the field is hovered or focused. */
 export const Clearable: Story = {
   render: args => {
     const [value, setValue] = useState('acme-corp');
@@ -86,12 +82,10 @@ export const Clearable: Story = {
   },
 };
 
-/** `type='password'` adds an eye toggle that reveals the entered characters. */
 export const Password: Story = {
   args: { type: 'password', defaultValue: 'hunter2', 'aria-label': 'Password', placeholder: 'Password' },
 };
 
-/** Danger border and ring — presentation only; the message is rendered by Form Field. */
 export const Invalid: Story = {
   args: { invalid: true, defaultValue: 'invalid@' },
 };

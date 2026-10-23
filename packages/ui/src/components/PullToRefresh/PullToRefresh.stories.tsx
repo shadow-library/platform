@@ -39,7 +39,6 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-/** Drag the list down from the top (or Tab to the hidden Refresh affordance) to trigger a 1.5s refresh. */
 export const Default: Story = {
   args: { onRefresh: () => undefined, children: null },
   render: () => {

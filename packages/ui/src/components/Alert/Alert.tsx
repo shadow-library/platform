@@ -15,12 +15,7 @@ function DismissIcon() {
   );
 }
 
-/**
- * A persistent, in-layout message about a condition — the one intent-tinted surface, built entirely
- * from the semantic role tokens (so dark mode is automatic). It sits in the layout and stays while
- * the condition holds. Danger/warning announce via `role="alert"`; info/success via `role="status"`.
- * Every warning/danger names a way out through `action` or an inline link.
- */
+/** Persistent in-layout message. Danger and warning announce via `role="alert"`, info and success via `role="status"`. */
 export const Alert = forwardRef<HTMLDivElement, AlertProps>(function Alert({ intent = 'info', title, action, onDismiss, className, children, ...props }, ref) {
   const role = intent === 'danger' || intent === 'warning' ? 'alert' : 'status';
   return (

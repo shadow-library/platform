@@ -9,13 +9,7 @@ export interface ControllableStateOptions<T> {
   onChange?: (next: T) => void;
 }
 
-/**
- * The controlled-or-uncontrolled value pattern in one place, so every value-bearing component resolves
- * it identically instead of re-deriving it. Returns the resolved value (the `value` prop when
- * controlled, internal state otherwise) and a setter that updates internal state only when uncontrolled
- * and always fires `onChange` — mirroring the `if (!isControlled) setInternal(next); onChange?.(next)`
- * idiom the components previously hand-rolled.
- */
+/** Resolves a controlled-or-uncontrolled value; the setter updates internal state only when uncontrolled and always fires `onChange`. */
 export function useControllableState<T>({ value, defaultValue, onChange }: ControllableStateOptions<T>): [T, (next: T) => void] {
   const isControlled = value !== undefined;
   const [internal, setInternal] = useState(defaultValue);

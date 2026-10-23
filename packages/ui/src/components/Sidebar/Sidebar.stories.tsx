@@ -13,7 +13,6 @@ function Dot() {
   );
 }
 
-// A compact identity mark — the monogram stays visible (centered) in rail; the label only shows expanded.
 function WorkspaceMark() {
   const { collapsed } = useSidebar();
   return (
@@ -100,11 +99,6 @@ export const Default: Story = {
   },
 };
 
-/**
- * `asChild` renders the caller's own element — a router `Link` in a real app — as the item, so navigation
- * keeps the router's client-side handling, prefetch and `aria-current`. The caller's children are rewrapped
- * in the label span, so the markup is identical to the plain-anchor branch.
- */
 export const RouterLinks: Story = {
   render: () => (
     <div style={{ display: 'flex', height: 320 }}>
@@ -126,10 +120,6 @@ export const RouterLinks: Story = {
   ),
 };
 
-/**
- * The project-scoped shape: a switcher directly under the brand, naming what every destination below it
- * resolves against. Firebase's model — change the scope, keep the navigation.
- */
 export const ProjectSwitcher: Story = {
   render: function ProjectSwitcherStory() {
     const projects = [
@@ -165,11 +155,6 @@ export const ProjectSwitcher: Story = {
   },
 };
 
-/**
- * A screen that owns a list — conversations, saved views — nests it under its own destination rather than
- * opening a second column. The header stays navigable, the disclosure moves to its own chevron, and the
- * action starts a new one without going through the screen first. In rail mode the flyout carries all three.
- */
 export const NestedDestinations: Story = {
   render: () => (
     <div style={{ display: 'flex', height: 380 }}>

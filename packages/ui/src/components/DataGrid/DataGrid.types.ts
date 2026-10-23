@@ -8,17 +8,13 @@ export interface GridSort {
 }
 
 export interface GridColumn<T> {
-  /** Stable column id (also the default data key). */
   id: string;
-  /** Header label. */
   header: ReactNode;
-  /** Display renderer; defaults to `String(row[id])`. */
   cell?: (row: T) => ReactNode;
   /** String value for the inline editor; defaults to `String(row[id])`. */
   accessor?: (row: T) => string;
   align?: GridAlign;
   sortable?: boolean;
-  /** Enable inline text editing for this column. */
   editable?: boolean;
   /** Initial width in px. @default 160 */
   width?: number;

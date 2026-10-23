@@ -55,8 +55,8 @@ describe('Stepper', () => {
     const user = userEvent.setup();
     const onFinish = vi.fn();
     render(<Wizard onFinish={onFinish} />);
-    await user.click(screen.getByRole('button', { name: 'Continue' })); // account -> team
-    await user.click(screen.getByRole('button', { name: 'Skip' })); // team -> review
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(screen.getByRole('button', { name: 'Skip' }));
     expect(screen.getByRole('button', { name: 'Finish' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Finish' }));
     await waitFor(() => expect(onFinish).toHaveBeenCalledOnce());

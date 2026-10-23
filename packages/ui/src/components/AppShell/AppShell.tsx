@@ -24,7 +24,6 @@ function isBranch(node: NavNode): node is NavBranch {
   return 'items' in node;
 }
 
-/** Substitutes `$param` segments so a template path can be compared against the live pathname. */
 function resolvePath(to: string, params?: Record<string, string>): string {
   if (params == null) return to;
   return Object.entries(params).reduce((path, [key, value]) => path.replaceAll(`$${key}`, value), to);
@@ -42,7 +41,6 @@ function visible<T extends { hidden?: boolean }>(entries: T[]): T[] {
   return entries.filter(entry => entry.hidden !== true);
 }
 
-/** A count of zero is absence, not a number worth drawing. */
 function renderBadge(leaf: NavLeaf): ReactNode {
   if (leaf.badge == null || leaf.badge.count <= 0) return null;
   return (
@@ -84,7 +82,6 @@ function NavLeafItem({ leaf }: { leaf: NavLeaf }): ReactElement {
 function NavNodeItem({ node, pathname, search }: { node: NavNode; pathname: string; search: Search }): ReactElement {
   if (!isBranch(node)) return <NavLeafItem leaf={node} />;
   const children = visible(node.items);
-  // A branch opens itself when it owns the current route, so a deep link never lands on a collapsed group.
   const active = children.some(leaf => isLeafActive(pathname, search, leaf)) || (node.to != null && matchPath(pathname, resolvePath(node.to, node.params)));
   return (
     <Sidebar.Group
@@ -135,16 +132,8 @@ function BrandMark({ brand, tone }: { brand: AppShellBrand; tone: 'default' | 'w
 }
 
 /**
- * The whole application frame, rendered from a declaration rather than assembled by hand. A product says
- * what its destinations are; this decides how they look, where identity lives, and how the frame behaves
- * on a phone — so four products cannot drift into four different shells.
- *
- * Identity is deliberately confined to the top bar's account menu. There is no sidebar identity slot: one
- * of the two copies always goes stale, and on a phone the footer costs the drawer its most reachable row.
- * `sidebarFooter` exists for progress and context, and refusing to accept a user there is the point.
- *
- * Composes `Shell`, so the mobile drawer, gutters, reading column, skip link, and safe-area handling are
- * inherited rather than restated.
+ * The application frame rendered from a declaration. Identity lives only in the top bar's account menu; `sidebarFooter` takes progress and context, never a user.
+ * Composes `Shell`, which supplies the mobile drawer, gutters, skip link and safe-area handling.
  */
 export function AppShell({
   brand,

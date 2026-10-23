@@ -5,7 +5,6 @@ export interface PaginationProps extends Omit<ComponentPropsWithoutRef<'nav'>, '
   page?: number;
   /** Fires with the next page. */
   onPageChange?: (page: number) => void;
-  /** Total item count — drives the page count and range summary. */
   total?: number;
   /** Items per page. @default 50 */
   pageSize?: number;
@@ -15,9 +14,9 @@ export interface PaginationProps extends Omit<ComponentPropsWithoutRef<'nav'>, '
   pageSizeOptions?: number[];
   /** Pages shown on each side of the current page. @default 1 */
   siblingCount?: number;
-  /** Show the "Showing X to Y of Z" range summary (page mode with a known total). @default true */
+  /** Show the "Showing X to Y of Z" summary (page mode, known total). @default true */
   summary?: boolean;
-  /** Collapse to arrows + "page / total" text. @default false */
+  /** Collapse to arrows + "page / total". */
   compact?: boolean;
   /** Locale for the range-summary numbers. Pinned by default so SSR and client agree. @default 'en-US' */
   locale?: string;

@@ -27,7 +27,6 @@ export const Playground: Story = {
   },
 };
 
-/** Locked behind a spinner while the session is re-issued for the new organisation. */
 export const Switching: Story = {
   args: { switching: true },
 };

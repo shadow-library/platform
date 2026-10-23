@@ -43,12 +43,7 @@ function CheckMark() {
   );
 }
 
-/**
- * The WAI-ARIA tree pattern for genuine hierarchies (files, org units, categories): role tree/treeitem/
- * group with aria-level/setsize/posinset/expanded, one tab stop with a roving cursor (arrows navigate,
- * →/← expand/collapse, Enter selects). Checkbox mode adds tri-state parents (aria-checked="mixed") that
- * never disagree with their descendants. Guides and icons are decorative; hierarchy is in the ARIA.
- */
+/** WAI-ARIA tree: one tab stop with a roving cursor. Checkbox mode adds tri-state parents (`aria-checked="mixed"`) that never disagree with their descendants. */
 export function TreeView({
   nodes,
   expanded,

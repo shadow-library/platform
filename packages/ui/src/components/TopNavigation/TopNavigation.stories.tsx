@@ -41,10 +41,6 @@ export const WithOverflow: Story = {
   ),
 };
 
-/**
- * The search slot claims the space between the destinations and the utility cluster, so a search or
- * command-palette trigger sits mid-bar without competing with the destination row for layout.
- */
 export const WithSearch: Story = {
   render: () => (
     <TopNavigation

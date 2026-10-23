@@ -6,7 +6,6 @@ import { RTEField, useRTEField } from './RTEField';
 
 function Editable() {
   const { labelId, disabled, invalid } = useRTEField();
-  // stand-in for an engine's contenteditable, which is role=textbox
   return <div role="textbox" aria-multiline="true" aria-labelledby={labelId} aria-disabled={disabled || undefined} aria-invalid={invalid || undefined} tabIndex={0} />;
 }
 

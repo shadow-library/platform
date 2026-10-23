@@ -17,7 +17,6 @@ function CloseIcon() {
   );
 }
 
-/** Header — title + optional meta, sharing the Dialog header grammar. Close × closes in either mode. */
 function DrawerHeader({ title, meta, showClose = true, className, ...props }: DrawerHeaderProps) {
   const { modal, titleId, onClose } = useContext(DrawerContext);
   const TitleTag = modal ? DialogPrimitive.Title : 'h2';
@@ -42,12 +41,10 @@ function DrawerHeader({ title, meta, showClose = true, className, ...props }: Dr
   );
 }
 
-/** Body — scrolls independently. */
 function DrawerBody({ className, ...props }: DrawerBodyProps) {
   return <div className={cn(styles.body, className)} {...props} />;
 }
 
-/** Footer — pinned; shares the Dialog footer grammar. */
 function DrawerFooter({ cancel, action, onAction, loading = false, className, children, ...props }: DrawerFooterProps) {
   const { modal, onClose } = useContext(DrawerContext);
   return (
@@ -76,12 +73,7 @@ function DrawerFooter({ cancel, action, onAction, loading = false, className, ch
   );
 }
 
-/**
- * A full-height edge panel for record detail. Modal mode wraps Radix Dialog (scrim, focus trap,
- * scroll lock — Dialog's rules) for focused edits; non-modal renders a `role="complementary"` landmark
- * that keeps the page interactive for browse-and-inspect, closing via ×, Esc, or the caller. One
- * drawer at a time; slides from its edge with the emphasized curve. Shares the Dialog header/footer.
- */
+/** Modal mode wraps Radix Dialog; non-modal renders a `role="complementary"` landmark that keeps the page interactive. */
 function DrawerRoot({
   open,
   onOpenChange,

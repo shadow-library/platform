@@ -12,12 +12,7 @@ function formatCount(children: ReactNode, max: number | undefined): ReactNode {
   return `${max}+`;
 }
 
-/**
- * A small, non-interactive status marker: state words, counts, and dots. Badges *tell* — they carry
- * no hover, cursor, or remove affordance (that is a Tag/Chip). Intent lives in the token layer, so a
- * theme flip recolors every badge automatically. Meaning is never color alone: pair a `dot` with the
- * word, and count badges take an `aria-label` from the caller.
- */
+/** Non-interactive status marker. Meaning is never colour alone: pair a `dot` with the word, and give count badges an `aria-label`. */
 export const Badge = forwardRef<HTMLSpanElement, BadgeProps>(function Badge(
   { intent = 'neutral', variant = 'soft', dot = false, max, size = 'md', className, children, ...props },
   ref,

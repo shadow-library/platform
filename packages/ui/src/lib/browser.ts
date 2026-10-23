@@ -1,8 +1,4 @@
-/**
- * Copy text to the clipboard, resolving to whether it succeeded — drive a "Copied" affordance off the
- * result. Reads `navigator.clipboard` lazily, so importing this module is safe on the server; only call
- * it from a client event handler.
- */
+/** Resolves to whether the copy succeeded. Client event handlers only; `navigator.clipboard` is read lazily so importing is server-safe. */
 export async function copyText(text: string): Promise<boolean> {
   try {
     await navigator.clipboard.writeText(text);
@@ -12,10 +8,7 @@ export async function copyText(text: string): Promise<boolean> {
   }
 }
 
-/**
- * Trigger a browser download of a text blob (recovery codes, exported config, …). Client-only by nature —
- * call it from an event handler, never during render or on the server.
- */
+/** Client-only: call from an event handler, never during render or on the server. */
 export function downloadTextFile(filename: string, contents: string): void {
   const blob = new Blob([contents], { type: 'text/plain' });
   const url = URL.createObjectURL(blob);

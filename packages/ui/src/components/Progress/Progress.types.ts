@@ -10,7 +10,6 @@ export interface ProgressProps extends Omit<ComponentPropsWithoutRef<'div'>, 'ch
   max?: number;
   /** Unknown-duration bar — an animated sweep, no percent label. @default false */
   indeterminate?: boolean;
-  /** Optional label row (name left, % right). */
   label?: ReactNode;
   /** Fill color — recolor on completion via intent tokens. @default 'accent' */
   intent?: ProgressIntent;

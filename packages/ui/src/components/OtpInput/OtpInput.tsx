@@ -12,13 +12,8 @@ const PRESET_PATTERN: Record<'numeric' | 'alphanumeric' | 'alphabetic', RegExp> 
 };
 
 /**
- * Segmented one-time-code entry. Each character owns a box; typing advances, Backspace retreats,
- * and a paste is distributed across the boxes after filtering to the allowed characters — so
- * copy-pasting a code (with or without separators) lands one character per box. The value stays
- * left-aligned and contiguous; `length` and the allowed set are always known, which is what makes
- * paste distribution deterministic.
- *
- * `className`/`style` and remaining props target the group fieldset; `value`/`onValueChange` are the API.
+ * Paste is distributed across the boxes after filtering to the allowed characters; the value stays left-aligned and contiguous. `className`/`style` and remaining props
+ * target the group fieldset.
  */
 export const OtpInput = forwardRef<HTMLInputElement, OtpInputProps>(function OtpInput(
   {
@@ -59,7 +54,6 @@ export const OtpInput = forwardRef<HTMLInputElement, OtpInputProps>(function Otp
 
   const boxesRef = useRef<(HTMLInputElement | null)[]>([]);
 
-  // autoFocus is a mount-only intent, not a live prop
   useEffect(() => {
     if (autoFocus) boxesRef.current[0]?.focus();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- autoFocus is a mount-only intent, not a live prop
@@ -78,7 +72,6 @@ export const OtpInput = forwardRef<HTMLInputElement, OtpInputProps>(function Otp
     el?.select();
   }
 
-  /** Place `incoming` starting at `index`, collapse to a contiguous left-aligned string, commit, and return it. */
   function place(index: number, incoming: string): string {
     const next = [...chars];
     let cursor = index;

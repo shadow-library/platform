@@ -37,13 +37,7 @@ function weekdayLabels(weekStartsOn: number, locale: string): string[] {
   return Array.from({ length: 7 }, (_, index) => addDays(base, (weekStartsOn + index) % 7).toLocaleDateString(locale, { weekday: 'short' }));
 }
 
-/**
- * A date field with a calendar popover, on ISO strings (YYYY-MM-DD) at the API boundary. Typing is the
- * accessible fast path — the field parses live and the calendar follows; the grid is an aid, never a
- * gate. The open calendar is a role="dialog" grid with roving-tabindex day cells labeled in full, day
- * states mapped to tokens (today border-accent, selected accent fill, disabled dimmed). Built on
- * Popover + Input.
- */
+/** Typing is the accessible fast path (the field parses live, the calendar follows); the open calendar is a `role="dialog"` grid with roving-tabindex days. */
 export function DatePicker({
   value,
   defaultValue = null,
@@ -89,7 +83,6 @@ export function DatePicker({
     }
   }
 
-  // Move DOM focus to the roving day while the calendar is open.
   useEffect(() => {
     if (!open) return;
     dayRefs.current.get(toISODate(focusedDate))?.focus();

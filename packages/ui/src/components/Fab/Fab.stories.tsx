@@ -52,7 +52,6 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-/** Interactive — adjust props from the controls panel. */
 export const Playground: Story = {};
 
 export const Variants: Story = {
@@ -73,7 +72,6 @@ export const Sizes: Story = {
   ),
 };
 
-/** A `label` extends the FAB into a pill — no `aria-label` needed. */
 export const Extended: Story = {
   render: () => (
     <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
@@ -83,7 +81,6 @@ export const Extended: Story = {
   ),
 };
 
-/** Fixed placements float past the safe areas — shown inside a containing frame. */
 export const Floating: Story = {
   render: () => (
     <PhoneFrame>
@@ -92,7 +89,6 @@ export const Floating: Story = {
   ),
 };
 
-/** `fixed` sets `position: fixed` with no offsets, so a consumer's own class supplies them — e.g. to clear a bottom nav. */
 export const FixedWithConsumerOffsets: Story = {
   render: () => (
     <PhoneFrame>

@@ -19,8 +19,6 @@ export interface TextareaProps extends Omit<TextareaHTMLAttributes<HTMLTextAreaE
   autoGrow?: boolean;
   /** Render a character counter (requires `maxLength`); revealed at 80% of the limit. */
   showCount?: boolean;
-  /** Presentation-only invalid state: danger border/ring + `aria-invalid`. */
   invalid?: boolean;
-  /** Convenience change handler receiving the string value directly (fires alongside native `onChange`). */
   onValueChange?: (value: string) => void;
 }

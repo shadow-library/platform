@@ -20,7 +20,6 @@ export const Default: Story = {
   },
 };
 
-/** With a page-size Select. */
 export const WithPageSize: Story = {
   render: () => {
     const [page, setPage] = useState(1);
@@ -29,12 +28,10 @@ export const WithPageSize: Story = {
   },
 };
 
-/** Cursor mode — only Prev/Next when totals are unknown. */
 export const Cursor: Story = {
   render: () => <Pagination hasPrev hasNext onPrev={() => {}} onNext={() => {}} />,
 };
 
-/** Compact — arrows + position text. */
 export const Compact: Story = {
   render: () => {
     const [page, setPage] = useState(4);

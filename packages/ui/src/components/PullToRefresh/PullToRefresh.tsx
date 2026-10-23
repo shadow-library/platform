@@ -16,13 +16,7 @@ interface DragState {
   distance: number;
 }
 
-/**
- * The list-refresh gesture: pulling down from the top of the scroll container reveals a progress
- * spinner and, past the threshold, arms a refresh that runs on release. The root is the scroll
- * container; content translates with the (resisted) pull. The gesture is never the only path —
- * a visually-hidden-until-focused button (skip-link treatment) gives keyboard and screen-reader
- * users the same refresh, and a live region announces the refreshing state.
- */
+/** The root is the scroll container. The gesture is never the only path: a visually-hidden-until-focused button gives keyboard and screen-reader users the same refresh. */
 export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(function PullToRefresh(
   { onRefresh, threshold = 64, disabled = false, refreshLabel = 'Refresh', className, style, children, ...props },
   ref,
@@ -57,8 +51,6 @@ export const PullToRefresh = forwardRef<HTMLDivElement, PullToRefreshProps>(func
     const dy = event.clientY - state.startY;
 
     if (!state.pulling) {
-      // The gesture only becomes a pull with clear downward travel while still at the top;
-      // upward travel is a normal scroll and releases the gesture untouched.
       if (dy < -DIRECTION_SLOP) {
         state.active = false;
         return;

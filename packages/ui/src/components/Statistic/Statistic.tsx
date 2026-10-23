@@ -40,10 +40,8 @@ function DeltaArrow({ direction }: { direction: -1 | 0 | 1 }) {
 }
 
 /**
- * One metric: label, value, and an honest delta. The primitive that KPI rows and dashboard headers
- * compose from — sentiment is declared (`positiveIs`), never inferred from the arrow's direction, so a
- * rising churn number can never render green. The value is always a raw number formatted through
- * `Intl.NumberFormat`; it is the tile content, not the tile — place it in a Card, grid, or page header.
+ * Sentiment is declared (`positiveIs`), never inferred from the arrow's direction, so a rising churn number can never render green. The value is a raw number formatted
+ * through `Intl.NumberFormat`.
  */
 export const Statistic = forwardRef<HTMLDivElement, StatisticProps>(function Statistic(
   {

@@ -23,7 +23,6 @@ function DialogRoot(props: DialogProps) {
   return <DialogPrimitive.Root {...props} />;
 }
 
-/** The scrim + centered panel (layer-modal, radius-xl, e3). Task dialogs close on scrim click or Esc. */
 const DialogContent = forwardRef<HTMLDivElement, DialogContentProps>(function DialogContent({ size = 'md', className, children, ...props }, ref) {
   return (
     <DialogPrimitive.Portal>
@@ -37,7 +36,6 @@ const DialogContent = forwardRef<HTMLDivElement, DialogContentProps>(function Di
   );
 });
 
-/** Header — heading-3 title + optional description, with the top-right close ×. */
 function DialogHeader({ title, description, showClose = true, className, ...props }: DialogHeaderProps) {
   return (
     <div className={cn(styles.header, className)} {...props}>
@@ -54,12 +52,10 @@ function DialogHeader({ title, description, showClose = true, className, ...prop
   );
 }
 
-/** Body — the content slot; scrolls internally once the dialog reaches the viewport height. */
 function DialogBody({ className, ...props }: DialogBodyProps) {
   return <div className={cn(styles.body, className)} {...props} />;
 }
 
-/** Footer — pass `cancel`/`action` for the standard grammar, or `children` for a custom row. */
 function DialogFooter({ cancel, action, onAction, loading = false, className, children, ...props }: DialogFooterProps) {
   return (
     <div className={cn(styles.footer, className)} {...props}>
@@ -81,11 +77,7 @@ function DialogFooter({ cancel, action, onAction, loading = false, className, ch
   );
 }
 
-/**
- * A modal surface for tasks that must be finished or abandoned before the page continues. Wraps Radix
- * Dialog — focus trap, scroll lock, scrim, Esc/scrim dismissal, and focus return to the trigger. For
- * a consequential yes/no, use `ConfirmDialog` (an alertdialog) instead of building one from this.
- */
+/** Radix Dialog: focus trap, scroll lock, scrim and Esc dismissal. For a consequential yes/no use `ConfirmDialog` (an alertdialog) instead. */
 export const Dialog = Object.assign(DialogRoot, {
   Trigger: DialogPrimitive.Trigger,
   Content: DialogContent,
@@ -95,12 +87,7 @@ export const Dialog = Object.assign(DialogRoot, {
   Close: DialogPrimitive.Close,
 });
 
-/**
- * The confirm grammar: a Radix AlertDialog that resolves one question — no × and no scrim-dismiss, so
- * the user must choose, and Cancel takes initial focus (destruction is never default-focused). Set
- * `intent='danger'` for the Danger primary, and `typedConfirmation` to gate irreversible actions until
- * the user retypes the resource name.
- */
+/** Radix AlertDialog with no × and no scrim dismissal, so the user must choose; Cancel takes initial focus so destruction is never default-focused. */
 export function ConfirmDialog({
   open,
   defaultOpen,

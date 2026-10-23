@@ -1,15 +1,11 @@
 import { type ReactNode } from 'react';
 
 export interface HoverCardProps<T = unknown> {
-  /** The trigger — an entity reference (mention, link, avatar). Rendered via Slot. */
   children: ReactNode;
   /** Static preview content. Use this or the async `content`/`render` pair, not both. */
   card?: ReactNode;
-  /** Async loader — fires once at hover-intent so the card can open full. */
   content?: () => Promise<T>;
-  /** Renders the resolved data from `content`. */
   render?: (data: T) => ReactNode;
-  /** Skeleton shown at final size while `content` resolves — content pops in without reflow. */
   fallback?: ReactNode;
   /** Quiet line shown if `content` rejects. @default "Couldn't load preview" */
   errorFallback?: ReactNode;

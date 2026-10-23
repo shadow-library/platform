@@ -15,12 +15,7 @@ function ChevronDown() {
   );
 }
 
-/**
- * The WAI-ARIA accordion pattern via Radix: `<h3><button aria-expanded aria-controls>` headers over
- * `role="region"` panels, ↑↓/Home/End convenience navigation, collapsed panels display:none-hidden.
- * Disclosure is not selection — open state is a weight/chevron shift, never the accent. `single` mode
- * scans one panel at a time; `multiple` keeps several open for working surfaces.
- */
+/** WAI-ARIA accordion via Radix. Disclosure is not selection: open state shifts weight and chevron, never the accent. */
 function AccordionRoot({ variant = 'plain', headingLevel = 3, className, children, ...rest }: AccordionProps) {
   const rootProps = rest as ComponentPropsWithoutRef<typeof AccordionPrimitive.Root>;
   return (
@@ -32,7 +27,6 @@ function AccordionRoot({ variant = 'plain', headingLevel = 3, className, childre
   );
 }
 
-/** One disclosure item — a header (title + optional meta) over a content panel. */
 const AccordionItem = forwardRef<HTMLDivElement, AccordionItemProps>(function AccordionItem({ value, title, meta, disabled, className, children }, ref) {
   const { headingLevel } = useContext(AccordionContext);
   const Heading = `h${headingLevel}` as 'h3';

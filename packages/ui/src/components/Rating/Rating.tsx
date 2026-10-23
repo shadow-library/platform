@@ -15,10 +15,8 @@ function StarIcon() {
 }
 
 /**
- * A star rating in two modes. Input is a radio group (role="radiogroup" with "1 star"…"n stars"
- * radios — the native one-of-n pattern, form-post compatible): click commits immediately, clicking the
- * current value clears it, arrows move within one focus ring. Display is a single image
- * (role="img" aria-label="Rated 4.3 out of 5") supporting fractional fills — never n separate icons.
+ * Input mode is a `radiogroup` of "1 star"..."n stars" radios (click commits, clicking the current value clears it).
+ * Display mode is a single `role="img"` supporting fractional fills.
  */
 export function Rating({
   value,

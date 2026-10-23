@@ -31,7 +31,6 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-/** Interactive — open, pick, reopen; the check marks the current value. */
 export const Playground: Story = {
   render: args => (
     <Select {...args}>
@@ -43,7 +42,6 @@ export const Playground: Story = {
   ),
 };
 
-/** Section labels and dividers organise 8–15 options with natural categories. */
 export const Grouped: Story = {
   render: args => (
     <Select {...args}>
@@ -60,7 +58,6 @@ export const Grouped: Story = {
   ),
 };
 
-/** Two-line items for consequential choices like plan tiers. */
 export const WithDescriptions: Story = {
   args: { placeholder: 'Choose a plan', 'aria-label': 'Plan' },
   render: args => (
@@ -78,7 +75,6 @@ export const WithDescriptions: Story = {
   ),
 };
 
-/** A leading icon per item; it repeats in the closed trigger. */
 export const WithIcons: Story = {
   args: { placeholder: 'Environment', 'aria-label': 'Environment' },
   render: args => (
@@ -109,7 +105,6 @@ export const Sizes: Story = {
   ),
 };
 
-/** Danger border/ring — presentation only; the message is rendered by Form Field. */
 export const Invalid: Story = {
   args: { invalid: true },
   render: args => (

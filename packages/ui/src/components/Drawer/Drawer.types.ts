@@ -25,9 +25,7 @@ export interface DrawerProps {
 }
 
 export interface DrawerHeaderProps extends Omit<ComponentPropsWithoutRef<'div'>, 'title'> {
-  /** Record title (heading-3). */
   title: ReactNode;
-  /** One line of identifying meta. */
   meta?: ReactNode;
   /** Render the close ×. @default true */
   showClose?: boolean;
@@ -36,9 +34,7 @@ export interface DrawerHeaderProps extends Omit<ComponentPropsWithoutRef<'div'>,
 export type DrawerBodyProps = ComponentPropsWithoutRef<'div'>;
 
 export interface DrawerFooterProps extends ComponentPropsWithoutRef<'div'> {
-  /** Ghost cancel label — closes the drawer. */
   cancel?: ReactNode;
-  /** Primary action label. */
   action?: ReactNode;
   onAction?: () => void;
   loading?: boolean;

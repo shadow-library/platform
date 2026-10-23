@@ -44,7 +44,6 @@ export const Intents: Story = {
   ),
 };
 
-/** Dismissible info notice. */
 export const Dismissible: Story = {
   args: { onDismiss: () => {} },
 };

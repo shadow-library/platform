@@ -14,13 +14,11 @@ export interface RatingProps {
   /** Render as a non-interactive display (supports fractional values). @default false */
   readOnly?: boolean;
   disabled?: boolean;
-  /** Force the danger stroke (required + empty). */
   invalid?: boolean;
   /** Click the current value again to clear it. @default true */
   allowClear?: boolean;
   /** Value → meaning labels (e.g. `['Terrible','Poor','Average','Good','Excellent']`). */
   labels?: string[];
-  /** Review count for the display accessible name. */
   reviewCount?: number;
   'aria-label'?: string;
 }

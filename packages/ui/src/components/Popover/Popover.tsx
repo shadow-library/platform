@@ -12,11 +12,7 @@ function PopoverRoot(props: PopoverProps) {
   return <PopoverPrimitive.Root {...props} />;
 }
 
-/**
- * The anchored, non-modal overlay content — the shared overlay surface (raised, border-default, e2),
- * radius-lg, offset 8 with flip/shift and no arrow. The dialog is labelled by its `Popover.Header`
- * title; pass `aria-label` for a headerless popover.
- */
+/** Labelled by its `Popover.Header` title; pass `aria-label` for a headerless popover. */
 const PopoverContent = forwardRef<HTMLDivElement, PopoverContentProps>(function PopoverContent(
   { className, side = 'bottom', align = 'center', sideOffset = 8, 'aria-label': ariaLabel, 'aria-labelledby': ariaLabelledby, children, ...props },
   ref,
@@ -44,7 +40,6 @@ const PopoverContent = forwardRef<HTMLDivElement, PopoverContentProps>(function 
   );
 });
 
-/** Optional header — title + supporting description, with the title wired as the dialog's label. */
 function PopoverHeader({ title, description, className, ...props }: PopoverHeaderProps) {
   const titleId = useContext(TitleContext);
   return (
@@ -59,12 +54,7 @@ function PopoverHeader({ title, description, className, ...props }: PopoverHeade
   );
 }
 
-/**
- * An anchored, interactive, non-modal overlay: links, quick filters, small forms, entity previews.
- * The page stays interactive behind it and it closes on outside click or Esc. Wraps Radix Popover,
- * which owns positioning, focus movement (to the first focusable, back to the trigger on close,
- * never trapped), and the dialog semantics.
- */
+/** Non-modal: the page stays interactive and it closes on outside click or Esc. Radix moves focus to the first focusable and back to the trigger, never trapping it. */
 export const Popover = Object.assign(PopoverRoot, {
   Trigger: PopoverPrimitive.Trigger,
   Anchor: PopoverPrimitive.Anchor,

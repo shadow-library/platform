@@ -31,10 +31,8 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-/** Interactive — type to watch auto-grow between the row bounds. */
 export const Playground: Story = {};
 
-/** The default: height follows content from `minRows` up to `maxRows`, then scrolls. */
 export const AutoGrow: Story = {
   render: args => {
     const [value, setValue] = useState('Shadow UI powers every internal tool at Acme.\nType more lines to watch it grow…');
@@ -42,17 +40,14 @@ export const AutoGrow: Story = {
   },
 };
 
-/** Fixed height with a vertical drag handle — for code, logs, and JSON. */
 export const ManualResize: Story = {
   args: { autoGrow: false, minRows: 4 },
 };
 
-/** Monospace with unwrapped lines — a JSON or config document edited in place. */
 export const Mono: Story = {
   args: { mono: true, wrap: 'off', autoGrow: false, minRows: 6, defaultValue: '{\n  "aliases": [\n    { "key": "fast", "model": "gpt-4o-mini", "state": "active" }\n  ]\n}' },
 };
 
-/** The counter stays hidden until 80% of `maxLength`, then turns danger at the limit. */
 export const WithCounter: Story = {
   render: args => {
     const [value, setValue] = useState('Great for quick feedback that stays within a tight limit.');

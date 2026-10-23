@@ -16,7 +16,7 @@ export function useConfirm(): ConfirmFn {
   return confirm;
 }
 
-/** Keeps ConfirmDialog's own defaults (`primary`, "Confirm"), so a destructive question passes `intent: 'danger'` and its verb. */
+/** Keeps ConfirmDialog's defaults (`primary`, "Confirm"): a destructive question passes `intent: 'danger'` and its verb. */
 export function ConfirmProvider({ children }: ConfirmProviderProps): ReactElement {
   const [request, setRequest] = useState<ConfirmRequest>({ id: 0, open: false, title: '' });
   const resolver = useRef<((confirmed: boolean) => void) | null>(null);

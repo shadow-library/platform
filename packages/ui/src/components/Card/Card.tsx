@@ -8,11 +8,6 @@ import { type CardBodyProps, type CardFooterProps, type CardHeaderProps, type Ca
 
 const PaddingContext = createContext<CardPadding>('md');
 
-/**
- * The bounded content surface. Flat, bordered, and quiet — a resting card never casts a shadow
- * (elevation e0); only an `interactive` card lifts on hover. Compose with `Card.Header`,
- * `Card.Body`, and `Card.Footer`, which share the root's `padding` scale through context.
- */
 const CardRoot = forwardRef<HTMLDivElement, CardProps>(function Card(
   { interactive = false, selected = false, asChild = false, padding = 'md', className, children, ...props },
   ref,
@@ -27,7 +22,6 @@ const CardRoot = forwardRef<HTMLDivElement, CardProps>(function Card(
   );
 });
 
-/** Header row — title + optional trailing action, with a hairline below. */
 const CardHeader = forwardRef<HTMLDivElement, CardHeaderProps>(function CardHeader({ title, action, className, children, ...props }, ref) {
   const padding = useContext(PaddingContext);
   return (
@@ -42,13 +36,11 @@ const CardHeader = forwardRef<HTMLDivElement, CardHeaderProps>(function CardHead
   );
 });
 
-/** Body — the free-form content slot, padded on all sides by the shared scale. */
 const CardBody = forwardRef<HTMLDivElement, CardBodyProps>(function CardBody({ className, ...props }, ref) {
   const padding = useContext(PaddingContext);
   return <div ref={ref} className={cn(styles.body, className)} data-padding={padding} {...props} />;
 });
 
-/** Footer — a single link or meta row, with a hairline above. */
 const CardFooter = forwardRef<HTMLDivElement, CardFooterProps>(function CardFooter({ className, ...props }, ref) {
   const padding = useContext(PaddingContext);
   return <div ref={ref} className={cn(styles.footer, className)} data-padding={padding} {...props} />;

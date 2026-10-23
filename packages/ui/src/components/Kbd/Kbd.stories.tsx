@@ -28,7 +28,6 @@ export const Combinations: Story = {
   ),
 };
 
-/** Bare glyphs for tooltips and menu rows. */
 export const Bare: Story = {
   args: { bare: true, keys: 'mod+shift+D' },
 };

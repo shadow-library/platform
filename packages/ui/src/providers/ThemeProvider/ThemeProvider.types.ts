@@ -3,15 +3,12 @@ import { type ReactNode } from 'react';
 import { type Theme, type ThemeMode } from '@/types';
 
 export interface ThemeContextValue {
-  /** The active theme — what `mode` currently resolves to. */
   theme: Theme;
   /** The persisted preference. `system` means nothing is stored, so the OS decides and keeps deciding. */
   mode: ThemeMode;
-  /** Set the theme explicitly and persist the choice. */
   setTheme: (theme: Theme) => void;
   /** Set the preference, including back to `system`, which discards the stored choice. */
   setMode: (mode: ThemeMode) => void;
-  /** Flip between light and dark. */
   toggleTheme: () => void;
 }
 
@@ -27,12 +24,8 @@ export interface ThemeProviderProps extends ThemeInitScriptOptions {
   /** Fallback theme when nothing is persisted and the OS preference can't be read. @default 'light' */
   defaultTheme?: Theme;
   /**
-   * Domain to write the cookie for. Leave it unset: the provider derives the registrable parent
-   * (`identity.example.com` → `.example.com`) so every app on a sibling subdomain shares one theme, and
-   * falls back to a host-only cookie wherever there is no parent to widen to (`localhost`, an IP, a bare
-   * registrable domain) or the browser refuses the one derived.
-   *
-   * Pass it only to override that — a deployment whose apps do not sit on sibling subdomains.
+   * Domain to write the cookie for. Leave unset to derive the registrable parent (`identity.example.com` → `.example.com`), falling back to
+   * host-only where there is none (`localhost`, an IP, a bare registrable domain) or the browser refuses it. Override for apps not on sibling subdomains.
    */
   cookieDomain?: string;
 }
