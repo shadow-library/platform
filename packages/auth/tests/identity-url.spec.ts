@@ -3,12 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { AuthClient } from '@shadow-library/auth';
 import { createTestIdP, TestIdP } from '@shadow-library/auth/testing';
 
-/**
- * Declaring the constants
- *
- * The mock advertises a public issuer it is not reachable at, which is the in-cluster shape: identity
- * claims `https://identity.<domain>` while a pod can only dial the Service.
- */
+// The mock advertises a public issuer it is not reachable at, the in-cluster shape: identity claims `https://identity.<domain>` while a pod can only dial the Service
 const PUBLIC_ISSUER = 'https://identity.shadow-apps.test';
 const AUDIENCE = 'api://pulse';
 const CLIENT = { id: 'svc-pulse', secret: 's3cr3t' };
@@ -37,11 +32,7 @@ describe('AuthClient identityUrl (back-channel split)', () => {
     expect(document.app_session_endpoint).toBe(`${idp.url}/api/v1/app-sessions`);
   });
 
-  /**
-   * The one that matters. A browser redirected to a cluster-internal host cannot resolve it, so
-   * rebasing a front-channel endpoint breaks login while every back-channel call keeps working —
-   * a failure that looks nothing like its cause.
-   */
+  // A browser redirected to a cluster-internal host cannot resolve it, so rebasing a front-channel endpoint breaks login while back-channel calls keep working
   it('should leave browser-facing endpoints on the public issuer', async () => {
     const auth = new AuthClient({ issuer: PUBLIC_ISSUER, identityUrl: idp.url, audience: AUDIENCE });
     const document = await auth.getDiscovery();
@@ -81,11 +72,7 @@ describe('AuthClient identityUrl (back-channel split)', () => {
     expect(() => new AuthClient({ issuer: PUBLIC_ISSUER, identityUrl: 'identity-server.identity', audience: AUDIENCE })).toThrow();
   });
 
-  /**
-   * Endpoints that come from discovery are rebased for free; a url this client builds by hand is
-   * not, and the public issuer resolves to the pod's own loopback in-cluster. `syncRoles` ran on
-   * `issuer` and died on connect at every startup that set identityUrl.
-   */
+  // Endpoints from discovery are rebased for free but hand-built urls are not, and the public issuer resolves to the pod's own loopback in-cluster
   it('should send a hand-built back-channel url to identityUrl, not the public issuer', async () => {
     const auth = new AuthClient({ issuer: PUBLIC_ISSUER, identityUrl: idp.url, audience: AUDIENCE, client: CLIENT });
     const before = idp.getRequestCount('/api/v1/authz/catalog');

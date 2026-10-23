@@ -12,16 +12,8 @@ export interface CookieAttributes {
   domain?: string;
 }
 
-/**
- * Declaring the constants
- *
- * Deliberately hand-rolled rather than routed through `@fastify/cookie`: that plugin is an *optional*
- * peer of `@shadow-library/fastify`, and requiring it would mean a service could no longer get a
- * working integration from `AuthModule.forRoot()` plus environment variables alone. Nothing here
- * needs signing or sealing either: the session cookie carries an opaque handle, and the login-state
- * cookie carries no credential — see `login-state.ts` for why the `__Host-` prefix, not encryption,
- * is what defends it.
- */
+// Hand-rolled rather than `@fastify/cookie`, an optional peer of `@shadow-library/fastify`: requiring it would break working integration from `AuthModule.forRoot()` alone.
+// No signing or sealing: the session cookie is an opaque handle and the login-state cookie holds no credential (see `login-state.ts`).
 
 /** The `__Host-` prefix is a browser-enforced promise: same origin, whole path, never a subdomain */
 const HOST_PREFIX = '__Host-';
@@ -32,11 +24,7 @@ export function assertValidCookieName(name: string, attributes: CookieAttributes
   throw AuthErrorCode.CONFIG_INVALID.create({ reason: `cookie '${name}' uses the __Host- prefix, which requires secure, path '/', and no domain` });
 }
 
-/**
- * A request's cookies are attacker-influenced input: any page on a sibling subdomain can plant a
- * malformed one. Nothing in here may throw, or a single junk cookie would wedge every request from
- * that browser into a 500 with no way for the user to recover.
- */
+/** Cookies are attacker-influenced (a sibling subdomain can plant junk), so nothing here may throw or one cookie would wedge every request into a 500 */
 export function parseCookies(header: string | string[] | undefined): Record<string, string> {
   const cookies: Record<string, string> = Object.create(null) as Record<string, string>;
   const raw = Array.isArray(header) ? header.join('; ') : header;

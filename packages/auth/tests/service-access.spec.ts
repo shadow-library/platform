@@ -3,23 +3,16 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { AuthClient } from '@shadow-library/auth';
 import { createTestIdP, TestIdP } from '@shadow-library/auth/testing';
 
-/**
- * Declaring the constants
- *
- * Rules loaded once at boot make revocation latency unbounded: an admin removing a caller's access has
- * no effect until somebody restarts the target service. These specs pin the refresh that closes that
- * gap, and — just as important — that an identity outage does not turn into a fleet-wide revocation.
- */
+// Rules loaded once at boot make revocation latency unbounded; these pin the refresh that closes that gap and that an identity outage does not become a fleet-wide revocation
 const AUDIENCE = 'api://pulse';
 const CLIENT = { id: 'svc-pulse', secret: 's3cr3t' };
 const RULE = { callerClientId: 'svc-indexer', method: 'POST', path: '/api/v1/index' };
 
 const SERVICE_ACCESS_PATH = '/api/v1/authz/service-access';
 
-/** Only for proving a timer does *not* fire; every other wait is driven by the mock's request counter */
+// Only for proving a timer does not fire; every other wait is driven by the mock's request counter
 const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
 
-/** Short enough that a test can watch the interval fire without sleeping for a perceptible time */
 const REFRESH_SECONDS = 0.05;
 
 describe('service access rules', () => {
@@ -69,7 +62,6 @@ describe('service access rules', () => {
     const auth = client();
     await auth.loadServiceAccess();
 
-    /** Two more calls than the initial load proves the interval is rearming, not firing once */
     const target = idp.getRequestCount(SERVICE_ACCESS_PATH) + 2;
     await idp.waitForRequest(SERVICE_ACCESS_PATH, target);
     expect(idp.getRequestCount(SERVICE_ACCESS_PATH)).toBeGreaterThanOrEqual(target);
@@ -84,7 +76,7 @@ describe('service access rules', () => {
     idp.setEndpointFailure(SERVICE_ACCESS_PATH, true);
     await expect(auth.refreshServiceAccess()).resolves.toEqual([RULE]);
 
-    /** An identity outage must not revoke every M2M caller of every service at once */
+    // An identity outage must not revoke every M2M caller of every service at once
     expect(auth.isServiceCallerAllowed(RULE.callerClientId, RULE.method, RULE.path)).toBe(true);
     idp.setEndpointFailure(SERVICE_ACCESS_PATH, false);
     auth.stop();
@@ -106,7 +98,6 @@ describe('service access rules', () => {
     await auth.loadServiceAccess();
     auth.stop();
 
-    /** A timer that outlives the application would keep calling identity from a dead process */
     const before = idp.getRequestCount(SERVICE_ACCESS_PATH);
     const fired = await Promise.race([idp.waitForRequest(SERVICE_ACCESS_PATH, before + 1).then(() => true), sleep(REFRESH_SECONDS * 1000 * 4).then(() => false)]);
     expect(fired).toBe(false);

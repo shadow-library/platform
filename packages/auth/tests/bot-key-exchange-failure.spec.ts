@@ -12,13 +12,8 @@ interface Interception {
   headers?: Record<string, string>;
 }
 
-/**
- * Declaring the constants
- *
- * Identity answers a throttled bot-key exchange with 429, and the key it refuses that way is perfectly
- * valid. Reading that as a credential rejection would negative-cache a working key for ten seconds and
- * keep answering 401 long after identity's window cleared, so the status taxonomy is pinned end to end.
- */
+// A throttled exchange answers 429 for a perfectly valid key; reading it as a credential rejection would negative-cache a working key and keep answering 401 after the
+// window cleared
 const AUDIENCE = 'api://novel-forge';
 const CLIENT = { id: 'novel-forge', secret: 's3cr3t' };
 const ORG = '7';

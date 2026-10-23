@@ -4,12 +4,6 @@ import { AuthClient } from '@shadow-library/auth';
 import { AppSessionService } from '@shadow-library/auth/module';
 import { createOfflineAuth, createTestIdP, type OfflineAuth } from '@shadow-library/auth/testing';
 
-/**
- * Declaring the constants
- *
- * The offline kit exists so unit tests and an infra-free app boot never open a socket; every spec here
- * watches the global `fetch` to hold it to that.
- */
 const ORG = 'org-1';
 
 describe('createOfflineAuth', () => {

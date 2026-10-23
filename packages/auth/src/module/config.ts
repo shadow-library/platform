@@ -105,11 +105,7 @@ export interface AuthModuleOptions extends Partial<AuthClientConfig> {
   defaultAccessMode?: AuthAccessMode;
 }
 
-/**
- * The locally-decided half of the browser configuration. Audience, redirect URI, granted scopes and
- * the step-up endpoint are deliberately absent: they come from identity at runtime (D-21), so they
- * cannot be settled here at `forRoot()` time. Only the overrides for them live here.
- */
+/** Audience, granted scopes and the step-up endpoint are absent: they come from identity at runtime, so only their overrides live here */
 export interface ResolvedBrowserAuthConfig {
   enabled: boolean;
   routes: AuthRoutePaths;
@@ -124,36 +120,18 @@ export interface ResolvedBrowserAuthConfig {
   cookie: CookieAttributes;
   stateCookieName: string;
   stateCookie: CookieAttributes;
-  /** Marks a browser already sent back through authorize to consent to a sensitive scope, so a second refusal answers 403 instead of looping */
+  /** Marks a browser already sent back through authorize for sensitive-scope consent, so a second refusal answers 403 instead of looping */
   reconsentCookieName: string;
   reconsentCookie: CookieAttributes;
 }
 
-/**
- * Declaring the constants
- *
- * A steady-state deploy configures three things: `AUTH_ISSUER`, `AUTH_APP_ID`, and one credential —
- * a projected service-account token at `AUTH_CLIENT_ASSERTION_PATH` in-cluster, or a static
- * `AUTH_CLIENT_SECRET` outside it. Everything identity already stores about the application is read
- * back from it (D-21): the audience its tokens are addressed to, the redirect URIs an admin
- * registered, the scopes an admin granted, and the step-up endpoint from discovery. Restating those
- * in environment variables is what the old `AUTH_AUDIENCE` / `AUTH_REDIRECT_URI` / `AUTH_SCOPES` /
- * `AUTH_STEP_UP_URL` did, and they are gone rather than deprecated — a stale value in a deploy
- * silently overriding what identity says is worse than having no override at all. The escape hatch is
- * `browser: { … }` in code, where it is visible and reviewed.
- *
- * The rest tunes behaviour and has safe defaults. The one setting that can weaken security —
- * `AUTH_SESSION_COOKIE_SECURE` — announces itself in the logs when it is used.
- */
+// A steady-state deploy sets only AUTH_ISSUER, AUTH_APP_ID and one credential (AUTH_CLIENT_ASSERTION_PATH in-cluster, AUTH_CLIENT_SECRET outside it).
+// Audience, redirect URIs, scopes and the step-up endpoint are read back from identity and deliberately have no env override: a stale value silently overriding identity is
+// worse than none.
+// The escape hatch is `browser: { … }` in code, where it is visible and reviewed.
 Config.load('auth.issuer');
 
-/**
- * Where back-channel traffic reaches identity when that is not the public issuer — in-cluster,
- * `svc://identity-server.identity`. Unset outside a cluster, where the issuer is reachable directly;
- * it is deliberately not defaulted to a service name, because a deployment that names its identity
- * Service differently would then dial an address nobody serves and fail as a timeout rather than a
- * config error. Browser-facing endpoints are unaffected; see `AuthClientConfig.identityUrl`.
- */
+// No default service name: a deployment naming its identity Service differently would dial an address nobody serves and fail as a timeout rather than a config error
 Config.load('auth.identity-url');
 
 /** Without it a production service cannot read its own registration back, and so cannot know its own audience */
@@ -180,7 +158,7 @@ Config.load('auth.allowed-redirects', { isArray: true });
 
 const logger = Logger.getLogger(NAMESPACE, 'AuthConfig');
 
-/** The login-state cookie shares the session cookie's name so both stand or fall on the same prefix rules */
+/** Derived from the session cookie's name so the login-state cookie inherits the `__Host-` prefix its login-CSRF defence rests on; only that name is validated */
 const STATE_COOKIE_SUFFIX = '-login';
 const RECONSENT_COOKIE_SUFFIX = '-reconsent';
 
@@ -193,12 +171,7 @@ const DEFAULT_ROUTES: AuthRoutePaths = {
   callback: '/callback',
   logout: '/logout',
 
-  /**
-   * Off by default. First-party revocation is pull-based: identity ends the central session and the
-   * next mint from that handle fails, so it never sends a back-channel logout to an app-session
-   * client — the route would sit there accepting nothing. It stays available for the third-party
-   * `RelyingParty` path, where a logout token really is the only notice a consumer gets.
-   */
+  // Off by default: first-party revocation is pull-based (the next mint from the handle fails), so identity never sends app-session clients a back-channel logout
   backchannelLogout: false,
   session: '/session',
   userinfo: '/userinfo',
@@ -208,13 +181,12 @@ const DEFAULT_ROUTES: AuthRoutePaths = {
   access: '/access',
 };
 
-/** Fills any option not supplied in code from the corresponding `AUTH_*` environment config */
 export function resolveAuthClientConfig(options: AuthModuleOptions = {}): AuthClientConfig {
   const issuer = options.issuer ?? Config.get('auth.issuer');
   const identityUrl = options.identityUrl ?? Config.get('auth.identity-url') ?? undefined;
   const appId = options.appId ?? Config.get('auth.app-id') ?? undefined;
 
-  /** The app id doubles as the OAuth client id, so a deploy names the application once and only once */
+  // The app id doubles as the OAuth client id
   let client = options.client;
   const clientId = Config.get('auth.client.id') || appId;
   if (!client && clientId) {
@@ -237,11 +209,7 @@ export function resolveAuthRoutes(overrides: Partial<AuthRoutePaths> = {}): Auth
   return { ...DEFAULT_ROUTES, ...overrides };
 }
 
-/**
- * Resolves the browser-facing half. It stays off without client credentials, because minting on a
- * browser's behalf is impossible without the application's own M2M credential — registering the
- * routes anyway would only hand callers a login that cannot complete.
- */
+// Off without client credentials: minting on a browser's behalf needs the application's own M2M credential, so the routes would offer a login that cannot complete
 export function resolveBrowserAuthConfig(client: AuthClientConfig, routes: AuthRoutePaths, options: BrowserAuthOptions = {}): ResolvedBrowserAuthConfig {
   const enabled = (options.enabled ?? Config.get('auth.browser-login')) && Boolean(client.client);
   const secure = options.cookieSecure ?? Config.get('auth.session.cookie-secure');
@@ -274,11 +242,7 @@ export function resolveBrowserAuthConfig(client: AuthClientConfig, routes: AuthR
     cookie,
     stateCookieName: `${cookieName}${STATE_COOKIE_SUFFIX}`,
 
-    /**
-     * The login-state cookie has to survive identity redirecting the browser back, which is a
-     * cross-site top-level navigation — `Strict` would withhold it and no login could ever complete.
-     * It is the one attribute the state cookie does not inherit.
-     */
+    // `Strict` would withhold the state cookie on identity's cross-site redirect back, so no login could complete
     stateCookie: { ...cookie, sameSite: sameSite === 'Strict' ? 'Lax' : sameSite, maxAge: LOGIN_STATE_TTL_SECONDS },
     reconsentCookieName: `${cookieName}${RECONSENT_COOKIE_SUFFIX}`,
     reconsentCookie: { ...cookie, sameSite: sameSite === 'Strict' ? 'Lax' : sameSite, maxAge: RECONSENT_TTL_SECONDS },

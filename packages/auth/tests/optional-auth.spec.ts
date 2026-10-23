@@ -46,13 +46,11 @@ describe('AuthGuard route policy', () => {
 
   const guard = (mode: AuthAccessMode): AuthGuard => new AuthGuard(auth, context, new AuthAccessPolicy(mode), sessions);
 
-  /** Records every header the guard writes, so a test can prove it wrote none */
   const capture = (): { response: GuardedResponse; headers: Record<string, unknown> } => {
     const headers: Record<string, unknown> = {};
     return { headers, response: { header: (name, value) => (headers[name] = value), redirect: () => undefined } };
   };
 
-  /** Runs the generated handler inside a fresh request context and reports the principal it left behind */
   const run = (metadata: HandlerMetadata, request: GuardedRequest, mode: AuthAccessMode = 'public', response?: GuardedResponse): Promise<AuthPrincipal | null> =>
     new Promise((resolve, reject) => {
       const hook = context.init() as unknown as (request: unknown, response: unknown, done: () => void) => void;

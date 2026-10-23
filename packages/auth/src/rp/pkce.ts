@@ -11,7 +11,6 @@ export function randomUrlSafeString(bytes = 32): string {
   return Buffer.from(buffer).toString('base64url');
 }
 
-/** Generates an RFC 7636 S256 verifier/challenge pair */
 export async function createPkcePair(): Promise<PkcePair> {
   const verifier = randomUrlSafeString(32);
   const digest = await crypto.subtle.digest('SHA-256', encoder.encode(verifier));

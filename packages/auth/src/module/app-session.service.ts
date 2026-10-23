@@ -29,11 +29,6 @@ export interface TokenRequest {
   elevated?: boolean;
 }
 
-/**
- * The half of the browser configuration identity owns (D-21), resolved per request from the
- * application's registration and refreshed with it — so an admin granting a scope or registering a
- * redirect URI reaches a running service without a redeploy.
- */
 export interface BrowserAuthRuntime {
   clientId: string;
   audience: string;
@@ -44,25 +39,13 @@ export interface BrowserAuthRuntime {
   stepUpUrl: string;
 }
 
-/**
- * Declaring the constants
- *
- * The whole first-party browser flow lives here so a consuming service inherits it rather than
- * writing it: PKCE and transient state, the handle cookie, the token cache, elevation, and logout.
- * The handle never leaves this class except into its own cookie and into `AppSessionClient`'s
- * request bodies; everything the SDK retains about a session is a hash of it.
- */
-
-/** RFC 9470 — the assurance level a step-up authorization must reach */
+/** RFC 9470 `acr_values` for the assurance level a step-up must reach */
 const STEP_UP_ACR = 'AAL2';
 
 /** Only http(s) origins can be compared meaningfully; every other scheme reports its origin as `"null"` */
 const WEB_PROTOCOLS = new Set(['http:', 'https:']);
 
-/**
- * Stands in for this application's origin when a relative `return_to` is resolved. Which origin the
- * browser is on does not matter, only whether following the reference would leave it.
- */
+/** Stands in for this application's origin when resolving a relative `return_to`; only whether the reference leaves it matters */
 const SAME_ORIGIN_BASE = 'https://return-to.invalid';
 
 /** A browser silently drops tabs and newlines from a URL, so `/\t/evil.test` reaches it as `//evil.test` */
@@ -71,17 +54,8 @@ const CONTROL_CHARACTERS = /\p{Cc}/u;
 /** Used when identity answers with an expiry this SDK cannot read, so a session is never immortal by accident */
 const FALLBACK_SESSION_TTL_MS = 60 * 60 * 1000;
 
-/**
- * How long a resolved profile is trusted. Short enough that someone who renames themselves sees it
- * take effect without anyone invalidating anything, long enough that the common case — a person
- * clicking around an application for a few minutes — costs identity one call rather than dozens.
- */
 const PROFILE_TTL_MS = 5 * 60 * 1000;
 
-/**
- * The OIDC scopes every first-party session asks for. `openid` makes the request an OIDC one at all;
- * `profile` is what releases the person's name back to the application that signed them in.
- */
 const PROTOCOL_SCOPES = ['openid', 'profile'];
 
 /** Identity releases a sensitive scope only into an elevated token, so asking for one on a plain mint would only read as a narrowed grant */
@@ -99,28 +73,14 @@ export class AppSessionService {
   private readonly tokens = new AccessTokenCache();
   private readonly registry = new SessionRegistry();
 
-  /** In-flight mints, keyed exactly as {@link AccessTokenCache} keys its entries — see {@link AppSessionService.getAccessToken} */
   private readonly mints = new Map<string, Promise<AppSessionToken>>();
 
-  /**
-   * Elevation grant windows in epoch milliseconds, keyed by session hash. The D-19 isolation boundary
-   * is (app session, audience), but a service only ever mints for its own audience, so the audience is
-   * a constant here — carrying it in the key would only invite a stale one into a lookup.
-   */
+  /** Elevation grant windows in epoch ms by session hash; the audience is omitted from the key because a service only mints for its own */
   private readonly grants = new Map<string, number>();
 
-  /** The last runtime derived from a registration, kept so an unchanged registration costs nothing */
   private derived: { registration: AppRegistration; requestOrigin: string | undefined; runtime: BrowserAuthRuntime } | null = null;
 
-  /**
-   * Resolved profiles, keyed by session hash and expiring on their own.
-   *
-   * A name is read on nearly every screen and changes about never, so fetching one per request would
-   * put an identity round trip on the critical path of the whole application for a string that was
-   * already correct. Keyed by session rather than by subject because that is the key every eviction
-   * path already speaks — a logout, an organisation switch, or a back-channel notice drops the
-   * profile with the tokens instead of leaving the previous person's name behind it.
-   */
+  /** Keyed by session hash rather than subject so every eviction path (logout, organisation switch, back-channel notice) drops the profile with the tokens */
   private readonly profiles = new Map<string, { profile: UserInfo; expiresAt: number }>();
 
   constructor(
@@ -128,11 +88,7 @@ export class AppSessionService {
     private readonly config: ResolvedBrowserAuthConfig,
   ) {}
 
-  /**
-   * Resolves the identity-owned half of the configuration and validates what a deploy can still get
-   * wrong. Called once at startup so a misregistration surfaces at boot rather than on a user's first
-   * login, and cheap afterwards — the registration is cached and refreshed on its own TTL.
-   */
+  /** Called at startup so a misregistration surfaces at boot rather than on a user's first login */
   async warmUp(): Promise<BrowserAuthRuntime> {
     const runtime = await this.runtime(undefined);
     if (this.config.validateScopes) await this.client.assertScopesSupported([...runtime.scopes, ...runtime.sensitiveScopes]);
@@ -147,7 +103,6 @@ export class AppSessionService {
     return runtime;
   }
 
-  /** Starts a login: PKCE, `state`, `nonce` and `resource` out; the transient state rides in its own cookie */
   async beginLogin(returnTo?: string, requestOrigin?: string): Promise<LoginRedirect> {
     const [document, runtime] = await Promise.all([this.client.getDiscovery(), this.runtime(requestOrigin)]);
     const pkce = await createPkcePair();
@@ -168,7 +123,6 @@ export class AppSessionService {
     return { url, cookies: [serializeCookie(this.config.stateCookieName, encodeLoginState(state), this.config.stateCookie)] };
   }
 
-  /** Completes the callback: validates `state`, redeems the code for a handle, and sets the session cookie */
   async completeLogin(query: { code?: string; state?: string }, cookies: Record<string, string>, requestOrigin?: string): Promise<LoginResult> {
     const pending = decodeLoginState(cookies[this.config.stateCookieName]);
     if (!pending) throw this.logged(AuthErrorCode.LOGIN_STATE_INVALID.create({ reason: 'no in-flight login matched this callback' }));
@@ -188,31 +142,19 @@ export class AppSessionService {
     };
   }
 
-  /**
-   * Resolves the caller behind a session cookie into the same principal a bearer token would produce:
-   * an access token for this app's own audience, minted or served from cache, then verified through
-   * the ordinary offline path. Route handlers never learn which credential the caller presented.
-   */
+  /** Produces the same principal a bearer token would, so route handlers never learn which credential was presented */
   async resolvePrincipal(handle: string, request: TokenRequest = {}): Promise<AuthPrincipal> {
     const token = await this.getAccessToken(handle, request);
     return this.client.verify(token.accessToken);
   }
 
-  /**
-   * The person behind this session, from identity's userinfo endpoint, cached for the session.
-   *
-   * Kept off `resolvePrincipal` deliberately. That call sits on the auth gate's critical path, and a
-   * gate that cannot answer "is this request authenticated" because a *name* could not be fetched
-   * would trade a working screen for a decorative one. Here the failure mode is the caller's to
-   * choose, and identity being unreachable degrades to what the token already proved: the subject.
-   */
+  /** Kept off `resolvePrincipal` so an unreachable userinfo endpoint can never fail the auth gate; it degrades to the subject the token proved */
   async getUserInfo(handle: string): Promise<UserInfo> {
     const handleHash = hashSessionHandle(handle);
     const cached = this.profiles.get(handleHash);
     if (cached && cached.expiresAt > Date.now()) return cached.profile;
 
     const token = await this.getAccessToken(handle);
-    /** Offline and already-cached-key work, so it costs nothing and guarantees a subject to fall back to. */
     const principal = await this.client.verify(token.accessToken);
 
     try {
@@ -220,13 +162,12 @@ export class AppSessionService {
       this.profiles.set(handleHash, { profile, expiresAt: Date.now() + PROFILE_TTL_MS });
       return profile;
     } catch (error) {
-      /** Not cached: one unreachable moment must not leave this person nameless for the whole window. */
+      // Not cached: one unreachable moment must not leave this person nameless for the whole TTL
       this.logger.warn('userinfo lookup failed; falling back to the subject the token proved', { reason: (error as Error).message });
       return { sub: principal.sub };
     }
   }
 
-  /** The cached-or-minted access token for this app's audience; elevation is part of the cache key, never a property of the entry */
   async getAccessToken(handle: string, request: TokenRequest = {}): Promise<AppSessionToken> {
     const handleHash = hashSessionHandle(handle);
     if (!this.registry.isActive(handleHash)) throw AuthErrorCode.SESSION_INVALID.create({ reason: 'session was ended by a back-channel logout' });
@@ -237,24 +178,15 @@ export class AppSessionService {
     const cached = this.tokens.get(key);
     if (cached) return cached;
 
-    /**
-     * The entry is only written once identity answers, so N concurrent calls that all miss would each
-     * mint — which is precisely what a cold page load does when its session query and every API call
-     * start together. Sharing one mint is safe because the key already names everything the token
-     * depends on; elevation is in it, so an `AAL2` mint can never be handed to an `AAL1` caller.
-     */
+    // Concurrent cache misses (a cold page load) would each mint; sharing one is safe because the key names elevation, so an AAL2 mint never reaches an AAL1 caller
     const flightKey = `${handleHash}|${elevated ? 'AAL2' : 'AAL1'}|${key.audience}|${key.scope ?? ''}`;
     const inflight = this.mints.get(flightKey);
     if (inflight) return inflight;
 
     const flight = this.mint(runtime.audience, key.scope, handle, handleHash, elevated)
       .then(minted => {
-        /**
-         * An elevated token is only cached for as long as the grant it came from is known to last. When
-         * that window is unknown — identity still held a grant this process never saw it claim — the
-         * expiry passed here is already in the past, so the token is used once and never stored. Guessing
-         * a window would be the one way an `AAL2` token could outlive its elevation.
-         */
+        // An unknown grant window (a grant this process never saw claimed) yields an expiry in the past, so the token is used once and never stored; guessing a window could
+        // let AAL2 outlive its elevation
         this.tokens.set(key, minted, elevated ? (this.grants.get(handleHash) ?? 0) : undefined);
         return minted;
       })
@@ -264,37 +196,24 @@ export class AppSessionService {
     return flight;
   }
 
-  /**
-   * Spends the user's step-up into a grant for this app session and this audience only. Elevation
-   * never bleeds to another service or up to the parent identity session, which is exactly why a
-   * user driving two applications must step up in each — the cost of the isolation, not a defect.
-   */
+  /** Elevation is scoped to this app session and audience, so a user driving two applications must step up in each */
   async claimElevation(handle: string): Promise<void> {
     const handleHash = hashSessionHandle(handle);
     const { audience } = await this.runtime(undefined);
     const elevation = await this.client.appSessions.claimElevation(handle, audience).catch((error: unknown) => this.forgetOnInvalidSession(handleHash, error));
-    /** An unreadable grant window records as already closed, so nothing elevated is ever cached from it */
+    // An unreadable grant window records as already closed, so nothing elevated is cached from it
     this.grants.set(handleHash, parseExpiry(elevation.expiresAt, 0));
 
-    /** Anything cached before the grant opened predates the elevation and must not be reused across it */
+    // Tokens cached before the grant opened predate the elevation
     this.tokens.evictElevated(handleHash);
   }
 
-  /** The organisations this session may act in, with the active one flagged; a single-entry list means there is nothing to switch to */
   async listOrganisations(handle: string): Promise<AppSessionOrganisation[]> {
     const handleHash = hashSessionHandle(handle);
     return this.client.appSessions.listOrganisations(handle).catch((error: unknown) => this.forgetOnInvalidSession(handleHash, error));
   }
 
-  /**
-   * Moves the session into another organisation and returns the cookie carrying its rotated handle.
-   *
-   * Identity retires the old handle, and that is precisely what makes the switch safe: tokens are
-   * cached against the handle, so a sibling replica — which never saw this request — would otherwise
-   * keep serving the previous organisation's authority until the token expired. A hash no client will
-   * present again is unreachable everywhere at once, which no local eviction could achieve. The local
-   * eviction below is merely the cheap half.
-   */
+  /** Identity retires the old handle, which makes sibling replicas' cached tokens for the previous organisation unreachable; the local eviction is the cheap half */
   async switchOrganisation(handle: string, organisationId: string): Promise<{ cookies: string[]; organisationId: string }> {
     const handleHash = hashSessionHandle(handle);
     const switched = await this.client.appSessions.switchOrganisation(handle, organisationId).catch((error: unknown) => this.forgetOnInvalidSession(handleHash, error));
@@ -307,11 +226,7 @@ export class AppSessionService {
     return { cookies: [serializeCookie(this.config.cookieName, switched.sessionHandle, this.config.cookie)], organisationId: switched.organisationId };
   }
 
-  /**
-   * Ends this application's session only; the central identity session is deliberately untouched.
-   * The handle is marked dead locally whether or not identity confirms it — a revocation that times
-   * out must not leave a logged-out handle quietly replayable against this process.
-   */
+  /** Marks the handle dead locally whether or not identity confirms, so a timed-out revocation cannot leave it replayable; the identity session is untouched */
   async logout(handle: string | undefined): Promise<string[]> {
     if (handle) {
       this.revoke(hashSessionHandle(handle));
@@ -322,31 +237,25 @@ export class AppSessionService {
     return this.clearedCookies();
   }
 
-  /** Drops every local session of the user identity has signed out, along with their cached tokens */
   async handleBackchannelLogout(logoutToken: string): Promise<void> {
     const claims = await this.client.verifyLogoutToken(logoutToken);
     if (!claims.sub) {
-      /** Identity keys first-party sessions by user; a `sid`-only notice has nothing here to match */
+      // Identity keys first-party sessions by user; a sid-only notice has nothing here to match
       this.logger.warn('back-channel logout carried no sub; no local session could be matched', { sid: Boolean(claims.sid) });
       return;
     }
     for (const handleHash of this.registry.revokeSubject(claims.sub)) this.evictTokens(handleHash);
   }
 
-  /** Reads the opaque handle out of the request's cookies; absent means "not logged in", never "anonymous but fine" */
   readHandle(cookies: Record<string, string>): string | undefined {
     return cookies[this.config.cookieName] || undefined;
   }
 
-  /** The `is_sensitive` scopes identity declares for this application, which only an elevated mint can carry */
   async sensitiveScopes(): Promise<string[]> {
     return (await this.runtime(undefined)).sensitiveScopes;
   }
 
-  /**
-   * Ends a session whose grant predates this application asking consent for a sensitive scope, so the next
-   * login authorizes afresh, and marks the browser as having been sent round once.
-   */
+  /** Ends a session whose grant predates the sensitive-scope consent and marks the browser as sent round once */
   async beginReconsent(handle: string): Promise<string[]> {
     const cleared = await this.logout(handle);
     return [...cleared, serializeCookie(this.config.reconsentCookieName, '1', this.config.reconsentCookie)];
@@ -364,26 +273,16 @@ export class AppSessionService {
     return [expireCookie(this.config.cookieName, this.config.cookie), expireCookie(this.config.stateCookieName, this.config.stateCookie)];
   }
 
-  /** This service's own login route, carrying where the browser should land once it is back */
   loginUrl(returnTo: string): string {
     return this.localUrl(this.config.routes.login, returnTo);
   }
 
-  /**
-   * This service's own step-up route. The guard sends the browser here rather than straight to
-   * identity, because the user may already have stepped up elsewhere — in which case claiming the
-   * grant is enough and no second prompt is needed.
-   */
+  /** The guard sends the browser here rather than straight to identity because the user may already have stepped up elsewhere, in which case claiming the grant suffices */
   stepUpUrl(returnTo: string): string {
     return this.localUrl(this.config.routes.stepUp, returnTo);
   }
 
-  /**
-   * Identity's step-up prompt, for when there is no step-up left to claim. It names its beneficiary:
-   * without `client_id` and `resource` the resulting window is unattributed, and any application the
-   * user happens to be driving could claim it first — the D-19 acquisition race. With them, identity
-   * records who the step-up was for and refuses a claim from anybody else.
-   */
+  /** `client_id` and `resource` name the beneficiary; without them any application the user is driving could claim the window first */
   async identityStepUpUrl(returnTo: string): Promise<string> {
     const runtime = await this.runtime(undefined);
     const url = new URL(runtime.stepUpUrl);
@@ -399,7 +298,6 @@ export class AppSessionService {
     return `${base}?return_to=${encodeURIComponent(returnTo)}`;
   }
 
-  /** Identity's RP-initiated logout, when one is configured; otherwise the browser stays on this app */
   async endSessionUrl(): Promise<string | undefined> {
     const postLogout = this.config.postLogoutRedirect;
     if (!postLogout) return undefined;
@@ -414,12 +312,8 @@ export class AppSessionService {
   }
 
   /**
-   * Validates a `return_to` against the allow-list. A relative reference is fine when a browser would
-   * resolve it without leaving this origin; anything absolute must be named in configuration. The
-   * decision is the URL parser's rather than a prefix check, because a browser folds backslashes into
-   * slashes and strips control characters before it resolves: `//evil.test`, `/\evil.test` and
-   * `/\t/evil.test` all read as a path to a string comparison and as an origin to the browser. What
-   * comes back is the parser's own normalised path, so it cannot be reinterpreted as an authority.
+   * Decided by the URL parser, not a prefix check: browsers fold backslashes and strip control characters, so `/\evil.test` and `/\t/evil.test` are origins to them but
+   * paths to a string comparison. Only the parser's normalised path is returned, and one starting `//` is refused, so the result cannot be reread as an authority
    */
   resolveReturnTo(candidate: string | undefined): string {
     if (!candidate) return this.config.postLoginRedirect;
@@ -442,11 +336,7 @@ export class AppSessionService {
     return this.logged(AuthErrorCode.REDIRECT_NOT_ALLOWED.create({ reason: `'${candidate}' is not in the redirect allow-list` }));
   }
 
-  /**
-   * An allow-list entry matches on exact origin, and on path prefix when it names one. Both sides
-   * must be http(s): every other scheme reports its origin as the string `"null"`, which would make
-   * one custom-scheme entry match every custom-scheme target.
-   */
+  /** Both sides must be http(s): other schemes report origin `"null"`, so one custom-scheme entry would match every custom-scheme target */
   private covers(entry: string, target: URL): boolean {
     const allowed = URL.parse(entry);
     if (!allowed || !WEB_PROTOCOLS.has(allowed.protocol) || !WEB_PROTOCOLS.has(target.protocol)) return false;
@@ -460,10 +350,6 @@ export class AppSessionService {
     return this.client.appSessions.mintToken(input).catch((error: unknown) => this.forgetOnInvalidSession(handleHash, error));
   }
 
-  /**
-   * Merges what identity says about this application with the local overrides. Recomputed only when the
-   * registration itself changes, so a request pays one map lookup rather than re-deriving on every call.
-   */
   private async runtime(requestOrigin: string | undefined): Promise<BrowserAuthRuntime> {
     const [registration, audience, stepUpEndpoint] = await Promise.all([
       this.client.getAppRegistration(),
@@ -475,15 +361,8 @@ export class AppSessionService {
     if (cached?.registration === registration && cached.requestOrigin === requestOrigin && cached.runtime.audience === audience && cached.runtime.stepUpUrl === stepUpEndpoint)
       return cached.runtime;
 
-    /**
-     * The protocol scopes lead, always. An application's registration lists the API capabilities it
-     * owns and never the OIDC ones — those belong to the protocol, not to a resource server — so
-     * without this an app requests `scope=` empty, the session consents to nothing, and identity
-     * has no basis on which to release the signed-in person's own name back to it. Identity honours
-     * them for any client without a grant, so adding them costs no registration change anywhere.
-     * An override pins the whole set, so it decides which sensitive scopes are asked for as well; a
-     * sensitive scope it names still belongs to the elevated set, never to a plain mint.
-     */
+    // Registrations list API scopes, never OIDC ones; without the protocol scopes the session consents to nothing and identity cannot release the person's name.
+    // An override pins the whole set, but a sensitive scope it names still belongs to the elevated set only.
     const sensitiveScopes = registration.sensitiveScopes.filter(scope => !this.config.scopes || this.config.scopes.includes(scope));
     const scopes = [...new Set([...PROTOCOL_SCOPES, ...(this.config.scopes ?? registration.scopes)])].filter(scope => !sensitiveScopes.includes(scope));
     const runtime: BrowserAuthRuntime = {
@@ -499,13 +378,8 @@ export class AppSessionService {
   }
 
   /**
-   * An application may have several registered redirect URIs. The one belonging to this deployment is
-   * the one pointing at the callback route this process actually serves — which is all the SDK can
-   * know, since a service behind a proxy cannot see its own public origin unless the request that
-   * reached it says so. When several candidates share the callback path, the one whose origin matches
-   * the incoming request's own origin wins, since a deployment serves exactly one origin. Only when
-   * that origin is unknown or matches none of them does the choice fall back to the first candidate —
-   * arbitrary, so it says so and the deploy is expected to pin `redirectUri`.
+   * Picks by callback path, then by request origin (a proxied service cannot see its public origin otherwise); the first-candidate fallback is arbitrary and warns so the
+   * deploy pins `redirectUri`
    */
   private callbackRedirectUri(redirectUris: string[], requestOrigin?: string): string {
     const callbackPath = this.config.routes.callback ? `${this.config.routes.basePath}${this.config.routes.callback}` : '';
@@ -528,11 +402,7 @@ export class AppSessionService {
     return chosen;
   }
 
-  /**
-   * A registered redirect uri that does not point at the callback route is the classic silent failure:
-   * login works, the browser comes back to nothing. It stays a warning rather than an error because a
-   * reverse proxy is perfectly entitled to rewrite the path in front of the service.
-   */
+  /** A warning, not an error: a reverse proxy may legitimately rewrite the path in front of the service */
   private warnOnRedirectUriMismatch(redirectUri: string): void {
     if (!this.config.routes.callback) return;
     const callbackPath = `${this.config.routes.basePath}${this.config.routes.callback}`;
@@ -545,12 +415,7 @@ export class AppSessionService {
     });
   }
 
-  /**
-   * A handle identity has rejected is remembered as dead rather than merely dropped. That keeps a
-   * forged or replayed cookie from buying a fresh round trip to identity on every retry — without it
-   * an unknown hash reads as active again immediately, and the application becomes an amplifier
-   * pointed at the one service every other application also depends on.
-   */
+  /** A rejected handle is remembered as dead, not dropped: an unknown hash reads as active, so forged cookies would otherwise cost identity a round trip per retry */
   private forgetOnInvalidSession(handleHash: string, error: unknown): never {
     if (AppError.is(error, AuthErrorCode.SESSION_INVALID)) this.revoke(handleHash);
     throw error;
@@ -567,7 +432,6 @@ export class AppSessionService {
     this.profiles.delete(handleHash);
   }
 
-  /** Records the failure at warn level before it propagates; browser-flow rejections are expected traffic, not defects */
   private logged(error: AppError): AppError {
     this.logger.warn(error.message);
     return error;

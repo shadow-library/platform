@@ -20,11 +20,7 @@ export interface JwtPayload {
   [claim: string]: unknown;
 }
 
-/**
- * Authentication assurance level (D-19). `AAL2` is only ever minted from a live step-up grant scoped
- * to one (app session, audience) pair, so it never travels to another service or up to the parent
- * identity session.
- */
+/** `AAL2` is only minted from a live step-up grant scoped to one (app session, audience) pair, so it never travels to another service */
 export type AssuranceLevel = 'AAL1' | 'AAL2';
 
 interface PrincipalBase {
@@ -48,10 +44,7 @@ export interface ServicePrincipal extends PrincipalBase {
   aal?: undefined;
 }
 
-/**
- * An organisation-owned, non-human principal. `sub` and `clientId` are the bot's OAuth client id; a
- * bot is refused on every guarded route that does not declare `@BotPermission`.
- */
+/** `sub` and `clientId` are the bot's OAuth client id; a bot is refused on every guarded route that does not declare `@BotPermission` */
 export interface BotPrincipal extends PrincipalBase {
   kind: 'bot';
   org: string;
@@ -66,10 +59,7 @@ export type AuthPrincipal = UserPrincipal | ServicePrincipal | BotPrincipal;
 
 export type PrincipalKind = AuthPrincipal['kind'];
 
-/**
- * Whether an application serves anyone at all without a session. `public` leaves an undecorated route
- * anonymous; `private` requires a session on it, and on every `@OptionalAuth()` route besides.
- */
+/** `public` leaves an undecorated route anonymous; `private` requires a session on it and on every `@OptionalAuth()` route */
 export type AuthAccessMode = 'public' | 'private';
 
 /** Transport used for every network call; injectable so consumers can test without sockets */
@@ -79,11 +69,7 @@ export interface AuthClientCredential {
   id: string;
   secret?: string;
 
-  /**
-   * Path to a projected Kubernetes service-account token. When set, the SDK authenticates to the
-   * token endpoint with the file's JWT as an RFC 7523 client assertion instead of a static secret;
-   * the file is re-read on every token request because the kubelet rotates it in place.
-   */
+  /** Projected Kubernetes service-account token authenticating as an RFC 7523 client assertion instead of a secret; re-read per request because the kubelet rotates it in place */
   assertionPath?: string;
 }
 
@@ -93,11 +79,7 @@ export interface AuthCacheOptions {
 }
 
 export interface ServiceAccessOptions {
-  /**
-   * How often the admin-configured M2M route allowlist is re-fetched, in seconds. Defaults to 300.
-   * This interval is the upper bound on how long a revoked caller keeps its access, so shortening it
-   * trades identity round trips for revocation latency.
-   */
+  /** Seconds between M2M route allowlist re-fetches (default 300); the upper bound on how long a revoked caller keeps access */
   refreshSeconds?: number;
 }
 
@@ -113,10 +95,7 @@ export interface RoleManifest {
   description?: string;
   /** Permission names this role grants; every name MUST also appear in the manifest's `permissions` */
   permissions: string[];
-  /**
-   * Marks this role as the application's baseline, granted implicitly to every user. Omitted unless
-   * set, so a manifest that never mentions it behaves exactly as before.
-   */
+  /** Marks this role as the application's baseline, granted implicitly to every user */
   default?: boolean;
 
   /** Makes the role grantable to bots; omitted, only people can hold it */
@@ -134,23 +113,14 @@ export interface BotGrantManifest {
   sensitive?: boolean;
 }
 
-/**
- * The full, declarative role catalog a service owns for its application. Pushed to identity via
- * `syncRoles`; anything absent from it is deleted there (cascading into assignments), so it must be
- * the complete set, not a delta.
- */
+/** Pushed via `syncRoles`; anything absent is deleted at identity (cascading into assignments), so it must be the complete set, not a delta */
 export interface RoleCatalogManifest {
   permissions: PermissionManifest[];
   roles: RoleManifest[];
 }
 
 export interface RoleCatalogSyncOptions {
-  /**
-   * Overrides the server's guardrail against a destructive sync (D-15). Identity refuses a manifest
-   * that would delete an unreasonable share of an application's catalog, because that is what a
-   * truncated or half-generated manifest looks like. Forcing past it is a deliberate call-site
-   * decision — `AuthModule` never passes it on the startup sync.
-   */
+  /** Overrides identity's guardrail against manifests that delete an unreasonable share of the catalog; `AuthModule` never passes it on the startup sync */
   force?: boolean;
 }
 
@@ -164,38 +134,19 @@ export interface RoleCatalogSyncResult {
 }
 
 export interface AuthClientConfig {
-  /**
-   * Issuer base URL of the identity service. This is an **identity**, not an address: it is the
-   * value the discovery document must claim and the audience tokens are addressed to. Unless
-   * `identityUrl` is set, it is also where discovery is fetched from.
-   */
+  /** Issuer base URL: the value the discovery document must claim and `iss` is validated against, not necessarily where identity is reached (see `identityUrl`) */
   issuer: string;
 
   /**
-   * Where this process actually reaches identity, when that differs from the public issuer. Takes a
-   * `svc://<service>` name or a plain address, resolved by `ServiceDiscovery` — so in a cluster
-   * `svc://identity-server.identity` addresses the Service, and `SERVICE_URL_IDENTITY_SERVER_IDENTITY`
-   * redirects it, by exactly the rules every other service-to-service call follows.
-   *
-   * Only back-channel traffic moves: discovery, JWKS, token, introspection, PDP and app-session
-   * calls. Browser-facing endpoints stay on the public issuer, because a user redirected to an
-   * in-cluster hostname cannot resolve it. The `iss` claim is still validated against `issuer`, so
-   * the RFC 8414 guarantee is unaffected — this is the split Keycloak spells `KC_HOSTNAME_BACKCHANNEL`.
+   * Where this process reaches identity when that differs from the public issuer: a `svc://<service>` name or plain address, resolved by `ServiceDiscovery`.
+   * Only back-channel calls move; browser-facing endpoints stay on the issuer because users cannot resolve in-cluster hostnames, and `iss` is still validated against `issuer`.
    */
   identityUrl?: string;
 
-  /**
-   * This application's identifier at identity, and by default the id its credential authenticates
-   * with. Everything else about the registration — audience, redirect URIs, granted scopes — is read
-   * back from `GET /api/v1/apps/me` rather than restated here.
-   */
+  /** This application's identifier at identity; audience, redirect URIs and scopes are read back from `GET /api/v1/apps/me` rather than restated */
   appId?: string;
 
-  /**
-   * Overrides the derived API resource identifier; tokens whose `aud` does not include it are
-   * rejected. Only needed when there is no credential to resolve the registration with, or when a
-   * deployment genuinely serves an audience identity does not know about.
-   */
+  /** Overrides the derived API resource identifier; tokens whose `aud` lacks it are rejected */
   audience?: string;
 
   /** Service-account credentials used for M2M tokens, PDP calls, and introspection */
@@ -213,23 +164,15 @@ export interface AuthClientConfig {
 
   serviceAccess?: ServiceAccessOptions;
 
-  /**
-   * Turns a silently narrowed mint into a thrown `SCOPE_NOT_GRANTED` instead of a warning. Off by
-   * default because a missing scope is usually only fatal to the one route that needs it; turn it on
-   * where a partial grant would be worse than no service at all.
-   */
+  /** Throws `SCOPE_NOT_GRANTED` instead of warning when a mint is silently narrowed; off by default because a missing scope usually only breaks one route */
   strictScopes?: boolean;
 
-  /**
-   * The application's role catalog. When set (and `client` credentials are present), `AuthModule`
-   * pushes it to identity on startup so roles are owned in code, not administered by hand.
-   */
+  /** Pushed to identity on startup by `AuthModule` when `client` credentials are present */
   roles?: RoleCatalogManifest;
 
   /**
-   * Total time budget in milliseconds applied to every outbound request the client makes. On expiry the
-   * request is aborted; transport calls surface their path's failure error (e.g. `DISCOVERY_FAILED`), while
-   * `fetchService` surfaces the common package's retryable `API_REQUEST_TIMEOUT`. Unbounded when unset.
+   * Per-request time budget in ms (unbounded when unset); transport calls fail with their path's error (e.g. `DISCOVERY_FAILED`), `fetchService` with the retryable
+   * `API_REQUEST_TIMEOUT`
    */
   timeout?: number;
 
@@ -259,22 +202,12 @@ export interface DiscoveryDocument {
   /** When published, configured scopes are validated against it at startup so a typo fails the boot */
   scopes_supported?: string[];
 
-  /** Where a browser is sent to satisfy a step-up prompt (D-19); derived rather than configured */
+  /** Where a browser is sent to satisfy a step-up prompt; derived rather than configured */
   step_up_endpoint?: string;
 
-  /** Base of the first-party app-session API (D-18); derived rather than configured */
+  /** Base of the first-party app-session API; derived rather than configured */
   app_session_endpoint?: string;
 }
-
-/*!
- * Derived configuration (D-21)
- *
- * Identity already stores what every consumer used to restate in environment variables: the API
- * resource its tokens are addressed to, the redirect URIs an admin registered, the scopes an admin
- * granted. Reading it back leaves `AUTH_ISSUER` + `AUTH_APP_ID` + a credential as the whole of a
- * steady-state deployment, and — because the registration is refreshed on a TTL — an admin granting
- * a scope takes effect without a redeploy.
- */
 
 export interface AppRegistration {
   /** Identity's own view of which application this credential belongs to */
@@ -290,32 +223,16 @@ export interface AppRegistration {
   /** Scopes an admin has granted this application; every browser-flow token asks for these */
   scopes: string[];
 
-  /**
-   * The application's `is_sensitive` scopes. Consent for them is asked at login, because identity
-   * freezes an app session's grant from its authorization code, but identity releases them only into
-   * an elevated mint, so only an elevated mint asks for them.
-   */
+  /** `is_sensitive` scopes: consented at login because identity freezes the grant from the authorization code, but released only into elevated mints */
   sensitiveScopes: string[];
 
   postLogoutRedirectUris?: string[];
 }
 
 export interface AppRegistryOptions {
-  /**
-   * How often the registration is re-resolved, in seconds. Defaults to 300, which is also the upper
-   * bound on how long an admin's grant change takes to reach a running service.
-   */
+  /** Seconds between registration re-resolves (default 300); the upper bound on how long an admin's grant change takes to reach a running service */
   refreshSeconds?: number;
 }
-
-/*!
- * First-party app sessions (D-18/D-19)
- *
- * A first-party application exchanges its authorization code for an opaque session handle and is
- * issued no refresh token: the handle itself is the renewal credential. Every call below is
- * machine-to-machine and authenticated with the application's own M2M token, so possessing a handle
- * grants nothing on its own.
- */
 
 export interface AppSessionCreateInput {
   code: string;
@@ -342,10 +259,7 @@ export interface AppSessionOrganisation {
 }
 
 export interface SwitchedOrganisation {
-  /**
-   * The rotated handle. Switching retires the handle that was presented, so a caller that keeps the
-   * old one will never mint again — store this before doing anything else.
-   */
+  /** Switching retires the presented handle, so store this one before doing anything else */
   sessionHandle: string;
   organisationId: string;
   expiresAt: string;
@@ -369,11 +283,7 @@ export interface AppSessionToken {
   audience?: string;
   aal?: AssuranceLevel;
 
-  /**
-   * What identity actually granted, parsed from `scope`. Minting answers 200 with whatever survived
-   * filtering rather than refusing, so a caller that reads its own request back instead of this hands
-   * its API a token missing the capability it asked for.
-   */
+  /** What identity actually granted; minting answers 200 with whatever survived filtering, so read this rather than the request */
   grantedScopes: string[];
 }
 
@@ -394,14 +304,6 @@ export interface ServiceTokenOptions {
   scopes?: string[];
 }
 
-/*!
- * Token exchange (D-22)
- *
- * The only supported way to call another application *as the user*. Forwarding the user's own token
- * is forbidden — the receiving API would see an audience that is not its own — and asserting the
- * user's identity in a header is forbidden outright: a header is not a credential.
- */
-
 export interface TokenExchangeInput {
   /** The user's access token as presented to this service; it must not itself be a delegated token */
   subjectToken: string;
@@ -418,10 +320,7 @@ export interface ExchangedToken {
   tokenType: string;
   expiresIn: number;
 
-  /**
-   * What identity actually granted. The server narrows silently, so a caller that assumes it received
-   * what it asked for will hand its downstream API a token missing the capability it needs.
-   */
+  /** What identity actually granted; the server narrows silently, so read this rather than the request */
   scope: string[];
 
   /** Present when identity echoes the audience the token was addressed to */
@@ -443,16 +342,14 @@ export interface CheckInput {
 
 export interface CheckOptions {
   /**
-   * Permits the action when the PDP is unreachable or throttled, instead of answering a deny (outage) or
-   * throwing a 503 `PDP_UNAVAILABLE` (throttle). Explicit opt-in for availability-critical read paths
-   * only; a reachable PDP answering DENY is always a DENY.
+   * Permits the action when the PDP is unreachable or throttled instead of denying or throwing `PDP_UNAVAILABLE`; a reachable PDP answering DENY is still a DENY.
+   * Opt in only on availability-critical read paths
    */
   failOpen?: boolean;
 
   /**
-   * Marks the action as high-risk, caching its decision for a much shorter window so a revocation
-   * bites in ~60 s instead of the default 15 min. Reserve for sensitive operations (credential or
-   * membership changes, destructive admin actions); routine reads should keep the long default.
+   * Caches the decision for a much shorter window so a revocation bites in ~60 s instead of the default 15 min.
+   * Reserve for sensitive operations (credential or membership changes, destructive admin actions)
    */
   highRisk?: boolean;
 }
@@ -467,14 +364,7 @@ export interface IntrospectionResult {
   tokenType?: string;
 }
 
-/**
- * The person behind a token, as OIDC's userinfo endpoint describes them.
- *
- * Claim names are the protocol's, not the repository's: this is a wire shape identity fills in from
- * the spec, and renaming it here would mean every future standard claim needs a translation entry
- * before an application could see it. Every field is optional — which ones arrive depends on the
- * scopes the session consented to, and a claim with no value is absent rather than empty.
- */
+/** OIDC userinfo claims under the protocol's own names; which ones arrive depends on consented scopes, and a claim with no value is absent rather than empty */
 export interface UserInfo {
   sub: string;
   name?: string;

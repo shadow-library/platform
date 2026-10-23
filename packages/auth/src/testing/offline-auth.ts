@@ -32,12 +32,7 @@ export interface OfflineAuth {
 const DEFAULT_APP_ID = 'offline-app';
 const DEFAULT_CLIENT_SECRET = 'offline-secret';
 
-/**
- * The real auth SDK against an unserved `TestIdP`: discovery, JWKS, token, PDP, role sync, service
- * access and app sessions are all answered in-process, so verification and authorisation run their
- * genuine code paths with no network. As boot overrides, the replaced client and session service are
- * what `AuthModule`'s startup warm-up, role sync and service-access load talk to.
- */
+/** The real SDK against an unserved `TestIdP`, so verification and authorisation run their genuine code paths with no network */
 export async function createOfflineAuth(options: OfflineAuthOptions = {}): Promise<OfflineAuth> {
   const appId = options.clientId ?? DEFAULT_APP_ID;
   const secret = options.clientSecret ?? DEFAULT_CLIENT_SECRET;

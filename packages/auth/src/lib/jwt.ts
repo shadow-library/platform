@@ -21,12 +21,7 @@ export interface ClaimExpectations {
   nonce?: string;
 }
 
-/**
- * Declaring the constants
- *
- * A minimal EdDSA-only JWT verifier on WebCrypto. Pinning a single algorithm at the codec level
- * removes the algorithm-confusion attack surface; `iss`, `aud`, and `exp` are always enforced.
- */
+// EdDSA-only: pinning a single algorithm at the codec level removes the algorithm-confusion attack surface; `iss`, `aud` and `exp` are always enforced
 const encoder = new TextEncoder();
 
 function decodeSegment<T>(segment: string, description: string): T {

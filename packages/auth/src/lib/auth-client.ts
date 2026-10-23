@@ -62,31 +62,23 @@ const DEFAULT_CLOCK_SKEW_SECONDS = 60;
 const DEFAULT_JWKS_TTL_SECONDS = 43_200;
 const DEFAULT_DECISION_TTL_SECONDS = 900;
 
-/** Matches the identity server's default token audience for its own API surface */
 const DEFAULT_IDENTITY_RESOURCE = 'shadow-identity';
 
-/** The server's PDP and service-access endpoints require a service token granted this scope */
 const PDP_SCOPE = 'authz:check';
 
-/** The catalog-sync endpoint requires a service token granted this scope */
 const ROLE_SYNC_SCOPE = 'authz:roles:sync';
 
-/** The app-session endpoints require a service token granted this scope */
 const APP_SESSION_SCOPE = 'app-session:manage';
 
-/** Reaches identity's directory seam, in either direction: naming a person by id, or by address. */
 const DIRECTORY_SCOPE = 'users:resolve';
 
-/** Identity caps a single directory request; batching above this would be silently truncated on the other side. */
+/** Identity caps a single directory request; larger batches would be silently truncated */
 const DIRECTORY_BATCH_SIZE = 50;
 
-/** The `events` member that marks a JWT as a back-channel logout notice rather than an ID token */
 const BACKCHANNEL_LOGOUT_EVENT = 'http://schemas.openid.net/event/backchannel-logout';
 
-/** How identity spells "your manifest would delete too much"; anything else on catalog sync is a plain failure */
 const CONFLICT = 409;
 
-/** RFC 8693 §2.1 — exchanging one token for another, here to act as the user towards another application */
 const TOKEN_EXCHANGE_GRANT_TYPE = 'urn:ietf:params:oauth:grant-type:token-exchange';
 const ACCESS_TOKEN_TYPE = 'urn:ietf:params:oauth:token-type:access_token';
 const BOT_KEY_TOKEN_TYPE = 'urn:shadow:token-type:bot-key';
@@ -98,16 +90,9 @@ const UNAUTHORIZED = 401;
 /** A 401 is identity refusing this application's own credential, not the key, so it is an outage from the bot's point of view; a 429 never reaches here */
 const isBotKeyRejection = (status: number): boolean => status >= 400 && status < 500 && status !== UNAUTHORIZED;
 
-/**
- * The consumer-facing auth client: offline token verification, PDP checks, M2M tokens, role
- * catalog sync, and admin-managed service-access rules. Designed as an injectable class —
- * `AuthModule.forRoot()` registers it under its own class token so application services take it
- * as an ordinary constructor dependency.
- */
 export class AuthClient {
   private readonly logger = Logger.getLogger(NAMESPACE, AuthClient.name);
   private readonly issuer: string;
-  /** Where back-channel traffic is sent; equals `issuer` unless `identityUrl` overrides it */
   private readonly identityUrl: string;
   private readonly transport: FetchLike;
   private readonly timeout?: number;
@@ -120,18 +105,13 @@ export class AuthClient {
   private readonly apps: AppRegistryClient;
   private readonly botKeys: BotKeyExchanger;
 
-  /** The first-party app-session protocol client; see `AppSessionClient` for why it is M2M-only */
   readonly appSessions: AppSessionClient;
 
   constructor(private readonly config: AuthClientConfig) {
     if (!config.issuer || !URL.canParse(config.issuer)) throw AuthErrorCode.CONFIG_INVALID.create({ reason: 'issuer must be a valid url' });
     if (config.client && !config.client.id) throw AuthErrorCode.CONFIG_INVALID.create({ reason: 'client credentials require an id' });
 
-    /**
-     * The audience is normally derived from the registration, which takes a credential to read. With
-     * neither, the client could never learn which tokens are addressed to it — so it refuses to start
-     * rather than accept every token or none, depending on which bug surfaces first.
-     */
+    // Without an explicit audience or a credential to read the registration, the client could never learn which tokens are addressed to it
     if (!config.audience && !isConfidential(config.client)) {
       throw AuthErrorCode.CONFIG_INVALID.create({ reason: 'either an explicit audience or a credential to resolve the app registration with is required' });
     }
@@ -141,13 +121,8 @@ export class AuthClient {
 
     this.issuer = config.issuer.replace(/\/+$/, '');
 
-    /**
-     * Resolved through `ServiceDiscovery`, so a `svc://` name and a `SERVICE_URL_<NAME>` override
-     * mean the same thing here as in every other service-to-service call. The OIDC paths are dialled
-     * with a bare `fetch` rather than `APIRequest` — a token endpoint mandates form encoding (RFC
-     * 6749 4.1.3) and these callers read a `Response` directly — so the name is resolved once, here,
-     * instead of per request.
-     */
+    // OIDC paths use a bare fetch rather than `APIRequest` (token endpoints mandate form encoding, RFC 6749 §4.1.3), so the `svc://` name is resolved once here instead of
+    // per request
     this.identityUrl = config.identityUrl ? ServiceDiscovery.resolve(config.identityUrl).replace(/\/+$/, '') : this.issuer;
     if (!URL.canParse(this.identityUrl)) throw AuthErrorCode.CONFIG_INVALID.create({ reason: 'identityUrl must resolve to a valid url' });
 
@@ -187,33 +162,19 @@ export class AuthClient {
     this.logger.info('auth client initialised', { issuer: this.issuer, appId: config.appId, audience: config.audience, hasClientCredentials: Boolean(config.client) });
   }
 
-  /**
-   * This application's registration at identity: audience, redirect URIs, and the scopes an admin has
-   * granted it. Resolved on first use and refreshed on a TTL, so a grant change propagates without a
-   * redeploy; the last good registration survives an identity outage.
-   */
   getAppRegistration(): Promise<AppRegistration> {
     return this.apps.get();
   }
 
-  /**
-   * The API resource this service's tokens must be addressed to. The explicit `audience` wins when one
-   * is configured, which is the escape hatch for a deployment identity does not know the whole of.
-   */
   async getAudience(): Promise<string> {
     return this.config.audience ?? (await this.apps.get()).audience;
   }
 
-  /** The issuer's discovery document, fetched once per process and cached for the deployment's lifetime */
   getDiscovery(): Promise<DiscoveryDocument> {
     return this.discovery.get();
   }
 
-  /**
-   * Fails the boot when a configured scope is absent from the issuer's published `scopes_supported`.
-   * A typo would otherwise mint quietly — with the misspelt scope simply dropped — and only surface
-   * as a puzzling 403 deep inside a request, so it is worth one startup round trip.
-   */
+  /** A typo would otherwise mint quietly with the scope dropped and surface as a 403 deep in a request, so it is worth one startup round trip */
   async assertScopesSupported(scopes: string[]): Promise<void> {
     if (scopes.length === 0) return;
     const supported = (await this.discovery.get()).scopes_supported;
@@ -224,11 +185,7 @@ export class AuthClient {
     this.logger.debug('configured scopes validated against discovery', { scopes });
   }
 
-  /**
-   * Verifies a bearer token offline against the issuer's JWKS and returns the resolved principal. A bot
-   * token is refused: bots are admitted only by exchanging their key through `resolveBotKey`, which is
-   * where identity checks the bot's IP allowlist and where revocation lag is capped at a minute.
-   */
+  /** A bot token is refused: bots enter only via `resolveBotKey`, where identity checks the IP allowlist and revocation lag is capped at a minute */
   async verify(token: string): Promise<UserPrincipal | ServicePrincipal> {
     const principal = await this.verifyToken(token);
     if (principal.kind === 'bot') throw AuthErrorCode.TOKEN_INVALID.create({ reason: 'a bot token is only accepted through bot key exchange' });
@@ -243,11 +200,7 @@ export class AuthClient {
     return principal;
   }
 
-  /**
-   * Verifies an OIDC back-channel logout token (OpenID Connect Back-Channel Logout 1.0 §2.6). Unlike
-   * an access token it is addressed to this *client*, not to this API, and the `events` claim plus
-   * the absence of `nonce` are what separate it from an ID token replayed as a logout notice.
-   */
+  /** OIDC Back-Channel Logout 1.0 §2.6: addressed to this client, not this API; the `events` claim and absent `nonce` separate it from an ID token replayed as a logout notice */
   async verifyLogoutToken(token: string): Promise<LogoutTokenClaims> {
     const clientId = this.config.client?.id;
     if (!clientId) throw AuthErrorCode.CONFIG_INVALID.create({ reason: 'back-channel logout requires client credentials' });
@@ -270,20 +223,13 @@ export class AuthClient {
     return { sub, sid, claims: payload };
   }
 
-  /**
-   * Resolves a bot key to the bot it belongs to by exchanging it at identity for a token addressed to
-   * this application, then verifying that token offline. `clientIp` is the caller's address, which
-   * identity checks against the bot's IP allowlist.
-   */
   resolveBotKey(botKey: string, clientIp?: string): Promise<BotPrincipal> {
     return this.botKeys.resolve(botKey, clientIp);
   }
 
   /**
-   * Identity forces the audience to this client's own resource, so the key can never be replayed into
-   * another application. A credential rejection is `BOT_KEY_INVALID`; anything else — transport, 5xx,
-   * a throttled exchange, identity refusing this application's own credential, a malformed answer — is
-   * `TOKEN_EXCHANGE_FAILED`, whose 503 keeps the exchanger from negative-caching a key that is fine.
+   * Identity forces the audience to this client's resource, so a key cannot be replayed into another application; only a credential rejection is `BOT_KEY_INVALID`,
+   * everything else is a 503 so a fine key is never negative-cached
    */
   private async exchangeBotKey(botKey: string, clientIp: string | undefined): Promise<string> {
     const endpoint = (await this.discovery.get()).token_endpoint;
@@ -305,9 +251,8 @@ export class AuthClient {
   }
 
   /**
-   * Asks the PDP whether the principal may perform the action. An unreachable or malformed PDP reads as
-   * a deny; a throttle that outlasts its retries throws a 503 `PDP_UNAVAILABLE` instead, because the
-   * caller may well be entitled. `failOpen` turns either into a permit.
+   * An unreachable or malformed PDP reads as a deny, but a throttle outlasting its retries throws 503 `PDP_UNAVAILABLE` because the caller may be entitled; `failOpen`
+   * permits either
    */
   check(input: CheckInput, options?: CheckOptions): Promise<boolean> {
     return this.pdp.check(input, options);
@@ -317,20 +262,14 @@ export class AuthClient {
     return this.pdp.checkAll(inputs, options);
   }
 
-  /** Returns a cached client-credentials token for calling another service */
   getServiceToken(options?: ServiceTokenOptions): Promise<string> {
     return this.tokens.getToken(options);
   }
 
   /**
-   * Exchanges the user's token for one addressed to another application, acting *as the user* (RFC
-   * 8693, D-22). This is the only supported way to do that: forwarding the user's own token gives the
-   * receiving API an audience that is not its own, and asserting the user in a header is forbidden
-   * outright because a header is not a credential.
-   *
-   * The result is never cached. It belongs to one user, is short-lived, and its `exp` is capped by the
-   * subject token's — caching it would key a per-user credential by resource and hand it to the wrong
-   * caller the moment two users' requests overlap.
+   * RFC 8693: the only supported way to call another application as the user; forwarding the user's token gives the receiving API a foreign audience,
+   * and a header is not a credential.
+   * Never cached: it is a per-user credential, and keying it by resource would hand it to the wrong caller when two users' requests overlap.
    */
   async exchangeUserToken(input: TokenExchangeInput): Promise<ExchangedToken> {
     const client = this.config.client;
@@ -348,7 +287,7 @@ export class AuthClient {
     };
     if (requested.length > 0) body.scope = requested.join(' ');
 
-    /** Never the body: it carries the user's live access token */
+    // Never log the body: it carries the user's live access token
     this.logger.debug('exchanging a user token', { endpoint, resource: input.resource, scopes: requested });
     const response = await this.postToOAuthEndpoint(endpoint, body, AuthErrorCode.TOKEN_EXCHANGE_FAILED, 'token exchange');
     const payload = (await response.json()) as TokenExchangeResponse;
@@ -364,11 +303,7 @@ export class AuthClient {
     return { accessToken: payload.access_token, tokenType: payload.token_type ?? 'Bearer', expiresIn: payload.expires_in, scope: granted, audience: payload.audience };
   }
 
-  /**
-   * Delegation is single-hop by protocol rule, and the check belongs client-side: a service that is
-   * itself being called through an exchange must learn that from the token it holds, not from a round
-   * trip to identity that fails for reasons it cannot distinguish from an outage.
-   */
+  /** Checked client-side so a service called through an exchange learns that from its token rather than from an identity failure it cannot tell from an outage */
   private assertSingleHop(subjectToken: string): void {
     if (!subjectToken) throw AuthErrorCode.TOKEN_EXCHANGE_REFUSED.create({ reason: 'no subject token provided' });
 
@@ -384,7 +319,6 @@ export class AuthClient {
     if (payload.token_type === 'bot') refuse('a bot token cannot be exchanged');
   }
 
-  /** `fetch` with the service token injected and a single automatic retry on a stale-token 401 */
   async fetch(url: string, init: RequestInit = {}, options: ServiceTokenOptions = {}): Promise<Response> {
     this.logger.debug('calling service endpoint', { url, method: init.method ?? 'GET', resource: options.resource });
     const token = await this.tokens.getToken(options);
@@ -397,11 +331,6 @@ export class AuthClient {
     return this.transport(url, this.withBearer(init, fresh));
   }
 
-  /**
-   * Calls a named ecosystem service over the `svc://` scheme, which APIRequest resolves through
-   * cluster DNS (or a `SERVICE_URL_<NAME>` override). A service token addressed to the service is
-   * attached and a stale-token 401 triggers a single retry with a fresh token.
-   */
   async fetchService<T = unknown>(service: string, path: string, init: RequestInit = {}, options: ServiceTokenOptions = {}): Promise<APIResponse<T>> {
     const resource = options.resource ?? service;
     const url = `svc://${service}${path.startsWith('/') ? path : `/${path}`}`;
@@ -434,12 +363,7 @@ export class AuthClient {
     return dispatch(await this.tokens.getToken({ ...options, resource }));
   }
 
-  /**
-   * Declaratively replaces this application's role catalog in identity; requires service-account
-   * credentials. The manifest is the complete truth — anything absent from it is deleted there — so
-   * identity guards against a sync that would delete too much and answers `ROLE_SYNC_REFUSED`. That
-   * refusal is deliberately its own error: a truncated manifest must not read as a transport blip.
-   */
+  /** The manifest is the complete truth; identity's guardrail refusal is its own `ROLE_SYNC_REFUSED` so a truncated manifest does not read as a transport blip */
   async syncRoles(manifest: RoleCatalogManifest, options: RoleCatalogSyncOptions = {}): Promise<RoleCatalogSyncResult> {
     if (!this.config.client) throw AuthErrorCode.CONFIG_INVALID.create({ reason: 'role sync requires service-account client credentials' });
     assertValidRoleCatalog(manifest);
@@ -456,42 +380,27 @@ export class AuthClient {
     return result;
   }
 
-  /**
-   * Loads the admin-configured service-access rules for this application from identity and schedules
-   * their periodic refresh. Called by `AuthModule` at startup; until the first load succeeds, every
-   * service-to-service caller is denied (deny-by-default), so a failure here aborts the boot rather
-   * than being swallowed.
-   */
+  /** Until the first load succeeds every M2M caller is denied, so a failure here aborts the boot rather than being swallowed */
   loadServiceAccess(): Promise<ServiceAccessRule[]> {
     if (!this.config.client) throw AuthErrorCode.CONFIG_INVALID.create({ reason: 'service access rules require service-account client credentials' });
     return this.serviceAccess.load();
   }
 
-  /**
-   * Re-fetches the rules out of band, as the scheduled refresh does. Never throws — the last good
-   * rules stay in force through an identity outage, because the alternative is every service in the
-   * fleet revoking every one of its M2M callers the moment identity blinks.
-   */
+  /** A failed refresh keeps the last good rules, or every service would revoke all its M2M callers the moment identity blinks */
   refreshServiceAccess(): Promise<ServiceAccessRule[]> {
     if (!this.config.client) throw AuthErrorCode.CONFIG_INVALID.create({ reason: 'service access rules require service-account client credentials' });
     return this.serviceAccess.refresh();
   }
 
-  /** Whether an M2M caller may invoke the given route, per the rules loaded from identity */
   isServiceCallerAllowed(callerClientId: string, method: string, path: string): boolean {
     return this.serviceAccess.isAllowed(callerClientId, method, path);
   }
 
-  /** Releases the client's background timers; `AuthModule` calls it when the application shuts down */
   stop(): void {
     this.serviceAccess.stopRefresh();
   }
 
-  /**
-   * Explicit fallback for opaque tokens; MUST NOT be used for routine verification. Introspection is
-   * now caller-scoped — another client's token reads as `active: false` — so it can no longer be used
-   * to probe tokens this application does not own.
-   */
+  /** Fallback for opaque tokens only, never routine verification; identity scopes it to the caller, so another client's token reads as `active: false` */
   async introspect(token: string): Promise<IntrospectionResult> {
     const endpoint = await this.oauthEndpoint('introspection_endpoint', 'introspect');
     const response = await this.postToOAuthEndpoint(endpoint, { token }, AuthErrorCode.INTROSPECTION_FAILED, 'introspection');
@@ -499,7 +408,6 @@ export class AuthClient {
     return { active: result.active === true, sub: result.sub, scope: result.scope, aud: result.aud, exp: result.exp, clientId: result.client_id, tokenType: result.token_type };
   }
 
-  /** RFC 7009 revocation; `tokenTypeHint` narrows the lookup when the token's kind is known */
   async revoke(token: string, tokenTypeHint?: 'access_token' | 'refresh_token'): Promise<void> {
     const endpoint = await this.oauthEndpoint('revocation_endpoint', 'revoke');
     const body: Record<string, string> = { token };
@@ -508,13 +416,12 @@ export class AuthClient {
     this.logger.info('token revoked', { tokenTypeHint });
   }
 
-  /** Identity's own explanation, when it sent one — a guardrail refusal is only actionable with its reason */
   private async readFailureReason(response: Response): Promise<string> {
     const body = (await response.json().catch(() => ({}))) as { code?: string; message?: string };
     return body.message ?? body.code ?? `http ${response.status}`;
   }
 
-  /** Discovery is the source of truth; the issuer-relative path stays only as a last resort for older deployments */
+  /** Discovery is the source of truth; the issuer-relative path is a last resort for older deployments */
   private async oauthEndpoint(key: 'introspection_endpoint' | 'revocation_endpoint', fallbackPath: string): Promise<string> {
     const document = await this.discovery.get();
     const advertised = document[key];
@@ -529,7 +436,6 @@ export class AuthClient {
     return response;
   }
 
-  /** Every `/oauth2/*` grant this client drives: form-encoded, authenticated by secret or SA assertion */
   private async dispatchToOAuthEndpoint(endpoint: string, body: Record<string, string>, errorCode: AuthErrorCode, description: string): Promise<Response> {
     const client = this.config.client;
     if (!isConfidential(client)) throw AuthErrorCode.CONFIG_INVALID.create({ reason: `${description} requires confidential client credentials` });
@@ -542,15 +448,7 @@ export class AuthClient {
     );
   }
 
-  /**
-   * The person behind a user access token, from identity's OIDC userinfo endpoint.
-   *
-   * Presented with the *user's* token rather than a service token, which is what makes this the
-   * generic answer to "who am I": the caller is the user, so no application needs a machine grant to
-   * learn its own signed-in person's name. Which claims come back is decided by the scopes that
-   * session consented to — a session established before `profile` was requested gets `sub` alone,
-   * and callers must treat every other field as optional rather than assume a name is there.
-   */
+  /** Presented with the user's own token, so no machine grant is needed; a session established before `profile` was requested gets `sub` alone */
   async getUserInfo(accessToken: string): Promise<UserInfo> {
     const endpoint = await this.userInfoEndpoint();
     const response = await this.transport(endpoint, { headers: { authorization: `Bearer ${accessToken}` } }).catch((error: Error) =>
@@ -561,18 +459,12 @@ export class AuthClient {
     return (await response.json()) as UserInfo;
   }
 
-  /**
-   * Names subjects the caller already holds ids for, through identity's directory.
-   *
-   * This is the *other* people question — a share list, an activity feed — and unlike userinfo it is
-   * a machine call, so it needs the `users:resolve` grant. Identity caps a single request, so the
-   * batching is done here once rather than in each application that needs a column of names.
-   */
+  /** Unlike userinfo this is a machine call needing the `users:resolve` grant; batched here because identity caps a single request */
   async lookupUsers(userIds: string[]): Promise<DirectoryUser[]> {
     return this.directory<DirectoryUser>('/api/v1/internal/users/lookup', 'userIds', userIds);
   }
 
-  /** The address direction of the same seam: an address identity will not name is absent, never an error. */
+  /** An address identity will not name is absent, never an error */
   async resolveUsersByEmail(emails: string[]): Promise<ResolvedDirectoryUser[]> {
     return this.directory<ResolvedDirectoryUser>('/api/v1/internal/users/resolve', 'emails', emails);
   }
@@ -593,7 +485,7 @@ export class AuthClient {
     return found;
   }
 
-  /** Discovery is the source of truth; the issuer-relative path stays only as a last resort for older deployments */
+  /** Discovery is the source of truth; the issuer-relative path is a last resort for older deployments */
   private async userInfoEndpoint(): Promise<string> {
     const advertised = (await this.discovery.get()).userinfo_endpoint;
     if (advertised) return advertised;
@@ -614,7 +506,6 @@ export class AuthClient {
     return this.config.identityResource ?? DEFAULT_IDENTITY_RESOURCE;
   }
 
-  /** Where a browser goes to satisfy a step-up prompt; published by discovery rather than configured */
   async getStepUpEndpoint(): Promise<string> {
     const advertised = (await this.discovery.get()).step_up_endpoint;
     if (advertised) return advertised;
@@ -639,7 +530,6 @@ export class AuthClient {
     return { ...base, kind: 'user', org: readString(payload.org), sid: readString(payload.sid), aal };
   }
 
-  /** A bot acts only inside its organisation and under its own rate limit, so a token missing either is unusable rather than partially trusted */
   private toBotPrincipal(payload: JwtPayload, base: Omit<BotPrincipal, 'kind' | 'org' | 'botId' | 'keyId' | 'rateLimitPerMinute'>): BotPrincipal {
     const org = readString(payload.org);
     const botId = readString(payload.bot_id);
@@ -659,7 +549,6 @@ export class AuthClient {
     return { ...init, headers };
   }
 
-  /** Records the failure at error level before it propagates, keeping guard throws single-line */
   private logged(error: AppError): AppError {
     this.logger.error(error.message);
     return error;

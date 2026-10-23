@@ -4,20 +4,10 @@ import { NAMESPACE } from '../constants';
 import { AuthErrorCode } from '../errors';
 import { DiscoveryDocument, FetchLike } from '../interfaces';
 
-/**
- * Declaring the constants
- *
- * The discovery document is immutable for the lifetime of a deployment, so it is fetched once per
- * process (singleflight) and cached indefinitely; endpoint changes ship as new deployments.
- *
- * Endpoints split by who dials them. Back-channel endpoints are called by this process, so when the
- * SDK reaches identity at an internal address they must be rebased onto it. Front-channel endpoints
- * — `authorization_endpoint`, `end_session_endpoint`, `step_up_endpoint` — are URLs a **browser** is
- * redirected to, and rebasing one onto a cluster-internal host would send the user somewhere they
- * cannot resolve. This is an allowlist rather than a denylist so a newly published endpoint is left
- * public by default: a front-channel endpoint wrongly rebased breaks login silently, while a
- * back-channel one left public still works, only over the long path.
- */
+// Front-channel endpoints (`authorization_endpoint`, `end_session_endpoint`, `step_up_endpoint`) are redirected to by a browser and must not be rebased onto a cluster-
+// internal host.
+// An allowlist, not a denylist: a new endpoint defaults to public because a wrongly rebased front-channel endpoint breaks login silently, while a back-channel one left
+// public still works.
 const BACK_CHANNEL_ENDPOINTS = ['jwks_uri', 'token_endpoint', 'userinfo_endpoint', 'introspection_endpoint', 'revocation_endpoint', 'app_session_endpoint'] as const;
 
 export class DiscoveryClient {
@@ -26,10 +16,8 @@ export class DiscoveryClient {
   private inflight: Promise<DiscoveryDocument> | null = null;
 
   /**
-   * `issuer` is an identity — the value the document must claim, and the audience tokens carry.
-   * `baseUrl` is an address — where this process actually sends HTTP. They differ whenever identity
-   * is reachable in-cluster under a name that is not its public hostname; RFC 8414 constrains the
-   * former and says nothing about the latter, so the two are validated and used independently.
+   * `issuer` is the identity the document must claim (RFC 8414); `baseUrl` is where HTTP is actually sent. They differ when identity is reached in-cluster under a non-
+   * public name
    */
   constructor(
     private readonly issuer: string,
@@ -59,10 +47,6 @@ export class DiscoveryClient {
     return this.document;
   }
 
-  /**
-   * Points the back-channel endpoints at `baseUrl`, leaving anything hosted elsewhere untouched so a
-   * document that legitimately delegates an endpoint to another origin still resolves there.
-   */
   private rebase(document: DiscoveryDocument): DiscoveryDocument {
     if (this.baseUrl === this.issuer) return document;
 
@@ -80,7 +64,6 @@ export class DiscoveryClient {
     return rebased;
   }
 
-  /** Records the failure at error level before it propagates, keeping guard throws single-line */
   private logged(error: AppError): AppError {
     this.logger.error(error.message, { issuer: this.issuer, baseUrl: this.baseUrl });
     return error;

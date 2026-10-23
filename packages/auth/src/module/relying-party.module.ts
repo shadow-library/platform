@@ -8,13 +8,9 @@ import { RelyingParty, type RelyingPartyConfig } from '../rp/relying-party';
 export type RelyingPartyModuleOptions = Omit<RelyingPartyConfig, 'issuer'> & { issuer?: string };
 
 /**
- * Declaring the constants
- *
- * **For third-party and external consumers only.** A Shadow app imports `AuthModule.forRoot()` and
- * gets first-party login end to end; importing this module instead reintroduces the token pair D-18
- * exists to remove. See `RelyingParty` for the full reasoning.
+ * For third-party and external consumers only: a Shadow app uses `AuthModule.forRoot()`, and this module reintroduces the access/refresh token pair that first-party app
+ * sessions exist to avoid
  */
-
 @Module({})
 export class RelyingPartyModule {
   static forRoot(options: RelyingPartyModuleOptions): DynamicModule {

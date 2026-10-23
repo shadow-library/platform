@@ -39,19 +39,9 @@ type AuthDecorator = ClassDecorator & MethodDecorator;
 
 type DecoratorFunction = (target: object, propertyKey?: string | symbol, descriptor?: TypedPropertyDescriptor<any>) => void;
 
-/**
- * Declaring the constants
- *
- * There is deliberately no per-route service allowlist decorator: which M2M callers may reach
- * which routes is administered centrally in the identity admin panel and loaded by `AuthModule`
- * at startup, so route code never hard-codes caller identities.
- *
- * The framework deep-merges a class's handler metadata under each method's, so a method's `access`
- * overrides its class's while `scopes` and `botPermissions` accumulate across both. Two decorators on
- * the same target merge last-applied-wins, which would let `@Public()` and `@Authenticated()` on one
- * method resolve by source order; each target therefore remembers the access it declared and refuses
- * a second, different one.
- */
+// Handler metadata deep-merges class under method (method `access` wins, `scopes` and `botPermissions` accumulate) and two decorators on one target merge
+// last-applied-wins, so each target remembers its declared access and refuses a different second one rather than resolve by source order.
+// There is deliberately no per-route service allowlist decorator: M2M access is administered centrally in identity and loaded by `AuthModule`.
 const DECLARED_ACCESS = Symbol('shadow-library:auth-declared-access');
 
 const authRoute =
@@ -71,11 +61,7 @@ const authRoute =
 /** Never authenticated, in either access mode — health checks, and the SDK's own sign-in surface */
 export const Public = (): AuthDecorator => authRoute({ access: 'public' });
 
-/**
- * Anonymous callers are served, and a presented credential is resolved best-effort so the handler can
- * tailor what it returns: a bad or absent one reads as anonymous, never as a 401, and a bot key is
- * never exchanged. In `private` mode the route requires a session like any other.
- */
+/** A presented credential is resolved best-effort: a bad or absent one reads as anonymous, never 401, and a bot key is never exchanged; `private` mode requires a session */
 export const OptionalAuth = (): AuthDecorator => authRoute({ access: 'optional' });
 
 /** Requires a valid bearer token; the resolved principal is exposed via `context.getAuthPrincipal()` */
@@ -88,21 +74,12 @@ export const RequireScope = (...scopes: string[]): AuthDecorator => authRoute({ 
 export const RequirePermission = (permission: string, options: RequirePermissionOptions = {}): AuthDecorator => authRoute({ access: 'required', permission, ...options });
 
 /**
- * Requires an `AAL2` principal, minted from a step-up grant scoped to this application's audience
- * (D-19). For a browser session the SDK drives the whole cycle — claim, prompt if there is nothing to
- * claim, retry — while a bearer caller is answered with `IAM_003` so it can drive the cycle itself.
- *
- * Elevation is deliberately not contagious: the elevated token is minted for these routes only and
- * never attached to ordinary requests, so a user working across two applications steps up in each.
+ * Requires an `AAL2` principal minted from a step-up grant scoped to this application's audience. Browser sessions are driven through claim, prompt and retry by the SDK;
+ * bearer callers get `IAM_003` to drive the cycle themselves. The elevated token is never attached to ordinary requests
  */
 export const RequireElevation = (...scopes: string[]): AuthDecorator => authRoute({ access: 'required', elevated: true, ...(scopes.length > 0 && { scopes }) });
 
-/**
- * Admits bot principals to the route, provided the PDP permits `permission` in the bot's organisation
- * (implies `@Authenticated`). Without it every bot is refused, whatever else the route declares. It is
- * evaluated for bots only — people and services on the same route are unaffected — and repeated
- * across class and method it accumulates: the bot must hold every one.
- */
+/** Without it every bot is refused; evaluated for bots only, implies `@Authenticated`, and accumulates across class and method so the bot must hold every one */
 export const BotPermission = (permission: string): AuthDecorator => {
   if (!permission) throw AuthErrorCode.CONFIG_INVALID.create({ reason: 'a bot permission must name a permission' });
   return authRoute({ access: 'required', botPermissions: [permission] });

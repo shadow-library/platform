@@ -9,7 +9,6 @@ import { botKeyIdToUuid, parseBotKey } from './bot-key';
 import { isThrottled, retryAfterHint } from './transport';
 
 export interface BotKeyExchangerOptions {
-  /** Exchanges the key at identity and returns the bot access token */
   exchange: (botKey: string, clientIp?: string) => Promise<string>;
   verify: (accessToken: string) => Promise<AuthPrincipal>;
   maxEntries?: number;
@@ -21,26 +20,13 @@ interface CachedBotPrincipal {
   expiresAt: number;
 }
 
-/**
- * Declaring the constants
- *
- * A verified principal is cached until `min(exp - 30 s, 60 s)`, which is also the upper bound on how
- * long a revoked key or a suspended bot keeps working on this replica. A definitive refusal (a 4xx
- * credential rejection) is cached for 10 s so a revoked key hammering the service costs identity one
- * exchange per window; an outage is not, so the first request after identity recovers succeeds.
- *
- * A throttle is neither. The key is valid, so it must not be negative-cached into a 401, but identity
- * said "stop" and nothing else on this path applies backpressure — the bot rate limiter only runs once
- * an exchange has succeeded, and identity charges nothing for the refusal. So the back-off is held
- * separately and still rethrown as an outage. Identity's own `Retry-After` is taken verbatim up to the
- * maximum, however short: it is what remains of *its* window, so a floor would only delay a bot that
- * identity is already willing to serve again. `THROTTLE_DEFAULT_MS` is the guess for a missing hint,
- * not a minimum.
- *
- * Entries are keyed by a hash of the key *and* the caller's IP: identity enforces the bot's IP
- * allowlist during the exchange, so a principal verified for one address must never answer a request
- * from another.
- */
+// A verified principal is cached until min(exp - 30 s, 60 s), the upper bound on how long a revoked key or suspended bot keeps working on this replica.
+// A 4xx credential refusal is cached for 10 s so a revoked key hammering the service costs identity one exchange per window; an outage is not cached.
+// A throttle is neither: the key is valid so it must not become a 401, but nothing else applies backpressure (the bot rate limiter only runs after a successful exchange),
+// so the back-off is held separately and rethrown as an outage. Identity's `Retry-After` is taken verbatim up to the maximum, since a floor would only delay a bot
+// identity will already serve; `THROTTLE_DEFAULT_MS` is the guess for a missing hint, not a minimum.
+// Entries are keyed by a hash of the key and the caller's IP because identity enforces the IP allowlist during the exchange: a principal verified for one address must not
+// answer another.
 const DEFAULT_MAX_ENTRIES = 1_000;
 const MAX_CACHE_MS = 60_000;
 const EXPIRY_MARGIN_MS = 30_000;

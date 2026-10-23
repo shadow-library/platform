@@ -13,10 +13,7 @@ import { AuthController, configureAuthRoutes } from './auth.controller';
 import { AuthModuleOptions, resolveAccessMode, resolveAuthClientConfig, resolveAuthRoutes, resolveBrowserAuthConfig, type ResolvedBrowserAuthConfig } from './config';
 import { extendContextWithAuth } from './context';
 
-/**
- * The slice of the Fastify instance the module needs. Typed structurally so the SDK does not have to
- * depend on `fastify` itself for one call.
- */
+// Typed structurally so the SDK need not depend on `fastify` itself for one call
 interface ContentTypeParserHost {
   hasContentTypeParser(contentType: string): boolean;
   addContentTypeParser(
@@ -26,23 +23,12 @@ interface ContentTypeParserHost {
   ): void;
 }
 
-/**
- * Declaring the constants
- *
- * Import `AuthModule.forRoot(...)` inside `FastifyModule.forRoot({ imports: [...] })` and the service
- * is done: the guard middleware registers against the HTTP routes, the browser-facing auth
- * controllers come with it, and on startup the module extends the app's `ContextService` with
- * principal accessors, validates the configured scopes against discovery, pushes the role catalog
- * when one is declared (roles live in code, not in hand-run admin calls), and loads the
- * admin-configured service-access rules that decide which M2M callers may reach which routes.
- */
 const AUTH_CONFIG: unique symbol = Symbol('shadow-library:auth-config');
 const BROWSER_CONFIG: unique symbol = Symbol('shadow-library:auth-browser-config');
 
 /** OIDC Back-Channel Logout posts form-encoded, which Fastify does not parse out of the box */
 const FORM_CONTENT_TYPE = 'application/x-www-form-urlencoded';
 
-/** A private application nobody can sign into would answer every request with a 401, so it is refused at boot instead */
 function assertSignInReachable(browser: ResolvedBrowserAuthConfig): void {
   const fail = (cause: string): never => {
     throw AuthErrorCode.CONFIG_INVALID.create({ reason: `access mode is private but ${cause}, so nobody could ever sign in` });
@@ -71,14 +57,10 @@ class AuthInitializer implements OnModuleInit, OnModuleDestroy {
     extendContextWithAuth(this.context);
     if (this.browser.enabled && this.browser.routes.backchannelLogout) this.registerFormParser();
 
-    /**
-     * Resolving the registration here is what makes a misconfiguration a boot failure rather than a
-     * puzzling 401 on a user's first login: audience, redirect uri and granted scopes all come from
-     * identity now, so this is the first moment the service can be told it is wrong.
-     */
+    // Audience, redirect uri and scopes come from identity, so this is the first moment a misconfiguration can be a boot failure rather than a 401 on a user's first login
     if (this.browser.enabled) await this.sessions.warmUp();
 
-    /** Never forced: overriding identity's destructive-sync guardrail on every boot would defeat it */
+    // Never forced: overriding identity's destructive-sync guardrail on every boot would defeat it
     if (this.config.roles) await this.client.syncRoles(this.config.roles);
     if (this.config.client) await this.client.loadServiceAccess();
     this.logger.info('auth module initialised', {
@@ -90,12 +72,11 @@ class AuthInitializer implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  /** The service-access refresh runs on an interval, so it has to be handed back when the app stops */
   onModuleDestroy(): void {
     this.client.stop();
   }
 
-  /** Left alone when the application already parses forms; the SDK is a guest in someone else's server */
+  // Left alone when the application already parses forms
   private registerFormParser(): void {
     if (this.fastify.hasContentTypeParser(FORM_CONTENT_TYPE)) return;
     this.fastify.addContentTypeParser(FORM_CONTENT_TYPE, { parseAs: 'string' }, (_request, body, done) => done(null, Object.fromEntries(new URLSearchParams(body))));
@@ -115,14 +96,9 @@ export class AuthModule {
     const client = new AuthClient(config);
     const sessions = new AppSessionService(client, browser);
 
-    /** Route metadata is settled before the registry scans the controller, so this must happen here */
     if (browser.enabled) configureAuthRoutes(routes);
 
-    /**
-     * Handed over through factories rather than `useValue`, because `@Module` deep-freezes its
-     * metadata: a value provider would freeze these live objects along with it, and a frozen client
-     * can no longer cache its own discovery document.
-     */
+    // Factories, not `useValue`: `@Module` deep-freezes its metadata, and a frozen client can no longer cache its discovery document
     return {
       module: AuthModule,
       imports: [FastifyModule],

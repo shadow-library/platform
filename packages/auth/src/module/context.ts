@@ -17,16 +17,8 @@ declare module '@shadow-library/fastify' {
   interface ContextService extends ContextExtension {}
 }
 
-/**
- * Declaring the constants
- *
- * The principal lives in the request-scoped context store, keyed by a module-private symbol; the
- * only supported reads are the `getAuthPrincipal*` methods installed onto the app's
- * `ContextService` when `AuthModule` boots.
- */
 export const AUTH_PRINCIPAL: unique symbol = Symbol('shadow-library:auth-principal');
 
-/** Installs the auth accessor methods onto the application's context service */
 export function extendContextWithAuth(context: ContextService): void {
   context.extend({
     getAuthPrincipal(): AuthPrincipal {

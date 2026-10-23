@@ -15,17 +15,14 @@ import {
 import { retryAfterSecondsOf, TOO_MANY_REQUESTS } from './transport';
 
 export interface AppSessionClientOptions {
-  /** Where identity is reached over the back channel; the public issuer unless `identityUrl` overrides it */
   baseUrl: string;
   fetchFn: FetchLike;
 
-  /** Supplies the application's own M2M bearer, which must carry the `app-session:manage` scope */
+  /** Must carry the `app-session:manage` scope */
   getToken: () => Promise<string>;
 
-  /** Drops that cached M2M token so a rejected credential is retried once with a fresh one */
   invalidateToken: () => void;
 
-  /** Turns a narrowed mint into a thrown `SCOPE_NOT_GRANTED` rather than a warning */
   strictScopes?: boolean;
 }
 
@@ -35,28 +32,20 @@ interface ErrorBody {
   message?: string;
 }
 
-/**
- * Declaring the constants
- *
- * The client half of the first-party app-session protocol. Every route is machine-to-machine: the
- * caller proves it is *this* application with its own M2M token, and the handle only says *which*
- * of its sessions is meant. That split is the security property the whole model rests on, so the
- * handle never leaves this file's request bodies — it is not logged, and it never reaches any host
- * but the identity service.
- */
+// Every route is machine-to-machine: the caller proves it is this application with its own M2M token and the handle only says which session is meant.
+// That split is the security property the model rests on, so the handle stays in request bodies, is never logged, and reaches no host but identity.
 const SESSIONS_PATH = '/api/v1/app-sessions';
 
-/** Identity's codes for the failures a caller is expected to branch on rather than retry blindly */
 const SESSION_INVALID_CODE = 'AUTH_005';
 const ELEVATION_REQUIRED_CODE = 'AUTH_006';
 
-/** The step-up existed but named another beneficiary; a retry cannot fix it, only a fresh prompt can */
+/** The step-up named another beneficiary; a retry cannot fix it, only a fresh prompt can */
 const ELEVATION_INTENT_MISMATCH_CODES = ['AUTH_007', 'elevation_intent_mismatch'];
 
-/** Identity's application-access denials; on the organisation routes they mean "not reachable through that one" */
+/** On the organisation routes these mean "not reachable through that one" */
 const ACCESS_DENIED_CODES = ['APP_006', 'APP_007'];
 
-/** RFC 6749 §5.2 codes, as identity's own catalog keys and as the bare OAuth strings */
+/** RFC 6749 §5.2 codes, both as identity's catalog keys and as bare OAuth strings */
 const INVALID_GRANT_CODES = ['OAU_003', 'invalid_grant'];
 const INVALID_TARGET_CODES = ['OAU_005', 'invalid_target'];
 const INVALID_SCOPE_CODES = ['OAU_004', 'invalid_scope'];
@@ -69,14 +58,12 @@ export class AppSessionClient {
     this.baseUrl = `${options.baseUrl.replace(/\/+$/, '')}${SESSIONS_PATH}`;
   }
 
-  /** Redeems the authorization code for an opaque session handle; the handle is returned only once */
   async createSession(input: AppSessionCreateInput): Promise<AppSession> {
     const session = await this.request<AppSession>('POST', '', input);
     this.logger.info('app session created', { userId: session.userId, expiresAt: session.expiresAt, scope: session.scope });
     return session;
   }
 
-  /** Mints an access token from the session handle, optionally from its live step-up grant */
   async mintToken(input: AppSessionTokenInput): Promise<AppSessionToken> {
     const minted = await this.request<AppSessionToken>('POST', '/token', input);
     const token: AppSessionToken = { ...minted, grantedScopes: parseScopes(minted.scope) };
@@ -88,48 +75,32 @@ export class AppSessionClient {
     return token;
   }
 
-  /**
-   * Spends the user's step-up on the identity domain into a grant for this app session and this
-   * audience only. Answers `ELEVATION_REQUIRED` when the user has not stepped up yet.
-   */
   async claimElevation(sessionHandle: string, resource: string): Promise<AppSessionElevation> {
     const elevation = await this.request<AppSessionElevation>('POST', '/elevation', { sessionHandle, resource });
     this.logger.info('elevation grant claimed', { resource, expiresAt: elevation.expiresAt });
     return elevation;
   }
 
-  /**
-   * The organisations this session may act in. A POST because the handle is a bearer secret and must
-   * not reach a query string, an access log or a `Referer` header — the same reason every sibling
-   * route carries it in the body.
-   */
+  /** A POST because the handle is a bearer secret and must not reach a query string, access log or `Referer` header */
   async listOrganisations(sessionHandle: string): Promise<AppSessionOrganisation[]> {
     const body = await this.request<{ organisations: AppSessionOrganisation[] }>('POST', '/organisations', { sessionHandle });
     return body.organisations;
   }
 
-  /**
-   * Moves the session into another organisation it may act in. Identity answers with a **rotated**
-   * handle: the one passed in is dead on return, and the caller must store the new one or it will
-   * never mint again.
-   */
   async switchOrganisation(sessionHandle: string, organisationId: string): Promise<SwitchedOrganisation> {
     const switched = await this.request<SwitchedOrganisation>('POST', '/organisation', { sessionHandle, organisationId });
     this.logger.info('app session switched organisation', { organisationId: switched.organisationId, expiresAt: switched.expiresAt });
     return switched;
   }
 
-  /** Ends this application's session only; the central identity session is untouched */
   async revokeSession(sessionHandle: string): Promise<void> {
     await this.request<{ success: boolean }>('DELETE', '', { sessionHandle });
     this.logger.info('app session revoked');
   }
 
   /**
-   * Minting answers 200 with whatever scope survived filtering rather than refusing, so a caller that
-   * never compares gets a token quietly missing the capability its API is about to check for. The
-   * delta is always logged; `strictScopes` makes it fatal for deployments where a partial grant is
-   * worse than an outright failure.
+   * Minting answers 200 with whatever scope survived, so a caller that never compares gets a token quietly missing a capability; the delta is always logged and
+   * `strictScopes` makes it fatal
    */
   private assertScopesSurvived(input: AppSessionTokenInput, token: AppSessionToken): void {
     const requested = parseScopes(input.scope);
@@ -141,11 +112,7 @@ export class AppSessionClient {
     this.logger.warn('identity narrowed the minted scope; the token carries less than was requested', detail);
   }
 
-  /**
-   * One round trip with a single retry reserved for the case where *our own* M2M token was the thing
-   * rejected. A 401 that identity attributes to the handle is terminal — retrying with a fresh
-   * service token would only ask the same question twice.
-   */
+  /** One retry only when our own M2M token was rejected; a 401 attributed to the handle is terminal */
   private async request<T>(method: string, path: string, body: unknown): Promise<T> {
     const response = await this.dispatch(method, path, body, await this.options.getToken());
     if (response.status !== 401) return this.parse<T>(response, method, path);
@@ -165,7 +132,7 @@ export class AppSessionClient {
       .catch((error: Error) => throwError(this.logged(AuthErrorCode.APP_SESSION_FAILED.create({ reason: `${method} ${SESSIONS_PATH}${path} failed: ${error.message}` }))));
   }
 
-  /** A throttle is marked as one, with identity's hint, so the guard can answer a retryable 503 instead of restarting the login */
+  /** A throttle is marked with identity's hint so the guard can answer a retryable 503 instead of restarting the login */
   private async parse<T>(response: Response, method: string, path: string): Promise<T> {
     if (response.ok) return (await response.json()) as T;
     if (response.status === TOO_MANY_REQUESTS) {
@@ -193,14 +160,12 @@ export class AppSessionClient {
     return this.logged(AuthErrorCode.APP_SESSION_FAILED.create({ reason: `${SESSIONS_PATH}${path} returned http ${status}: ${failure.reason}` }));
   }
 
-  /** Records the failure at error level before it propagates, keeping guard throws single-line */
   private logged(error: AppError): AppError {
     this.logger.error(error.message, { code: error.code, reason: error.data?.reason });
     return error;
   }
 }
 
-/** A `scope` parameter is space separated on the wire, matching how it travels in an OAuth request */
 function parseScopes(scope: string | undefined): string[] {
   return (scope ?? '').split(' ').filter(Boolean);
 }

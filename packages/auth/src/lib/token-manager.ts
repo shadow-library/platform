@@ -23,13 +23,7 @@ interface TokenEndpointResponse {
   expires_in?: number;
 }
 
-/**
- * Declaring the constants
- *
- * Client-credentials tokens are cached per (resource, scopes) until shortly before expiry, and
- * concurrent callers share one in-flight request (singleflight). Failures surface immediately and
- * are never cached, so a misconfigured client cannot cause a retry storm.
- */
+// Failures are never cached and surface immediately, so a misconfigured client cannot cause a retry storm
 const DEFAULT_REFRESH_SKEW_SECONDS = 60;
 
 export class ServiceTokenManager {
@@ -69,14 +63,13 @@ export class ServiceTokenManager {
     const document = await this.options.discovery.get();
     const scopes = [...(options.scopes ?? [])].sort();
 
-    /** RFC 6749 §2.3.1: the token endpoint takes form-encoded bodies */
     const authentication = await buildClientAuthentication(client);
     const headers: Record<string, string> = { 'content-type': 'application/x-www-form-urlencoded', ...authentication.headers };
     const body: Record<string, string> = { grant_type: 'client_credentials', ...authentication.body };
     if (scopes.length > 0) body.scope = scopes.join(' ');
     if (options.resource) body.resource = options.resource;
 
-    /** Never the body: it carries the client assertion, which is a live bearer credential */
+    // Never log the body: it carries the client assertion, a live bearer credential
     this.logger.debug('requesting service token', { url: document.token_endpoint, clientId: client.id, resource: options.resource, scopes });
     const response = await this.options
       .fetchFn(document.token_endpoint, { method: 'POST', headers, body: new URLSearchParams(body).toString() })
@@ -93,7 +86,6 @@ export class ServiceTokenManager {
     return payload.access_token;
   }
 
-  /** Records the failure at error level before it propagates, keeping guard throws single-line */
   private logged(error: AppError): AppError {
     this.logger.error(error.message);
     return error;

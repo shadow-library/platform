@@ -2,12 +2,7 @@ import { describe, expect, it } from 'bun:test';
 
 import { BOT_KEY_PREFIX, botKeyIdToUuid, formatBotKey, isBotKeyShaped, parseBotKey } from '@shadow-library/auth';
 
-/**
- * Declaring the constants
- *
- * The vector was computed independently of the SDK (Python's `zlib.crc32` and integer base62), so it
- * pins the wire format identity mints against rather than whatever this implementation happens to do.
- */
+// The vector was computed independently of the SDK (Python `zlib.crc32` and integer base62), so it pins the wire format identity mints against
 const VECTOR_UUID = '0190f5a2-7c3e-7d4b-9a1f-2b3c4d5e6f70';
 const VECTOR_SECRET = Uint8Array.from({ length: 32 }, (_, index) => index);
 const VECTOR_KEY = 'sl_bot_02xEokPYuqAXCFGP9guBLk_003aUlTJC7tjlCTQj2uNU3MFagCXG9LRKRcwGkBIDlf_1QWt8A';

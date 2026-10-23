@@ -16,13 +16,8 @@ interface Batch {
   commands: string[];
 }
 
-/**
- * Declaring the constants
- *
- * Fastify validates a route's schemas between `preValidation` and `preHandler`. While the guard sat on
- * `preHandler` an anonymous caller could POST a deliberately broken body and read the 422 field errors
- * back, learning the shape of a route it was never allowed to reach. The guard now answers first.
- */
+// Fastify validates schemas between `preValidation` and `preHandler`; on `preHandler` an anonymous caller could POST a broken body and read the 422 field errors, learning
+// the shape of a route it may not reach
 const CLIENT = { id: 'svc-batches', secret: 's3cr3t' };
 const AUDIENCE = 'api://batches';
 const VALID: Batch = { commands: ['noop'] };
@@ -64,7 +59,7 @@ describe('guard lifecycle ordering', () => {
   beforeAll(async () => {
     idp = await createTestIdP({ clientId: CLIENT.id, clientSecret: CLIENT.secret });
 
-    /** `appId` is named because `Config` is process-wide and a sibling spec's `AUTH_APP_ID` would otherwise be inherited here */
+    // `appId` is named because `Config` is process-wide and a sibling spec's `AUTH_APP_ID` would otherwise be inherited
     const auth = AuthModule.forRoot({ issuer: idp.issuer, audience: AUDIENCE, appId: CLIENT.id, client: CLIENT });
 
     @Module({ imports: [FastifyModule.forRoot({ imports: [auth, BatchModule] })] })

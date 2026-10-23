@@ -15,13 +15,6 @@ export interface AuthorizationUrlInput {
   acrValues?: string[];
 }
 
-/**
- * Declaring the constants
- *
- * Shared by both flows so a third-party relying party and a first-party app session cannot drift
- * apart on what an authorization request looks like — only what they redeem the code for differs.
- */
-
 export function buildAuthorizationUrl(input: AuthorizationUrlInput): string {
   const url = new URL(input.authorizationEndpoint);
   url.searchParams.set('response_type', 'code');

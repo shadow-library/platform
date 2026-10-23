@@ -11,13 +11,6 @@ interface MockRouter {
   mockRequest(options: { method: string; url: string; headers?: Record<string, string>; payload?: string }): Promise<MockResponse>;
 }
 
-/**
- * Declaring the constants
- *
- * The whole point of this spec: a service declares its own routes, imports `AuthModule.forRoot()`,
- * and gets login, callback, logout, session, step-up and principal resolution without writing a line
- * of auth code. Everything below drives that integration over real HTTP through the real router.
- */
 const CLIENT = { id: 'svc-reports', secret: 's3cr3t' };
 const AUDIENCE = 'api://reports';
 const REDIRECT_URI = 'https://reports.test/auth/callback';
@@ -25,7 +18,6 @@ const SESSION_COOKIE = '__Host-shadow-session';
 const STATE_COOKIE = '__Host-shadow-session-login';
 const USER = 'user-42';
 
-/** A top-level navigation, which is what earns a browser a redirect rather than a status code */
 const BROWSER = { accept: 'text/html,application/xhtml+xml' };
 
 @HttpController('/reports')
@@ -68,7 +60,6 @@ describe('first-party browser flow', () => {
               client: CLIENT,
               browser: { redirectUri: REDIRECT_URI, scopes: ['openid', 'reports:read'], allowedRedirects: ['https://reports.test'] },
 
-              /** Off by default for a first-party app, so this spec has to ask for it to exercise it */
               routes: { backchannelLogout: '/backchannel-logout' },
             }),
             ReportModule,
@@ -90,12 +81,11 @@ describe('first-party browser flow', () => {
   const get = (url: string, cookie?: string, headers: Record<string, string> = {}) =>
     router.mockRequest({ method: 'GET', url, headers: { ...headers, ...(cookie ? { cookie } : {}) } });
 
-  /** `light-my-request` types `json()` as `undefined`, so the payload is parsed directly */
+  // `light-my-request` types `json()` as `undefined`, so the payload is parsed directly
   const body = (response: MockResponse): Record<string, unknown> => JSON.parse(response.payload) as Record<string, unknown>;
 
   const post = (url: string, cookie?: string) => router.mockRequest({ method: 'POST', url, headers: cookie ? { cookie } : {} });
 
-  /** Pulls one cookie out of the `set-cookie` headers the way a browser would */
   const readCookie = (response: MockResponse, name: string): string | undefined => {
     const headers = response.headers['set-cookie'];
     const all = Array.isArray(headers) ? headers : [headers];
@@ -103,7 +93,6 @@ describe('first-party browser flow', () => {
     return typeof match === 'string' ? (match.split(';')[0] as string) : undefined;
   };
 
-  /** Walks the login the way a browser does: bounce to identity, come back with a code and the state */
   const login = async (sub = USER): Promise<string> => {
     const started = await get('/auth/login?return_to=/reports');
     expect(started.statusCode).toBe(302);
@@ -127,13 +116,11 @@ describe('first-party browser flow', () => {
     expect(authorize.searchParams.get('response_type')).toBe('code');
     expect(authorize.searchParams.get('client_id')).toBe(CLIENT.id);
     expect(authorize.searchParams.get('redirect_uri')).toBe(REDIRECT_URI);
-    /** The protocol scopes lead every request: `profile` is what lets the app be told who signed in. */
     expect(authorize.searchParams.get('scope')).toBe('openid profile reports:read');
     expect(authorize.searchParams.get('code_challenge_method')).toBe('S256');
     expect(authorize.searchParams.get('resource')).toBe(AUDIENCE);
     expect(authorize.searchParams.get('code_challenge')).toBeTruthy();
 
-    /** The cookie is the only place the callback's `state` and verifier are remembered — no server-side store */
     const carried = decodeLoginState(readCookie(started, STATE_COOKIE)?.split('=')[1]);
     expect(carried?.state).toBe(authorize.searchParams.get('state') as string);
     expect(carried?.codeVerifier).toBeString();
@@ -185,7 +172,6 @@ describe('first-party browser flow', () => {
       expect((await get('/auth/userinfo')).statusCode).toBe(401);
     });
 
-    /** The whole point of caching it: a name is read on every screen and must not cost a round trip each time. */
     it('should serve a repeat read from the session cache rather than asking identity again', async () => {
       idp.setUserProfile(USER, { name: 'Leander Paul' });
       await get('/auth/userinfo', sessionCookie);
@@ -196,7 +182,6 @@ describe('first-party browser flow', () => {
       expect(idp.getRequestCount('/oauth2/userinfo')).toBe(after);
     });
 
-    /** A name is decoration; an unreachable identity must degrade to the subject, not fail the screen. */
     it('should fall back to the subject when identity cannot be reached', async () => {
       const cookie = await login('degrading-user');
       idp.setEndpointFailure('/oauth2/userinfo', true);
@@ -208,7 +193,7 @@ describe('first-party browser flow', () => {
       idp.setEndpointFailure('/oauth2/userinfo', false);
     });
 
-    /** The failure must not be cached, or one blip would leave this person nameless for the whole window. */
+    // The failure must not be cached, or one blip would leave this person nameless for the whole TTL
     it('should resolve the name on the next read after a failure', async () => {
       const cookie = await login('recovering-user');
       idp.setUserProfile('recovering-user', { name: 'Recovered Name' });
@@ -233,10 +218,10 @@ describe('first-party browser flow', () => {
   it('should refuse to send the browser to a return_to outside the allow-list', async () => {
     expect((await get('/auth/login?return_to=https://evil.test/steal')).statusCode).toBe(400);
 
-    /** Protocol-relative targets read as a path to a careless check and as an origin to a browser */
+    // Protocol-relative targets read as a path to a careless check and as an origin to a browser
     expect((await get(`/auth/login?return_to=${encodeURIComponent('//evil.test')}`)).statusCode).toBe(400);
 
-    /** ...and a browser folds a backslash into a slash, so `/\evil.test` is the same attack spelled differently */
+    // A browser folds a backslash into a slash, so `/\evil.test` is the same attack
     expect((await get(`/auth/login?return_to=${encodeURIComponent('/\\evil.test')}`)).statusCode).toBe(400);
     expect((await get(`/auth/login?return_to=${encodeURIComponent('/\\\\evil.test')}`)).statusCode).toBe(400);
     expect((await get('/auth/login?return_to=https://reports.test/dashboard')).statusCode).toBe(302);
@@ -250,7 +235,7 @@ describe('first-party browser flow', () => {
     const afterFirst = idp.getRequestCount('/api/v1/app-sessions/token');
     expect(afterFirst).toBe(before + 1);
 
-    /** A rejected handle is remembered as dead, so a retry loop cannot amplify into the identity service */
+    // A rejected handle is remembered as dead, so a retry loop cannot amplify into the identity service
     expect((await get('/reports', forged)).statusCode).toBe(401);
     expect((await get('/reports', forged)).statusCode).toBe(401);
     expect(idp.getRequestCount('/api/v1/app-sessions/token')).toBe(afterFirst);
@@ -294,7 +279,7 @@ describe('first-party browser flow', () => {
       expect(target.searchParams.get('acr_values')).toBe('AAL2');
       expect(target.searchParams.get('return_to')).toContain('claimed=1');
 
-      /** Naming the beneficiary is what stops another application claiming the resulting window first */
+      // Naming the beneficiary stops another application claiming the window first
       expect(target.searchParams.get('client_id')).toBe(CLIENT.id);
       expect(target.searchParams.get('resource')).toBe(AUDIENCE);
     });
@@ -305,7 +290,7 @@ describe('first-party browser flow', () => {
       const response = await get('/auth/step-up?return_to=%2Freports%2Fsensitive', elevated);
       expect(response.statusCode).toBe(302);
 
-      /** Retrying the claim could never succeed; only a fresh prompt naming this application can */
+      // Retrying the claim could never succeed; only a fresh prompt naming this application can
       const target = new URL(response.headers.location as string);
       expect(target.searchParams.get('client_id')).toBe(CLIENT.id);
       expect(target.searchParams.get('return_to')).toContain('retried=1');
@@ -355,7 +340,6 @@ describe('first-party browser flow', () => {
       expect(response.statusCode).toBe(200);
       expect(body(response)).toEqual({ sub: 'user-stepping-up', aal: 'AAL1' });
 
-      /** The elevated mint asked for it explicitly; the ordinary one never does */
       expect(idp.getLastMintRequest()).toMatchObject({ resource: AUDIENCE, elevated: false });
     });
   });
@@ -402,7 +386,7 @@ describe('first-party browser flow', () => {
       expect(response.statusCode).toBe(200);
       idp.setEndpointFailure('/api/v1/app-sessions', false);
 
-      /** Identity never confirmed the revocation, so the handle may well still be live there — it must not be live here */
+      // Identity never confirmed the revocation, so the handle may still be live there but must not be live here
       expect((await get('/reports', cookie)).statusCode).toBe(401);
     });
 
@@ -454,11 +438,7 @@ describe('first-party browser flow', () => {
       expect(body(await get('/auth/session', rotated)).org).toBe(TEAM.id);
     });
 
-    /**
-     * Rotation is the invalidation mechanism, not hygiene: tokens are cached against the handle, and a
-     * switch served by one replica can never reach a sibling's cache. A handle no client will present
-     * again is unreachable everywhere at once.
-     */
+    // Rotation is the invalidation mechanism: tokens are cached against the handle, and a switch on one replica cannot reach a sibling's cache
     it('should retire the previous cookie so no cached token survives the switch', async () => {
       const cookie = await login(MEMBER);
 
@@ -483,11 +463,7 @@ describe('first-party browser flow', () => {
   });
 });
 
-/**
- * RP-initiated logout needs its own application, because configuring `postLogoutRedirect` changes what
- * every logout answers with — the suite above asserts the bare `{ success: true }` of a deployment that
- * ends logout locally.
- */
+// Separate application: configuring `postLogoutRedirect` changes what every logout answers with
 describe('RP-initiated logout', () => {
   const POST_LOGOUT = 'https://reports.test/signed-out';
 
@@ -561,11 +537,7 @@ describe('RP-initiated logout', () => {
     expect(url.searchParams.get('post_logout_redirect_uri')).toBe(POST_LOGOUT);
   });
 
-  /**
-   * The regression guard. This route answers a `fetch`, which cannot hand a user to a cross-origin
-   * redirect — it would either fail CORS or follow it as a background request the browser never lands on,
-   * ending the local session while leaving the identity session live.
-   */
+  // A `fetch` cannot hand a user to a cross-origin redirect: it would end the local session while leaving the identity session live
   it('should answer with a status the caller can read, never a redirect', async () => {
     const response = await logout(await login());
 

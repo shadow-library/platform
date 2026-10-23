@@ -62,7 +62,6 @@ describe('AuthController under an identity throttle', () => {
   let sessions: AppSessionService;
   let cookieName: string;
 
-  /** Answers the app-session create and elevation calls the way identity's rate limiter does */
   const throttling: FetchLike = (url, init) =>
     ['/api/v1/app-sessions', '/api/v1/app-sessions/elevation'].includes(new URL(url).pathname)
       ? Promise.resolve(Response.json({ code: 'SEC_001', message: 'Too many requests' }, { status: 429, headers: { 'retry-after': '30' } }))

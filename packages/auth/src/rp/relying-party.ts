@@ -63,27 +63,12 @@ interface TokenEndpointResponse {
   refresh_token?: string;
 }
 
-/**
- * Declaring the constants
- *
- * The protocol core of an OIDC relying party: authorization URLs, PKCE, code exchange, ID-token
- * validation. Session-cookie management and back-channel logout are deliberately left to the
- * consuming app (see docs/identity.md).
- *
- * **For third-party and external consumers only.** A Shadow app is first-party: it logs users in
- * through `AuthModule`'s browser routes, exchanges the code for an opaque app-session handle, and
- * holds no tokens at rest (D-18). Reaching for this class inside a Shadow app means reintroducing the
- * token pair that model exists to remove — and hand-writing the login, cookie and cache code
- * `AuthModule.forRoot()` already provides.
- */
+// For third-party and external consumers only: a Shadow app logs in through `AuthModule`'s browser routes and holds an opaque app-session handle, no tokens at rest.
+// Using this class inside one reintroduces the token pair that model exists to remove. Session cookies and back-channel logout are left to the consuming app.
 const DEFAULT_SCOPES = ['openid'];
 const DEFAULT_CLOCK_SKEW_SECONDS = 60;
 const DEFAULT_JWKS_TTL_SECONDS = 300;
 
-/**
- * Injectable class: `RelyingPartyModule.forRoot()` registers it under its own class token so app
- * services take it as an ordinary constructor dependency. Third-party consumers only — see above.
- */
 export class RelyingParty {
   private readonly logger = Logger.getLogger(NAMESPACE, RelyingParty.name);
   private readonly issuer: string;
@@ -99,8 +84,7 @@ export class RelyingParty {
 
     this.issuer = config.issuer.replace(/\/+$/, '');
     this.transport = withTimeout(config.fetch ?? ((url, init) => fetch(url, init)), config.timeout);
-    // A relying party is third-party by definition, so it has no in-cluster route to identity: the
-    // issuer is both the identity to validate and the address to dial. The split is AuthClient's.
+    // Third-party, so no in-cluster route to identity: the issuer is both the identity to validate and the address to dial
     this.discovery = new DiscoveryClient(this.issuer, this.issuer, this.transport);
     this.jwks = new RemoteJwks({ discovery: this.discovery, fetchFn: this.transport, ttlSeconds: config.cache?.jwksTtlSeconds ?? DEFAULT_JWKS_TTL_SECONDS });
   }
@@ -124,7 +108,7 @@ export class RelyingParty {
       resource: options.resource,
     });
 
-    /** Never `state` or `nonce`: both are single-use secrets for as long as the flow is in flight */
+    // Never log `state` or `nonce`: both are single-use secrets while the flow is in flight
     this.logger.debug('authorization url created', { scopes, resource: options.resource });
     return { url, state, nonce, codeVerifier: pkce.verifier };
   }
@@ -173,7 +157,6 @@ export class RelyingParty {
     return verifyJwt(idToken, kid => this.jwks.getKey(kid), expectations);
   }
 
-  /** Records the failure at error level before it propagates, keeping guard throws single-line */
   private logged(error: AppError): AppError {
     this.logger.error(error.message);
     return error;

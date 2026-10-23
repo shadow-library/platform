@@ -7,25 +7,13 @@ import { type AuthRouteAccess, type AuthRouteMetadata, type RequiredAuthRoute } 
 
 type DeclaredAuthRoute = Partial<Omit<RequiredAuthRoute, 'access'>> & { access?: unknown };
 
-/**
- * Declaring the constants
- *
- * A route's declared access is merged from its class and its method before anything reads it, so a
- * method-level `@Public()` under a class-level `@RequireScope()` arrives as `public` still carrying
- * the class's scopes. Which of the two was meant cannot be told from the merged value, so the route
- * is refused at registration rather than served either way.
- */
+// Access is merged from class and method before it is read, so a method-level `@Public()` under a class-level `@RequireScope()` arrives as `public` still carrying
+// scopes; which was meant cannot be told, so the route is refused at registration.
 const ROUTE_ACCESS: readonly AuthRouteAccess[] = ['public', 'optional', 'required'];
 const REQUIREMENTS: readonly (keyof DeclaredAuthRoute)[] = ['scopes', 'permission', 'failOpen', 'highRisk', 'elevated', 'botPermissions'];
 
 const describeRoute = (route: HandlerMetadata): string => `${String(route.method ?? '*')} ${String(route.path ?? '/')}`;
 
-/**
- * The access a route is actually served with in `mode`. An undecorated route follows the mode —
- * anonymous when `public`, a plain session requirement when `private` — and `@OptionalAuth()` is
- * promoted to that requirement in `private` mode; `@Public()` and the requiring decorators mean the
- * same thing in both.
- */
 export function resolveRoutePolicy(route: HandlerMetadata, mode: AuthAccessMode): AuthRouteMetadata {
   const declared = route[AUTH_ROUTE_METADATA] as DeclaredAuthRoute | undefined;
   if (!declared) return mode === 'private' ? { access: 'required' } : { access: 'public' };
@@ -44,7 +32,6 @@ export function resolveRoutePolicy(route: HandlerMetadata, mode: AuthAccessMode)
   return { access };
 }
 
-/** The application's resolved access mode, for app code that has to agree with the guard — a cache policy, a sentinel, a context resolver */
 export class AuthAccessPolicy {
   constructor(readonly mode: AuthAccessMode) {}
 

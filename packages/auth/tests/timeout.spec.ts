@@ -10,7 +10,6 @@ const AUDIENCE = 'api://pulse';
 const ISSUER = 'https://identity.test';
 const REDIRECT_URI = 'https://app.test/auth/callback';
 
-/** A transport that never resolves on its own, so only the injected timeout signal can settle it */
 const hangingFetch = (_url: string, init: RequestInit = {}): Promise<Response> =>
   new Promise((_resolve, reject) => init.signal?.addEventListener('abort', () => reject(init.signal?.reason)));
 
@@ -48,7 +47,6 @@ describe('AuthClient.fetchService timeout', () => {
   let slow: ReturnType<typeof Bun.serve>;
 
   beforeAll(() => {
-    /** A reachable service that never answers, resolved through the svc:// override below */
     slow = Bun.serve({ port: 0, fetch: () => new Promise<Response>(() => {}) });
     process.env.SERVICE_URL_SLOW_SVC = `http://127.0.0.1:${slow.port}`;
   });

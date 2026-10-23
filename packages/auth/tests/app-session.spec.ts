@@ -55,14 +55,14 @@ describe('AppSessionClient', () => {
   it('should refuse a claim on a step-up granted to another application or resource', async () => {
     const session = await createSession('someone-elses-step-up');
 
-    /** D-19: the step-up names its beneficiary, so whoever asks first cannot simply take the window */
+    // The step-up names its beneficiary, so whoever asks first cannot take the window
     idp.setSteppedUp('someone-elses-step-up', { clientId: 'svc-somebody-else' });
     await expect(auth.appSessions.claimElevation(session.sessionHandle, AUDIENCE)).rejects.toMatchObject({ code: 'ELEVATION_INTENT_MISMATCH', status: 403 });
 
     idp.setSteppedUp('someone-elses-step-up', { clientId: CLIENT.id, resource: OTHER_AUDIENCE });
     await expect(auth.appSessions.claimElevation(session.sessionHandle, AUDIENCE)).rejects.toMatchObject({ code: 'ELEVATION_INTENT_MISMATCH' });
 
-    /** The step-up is still there to be spent — a mismatch refuses the claim, it does not consume it */
+    // A mismatch refuses the claim without consuming the step-up
     idp.setSteppedUp('someone-elses-step-up', { clientId: CLIENT.id, resource: AUDIENCE });
     await expect(auth.appSessions.claimElevation(session.sessionHandle, AUDIENCE)).resolves.toMatchObject({ expiresAt: expect.any(String) });
   });
@@ -77,7 +77,7 @@ describe('AppSessionClient', () => {
     const elevated = await auth.appSessions.mintToken({ sessionHandle: session.sessionHandle, resource: AUDIENCE, elevated: true });
     expect(elevated.aal).toBe('AAL2');
 
-    /** The grant covers one audience; the same session asking for another is still unelevated */
+    // The grant covers one audience; the same session asking for another is still unelevated
     await expect(auth.appSessions.mintToken({ sessionHandle: session.sessionHandle, resource: OTHER_AUDIENCE, elevated: true })).rejects.toMatchObject({
       code: 'ELEVATION_REQUIRED',
     });
@@ -95,7 +95,6 @@ describe('AppSessionClient', () => {
   it('should surface the scope that survived filtering, not the one requested', async () => {
     const session = await createSession('narrowed', ['openid', 'reports:read']);
 
-    /** Minting answers 200 with whatever survived, so the delta has to reach the caller somehow */
     const token = await auth.appSessions.mintToken({ sessionHandle: session.sessionHandle, resource: AUDIENCE, scope: 'reports:read reports:write' });
     expect(token.grantedScopes).toEqual(['reports:read']);
     expect(token.scope).toBe('reports:read');
@@ -146,12 +145,12 @@ describe('AppSessionClient', () => {
     const handleOnly = new AuthClient({ issuer: idp.issuer, audience: AUDIENCE, client: CLIENT, fetch: idp.handleOnlyTransport() });
     const session = await createSession('handle-alone');
 
-    /** The property the whole first-party model rests on: the handle says *which* session, not *who asks* */
+    // The handle says which session, not who asks
     await expect(handleOnly.appSessions.mintToken({ sessionHandle: session.sessionHandle, resource: AUDIENCE })).rejects.toMatchObject({ code: 'APP_SESSION_FAILED' });
     await expect(handleOnly.appSessions.claimElevation(session.sessionHandle, AUDIENCE)).rejects.toMatchObject({ code: 'APP_SESSION_FAILED' });
     await expect(handleOnly.appSessions.revokeSession(session.sessionHandle)).rejects.toMatchObject({ code: 'APP_SESSION_FAILED' });
 
-    /** ...and the session is still there, so the refusal was authentication, not an accidental revoke */
+    // The session is still there, so the refusal was authentication, not an accidental revoke
     await expect(auth.appSessions.mintToken({ sessionHandle: session.sessionHandle, resource: AUDIENCE })).resolves.toMatchObject({ tokenType: 'Bearer' });
     handleOnly.stop();
   });
@@ -189,10 +188,9 @@ describe('AccessTokenCache', () => {
     const cache = new AccessTokenCache();
     const requested = { handleHash, audience: AUDIENCE, elevated: false, scope: 'reports:read reports:write' };
 
-    /** Identity granted only the read scope; nothing may end up labelled as carrying the write scope */
+    // Nothing may end up labelled as carrying the write scope identity did not grant
     cache.set(requested, token('AAL1', 600, ['reports:read']));
 
-    /** The entry is honest about what it holds, and no other request borrows it without minting */
     expect(cache.get(requested)?.grantedScopes).toEqual(['reports:read']);
     expect(cache.get({ handleHash, audience: AUDIENCE, elevated: false, scope: 'reports:read' })).toBeUndefined();
   });
@@ -205,7 +203,7 @@ describe('AccessTokenCache', () => {
     cache.set(wide, token('AAL1', 600, ['reports:read']));
     cache.set(narrow, token('AAL1', 600, ['reports:read']));
 
-    /** Both requests resolved to the same grant, so evicting it must take both lookups with it */
+    // Both requests resolved to the same grant, so evicting it must take both lookups with it
     cache.evictSession(handleHash);
     expect(cache.get(wide)).toBeUndefined();
     expect(cache.get(narrow)).toBeUndefined();
@@ -243,7 +241,7 @@ describe('AccessTokenCache', () => {
     const cache = new AccessTokenCache();
     const key = { handleHash, audience: AUDIENCE, elevated: true };
 
-    /** `NaN` compares false against everything, so an unchecked bound would cache an AAL2 token forever */
+    // `NaN` compares false against everything, so an unchecked bound would cache an AAL2 token forever
     cache.set(key, token('AAL2', 3600), Number.NaN);
     expect(cache.get(key)).toBeUndefined();
 
@@ -258,7 +256,7 @@ describe('AccessTokenCache', () => {
     cache.set(key, token('AAL1', 600));
     expect(cache.get(key)?.accessToken).toBe('token-AAL1');
 
-    /** 30s of life left is inside the 60s margin, so it is already unusable */
+    // 30s of life left is inside the 60s refresh margin
     cache.set(key, token('AAL1', 30));
     expect(cache.get(key)).toBeUndefined();
   });
@@ -327,7 +325,7 @@ describe('redirect allow-list', () => {
   });
 
   it('should not let one custom-scheme entry whitelist every custom-scheme target', () => {
-    /** Every non-special scheme reports its origin as the string "null", which would compare equal */
+    // Non-web schemes report origin "null", which would compare equal
     const sessions = service(['app-reports://callback']);
     expect(() => sessions.resolveReturnTo('app-evil://callback')).toThrow(/not allowed/);
     expect(() => sessions.resolveReturnTo('app-reports://callback')).toThrow(/not allowed/);
@@ -342,7 +340,6 @@ describe('login state cookie', () => {
   });
 
   it('should read a cookie written by another replica, since nothing is held server-side', () => {
-    /** The multi-instance caveat the sealed store carried is gone: no shared secret, no shared memory */
     const written = encodeLoginState(state);
     expect(decodeLoginState(written)).toEqual(state);
     expect(decodeLoginState(written)).toEqual(decodeLoginState(written));

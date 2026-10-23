@@ -6,10 +6,9 @@ import { CheckInput, CheckOptions, FetchLike } from '../interfaces';
 import { isThrottled, retryAfterHint, retryAfterSecondsOf, TOO_MANY_REQUESTS } from './transport';
 
 export interface PdpClientOptions {
-  /** Where identity is reached over the back channel; the public issuer unless `identityUrl` overrides it */
   baseUrl: string;
   fetchFn: FetchLike;
-  /** Supplies the SDK's own M2M bearer for PDP calls; a failed acquisition falls back to an unauthenticated call */
+  /** A failed acquisition falls back to an unauthenticated call */
   getToken?: () => Promise<string>;
   ttlSeconds?: number;
   maxEntries?: number;
@@ -26,26 +25,12 @@ interface PdpResponse {
   authzVersion?: number;
 }
 
-/**
- * Declaring the constants
- *
- * Decisions are cached in a small LRU keyed by (principal, organisation, action). Every PDP
- * response piggybacks the principal's `authz_version`; observing a bump discards that principal's
- * stale entries so grant changes propagate within one round-trip instead of a full TTL. Transport
- * failures and malformed responses are a DENY unless the caller explicitly opted into fail-open.
- * A bot's decision is always high-risk: its grants are revocable by an organisation admin at any time,
- * and a long-TTL entry written by a routine check would otherwise answer the guard's later ones.
- *
- * A throttle is the exception to "failure is a DENY". Identity said "not now", not "no", so reading it
- * as a denial would refuse an entitled caller with a 403 that no retry could ever be expected to fix.
- * It is rethrown as the 503 it is, carrying identity's hint, unless the caller opted into fail-open.
- *
- * Identity's limiters are fixed windows, so `Retry-After` is what is left of the current one: a retry
- * can only succeed once it has elapsed, and only a window about to close is worth holding the request
- * for. So a throttle is retried once, and only when identity named a wait within
- * `THROTTLE_MAX_WAIT_SECONDS`; with no hint the retry would land inside the same window and merely add
- * load. The jitter keeps every waiter throttled at the same instant from arriving back together.
- */
+// Every PDP response piggybacks the principal's `authz_version`; a bump discards that principal's stale entries so grant changes propagate in one round trip instead of a full TTL.
+// A bot's decision is always high-risk: admins can revoke its grants at any time, and a long-TTL entry from a routine check would answer the guard's later ones.
+// A throttle is not a DENY: identity said "not now", and a 403 would refuse an entitled caller with no retry able to fix it, so it is rethrown as 503 unless `failOpen`.
+// Limiters are fixed windows and `Retry-After` is what remains of the current one, so a throttle is retried once and only when the named wait is short; with no hint the
+// retry would land in the same window.
+// The jitter keeps waiters throttled at the same instant from returning together.
 const DEFAULT_TTL_SECONDS = 900;
 const HIGH_RISK_TTL_SECONDS = 60;
 const DEFAULT_MAX_ENTRIES = 1000;
@@ -57,7 +42,6 @@ export class PdpClient {
   private readonly logger = Logger.getLogger(NAMESPACE, PdpClient.name);
   private readonly cache = new Map<string, CachedDecision>();
   private readonly versions = new Map<string, number>();
-  /** In-flight checks, keyed as the cache is — see {@link PdpClient.dedupe}. */
   private readonly inflight = new Map<string, Promise<boolean>>();
 
   constructor(private readonly options: PdpClientOptions) {}
@@ -93,15 +77,7 @@ export class PdpClient {
     return Promise.all(inputs.map(input => this.check(input, options)));
   }
 
-  /**
-   * Collapses concurrent identical checks onto a single request. The cache is only written once a
-   * response returns, so without this the exact case the cache exists for — a cold page load asking
-   * the same question N times at once — issues N identical POSTs and warms the entry N times.
-   *
-   * `highRisk` joins the key because it shortens the cached TTL: sharing across it would let a
-   * high-risk check ride on a long-TTL result, quietly widening the window it was asked to narrow.
-   * Rejections propagate to every waiter, so each caller still applies its own `failOpen`.
-   */
+  /** `highRisk` joins the key because sharing across it would let a high-risk check ride on a long-TTL result; rejections reach every waiter so each applies its own `failOpen` */
   private dedupe(key: string, options: CheckOptions, run: () => Promise<boolean>): Promise<boolean> {
     const flightKey = options.highRisk ? `${key}:high-risk` : key;
     const existing = this.inflight.get(flightKey);

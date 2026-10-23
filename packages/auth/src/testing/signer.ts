@@ -10,7 +10,6 @@ const encoder = new TextEncoder();
 
 const encodeSegment = (value: object): string => Buffer.from(JSON.stringify(value)).toString('base64url');
 
-/** Creates an ephemeral Ed25519 signer for unit tests; the public JWK is ready to publish in a JWKS */
 export async function createTestSigner(): Promise<TestSigner> {
   const pair = (await crypto.subtle.generateKey('Ed25519', true, ['sign', 'verify'])) as CryptoKeyPair;
   const kid = crypto.randomUUID();

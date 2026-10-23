@@ -7,10 +7,6 @@ const invalid = (reason: string): never => {
   throw AuthErrorCode.CONFIG_INVALID.create({ reason });
 };
 
-/**
- * Refuses a bot grant identity could only reject or, worse, accept in a shape an organisation admin
- * cannot reason about: one role per (resource, level), a valid level, and `write` implying `read`.
- */
 export function assertValidRoleCatalog(manifest: RoleCatalogManifest): void {
   const grants = new Map<string, Partial<Record<BotGrantLevel, RoleManifest>>>();
   for (const role of manifest.roles) {

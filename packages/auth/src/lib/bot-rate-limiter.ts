@@ -11,15 +11,8 @@ interface TokenBucket {
   refilledAt: number;
 }
 
-/**
- * Declaring the constants
- *
- * One token bucket per bot, per replica: the effective limit is the bot's `rl` times the replica count,
- * because consumers hold no shared store. The map is kept in least-recently-used order and capped. A
- * bucket idle for a full minute is back at capacity, so evicting it costs that bot nothing; when every
- * bucket is active, the one closest to full is evicted instead, which hands that bot back the few
- * tokens it had spent — a bounded leniency, and only once more distinct bots are active than the cap.
- */
+// Per replica, with no shared store, so the effective limit is `rl` times the replica count. An idle bucket is back at capacity, so evicting it is free;
+// when every bucket is active the closest to full is evicted, handing that bot back a few spent tokens (bounded leniency, only beyond the cap).
 const DEFAULT_MAX_BUCKETS = 10_000;
 const WINDOW_MS = 60_000;
 

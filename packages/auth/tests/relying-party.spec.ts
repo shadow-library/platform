@@ -60,7 +60,6 @@ describe('RelyingParty', () => {
     expect(captured?.contentType).toContain('application/x-www-form-urlencoded');
     expect(captured?.body).toMatchObject({ grant_type: 'authorization_code', code, redirect_uri: REDIRECT_URI, code_verifier: request.codeVerifier });
 
-    /** Basic keeps the secret out of the body entirely */
     expect(captured?.authorization).toBe(`Basic ${Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString('base64')}`);
     expect(captured?.body).not.toHaveProperty('client_secret');
   });

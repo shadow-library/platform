@@ -107,7 +107,6 @@ describe('AuthClient.syncRoles', () => {
     const auth = new AuthClient({ issuer: idp.issuer, audience: AUDIENCE, client: CLIENT });
     idp.setCatalogGuardrail(true);
 
-    /** A truncated manifest must fail loudly rather than look like something worth retrying past */
     const refusal = await auth.syncRoles(MANIFEST).catch((error: unknown) => error);
     expect(refusal).toMatchObject({ code: 'ROLE_SYNC_REFUSED', status: 409 });
     expect((refusal as AppError).message).toContain('80%');

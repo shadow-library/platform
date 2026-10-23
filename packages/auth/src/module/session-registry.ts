@@ -7,15 +7,7 @@ interface RegisteredSession {
   expiresAt: number;
 }
 
-/**
- * Declaring the constants
- *
- * Back-channel logout arrives keyed by subject, but the SDK deliberately holds no session handles
- * outside the browser's cookie — so the registry maps *hashes* of handles to the user they belong
- * to. That is enough: a revoked hash makes the next request drop its cookie and start a fresh login,
- * and identity has already ended the central session, so no mint from that handle could succeed
- * anyway. Nothing here is a credential, which is the point.
- */
+// Back-channel logout is keyed by subject but the SDK holds no handles outside the cookie, so this maps hashes of handles to users; nothing here is a credential.
 const MAX_TRACKED_SESSIONS = 50_000;
 
 /** How long a handle this process never issued stays remembered as dead once identity has rejected it */
@@ -26,11 +18,7 @@ export class SessionRegistry {
   private readonly sessions = new Map<string, RegisteredSession>();
   private readonly bySubject = new Map<string, Set<string>>();
 
-  /**
-   * Revoked hashes and when they would have expired anyway. A revoked session must not simply be
-   * forgotten: an unknown hash is treated as active on purpose, so deleting one would quietly hand
-   * the cookie back its access.
-   */
+  /** Revoked hashes with their natural expiry; forgetting one would hand the cookie back its access, since unknown hashes read as active */
   private readonly revoked = new Map<string, number>();
 
   register(handleHash: string, sub: string, expiresAt: number): void {
@@ -41,10 +29,7 @@ export class SessionRegistry {
     this.bySubject.set(sub, hashes);
   }
 
-  /**
-   * Whether this handle may still be presented. Unknown hashes answer `true`: a process that
-   * restarted, or an instance that never served the login, must not log everybody out.
-   */
+  /** Unknown hashes answer `true`: a restarted process, or an instance that never served the login, must not log everybody out */
   isActive(handleHash: string): boolean {
     if (this.revoked.has(handleHash)) return false;
 
@@ -55,11 +40,7 @@ export class SessionRegistry {
     return false;
   }
 
-  /**
-   * Records a handle as dead. Unlike `forget` this is remembered, which is what stops a rejected or
-   * logged-out handle from reading as "unknown, therefore active" on the next request — and what
-   * keeps a forged cookie from buying another round trip to identity on every retry.
-   */
+  /** Unlike `forget` this is remembered, so a rejected handle does not read as "unknown, therefore active" or buy a forged cookie another identity round trip per retry */
   revoke(handleHash: string): void {
     const expiresAt = this.sessions.get(handleHash)?.expiresAt;
     this.revoked.set(handleHash, expiresAt && expiresAt > Date.now() ? expiresAt : Date.now() + UNKNOWN_SESSION_MEMORY_MS);
@@ -67,10 +48,8 @@ export class SessionRegistry {
   }
 
   /**
-   * Moves a live session onto a freshly issued handle. The old hash is remembered as dead rather than
-   * forgotten, and the new one inherits the subject so a back-channel logout still matches it. This is
-   * what makes handle rotation — how an organisation switch invalidates tokens cached against the
-   * previous handle — safe rather than merely a rename.
+   * The old hash is remembered as dead, which is how an organisation switch invalidates tokens cached against it; the new one inherits the subject so back-channel logout
+   * still matches
    */
   rotate(handleHash: string, rotatedHash: string, expiresAt: number): void {
     const sub = this.sessions.get(handleHash)?.sub;
@@ -87,7 +66,6 @@ export class SessionRegistry {
     if (hashes && hashes.size === 0) this.bySubject.delete(session.sub);
   }
 
-  /** Ends every session this process knows of for one user; returns the hashes whose tokens must go */
   revokeSubject(sub: string): string[] {
     const hashes = [...(this.bySubject.get(sub) ?? [])];
     for (const hash of hashes) {
@@ -105,7 +83,7 @@ export class SessionRegistry {
       if (session.expiresAt <= now) this.forget(hash);
     }
 
-    /** A revocation only has to outlive the session it ended; after that the handle is dead anyway */
+    // A revocation only has to outlive the session it ended
     for (const [hash, expiresAt] of this.revoked) {
       if (expiresAt <= now) this.revoked.delete(hash);
     }

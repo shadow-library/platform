@@ -2,14 +2,8 @@ import { Field, Schema } from '@shadow-library/class-schema';
 
 import { type AuthAccessMode } from '../interfaces';
 
-/**
- * Declaring the constants
- *
- * The query and body shapes keep their wire names: `return_to`, `logout_token` and the OAuth error
- * parameters are spelled by their specifications, and renaming them here would only hide which
- * parameter a failure is actually about. Every query schema stays open to additional properties so a
- * future identity release can add one without this SDK rejecting the callback.
- */
+// Wire names (`return_to`, `logout_token`, OAuth error parameters) are spelled by their specifications; query schemas stay open so a future identity release can add a
+// parameter without the callback being rejected.
 
 @Schema({ additionalProperties: true })
 export class AuthLoginQuery {
@@ -74,22 +68,15 @@ export class AuthSessionResponse {
 }
 
 /**
- * The signed-in person, mirroring OIDC's standard claims so an application never has to build a
- * profile endpoint of its own. Claim names stay in the protocol's spelling rather than the
- * repository's camelCase, because they are identity's answer passed through rather than a shape
- * this package invented — a translation layer here would need an entry before any future standard
- * claim could reach an application.
- *
- * Everything but `sub` is optional, and all of it can be missing at once: a profile nobody filled in
- * is a normal account, and a session established before the `profile` scope was requested carries no
- * name until its next login. Consumers must render a fallback rather than assume a name is present.
+ * OIDC claim names are passed through as spelled; everything but `sub` can be missing (an unfilled profile, or a session predating the `profile` scope), so consumers must
+ * render a fallback
  */
 @Schema()
 export class AuthUserInfoResponse {
   @Field()
   sub: string;
 
-  /** The one presentable string — a chosen display name, else the legal name parts joined. */
+  /** The one presentable string: a chosen display name, else the name parts joined */
   @Field({ optional: true })
   name?: string;
 

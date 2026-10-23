@@ -3,14 +3,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { AuthClient } from '@shadow-library/auth';
 import { createTestIdP, TestIdP } from '@shadow-library/auth/testing';
 
-/**
- * Declaring the constants
- *
- * Calling another application *as the user* has exactly one supported shape (D-22): an RFC 8693
- * exchange. The two properties worth pinning are that identity narrows the scope silently — so the
- * caller must be handed what actually survived — and that delegation stops after one hop, refused
- * client-side before a round trip that would fail for reasons a caller cannot tell from an outage.
- */
+// Identity narrows exchanged scope silently, so the caller must be handed what survived; delegation stops after one hop, refused client-side before a round trip that looks
+// like an outage
 const AUDIENCE = 'api://pulse';
 const DOWNSTREAM = 'api://novel-forge';
 const CLIENT = { id: 'svc-pulse', secret: 's3cr3t' };
@@ -36,7 +30,6 @@ describe('AuthClient.exchangeUserToken', () => {
     expect(exchanged.scope).toEqual(['books:read']);
     expect(exchanged.audience).toBe(DOWNSTREAM);
 
-    /** The exchanged token still speaks for the user, with this application recorded as the actor */
     const downstream = new AuthClient({ issuer: idp.issuer, audience: DOWNSTREAM });
     await expect(downstream.verify(exchanged.accessToken)).resolves.toMatchObject({ sub: USER, scopes: ['books:read'] });
   });

@@ -58,7 +58,6 @@ describe('AuthClient.check (pdp client)', () => {
 
     idp.grantPermission(principal, ORG, 'posts:write');
     idp.bumpAuthzVersion();
-    // The bump is observed piggybacked on the next uncached response for this principal
     await auth.check({ action: 'posts:read', organisationId: ORG, principal });
     expect(await auth.check({ action: 'posts:write', organisationId: ORG, principal })).toBe(true);
   });
@@ -116,7 +115,6 @@ describe('AuthClient.check under an identity throttle', () => {
 
   const freshPrincipal = (): CheckPrincipal => ({ kind: 'user', sub: `throttled-${++counter}` });
 
-  /** Answers the first `times` pdp calls the way identity's rate limiter does, then lets the rest through */
   const throttledClient = (retryAfter: string | undefined, times = Number.POSITIVE_INFINITY): { auth: AuthClient; throttled: () => number } => {
     let throttled = 0;
     const headers: Record<string, string> = retryAfter === undefined ? {} : { 'retry-after': retryAfter };

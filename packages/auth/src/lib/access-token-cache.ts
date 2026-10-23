@@ -6,7 +6,7 @@ import { NAMESPACE } from '../constants';
 import { AppSessionToken } from '../interfaces';
 
 export interface AccessTokenKey {
-  /** Hash of the session handle — the handle itself never becomes a map key */
+  /** The handle itself never becomes a map key */
   handleHash: string;
   audience: string;
   elevated: boolean;
@@ -23,25 +23,13 @@ interface CachedAccessToken {
   requestIds: Set<string>;
 }
 
-/**
- * Declaring the constants
- *
- * Minted tokens are cached until shortly before `exp`, mirroring the service-token manager's margin.
- *
- * Two things are structural rather than advisory. Elevation is part of the key rather than a property
- * of the entry, which makes an `AAL2` token incapable of answering an `AAL1` lookup and vice versa;
- * elevated entries are additionally bounded by their grant window, so one cannot outlive the elevation
- * it was minted from even when the token's own `exp` is further out.
- *
- * And an entry is filed under the scope identity **granted**, not the scope that was requested. The
- * server narrows silently, so requested-keying would leave an entry labelled `posts:read posts:write`
- * holding a token that only carries `posts:read` — a cache that lies about its own contents. Requests
- * reach it through a second, explicitly separate lookup, so the two can never be confused.
- */
+// Elevation is part of the key, so an `AAL2` token cannot answer an `AAL1` lookup; elevated entries are also bounded by their grant window so they cannot outlive the elevation.
+// Entries are filed under the scope identity granted, not requested: the server narrows silently, and requested-keying would label an entry `posts:read posts:write` while
+// holding only `posts:read`.
+// Requests reach entries through a separate lookup so the two never mix.
 const DEFAULT_REFRESH_SKEW_SECONDS = 60;
 const DEFAULT_MAX_ENTRIES = 5_000;
 
-/** The only representation of a handle the SDK is allowed to keep outside the cookie */
 export function hashSessionHandle(handle: string): string {
   return createHash('sha256').update(handle).digest('base64url');
 }
@@ -49,13 +37,10 @@ export function hashSessionHandle(handle: string): string {
 export class AccessTokenCache {
   private readonly logger = Logger.getLogger(NAMESPACE, AccessTokenCache.name);
 
-  /** Keyed by granted scope; what a caller asked for never names an entry */
   private readonly entries = new Map<string, CachedAccessToken>();
 
-  /** The requested-scope lookup: request key → the granted-scope entry that satisfies it */
   private readonly lookups = new Map<string, string>();
 
-  /** Secondary index so a logout, a revoked session, or a back-channel notice can evict in one step */
   private readonly bySession = new Map<string, Set<string>>();
 
   constructor(
@@ -80,24 +65,18 @@ export class AccessTokenCache {
     return cached.token;
   }
 
-  /** `grantExpiresAt` is the elevation window in epoch milliseconds; entries never outlive it */
+  /** `grantExpiresAt` is the elevation window in epoch ms; entries never outlive it */
   set(key: AccessTokenKey, token: AppSessionToken, grantExpiresAt?: number): void {
     const requestId = this.requestId(key);
     const grantedId = this.grantedId(key, token);
 
-    /** An earlier mint for this request may have been granted something else; that lookup is now stale */
     const previous = this.lookups.get(requestId);
     if (previous && previous !== grantedId) this.detach(requestId, previous, key.handleHash);
 
-    /**
-     * A bound that is not a real number is treated as already elapsed: `NaN` compares false against
-     * everything, so letting one through would produce an entry that never expires — which for an
-     * elevated token means an `AAL2` credential outliving the grant that justified it.
-     */
+    // A non-finite bound counts as elapsed: NaN compares false against everything and would yield an entry that never expires, i.e. AAL2 outliving its grant
     const bound = grantExpiresAt === undefined ? Infinity : Number.isFinite(grantExpiresAt) ? grantExpiresAt : 0;
     const expiresAt = Math.min(Date.now() + (token.expiresIn - this.refreshSkewSeconds) * 1000, bound);
 
-    /** Whatever was here is superseded, so it goes even when the replacement is too short-lived to keep */
     if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
       this.evict(grantedId, key.handleHash);
       this.lookups.delete(requestId);
@@ -115,7 +94,6 @@ export class AccessTokenCache {
     this.prune();
   }
 
-  /** Drops every token minted for one session — used on logout, `SESSION_INVALID`, and back-channel logout */
   evictSession(handleHash: string): void {
     const ids = this.bySession.get(handleHash);
     if (!ids) return;
@@ -124,7 +102,6 @@ export class AccessTokenCache {
     this.logger.debug('cached tokens evicted for session', { entries: ids.size });
   }
 
-  /** Drops only the elevated entries of a session, leaving its ordinary tokens in place */
   evictElevated(handleHash: string): void {
     const ids = this.bySession.get(handleHash);
     if (!ids) return;
@@ -139,12 +116,10 @@ export class AccessTokenCache {
     this.bySession.clear();
   }
 
-  /** Names the lookup a caller performs: everything but the scope, which is what it asked for */
   private requestId(key: AccessTokenKey): string {
     return `${this.prefix(key)}|request:${normalise(key.scope?.split(' '))}`;
   }
 
-  /** Names the entry itself: everything but the scope, which is what identity actually granted */
   private grantedId(key: AccessTokenKey, token: AppSessionToken): string {
     return `${this.prefix(key)}|granted:${normalise(token.grantedScopes)}`;
   }
@@ -160,7 +135,6 @@ export class AccessTokenCache {
     this.bySession.get(handleHash)?.delete(grantedId);
   }
 
-  /** Unhooks one request from an entry, taking the entry with it once nothing reaches it any more */
   private detach(requestId: string, grantedId: string, handleHash: string): void {
     this.lookups.delete(requestId);
     const cached = this.entries.get(grantedId);
@@ -169,7 +143,6 @@ export class AccessTokenCache {
     if (cached.requestIds.size === 0) this.evict(grantedId, handleHash);
   }
 
-  /** Sweeps expired entries first and only then falls back to dropping the oldest insertion */
   private prune(): void {
     if (this.entries.size <= this.maxEntries) return;
     const now = Date.now();
@@ -188,12 +161,10 @@ export class AccessTokenCache {
   }
 }
 
-/** Scope is a set, not a sequence, so two spellings of the same grant must name the same entry */
 function normalise(scopes: string[] | undefined): string {
   return [...(scopes ?? [])].filter(Boolean).sort().join(' ');
 }
 
-/** The handle hash leads every id, so an entry always knows which session index holds it */
 function sessionOf(id: string): string {
   return id.slice(0, id.indexOf('|'));
 }

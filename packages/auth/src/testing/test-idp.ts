@@ -6,10 +6,7 @@ export interface TestIdPOptions {
   /** Overrides the issuer advertised in discovery; defaults to the bound server url, or `https://identity.test` when not serving */
   issuer?: string;
 
-  /**
-   * Binds an HTTP server on a random port; on by default. Turned off, the mock is reachable only through
-   * `transport`, which answers in-process — no socket, so a unit test does no I/O at all.
-   */
+  /** Binds an HTTP server on a random port (default on); off, the mock is reachable only through in-process `transport`, so a unit test does no I/O */
   serve?: boolean;
 
   /** When set, the token endpoint enforces these client credentials */
@@ -24,10 +21,7 @@ export interface TestIdPOptions {
   /** How long an app session lives before its handle stops minting; defaults to an hour */
   appSessionTtlSeconds?: number;
 
-  /**
-   * What `GET /api/v1/apps/me` answers (D-21). Left unset, the mock publishes a registration derived
-   * from `clientId`, so a consumer configured with nothing but issuer + app id + credential still boots.
-   */
+  /** What `GET /api/v1/apps/me` answers; unset, a registration derived from `clientId` is published */
   app?: Partial<AppRegistration>;
 }
 
@@ -83,7 +77,6 @@ interface AppSessionRecord {
   organisationId?: string;
 }
 
-/** One organisation a test user reaches the application through */
 export interface TestOrganisation {
   id: string;
   slug: string;
@@ -119,32 +112,19 @@ export interface TestLogoutTokenInput {
 export interface TestIdP {
   issuer: string;
 
-  /**
-   * The address the mock is actually bound to. Equals `issuer` unless `options.issuer` overrides it,
-   * which is how a back-channel split is exercised: discovery claims the public issuer while the
-   * document is only reachable here.
-   */
+  /** Where the mock is actually bound; differs from `issuer` when `options.issuer` overrides it, which exercises a back-channel split */
   url: string;
 
-  /**
-   * Answers any request from this mock in-process, whatever host the URL names. Hand it to the SDK as
-   * `fetch`; it is the only way in when `serve` is off.
-   */
+  /** Answers any request in-process whatever host the URL names; the only way in when `serve` is off */
   transport: FetchLike;
 
   /** Mints a signed token with sensible claim defaults */
   issueToken(input: TestTokenInput): Promise<string>;
 
-  /**
-   * Registers a bot key the token endpoint's bot-key exchange redeems and returns the full `sl_bot_…`
-   * key. This is how a consumer tests a bot end to end: present the key as a bearer, exactly as a bot does.
-   */
+  /** Registers a bot key the token endpoint's bot-key exchange redeems and returns the full `sl_bot_…` key */
   issueBotKey(input: TestBotKeyInput): string;
 
-  /**
-   * Signs a bot access token directly, bypassing the exchange. The SDK refuses such a token presented as
-   * a bearer — bots enter only through their key — so this exists to assert that refusal, not to admit a bot.
-   */
+  /** Bypasses the exchange; the SDK refuses such a token as a bearer (bots enter only through their key), so this exists to assert that refusal */
   mintBotToken(input: TestBotTokenInput): Promise<string>;
 
   /** Makes the exchange refuse the key from now on */
@@ -170,18 +150,10 @@ export interface TestIdP {
   setEndpointFailure(pathname: string, fail: boolean): void;
   getRequestCount(pathname: string): number;
 
-  /**
-   * Resolves once an endpoint has been called `count` times, so a test can wait for a scheduled
-   * refresh to fire instead of sleeping for longer than it should take. It reports that the request
-   * arrived, not that the SDK has finished applying the answer — assert on observable state after it.
-   */
+  /** Resolves once the request arrived, not once the SDK applied the answer; assert on observable state after it */
   waitForRequest(pathname: string, count?: number): Promise<void>;
 
-  /**
-   * A transport that drops the application's own M2M bearer, so a request arrives carrying nothing but
-   * the session handle. Every app-session route then refuses it, which is the property the whole
-   * first-party model rests on: possessing a handle grants nothing.
-   */
+  /** Drops the application's M2M bearer so a request carries only the session handle, which every app-session route must refuse */
   handleOnlyTransport(): FetchLike;
 
   /** Returns the most recent role-catalog sync the mock received, if any */
@@ -208,22 +180,10 @@ export interface TestIdP {
   /** Puts a profile on file for a subject; `userinfo` still releases it only to a `profile`-scoped token */
   setUserProfile(sub: string, profile: Record<string, unknown>): void;
 
-  /*!
-   * First-party app sessions (D-18/D-19)
-   */
-
-  /**
-   * Marks the user as having satisfied a step-up on the identity domain, so an elevation claim succeeds.
-   * The intent names which application and resource the step-up was for (D-19) — a claim from anybody
-   * else is refused with `AUTH_007`. Pass `true` for a step-up any claimant may spend, `false` to clear.
-   */
+  /** The intent names the application and resource the step-up was for; a claim from anybody else is refused with `AUTH_007`. `true` lets any claimant spend it, `false` clears */
   setSteppedUp(userId: string, intent: TestStepUpIntent | boolean): void;
 
-  /**
-   * Declares the organisations a user reaches the application through. A session opens in the first
-   * one, and only these may be switched into. Left unset the user has none, so the mint carries no
-   * `org` claim — which is what every test that never mentions organisations relies on.
-   */
+  /** A session opens in the first and may only switch into these; unset, the mint carries no `org` claim */
   setOrganisations(userId: string, organisations: TestOrganisation[]): void;
 
   /** The organisation a live app session is currently acting in */
@@ -252,10 +212,8 @@ const DEFAULT_APP_SESSION_TTL_SECONDS = 3600;
 const DEFAULT_AUDIENCE = 'shadow-identity';
 const UNSERVED_ISSUER = 'https://identity.test';
 
-/** How long a claimed step-up grant stays live, mirroring identity's short elevation window */
 const ELEVATION_WINDOW_SECONDS = 600;
 
-/** The scope every app-session route demands of its M2M caller */
 const APP_SESSION_SCOPE = 'app-session:manage';
 
 const SESSIONS_PATH = '/api/v1/app-sessions';
@@ -280,7 +238,6 @@ const readClaims = (token: string): JwtPayload | undefined => {
   }
 };
 
-/** Identity's catalog keys for the two app-session failures an SDK is expected to branch on */
 const sessionInvalid = (): Response => json({ code: 'AUTH_005', message: 'Application session is no longer valid' }, 401);
 const elevationRequired = (): Response => json({ code: 'AUTH_006', message: 'Step-up authentication is required' }, 403);
 /** Identity's userinfo refusal (RFC 6750 §3.1): a bare challenge when no bearer came, `invalid_token` when one did and failed */
@@ -291,11 +248,6 @@ const invalidToken = (challenge = 'Bearer error="invalid_token"'): Response =>
   });
 const intentMismatch = (): Response => json({ code: 'AUTH_007', message: 'the step-up was not granted for this application and resource' }, 403);
 
-/**
- * Spins an in-process mock identity provider: an ephemeral Ed25519 key, discovery + JWKS + token +
- * PDP endpoints on a random port, or reachable only in-process when `serve` is off. Consuming services
- * test their guards against it without a running identity service.
- */
 export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestIdP> {
   let signer: TestSigner = await createTestSigner();
   const retiredJwks: (Jwk & { kid: string })[] = [];
@@ -306,7 +258,6 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
   const refreshTokens = new Map<string, TestTokenInput>();
   const grants = new Set<string>();
 
-  /** The profile `userinfo` releases per subject; a subject with no entry has nothing on file. */
   const profiles = new Map<string, Record<string, unknown>>();
   const organisationsByUser = new Map<string, TestOrganisation[]>();
   const appSessions = new Map<string, AppSessionRecord>();
@@ -324,7 +275,6 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
   const botKeys = new Map<string, TestBotTokenInput>();
   let botKeyExchanges = 0;
 
-  /** The default registration is what a real `apps/me` would return for a freshly provisioned app */
   const appId = options.clientId ?? 'test-client';
   let appRegistration: AppRegistration = {
     appId,
@@ -381,12 +331,12 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
       const decoded = Buffer.from(header.slice(6), 'base64').toString();
       return decoded === `${options.clientId}:${options.clientSecret ?? ''}`;
     }
-    /** RFC 7523 client assertions (projected SA tokens) are accepted verbatim; tests inspect them via getLastTokenRequest */
+    // RFC 7523 client assertions are accepted verbatim; tests inspect them via getLastTokenRequest
     if (typeof body.client_assertion === 'string' && body.client_assertion.length > 0) return body.client_id === options.clientId;
     return body.client_id === options.clientId && (options.clientSecret === undefined || body.client_secret === options.clientSecret);
   };
 
-  /** Real-world RPs send form-encoded token requests (RFC 6749 §4.1.3); JSON stays accepted for the SDK. */
+  // Real RPs send form-encoded token requests (RFC 6749 §4.1.3); JSON stays accepted for the SDK
   const readTokenBody = async (request: Request): Promise<Record<string, unknown>> => {
     const contentType = request.headers.get('content-type') ?? '';
     if (contentType.includes('application/x-www-form-urlencoded')) return Object.fromEntries(new URLSearchParams(await request.text()));
@@ -415,7 +365,6 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
       const clientId = options.clientId ?? stored.clientId ?? 'test-client';
       const accessToken = await issueToken({ ...stored, clientId });
       const now = Math.floor(Date.now() / 1000);
-      /** Extra claims (email, email_verified, …) flow into the ID token so RPs can test claim mapping. */
       const idClaims: JwtPayload = { iss: issuer, sub: stored.sub, aud: clientId, iat: now, exp: now + ttl, auth_time: now, ...stored.claims };
       if (stored.nonce) idClaims.nonce = stored.nonce;
       const idToken = await signer.sign(idClaims);
@@ -424,7 +373,7 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
       return json({ access_token: accessToken, id_token: idToken, token_type: 'Bearer', expires_in: ttl, scope: (stored.scopes ?? []).join(' '), refresh_token: refreshToken });
     }
 
-    /** Identity forces the audience to the exchanging application's own resource, whatever the request names */
+    // Identity forces the audience to the exchanging application's own resource, whatever the request names
     if (body.grant_type === TOKEN_EXCHANGE_GRANT_TYPE && body.subject_token_type === BOT_KEY_TOKEN_TYPE) {
       botKeyExchanges += 1;
       const bot = botKeys.get(typeof body.subject_token === 'string' ? body.subject_token : '');
@@ -433,11 +382,7 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
       return json({ access_token: accessToken, token_type: 'Bearer', expires_in: bot.ttlSeconds ?? DEFAULT_BOT_TOKEN_TTL_SECONDS, audience: appRegistration.audience });
     }
 
-    /**
-     * RFC 8693 (D-22): the exchanged token is addressed to the target resource, acts for the subject,
-     * and carries only what the subject and the requesting application both hold. Identity narrows
-     * silently — no error, just a smaller `scope` — which is exactly the trap the SDK guards against.
-     */
+    // RFC 8693: identity narrows silently (no error, just a smaller `scope`), which is the trap the SDK guards against
     if (body.grant_type === TOKEN_EXCHANGE_GRANT_TYPE) {
       const subject = readClaims(typeof body.subject_token === 'string' ? body.subject_token : '');
       if (!subject?.sub) return json({ error: 'invalid_grant' }, 400);
@@ -470,11 +415,7 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
     return json({ error: 'unsupported_grant_type' }, 400);
   };
 
-  /**
-   * Every app-session route is machine-to-machine: possessing a handle grants nothing without the
-   * application's own M2M token carrying `app-session:manage`. The mock enforces that so a consuming
-   * service can actually test the property rather than take it on trust.
-   */
+  // Possessing a handle grants nothing without the application's own M2M token carrying `app-session:manage`; enforced so consumers can test the property
   const appSessionCaller = (request: Request): JwtPayload | undefined => {
     const header = request.headers.get('authorization');
     if (!header?.startsWith('Bearer ')) return undefined;
@@ -525,7 +466,6 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
     return json({ organisations });
   };
 
-  /** Mirrors identity: the handle is rotated, so the one presented is dead the moment this answers */
   const handleAppSessionOrganisation = async (request: Request): Promise<Response> => {
     if (!isAppSessionCaller(request)) return json({ code: 'AUTH_002', message: 'Service token missing the app-session:manage scope' }, 401);
     const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
@@ -555,7 +495,7 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
     const elevated = body.elevated === true;
     if (elevated && (elevationGrants.get(`${String(body.sessionHandle)}|${audience}`) ?? 0) <= Date.now()) return elevationRequired();
 
-    /** Identity narrows silently: an unconsented scope, or a sensitive one on an unelevated mint, is filtered out and the mint still answers 200 */
+    // Identity narrows silently: an unconsented scope, or a sensitive one on an unelevated mint, is filtered out and the mint still answers 200
     const consented = session.scope.split(' ').filter(Boolean);
     const requested = typeof body.scope === 'string' && body.scope ? body.scope.split(' ').filter(Boolean) : consented;
     const granted = requested.filter(entry => consented.includes(entry) && (elevated || !appRegistration.sensitiveScopes.includes(entry)));
@@ -577,27 +517,20 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
     const intent = steppedUp.get(session.userId);
     if (!intent) return elevationRequired();
 
-    /**
-     * D-19: the step-up names its beneficiary, so a window one application prompted for cannot be
-     * claimed by another that happens to ask first. A mismatch is its own answer — retrying the claim
-     * can never succeed, only a fresh prompt carrying the right intent can.
-     */
+    // A step-up names its beneficiary; a mismatch is its own answer because retrying the claim can never succeed
     const audience = typeof body.resource === 'string' ? body.resource : DEFAULT_AUDIENCE;
     const clientId = typeof caller.client_id === 'string' ? caller.client_id : undefined;
     if (intent.clientId && intent.clientId !== clientId) return intentMismatch();
     if (intent.resource && intent.resource !== audience) return intentMismatch();
 
-    /** The step-up is *spent*: the grant covers this session and this audience, and nothing else */
+    // The step-up is spent: the grant covers this session and audience only
     steppedUp.delete(session.userId);
     const expiresAt = Date.now() + ELEVATION_WINDOW_SECONDS * 1000;
     elevationGrants.set(`${String(body.sessionHandle)}|${audience}`, expiresAt);
     return json({ expiresAt: new Date(expiresAt).toISOString() });
   };
 
-  /**
-   * Mirrors identity's userinfo: claims are released against the token's own scope, so a spec that
-   * forgets to consent to `profile` sees exactly what production would show it — the subject alone.
-   */
+  // Claims are released against the token's own scope, so a spec that forgets the `profile` scope sees only the subject, as in production
   const handleUserInfo = (request: Request): Response => {
     const header = request.headers.get('authorization');
     const token = header?.startsWith('Bearer ') ? header.slice(7) : undefined;
@@ -626,7 +559,7 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
     const forced = new URL(request.url).searchParams.get('force') === 'true';
     lastCatalog = { manifest: { permissions, roles }, authorization: request.headers.get('authorization'), forced };
 
-    /** Identity's D-15 guardrail: a manifest that would delete too much is refused unless forced */
+    // Identity's guardrail: a manifest that would delete too much is refused unless forced
     if (catalogGuardrail && !forced) return json({ code: 'AUTHZ_009', message: 'catalog sync would delete 80% of the application catalog' }, 409);
     return json({ permissionsUpserted: permissions.length, permissionsDeleted: 0, rolesUpserted: roles.length, rolesDeleted: 0, principalsInvalidated: 0 });
   };
@@ -692,7 +625,7 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
   const send: FetchLike = server ? (target, init) => fetch(target, init) : transport;
   issuer = options.issuer ?? url;
 
-  /** A bot reaches the PDP as a SERVICE_ACCOUNT, so its grants are filed exactly where a service's would be */
+  // A bot reaches the PDP as a SERVICE_ACCOUNT, so its grants are filed where a service's would be
   const grantKey = (principal: TestPrincipalRef, organisationId: string, action: string): string =>
     `${principal.kind === 'bot' ? 'service' : principal.kind}:${principal.sub}:${organisationId}:${action}`;
 
@@ -735,8 +668,7 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
       (url, init = {}) => {
         if (!new URL(url).pathname.startsWith(SESSIONS_PATH)) return send(url, init);
 
-        /** Only the app-session bearer goes; the client still authenticates to /oauth2/token normally,
-         * so what arrives at the route really is a handle and nothing else. */
+        // Only the app-session bearer goes; the client still authenticates to /oauth2/token normally
         const headers = new Headers(init.headers);
         headers.delete('authorization');
         return send(url, { ...init, headers });

@@ -7,13 +7,8 @@ export interface ParsedBotKey {
   secret: string;
 }
 
-/**
- * Declaring the constants
- *
- * `sl_bot_<keyId>_<secret>_<checksum>`, every segment base62 so `_` stays an unambiguous delimiter. The
- * CRC-32 lets secret scanners and the SDK reject typos and random strings without a network call; it
- * is not a MAC, so a well-formed key still proves nothing until identity has exchanged it.
- */
+// `sl_bot_<keyId>_<secret>_<checksum>`, base62 segments so `_` stays an unambiguous delimiter. The CRC-32 lets secret scanners and the SDK reject typos without a network call;
+// it is not a MAC, so a well-formed key proves nothing until identity has exchanged it.
 export const BOT_KEY_PREFIX = 'sl_bot_';
 
 const BASE62_ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
@@ -46,12 +41,10 @@ const fitsIn = (value: bigint, bits: bigint): boolean => value < 1n << bits;
 
 const checksumOf = (body: string): string => encodeBase62(BigInt(crc32(body)), CHECKSUM_LENGTH);
 
-/** Whether the value has the bot-key structure; says nothing about the checksum */
 export function isBotKeyShaped(value: unknown): value is string {
   return typeof value === 'string' && BOT_KEY_PATTERN.test(value);
 }
 
-/** Validates structure, segment ranges and checksum; `null` for anything that could never be exchanged */
 export function parseBotKey(value: unknown): ParsedBotKey | null {
   if (typeof value !== 'string') return null;
   const match = BOT_KEY_PATTERN.exec(value);
@@ -63,13 +56,11 @@ export function parseBotKey(value: unknown): ParsedBotKey | null {
   return { keyId, secret };
 }
 
-/** The uuid of the key row a parsed key id names, lower-case and hyphenated */
 export function botKeyIdToUuid(keyId: string): string {
   const hex = decodeBase62(keyId).toString(16).padStart(32, '0');
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
-/** Assembles a bot key from the key row's uuid and 32 secret bytes */
 export function formatBotKey(keyUuid: string, secret: Uint8Array): string {
   if (!UUID_PATTERN.test(keyUuid)) throw AuthErrorCode.BOT_KEY_INVALID.create({ reason: 'the key id must be a uuid' });
   if (secret.length !== SECRET_BYTES) throw AuthErrorCode.BOT_KEY_INVALID.create({ reason: `the secret must be ${SECRET_BYTES} bytes` });

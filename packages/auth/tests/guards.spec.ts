@@ -26,7 +26,6 @@ type RouteMetadataRecord = Record<string, unknown>;
 const AUDIENCE = 'api://pulse';
 const ORG = '7';
 
-/** Reads back the metadata the decorators wrote through the framework `Handler` decorator */
 const getRouteMetadata = (target: object): RouteMetadataRecord => {
   for (const key of Reflect.getMetadataKeys(target)) {
     const value = Reflect.getMetadata(key, target) as RouteMetadataRecord | undefined;
@@ -77,7 +76,6 @@ describe('AuthGuard', () => {
 
   const request = (token?: string): GuardedRequest => ({ headers: token ? { authorization: `Bearer ${token}` } : {} });
 
-  /** Runs the generated handler inside a fresh request context, mirroring the fastify onRequest hook */
   const runInContext = (rid: string, run: () => void): void => {
     const hook = context.init() as unknown as (request: unknown, response: unknown, done: () => void) => void;
     hook({ id: rid }, {}, run);
@@ -144,7 +142,6 @@ describe('AuthGuard', () => {
       expect(context.getAuthPrincipal().clientId).toBe('svc-indexer');
     });
 
-    /** A rule for another route or caller must not leak access */
     await expectStatus(generate({ shadowAuth: { access: 'required' }, method: 'DELETE' as never, path: '/api/v1/index' }), await serviceRequest(), 403);
     await expectStatus(handler, request(await idp.issueToken({ sub: 'svc-other', kind: 'service', clientId: 'svc-other', audience: AUDIENCE })), 403);
   });
@@ -174,16 +171,11 @@ describe('AuthGuard', () => {
     await expectStatus(handler, request(await idp.issueToken({ sub: '42', audience: AUDIENCE })), 403);
   });
 
-  /**
-   * `failOpen` means "the decision point was unreachable, prefer availability" — never "there was
-   * nothing to ask, assume yes". Letting it cover a missing organisation would quietly unguard every
-   * `failOpen` route for exactly the credentials least entitled to pass it.
-   */
+  // `failOpen` means "PDP unreachable", never "nothing to ask"; covering a missing organisation would unguard every `failOpen` route for the least entitled credentials
   it('should deny an organisation-less token on a fail-open permission route', async () => {
     const handler = generate({ shadowAuth: { access: 'required', permission: 'posts:write', failOpen: true } });
     await expectStatus(handler, request(await idp.issueToken({ sub: 'orgless', audience: AUDIENCE })), 403);
 
-    /** The same route does fail open once the token names an organisation — which is what the flag is actually for. */
     idp.setEndpointFailure('/api/v1/authz/check', true);
     const named = request(await idp.issueToken({ sub: 'named', audience: AUDIENCE, org: ORG }));
     await runGuarded(handler, named, () => {
@@ -195,7 +187,6 @@ describe('AuthGuard', () => {
   describe('under an identity throttle', () => {
     const CLIENT = { id: 'svc-pulse', secret: 's3cr3t' };
 
-    /** Answers every call to `pathname` the way identity's rate limiter does */
     const throttling =
       (pathname: string): FetchLike =>
       (url, init) =>
@@ -287,7 +278,6 @@ describe('AuthGuard re-consent for a sensitive scope', () => {
   const config = () => resolveBrowserAuthConfig({ issuer: idp.issuer, client: CLIENT }, resolveAuthRoutes(), { enabled: true });
   const reconsentCookie = (): string => config().reconsentCookieName;
 
-  /** A session whose grant was frozen from an authorization that did or did not consent to the sensitive scope, already stepped up */
   const elevatedSession = async (consented: boolean): Promise<string> => {
     const sub = `memo-user-${++counter}`;
     const scopes = ['openid', 'profile', 'memo:read', ...(consented ? [SENSITIVE] : [])];

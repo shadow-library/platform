@@ -11,14 +11,8 @@ export interface RemoteJwksOptions {
   ttlSeconds: number;
 }
 
-/**
- * Declaring the constants
- *
- * Keys are imported once as `CryptoKey` objects and cached for `ttlSeconds`. An unknown `kid`
- * triggers one immediate refetch (singleflight, with a short negative cache) so key rotation is
- * zero-config for consumers. When a refresh fails but cached keys exist, verification keeps using
- * the stale set — an unknown `kid` with an unreachable JWKS endpoint still fails closed.
- */
+// An unknown `kid` triggers one refetch (singleflight, short negative cache) so rotation needs no consumer config; a failed refresh serves the stale set, but an unknown
+// `kid` with an unreachable endpoint still fails closed
 const NEGATIVE_CACHE_MS = 10_000;
 
 export class RemoteJwks {
@@ -47,7 +41,7 @@ export class RemoteJwks {
       if (!key) this.lastMissAt = Date.now();
     }
     if (!key) {
-      /** Client-supplied input, not a system fault — warn, not error */
+      // Client-supplied input, not a system fault: warn, not error
       this.logger.warn('no published key matches the token kid', { kid });
       throw AuthErrorCode.KEY_UNKNOWN.create({ reason: `no published key matches kid '${kid}'` });
     }
@@ -79,7 +73,6 @@ export class RemoteJwks {
     this.logger.info('jwks refreshed', { keyCount: keys.size });
   }
 
-  /** Records the failure at error level before it propagates, keeping guard throws single-line */
   private logged(error: AppError): AppError {
     this.logger.error(error.message);
     return error;

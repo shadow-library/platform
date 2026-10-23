@@ -3,14 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { AuthClient } from '@shadow-library/auth';
 import { createTestIdP, TestIdP } from '@shadow-library/auth/testing';
 
-/**
- * Declaring the constants
- *
- * `createTestIdP` is public surface: a consuming service tests its guards, its login and its step-up
- * against it instead of a live identity. So the mock has to answer for every part of the v1.1 protocol
- * a consumer can hit, and these specs pin that parity — a mock that quietly lags the SDK turns green
- * suites into false confidence.
- */
+// `createTestIdP` is public surface: a mock that quietly lags the SDK turns green consumer suites into false confidence, so these pin its parity
 const APP_ID = 'svc-parity';
 const CLIENT = { id: APP_ID, secret: 's3cr3t' };
 const AUDIENCE = 'api://parity';

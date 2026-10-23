@@ -28,23 +28,11 @@ import { AuthGuardErrorCode } from './errors';
 
 type RouteName = keyof Omit<AuthRoutePaths, 'basePath'>;
 
-/**
- * Declaring the constants
- *
- * The browser-facing surface a consuming service inherits rather than writes. Paths and enablement
- * are resolved once by `AuthModule.forRoot()` and stamped onto this class before the framework scans
- * it: `EnableIf` reads the registry below and any overridden path is written over the default the
- * decorators declared. That is why the registry is module-scoped mutable state — route metadata is
- * settled at class-definition time, long before a provider could be injected to supply it.
- *
- * Every route is `@Public()`: this is how a caller gets a session, so in a `private` application
- * guarding it would leave nobody able to sign in. The routes that need a session check for one
- * themselves and answer a plain 401 rather than a login bounce.
- *
- * Cookies are read off the raw request rather than through `@Cookie()` on purpose: that decorator
- * pulls in the optional `@fastify/cookie` peer, and needing an extra install would break the promise
- * that `AuthModule.forRoot()` plus environment variables is the entire integration.
- */
+// Module-scoped mutable state: route metadata is settled at class-definition time, before a provider could be injected, so `AuthModule.forRoot()` stamps paths and
+// enablement here before the scan.
+// Every route is `@Public()` because guarding the sign-in surface in a `private` app would leave nobody able to sign in; routes needing a session check themselves and
+// answer a plain 401.
+// Cookies are read off the raw request, not `@Cookie()`, which pulls in the optional `@fastify/cookie` peer.
 const ROUTE_HANDLERS: [RouteName, string][] = [
   ['login', 'login'],
   ['callback', 'callback'],
@@ -62,13 +50,12 @@ let routes: AuthRoutePaths | null = null;
 
 const isEnabled = (route: RouteName): boolean => Boolean(routes?.[route]);
 
-/** 302 keeps the browser's method on a redirect the user follows interactively */
 const FOUND = 302;
 
 /** RFC 6749 §4.1.2.1: the two callback errors that report identity's own trouble rather than a refusal of this request */
 const TRANSIENT_AUTHORIZATION_ERRORS = new Set(['server_error', 'temporarily_unavailable']);
 
-/** Applies the resolved paths to the controller; must run before the module registry scans the class */
+// Must run before the module registry scans the class
 export function configureAuthRoutes(resolved: AuthRoutePaths): void {
   routes = resolved;
   Controller({ path: resolved.basePath })(AuthController);
@@ -91,7 +78,6 @@ export class AuthController {
     private readonly accessPolicy: AuthAccessPolicy,
   ) {}
 
-  /** Lets a browser client decide whether to send an anonymous visitor to login before it renders, without probing a guarded route to find out */
   @Get('/access')
   @EnableIf(() => isEnabled('access'))
   @RespondFor(200, AuthAccessResponse)
@@ -99,7 +85,6 @@ export class AuthController {
     return { mode: this.accessPolicy.mode };
   }
 
-  /** Starts the login: PKCE, `state`, `nonce` and `resource` out, the transient state into its own cookie */
   @Get('/login')
   @EnableIf(() => isEnabled('login'))
   async login(@Query() query: AuthLoginQuery): Promise<void> {
@@ -108,7 +93,6 @@ export class AuthController {
     this.send(response, redirect.cookies, redirect.url);
   }
 
-  /** Redeems the code for an opaque app-session handle and puts it in this application's own cookie */
   @Get('/callback')
   @EnableIf(() => isEnabled('callback'))
   async callback(@Query() query: AuthCallbackQuery): Promise<void> {
@@ -118,18 +102,7 @@ export class AuthController {
     this.send(this.context.getResponse(), result.cookies, result.returnTo);
   }
 
-  /**
-   * Ends this application's session. The central identity session survives it unless a post-logout
-   * redirect is configured, in which case the reply carries identity's RP-initiated logout URL and the
-   * caller hands the browser to it.
-   *
-   * That URL is *returned* rather than issued as a 302, which is what `AuthLogoutResponse` has always
-   * declared. Unlike `/login` and `/callback`, this route is a `POST` a browser client makes with
-   * `fetch` — never a top-level navigation, by the same rule `auth-guard` applies — and `fetch` cannot
-   * hand a user to a cross-origin redirect: following it makes a background request the browser never
-   * navigates to, and `redirect: 'manual'` yields an opaque response with no readable `Location`. A 302
-   * here ended the local session and then stranded the caller, leaving the identity session live.
-   */
+  /** The logout URL is returned, not 302'd: this is a `fetch` POST, which cannot hand the user to a cross-origin redirect (`redirect: 'manual'` yields an opaque response) */
   @Post('/logout')
   @EnableIf(() => isEnabled('logout'))
   @RespondFor(200, AuthLogoutResponse)
@@ -140,11 +113,7 @@ export class AuthController {
     return redirectTo ? { success: true, redirectTo } : { success: true };
   }
 
-  /**
-   * Accepts identity's back-channel logout notice and drops every local session of that user along
-   * with their cached tokens. Answers 200 even when nothing matched — the notice is about the
-   * identity session, and this application may simply never have had one for it.
-   */
+  /** Answers 200 even when nothing matched: the notice is about the identity session, which this application may never have had */
   @Post('/backchannel-logout')
   @EnableIf(() => isEnabled('backchannelLogout'))
   @RespondFor(200, BackchannelLogoutResponse)
@@ -153,7 +122,6 @@ export class AuthController {
     return { success: true };
   }
 
-  /** Lets a browser client discover its login state without ever parsing — or seeing — a token */
   @Get('/session')
   @EnableIf(() => isEnabled('session'))
   @RespondFor(200, AuthSessionResponse)
@@ -165,11 +133,7 @@ export class AuthController {
     return { sub: principal.sub, scopes: principal.scopes, org: principal.org, aal: principal.aal, clientId: principal.clientId };
   }
 
-  /**
-   * Who the signed-in person is, by name — the reason an application needs no profile endpoint of
-   * its own. Separate from `/session` because that route gates rendering: a name is decoration, and
-   * putting an identity round trip behind the gate would let a profile outage read as a logout.
-   */
+  /** Separate from `/session`, which gates rendering: a profile outage must not read as a logout */
   @Get('/userinfo')
   @EnableIf(() => isEnabled('userinfo'))
   @RespondFor(200, AuthUserInfoResponse)
@@ -180,7 +144,6 @@ export class AuthController {
     return this.sessions.getUserInfo(handle);
   }
 
-  /** The organisations this session may act in; a browser client renders a switcher only when there is more than one */
   @Get('/organisations')
   @EnableIf(() => isEnabled('organisations'))
   @RespondFor(200, AuthOrganisationsResponse)
@@ -191,10 +154,7 @@ export class AuthController {
     return { organisations: await this.sessions.listOrganisations(handle) };
   }
 
-  /**
-   * Switches the organisation this session acts in. Identity rotates the handle, so the response
-   * carries a replacement cookie — a client that keeps the old one is logged out, by design.
-   */
+  /** Identity rotates the handle, so the response carries a replacement cookie; a client keeping the old one is logged out */
   @Post('/organisation')
   @EnableIf(() => isEnabled('organisation'))
   @RespondFor(200, SwitchOrganisationResponse)
@@ -208,14 +168,9 @@ export class AuthController {
   }
 
   /**
-   * The step-up landing point. It first tries to *claim* an existing step-up — the user may already
-   * have satisfied identity elsewhere — and only prompts when there is nothing to claim.
-   *
-   * Both failures lead back to the prompt, but for opposite reasons, so each gets its own marker to
-   * keep the bounce from becoming a loop. `claimed` says a prompt has already been answered and there
-   * was still nothing to claim, which is terminal. `retried` says the step-up existed but named
-   * another beneficiary (D-19) — a claim can never fix that, only a fresh prompt carrying this
-   * application's intent can, and it gets exactly one.
+   * Claims an existing step-up first (the user may have satisfied identity elsewhere) and prompts only when there is none.
+   * `claimed` marks a prompt already answered with nothing to claim, which is terminal;
+   * `retried` marks a step-up that named another beneficiary, which only one fresh prompt can fix.
    */
   @Get('/step-up')
   @EnableIf(() => isEnabled('stepUp'))
@@ -246,7 +201,6 @@ export class AuthController {
       });
   }
 
-  /** Carries both markers forward, so neither failure can bounce the browser more than once each */
   private promptUrl(returnTo: string, outcome: 'absent' | 'mismatch', query: AuthStepUpQuery): Promise<string> {
     const markers = [outcome === 'absent' || query.claimed ? 'claimed=1' : '', outcome === 'mismatch' || query.retried ? 'retried=1' : ''].filter(Boolean);
     return this.sessions.identityStepUpUrl(`${this.sessions.stepUpUrl(returnTo)}&${markers.join('&')}`);
