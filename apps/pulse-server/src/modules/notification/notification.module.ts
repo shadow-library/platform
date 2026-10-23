@@ -9,6 +9,8 @@ import { TemplateModule } from '@modules/template';
 
 import { ConsoleSendLimiter } from './console-send-limiter.service';
 import { ConsoleSendService } from './console-send.service';
+import { NotificationJobExecutor } from './notification-job.executor';
+import { NotificationJobRunner } from './notification-job.runner';
 import { NotificationProviderService } from './notification-provider.service';
 import { NotificationController } from './notification.controller';
 import { NotificationService } from './notification.service';
@@ -29,6 +31,8 @@ import { DevNotificationProvider, RESEND_CLIENT, ResendNotificationProvider } fr
     },
     NotificationService,
     NotificationProviderService,
+    NotificationJobExecutor,
+    NotificationJobRunner,
     ConsoleSendLimiter,
     ConsoleSendService,
   ],

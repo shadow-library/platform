@@ -1,20 +1,17 @@
 import assert from 'node:assert';
 
 import { and, asc, desc, eq, sql } from 'drizzle-orm';
-import parsePhoneNumber from 'libphonenumber-js';
 import validator from 'validator';
 import { Injectable } from '@shadow-library/app';
-import { AppError, type AppErrorObject, Logger, OffsetPagination, OffsetPaginationResult, utils } from '@shadow-library/common';
+import { type AppErrorObject, Logger, OffsetPagination, OffsetPaginationResult, utils } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
-import { SenderEndpointService, SenderRoutingRuleService } from '@modules/configuration';
 import { DEFAULT_LOCALE, type ResolvedTemplate, resolvePayload, TemplateResolverService } from '@modules/template';
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
-import { Configuration, Notification, PrimaryDatabase, schema, Template } from '@server/database';
+import { Notification, PrimaryDatabase, schema, Template } from '@server/database';
 
-import { NotificationProviderService } from './notification-provider.service';
-import { NotificationOpResult } from './providers';
+import { NotificationJobRunner } from './notification-job.runner';
 
 export enum NotificationStatus {
   ACCEPTED = 'ACCEPTED',
@@ -75,10 +72,6 @@ export interface NotificationMessage {
   createdAt: Date;
 }
 
-const MAX_ATTEMPTS = 5;
-const BASE_DELAY_SECONDS: Record<Template.MessageType, number> = { OTP: 2, TRANSACTIONAL: 30, PROMOTIONAL: 5 * 60 };
-const MAX_DELAY_SECONDS: Record<Template.MessageType, number> = { OTP: 30, TRANSACTIONAL: 30 * 60, PROMOTIONAL: 6 * 60 * 60 };
-const PRIORITY_MODIFIER: Record<Notification.Priority, number> = { LOW: 2, MEDIUM: 1, HIGH: 0.5 };
 const RECIPIENT_VALIDATION_ERROR_CODES: Record<Notification.Channel, AppErrorCode> = {
   SMS: AppErrorCode.NTF_001,
   EMAIL: AppErrorCode.NTF_002,
@@ -91,14 +84,11 @@ export class NotificationService {
   private readonly db: PrimaryDatabase;
 
   constructor(
-    private readonly databaseService: DatabaseService,
-    private readonly notificationProviderService: NotificationProviderService,
-
+    databaseService: DatabaseService,
     private readonly templateResolver: TemplateResolverService,
-    private readonly senderRoutingRuleService: SenderRoutingRuleService,
-    private readonly senderEndpointService: SenderEndpointService,
+    private readonly jobRunner: NotificationJobRunner,
   ) {
-    this.db = this.databaseService.getPostgresClient();
+    this.db = databaseService.getPostgresClient();
   }
 
   private getValidatedRecipient(channel: Notification.Channel, recipients: Recipients): string | null {
@@ -125,92 +115,6 @@ export class NotificationService {
     }
   }
 
-  private getRegion(notificationJob: Notification.Job): string {
-    if (notificationJob.channel !== 'SMS') return 'ZZ';
-    const phoneNumber = parsePhoneNumber(notificationJob.recipient);
-    return phoneNumber?.country ?? 'ZZ';
-  }
-
-  private getNextAttemptAt(messageType: Template.MessageType, priority: Notification.Priority, attempt: number): Date {
-    const baseDelay = BASE_DELAY_SECONDS[messageType];
-    const maxDelay = MAX_DELAY_SECONDS[messageType];
-    const priorityModifier = PRIORITY_MODIFIER[priority];
-    const delaySeconds = Math.min(baseDelay * Math.pow(2, attempt) * priorityModifier, maxDelay);
-    const jitter = Math.floor(Math.random() * 0.25 * delaySeconds);
-    const totalDelaySeconds = delaySeconds + jitter;
-    return new Date(Date.now() + totalDelaySeconds * 1000);
-  }
-
-  private getJobStatus(result: NotificationOpResult, attempt: number): Notification.Status {
-    if (result.success) return 'SENT';
-    return !result.retriable || attempt >= MAX_ATTEMPTS ? 'PERMANENTLY_FAILED' : 'FAILED';
-  }
-
-  /**
-   * Executes a single job end-to-end: re-resolves the render bundle from the pinned version (so a retry re-renders
-   * identical content), selects a vendor via the routing rules, renders + hands off to the provider, and records the
-   * outcome with an exponential, message-type-aware backoff. Stubbed out in tests to avoid real provider calls.
-   */
-  private async executeNotificationJob(notificationJob: Notification.Job): Promise<void> {
-    const attempt = notificationJob.attempt + 1;
-    const recipient = utils.string.mask(notificationJob.recipient);
-    const jobLogData: Record<string, any> = { jobId: notificationJob.id, ...utils.object.pickKeys(notificationJob, ['channel', 'locale', 'createdAt']), recipient, attempt };
-    try {
-      const template = await this.db.query.templates.findFirst({ where: eq(schema.templates.id, notificationJob.templateId) });
-      assert(template, 'Template not found for notification job');
-      const bundle = await this.templateResolver.loadRenderBundle(notificationJob.templateVersionId, notificationJob.channel, notificationJob.locale);
-      assert(bundle, 'Render bundle not found for notification job');
-
-      const region = this.getRegion(notificationJob);
-      const service = notificationJob.service ?? 'default';
-      Object.assign(jobLogData, { templateKey: template.templateKey, service, region });
-      this.logger.debug('Resolved service, region and messageType for notification job', jobLogData);
-
-      const routingRule = await this.senderRoutingRuleService.resolveSenderRoutingRule(service, region, template.messageType);
-      const senderEndpoints = await this.senderEndpointService.getSenderEndpointsByChannel(routingRule.senderProfileId, notificationJob.channel);
-      if (senderEndpoints.length === 0) throw AppErrorCode.SND_EP_001.create();
-      Object.assign(jobLogData, { routingRuleId: routingRule.id, senderProfileId: routingRule.senderProfileId, senderEndpointCount: senderEndpoints.length });
-      this.logger.debug(`Resolved sender profile for notification job - ${notificationJob.id}`, jobLogData);
-
-      const senderEndpointIndex = notificationJob.attempt % senderEndpoints.length;
-      const senderEndpoint = senderEndpoints[senderEndpointIndex] as Configuration.SenderEndpoint;
-      Object.assign(jobLogData, { senderEndpointId: senderEndpoint.id });
-      this.logger.debug(`Resolved sender endpoint for notification job - ${notificationJob.id}`, jobLogData);
-
-      let result: NotificationOpResult;
-      if (notificationJob.channel === 'SMS') result = await this.notificationProviderService.sendSMS(notificationJob, senderEndpoint, bundle);
-      else if (notificationJob.channel === 'EMAIL') result = await this.notificationProviderService.sendEmail(notificationJob, senderEndpoint, bundle);
-      else result = await this.notificationProviderService.sendPushNotification(notificationJob, senderEndpoint, bundle);
-
-      const status = this.getJobStatus(result, attempt);
-      const updateResult = await this.db
-        .update(schema.notificationJobs)
-        .set({
-          status,
-          attempt: sql`${schema.notificationJobs.attempt} + 1`,
-          lastError: result.success ? null : result.error.name,
-          lastAttemptedAt: new Date(),
-          nextAttemptAt: status === 'FAILED' ? this.getNextAttemptAt(template.messageType, notificationJob.priority, notificationJob.attempt + 1) : null,
-        })
-        .where(eq(schema.notificationJobs.id, notificationJob.id))
-        .returning({ id: schema.notificationJobs.id, status: schema.notificationJobs.status });
-      this.logger.info(`Executed notification job - ${notificationJob.id}`, { ...jobLogData, result, updateResult, status });
-    } catch (error) {
-      const result = await this.db
-        .update(schema.notificationJobs)
-        .set({
-          status: 'PERMANENTLY_FAILED',
-          attempt: sql`${schema.notificationJobs.attempt} + 1`,
-          lastError: error instanceof AppError ? error.code : 'UNKNOWN_ERROR',
-          lastAttemptedAt: new Date(),
-        })
-        .where(eq(schema.notificationJobs.id, notificationJob.id))
-        .returning({ id: schema.notificationJobs.id, status: schema.notificationJobs.status });
-      this.logger.error(`Error executing notification job - ${notificationJob.id}`, error);
-      this.logger.error(`Failed to execute notification job - ${notificationJob.id}`, { ...jobLogData, result });
-    }
-  }
-
   private async sendChannelNotification(
     channel: Notification.Channel,
     resolved: ResolvedTemplate,
@@ -228,6 +132,7 @@ export class NotificationService {
     const content = await this.templateResolver.findContent(resolved.publishedVersion.id, channel, config.locale ?? DEFAULT_LOCALE);
     if (!content) return { channel, status: ChannelNotificationStatus.FAILED, error: AppErrorCode.TPL_CNT_003.create().toResponse() };
 
+    const admission = this.jobRunner.admit();
     const [notification] = await this.db
       .insert(schema.notificationJobs)
       .values({
@@ -239,7 +144,7 @@ export class NotificationService {
         priority: resolved.template.priority,
         recipient,
         payload,
-        status: 'PENDING',
+        ...admission,
       })
       .returning();
     assert(notification, 'Failed to create notification job');
@@ -247,7 +152,7 @@ export class NotificationService {
     const logData = { channel, recipient: utils.string.mask(recipient), templateKey: config.templateKey, locale: content.locale };
     this.logger.info(`Created notification job - ${notification.id}`, logData);
     this.logger.debug('Notification job details', { notification });
-    this.executeNotificationJob(notification);
+    this.jobRunner.start(notification, admission);
     return { jobId: notification.id, channel, status: ChannelNotificationStatus.QUEUED, locale: content.locale };
   }
 

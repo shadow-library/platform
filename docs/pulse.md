@@ -18,9 +18,15 @@ Notification service and operations console. Other apps send a message by templa
   `POST /api/v1/notifications/console` (`pulse:notifications:send`, PulseAdmin only, high-risk decision TTL, stepped-up session). Neither route admits the
   other's caller. On IAM_003 pulse-web stashes the form in sessionStorage, walks through `/api/auth/step-up` and restores it on return; a draft
   older than ten minutes is dropped.
-- Producers only enqueue: Pulse answers with per-channel QUEUED/FAILED and delivers afterwards, in-process. A producer needing durability keeps its own worker-drained outbox (identity and memoir do); Pulse has no retry worker.
+- Producers only enqueue: Pulse answers with per-channel QUEUED/FAILED and delivers afterwards, in-process. A producer needing durability keeps its own worker-drained outbox (identity and memoir do).
+- Delivery is at-least-once. An executing job holds a lease (`PROCESSING`, `next_attempt_at` as expiry) taken at insert; a per-replica recovery poller claims expired leases,
+  due `FAILED` retries and jobs accepted while the replica drains, with `FOR UPDATE SKIP LOCKED`. The lease MUST outlast the provider timeout, or a slow send is sent twice.
+  Shutdown stops claiming and waits a bounded time for in-flight jobs; what it abandons is re-sent once its lease expires. The executor fences its writes on the lease it
+  wrote, never one read back: the columns are zone-less and Bun SQL decodes them in the process time zone. Resend dedupes an identical re-send by job id for 24 hours, but a
+  retry that rendered differently (rotated endpoint, republished layout) is refused as an idempotency conflict. A job older than its message type's maximum age (OTP ten
+  minutes, others a day, judged by the database clock) is expired, never sent.
 - Send validates the payload once, then per channel inserts a job pinned to the published version id. Delivery composes that pinned content with the CURRENT
-  layout and partials, picks rule and endpoint (attempt index into the weight-ordered active endpoints, so today always the heaviest), renders (sandboxed LiquidJS) and hands to the provider.
+  layout and partials, picks rule and endpoint (attempt index into the weight-ordered active endpoints, so a retry rotates to the next one), renders (sandboxed LiquidJS) and hands to the provider.
 - A baseline seed (every migration, prod included) creates the default layout, partials and the template catalogue producers rely on. Each version it writes records
   the fixture's content hash; while the PUBLISHED version is one of those, a changed fixture is published as a new version (archive-then-insert, like rollback).
   An operator's publish or rollback writes a version without a hash, and from then on the seed never touches that item; an open draft, a changed variable
@@ -66,5 +72,4 @@ Notification service and operations console. Other apps send a message by templa
 
 ## Open work
 
-- Retries never run: jobs execute once at send time, FAILED jobs get `nextAttemptAt` but no worker picks them up, and a crash leaves jobs PENDING. A gap, not a design.
 - No real SMS or PUSH provider exists yet.

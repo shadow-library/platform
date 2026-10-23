@@ -21,7 +21,7 @@ const DAY_MS = 86_400_000;
 
 /**
  * `FAILED` is the retryable state and `PERMANENTLY_FAILED` the terminal one (see
- * `NotificationService.executeNotificationJob`), so a job that will be retried counts as pending, not
+ * `NotificationJobExecutor.execute`), so a job that will be retried counts as pending, not
  * failed. Every status maps to exactly one bucket, which is what makes `total` equal `count(*)`.
  */
 const SUCCEEDED_STATUSES = ['SENT'] satisfies Notification.Status[];
