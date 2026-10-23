@@ -9,8 +9,7 @@ export interface ChapterHashInput {
   contentRating?: ContentRating | null;
 }
 
-// Key order must not affect the hash: a baseline hash is later recomputed from a freshly loaded row,
-// where property order is not guaranteed to match the original.
+// Key order must not affect the hash: a stored row is reloaded with no guaranteed property order.
 function canonicalize(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(canonicalize);
   if (value === null || typeof value !== 'object') return value ?? null;
@@ -29,16 +28,10 @@ export function computeContentHash(content: Record<string, unknown>): string {
 }
 
 /**
- * Wire contract between novel-forge-server and web-novel-server: the reader recomputes this
- * digest from the payload it receives and rejects a mismatch, and the forge's ledger decides republish-vs-no-op
- * by comparing it. What governs the field set is therefore not "never change it" — `contentRating` was added
- * after this comment first declared the set frozen, because a rating change
- * must reach readers — but the stricter rule that survived that change: **no edit may move the digest of a
- * chapter whose reader-visible content did not change.** An unrated chapter omits `contentRating` entirely and
- * keeps its historical digest, so only a chapter that actually carries a rating hashes differently; that is what
- * lets the two services ship on different days. Any further field must be additive and absent-by-default under
- * the same rule, or ship as a versioned hash alongside this one. The null-for-absent author note predates the
- * rule and is frozen as-is.
+ * Wire contract between novel-forge-server and web-novel-server: the reader recomputes this digest and rejects a mismatch, and the forge's
+ * ledger compares it to decide republish-vs-no-op. No edit may move the digest of a chapter whose reader-visible content did not change:
+ * an unrated chapter omits `contentRating` and keeps its historical digest, so the two services can ship on different days. Any further field
+ * must be additive and absent-by-default, or ship as a versioned hash. The null-for-absent author note is frozen as-is.
  */
 export function chapterContentHash({ title, content, authorNote, contentRating }: ChapterHashInput): string {
   const rating = normalizeContentRating(contentRating);
