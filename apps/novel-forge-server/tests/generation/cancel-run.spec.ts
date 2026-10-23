@@ -13,7 +13,7 @@ function makeService(reads: (RunRow | undefined)[], outcome: RunCancelOutcome): 
   const databaseService = { getPostgresClient: () => db } as never;
   const workflowRunService = { cancel: async (runId: string) => (cancelCalls.push(runId), outcome) } as never;
   const noop = {} as never;
-  const service = new GenerationService(databaseService, workflowRunService, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop);
+  const service = new GenerationService(databaseService, workflowRunService, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop);
   return { service, cancelCalls };
 }
 

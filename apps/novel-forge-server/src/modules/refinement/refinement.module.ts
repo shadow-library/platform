@@ -9,7 +9,10 @@ import { PluginsModule } from '../plugins/plugins.module';
 import { ActionRegistryModule } from './action-registry.module';
 import { ChangeHistoryController } from './change-history.controller';
 import { ChatCompactionService } from './chat-compaction.service';
+import { ChatSessionService } from './chat-session.service';
+import { ChatTurnStagingService } from './chat-turn-staging.service';
 import { ChatController } from './chat.controller';
+import { ChatLookupService } from './chat-lookup.service';
 import { ChatService } from './chat.service';
 import { IdeaRejectionService } from './idea-rejection.service';
 import { ProposalApplyService } from './proposal-apply.service';
@@ -35,6 +38,9 @@ import { WriterPreviewService } from './writer-preview.service';
     ProposalApplyService,
     ProposalOpUndoService,
     ChatCompactionService,
+    ChatSessionService,
+    ChatLookupService,
+    ChatTurnStagingService,
     ChatService,
     IdeaRejectionService,
     RefineService,
@@ -45,6 +51,6 @@ import { WriterPreviewService } from './writer-preview.service';
     TurnCostService,
     WriterPreviewService,
   ],
-  exports: [ProposalService, ProposalApplyService, ChatCompactionService, ChatService, RefineService, TurnStreamService, TurnCostService],
+  exports: [ProposalService, ProposalApplyService, ChatCompactionService, ChatSessionService, ChatService, RefineService, TurnStreamService, TurnCostService],
 })
 export class RefinementModule {}

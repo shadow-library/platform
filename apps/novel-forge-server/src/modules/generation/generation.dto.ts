@@ -1,18 +1,11 @@
-import { EnumType, Field, Integer, OmitType, Schema } from '@shadow-library/class-schema';
+import { Field, Integer, Schema } from '@shadow-library/class-schema';
 import { ErrorResponseDto, Transform } from '@shadow-library/fastify';
-import { Paginated, PaginationQuery } from '@shadow-library/modules/http-core';
 import { type ContentRating, type DarkContentLevel, type SexualContentLevel, type ViolenceLevel } from '@shadow-library/sdk';
 
 import {
   BriefWriteMode,
-  type ChapterFilter,
-  type ChapterRow,
-  ChapterRowFilter,
-  ChapterRowKind,
   ContentMode,
   ContinuityProposalStatus,
-  CostSource,
-  CostTier,
   DarkContentRating,
   DraftReviewStatus,
   DraftRevisionSource,
@@ -21,11 +14,9 @@ import {
   JobStatus,
   RevealRuleDetails,
   SexualContentRating,
-  SortByTime,
   UserFeedbackDisposition,
   ViolenceRating,
   WorkflowRunStatus,
-  WriterAttemptRole,
 } from '@server/common';
 import { type Ai, type Generation, type Job, type Project } from '@server/database';
 
@@ -65,16 +56,6 @@ export class RevisionParams {
 }
 
 @Schema()
-export class RunParams {
-  @Field(() => String, { pattern: '^[0-9]+$' })
-  @Transform('bigint:parse')
-  projectId: bigint;
-
-  @Field()
-  runId: string;
-}
-
-@Schema()
 export class JobParams {
   @Field(() => String, { pattern: '^[0-9]+$' })
   @Transform('bigint:parse')
@@ -82,20 +63,6 @@ export class JobParams {
 
   @Field()
   jobId: string;
-}
-
-@Schema()
-export class RunCallParams {
-  @Field(() => String, { pattern: '^[0-9]+$' })
-  @Transform('bigint:parse')
-  projectId: bigint;
-
-  @Field()
-  runId: string;
-
-  @Field(() => String, { pattern: '^[0-9]+$' })
-  @Transform('bigint:parse')
-  callId: bigint;
 }
 
 @Schema()
@@ -108,7 +75,7 @@ export class SeedFromBriefBody {
 }
 
 @Schema({ description: 'One scene of a chapter plan.' })
-export class BriefSceneSchema {
+class BriefSceneSchema {
   @Field({ minLength: 1 })
   summary: string;
 
@@ -343,51 +310,6 @@ export class UpdateSummaryBody extends DraftSaveBase {
 }
 
 @Schema()
-export class AmendChapterBody {
-  @Field({
-    minLength: 1,
-    description: 'Replacement prose for the finalized chapter. Amend is the only path that writes past the immutability lock, and it never unlocks the chapter.',
-  })
-  content: string;
-
-  @Field({ optional: true, description: 'Replacement title; omission keeps the stored title.' })
-  title?: string;
-
-  @Field({ optional: true, description: "Replacement author's note; omission keeps the stored note. The note reaches the reader, so changing it does move the published payload." })
-  note?: string;
-
-  @Field(() => ContentRatingInput, { optional: true, description: 'Rating of the amended prose; omission keeps the stored rating, an empty object clears it back to unrated.' })
-  contentRating?: ContentRatingInput;
-}
-
-@Schema({ description: 'Outcome of amending finalized canon in place. The amendment is prose-only: the bible, continuity, and downstream chapters are untouched.' })
-export class AmendChapterResponse {
-  @Field(() => Integer)
-  chapter: number;
-
-  @Field(() => Integer, { description: 'Word count recomputed from the amended prose.' })
-  wordCount: number;
-
-  @Field({
-    description:
-      'False when the chapter is isolated (isolated prose is never indexed) or the re-embed failed. A failed re-embed leaves the chapter unindexed until the next backfill; the amended prose is committed either way.',
-  })
-  indexed: boolean;
-
-  @Field({ description: 'True when the reader-facing payload hash moved and the publication was rescheduled for the next push sweep. An unchanged payload never republishes.' })
-  republished: boolean;
-
-  @Field(() => Integer, { optional: true, description: 'Publication revision after the bump; absent when nothing was republished.' })
-  publicationRevision?: number;
-
-  @Field({
-    description:
-      'Always true. Amend replaces prose only, so anything this chapter already contributed to the bible stays there and keeps propagating — offer POST /chapters/:n/extract-to-bible so the author can re-derive canon deliberately.',
-  })
-  suggestExtractToBible: boolean;
-}
-
-@Schema()
 export class UpdateContinuityBody {
   @Field(() => Object, { additionalProperties: true, description: 'Continuity findings and suggested edits produced by the continuity model.' })
   proposal: Record<string, unknown>;
@@ -535,7 +457,7 @@ export class DraftResponse {
 }
 
 @Schema({ description: 'The draft as it stands when a save was refused for being made against an older one.' })
-export class ConflictingDraftResponse {
+class ConflictingDraftResponse {
   @Field(() => String)
   id: bigint;
 
@@ -577,7 +499,7 @@ export class SummaryConflictResponse extends DraftConflictResponse {
 }
 
 @Schema()
-export class FinalizeBlockerResponse {
+class FinalizeBlockerResponse {
   @Field({ description: 'The error code finalize would refuse with.' })
   code: string;
 
@@ -595,7 +517,7 @@ export class FinalizeReadinessResponse {
 }
 
 @Schema({ description: 'A learned fact as stored: plan and proposal writes only require non-blank keys, so the response imposes no key pattern.' })
-export class KnowledgeRevealResponse {
+class KnowledgeRevealResponse {
   @Field()
   entityKey: string;
 
@@ -604,7 +526,7 @@ export class KnowledgeRevealResponse {
 }
 
 @Schema({ description: "A brief's knowledge contract as the pipeline reads it." })
-export class KnowledgeContractResponse {
+class KnowledgeContractResponse {
   @Field(() => [String], { description: 'Entity keys whose ledgered knowledge bounds what the chapter may state.' })
   pov: string[];
 
@@ -712,7 +634,7 @@ export class BriefResponse {
 }
 
 @Schema({ description: "A brief's identity and freshness without its body." })
-export class BriefSummaryResponse {
+class BriefSummaryResponse {
   @Field(() => Integer)
   chapter: number;
 
@@ -849,348 +771,6 @@ export class ListContinuityProposalResponse {
 }
 
 @Schema()
-export class RunModelCallResponse {
-  @Field(() => String)
-  id: bigint;
-
-  @Field({ optional: true, nullable: true })
-  node?: string | null;
-
-  @Field()
-  role: string;
-
-  @Field()
-  provider: string;
-
-  @Field({ description: 'The model that answered, as recorded: a catalog model, or its task when no model answered. Named by `GET /ai/models` `modelLabels`.' })
-  model: string;
-
-  @Field()
-  promptKey: string;
-
-  @Field()
-  promptVersion: string;
-
-  @Field()
-  status: string;
-
-  @Field(() => Integer, { optional: true, nullable: true })
-  inputTokens?: number | null;
-
-  @Field(() => Integer, {
-    optional: true,
-    nullable: true,
-    description: 'The share of inputTokens served from a provider cache; null when the provider reported no cache accounting.',
-  })
-  cachedInputTokens?: number | null;
-
-  @Field(() => Integer, { optional: true, nullable: true })
-  outputTokens?: number | null;
-
-  @Field(() => Integer, { optional: true, nullable: true })
-  latencyMs?: number | null;
-
-  @Field({ optional: true, nullable: true })
-  costUsd?: string | null;
-
-  @Field(() => CostSource, { optional: true, nullable: true, description: 'Where costUsd came from; null on a row written before cost_source existed.' })
-  costSource?: Ai.CostSource | null;
-
-  @Field(() => CostTier, { optional: true, nullable: true, description: 'The cost tier this call ran under; null when the call predates tier tracking.' })
-  tier?: Project.CostTier | null;
-
-  @Field(() => ContentMode, { optional: true, nullable: true })
-  contentMode?: Project.ContentMode | null;
-
-  @Field(() => String, { optional: true, nullable: true, description: 'Reasoning effort sent with the call; null when the call sent none or predates effort tracking.' })
-  reasoningEffort?: string | null;
-
-  @Field(() => Integer)
-  attempt: number;
-
-  @Field(() => String, { format: 'date-time' })
-  createdAt: Date;
-}
-
-@Schema({ description: 'A read-only lookup performed by a model during a run.' })
-export class RunToolCallResponse {
-  @Field(() => String)
-  id: bigint;
-
-  @Field({ optional: true, nullable: true })
-  node?: string | null;
-
-  @Field()
-  tool: string;
-
-  @Field(() => Object, { optional: true, nullable: true, additionalProperties: true })
-  args?: Record<string, unknown> | null;
-
-  @Field()
-  status: string;
-
-  @Field({ optional: true, nullable: true })
-  resultDigest?: string | null;
-
-  @Field(() => Integer, { optional: true, nullable: true })
-  latencyMs?: number | null;
-
-  @Field(() => String, { format: 'date-time' })
-  createdAt: Date;
-}
-
-@Schema()
-export class RunContextSectionItem {
-  @Field()
-  key: string;
-
-  @Field()
-  tier: string;
-
-  @Field()
-  segment: string;
-
-  @Field(() => Integer)
-  tokens: number;
-
-  @Field()
-  truncated: boolean;
-}
-
-@Schema({ description: "The context sections that contributed to a run's prompt token usage." })
-export class RunContextPackResponse {
-  @Field()
-  id: string;
-
-  @Field()
-  purpose: string;
-
-  @Field(() => Integer, { optional: true, nullable: true })
-  budgetTokens?: number | null;
-
-  @Field(() => Integer, { optional: true, nullable: true })
-  usedTokens?: number | null;
-
-  @Field(() => [RunContextSectionItem])
-  sections: RunContextSectionItem[];
-}
-
-@Schema()
-export class RunContextResponse extends RunContextPackResponse {
-  @Field({ description: 'The exact stable and volatile context text supplied to the prompt, in order.' })
-  rendered: string;
-}
-
-@Schema()
-export class RunModelCallDetailResponse extends RunModelCallResponse {
-  @Field({ optional: true, nullable: true })
-  rawOutput?: string | null;
-
-  @Field(() => Object, { optional: true, nullable: true, additionalProperties: true })
-  error?: Record<string, unknown> | null;
-}
-
-@Schema({ description: "Spend split by where the cost came from — 'provider', 'gateway', 'estimate', or 'error' for a call that recorded none." })
-export class RunCostSourceItem {
-  @Field()
-  costSource: string;
-
-  @Field(() => Integer)
-  calls: number;
-
-  @Field()
-  costUsd: number;
-}
-
-@Schema({ description: "A workflow run's cost, tokens and call totals — the author-facing figure, never the prompt or response bodies behind it." })
-export class RunUsageResponse {
-  @Field(() => Integer)
-  calls: number;
-
-  @Field(() => Integer)
-  inputTokens: number;
-
-  @Field(() => Integer)
-  cachedInputTokens: number;
-
-  @Field(() => Integer)
-  outputTokens: number;
-
-  @Field({ description: 'Recorded cost plus the list-price estimate for calls that recorded none.' })
-  costUsd: number;
-
-  @Field({ description: 'The part of costUsd estimated from list prices because the call recorded no cost.' })
-  estimatedCostUsd: number;
-
-  @Field(() => Integer, { optional: true, nullable: true, description: 'Wall-clock milliseconds from startedAt to endedAt; null while the run is still in progress.' })
-  durationMs?: number | null;
-
-  @Field(() => [RunCostSourceItem])
-  byCostSource: RunCostSourceItem[];
-}
-
-@Schema()
-export class WorkflowRunDetailResponse {
-  @Field()
-  id: string;
-
-  @Field(() => String)
-  projectId: bigint;
-
-  @Field({ optional: true, nullable: true })
-  jobId?: string | null;
-
-  @Field()
-  graph: string;
-
-  @Field()
-  target: string;
-
-  @Field(() => WorkflowRunStatus)
-  status: Ai.WorkflowRunStatus;
-
-  @Field({ optional: true, nullable: true })
-  outcome?: string | null;
-
-  @Field(() => Object, { optional: true, nullable: true, additionalProperties: true, description: 'Workflow-specific input captured for this run.' })
-  input?: Record<string, unknown> | null;
-
-  @Field(() => Object, { optional: true, nullable: true, additionalProperties: true })
-  error?: Record<string, unknown> | null;
-
-  @Field(() => [String], { optional: true, nullable: true })
-  nodeTrace?: string[] | null;
-
-  @Field(() => [String], { description: 'Bible-builder only: stages this run left untouched because their document already had content. Empty for every other graph.' })
-  skippedStages: string[];
-
-  @Field(() => [RunModelCallResponse], { optional: true, description: 'Model calls made by this run. Included only by the run-detail endpoint.' })
-  modelCalls?: RunModelCallResponse[];
-
-  @Field(() => [RunToolCallResponse], { optional: true, description: 'Tool lookups performed by this run. Included only by the run-detail endpoint.' })
-  toolCalls?: RunToolCallResponse[];
-
-  @Field(() => RunContextPackResponse, { optional: true, description: 'Prompt context breakdown. Included only by the run-detail endpoint when linked.' })
-  contextPack?: RunContextPackResponse;
-
-  @Field(() => String, { format: 'date-time' })
-  startedAt: Date;
-
-  @Field(() => String, { format: 'date-time', optional: true, nullable: true })
-  endedAt?: Date | null;
-
-  @Field(() => RunUsageResponse)
-  totals: RunUsageResponse;
-}
-
-@Schema({ description: 'The non-admin-safe projection of a workflow run: identity, status and timing, never its input, error or context pack.' })
-export class WorkflowRunSummaryResponse {
-  @Field()
-  id: string;
-
-  @Field(() => String)
-  projectId: bigint;
-
-  @Field({ optional: true, nullable: true })
-  jobId?: string | null;
-
-  @Field()
-  graph: string;
-
-  @Field()
-  target: string;
-
-  @Field(() => WorkflowRunStatus)
-  status: Ai.WorkflowRunStatus;
-
-  @Field({ optional: true, nullable: true })
-  outcome?: string | null;
-
-  @Field(() => [String], { description: 'Bible-builder only: stages this run left untouched because their document already had content. Empty for every other graph.' })
-  skippedStages: string[];
-
-  @Field(() => String, { format: 'date-time' })
-  startedAt: Date;
-
-  @Field(() => String, { format: 'date-time', optional: true, nullable: true })
-  endedAt?: Date | null;
-}
-
-@Schema()
-export class WorkflowRunListItemResponse extends WorkflowRunSummaryResponse {
-  @Field(() => RunUsageResponse)
-  totals: RunUsageResponse;
-}
-
-/**
- * Graphs the author asked for, directly or as a pipeline they started — everything `listRuns` surfaces.
- * An allowlist rather than a denylist of background graphs (`chat-title`, `chat-compact` —
- * fire-and-forget metadata graphs no `turn()` caller awaits or reports through) because a
- * forgotten entry then fails closed: a new background graph stays off this list by default and never
- * leaks into the runs rail, where a forgotten denylist entry fails open exactly as `chat-title` did.
- */
-export const AUTHOR_FACING_GRAPHS = [
-  'chat-turn',
-  'premise-enhance',
-  'bible-audit',
-  'illustration',
-  'chapter-generation',
-  'chapter-finalization',
-  'chapter-review',
-  'bible-builder',
-  'novel-validation',
-] as const;
-
-const RunGraph = EnumType.create('RunGraph', [...AUTHOR_FACING_GRAPHS]);
-
-@Schema()
-export class ListRunsQuery extends OmitType(PaginationQuery(SortByTime, { limit: 20 }, { maximumLimit: 100 }), ['sortBy', 'sortOrder'] as const) {
-  @Field(() => RunGraph, { optional: true })
-  graph?: (typeof AUTHOR_FACING_GRAPHS)[number];
-
-  @Field(() => String, { optional: true, description: 'Only runs started at or after this ISO 8601 time.' })
-  @Transform('date:parse')
-  from?: Date;
-
-  @Field(() => String, { optional: true, description: 'Only runs started at or before this ISO 8601 time.' })
-  @Transform('date:parse')
-  to?: Date;
-}
-
-@Schema({ description: "A workflow run's model calls, without prompt, context or raw output — that detail stays admin-only." })
-export class RunUsageDetailResponse extends WorkflowRunSummaryResponse {
-  @Field(() => RunUsageResponse)
-  totals: RunUsageResponse;
-
-  @Field(() => [RunModelCallResponse])
-  calls: RunModelCallResponse[];
-}
-
-@Schema({ description: "Spend under one internal call role ('generation', 'judge', 'review', 'revision', 'continuity', 'chapter-extract', 'chapter-summarize', …)." })
-export class ChapterCostBreakdownItem {
-  @Field()
-  role: string;
-
-  @Field(() => Integer)
-  calls: number;
-
-  @Field()
-  costUsd: number;
-}
-
-@Schema({ description: 'Every model call any action has made against one chapter — generation, judging, review, revision, continuity and extraction alike.' })
-export class ChapterCostResponse {
-  @Field(() => Integer)
-  chapter: number;
-
-  @Field(() => RunUsageResponse)
-  totals: RunUsageResponse;
-
-  @Field(() => [ChapterCostBreakdownItem], { description: 'By internal call role, highest spend first.' })
-  byRole: ChapterCostBreakdownItem[];
-}
-
-@Schema()
 export class JobEnqueueResponse {
   @Field()
   jobId: string;
@@ -1230,7 +810,7 @@ export class ListDraftResponse {
 }
 
 @Schema({ description: "One chapter's draft state without its prose." })
-export class DraftSummaryItem {
+class DraftSummaryItem {
   @Field(() => Integer)
   chapter: number;
 
@@ -1269,124 +849,7 @@ export class DraftSummaryResponse {
 }
 
 @Schema()
-export class ListChapterRowsQuery extends OmitType(PaginationQuery(SortByTime, { limit: 25 }), ['sortBy', 'sortOrder'] as const) {
-  @Field(() => ChapterRowFilter, { default: 'all' })
-  filter: ChapterFilter;
-
-  @Field({ optional: true, description: "Only rows whose brief's point of view (any pooled scene) is this entity key. Covers drafts and planned chapters too." })
-  pov?: string;
-
-  @Field({ optional: true, description: 'Only rows this thread opened, closed, or was last advanced in. Covers drafts and planned chapters too.' })
-  thread?: string;
-}
-
-@Schema({ description: 'One chapter of the plan: a written draft, or a brief with no draft yet. Rows are always in chapter order.' })
-export class ChapterRowResponse {
-  @Field(() => ChapterRowKind)
-  kind: ChapterRow['kind'];
-
-  @Field(() => Integer)
-  chapter: number;
-
-  @Field({ optional: true, nullable: true, description: "The draft's title for a written row, the brief's for a planned one." })
-  title?: string | null;
-
-  @Field(() => BriefWriteMode, { optional: true, nullable: true, description: 'Null for a written chapter that has no brief.' })
-  writeMode?: Generation.BriefWriteMode | null;
-
-  @Field({ optional: true, nullable: true, description: "The chapter's point of view: the brief's own pov, or the first pooled scene pov. Null when neither names one." })
-  pov?: string | null;
-
-  @Field(() => DraftStatus, { optional: true, description: 'Written rows only.' })
-  status?: Generation.DraftStatus;
-
-  @Field(() => DraftReviewStatus, { optional: true, description: 'Written rows only.' })
-  reviewStatus?: Generation.DraftReviewStatus;
-
-  @Field(() => String, { optional: true, description: 'Written rows only.' })
-  generator?: Generation.Draft['generator'];
-
-  @Field({ optional: true, description: 'Written rows only.' })
-  isolated?: boolean;
-
-  @Field({
-    optional: true,
-    description: 'Written rows only: finalize is refused until the chapter has a summary — every chapter needs one — plus, for an isolated chapter, continuation state.',
-  })
-  finalizeBlocked?: boolean;
-
-  @Field(() => Integer, { optional: true, description: "Written rows only: the draft's current revision." })
-  revision?: number;
-
-  @Field(() => Integer, { optional: true, nullable: true, description: 'Written rows only: the last revision the author approved, null when none was.' })
-  approvedRevision?: number | null;
-
-  @Field(() => Integer, { optional: true, description: 'Written rows only.' })
-  wordCount?: number;
-}
-
-@Schema({ description: 'The first chapter the judge flagged, which blocks further generation until it is resolved.' })
-export class ChapterContradictionResponse {
-  @Field(() => Integer)
-  chapter: number;
-
-  @Field({ optional: true, nullable: true })
-  judgeNote?: string | null;
-
-  @Field(() => Integer, { description: 'How many chapters are flagged in total.' })
-  count: number;
-}
-
-@Schema()
-export class ChapterRowCountsResponse {
-  @Field(() => Integer)
-  all: number;
-
-  @Field(() => Integer)
-  not_written: number;
-
-  @Field(() => Integer)
-  needs_review: number;
-
-  @Field(() => Integer)
-  draft: number;
-
-  @Field(() => Integer)
-  final: number;
-}
-
-@Schema({ description: 'One page of chapter rows, plus whole-novel figures the list needs regardless of the page shown.' })
-export class ListChapterRowsResponse extends Paginated(ChapterRowResponse) {
-  @Field(() => ChapterRowCountsResponse, { description: 'Rows matching each filter across the whole novel.' })
-  counts: ChapterRowCountsResponse;
-
-  @Field(() => Integer)
-  totalWords: number;
-
-  @Field(() => Integer, { optional: true, nullable: true, description: 'The lowest brief with no draft — the chapter `generate` targets next.' })
-  nextBriefChapter?: number | null;
-
-  @Field(() => Integer, {
-    description:
-      'The only chapter a new draft may start at — the lowest with neither a draft nor finalized prose, planned or not. Writing or filling any other unwritten chapter is refused.',
-  })
-  nextWritableChapter: number;
-
-  @Field(() => Integer, { description: 'The highest planned or written chapter number, 0 when there are none.' })
-  lastChapter: number;
-
-  @Field(() => Integer, { description: 'The highest finalized chapter, 0 when none is; no chapter can be inserted below it.' })
-  frontier: number;
-
-  @Field(() => [Integer], { description: 'Every planned or written chapter number, ascending.' })
-  chapters: number[];
-
-  @Field(() => ChapterContradictionResponse, { optional: true, nullable: true })
-  contradiction?: ChapterContradictionResponse | null;
-}
-
-@Schema()
-export class JudgeFindingResponse {
+class JudgeFindingResponse {
   @Field()
   severity: string;
 
@@ -1428,10 +891,7 @@ export class ChapterReviewResponse {
 }
 
 @Schema()
-export class ListWorkflowRunResponse extends Paginated(WorkflowRunListItemResponse) {}
-
-@Schema()
-export class SearchHitResponse {
+class SearchHitResponse {
   @Field()
   text: string;
 
@@ -1449,7 +909,7 @@ export class SearchResponse {
 }
 
 @Schema()
-export class GenerationJobItem {
+class GenerationJobItem {
   @Field()
   id: string;
 
@@ -1491,178 +951,4 @@ export class GenerationJobItem {
 export class ListGenerationJobResponse {
   @Field(() => [GenerationJobItem])
   items: GenerationJobItem[];
-}
-
-@Schema()
-export class ChapterImageParams {
-  @Field(() => String, { pattern: '^[0-9]+$' })
-  @Transform('bigint:parse')
-  projectId: bigint;
-
-  @Field(() => Integer)
-  n: number;
-
-  @Field(() => String, { pattern: '^[0-9]+$' })
-  @Transform('bigint:parse')
-  imageId: bigint;
-}
-
-@Schema()
-export class AddChapterImageBody {
-  @Field(() => String, { enum: ['image/png', 'image/jpeg', 'image/webp'] })
-  mime: 'image/png' | 'image/jpeg' | 'image/webp';
-
-  @Field({ description: 'Base64-encoded image bytes without a data URL prefix.' })
-  image: string;
-
-  @Field({ optional: true })
-  caption?: string;
-}
-
-@Schema()
-export class ChapterImageResponse {
-  @Field(() => String)
-  id: bigint;
-
-  @Field(() => String)
-  projectId: bigint;
-
-  @Field(() => Integer)
-  chapter: number;
-
-  @Field({ description: 'Absolute public URL for the stored scene image.' })
-  imageUrl: string;
-
-  @Field({ optional: true, nullable: true })
-  caption?: string | null;
-
-  @Field(() => Integer)
-  sortOrder: number;
-
-  @Field(() => String, { format: 'date-time' })
-  createdAt: Date;
-}
-
-@Schema()
-export class ListChapterImageResponse {
-  @Field(() => [ChapterImageResponse])
-  items: ChapterImageResponse[];
-}
-
-@Schema()
-export class ChapterInsertParams {
-  @Field(() => String, { pattern: '^[0-9]+$' })
-  @Transform('bigint:parse')
-  projectId: bigint;
-
-  @Field(() => Integer, { minimum: 0, description: 'Insert the new chapter immediately after this number; 0 inserts ahead of chapter 1.' })
-  afterChapter: number;
-}
-
-@Schema()
-export class InsertChapterBody {
-  @Field(() => String, { enum: ['hand', 'planner'], description: "'hand' takes briefBody verbatim; 'planner' drafts the brief from intent." })
-  briefOrigin: 'hand' | 'planner';
-
-  @Field({ optional: true, description: "The brief body to store verbatim. Required when briefOrigin is 'hand'." })
-  briefBody?: string;
-
-  @Field({ optional: true, description: "One line describing what the inserted chapter must do. Required when briefOrigin is 'planner'." })
-  intent?: string;
-}
-
-@Schema({ description: 'The brief created in the freed slot, plus the extent of the renumber that freed it.' })
-export class InsertChapterResponse {
-  @Field(() => BriefResponse)
-  brief: BriefResponse;
-
-  @Field(() => Integer, { description: 'Number the inserted chapter now occupies.' })
-  newChapter: number;
-
-  @Field(() => Integer, { description: 'How many briefs the insert renumbered.' })
-  shiftedChapters: number;
-}
-
-@Schema()
-export class SnapshotParams {
-  @Field(() => String, { pattern: '^[0-9]+$' })
-  @Transform('bigint:parse')
-  projectId: bigint;
-
-  @Field(() => Integer)
-  n: number;
-
-  @Field(() => String, { pattern: '^[0-9]+$' })
-  @Transform('bigint:parse')
-  snapshotId: bigint;
-}
-
-@Schema({ description: "One writer attempt's metadata — no messages or kept-back detail, just enough to pick one for the Writer's view." })
-export class WriterSnapshotSummaryResponse {
-  @Field(() => String)
-  id: bigint;
-
-  @Field(() => Integer)
-  chapter: number;
-
-  @Field(() => Integer)
-  draftRevision: number;
-
-  @Field(() => Integer)
-  attempt: number;
-
-  @Field(() => WriterAttemptRole)
-  role: Ai.WriterAttemptRole;
-
-  @Field()
-  promptKey: string;
-
-  @Field()
-  promptVersion: string;
-
-  @Field(() => Object, { additionalProperties: true })
-  modelRoute: { provider: string; model: string };
-
-  @Field()
-  isolated: boolean;
-
-  @Field(() => String, { format: 'date-time' })
-  createdAt: Date;
-}
-
-@Schema()
-export class ListWriterSnapshotResponse {
-  @Field(() => [WriterSnapshotSummaryResponse])
-  items: WriterSnapshotSummaryResponse[];
-}
-
-@Schema({ description: 'One message as the model router sent it.' })
-export class WriterSnapshotMessageResponse {
-  @Field()
-  role: string;
-
-  @Field()
-  content: string;
-}
-
-@Schema({
-  description:
-    "The Writer's view of one attempt: the exact messages the model router sent, what was kept back and why, and the plan and Story " +
-    'Bible state it was written against. An isolated chapter reads this walled off, like any other standard read.',
-})
-export class WriterSnapshotDetailResponse extends WriterSnapshotSummaryResponse {
-  @Field(() => String, { optional: true, nullable: true })
-  contextPackId: bigint | null;
-
-  @Field(() => [WriterSnapshotMessageResponse])
-  messages: WriterSnapshotMessageResponse[];
-
-  @Field(() => Object, { optional: true, nullable: true, additionalProperties: true })
-  keptBack: Record<string, unknown> | null;
-
-  @Field(() => Integer, { optional: true, nullable: true })
-  planRevision: number | null;
-
-  @Field({ optional: true, nullable: true })
-  bibleHash: string | null;
 }

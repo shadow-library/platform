@@ -1,15 +1,15 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 
 import { AIMessage, type BaseMessage, HumanMessage } from '@langchain/core/messages';
-import { and, asc, desc, eq, gt, inArray, isNull, lt, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, inArray } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
-import { AppError, Logger, OffsetPaginationResult, utils } from '@shadow-library/common';
+import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
 import { PROGRESS_ITEM_KEYS } from '@server/common';
 import { APP_NAME } from '@server/constants';
-import { type PrimaryDatabase, type PrimaryTransaction, type Project, type Refinement, schema } from '@server/database';
+import { type PrimaryDatabase, type Refinement, schema } from '@server/database';
 
 import { CHAT_HISTORY_BUDGET, ContextAssembler } from '../ai/context/context-assembler.service';
 import { countTokens } from '../ai/context/token-budget';
@@ -17,48 +17,34 @@ import { type ResolvedModel } from '../ai/defaults';
 import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { hardLineError, screenTexts } from '../ai/hard-line';
 import { type ModelRoute, ModelRouterService, type ProjectConfig } from '../ai/model-router.service';
-import { buildChatRefinePrompt, chatPromptTokens, chatScopeInstructions, HUB_ALLOWED_OPS, PROMPT_REGISTRY, renderTurnMessage, renderTurnRules } from '../ai/prompts';
-import { RetrievalService } from '../ai/retrieval';
-import { type ChatRefineOutput, type ChatTitleOutput } from '../ai/schemas';
+import { buildChatRefinePrompt, chatPromptTokens, chatScopeInstructions, HUB_ALLOWED_OPS, renderTurnMessage, renderTurnRules } from '../ai/prompts';
+import { type ChatRefineOutput } from '../ai/schemas';
 import { NovelForgeCatalogService } from '../ai/novel-forge-catalog.service';
 import { gatewaySessionKey, SYNAPSE_CHAT_TASK, SYNAPSE_PROVIDER, synapseAlias, synapseSelectors } from '../ai/synapse-request';
-import { type ToolContext, ToolRegistryService } from '../ai/tools';
 import { resolveUnrestrictedRoute } from '../ai/unrestricted-route';
-import { type WebLookups, type WebMode, WebResearchService } from '../ai/web';
+import { WebResearchService } from '../ai/web';
 import { countWords } from '../eval/deterministic-metrics';
 import { ProjectEventService } from '../events/project-event.service';
 import { NotesStoreService } from '../notes/notes-store.service';
 import { ORGANISE_MIN_WORDS } from '../notes/organise-plan';
 import { type ForgeCallPolicy, PluginPolicyService } from '../plugins/plugin-policy.service';
-import { ActionExecutorRegistry } from './action-registry';
-import { type ChangeOp, parseChangeSet, parseOptionalChangeSet } from './change-set';
+import { parseChangeSet } from './change-set';
 import { ChatCompactionService, type ChatConversation } from './chat-compaction.service';
+import { ChatLookupService } from './chat-lookup.service';
 import { contextUpdate, playbookDigest, toExchangeMessage } from './chat-exchange';
 import { type ChatTurnEmitter, EmitterRelay } from './chat-turn-emitter';
 import { TurnTraceCollector } from './chat-turn-trace';
-import { aliasRoutedProject, CHAT_TURN_GRAPH, type ChatSelection, chatSelection, type ChatSelectionOverride, loadTurnSelections } from './chat-selection';
+import { aliasRoutedProject, CHAT_TURN_GRAPH, type ChatSelection, chatSelection, type ChatSelectionOverride } from './chat-selection';
+import { type ChatMessageView, ChatSessionService } from './chat-session.service';
+import { ChatTurnStagingService, type StagingContext } from './chat-turn-staging.service';
 import { sanitizeChatQuestion } from './chat-question';
-import { loadRejectedIdeas } from './idea-rejections';
 import { requestedNegations } from './negation-echo';
-import { isNotesOrganiseRequest, ORGANISE_NOTES_OP, type OrganiseRouting, organiseRouting, withLaterPlansRouted } from './later-plans-guard';
+import { isNotesOrganiseRequest, organiseRouting, withLaterPlansRouted } from './later-plans-guard';
 import { authorWords, type PassageContextInput, renderTurnContent, resolvePassageContexts, turnScreens } from './passage-context';
-import { anchorPassageRewrites, droppedRewritesNote } from './passage-rewrite';
-import { chatTurnWarnings, readsPlannerOnlyPage } from './planner-only-guard';
-import { ProposalApplyService } from './proposal-apply.service';
-import { ProposalService } from './proposal.service';
+import { chatTurnWarnings } from './planner-only-guard';
 import { findNegationEchoWarnings } from './proposal-warnings';
 import { proseWithheldNote, withoutProseEditOps } from './prose-intent';
-import {
-  IDEAS_DROPPED_NOTE,
-  splitTurnChangeSet,
-  stageTurnChangeSet,
-  startNotesOrganise,
-  type TurnApplied,
-  turnHold,
-  type TurnHoldReason,
-  type TurnProposalPort,
-  type TurnStaging,
-} from './turn-proposals';
+import { type TurnApplied, type TurnHoldReason } from './turn-proposals';
 
 /** `contentMode` and `costTier` apply to this turn's reply only; actions the turn starts inherit its tier, never its mode. */
 export interface ChatTurnOptions extends ChatSelectionOverride {
@@ -69,41 +55,8 @@ export interface ChatTurnOptions extends ChatSelectionOverride {
   contexts?: PassageContextInput[];
 }
 
-export interface CreateSessionInput {
-  mode?: Refinement.ChatMode;
-}
-
-/** `null` clears a field back to the project default; an omitted one is left alone. */
-export interface SessionModelUpdate {
-  provider?: string | null;
-  model?: string | null;
-  contentMode?: Project.ContentMode | null;
-  costTier?: Project.CostTier | null;
-}
-
 /** What a reply records when no response named its model, as a call that never answered records itself. */
 const UNANSWERED_CHAT: ResolvedModel = { provider: SYNAPSE_PROVIDER, model: SYNAPSE_CHAT_TASK };
-
-interface SessionPin {
-  provider: string | null;
-  model: string | null;
-}
-
-/** The selection is absent on user messages and on turns older than selections. */
-export type ChatMessageView = Omit<Refinement.ChatMessage, 'exchange'> & Partial<ChatSelection>;
-
-interface LookupObservers {
-  round: number;
-  relay: EmitterRelay | null;
-  trace: TurnTraceCollector;
-  planner: { read: boolean };
-  web?: WebLookups;
-  webMode: WebMode;
-}
-
-// A web lookup's refusal says why — not configured, the engine failed, or the page is off limits — so the model can search again or answer
-// without it; every other handler failure stays the bare "lookup failed".
-const WEB_LOOKUP_REFUSALS: ReadonlySet<string> = new Set([AppErrorCode.AI_019.code, AppErrorCode.AI_020.code, AppErrorCode.AI_021.code]);
 
 function plainConversation(history: BaseMessage[]): ChatConversation {
   return { plain: history, history, segment: null };
@@ -148,13 +101,6 @@ interface AuthoredMessage {
   rendered: string;
 }
 
-interface StagingContext {
-  justDiscussing: boolean;
-  organise: OrganiseRouting;
-  /** The passage comments the author sent this turn, which tell a rewrite's passage apart when its words occur more than once. */
-  contexts: readonly Refinement.ChatPassageContext[];
-}
-
 export interface ChatTurnResult {
   userMessage: Refinement.ChatMessage;
   assistantMessage: ChatMessageView;
@@ -168,19 +114,9 @@ export interface ChatTurnResult {
   runId: string;
 }
 
-interface SessionListFilter {
-  scopeType?: Refinement.ChatScope;
-  status?: Refinement.ChatSessionStatus;
-  limit?: number;
-  offset?: number;
-  sortBy?: string;
-  sortOrder?: string;
-}
-
 // Declared-lookup budget for a hub turn: at most this many lookup rounds
 // execute before the model is told to answer with what it has.
 const MAX_LOOKUP_ROUNDS = 3;
-const CHAT_HUB_NODE = 'chat-hub';
 
 function withheldProse(output: ChatRefineOutput, proseEdits: boolean): ChatRefineOutput {
   if (proseEdits || !output.changeSet?.length) return output;
@@ -197,10 +133,6 @@ function negationFixRequest(warnings: string[]): string {
   return `Your changeSet removes things by stating their absence, which hands them straight back to the chapter writer:\n${warnings.map(w => `- ${w}`).join('\n')}\n\nRespond again with the same JSON shape and no lookups: rewrite each of those passages without the removed idea, and keep every other change. Keep any line that withholds knowledge or schedules a reveal ("does not yet learn", "no longer") — that is plot, not a removal.`;
 }
 
-// An opener this short ("fix this") never earns an auto-title — it would name nothing worth keeping.
-const CHAT_TITLE_MIN_CONTENT_LENGTH = 15;
-const CHAT_TITLE_GRAPH = 'chat-title';
-
 // A chat-turn run older than this is treated as orphaned, never "in progress", so a crashed process
 // can't leave a session's thinking indicator stuck on forever.
 const PENDING_TURN_MAX_AGE_MS = 15 * 60 * 1000;
@@ -216,40 +148,17 @@ export class ChatService {
     private readonly contextAssembler: ContextAssembler,
     private readonly modelRouter: ModelRouterService,
     private readonly workflowRunService: WorkflowRunService,
-    private readonly proposalService: ProposalService,
-    private readonly proposalApplyService: ProposalApplyService,
-    private readonly toolRegistry: ToolRegistryService,
-    private readonly retrievalService: RetrievalService,
     private readonly compaction: ChatCompactionService,
     private readonly pluginPolicy: PluginPolicyService,
     private readonly events: ProjectEventService,
     private readonly notesStore: NotesStoreService,
     private readonly webResearch: WebResearchService,
-    private readonly actionRegistry: ActionExecutorRegistry,
+    private readonly sessions: ChatSessionService,
+    private readonly lookups: ChatLookupService,
+    private readonly turnStaging: ChatTurnStagingService,
     private readonly catalog?: NovelForgeCatalogService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
-  }
-
-  async createSession(projectId: bigint, input: CreateSessionInput, tx?: PrimaryTransaction): Promise<Refinement.ChatSession> {
-    const [session] = await (tx ?? this.db)
-      .insert(schema.chatSessions)
-      .values({ projectId, scopeType: 'project', scopeRef: null, title: null, mode: input.mode ?? 'auto' })
-      .returning();
-    if (!session) throw AppErrorCode.CHT_001.create();
-    // Logged only outside a caller's transaction: inside one, the row isn't committed yet, and the caller logs once it is.
-    if (!tx) this.logger.info('chat session created', { projectId, sessionId: session.id, mode: session.mode });
-    return session;
-  }
-
-  async updateSession(projectId: bigint, sessionId: string, update: { mode?: Refinement.ChatMode; title?: string }): Promise<Refinement.ChatSession> {
-    const session = await this.getSession(projectId, sessionId);
-    const set: Record<string, unknown> = { updatedAt: new Date() };
-    if (update.mode !== undefined) set['mode'] = update.mode;
-    if (update.title !== undefined) set['title'] = update.title;
-    const [updated] = await this.db.update(schema.chatSessions).set(set).where(eq(schema.chatSessions.id, session.id)).returning();
-    if (!updated) throw AppErrorCode.CHT_001.create();
-    return updated;
   }
 
   private async validateScopeRef(projectId: bigint, scopeType: Refinement.ChatScope, scopeRef: string | null): Promise<string | null> {
@@ -290,83 +199,6 @@ export class ChatService {
     }
   }
 
-  async listSessions(projectId: bigint, filter: SessionListFilter): Promise<OffsetPaginationResult<Refinement.ChatSession>> {
-    const query = utils.pagination.normalise(filter, { mode: 'offset', defaults: { limit: 20, offset: 0, sortBy: 'updatedAt', sortOrder: 'desc' } });
-
-    const conditions = [eq(schema.chatSessions.projectId, projectId)];
-    if (filter.scopeType) conditions.push(eq(schema.chatSessions.scopeType, filter.scopeType));
-    if (filter.status) conditions.push(eq(schema.chatSessions.status, filter.status));
-    const where = and(...conditions);
-
-    const column = query.sortBy === 'createdAt' ? schema.chatSessions.createdAt : schema.chatSessions.updatedAt;
-    const order = query.sortOrder === 'asc' ? asc(column) : desc(column);
-
-    const [total, items] = await Promise.all([
-      this.db.$count(schema.chatSessions, where),
-      this.db.query.chatSessions.findMany({ where, limit: query.limit, offset: query.offset, orderBy: order }),
-    ]);
-    return utils.pagination.createResult(query, items, total);
-  }
-
-  async getSession(projectId: bigint, sessionId: string): Promise<Refinement.ChatSession> {
-    const session = await this.db.query.chatSessions.findFirst({ where: and(eq(schema.chatSessions.projectId, projectId), eq(schema.chatSessions.id, sessionId)) });
-    if (!session) throw AppErrorCode.CHT_001.create();
-    return session;
-  }
-
-  async setSessionStatus(projectId: bigint, sessionId: string, status: Refinement.ChatSessionStatus): Promise<Refinement.ChatSession> {
-    const session = await this.getSession(projectId, sessionId);
-    const [updated] = await this.db.update(schema.chatSessions).set({ status, updatedAt: new Date() }).where(eq(schema.chatSessions.id, session.id)).returning();
-    if (!updated) throw AppErrorCode.CHT_001.create();
-    return updated;
-  }
-
-  /** Deletes a chat and its whole history (messages cascade); staged proposals survive with the session detached. */
-  async deleteSession(projectId: bigint, sessionId: string): Promise<Refinement.ChatSession> {
-    const session = await this.getSession(projectId, sessionId);
-    await this.db.delete(schema.chatSessions).where(eq(schema.chatSessions.id, session.id));
-    return session;
-  }
-
-  async updateSessionModel(projectId: bigint, sessionId: string, update: SessionModelUpdate): Promise<Refinement.ChatSession> {
-    const session = await this.getSession(projectId, sessionId);
-    const set: Partial<typeof schema.chatSessions.$inferInsert> = { updatedAt: new Date() };
-    if (update.contentMode !== undefined) set.contentMode = update.contentMode;
-    if (update.costTier !== undefined) set.costTier = update.costTier;
-    if (update.provider !== undefined || update.model !== undefined) {
-      const pin = { provider: update.provider ?? null, model: update.model ?? null };
-      // The registry slug columns are cleared on every pin change, so the alias backfill cannot bring an old slug back.
-      const aliasKey = pin.provider === null && pin.model === null ? null : await this.offeredAlias(projectId, { ...session, ...set }, pin);
-      Object.assign(set, { modelProvider: null, modelId: null, aliasKey });
-    }
-    const [updated] = await this.db.update(schema.chatSessions).set(set).where(eq(schema.chatSessions.id, session.id)).returning();
-    if (!updated) throw AppErrorCode.CHT_001.create();
-    return updated;
-  }
-
-  /** An alias pin must be one the catalog offers this chat's chat task under the model type and cost tier the chat will have after this update. */
-  private async offeredAlias(projectId: bigint, session: Pick<Refinement.ChatSession, 'contentMode' | 'costTier'>, pin: SessionPin): Promise<string> {
-    if (pin.provider !== SYNAPSE_PROVIDER || !pin.model) throw AppErrorCode.AI_002.create();
-    if (!this.catalog) throw AppErrorCode.AI_007.create({ transient: true });
-    const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId), columns: { contentMode: true, costTier: true } });
-    return (await this.catalog.requireChatAlias(pin.model, chatSelection({}, session, project))).key;
-  }
-
-  async listMessages(projectId: bigint, sessionId: string, opts: { before?: number; limit?: number }): Promise<ChatMessageView[]> {
-    await this.getSession(projectId, sessionId);
-    const conditions = [eq(schema.chatMessages.sessionId, sessionId)];
-    if (opts.before !== undefined) conditions.push(lt(schema.chatMessages.ordinal, opts.before));
-    const rows = await this.db.query.chatMessages.findMany({
-      columns: { exchange: false },
-      where: and(...conditions),
-      orderBy: desc(schema.chatMessages.ordinal),
-      limit: opts.limit ?? 50,
-    });
-    const runIds = [...new Set(rows.flatMap(row => (row.role === 'assistant' && row.runId ? [row.runId] : [])))];
-    const selections = await loadTurnSelections(this.db, runIds);
-    return rows.reverse().map(row => (row.role === 'assistant' && row.runId ? { ...row, ...selections.get(row.runId) } : row));
-  }
-
   async authorNotes(projectId: bigint): Promise<string> {
     return (await this.notesStore.read(projectId)).text;
   }
@@ -394,16 +226,12 @@ export class ChatService {
   }
 
   async turnStatus(projectId: bigint, sessionId: string): Promise<ChatTurnStatus> {
-    await this.getSession(projectId, sessionId);
-    const [pendingTurn, lastOrdinal] = await Promise.all([this.pendingTurn(projectId, sessionId), this.latestOrdinal(sessionId)]);
+    await this.sessions.getSession(projectId, sessionId);
+    const [pendingTurn, lastOrdinal] = await Promise.all([this.pendingTurn(projectId, sessionId), this.sessions.latestOrdinal(sessionId)]);
     // Only looked up once nothing is running: a live turn is the answer, and the previous failure it is
     // retrying would otherwise be reported alongside it.
     const failedTurn = pendingTurn ? null : await this.failedTurn(projectId, sessionId);
     return { pendingTurn, failedTurn, lastOrdinal };
-  }
-
-  async hasPendingTurn(projectId: bigint, sessionId: string): Promise<boolean> {
-    return Boolean(await this.pendingTurn(projectId, sessionId));
   }
 
   /**
@@ -458,7 +286,7 @@ export class ChatService {
    */
   async turn(projectId: bigint, sessionId: string, content: string, emitter?: ChatTurnEmitter, options: ChatTurnOptions = {}): Promise<ChatTurnResult> {
     const trace = new TurnTraceCollector();
-    const session = await this.getSession(projectId, sessionId);
+    const session = await this.sessions.getSession(projectId, sessionId);
     if (session.status !== 'active') throw AppErrorCode.CHT_002.create();
     await this.validateScopeRef(projectId, session.scopeType, session.scopeRef);
     const contexts = await resolvePassageContexts(this.db, projectId, options.contexts ?? []);
@@ -486,7 +314,7 @@ export class ChatService {
     const guarded = (output: ChatRefineOutput): ChatRefineOutput => withLaterPlansRouted(withheldProse(output, proseEdits), organise);
     const turnRules = renderTurnRules({ proseEdits, justDiscussing, organiseNotes: organiseRequest, mode: session.mode });
     const webMode = await this.webResearch.modeFor(synapseSelectors(route), synapseAlias('chat', routed));
-    const scopeInstructions = chatScopeInstructions(this.toolRegistry.getRaw(CHAT_HUB_NODE, webMode), webMode);
+    const scopeInstructions = chatScopeInstructions(this.lookups.tools(webMode), webMode);
     const playbook = playbookDigest(scopeInstructions);
     const keyed = route.contentMode === 'standard';
     const conversation = keyed
@@ -520,7 +348,7 @@ export class ChatService {
       relay?.userMessage(userMessage);
       // Not awaited: must overlap the turn, not delay it. Its own workflow run, not this one — this
       // run may already be marked complete by the time it resolves.
-      if (userMessage.ordinal === 1) this.nameSession(projectId, session, content, routed, runId);
+      if (userMessage.ordinal === 1) this.sessions.nameSession(projectId, session, content, routed, runId);
       // Every call of the turn — lookup rounds, the negation fix and the router's repairs — appends to `rounds`, and `settled` marks the
       // rounds the last answered call sent, which is where the next turn's conversation picks up.
       const rounds: BaseMessage[] = [];
@@ -555,7 +383,7 @@ export class ChatService {
       const web = webMode === 'brave' ? this.webResearch.forTurn(authorTexts(authorWords(content, contexts), conversation.plain)) : undefined;
       for (let round = 0; round < MAX_LOOKUP_ROUNDS && (output.lookups?.length ?? 0) > 0; round++) {
         this.logger.debug('chat turn: executing declared lookups', { runId, round, lookups: output.lookups?.map(l => l.tool) });
-        const results = await this.executeLookups(projectId, runId, output.lookups ?? [], lookupCallCounts, { round, relay, trace, planner, web, webMode });
+        const results = await this.lookups.executeLookups(projectId, runId, output.lookups ?? [], lookupCallCounts, { round, relay, trace, planner, web, webMode });
         const exhausted = round === MAX_LOOKUP_ROUNDS - 1 ? '\n\nLookup budget exhausted — answer with what you have; do not request more lookups.' : '';
         rounds.push(new AIMessage(JSON.stringify({ reply: output.reply, lookups: output.lookups })), new HumanMessage(`Lookup results:\n${results}${exhausted}`));
         supersede();
@@ -602,112 +430,6 @@ export class ChatService {
     return { ...result, runId };
   }
 
-  /** Names a session from its opening message alone. */
-  private nameSession(projectId: bigint, session: Refinement.ChatSession, content: string, project: ProjectConfig | undefined, turnRunId: string): void {
-    if (session.title !== null) return;
-    const message = content.trim();
-    if (message.length < CHAT_TITLE_MIN_CONTENT_LENGTH) return;
-    this.runNameSession(projectId, session.id, message, project, turnRunId).catch(err => this.logger.warn('chat session naming failed', { projectId, sessionId: session.id, err }));
-  }
-
-  private async runNameSession(projectId: bigint, sessionId: string, message: string, project: ProjectConfig | undefined, turnRunId: string): Promise<void> {
-    const prompt = PROMPT_REGISTRY['chat-title'];
-    const { result: named } = await this.workflowRunService.runChain(
-      projectId,
-      CHAT_TITLE_GRAPH,
-      `session:${sessionId}`,
-      { message },
-      async runId => {
-        const ctx = { projectId, runId, node: CHAT_TITLE_GRAPH, promptKey: prompt.key, promptVersion: prompt.version, role: 'title' };
-        const output = (await this.modelRouter.structured(prompt, { message }, ctx, project)) as ChatTitleOutput;
-        const title = output.title.trim();
-        if (!title) return false;
-
-        // Guarded in the query, not read-then-write: a rename the author makes mid-turn must never be clobbered.
-        const [written] = await this.db
-          .update(schema.chatSessions)
-          .set({ title, updatedAt: new Date() })
-          .where(and(eq(schema.chatSessions.id, sessionId), isNull(schema.chatSessions.title)))
-          .returning({ id: schema.chatSessions.id });
-        return Boolean(written);
-      },
-      undefined,
-      turnRunId,
-    );
-    if (named) this.events.publish(projectId, { type: 'chat', sessionId });
-  }
-
-  /**
-   * Runs declared lookups through the registry handlers with the same audit and budgets as the tool loop.
-   * `callCounts` is threaded in by the caller so `maxCallsPerRun` is enforced across every round of one turn,
-   * not reset per round — the map lives on the turn's call stack, never on the (singleton, cross-project) service.
-   */
-  private async executeLookups(
-    projectId: bigint,
-    runId: string,
-    lookups: { tool: string; args?: Record<string, unknown> }[],
-    callCounts: Map<string, number>,
-    { round, relay, trace, planner, web, webMode }: LookupObservers,
-  ): Promise<string> {
-    const rawTools = this.toolRegistry.getRaw(CHAT_HUB_NODE, webMode);
-    const ctx: ToolContext = { chapter: null, db: this.db, node: CHAT_HUB_NODE, projectId, retrieval: this.retrievalService, runId, web };
-    const blocks: string[] = [];
-
-    for (const lookup of lookups) {
-      const args = lookup.args ?? {};
-      relay?.lookup({ round, tool: lookup.tool, args: { ...args }, status: 'running' });
-      trace.lookupStarted();
-      const rawTool = rawTools.find(t => t.name === lookup.tool);
-      const callCount = (callCounts.get(lookup.tool) ?? 0) + 1;
-      callCounts.set(lookup.tool, callCount);
-      const startedAt = Date.now();
-
-      let resultStr: string;
-      let auditStatus: 'budget_exceeded' | 'handler_error' | 'invalid_args' | 'ok';
-      if (!rawTool) {
-        resultStr = `error: unknown tool '${lookup.tool}'`;
-        auditStatus = 'invalid_args';
-      } else if (callCount > rawTool.maxCallsPerRun) {
-        resultStr = `error: tool '${lookup.tool}' has exceeded its call budget for this turn`;
-        auditStatus = 'budget_exceeded';
-      } else {
-        const parsed = rawTool.inputSchema.safeParse(args);
-        if (!parsed.success) {
-          resultStr = `error: ${parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; ')}`;
-          auditStatus = 'invalid_args';
-        } else {
-          try {
-            const result = await rawTool.handler(parsed.data, ctx);
-            resultStr = typeof result === 'string' ? result : JSON.stringify(result);
-            if (rawTool.tokensBudget > 0 && resultStr.length > rawTool.tokensBudget * 4) resultStr = resultStr.slice(0, rawTool.tokensBudget * 4) + '\n...[truncated]';
-            auditStatus = 'ok';
-            if (readsPlannerOnlyPage(lookup.tool, parsed.data)) planner.read = true;
-          } catch (err) {
-            const refusal = AppError.is(err) && WEB_LOOKUP_REFUSALS.has(err.code);
-            if (refusal) this.logger.warn('web lookup refused', { tool: lookup.tool, code: err.code, reason: err.message });
-            else this.logger.error('lookup handler error', { err, tool: lookup.tool });
-            resultStr = refusal ? `error: ${err.message}` : 'error: lookup failed';
-            auditStatus = 'handler_error';
-          }
-        }
-      }
-
-      // Copied, not shared: `args` is the object the audit row below stores, and a subscriber that
-      // redacts what it is handed in place would rewrite that row.
-      const status = auditStatus === 'ok' ? 'ok' : 'error';
-      relay?.lookup({ round, tool: lookup.tool, args: { ...args }, status });
-      trace.lookupSettled(lookup.tool, args, status);
-
-      const digest = createHash('sha256').update(resultStr).digest('hex').slice(0, 16);
-      await this.db
-        .insert(schema.toolCalls)
-        .values({ args, latencyMs: Date.now() - startedAt, node: CHAT_HUB_NODE, resultDigest: digest, runId, status: auditStatus, tool: lookup.tool })
-        .catch(err => this.logger.error('failed to write lookup audit row', { err }));
-      blocks.push(`### ${lookup.tool}\n${resultStr}`);
-    }
-    return blocks.join('\n\n');
-  }
-
   /**
    * Routes the reply under the turn's selection: the chat's own model pin, then the tier's route. An unrestricted reply goes through the
    * unrestricted route, which reaches an unrestricted model only where the catalog routes `content_mode: unrestricted` for the tier.
@@ -724,7 +446,7 @@ export class ChatService {
   }
 
   private async persistUserMessage(projectId: bigint, session: Refinement.ChatSession, authored: AuthoredMessage, runId: string): Promise<Refinement.ChatMessage> {
-    const lastOrdinal = await this.latestOrdinal(session.id);
+    const lastOrdinal = await this.sessions.latestOrdinal(session.id);
     const { content, contexts, rendered } = authored;
     const [userMessage] = await this.db
       .insert(schema.chatMessages)
@@ -777,8 +499,8 @@ export class ChatService {
     if (!assistantMessage) throw AppErrorCode.CHT_001.create();
 
     const authored = authorWords(userMessage.content, userMessage.contexts);
-    const { replyNote, ...staged } = await this.stageChangeSet(projectId, session, assistantMessage, authored, output, runId, warnings, staging);
-    if (staged.cardProposal) await this.linkMessage(assistantMessage, { proposalId: staged.cardProposal.id });
+    const { replyNote, ...staged } = await this.turnStaging.stageChangeSet(projectId, session, assistantMessage, authored, output, runId, warnings, staging);
+    if (staged.cardProposal) await this.turnStaging.linkMessage(assistantMessage, { proposalId: staged.cardProposal.id });
     if (replyNote) await this.appendToReply(assistantMessage, replyNote);
     await this.saveTrace(projectId, assistantMessage, trace.finish());
 
@@ -787,112 +509,11 @@ export class ChatService {
     return { userMessage, assistantMessage, proposal, appliedProposal, applied, applyNote, held };
   }
 
-  /** A rewrite that cannot be placed in its chapter is left out before the split, and the reply says which and why. */
-  private async stageChangeSet(
-    projectId: bigint,
-    session: Refinement.ChatSession,
-    message: Refinement.ChatMessage,
-    authorMessage: string,
-    output: ChatRefineOutput,
-    runId: string,
-    warnings: string[],
-    staging: StagingContext,
-  ): Promise<TurnStaging & { replyNote?: string }> {
-    const proposed = parseOptionalChangeSet(output.changeSet, HUB_ALLOWED_OPS);
-    if (proposed.length === 0) return { appliedProposal: null, cardProposal: null };
-    const { ops, dropped } = await anchorPassageRewrites(this.db, projectId, proposed, staging.contexts);
-    if (dropped.length > 0) this.logger.info('chat turn: left out passage rewrites it could not place', { projectId, runId, dropped });
-    const staged: TurnStaging & { replyNote?: string } =
-      ops.length === 0
-        ? { appliedProposal: null, cardProposal: null }
-        : await this.stageAnchored(projectId, session, message, authorMessage, output, ops, runId, warnings, staging);
-    const replyNote = [staged.replyNote, droppedRewritesNote(dropped)].filter(Boolean).join('\n\n');
-    return { ...staged, ...(replyNote ? { replyNote } : {}) };
-  }
-
-  /** Splits the change-set by the write policy and stages it as at most two proposals: what applies in the turn, and the rest as cards. */
-  private async stageAnchored(
-    projectId: bigint,
-    session: Refinement.ChatSession,
-    message: Refinement.ChatMessage,
-    authorMessage: string,
-    output: ChatRefineOutput,
-    ops: ChangeOp[],
-    runId: string,
-    warnings: string[],
-    { justDiscussing, organise }: StagingContext,
-  ): Promise<TurnStaging & { replyNote?: string }> {
-    const stage: TurnProposalPort['stage'] = (changeSet, stageWarnings, options) =>
-      this.proposalService
-        .create(projectId, {
-          sessionId: session.id,
-          messageId: message.id,
-          scopeType: session.scopeType,
-          scopeRef: session.scopeRef,
-          kind: session.scopeType === 'project' ? 'hub' : 'chat',
-          summary: output.reply.split('\n', 1)[0]?.slice(0, 300),
-          changeSet,
-          allowedOps: HUB_ALLOWED_OPS,
-          entityMaterialization: options.entityMaterialization,
-          runId,
-          warnings: stageWarnings,
-        })
-        .catch((err: unknown) => {
-          this.logger.warn('chat turn: staging a proposal failed', { projectId, runId, err });
-          throw err;
-        });
-
-    const organiseOnly = ops.length === 1 && ops[0]?.op === ORGANISE_NOTES_OP;
-    if (organise === 'start' && organiseOnly && turnHold(warnings) !== 'turn') {
-      const started = await startNotesOrganise(
-        {
-          stage,
-          refusal: action => this.actionRegistry.refusal(projectId, action),
-          accept: proposalId => this.proposalApplyService.apply(projectId, proposalId),
-        },
-        warnings,
-      );
-      this.logger.info('chat turn: organising the notes the author asked for', { projectId, runId, started: started.cardProposal === null, note: started.note });
-      return { appliedProposal: null, cardProposal: started.cardProposal, replyNote: started.note };
-    }
-
-    const rejectedIdeas = (ideaIds: string[]) =>
-      loadRejectedIdeas(this.db, projectId, ideaIds).catch((err: unknown) => {
-        this.logger.warn('chat turn: reading turned-down ideas failed — every idea stays a card', { projectId, runId, err });
-        throw err;
-      });
-    const split = await splitTurnChangeSet(this.db, projectId, ops, { authorMessage, mode: session.mode, justDiscussing, warnings, rejectedIdeas });
-    this.logger.debug('chat turn: write policy', { projectId, runId, dispositions: split.dispositions });
-    if (split.droppedIdeas.length > 0) this.logger.info('chat turn: dropped suggestions the author turned down', { projectId, runId, ideaIds: split.droppedIdeas });
-    if (split.ops.length === 0) return { appliedProposal: null, cardProposal: null, applyNote: IDEAS_DROPPED_NOTE };
-
-    const port: TurnProposalPort = {
-      stage,
-      apply: (proposalId, opSources) => this.proposalApplyService.apply(projectId, proposalId, { autoApplied: true, opSources }),
-      linkApplied: proposal =>
-        this.linkMessage(message, { appliedProposalId: proposal.id }).catch((err: unknown) => {
-          this.logger.warn('chat turn: linking the applied proposal to its reply failed', { projectId, runId, proposalId: proposal.id, err });
-          throw err;
-        }),
-      discard: proposalId =>
-        this.proposalService.discard(projectId, proposalId).catch(err => this.logger.warn('chat turn: discarding an unapplied proposal failed', { projectId, proposalId, err })),
-    };
-    const staged = await stageTurnChangeSet(port, split, warnings);
-    const staging = split.droppedIdeas.length > 0 ? { ...staged, applyNote: [staged.applyNote, IDEAS_DROPPED_NOTE].filter(Boolean).join(' ') } : staged;
-    if (staging.applyNote) this.logger.info('chat turn: staging left a note for the author', { projectId, runId, note: staging.applyNote });
-    return staging;
-  }
-
   private async appendToReply(message: Refinement.ChatMessage, note: string): Promise<void> {
     const content = `${message.content}\n\n${note}`;
     const reply = { content, tokens: countTokens(content) };
     await this.db.update(schema.chatMessages).set(reply).where(eq(schema.chatMessages.id, message.id));
     Object.assign(message, reply);
-  }
-
-  private async linkMessage(message: Refinement.ChatMessage, link: Pick<Refinement.ChatMessage, 'proposalId'> | Pick<Refinement.ChatMessage, 'appliedProposalId'>): Promise<void> {
-    await this.db.update(schema.chatMessages).set(link).where(eq(schema.chatMessages.id, message.id));
-    Object.assign(message, link);
   }
 
   /** A turn whose reply and changes are already saved is never failed by its trace; the reply then reads as one from before traces. */
@@ -913,13 +534,5 @@ export class ChatService {
       this.logger.warn('chat turn: negation check failed — staging without warnings', { projectId, err });
       return [];
     }
-  }
-
-  private async latestOrdinal(sessionId: string): Promise<number> {
-    const [row] = await this.db
-      .select({ max: sql<number | null>`max(${schema.chatMessages.ordinal})` })
-      .from(schema.chatMessages)
-      .where(eq(schema.chatMessages.sessionId, sessionId));
-    return row?.max ?? 0;
   }
 }

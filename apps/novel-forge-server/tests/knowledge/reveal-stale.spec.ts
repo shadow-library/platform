@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 
 import { commitFinalProse } from '@modules/ai/graphs/chapter-finalization.graph';
 import { MilestoneService } from '@modules/bible/milestone/milestone.service';
+import { BriefService } from '@modules/generation/brief.service';
 import { GenerationService } from '@modules/generation/generation.service';
 import { ledgerBriefReveals, markDescendantDraftsStale, reconcilePlanState, REVEAL_STALE_PREFIX } from '@server/common';
 import { schema } from '@server/database';
@@ -49,11 +50,13 @@ function generation(tables: ReturnType<typeof planTables>): GenerationService {
     noop,
     noop,
     noop,
-    noop,
-    noop,
     new FakeAuthoringClaims().asService(),
     noop,
   );
+}
+
+function briefs(tables: ReturnType<typeof planTables>): BriefService {
+  return new BriefService({ getPostgresClient: () => tables.db } as never);
 }
 
 describe('reconcilePlanState — a reveal that stops holding', () => {
@@ -156,7 +159,7 @@ describe('GenerationService — approval and plans at the frontier', () => {
   it('should refuse a plan edit at a finalized chapter even while the story cursor is behind it', async () => {
     const tables = planTables({ chapters: [{ number: 6 }], briefs: [{ chapter: 6, body: 'Mira climbs.' }], storyCurrentChapter: 5 });
 
-    await expect(generation(tables).updateBrief(7n, 6, { body: 'Mira falls.' })).rejects.toMatchObject({ code: 'PLN_005' });
+    await expect(briefs(tables).updateBrief(7n, 6, { body: 'Mira falls.' })).rejects.toMatchObject({ code: 'PLN_005' });
     expect(tables.brief(6)?.['body']).toBe('Mira climbs.');
   });
 });

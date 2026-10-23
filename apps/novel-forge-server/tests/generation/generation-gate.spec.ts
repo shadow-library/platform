@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
+import { BriefService } from '@modules/generation/brief.service';
 import { GenerationService } from '@modules/generation/generation.service';
 
 import { FakeAuthoringClaims } from '../jobs/authoring-claim-fixtures';
@@ -51,8 +52,6 @@ function makeService(fixture: GateFixture = {}) {
   const noop = {} as never;
   const service = new GenerationService(
     { getPostgresClient: () => db } as never,
-    noop,
-    noop,
     noop,
     noop,
     noop,
@@ -253,7 +252,7 @@ describe('GenerationService.finalize', () => {
   });
 });
 
-describe('GenerationService.updateBrief', () => {
+describe('BriefService.updateBrief', () => {
   function briefDb(existing: Record<string, unknown> | undefined, planned: Record<string, unknown>[]) {
     const inserted: Record<string, unknown>[] = [];
     const rows = planned.map(row => ({ projectId: 1n, ...row }));
@@ -275,8 +274,7 @@ describe('GenerationService.updateBrief', () => {
       }),
     };
     const db = { transaction: async (run: (handle: unknown) => Promise<unknown>) => run(tx) };
-    const noop = {} as never;
-    const service = new GenerationService({ getPostgresClient: () => db } as never, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop);
+    const service = new BriefService({ getPostgresClient: () => db } as never);
     return { service, inserted };
   }
 

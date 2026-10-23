@@ -3,14 +3,14 @@ import { describe, expect, it } from 'bun:test';
 import { AppErrorCode } from '@server/classes';
 
 import { type CatalogSelection } from '@modules/ai/novel-forge-catalog.service';
-import { ChatService, type SessionModelUpdate } from '@modules/refinement/chat.service';
+import { ChatSessionService, type SessionModelUpdate } from '@modules/refinement/chat-session.service';
 
 type Row = Record<string, unknown>;
 
 const OFFERED: Record<string, string[]> = { standard: ['opus', 'grok'], unrestricted: ['grok'] };
 
 interface Harness {
-  service: ChatService;
+  service: ChatSessionService;
   writes: Row[];
   checked: { alias: string; selection: CatalogSelection }[];
 }
@@ -43,13 +43,13 @@ function harness(session: Row = {}): Harness {
     },
   };
   const none = {} as never;
-  const service = new ChatService({ getPostgresClient: () => db } as never, none, none, none, none, none, none, none, none, none, none, none, none, none, catalog as never);
+  const service = new ChatSessionService({ getPostgresClient: () => db } as never, none, none, none, catalog as never);
   return { service, writes, checked };
 }
 
 const pin = (h: Harness, update: SessionModelUpdate) => h.service.updateSessionModel(1n, 's1', update);
 
-describe('ChatService.updateSessionModel', () => {
+describe('ChatSessionService.updateSessionModel', () => {
   it('should store an offered alias as the pin and clear the registry slug pin beside it', async () => {
     const h = harness({ modelProvider: 'openrouter', modelId: 'anthropic/claude-opus-5', aliasKey: 'opus' });
 

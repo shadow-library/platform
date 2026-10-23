@@ -26,7 +26,7 @@ function makeService(stored: Record<string, unknown> = VALID): { service: Genera
   };
   const databaseService = { getPostgresClient: () => db } as never;
   const noop = {} as never;
-  const service = new GenerationService(databaseService, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop);
+  const service = new GenerationService(databaseService, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop);
   return { service, saved };
 }
 

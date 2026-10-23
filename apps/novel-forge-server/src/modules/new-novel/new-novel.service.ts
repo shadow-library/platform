@@ -11,7 +11,7 @@ import { type PrimaryDatabase, schema } from '@server/database';
 import { LedgerService } from '../ledger/ledger.service';
 import { NotesStoreService } from '../notes/notes-store.service';
 import { ProjectService } from '../project';
-import { ChatService } from '../refinement/chat.service';
+import { ChatSessionService } from '../refinement/chat-session.service';
 import {
   type CreateNovelWithNotesBody,
   type CreateNovelWithNotesResponse,
@@ -35,7 +35,7 @@ export class NewNovelService {
     private readonly projectService: ProjectService,
     private readonly ledger: LedgerService,
     private readonly notes: NotesStoreService,
-    private readonly chat: ChatService,
+    private readonly chat: ChatSessionService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }

@@ -7,6 +7,7 @@ import { type ContinuityOutput } from '@modules/ai/schemas';
 import { FinalizeReviewService } from '@modules/finalize-review/finalize-review.service';
 import { canonicalJson, effectiveChange } from '@modules/finalize-review/finalize-review-items';
 import { bridgedSummary, loadIsolationBridges } from '@modules/finalize-review/isolation-bridge';
+import { BriefService } from '@modules/generation/brief.service';
 import { ChapterAmendService } from '@modules/generation/chapter-amend.service';
 import { DraftVersionService } from '@modules/generation/draft-versions.service';
 import { GenerationService } from '@modules/generation/generation.service';
@@ -153,6 +154,7 @@ export class IntegrityWorld {
   readonly jobs = new FakeJobs();
   readonly log: string[] = [];
   readonly generation: GenerationService;
+  readonly briefs: BriefService;
   readonly reviews: FinalizeReviewService;
   readonly versions: DraftVersionService;
   readonly amends: ChapterAmendService;
@@ -189,8 +191,6 @@ export class IntegrityWorld {
       this.desk as never,
       contextAssembler as never,
       absent,
-      absent,
-      indexing as never,
       this.jobs as never,
       executor as never,
       absent,
@@ -200,6 +200,7 @@ export class IntegrityWorld {
       this.claims.asService(),
       writerSnapshots as never,
     );
+    this.briefs = new BriefService(database);
     this.reviews = new FinalizeReviewService(database, this.desk as never, jobHandlers as never, this.generation);
     this.versions = new DraftVersionService(database);
     this.amends = new ChapterAmendService(database, indexing as never);
@@ -780,7 +781,7 @@ export class IntegrityWorld {
     const before = this.store.writes();
     const outcome = await this.attempt(
       'plan edit',
-      this.generation.updateBrief(P, chapter, { body: `Chapter ${chapter}: the keepers hold the harbour.`, claimedMilestones, knowledgeContract: { pov: ['ada'], learns } }),
+      this.briefs.updateBrief(P, chapter, { body: `Chapter ${chapter}: the keepers hold the harbour.`, claimedMilestones, knowledgeContract: { pov: ['ada'], learns } }),
       ['PLN_001', 'PLN_002', 'PLN_003', 'PLN_005', 'BRF_004'],
     );
     if (!outcome.ok) {

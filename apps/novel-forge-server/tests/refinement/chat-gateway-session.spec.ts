@@ -9,6 +9,9 @@ import { schema } from '@server/database';
 import { type ContextSection, joinSections } from '@modules/ai/context/sections';
 import { ModelRouterService } from '@modules/ai/model-router.service';
 import { ChatCompactionService } from '@modules/refinement/chat-compaction.service';
+import { ChatLookupService } from '@modules/refinement/chat-lookup.service';
+import { ChatSessionService } from '@modules/refinement/chat-session.service';
+import { ChatTurnStagingService } from '@modules/refinement/chat-turn-staging.service';
 import { ChatService } from '@modules/refinement/chat.service';
 
 import { FakeSynapse } from '../ai/synapse-fakes';
@@ -159,16 +162,14 @@ function harness(outputs: Record<string, unknown[]>, webMode = 'off', served?: {
     contextAssembler as never,
     modelRouter,
     workflowRunService as never,
-    {} as never,
-    {} as never,
-    { getRaw: () => [getNotes] } as never,
-    {} as never,
     compaction,
     pluginPolicy as never,
     { publish: () => undefined } as never,
     { read: async () => ({ text: '' }) } as never,
     { modeFor: async () => webMode } as never,
-    {} as never,
+    new ChatSessionService(databaseService, modelRouter, workflowRunService as never, { publish: () => undefined } as never),
+    new ChatLookupService(databaseService, { getRaw: () => [getNotes] } as never, {} as never),
+    new ChatTurnStagingService(databaseService, {} as never, {} as never, {} as never),
   );
   const chatCalls = () => calls.filter(call => call.role === 'chat');
   return { service, session, stable, calls, chatCalls, rows };

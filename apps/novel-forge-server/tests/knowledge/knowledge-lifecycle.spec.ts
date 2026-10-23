@@ -3,6 +3,7 @@ import { describe, expect, it } from 'bun:test';
 import { commitFinalProse } from '@modules/ai/graphs/chapter-finalization.graph';
 import { loadKnowledgeView, loadWriterForbiddenFacts, loadWriterHiddenFactKeys, renderJudgeReaderKnows, renderReaderKnows } from '@modules/bible/fact/knowledge-view';
 import { FinalizeReviewService } from '@modules/finalize-review/finalize-review.service';
+import { BriefService } from '@modules/generation/brief.service';
 import { type GenerationService } from '@modules/generation/generation.service';
 import { findPlanClaimProblems, loadPlanState, planRevealsRefusal, resetApprovalForPlanChange, revokeProvisionalReveals } from '@server/common';
 import { schema } from '@server/database';
@@ -52,6 +53,7 @@ function settleReviews(tables: Tables): void {
 }
 
 const generation = (tables: Tables): GenerationService => makeGenerationService(tables.db);
+const briefs = (tables: Tables): BriefService => new BriefService({ getPostgresClient: () => tables.db } as never);
 
 function editDraft(tables: Tables): Promise<void> {
   Object.assign(tables.draft(5) as object, { revision: (tables.draft(5)?.['revision'] as number) + 1, reviewStatus: 'needs_review' });
@@ -132,7 +134,7 @@ describe('knowledge lifecycle — a plan edit after approval', () => {
     await service.approveDraft(7n, 5, { revision: 2, saveSeq: 0, draftId: 55n });
     const later = approvedChapterSix(tables);
 
-    await service.updateBrief(7n, 5, { body: 'Mira keeps the rank a secret.', knowledgeContract: { pov: ['mira', 'oren'], learns: [] } });
+    await briefs(tables).updateBrief(7n, 5, { body: 'Mira keeps the rank a secret.', knowledgeContract: { pov: ['mira', 'oren'], learns: [] } });
 
     expect(tables.draft(5)?.['reviewStatus']).toBe('needs_review');
     expect(ledger(tables)).toEqual([]);
@@ -157,7 +159,7 @@ describe('knowledge lifecycle — a plan edit after approval', () => {
     const service = generation(tables);
     await service.approveDraft(7n, 5, { revision: 2, saveSeq: 0, draftId: 55n });
 
-    await service.updateBrief(7n, 5, { body: 'Mira climbs the tower at dusk.' });
+    await briefs(tables).updateBrief(7n, 5, { body: 'Mira climbs the tower at dusk.' });
 
     expect(tables.draft(5)?.['reviewStatus']).toBe('approved');
     expect(ledger(tables)).toEqual([{ chapter: 5, status: 'provisional', revision: 2 }]);

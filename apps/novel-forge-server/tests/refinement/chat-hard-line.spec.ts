@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'bun:test';
 
 import { HARD_LINE_LEXICON, isHardLineRefusal } from '@modules/ai/hard-line';
+import { ChatLookupService } from '@modules/refinement/chat-lookup.service';
+import { ChatSessionService } from '@modules/refinement/chat-session.service';
+import { ChatTurnStagingService } from '@modules/refinement/chat-turn-staging.service';
 import { ChatService } from '@modules/refinement/chat.service';
 import { AppErrorCode } from '@server/classes';
 import { ChatCompactionService } from '@modules/refinement/chat-compaction.service';
@@ -44,21 +47,20 @@ function chat() {
       return { runId: 'run-2', result: { proposal: null } };
     },
   };
+  const databaseService = { getPostgresClient: () => db } as never;
   const service = new ChatService(
-    { getPostgresClient: () => db } as never,
+    databaseService,
     { forNovelChat: async () => ({ id: null, sections: [], omitted: [], renderedStable: '', renderedVolatile: '' }) } as never,
     modelRouter as never,
     workflowRunService as never,
-    {} as never,
-    {} as never,
-    { getRaw: () => [] } as never,
-    {} as never,
     { compactIfNeeded: async () => undefined, buildHistory: async () => [], continueConversation: async () => ({ plain: [], history: [], segment: null }) } as never,
     { resolve: async () => ({ writerClass: 'permissive', raised: false, systemMessages: [] }) } as never,
     { publish: () => undefined } as never,
     { read: async () => ({ text: '' }) } as never,
     { modeFor: async () => 'off' } as never,
-    {} as never,
+    new ChatSessionService(databaseService, modelRouter as never, workflowRunService as never, { publish: () => undefined } as never),
+    new ChatLookupService(databaseService, { getRaw: () => [] } as never, {} as never),
+    new ChatTurnStagingService(databaseService, {} as never, {} as never, {} as never),
   );
   return { service, inserts, turns };
 }

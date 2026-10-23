@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { GenerationService } from '@modules/generation/generation.service';
+import { RunInspectionService } from '@modules/generation/run-inspection.service';
 
 type Row = Record<string, unknown>;
 
@@ -41,13 +41,11 @@ function fakeDb(opts: FakeDbOptions = {}): FakeDb {
   return { db, findFirstCalls };
 }
 
-function makeService({ db }: FakeDb): GenerationService {
-  const databaseService = { getPostgresClient: () => db } as never;
-  const noop = {} as never;
-  return new GenerationService(databaseService, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop);
+function makeService({ db }: FakeDb): RunInspectionService {
+  return new RunInspectionService({ getPostgresClient: () => db } as never);
 }
 
-describe('GenerationService.getChapterCost', () => {
+describe('RunInspectionService.getChapterCost', () => {
   it('should fold every model_calls row tagged with this chapter into one total, grouped by role', async () => {
     const calls = [
       {
@@ -93,7 +91,7 @@ describe('GenerationService.getChapterCost', () => {
   });
 });
 
-describe('GenerationService.getRunUsage', () => {
+describe('RunInspectionService.getRunUsage', () => {
   it('should 404 for a run that does not belong to the project', async () => {
     const service = makeService(fakeDb({ workflowRunFindFirst: undefined }));
 
@@ -142,7 +140,7 @@ describe('GenerationService.getRunUsage', () => {
   });
 });
 
-describe('GenerationService.listRuns', () => {
+describe('RunInspectionService.listRuns', () => {
   const run = {
     id: 'run-1',
     projectId: 1n,

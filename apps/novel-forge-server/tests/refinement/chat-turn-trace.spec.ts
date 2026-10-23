@@ -4,6 +4,9 @@ import { z } from 'zod';
 import { AppErrorCode } from '@server/classes';
 
 import { type ReplyStreamHandlers } from '@modules/ai/model-router.service';
+import { ChatLookupService } from '@modules/refinement/chat-lookup.service';
+import { ChatSessionService } from '@modules/refinement/chat-session.service';
+import { ChatTurnStagingService } from '@modules/refinement/chat-turn-staging.service';
 import { ChatService } from '@modules/refinement/chat.service';
 import { type ChatTurnEmitter } from '@modules/refinement/chat-turn-emitter';
 import { traceArgs, TurnTraceCollector } from '@modules/refinement/chat-turn-trace';
@@ -235,21 +238,20 @@ function chat({ outputs, failTraceUpdate = false, tools = [getNotes], webResearc
     linkContextPack: async () => undefined,
     setParentRun: async () => undefined,
   };
+  const databaseService = { getPostgresClient: () => db } as never;
   const service = new ChatService(
-    { getPostgresClient: () => db } as never,
+    databaseService,
     { forNovelChat: async () => ({ id: null, sections: [], omitted: [], renderedStable: '', renderedVolatile: '' }) } as never,
     modelRouter as never,
     workflowRunService as never,
-    {} as never,
-    {} as never,
-    { getRaw: () => tools } as never,
-    {} as never,
     { compactIfNeeded: async () => undefined, buildHistory: async () => [], continueConversation: async () => ({ plain: [], history: [], segment: null }) } as never,
     { resolve: async () => ({ writerClass: 'standard', raised: false, systemMessages: [] }) } as never,
     { publish: () => undefined } as never,
     { read: async () => ({ text: '' }) } as never,
     webResearch as never,
-    {} as never,
+    new ChatSessionService(databaseService, modelRouter as never, workflowRunService as never, { publish: () => undefined } as never),
+    new ChatLookupService(databaseService, { getRaw: () => tools } as never, {} as never),
+    new ChatTurnStagingService(databaseService, {} as never, {} as never, {} as never),
   );
   return { service, updates, inputs, contexts };
 }

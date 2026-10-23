@@ -4,6 +4,9 @@ import { type Refinement } from '@server/database';
 
 import { findHardLine, HARD_LINE_LEXICON, isHardLineRefusal } from '@modules/ai/hard-line';
 import { passageHash } from '@modules/generation/passage-anchor';
+import { ChatLookupService } from '@modules/refinement/chat-lookup.service';
+import { ChatSessionService } from '@modules/refinement/chat-session.service';
+import { ChatTurnStagingService } from '@modules/refinement/chat-turn-staging.service';
 import { ChatService } from '@modules/refinement/chat.service';
 import { ChatCompactionService } from '@modules/refinement/chat-compaction.service';
 import { authorWords, type PassageContextInput, renderTurnContent, resolvePassageContexts, turnScreens } from '@modules/refinement/passage-context';
@@ -274,21 +277,20 @@ function chat(contentMode: 'standard' | 'unrestricted', draftRows: DraftRow[] = 
     linkContextPack: async () => undefined,
     setParentRun: async () => undefined,
   };
+  const databaseService = { getPostgresClient: () => db } as never;
   const service = new ChatService(
-    { getPostgresClient: () => db } as never,
+    databaseService,
     { forNovelChat: async () => ({ id: null, sections: [], omitted: [], renderedStable: '', renderedVolatile: '' }) } as never,
     modelRouter as never,
     workflowRunService as never,
-    {} as never,
-    {} as never,
-    { getRaw: () => [] } as never,
-    {} as never,
     { compactIfNeeded: async () => undefined, buildHistory: async () => [], continueConversation: async () => ({ plain: [], history: [], segment: null }) } as never,
     { resolve: async () => ({ writerClass: 'standard', raised: false, systemMessages: [] }) } as never,
     { publish: () => undefined } as never,
     { read: async () => ({ text: '' }) } as never,
     { modeFor: async () => 'off' } as never,
-    {} as never,
+    new ChatSessionService(databaseService, modelRouter as never, workflowRunService as never, { publish: () => undefined } as never),
+    new ChatLookupService(databaseService, { getRaw: () => [] } as never, {} as never),
+    new ChatTurnStagingService(databaseService, {} as never, {} as never, {} as never),
   );
   return { service, inserts, prompts, runs };
 }

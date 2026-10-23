@@ -20,7 +20,7 @@ export class CompareVersionsQuery {
 export class RestoreVersionBody extends DraftSaveBase {}
 
 @Schema({ description: "One stored version of a chapter's draft and its cause." })
-export class DraftVersionResponse {
+class DraftVersionResponse {
   @Field(() => Integer)
   revision: number;
 
@@ -53,7 +53,7 @@ export class ListDraftVersionResponse {
 }
 
 @Schema({ description: 'A run of text that is unchanged, added or removed; concatenating `equal` and `delete` gives the older text, `equal` and `insert` the newer.' })
-export class DiffHunkResponse {
+class DiffHunkResponse {
   @Field(() => DiffOp)
   op: 'equal' | 'insert' | 'delete';
 

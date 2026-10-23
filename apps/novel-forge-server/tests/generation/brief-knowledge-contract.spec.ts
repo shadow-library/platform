@@ -3,9 +3,12 @@ import Ajv from 'ajv';
 
 import { ClassSchema } from '@shadow-library/class-schema';
 
+import { BriefService } from '@modules/generation/brief.service';
 import { BriefResponse } from '@modules/generation/generation.dto';
 
-import { makeGenerationService } from './generation-fixtures';
+function briefService(db: object): BriefService {
+  return new BriefService({ getPostgresClient: () => db } as never);
+}
 
 function briefDb(knowledgeContract: unknown) {
   return { query: { briefs: { findFirst: async () => ({ id: 3n, projectId: 1n, chapter: 2, body: 'Amara copies the withdrawals.', knowledgeContract }) } } };
@@ -34,17 +37,17 @@ describe('BriefResponse', () => {
   });
 });
 
-describe('GenerationService.getBrief', () => {
+describe('BriefService.getBrief', () => {
   it('should echo the stored knowledge contract in its narrowed shape', async () => {
     const stored = { pov: ['amara_veil'], learns: [{ entityKey: 'amara_veil', factKey: 'rook_holds_the_slip' }, { entityKey: 'amara_veil' }], extra: true };
 
-    const brief = await makeGenerationService(briefDb(stored)).getBrief(1n, 2);
+    const brief = await briefService(briefDb(stored)).getBrief(1n, 2);
 
     expect(brief.knowledgeContract).toEqual({ pov: ['amara_veil'], learns: [{ entityKey: 'amara_veil', factKey: 'rook_holds_the_slip' }] });
   });
 
   it('should answer null for a stored contract that names no point-of-view entity', async () => {
-    const brief = await makeGenerationService(briefDb({ pov: [], learns: [] })).getBrief(1n, 2);
+    const brief = await briefService(briefDb({ pov: [], learns: [] })).getBrief(1n, 2);
 
     expect(brief.knowledgeContract).toBeNull();
   });

@@ -3,8 +3,9 @@ import { Get, HttpController, Params, Query, RespondFor } from '@shadow-library/
 
 import { PROJECTS_READ_PERMISSION } from '@server/constants';
 
+import { ListChapterRowsQuery, ListChapterRowsResponse } from './chapter-rows.dto';
 import { ChapterRowsService } from './chapter-rows.service';
-import { ListChapterRowsQuery, ListChapterRowsResponse, ProjectParams } from './generation.dto';
+import { ProjectParams } from './generation.dto';
 
 @BotPermission(PROJECTS_READ_PERMISSION)
 @Authenticated()

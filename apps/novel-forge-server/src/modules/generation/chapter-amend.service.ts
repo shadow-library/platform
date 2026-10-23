@@ -10,7 +10,7 @@ import { type Chapter, type DbExecutor, type PrimaryDatabase, schema } from '@se
 
 import { IndexingService } from '../ai/retrieval/indexing.service';
 import { renderChapterPayload } from '../publishing/publish-payload';
-import { type AmendChapterBody, type AmendChapterResponse } from './generation.dto';
+import { type AmendChapterBody, type AmendChapterResponse } from './chapter-amend.dto';
 
 type AmendedDraftFields = Partial<Pick<Chapter.Row, 'title' | 'contentRating'>>;
 

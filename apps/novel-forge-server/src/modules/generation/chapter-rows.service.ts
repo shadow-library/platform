@@ -17,7 +17,7 @@ import {
 } from '@server/common';
 import { type PrimaryDatabase, schema } from '@server/database';
 
-import { type ListChapterRowsQuery, type ListChapterRowsResponse } from './generation.dto';
+import { type ListChapterRowsQuery, type ListChapterRowsResponse } from './chapter-rows.dto';
 
 const drafts = schema.drafts;
 

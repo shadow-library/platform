@@ -3,8 +3,9 @@ import { Body, HttpController, Params, Post, RespondFor } from '@shadow-library/
 
 import { GENERATION_RUN_PERMISSION, PROJECTS_WRITE_PERMISSION } from '@server/constants';
 
+import { AmendChapterBody, AmendChapterResponse } from './chapter-amend.dto';
 import { ChapterAmendService } from './chapter-amend.service';
-import { AmendChapterBody, AmendChapterResponse, ChapterParams } from './generation.dto';
+import { ChapterParams } from './generation.dto';
 
 @Authenticated()
 @HttpController('/api/v1/projects/:projectId/chapters/:n')

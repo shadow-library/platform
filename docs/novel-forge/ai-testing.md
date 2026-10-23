@@ -423,10 +423,10 @@ API (all three require `ADMIN_PERMISSION`, `highRisk` — `generation.controller
 
 - `GET /api/v1/projects/:id/runs` — run list (not admin-gated, `:301`).
 - `GET /api/v1/projects/:id/runs/:runId` — status, outcome, `input`, `nodeTrace`, `modelCalls[]`, `toolCalls[]`,
-  `contextPack` (`generation.dto.ts:731-777`).
+  `contextPack` (`WorkflowRunDetailResponse`, `run-inspection.dto.ts`).
 - `GET /api/v1/projects/:id/runs/:runId/context` — the assembled pack plus `rendered`, the exact text supplied
-  (`generation.dto.ts:716-720`).
-- `GET /api/v1/projects/:id/runs/:runId/calls/:callId` — adds **`rawOutput`** and `error` (`generation.dto.ts:722-729`).
+  (`RunContextResponse`, `run-inspection.dto.ts`).
+- `GET /api/v1/projects/:id/runs/:runId/calls/:callId` — adds **`rawOutput`** and `error` (`RunModelCallDetailResponse`, `run-inspection.dto.ts`).
 - `GET /api/v1/projects/:id/cost` — spend by group/role/model plus `byCostSource`/`byTier`/`byContentMode` breakdowns.
 
 DB, when you are not an admin:
@@ -962,7 +962,7 @@ rejected: `applyBriefReveals` logs `brief reveals reference unknown keys — ski
 - **Run:** 1. Open the brief. 2. Edit → paste → Save.
 - **Verify:** `briefs.hand_edited=true`,
   `briefs.knowledge_contract` stores **only** `{pov, learns}` — the service narrows it
-  (`generation.service.ts:563`). `GET /briefs/:n` echoes it back. No model call.
+  (`BriefService.updateBrief`, `brief.service.ts`; read back by `BriefService.getBrief`). `GET /briefs/:n` echoes it back. No model call.
   `body` is required and `knowledgeContract.pov` carries `minItems: 1`, so an omitted `body` or an empty
   `pov` is a 400 here, not a silent no-op (`ai/schemas/knowledge-contract.schema.ts:17`).
 - **Fails when:** `DRF_001` if the upsert returns nothing. **Gap:** `PUT /briefs/:n` cannot set `writeMode` —
@@ -1325,7 +1325,7 @@ Veil pledge' out loud to Amara."}` — the guidance is the provocation, and `aut
   `GET /runs/:runId/context`, `GET /runs/:runId/calls/:callId`, `GET /cost`,
   `GET /context/preview?purpose=generation&chapter=3`.
 - **Verify:** `GET /runs` lists only the 20 latest author-facing graphs (an allowlist —
-  `generation.service.ts:125`); the detail carries `modelCalls[]` (`promptKey@promptVersion`, `role`,
+  `AUTHOR_FACING_GRAPHS` in `run-inspection.dto.ts`, filtered in `RunInspectionService.listRuns`); the detail carries `modelCalls[]` (`promptKey@promptVersion`, `role`,
   `provider`, `model`, `inputTokens`/`outputTokens`, `latencyMs`, `costUsd`, `attempt`, `status`),
   `toolCalls[]` (`tool`, `args`, `resultDigest`), `nodeTrace[]` and a `contextPack` breakdown
   (`sections[]` with `key`/`tier`/`segment`/`tokens`/`truncated`, `budgetTokens`, `usedTokens`).
@@ -1420,7 +1420,7 @@ Cost basis: the model and list price behind every tier × model type × group ar
 
 | Endpoint                                              | Gives you                                                                                                                                                                                                                                                                                                                                                                                           |
 | ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /runs`                                           | The 20 newest author-facing runs (graph allowlist `AUTHOR_FACING_GRAPHS`, `generation.service.ts:125`). Fields: `id, projectId, graph, target, status, outcome, input, error, nodeTrace, jobId, startedAt, endedAt`. `chat-title` and `chat-compact` are NOT listed (fetch them by id).                                                                                                             |
+| `GET /runs`                                           | The 20 newest author-facing runs (graph allowlist `AUTHOR_FACING_GRAPHS` in `run-inspection.dto.ts`, filtered in `RunInspectionService.listRuns`). Fields: `id, projectId, graph, target, status, outcome, input, error, nodeTrace, jobId, startedAt, endedAt`. `chat-title` and `chat-compact` are NOT listed (fetch them by id).                                                                  |
 | `GET /runs/:id` (admin)                               | Adds `modelCalls[]` (`id,node,role,provider,model,promptKey,promptVersion,status,inputTokens,outputTokens,latencyMs,costUsd,reasoningEffort,attempt,createdAt`), `toolCalls[]` (`id,node,tool,args,status,resultDigest,latencyMs,createdAt`) and `contextPack{id,purpose,budgetTokens,usedTokens,sections[{key,tier,segment,tokens,truncated}]}`.                                                   |
 | `GET /runs/:id/context` (admin)                       | Pack summary plus `rendered`: the exact stable-then-volatile context text. 404 `CTX_001` if no pack is linked.                                                                                                                                                                                                                                                                                      |
 | `GET /runs/:id/calls/:callId` (admin)                 | Model-call row plus `rawOutput` (the raw text, stored before parsing) and `error`.                                                                                                                                                                                                                                                                                                                  |
@@ -1482,7 +1482,7 @@ select purpose,budget_tokens,used_tokens,sections,omitted,unresolved_refs,left(r
 Ordinary hub turns run `chat-refine@2.13.0`, role `chat` (planning-group model), node `chat-turn`, graph `chat-turn`.
 
 - Session routes: `/projects/:p/chat/sessions...`. Non-streaming turn: `POST /chat/sessions/:s/messages`. Streaming turn: `POST /projects/:p/chats/:s/turn/stream` (note `chats`, not `chat/sessions`).
-- Sessions are always scope `project`; the request body has no scope field. A new session is `auto` unless the body says `{"mode":"manual"}` (`chat.service.ts`).
+- Sessions are always scope `project`; the request body has no scope field. A new session is `auto` unless the body says `{"mode":"manual"}` (`ChatSessionService.createSession`, `chat-session.service.ts`).
 - **Fixture used by blocks 1.1-1.9.** Create it once: `POST /projects {"name":"Tidewrights QA","kind":"new_novel"}`. Block 1.1 builds its canon.
 
 #### 1.1 Manual hub turn: materialise canon as a staged proposal

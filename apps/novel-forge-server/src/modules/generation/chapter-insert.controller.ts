@@ -5,7 +5,7 @@ import { RevealRuleErrorResponse } from '@server/common';
 import { GENERATION_RUN_PERMISSION, PROJECTS_WRITE_PERMISSION } from '@server/constants';
 
 import { ChapterInsertService } from './chapter-insert.service';
-import { ChapterInsertParams, InsertChapterBody, InsertChapterResponse } from './generation.dto';
+import { ChapterInsertParams, InsertChapterBody, InsertChapterResponse } from './chapter-insert.dto';
 
 @Authenticated()
 @HttpController('/api/v1/projects/:projectId/chapters/:afterChapter')

@@ -6,12 +6,12 @@ import { ADMIN_PERMISSION, GENERATION_RUN_PERMISSION, PROJECTS_READ_PERMISSION, 
 
 import { ProposalResponse } from '../refinement/refinement.dto';
 import { serialiseProposal } from '../refinement/serialise';
+import { BriefService } from './brief.service';
 import {
   ApproveDraftBody,
   BriefResponse,
   CancelJobResponse,
   CancelRunResponse,
-  ChapterCostResponse,
   ChapterParams,
   ChapterSummarizeResponse,
   ContinuityProposalResponse,
@@ -33,17 +33,10 @@ import {
   ListDraftResponse,
   ListDraftRevisionResponse,
   ListGenerationJobResponse,
-  ListRunsQuery,
-  ListWorkflowRunResponse,
   MarkdownResponse,
   ProjectParams,
   ReviseDraftBody,
   RevisionParams,
-  RunCallParams,
-  RunContextResponse,
-  RunModelCallDetailResponse,
-  RunParams,
-  RunUsageDetailResponse,
   SearchQuery,
   SearchResponse,
   SeedFromBriefBody,
@@ -53,16 +46,31 @@ import {
   UpdateDraftBody,
   UpdateSummaryBody,
   UserFeedbackResponse,
-  WorkflowRunDetailResponse,
   WorkflowRunResponse,
 } from './generation.dto';
 import { GenerationService } from './generation.service';
+import {
+  ChapterCostResponse,
+  ListRunsQuery,
+  ListWorkflowRunResponse,
+  RunCallParams,
+  RunContextResponse,
+  RunModelCallDetailResponse,
+  RunParams,
+  RunUsageDetailResponse,
+  WorkflowRunDetailResponse,
+} from './run-inspection.dto';
+import { RunInspectionService } from './run-inspection.service';
 
 @BotPermission(PROJECTS_READ_PERMISSION)
 @Authenticated()
 @HttpController('/api/v1/projects/:projectId')
 export class GenerationController {
-  constructor(private readonly generationService: GenerationService) {}
+  constructor(
+    private readonly generationService: GenerationService,
+    private readonly briefs: BriefService,
+    private readonly runs: RunInspectionService,
+  ) {}
 
   @BotPermission(PROJECTS_WRITE_PERMISSION)
   @BotPermission(GENERATION_RUN_PERMISSION)
@@ -75,14 +83,14 @@ export class GenerationController {
   @Get('/briefs')
   @RespondFor(200, ListBriefSummaryResponse)
   async listBriefs(@Params() params: ProjectParams): Promise<ListBriefSummaryResponse> {
-    const items = await this.generationService.listBriefs(params.projectId);
+    const items = await this.briefs.listBriefs(params.projectId);
     return { items };
   }
 
   @Get('/briefs/:n')
   @RespondFor(200, BriefResponse)
   getBrief(@Params() params: ChapterParams): Promise<BriefResponse> {
-    return this.generationService.getBrief(params.projectId, params.n);
+    return this.briefs.getBrief(params.projectId, params.n);
   }
 
   @BotPermission(PROJECTS_WRITE_PERMISSION)
@@ -90,7 +98,7 @@ export class GenerationController {
   @RespondFor(200, BriefResponse)
   @RespondFor(400, RevealRuleErrorResponse)
   updateBrief(@Params() params: ChapterParams, @Body() body: UpdateBriefBody): Promise<BriefResponse> {
-    return this.generationService.updateBrief(params.projectId, params.n, body);
+    return this.briefs.updateBrief(params.projectId, params.n, body);
   }
 
   @BotPermission(PROJECTS_WRITE_PERMISSION)
@@ -322,26 +330,26 @@ export class GenerationController {
   @Get('/runs')
   @RespondFor(200, ListWorkflowRunResponse)
   listRuns(@Params() params: ProjectParams, @Query() query: ListRunsQuery): Promise<ListWorkflowRunResponse> {
-    return this.generationService.listRuns(params.projectId, query);
+    return this.runs.listRuns(params.projectId, query);
   }
 
   @RequirePermission(ADMIN_PERMISSION, { highRisk: true })
   @Get('/runs/:runId')
   @RespondFor(200, WorkflowRunDetailResponse)
   getRun(@Params() params: RunParams): Promise<WorkflowRunDetailResponse> {
-    return this.generationService.getRun(params.projectId, params.runId);
+    return this.runs.getRun(params.projectId, params.runId);
   }
 
   @Get('/runs/:runId/usage')
   @RespondFor(200, RunUsageDetailResponse)
   getRunUsage(@Params() params: RunParams): Promise<RunUsageDetailResponse> {
-    return this.generationService.getRunUsage(params.projectId, params.runId);
+    return this.runs.getRunUsage(params.projectId, params.runId);
   }
 
   @Get('/chapters/:n/cost')
   @RespondFor(200, ChapterCostResponse)
   getChapterCost(@Params() params: ChapterParams): Promise<ChapterCostResponse> {
-    return this.generationService.getChapterCost(params.projectId, params.n);
+    return this.runs.getChapterCost(params.projectId, params.n);
   }
 
   @BotPermission(PROJECTS_WRITE_PERMISSION)
@@ -356,14 +364,14 @@ export class GenerationController {
   @Get('/runs/:runId/context')
   @RespondFor(200, RunContextResponse)
   getRunContext(@Params() params: RunParams): Promise<RunContextResponse> {
-    return this.generationService.getRunContext(params.projectId, params.runId);
+    return this.runs.getRunContext(params.projectId, params.runId);
   }
 
   @RequirePermission(ADMIN_PERMISSION, { highRisk: true })
   @Get('/runs/:runId/calls/:callId')
   @RespondFor(200, RunModelCallDetailResponse)
   getRunCall(@Params() params: RunCallParams): Promise<RunModelCallDetailResponse> {
-    return this.generationService.getRunCall(params.projectId, params.runId, params.callId);
+    return this.runs.getRunCall(params.projectId, params.runId, params.callId);
   }
 
   @BotPermission(GENERATION_RUN_PERMISSION)

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
+import { BriefService } from '@modules/generation/brief.service';
 import { type UpdateBriefBody } from '@modules/generation/generation.dto';
-import { GenerationService } from '@modules/generation/generation.service';
 
 type Row = Record<string, unknown>;
 
@@ -19,7 +19,7 @@ const existing: Row = {
   isEnding: true,
 };
 
-function makeService(): { service: GenerationService; written: { values?: Row; set?: Row } } {
+function makeService(): { service: BriefService; written: { values?: Row; set?: Row } } {
   const written: { values?: Row; set?: Row } = {};
   const milestones = ['mira_rank_2', 'mira_rank_3', 'tide_turns'].map((milestoneKey, index) => ({ id: BigInt(index + 1), milestoneKey, state: 'open', plannedChapter: null }));
   const tx = {
@@ -46,12 +46,11 @@ function makeService(): { service: GenerationService; written: { values?: Row; s
     }),
   };
   const db = { transaction: async (run: (handle: unknown) => Promise<unknown>) => run(tx) };
-  const noop = {} as never;
-  const service = new GenerationService({ getPostgresClient: () => db } as never, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop);
+  const service = new BriefService({ getPostgresClient: () => db } as never);
   return { service, written };
 }
 
-describe('GenerationService.updateBrief — chapter plan fields', () => {
+describe('BriefService.updateBrief — chapter plan fields', () => {
   it('should leave every plan field the body omits untouched', async () => {
     const { service, written } = makeService();
 

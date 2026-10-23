@@ -7,6 +7,7 @@ import { JobsModule } from '../jobs/jobs.module';
 import { PluginProposalModule } from '../plugins/plugin-proposal.module';
 import { PluginsModule } from '../plugins/plugins.module';
 import { RefinementModule } from '../refinement/refinement.module';
+import { BriefService } from './brief.service';
 import { ChapterAmendController } from './chapter-amend.controller';
 import { ChapterAmendService } from './chapter-amend.service';
 import { ChapterImageController } from './chapter-image.controller';
@@ -19,6 +20,7 @@ import { ChapterWorkspaceController } from './chapter-workspace.controller';
 import { DraftVersionService } from './draft-versions.service';
 import { GenerationController } from './generation.controller';
 import { GenerationService } from './generation.service';
+import { RunInspectionService } from './run-inspection.service';
 import { WriterSnapshotController } from './writer-snapshot.controller';
 
 @Module({
@@ -32,7 +34,7 @@ import { WriterSnapshotController } from './writer-snapshot.controller';
     WriterSnapshotController,
     ChapterWorkspaceController,
   ],
-  providers: [GenerationService, ChapterImageService, ChapterInsertService, ChapterAmendService, ChapterRowsService, DraftVersionService],
+  providers: [GenerationService, BriefService, RunInspectionService, ChapterImageService, ChapterInsertService, ChapterAmendService, ChapterRowsService, DraftVersionService],
   exports: [GenerationService, ChapterImageService, ChapterInsertService, ChapterAmendService],
 })
 export class GenerationModule {}

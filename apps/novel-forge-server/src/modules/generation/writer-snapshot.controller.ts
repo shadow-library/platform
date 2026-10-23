@@ -4,7 +4,8 @@ import { Get, HttpController, Params, RespondFor } from '@shadow-library/fastify
 import { PROJECTS_READ_PERMISSION } from '@server/constants';
 
 import { WriterSnapshotService } from '../ai/writer-snapshot.service';
-import { ChapterParams, ListWriterSnapshotResponse, SnapshotParams, WriterSnapshotDetailResponse } from './generation.dto';
+import { ChapterParams } from './generation.dto';
+import { ListWriterSnapshotResponse, SnapshotParams, WriterSnapshotDetailResponse } from './writer-snapshot.dto';
 
 @BotPermission(PROJECTS_READ_PERMISSION)
 @Authenticated()

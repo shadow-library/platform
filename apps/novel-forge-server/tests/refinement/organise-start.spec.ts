@@ -7,6 +7,9 @@ import { type Refinement } from '@server/database';
 import { renderTurnRules } from '@modules/ai/prompts';
 import { ORGANISE_CARD_NOTE, ORGANISE_ROUTED_NOTE, organiseRouting, withLaterPlansRouted } from '@modules/refinement/later-plans-guard';
 import { type ApplyResult } from '@modules/refinement/proposal-apply.service';
+import { ChatLookupService } from '@modules/refinement/chat-lookup.service';
+import { ChatSessionService } from '@modules/refinement/chat-session.service';
+import { ChatTurnStagingService } from '@modules/refinement/chat-turn-staging.service';
 import { ChatService, type ChatTurnOptions } from '@modules/refinement/chat.service';
 import { ORGANISE_BUSY_NOTE, ORGANISE_REFUSED_NOTE, ORGANISE_STARTED_NOTE, type OrganiseStartPort, startNotesOrganise } from '@modules/refinement/turn-proposals';
 
@@ -146,21 +149,20 @@ function chat({ mode, output, refusal }: ChatSetup) {
     apply: async (_projectId: bigint, proposalId: bigint, options?: unknown) => (applies.push({ proposalId, options }), applied(proposal(proposalId, [organise]))),
   };
   const actionRegistry = { refusal: async () => refusal };
+  const databaseService = { getPostgresClient: () => db } as never;
   const service = new ChatService(
-    { getPostgresClient: () => db } as never,
+    databaseService,
     { forNovelChat: async () => ({ id: null, sections: [], omitted: [], renderedStable: '', renderedVolatile: '' }) } as never,
     modelRouter as never,
     workflowRunService as never,
-    proposalService as never,
-    proposalApplyService as never,
-    { getRaw: () => [] } as never,
-    {} as never,
     { compactIfNeeded: async () => undefined, buildHistory: async () => [], continueConversation: async () => ({ plain: [], history: [], segment: null }) } as never,
     { resolve: async () => ({ writerClass: 'standard', raised: false, systemMessages: [] }) } as never,
     { publish: () => undefined } as never,
     { read: async () => ({ text: NOTES }) } as never,
     { modeFor: async () => 'off' } as never,
-    actionRegistry as never,
+    new ChatSessionService(databaseService, modelRouter as never, workflowRunService as never, { publish: () => undefined } as never),
+    new ChatLookupService(databaseService, { getRaw: () => [] } as never, {} as never),
+    new ChatTurnStagingService(databaseService, proposalService as never, proposalApplyService as never, actionRegistry as never),
   );
   const turn = (content: string, options?: ChatTurnOptions) => service.turn(1n, 'session-1', content, undefined, options);
   return { turn, updates, created, applies };

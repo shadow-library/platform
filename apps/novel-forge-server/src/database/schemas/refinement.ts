@@ -166,7 +166,7 @@ export const chatSessions = pgTable(
     title: varchar('title', { length: 500 }),
     status: chatSessionStatus('status').notNull().default('active'),
     // How this session lands its change-sets: 'auto' applies the author's quoted words in-turn under the quote rule and stages the
-    // rest as cards; 'manual' stages everything as cards. ChatService.createSession sets 'auto' for a new chat — this column default
+    // rest as cards; 'manual' stages everything as cards. ChatSessionService.createSession sets 'auto' for a new chat — this column default
     // stays 'manual' only so no migration is needed. Provenance lives on each proposal (autoApplied).
     mode: chatMode('mode').notNull().default('manual'),
     // Per-session model pin (null → the cost tier's model): `alias_key`, a Synapse alias. `model_*` holds a pre-Synapse registry pin, read only by

@@ -3,8 +3,9 @@ import { Body, Delete, Get, HttpController, HttpStatus, Params, Post, RespondFor
 
 import { ILLUSTRATIONS_WRITE_PERMISSION, PROJECTS_READ_PERMISSION } from '@server/constants';
 
+import { AddChapterImageBody, ChapterImageParams, ChapterImageResponse, ListChapterImageResponse } from './chapter-image.dto';
 import { ChapterImageService } from './chapter-image.service';
-import { AddChapterImageBody, ChapterImageParams, ChapterImageResponse, ChapterParams, ListChapterImageResponse } from './generation.dto';
+import { ChapterParams } from './generation.dto';
 
 @BotPermission(PROJECTS_READ_PERMISSION)
 @Authenticated()

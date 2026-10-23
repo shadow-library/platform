@@ -208,8 +208,6 @@ export function makeGenerationService(db: object, deps: GenerationDeps = {}): Ge
     (deps.modelRouter ?? absent) as never,
     (deps.contextAssembler ?? absent) as never,
     absent,
-    absent,
-    absent,
     (deps.jobService ?? absent) as never,
     (deps.jobExecutor ?? absent) as never,
     (deps.proposalService ?? absent) as never,
