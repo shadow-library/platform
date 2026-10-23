@@ -141,7 +141,7 @@ describe('Storage Module', () => {
       expect(url).toContain('abc123.png');
     });
 
-    it('should accept a caller-supplied non-content-addressed ref for presigning (ADR-0008)', () => {
+    it('should accept a caller-supplied non-content-addressed ref for presigning', () => {
       const url = storage.getPresignedUploadUrl('r/42/018f1234-abcd-7000-8000-000000000000.jpg', { contentType: 'image/jpeg' });
       expect(url).toContain('r/42/018f1234-abcd-7000-8000-000000000000.jpg');
     });

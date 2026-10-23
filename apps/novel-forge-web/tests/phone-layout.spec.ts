@@ -131,12 +131,12 @@ describe('Phone top bar', () => {
     expect(sheetOf(new URL('components/TopNavigation/TopNavigation.module.css', UI)).blocks.get(SHELL_PHONE)?.get('.menuSlot')).toEqual({ display: 'inline-flex' });
   });
 
-  it('should give the novel’s title the slack and drop the screen crumb (Phone l.35)', () => {
+  it('should give the novel’s title the slack and drop the screen crumb', () => {
     expect(shell.get(".shellRoot :global(header[data-layout='centred'])")).toEqual({ 'grid-template-columns': 'minmax(0, 1fr) auto auto' });
     expect(shell.get('.crumbLeaf')).toEqual({ display: 'none' });
   });
 
-  it('should turn search into a 44px icon button (Phone l.21 .icon, l.36)', () => {
+  it('should turn search into a 44px icon button', () => {
     expect(token('--sh-tap-target')).toBe(44);
     expect(shell.get('.search')).toEqual({
       'justify-content': 'center',

@@ -14,12 +14,6 @@ export const BookIcon = (p: IconProps): React.JSX.Element => (
   </SvgIcon>
 );
 
-export const ListIcon = (p: IconProps): React.JSX.Element => (
-  <SvgIcon {...p}>
-    <path d="M3 6h18M3 12h18M3 18h12" />
-  </SvgIcon>
-);
-
 export const EditIcon = (p: IconProps): React.JSX.Element => (
   <SvgIcon {...p}>
     <path d="M12 20h9" />
@@ -79,12 +73,6 @@ export const ChevronLeftIcon = (p: IconProps): React.JSX.Element => (
 export const CloseIcon = (p: IconProps): React.JSX.Element => (
   <SvgIcon {...p}>
     <path d="M18 6L6 18M6 6l12 12" />
-  </SvgIcon>
-);
-
-export const GripIcon = (p: IconProps): React.JSX.Element => (
-  <SvgIcon {...p}>
-    <path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01" strokeWidth={3} />
   </SvgIcon>
 );
 

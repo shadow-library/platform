@@ -4,7 +4,7 @@ import { promisify } from 'node:util';
 export interface ServiceAccountTokenOptions {
   /** Requested `aud` values. Omitting them yields the cluster's own default audiences, which identity must refuse. */
   audiences?: string[];
-  /** Requested lifetime. The TokenRequest API refuses anything under `MIN_TOKEN_DURATION_SECONDS`. */
+  /** Requested lifetime. The TokenRequest API refuses anything under 600 seconds, so a test cannot produce an expired cluster-signed token. */
   durationSeconds?: number;
 }
 
@@ -17,9 +17,6 @@ export const KUBE_CONTEXT = process.env.E2E_KUBE_CONTEXT || 'k3d-shadow-apps-dev
 
 /** `AUTH_WORKLOAD_ISSUER` in the dev cluster — the `iss` every cluster-signed assertion carries. */
 export const WORKLOAD_ISSUER = 'https://kubernetes.default.svc.cluster.local';
-
-/** The TokenRequest API's floor, which is why an expired cluster-signed token cannot be produced inside a test. */
-export const MIN_TOKEN_DURATION_SECONDS = 600;
 
 export class ClusterTokenError extends Error {
   override readonly name = 'ClusterTokenError';

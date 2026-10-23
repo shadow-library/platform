@@ -34,7 +34,7 @@ const input = (overrides: Partial<ResolveReferencesInput>): ResolveReferencesInp
   ...overrides,
 });
 
-describe('the reference portraits auto-selected for reader-facing art (P4-51)', () => {
+describe('the reference portraits auto-selected for reader-facing art', () => {
   it('should leave out a chapter image cast portrait dated after that chapter, giving its slot to the next one', async () => {
     const [mira, dace, vell] = CAST as [CastMember, CastMember, CastMember];
     const refs = async (cast: CastMember[]) => (await references(cast).service.resolve(input({}))).references.map(reference => reference.ref);

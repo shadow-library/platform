@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 
 import { advanceDueDate } from '@modules/finance';
 
-describe('advanceDueDate (T-25)', () => {
+describe('advanceDueDate', () => {
   it('should advance a weekly subscription by 7 days', () => {
     expect(advanceDueDate({ frequency: 'weekly', billingDay: 1, customIntervalDays: null }, '2026-08-10')).toBe('2026-08-17');
   });

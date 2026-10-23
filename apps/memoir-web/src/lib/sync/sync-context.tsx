@@ -2,7 +2,7 @@ import { createContext, type ReactElement, type ReactNode, useContext, useEffect
 import { Button } from '@shadow-library/ui';
 
 import { StatusPage } from '@/components/StatusPage';
-import { accountKeys, type MemoirData, memoirKeys, memoirQueryClient, setFinanceProvider, setQuickLogProvider, setTodaySource } from '@/lib/data';
+import { accountKeys, type MemoirData, memoirKeys, memoirQueryClient, setTodaySource } from '@/lib/data';
 
 import { type AccountMarker, MemoirStore, type UnloadBacking } from './memoir-store';
 import { SyncEngine } from './sync-engine';
@@ -100,16 +100,11 @@ export function createSyncedMemoirData(options: SyncedMemoirOptions): SyncedMemo
   return composeSyncedMemoirData(engine, options.principal);
 }
 
-/**
- * Everything but the store and the engine, so a test composes the same providers over its own engine. Installing the module-level finance, quick-log and
- * day sources is part of it.
- */
+/** Everything but the store and the engine, so a test composes the same providers over its own engine. Installing the module-level day source is part of it. */
 export function composeSyncedMemoirData(engine: SyncEngine, principal?: () => Promise<string>): SyncedMemoirData {
   const account = new SyncedAccountProvider(engine, principal);
   const finance = new SyncedFinanceProvider(engine);
   const quickLogs = new SyncedQuickLogProvider(engine);
-  setFinanceProvider(finance);
-  setQuickLogProvider(quickLogs);
   setTodaySource(() => engine.today);
 
   return {

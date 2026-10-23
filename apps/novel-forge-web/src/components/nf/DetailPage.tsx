@@ -2,10 +2,7 @@ import { type ReactElement, type ReactNode } from 'react';
 
 import styles from './DetailPage.module.css';
 
-/**
- * The width bands a right-hand panel may take. `summary` holds labels, chips and clamped summaries;
- * `prose` is the narrowest column prose reads at, below which a field belongs in a `ReadingSheet`.
- */
+/** The width bands a right-hand panel may take. `summary` holds labels, chips and clamped summaries; `prose` is the narrowest column prose reads at. */
 export type DetailAsideWidth = 'summary' | 'prose';
 
 export interface DetailPageProps {

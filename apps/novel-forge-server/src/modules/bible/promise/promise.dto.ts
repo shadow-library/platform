@@ -31,7 +31,7 @@ export class ListPromisesQuery extends PaginationQuery(SortByTime) {
   sort?: 'due';
 }
 
-@Schema({ description: "One thing the story owes the reader — a plot thread or a mystery — never the mystery's own truth fact (P4-38)." })
+@Schema({ description: "One thing the story owes the reader — a plot thread or a mystery — never the mystery's own truth fact." })
 export class PromiseItemResponse {
   @Field(() => PromiseKindType)
   kind: PromiseKind;

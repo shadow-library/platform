@@ -25,7 +25,7 @@ export class AiTaskSubmitDto {
   })
   id: string;
 
-  @Field({ minLength: 1, maxLength: 2000, description: 'The natural-language question (most-sensitive class, ARCHITECTURE §23)' })
+  @Field({ minLength: 1, maxLength: 2000, description: 'The natural-language question (most-sensitive class)' })
   queryText: string;
 }
 
@@ -57,7 +57,7 @@ export class AiConsentGrantDto {
 
   @Field({
     description:
-      'true grants (or re-grants) the class; false withdraws it — withdrawal excludes the class from future reads only, past answers already incorporating it are unaffected (PRD §6.7)',
+      'true grants (or re-grants) the class; false withdraws it — withdrawal excludes the class from future reads only, past answers already incorporating it are unaffected',
   })
   granted: boolean;
 }

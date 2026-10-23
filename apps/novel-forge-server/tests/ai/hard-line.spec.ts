@@ -166,7 +166,7 @@ describe('the lexicon', () => {
     expect([pairs(HARD_LINE_LEXICON.sexual, 'sex'), pairs(HARD_LINE_LEXICON.explicit, 'sex'), pairs(HARD_LINE_LEXICON.sexual, 'sextant')]).toEqual([true, false, false]);
   });
 
-  it('should keep "molest" on the supplied scope (P4-27) and "intercourse" on both', () => {
+  it('should keep "molest" on the supplied scope and "intercourse" on both', () => {
     expect([pairs(HARD_LINE_LEXICON.sexual, 'molested'), pairs(HARD_LINE_LEXICON.explicit, 'molested')]).toEqual([true, false]);
     expect([pairs(HARD_LINE_LEXICON.sexual, 'intercourse'), pairs(HARD_LINE_LEXICON.explicit, 'intercourse')]).toEqual([true, true]);
   });

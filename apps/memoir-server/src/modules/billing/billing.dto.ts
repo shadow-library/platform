@@ -2,7 +2,7 @@ import { Field, Schema } from '@shadow-library/class-schema';
 
 @Schema()
 export class CheckoutDto {
-  @Field({ enum: ['monthly', 'yearly'], description: 'Billing period to purchase; pricing per period is environment config (PRD §6.9)' })
+  @Field({ enum: ['monthly', 'yearly'], description: 'Billing period to purchase; pricing per period is environment config' })
   plan: 'monthly' | 'yearly';
 }
 

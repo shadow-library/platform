@@ -767,7 +767,7 @@ export interface components {
       scheduleEndMin: number;
     };
     OcrParseDto: {
-      /** @description On-device-extracted receipt text (ARCHITECTURE §14.3 step 1); the server never sees the receipt image itself */
+      /** @description On-device-extracted receipt text; the server never sees the receipt image itself */
       extractedText: string;
     };
     OcrParseResponseDto: {
@@ -799,7 +799,7 @@ export interface components {
     };
     CheckoutDto: {
       /**
-       * @description Billing period to purchase; pricing per period is environment config (PRD §6.9)
+       * @description Billing period to purchase; pricing per period is environment config
        * @enum {string}
        */
       plan: 'monthly' | 'yearly';
@@ -844,7 +844,7 @@ export interface components {
     AiTaskSubmitDto: {
       /** @description Client-minted task id; resubmitting the same id converges on the first submission rather than creating a second task or consuming quota twice */
       id: string;
-      /** @description The natural-language question (most-sensitive class, ARCHITECTURE §23) */
+      /** @description The natural-language question (most-sensitive class) */
       queryText: string;
     };
     AiTaskResponseDto: {
@@ -886,7 +886,7 @@ export interface components {
     AiConsentGrantDto: {
       /** @enum {string} */
       dataClass: 'journal_reflection_reason' | 'health';
-      /** @description true grants (or re-grants) the class; false withdraws it — withdrawal excludes the class from future reads only, past answers already incorporating it are unaffected (PRD §6.7) */
+      /** @description true grants (or re-grants) the class; false withdraws it — withdrawal excludes the class from future reads only, past answers already incorporating it are unaffected */
       granted: boolean;
     };
     AiScheduledQueryUpsertDto: {

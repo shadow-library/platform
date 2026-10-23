@@ -53,10 +53,6 @@ export interface ScopedPolicyResolver {
   forPack(call: PolicyCall, consumers: readonly string[]): ForgeCallPolicy;
 }
 
-export function raisedContainment(policy: { raised?: boolean } | undefined): { generator: 'unrestricted'; isolated: true } | Record<string, never> {
-  return policy?.raised ? { generator: 'unrestricted', isolated: true } : {};
-}
-
 export function emptyPolicy(writerClass: WriterClass = 'standard'): ForgeCallPolicy {
   return { writerClass, raised: false, plugins: [], systemMessages: [], contextSections: [], knobs: {}, digest: '' };
 }

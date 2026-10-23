@@ -1,7 +1,6 @@
 import { createApiClient } from '@shadow-library/web';
 
-export { ApiError, isApiError } from '@shadow-library/web';
-export type { ApiFailure, ApiResult, ErrorField, ErrorResponse, PollingOptions, QueryParams, QueryValue } from '@shadow-library/web';
+export { ApiError } from '@shadow-library/web';
 
 // The SSR guard must live in app code: @shadow-library/web ships prebuilt so Vite cannot prune its server graph there, and a bare dynamic import would still bundle node:stream.
 export const apiClient = createApiClient({

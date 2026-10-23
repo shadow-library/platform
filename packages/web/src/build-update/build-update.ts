@@ -49,6 +49,7 @@ export function retryDelay(failures: number, timing: BuildCheckTiming): number {
   return Math.min(timing.intervalMs * 2 ** (failures - 1), timing.maxBackoffMs);
 }
 
+/** Milliseconds until the next routine check is due. */
 export function nextCheckDelay(state: BuildCheckState, now: number, timing: BuildCheckTiming): number {
   return Math.max(0, state.lastAttemptAt + retryDelay(state.failures, timing) - now);
 }

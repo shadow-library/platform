@@ -27,7 +27,7 @@ function withAnswer(answer: string): GuardrailInput {
   return input({ draft: { ...CLEAN_DRAFT, answer } });
 }
 
-describe('AI output guardrails (T-33, PRD §6.6, ARCHITECTURE §28.6)', () => {
+describe('AI output guardrails', () => {
   describe('clean output', () => {
     it('should pass an answer that paraphrases, names no identity, and only offers allowed suggestion kinds', () => {
       const outcome = applyGuardrails(input());
@@ -45,7 +45,7 @@ describe('AI output guardrails (T-33, PRD §6.6, ARCHITECTURE §28.6)', () => {
     });
   });
 
-  describe('no verbatim quotes (PRD §6.6.1)', () => {
+  describe('no verbatim quotes', () => {
     const canaries: [string, string][] = [
       ['a long journal sentence reproduced whole', JOURNAL_ENTRY],
       ['a seven-word run lifted out of the middle of a journal entry', 'because my manager kept me on a call'],
@@ -78,7 +78,7 @@ describe('AI output guardrails (T-33, PRD §6.6, ARCHITECTURE §28.6)', () => {
     });
   });
 
-  describe('no identity assertion or diagnosis (PRD §6.6.2)', () => {
+  describe('no identity assertion or diagnosis', () => {
     const shapes: [string, string][] = [
       ['a bare identity assertion', 'You are lazy about evenings.'],
       ['a contracted identity assertion', "You're a procrastinator when it comes to the gym."],
@@ -102,7 +102,7 @@ describe('AI output guardrails (T-33, PRD §6.6, ARCHITECTURE §28.6)', () => {
     });
   });
 
-  describe('no shame copy (PRD §6.6.5)', () => {
+  describe('no shame copy', () => {
     const shapes = ['You failed again this week.', 'You should be ashamed of that streak.', 'Four misses is disappointing.', 'Stop being lazy about it.'];
 
     for (const answer of shapes) {
@@ -115,7 +115,7 @@ describe('AI output guardrails (T-33, PRD §6.6, ARCHITECTURE §28.6)', () => {
     }
   });
 
-  describe('no mechanic mutation (PRD §6.6.4)', () => {
+  describe('no mechanic mutation', () => {
     it('should block an answer claiming it changed game state itself', () => {
       const outcome = applyGuardrails(withAnswer("I've moved your evening run to 18:00 and awarded 20 XP for the streak."));
       expect(outcome.status).toBe('blocked');
@@ -148,7 +148,7 @@ describe('AI output guardrails (T-33, PRD §6.6, ARCHITECTURE §28.6)', () => {
     });
   });
 
-  describe('crisis handoff (PRD §6.6.3)', () => {
+  describe('crisis handoff', () => {
     it('should replace the whole answer with the handoff response when the question indicates self-harm risk', () => {
       const outcome = applyGuardrails(input({ queryText: 'why do I keep thinking I want to die when I miss my quests' }));
       expect(outcome.status).toBe('crisis');

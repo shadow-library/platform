@@ -105,13 +105,13 @@ jobs:
           fi
           echo "Affected workspaces: $SELECTED_JSON"
 
-          # Per-workspace metadata that is not structural: checkMigrations opts a server out of the migrations check (pulse-server today),
+          # Per-workspace metadata that is not structural: checkMigrations opts a server into the migrations check,
           # and "checkApiTypes": false opts out a server whose paired web app does not exist yet.
           cat > /tmp/workspace-metadata.json <<'JSON'
           {
             "apps/identity-server": { "checkMigrations": true },
             "apps/novel-forge-server": { "checkMigrations": true },
-            "apps/pulse-server": { "checkMigrations": false },
+            "apps/pulse-server": { "checkMigrations": true },
             "apps/memoir-server": { "checkMigrations": true },
             "apps/synapse-server": { "checkMigrations": true },
             "apps/web-novel-server": { "checkMigrations": true }
@@ -201,17 +201,65 @@ jobs:
         if: matrix.workspace != 'scripts'
         run: bun scripts/build.ts ${{ matrix.workspace }}
 
+  # Whole-repo by nature (an export is unused only once every workspace is read), so it runs on every change rather than per affected workspace.
+  code-health:
+    name: code-health
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      # knip, jscpd and madge run under Node, and knip.config.ts needs `fs.globSync` (Node 22+), newer than the runner image's default Node.
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Cache Bun downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-cache-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            bun-cache-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # knip loads each web app's vite.config.ts, which imports the built `@shadow-library/web`; same key as the verify job, so the full set is built on a miss.
+      - name: Restore built package dists
+        id: pkgdist
+        uses: actions/cache@v4
+        with:
+          path: packages/*/dist
+          key: pkgdist-${{ runner.os }}-${{ hashFiles('packages/*/src/**', 'packages/*/package.json', 'packages/*/tsconfig*.json', 'packages/*/README.md', 'packages/tsconfig.lib.json', 'packages/tsconfig.build.json', 'bun.lock', 'package.json', 'tsconfig.base.json', 'types/**', 'scripts/**') }}
+
+      - name: Build packages
+        if: steps.pkgdist.outputs.cache-hit != 'true'
+        run: bun scripts/build.ts 'packages/*'
+
+      - name: Code health
+        run: bun scripts/code-health.ts
+
   # Required-status-check target: a zero-leg matrix reports "skipped", so a check pinned to `verify` would wait forever. This job always runs and normalizes that.
   ci:
     name: CI
-    needs: [changes, verify]
+    needs: [changes, verify, code-health]
     if: always()
     runs-on: ubuntu-latest
     steps:
-      - name: Require verify to have succeeded or been legitimately skipped
+      # verify may be skipped only because `changes` succeeded with an empty matrix; a failed `changes` also skips it, so `changes` must succeed.
+      - name: Require changes and code-health to have succeeded, and verify to have succeeded or been legitimately skipped
         run: |
-          result="${{ needs.verify.result }}"
-          echo "verify result: $result"
-          if [ "$result" = "failure" ] || [ "$result" = "cancelled" ]; then
+          changes="${{ needs.changes.result }}"
+          verify="${{ needs.verify.result }}"
+          health="${{ needs.code-health.result }}"
+          echo "changes result: $changes, verify result: $verify, code-health result: $health"
+          if [ "$changes" != "success" ] || [ "$verify" = "failure" ] || [ "$verify" = "cancelled" ] || [ "$health" != "success" ]; then
             exit 1
           fi

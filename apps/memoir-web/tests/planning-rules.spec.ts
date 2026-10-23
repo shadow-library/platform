@@ -34,7 +34,7 @@ const MON_TO_SAT_DRAFT: QuestDraft = {
   active: true,
 };
 
-describe('planning board (P2-03)', () => {
+describe('planning board', () => {
   it('should mark past days without logs as missed', async () => {
     const world = projectWorldState({ quests: [DAILY_QUEST] }, TODAY);
     const plan = await new MemoirEngine(world).getPlan({ scope: 'week', anchor: TODAY });

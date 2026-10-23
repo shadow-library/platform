@@ -31,25 +31,24 @@ function spacingOf(file: string): Map<string, Record<string, string>> {
 
 // Every value is a design number or copied verbatim from a sibling stylesheet (cited by file + selector), never invented here.
 const AUDIT_DIALOG: Expected[] = [
-  { selector: '.body', values: { gap: '16px' }, source: 'canvas l.80 dialog content wrapper gap 16px' },
+  { selector: '.body', values: { gap: '16px' }, source: 'design: dialog content wrapper gap 16px' },
   { selector: '.loading', values: { padding: '48px' }, source: 'copied from components/nf/nf.module.css .paneLoader (padding 48, flex-centered loading state)' },
   {
     selector: '.placeholder',
     values: { margin: '0' },
     source: 'copied from components/nf/BibleTidyDialog.module.css .placeholder (margin 0 — paragraph reset, spacing comes from .body’s gap)',
   },
-  { selector: '.group', values: { gap: '8px' }, source: 'canvas l.82 group section gap 8px' },
+  { selector: '.group', values: { gap: '8px' }, source: 'design: group section gap 8px' },
   {
     selector: '.finding',
     values: { gap: '12px', padding: '12px 14px', 'border-radius': 'var(--sh-radius-lg)' },
-    source: 'canvas l.84 finding row: gap 12px, padding 12px 14px, radius 8px (--sh-radius-lg)',
+    source: 'design: finding row: gap 12px, padding 12px 14px, radius 8px (--sh-radius-lg)',
   },
-  { selector: '.findingMain', values: { gap: '4px' }, source: 'canvas l.85 finding text column gap 4px' },
+  { selector: '.findingMain', values: { gap: '4px' }, source: 'design: finding text column gap 4px' },
   {
     selector: '.findingHead',
     values: { gap: '6px' },
-    source:
-      'same value as apps/novel-forge-web/src/features/chapter-workspace/ChecksPanel.module.css .findingHead (gap 6px, itself canvas Chapter.dc.html l.165) — reused for this ref+chip row',
+    source: 'same value as apps/novel-forge-web/src/features/chapter-workspace/ChecksPanel.module.css .findingHead (gap 6px, itself a design value) — reused for this ref+chip row',
   },
   {
     selector: '.findingText',
@@ -59,20 +58,18 @@ const AUDIT_DIALOG: Expected[] = [
   {
     selector: '.evidence',
     values: { gap: '4px', margin: '0', padding: '0' },
-    source: 'gap: canvas l.85 same text column, reused for the stacked evidence quotes; margin/padding 0: list reset, not a design value',
+    source: 'gap: the design’s text column, reused for the stacked evidence quotes; margin/padding 0: list reset, not a design value',
   },
   { selector: '.withheld', values: { margin: '0' }, source: 'paragraph margin reset; spacing comes from the findingMain column gap' },
   {
     selector: '.decision',
     values: { gap: '8px' },
-    source:
-      'same value as ChecksPanel.module.css .runRow (gap 8px, canvas Chapter.dc.html l.181 — a control next to its own field); ui-spacing-reference.md rule 6 (8px between controls)',
+    source: 'same value as ChecksPanel.module.css .runRow (gap 8px, a design value — a control next to its own field); gap ladder (8px between controls)',
   },
   {
     selector: '.historyBody',
     values: { gap: '14px' },
-    source:
-      'same value as ChecksDrawer.module.css .panel (gap 14px, canvas Chapter.dc.html l.144 aside body) — a Drawer body flex column; ui-spacing-reference.md rule 9 (Drawer body gap 14–16)',
+    source: 'same value as ChecksDrawer.module.css .panel (gap 14px, the design’s aside body) — a Drawer body flex column; dialog-body rule (Drawer body gap 14–16)',
   },
   {
     selector: '.historyList',
@@ -88,7 +85,7 @@ const AUDIT_DIALOG: Expected[] = [
   {
     selector: '.historyMeta',
     values: { gap: '6px' },
-    source: 'ui-spacing-reference.md rule 6 (6px chips) — the relative-time label next to its status chips',
+    source: 'gap ladder (6px chips) — the relative-time label next to its status chips',
   },
 ];
 
@@ -97,7 +94,7 @@ function uncited(file: string, table: Expected[]): string[] {
 }
 
 describe('Bible audit spacing', () => {
-  it('should keep every spacing value equal to the value its cited source uses, so drift from the canvas or today’s screens fails here', () => {
+  it('should keep every spacing value equal to the value its cited source uses, so drift from the design or today’s screens fails here', () => {
     const rules = spacingOf('AuditDialog.module.css');
     for (const expected of AUDIT_DIALOG)
       expect({ selector: expected.selector, values: rules.get(expected.selector) }).toEqual({ selector: expected.selector, values: expected.values });

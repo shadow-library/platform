@@ -67,7 +67,9 @@ export function Cookie(): ParameterDecorator {
 }
 
 export const Request = (): ParameterDecorator => HttpInput(RouteInputType.REQUEST);
+/** @alias */
 export const Req = Request;
 
 export const Response = (): ParameterDecorator => HttpInput(RouteInputType.RESPONSE);
+/** @alias */
 export const Res = Response;

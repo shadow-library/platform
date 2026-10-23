@@ -2,7 +2,7 @@ import { Field, Schema } from '@shadow-library/class-schema';
 
 @Schema()
 export class OcrParseDto {
-  @Field({ minLength: 1, maxLength: 8000, description: 'On-device-extracted receipt text (ARCHITECTURE §14.3 step 1); the server never sees the receipt image itself' })
+  @Field({ minLength: 1, maxLength: 8000, description: 'On-device-extracted receipt text; the server never sees the receipt image itself' })
   extractedText: string;
 }
 

@@ -732,7 +732,7 @@ describe('Prompt modules', () => {
     });
   });
 
-  describe('ContinuitySchema (P1-05 characterStates/knowledgeChanges)', () => {
+  describe('ContinuitySchema characterStates/knowledgeChanges', () => {
     const base = {
       appeared: ['amara'],
       newEntities: [],

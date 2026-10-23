@@ -26,13 +26,6 @@ export interface GlobalProvider {
   readonly isActive: boolean;
 }
 
-/** Identity's stored endpoints for a provider — what discovery resolved, and what a spec may re-point. */
-export interface ProviderEndpoints {
-  readonly authorizationEndpoint: string;
-  readonly tokenEndpoint: string;
-  readonly jwksUri: string;
-}
-
 export interface GlobalProviderSnapshot {
   readonly id: string;
   readonly isActive: boolean;
@@ -85,14 +78,6 @@ export async function listGlobalProviders(): Promise<GlobalProvider[]> {
     SELECT id::text, kind, issuer, client_id AS "clientId", allow_sign_up AS "allowSignUp", is_active AS "isActive"
     FROM identity_providers WHERE organisation_id IS NULL ORDER BY kind
   `;
-}
-
-export async function readProviderEndpoints(providerId: string): Promise<ProviderEndpoints> {
-  const [row] = await identityDb()<ProviderEndpoints[]>`
-    SELECT authorization_endpoint AS "authorizationEndpoint", token_endpoint AS "tokenEndpoint", jwks_uri AS "jwksUri" FROM identity_providers WHERE id = ${providerId}
-  `;
-  if (!row) throw new IdentityProviderError(`no identity provider ${providerId}`);
-  return row;
 }
 
 export interface ProviderSecretStorage {

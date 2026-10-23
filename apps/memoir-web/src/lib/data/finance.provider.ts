@@ -765,13 +765,3 @@ export class FixtureFinanceProvider implements FinanceProvider {
     return applyFinanceCommand(this.state, command);
   }
 }
-
-let provider: FinanceProvider = new FixtureFinanceProvider();
-
-export function setFinanceProvider(next: FinanceProvider): void {
-  provider = next;
-}
-
-export function getFinanceProvider(): FinanceProvider {
-  return provider;
-}

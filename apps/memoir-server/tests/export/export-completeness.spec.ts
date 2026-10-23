@@ -10,7 +10,7 @@ import { EXPORT_TABLE_EXCLUSIONS, EXPORT_TABLE_REGISTRY } from '@server/modules/
  * Every table in the schema barrel must be in `EXPORT_TABLE_REGISTRY` or explicitly excluded in `EXPORT_TABLE_EXCLUSIONS`, so a new user-owned
  * table not wired in fails here instead of silently shipping an incomplete export.
  */
-describe('Export table registry completeness (T-29)', () => {
+describe('Export table registry completeness', () => {
   it('should account for every table in the schema barrel', () => {
     const schemaTableNames = Object.values(schema)
       .filter(value => is(value, PgTable))

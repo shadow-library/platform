@@ -391,14 +391,14 @@ const PROMISE_CASES: Case[] = [
   },
   {
     // A plain, already-stated key ('ledger') needs no key-laundering exemption: the label's own words are already in the author's message.
-    name: 'P4-41 probe: a plain key like "ledger" still applies once its label is otherwise stated',
+    name: 'a plain key like "ledger" still applies once its label is otherwise stated',
     op: { op: 'promise.create', kind: 'thread', key: 'ledger', label: 'Who took the ledger', quote: 'Mira swore to find who took the ledger' },
     message: PROMISE_MESSAGE,
     expected: { side: 'direct', source: 'quoted' },
   },
   {
     // A long descriptive key's own words count against the novelty budget on create, so a model cannot smuggle an unstated secret into the key and repeat it in the label.
-    name: 'P4-41 probe: a long descriptive key no longer launders its words into the label on create',
+    name: 'a long descriptive key no longer launders its words into the label on create',
     op: {
       op: 'promise.create',
       kind: 'thread',

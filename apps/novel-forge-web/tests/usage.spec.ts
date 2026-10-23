@@ -55,7 +55,7 @@ describe('formatUsd', () => {
 });
 
 describe('formatCompactTokens', () => {
-  it('should compact thousands and millions the way the canvas reads them', () => {
+  it('should compact thousands and millions the way the design reads them', () => {
     expect(formatCompactTokens(950)).toBe('950');
     expect(formatCompactTokens(14_200)).toBe('14.2k');
     expect(formatCompactTokens(96_000)).toBe('96k');

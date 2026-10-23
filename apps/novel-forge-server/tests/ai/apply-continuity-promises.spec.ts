@@ -57,7 +57,7 @@ function fakeTx(seed: { plotThreads?: Row[]; mysteries?: Row[] } = {}) {
   return { tx, rows, locked };
 }
 
-describe('applyContinuityDelta — a dropped or dormant-on-purpose promise outranks extraction (P4-41)', () => {
+describe('applyContinuityDelta — a dropped or dormant-on-purpose promise outranks extraction', () => {
   it('should lock each thread and mystery row before reading its status, so a concurrent drop cannot be overwritten', async () => {
     const { tx, locked } = fakeTx();
 

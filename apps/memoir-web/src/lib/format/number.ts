@@ -15,16 +15,6 @@ export function formatCount(count: number, singular: string, plural: string, loc
   return `${count.toLocaleString(locale)} ${count === 1 ? singular : plural}`;
 }
 
-export interface CompactMoneyOptions {
-  locale?: string;
-}
-
-/** A rounded, tight-space amount ("€1.2K"); an exact total still belongs to `formatMinor`. */
-export function formatCompactMoney(amountMinor: number, currency: string, options: CompactMoneyOptions = {}): string {
-  const major = amountMinor / 100;
-  return new Intl.NumberFormat(options.locale ?? DEFAULT_LOCALE, { style: 'currency', currency, notation: 'compact', maximumFractionDigits: 1 }).format(major);
-}
-
 const MONEY_STAT_COMPACT_ABOVE_CHARACTERS = 12;
 
 export interface MoneyStatFormatOptions {

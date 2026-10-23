@@ -3,7 +3,7 @@ import { describe, expect, it } from 'bun:test';
 import { isRetiredScreen, PROJECT_SCREENS, projectHomeRoute, SCREEN_LABEL, topBarCrumbs } from '../src/components/Layout/screens';
 
 describe('PROJECT_SCREENS', () => {
-  it('should list the sidebar in the canvas order, chat first (Main.dc.html l.52-62)', () => {
+  it('should list the sidebar in the design order, chat first', () => {
     expect(PROJECT_SCREENS.map(screen => screen.segment)).toEqual(['chat', 'overview', 'story-bible', 'chapters', 'illustrations', 'runs', 'publish', 'usage', 'settings']);
   });
 
@@ -58,7 +58,7 @@ describe('SCREEN_LABEL', () => {
 });
 
 describe('topBarCrumbs', () => {
-  it('should read the novel and the screen inside a project, as “The Tide Ledger / Chat” (Main.dc.html l.68)', () => {
+  it('should read the novel and the screen inside a project, as “The Tide Ledger / Chat”', () => {
     expect(topBarCrumbs({ pathname: '/novels/288/chat', inProject: true, projectName: 'The Tide Ledger' })).toEqual({ root: 'The Tide Ledger', leaf: 'Chat' });
   });
 

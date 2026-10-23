@@ -4,4 +4,5 @@ type PublicDecorator = ClassDecorator & MethodDecorator;
 
 export const PUBLIC_ROUTE_METADATA = 'pulsePublic';
 
+/** @public The default-deny sentinel's opt-out, kept for the first route that must be reachable without a session. */
 export const Public = (): PublicDecorator => Handler({ [PUBLIC_ROUTE_METADATA]: true });

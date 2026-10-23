@@ -13,5 +13,6 @@ export * from './wiki.api';
 /**
  * `types.ts` shares `NovelSummary` and `ChapterListResponse` with `api-types.gen.ts`, so the star exports collide; explicit re-exports win the ambiguity.
  * The UI builds on the client model; generated wire shapes are used only inside the api modules, aliased to `Server*`.
+ * @public
  */
 export type { ChapterListResponse, NovelSummary } from './types';

@@ -152,7 +152,7 @@ describe('PlanCard', () => {
     expect(html).toContain('The Writer’s view shows exactly what was sent.');
   });
 
-  it('should offer Write, Ask for changes and Discard on a pending plan, with the canvas hint', () => {
+  it('should offer Write, Ask for changes and Discard on a pending plan, with the design’s hint', () => {
     const html = card();
     expect(html).toContain('Write chapter 4');
     expect(html).toContain('Usually a few minutes — you can leave');

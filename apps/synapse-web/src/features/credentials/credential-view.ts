@@ -12,7 +12,6 @@ const WHITESPACE = /\s/;
 const HTTP_PROTOCOLS = ['http:', 'https:'];
 const HIDDEN_HINT = '…';
 
-export type CredentialTestCode = NonNullable<CredentialTestResponse['code']>;
 export type CreateField = keyof CreateCredentialBody;
 export type FieldErrors = Partial<Record<CreateField, string>>;
 

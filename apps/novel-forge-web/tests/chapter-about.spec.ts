@@ -33,7 +33,7 @@ describe('whoAppears', () => {
 });
 
 describe('aboutSections', () => {
-  it('should group the Story Bible updates as the canvas does, skipping what the author skipped', () => {
+  it('should group the Story Bible updates as the design does, skipping what the author skipped', () => {
     const sections = aboutSections({
       consequential: [item({ id: 'k', category: 'knowledge', claim: 'Tamsin learns the Rook line is empty.' })],
       routine: [

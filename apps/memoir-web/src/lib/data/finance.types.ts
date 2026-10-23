@@ -32,8 +32,6 @@ export const CURRENCIES: Record<CurrencyCode, CurrencyMeta> = {
   BRL: { code: 'BRL', label: 'Brazilian real', symbol: 'R$', exponent: 2 },
 };
 
-export const SUPPORTED_CURRENCIES = Object.keys(CURRENCIES) as CurrencyCode[];
-
 export type ExpenseCategoryId = 'food' | 'groceries' | 'transport' | 'bills' | 'health' | 'shopping' | 'home' | 'subs' | 'uncat';
 
 export type CategoryTone = 'accent' | 'success' | 'warning' | 'neutral';

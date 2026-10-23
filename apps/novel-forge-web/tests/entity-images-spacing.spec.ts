@@ -56,9 +56,9 @@ const NEW_RULES: Expected[] = [
   {
     selector: '.dateField',
     values: { gap: '8px', padding: '8px', 'border-radius': 'var(--sh-radius-md)' },
-    source: 'ReferenceImages.module.css .row padding 8px, radius md; reference rule 6 (8px between controls)',
+    source: 'ReferenceImages.module.css .row padding 8px, radius md; gap ladder (8px between controls)',
   },
-  { selector: '.futureRow', values: { gap: '8px' }, source: 'ReferenceImages.module.css .rowControls/.actions gap 8px; reference rule 6 (8px between controls)' },
+  { selector: '.futureRow', values: { gap: '8px' }, source: 'ReferenceImages.module.css .rowControls/.actions gap 8px; gap ladder (8px between controls)' },
   { selector: '.futureInput', values: { width: '120px' }, source: 'ReferenceImages.module.css .roleSelect width 120px' },
 ];
 
@@ -70,7 +70,7 @@ function uncited(file: string, table: Expected[]): string[] {
 }
 
 describe('Entity images spacing — new rules', () => {
-  it('should keep every spacing value equal to the value its cited source uses, so drift from the canvas or today’s screens fails here', () => {
+  it('should keep every spacing value equal to the value its cited source uses, so drift from the design or today’s screens fails here', () => {
     const rules = spacingOf('../src/features/illustrations/EntityImages.module.css');
     for (const expected of NEW_RULES)
       expect({ selector: expected.selector, values: rules.get(expected.selector) }).toEqual({ selector: expected.selector, values: expected.values });

@@ -71,6 +71,27 @@ const noSectionBanner: Rule.RuleModule = {
   },
 };
 
+const DANGLING_REFERENCE = /scratch-pad\/|PRD §|ADR-\d+|\bT-\d{2,}\b|\(D\d{2,}\)|\bD-\d{1,3}\b|\bP\d-\d+\b/;
+
+const noDanglingReference: Rule.RuleModule = {
+  meta: {
+    type: 'problem',
+    schema: [],
+    messages: { reference: 'Comment cites "{{reference}}", which lives outside the repository; state the rule itself instead.' },
+  },
+  create(context) {
+    const { sourceCode } = context;
+    return {
+      Program() {
+        for (const comment of sourceCode.getAllComments()) {
+          const reference = DANGLING_REFERENCE.exec(comment.value)?.[0];
+          if (reference) context.report({ loc: comment.loc as AST.SourceLocation, messageId: 'reference', data: { reference } });
+        }
+      },
+    };
+  },
+};
+
 // Never `'detect'`: the plugin's auto-detection calls `context.getFilename()`, removed in ESLint 9+, so it throws under ESLint 10.
 const DEFAULT_REACT_VERSION = '19.2';
 
@@ -157,8 +178,12 @@ export default defineConfig([
   ...reactLayer(DEFAULT_REACT_VERSION, WEB_APP_SCOPE),
   { files: [`${WEB_APP_SCOPE}/${SOURCE_FILES}`], languageOptions: { globals: globals.browser } },
 
-  // Section banners are noise; the autofix deletes them.
-  { files: ['**/*.{ts,tsx}'], plugins: { local: { rules: { 'no-section-banner': noSectionBanner } } }, rules: { 'local/no-section-banner': 'error' } },
+  // Section banners are noise (autofixed away); a citation of a document outside the repository leaves the reader nothing to follow.
+  {
+    files: ['**/*.{ts,tsx}'],
+    plugins: { local: { rules: { 'no-section-banner': noSectionBanner, 'no-dangling-reference': noDanglingReference } } },
+    rules: { 'local/no-section-banner': 'error', 'local/no-dangling-reference': 'error' },
+  },
 
   // `common/crypto` runs on `node:crypto` and handles master keys, so it must not reach a client bundle.
   {

@@ -11,12 +11,12 @@ const typeLevelProof: EnqueueCategoryParam extends NotificationCategory ? (Notif
  * The category registry is the complete allow-list and exactly the three template keys, so a forbidden category (re-engagement, "we miss you",
  * streak-loss framing) has no code path to attach to.
  */
-describe('Notification category registry (T-34, structural)', () => {
-  it('should contain exactly the three PRD-allowed categories, no more, no fewer', () => {
+describe('Notification category registry (structural)', () => {
+  it('should contain exactly the three allowed categories, no more, no fewer', () => {
     expect(Object.keys(NOTIFICATION_CATEGORIES).sort()).toEqual(['aiResultReady', 'billingReminder', 'weeklyDigest']);
   });
 
-  it("should map each category to exactly one of T-05's real pulse template keys", () => {
+  it("should map each category to exactly one of pulse's real memoir template keys", () => {
     const templateKeys = Object.values(NOTIFICATION_CATEGORIES).map(definition => definition.templateKey);
     expect(templateKeys.sort()).toEqual(['memoir-ai-result-ready', 'memoir-billing-reminder', 'memoir-weekly-digest']);
   });

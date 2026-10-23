@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 
 import { toStructuringResult } from '@modules/ocr';
 
-describe('Receipt structuring result mapping (ARCHITECTURE §14.3 step 2)', () => {
+describe('Receipt structuring result mapping', () => {
   it('should map a well-formed model response onto the structuring result', () => {
     const result = toStructuringResult({
       amount: '24.90',

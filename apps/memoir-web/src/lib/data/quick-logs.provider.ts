@@ -569,14 +569,4 @@ function metricMeta(entry: HealthMetricEntry): string {
   return entry.replacedValue === null ? `Today · logged ${when}` : `Today · logged ${when} · replaced ${entry.replacedValue}`;
 }
 
-let provider: QuickLogProvider = new FixtureQuickLogProvider();
-
-export function setQuickLogProvider(next: QuickLogProvider): void {
-  provider = next;
-}
-
-export function getQuickLogProvider(): QuickLogProvider {
-  return provider;
-}
-
 export { today as todayISODate };

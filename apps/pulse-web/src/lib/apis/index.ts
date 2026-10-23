@@ -10,5 +10,8 @@ export * from './session.api';
 export * from './studio.types';
 export * from './template.api';
 
-// Explicit re-exports win over the ambiguous star exports: studio.types.ts narrows `variableSchema`, which the generated types widen to a loose record.
+/**
+ * Explicit re-exports win over the ambiguous star exports (TS2308): studio.types.ts narrows `variableSchema`, which the generated types widen to a loose record.
+ * @public
+ */
 export type { CreateTemplateBody, ListTemplateResponse, TemplateDetailResponse, TemplateResponse, UpdateTemplateBody } from './studio.types';

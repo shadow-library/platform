@@ -22,7 +22,10 @@ export class ServiceDiscoveryService {
     return this.env('SERVICE_DISCOVERY_SCHEME') ?? DEFAULT_SCHEME;
   }
 
-  /** Base address without a trailing slash; `pulse-server` reads `SERVICE_URL_PULSE_SERVER` (dots and dashes become underscores). A `scheme://` override is used verbatim. */
+  /**
+   * Base address without a trailing slash; `pulse-server` reads `SERVICE_URL_PULSE_SERVER` (dots and dashes become underscores).
+   * A `scheme://` override is used verbatim; otherwise `SERVICE_DISCOVERY_SCHEME` (default `http`) supplies the scheme, as it does for the in-cluster host.
+   */
   getUrl(service: string): string {
     if (!SERVICE_NAME_PATTERN.test(service)) throw ErrorCode.SERVICE_UNKNOWN.create({ reason: `'${service}' is not a valid service name` });
 

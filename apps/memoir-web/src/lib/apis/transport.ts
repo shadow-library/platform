@@ -15,5 +15,4 @@ export const apiClient = createApiClient({
 
 export const APIRequest = apiClient.api;
 
-export { ApiError, isApiError } from '@shadow-library/web';
-export type { ApiFailure, ApiResult, ErrorField, ErrorResponse, QueryParams } from '@shadow-library/web';
+export { isApiError } from '@shadow-library/web';

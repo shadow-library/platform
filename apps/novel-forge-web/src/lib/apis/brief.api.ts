@@ -1,6 +1,6 @@
-import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryOptions, type UseQueryResult } from '@tanstack/react-query';
+import { queryOptions, useQuery, type UseQueryOptions, type UseQueryResult } from '@tanstack/react-query';
 
-import { type BriefResponse, type ListBriefSummaryResponse, type UpdateBriefBody } from './api-types.gen';
+import { type BriefResponse, type ListBriefSummaryResponse } from './api-types.gen';
 import { ApiError, APIRequest } from './transport';
 
 const briefKeys = {
@@ -23,17 +23,5 @@ export function useBriefQuery(projectId: string, n: number | undefined, enabled 
     queryKey: briefKeys.detail(projectId, n ?? -1),
     queryFn: () => APIRequest.get(`/projects/${projectId}/briefs/${n}`).execute(),
     enabled: enabled && Boolean(projectId) && n !== undefined,
-  });
-}
-
-export function useUpdateBriefMutation(projectId: string, n: number): UseMutationResult<BriefResponse, ApiError, UpdateBriefBody> {
-  const queryClient = useQueryClient();
-  return useMutation<BriefResponse, ApiError, UpdateBriefBody>({
-    mutationFn: data => APIRequest.put(`/projects/${projectId}/briefs/${n}`).body(data).execute(),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: briefKeys.detail(projectId, n) });
-      queryClient.invalidateQueries({ queryKey: briefKeys.list(projectId) });
-      queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'drafts', 'rows'] });
-    },
   });
 }

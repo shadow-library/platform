@@ -50,7 +50,7 @@ describe('command-wire fixtures (FE-4)', () => {
   }
 });
 
-describe('quest log undo (P2-02)', () => {
+describe('quest log undo', () => {
   it('should send quest.deleteLog to the server with only its occurrence id', () => {
     const command: SyncCommand = { type: 'quest.deleteLog', occurrenceId: '42:2026-09-14' };
 
@@ -149,7 +149,7 @@ describe('threshold offers (P3-01c)', () => {
   });
 });
 
-describe('progression contract (P1-17)', () => {
+describe('progression contract', () => {
   const ACCOUNT = {
     level: 5,
     totalXp: '1703',
@@ -215,7 +215,7 @@ describe('progression contract (P1-17)', () => {
   });
 });
 
-describe('category archive (P1-18)', () => {
+describe('category archive', () => {
   const HOME = { id: '7', key: 'home', label: 'Home', builtin: true };
 
   function page(cursor: string, domains: DeltaPage['domains']): DeltaPage {
@@ -249,7 +249,7 @@ describe('category archive (P1-18)', () => {
   });
 });
 
-describe('monthly budget contract (P1-18)', () => {
+describe('monthly budget contract', () => {
   it('should project the budget, home currency and enabled currencies from the account row', () => {
     const { settings } = projectFinanceRows({ account: [{ defaultCurrency: 'NOK', enabledCurrencies: ['EUR', 'NOK', 'XXX'], weekStart: 0, monthlyBudgetMinor: '160000' }] });
 
@@ -258,7 +258,7 @@ describe('monthly budget contract (P1-18)', () => {
   });
 });
 
-describe('expense audit contract (P1-19)', () => {
+describe('expense audit contract', () => {
   const EXPENSE_ID = '0192f1a2-7b3c-7d4e-8f50-1a2b3c4d5e6f';
   const EXPENSE = { id: EXPENSE_ID, amountMinor: '520', amountText: '5.20', currency: 'EUR', categoryId: 'transport', occurredOn: '2026-08-24', note: null, merchant: null };
 

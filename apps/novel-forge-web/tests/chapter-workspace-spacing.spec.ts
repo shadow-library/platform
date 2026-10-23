@@ -34,30 +34,30 @@ function check(path: string, table: Expected[]): void {
 }
 
 const DETAILS: Expected[] = [
-  { selector: '.panel', values: { 'border-radius': '0' }, source: 'canvas l.140 aside is border-left only; reference SidePanel “next to a transcript: border-left only”' },
-  { selector: '.tab', values: { gap: '14px' }, source: 'canvas l.144 aside body gap 14px' },
-  { selector: '.section', values: { gap: '6px' }, source: 'canvas l.146, l.151–153, l.187, l.197 sections gap 6px' },
-  { selector: '.people', values: { gap: '8px' }, source: 'canvas l.147 Who appears gap 8px' },
-  { selector: '.person', values: { gap: '10px' }, source: 'canvas l.148 avatar row gap 10px' },
-  { selector: '.avatar', values: { width: '32px', height: '32px', 'border-radius': 'var(--sh-radius-full)' }, source: 'canvas l.148 avatar 32×32, radius 9999px' },
-  { selector: '.hint', values: { padding: '10px 12px', 'border-radius': 'var(--sh-radius-lg)' }, source: 'canvas l.154 suggestions note padding 10px 12px, radius 8px' },
-  { selector: '.keptBack', values: { gap: '6px', padding: '10px 12px', 'border-radius': 'var(--sh-radius-lg)' }, source: 'canvas l.190 Kept from the writer box' },
+  { selector: '.panel', values: { 'border-radius': '0' }, source: 'design: aside is border-left only; SidePanel “next to a transcript: border-left only”' },
+  { selector: '.tab', values: { gap: '14px' }, source: 'design: aside body gap 14px' },
+  { selector: '.section', values: { gap: '6px' }, source: 'design: sections gap 6px' },
+  { selector: '.people', values: { gap: '8px' }, source: 'design: Who appears gap 8px' },
+  { selector: '.person', values: { gap: '10px' }, source: 'design: avatar row gap 10px' },
+  { selector: '.avatar', values: { width: '32px', height: '32px', 'border-radius': 'var(--sh-radius-full)' }, source: 'design: avatar 32×32, radius 9999px' },
+  { selector: '.hint', values: { padding: '10px 12px', 'border-radius': 'var(--sh-radius-lg)' }, source: 'design: suggestions note padding 10px 12px, radius 8px' },
+  { selector: '.keptBack', values: { gap: '6px', padding: '10px 12px', 'border-radius': 'var(--sh-radius-lg)' }, source: 'design: Kept from the writer box' },
   {
     selector: '.message',
     values: { gap: '6px', padding: '10px 12px', 'border-radius': 'var(--sh-radius-lg)' },
-    source: 'canvas l.164 finding card: the Review tab’s card, reused for each message sent',
+    source: 'design: finding card: the Review tab’s card, reused for each message sent',
   },
   { selector: '.messageBody', values: { margin: '0' }, source: 'pre reset; spacing comes from the card gap' },
-  { selector: '.version', values: { gap: '4px', padding: '10px 12px', 'border-radius': 'var(--sh-radius-lg)' }, source: 'canvas l.207 version card' },
-  { selector: '.versionHead', values: { gap: '8px' }, source: 'canvas l.208 version head gap 8px' },
-  { selector: '.badge', values: { 'margin-left': 'auto' }, source: 'canvas l.208 “Current” margin-left auto' },
-  { selector: '.versionActions', values: { gap: '8px' }, source: 'canvas l.210 version actions gap 8px' },
-  { selector: '.compare', values: { gap: '14px' }, source: 'reference rule 9: Dialog body flex column gap 14–16' },
-  { selector: '.compareBar', values: { gap: '8px' }, source: 'reference rule 6: 8px between controls' },
-  { selector: '.diff', values: { gap: '12px' }, source: 'reference rule 6: 12px inside cards' },
+  { selector: '.version', values: { gap: '4px', padding: '10px 12px', 'border-radius': 'var(--sh-radius-lg)' }, source: 'design: version card' },
+  { selector: '.versionHead', values: { gap: '8px' }, source: 'design: version head gap 8px' },
+  { selector: '.badge', values: { 'margin-left': 'auto' }, source: 'design: “Current” margin-left auto' },
+  { selector: '.versionActions', values: { gap: '8px' }, source: 'design: version actions gap 8px' },
+  { selector: '.compare', values: { gap: '14px' }, source: 'dialog-body rule: Dialog body flex column gap 14–16' },
+  { selector: '.compareBar', values: { gap: '8px' }, source: 'gap ladder: 8px between controls' },
+  { selector: '.diff', values: { gap: '12px' }, source: 'gap ladder: 12px inside cards' },
   { selector: '.paragraph', values: { margin: '0' }, source: 'paragraph reset; spacing comes from the diff gap' },
-  { selector: '.paragraph ins', values: { 'border-radius': 'var(--sh-radius-sm)' }, source: 'canvas l.91 rewritten passage highlight radius 3px → radius-sm' },
-  { selector: '.paragraph del', values: { 'border-radius': 'var(--sh-radius-sm)' }, source: 'canvas l.91 rewritten passage highlight radius 3px → radius-sm' },
+  { selector: '.paragraph ins', values: { 'border-radius': 'var(--sh-radius-sm)' }, source: 'design: rewritten passage highlight radius 3px → radius-sm' },
+  { selector: '.paragraph del', values: { 'border-radius': 'var(--sh-radius-sm)' }, source: 'design: rewritten passage highlight radius 3px → radius-sm' },
 ];
 
 function declarationsOf(css: string, selector: string): Record<string, string> | undefined {
@@ -109,7 +109,7 @@ describe('Chapter workspace layout', () => {
 });
 
 describe('Chapter workspace spacing', () => {
-  it('should keep the details panel on the canvas values, with nothing uncited', () => {
+  it('should keep the details panel on the design values, with nothing uncited', () => {
     check('features/chapter-workspace/ChapterDetails.module.css', DETAILS);
   });
 });

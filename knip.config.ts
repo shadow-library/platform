@@ -1,4 +1,4 @@
-import { globSync } from 'node:fs';
+import { globSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { type KnipConfig } from 'knip';
@@ -28,9 +28,19 @@ const PACKAGE_ENTRIES: Record<string, string[]> = {
     'src/services/logger/index.ts',
     'src/classes/api-request.ts',
     'src/services/reflector.service.ts',
+    'src/crypto/index.ts',
+    'src/testing/index.ts',
   ],
   'packages/fastify': ['src/index.ts'],
-  'packages/modules': ['src/index.ts', 'src/bootstrap/index.ts', 'src/http-core/index.ts', 'src/database/index.ts', 'src/cache/index.ts', 'src/storage/index.ts'],
+  'packages/modules': [
+    'src/index.ts',
+    'src/bootstrap/index.ts',
+    'src/http-core/index.ts',
+    'src/database/index.ts',
+    'src/cache/index.ts',
+    'src/storage/index.ts',
+    'src/testing/index.ts',
+  ],
   'packages/sdk': ['src/index.ts', 'src/publishing/index.ts'],
   'packages/synapse': ['src/index.ts', 'src/langchain/index.ts'],
   'packages/ui': ['src/index.ts'],
@@ -50,6 +60,12 @@ const PACKAGE_ENTRIES: Record<string, string[]> = {
 const PACKAGE_IGNORED_DEPENDENCIES: Record<string, string[]> = {
   'packages/modules': ['fastify'],
 };
+
+// drizzle-kit loads this barrel by path, and drizzle's relational queries read the relations it exports through `import * as schema`.
+function drizzleSchemaEntry(dir: string): string {
+  const manifest = JSON.parse(readFileSync(resolve(ROOT, dir, 'package.json'), 'utf-8')) as { shadow?: { db?: { schema?: string } } };
+  return manifest.shadow?.db?.schema ?? 'src/database/schemas/index.ts';
+}
 
 const COLOCATED_TESTS = ['src/**/*.{test,spec}.{ts,tsx}'];
 
@@ -84,7 +100,7 @@ const config: KnipConfig = {
       workspaceDirs('apps', '-server').map(dir => [
         dir,
         {
-          entry: existing(dir, SERVER_ENTRIES),
+          entry: existing(dir, [...SERVER_ENTRIES, drizzleSchemaEntry(dir)]),
           project: existing(dir, ['src/**/*.ts', 'tests/**/*.ts']),
           ignoreDependencies: ['drizzle-kit'],
         },

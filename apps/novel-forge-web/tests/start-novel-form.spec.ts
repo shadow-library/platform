@@ -69,7 +69,7 @@ describe('StartNovelForm', () => {
     expect(html).toContain('placeholder="Untitled novel"');
   });
 
-  it('should mark the working name optional in the canvas’s words', () => {
+  it('should mark the working name optional in the design’s words', () => {
     const html = form();
     expect(html).toContain('Working name');
     expect(html).toContain('Optional — you can rename it any time.');
@@ -87,7 +87,7 @@ describe('StartNovelForm', () => {
     expect(form({ pending: true }).match(/readOnly=""/g)).toHaveLength(2);
   });
 
-  it('should not offer an import link that the canvas does not draw', () => {
+  it('should not offer an import link that the design does not draw', () => {
     expect(form()).not.toContain('/import');
   });
 });

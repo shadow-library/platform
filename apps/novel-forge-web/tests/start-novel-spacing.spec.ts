@@ -25,13 +25,13 @@ function spacingOf(file: string): Map<string, Record<string, string>> {
 }
 
 const DIALOG: Expected[] = [
-  { selector: '.form', values: { gap: '16px' }, source: 'canvas l.78 dialog form gap 16px; reference "New-novel modal" form gap 16 (today’s value kept)' },
+  { selector: '.form', values: { gap: '16px' }, source: 'design: dialog form gap 16px; the "New-novel modal" form gap 16 (today’s value kept)' },
   {
     selector: '.hint',
     values: { 'border-radius': 'var(--sh-radius-md)', padding: '12px' },
-    source: 'canvas l.88 hint padding 12px radius 6px; reference "New-novel modal" hint padding 12 (today’s value kept)',
+    source: 'design: hint padding 12px radius 6px; the "New-novel modal" hint padding 12 (today’s value kept)',
   },
-  { selector: '.hintRow', values: { gap: '8px' }, source: 'canvas l.88 hint gap 8px; today’s .hintRow gap 8 kept' },
+  { selector: '.hintRow', values: { gap: '8px' }, source: 'design: hint gap 8px; today’s .hintRow gap 8 kept' },
 ];
 
 function uncited(file: string, table: Expected[]): string[] {

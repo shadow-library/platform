@@ -6085,7 +6085,7 @@ export interface components {
       offset: number;
       items: components['schemas']['PromiseItemResponse'][];
     };
-    /** @description One thing the story owes the reader — a plot thread or a mystery — never the mystery's own truth fact (P4-38). */
+    /** @description One thing the story owes the reader — a plot thread or a mystery — never the mystery's own truth fact. */
     PromiseItemResponse: {
       kind: components['schemas']['PromiseKind'];
       /** @description The thread or mystery key. */

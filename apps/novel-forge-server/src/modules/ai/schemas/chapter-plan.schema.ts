@@ -77,7 +77,6 @@ export class ChapterPlanSchema {
 }
 
 export type ChapterPlanOutput = ChapterPlanSchema;
-export type ChapterPlanSceneOutput = ChapterPlanSceneSchema;
 
 export function chapterPlanIssues(plan: ChapterPlanOutput): string[] {
   const issues = (plan.readerValue ?? [])

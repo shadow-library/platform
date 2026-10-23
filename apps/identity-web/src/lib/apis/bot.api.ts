@@ -17,7 +17,6 @@ import {
   type BotCatalogApplicationItem,
   type BotCatalogLevelItem,
   type BotCatalogResourceItem,
-  type BotDeletionItem,
   type BotGrantBody,
   type BotGrantItem,
   type BotItem,
@@ -26,13 +25,10 @@ import {
   type BotOwnedRecordItem,
   type BotOwnershipApplicationItem,
   type BotOwnershipResponse,
-  type BotOwnershipTransferItem,
   type BotPermissionCatalogResponse,
   type BotPermissionsResponse,
   type BotsResponse,
-  type BotTransferRecipientItem,
   type BotTransferRetryResponse,
-  type BotUsageItem,
   type CreateBotBody,
   type CreateBotKeyBody,
   type CreatedBotKeyResponse,
@@ -52,7 +48,6 @@ export type {
   BotCatalogApplicationItem,
   BotCatalogLevelItem,
   BotCatalogResourceItem,
-  BotDeletionItem,
   BotGrantBody,
   BotGrantItem,
   BotItem,
@@ -61,22 +56,17 @@ export type {
   BotOwnedRecordItem,
   BotOwnershipApplicationItem,
   BotOwnershipResponse,
-  BotOwnershipTransferItem,
   BotPermissionCatalogResponse,
   BotPermissionsResponse,
   BotsResponse,
-  BotTransferRecipientItem,
   BotTransferRetryResponse,
-  BotUsageItem,
   CreateBotBody,
   CreateBotKeyBody,
   CreatedBotKeyResponse,
   DeleteBotBody,
-  ReplaceBotPermissionsBody,
   UpdateBotBody,
 };
 export type BotStatus = BotItem['status'];
-export type BotKeyStatus = BotKeyItem['status'];
 export type BotGrantLevel = BotGrantBody['level'];
 export type BotActivityAction = NonNullable<ListActivityQueryParams['action']>;
 export type BotActivityOutcome = NonNullable<ListActivityQueryParams['outcome']>;

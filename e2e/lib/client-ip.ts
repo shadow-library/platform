@@ -12,7 +12,7 @@ import { clearIpState } from './redis';
  * Addresses come from 198.18.0.0/15 (RFC 2544 benchmarking): never routed, and outside every trusted proxy range, where they would be skipped as a hop.
  */
 
-export const FORWARDED_FOR_HEADER = 'x-forwarded-for';
+const FORWARDED_FOR_HEADER = 'x-forwarded-for';
 
 /** A random address in 198.18.0.0/15; host octets 0 and 255 are avoided so no tool reads it as a network or broadcast address. */
 export function uniqueClientIp(): string {

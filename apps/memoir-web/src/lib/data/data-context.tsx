@@ -4,11 +4,11 @@ import { toISODate } from '@shadow-library/ui';
 
 import { type AccountProvider, createAccountProvider } from './account.provider';
 import { type DataProvider } from './data-provider';
-import { type FinanceProvider, FixtureFinanceProvider, setFinanceProvider } from './finance.provider';
+import { type FinanceProvider, FixtureFinanceProvider } from './finance.provider';
 import { createFixtureProvider, type FixtureProviderOptions } from './fixture-provider';
 import { type Persona, seed } from './fixtures';
 import { createHeroProvider, type HeroProvider } from './hero.provider';
-import { FixtureQuickLogProvider, type QuickLogProvider, setQuickLogProvider, setTodaySource } from './quick-logs.provider';
+import { FixtureQuickLogProvider, type QuickLogProvider, setTodaySource } from './quick-logs.provider';
 import { createReflectProvider, type ReflectProvider } from './reflect.provider';
 
 export interface MemoirData {
@@ -31,14 +31,12 @@ export function memoirQueryClient(): QueryClient {
   return new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 0, networkMode: 'always' }, mutations: { networkMode: 'always' } } });
 }
 
-/** Finance and quick logs are reached through module-level singletons, so composing a `MemoirData` also installs them; building fixture data restores the fixture providers. */
+/** Quick logs read "today" through a module-level source, so building fixture data resets it to the browser's day. */
 export function createMemoirData(options: FixtureProviderOptions = {}): MemoirData {
   const today = options.today ?? toISODate(new Date());
   const persona = options.persona ?? 'active';
   const finance = new FixtureFinanceProvider();
   const quickLogs = new FixtureQuickLogProvider();
-  setFinanceProvider(finance);
-  setQuickLogProvider(quickLogs);
   setTodaySource();
 
   return {

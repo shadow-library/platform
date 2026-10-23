@@ -34,6 +34,7 @@ export interface StringFieldSchema extends BaseFieldSchema<string> {
 
   pattern?: string;
 
+  /** JSON Schema string format, e.g. `date`, `email` */
   format?: string;
 }
 

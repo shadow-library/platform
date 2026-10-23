@@ -37,10 +37,10 @@ function assertCalmContent(...fragments: (string | null | undefined)[]): void {
   for (const phrase of FORBIDDEN_PHRASES) expect(lowered).not.toContain(phrase);
 }
 
-describe('Memoir notification templates (T-05, static source scan)', () => {
+describe('Memoir notification templates (static source scan)', () => {
   const memoirTemplates = BASELINE_TEMPLATES.filter(t => t.templateKey.startsWith('memoir-'));
 
-  it('should define exactly the three ARCHITECTURE §17 memoir EMAIL templates', () => {
+  it('should define exactly the three memoir EMAIL templates', () => {
     expect(memoirTemplates.map(t => t.templateKey).sort()).toStrictEqual(['memoir-ai-result-ready', 'memoir-billing-reminder', 'memoir-weekly-digest']);
   });
 

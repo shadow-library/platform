@@ -26,8 +26,6 @@ export interface UnlockLookup {
   status: 'loading' | 'error' | 'ready';
 }
 
-export type SecretFact = Pick<FactResponse, 'knowledge' | 'unlock' | 'revealChapter' | 'plannedChapter' | 'disclosedInChapter' | 'allowedClues' | 'writerNote'>;
-
 export const TERM_INTENT: Record<TermState, ChipIntent> = { reached: 'success', planned: 'accent', open: 'neutral', unknown: 'neutral' };
 
 function milestoneRow(key: string, milestones: UnlockLookup['milestones']): UnlockTermRow {

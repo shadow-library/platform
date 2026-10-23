@@ -16,17 +16,6 @@ export const TOPIC_LABEL: Record<BibleTopic, string> = {
   author: 'Author-only',
 };
 
-export const TOPIC_SHORT_LABEL: Record<BibleTopic, string> = {
-  core: 'Core',
-  people: 'People',
-  factions: 'Factions',
-  places: 'Places',
-  power: 'Power',
-  lore: 'Lore',
-  objects: 'Objects',
-  author: 'Author-only',
-};
-
 export const TOPIC_DESCRIPTION: Record<BibleTopic, string> = {
   core: 'The premise, the plot and the plan the whole story runs on.',
   people: 'The cast, the groups they move in, and the guides about them.',

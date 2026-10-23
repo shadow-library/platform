@@ -4,8 +4,6 @@ import { isWriterExcludedBibleDoc } from '../ai/context/bible-docs';
 import { type ChangeOp, type ContentOp, declaredOpFields, isActionOp, opFields } from './change-set';
 import { normaliseForQuote } from './write-policy';
 
-export const IDEA_ID_PATTERN = /^[0-9a-f]{24}$/;
-
 const LABEL_MAX_CHARS = 240;
 
 function canonical(value: unknown): unknown {
