@@ -6,7 +6,7 @@ import { APP_NAME } from '@server/constants';
 import { Auth } from '@server/modules/access';
 import { FederatedCallbackBody, FederatedCallbackQuery, FederationError, IdentityProviderService, UpstreamOidcService } from '@server/modules/auth/federation';
 
-import { AuthFlowService } from './auth-flow.service';
+import { AuthFlowService, sanitizeReturnTo } from './auth-flow.service';
 import { FederatedStepUpService } from './federated-step-up.service';
 import { LoginService } from './login.service';
 
@@ -14,6 +14,7 @@ import { LoginService } from './login.service';
 export class FederatedController {
   private readonly logger = Logger.getLogger(APP_NAME, FederatedController.name);
   private readonly loginUrl = Config.get('oauth.login-url');
+  private readonly issuer = Config.get('oauth.issuer');
 
   constructor(
     private readonly authFlowService: AuthFlowService,
@@ -43,12 +44,14 @@ export class FederatedController {
     appleUser: string | undefined,
     reply: FastifyReply,
   ): Promise<void> {
+    const flow = state ? await this.authFlowService.get(state) : null;
+    // Re-sanitized on use: a flow stored before a sanitizer fix may still hold a destination that is now refused.
+    const returnTo = sanitizeReturnTo(flow?.returnTo, this.issuer);
     const fail = (reason: string): void => {
       this.logger.warn('federated callback failed', { reason });
-      reply.status(302).redirect(`${this.loginUrl}?error=federation_failed`);
+      reply.status(302).redirect(this.loginRedirect({ error: 'federation_failed', returnTo }));
     };
 
-    const flow = state ? await this.authFlowService.get(state) : null;
     if (!flow || (flow.kind !== 'LOGIN' && flow.kind !== 'STEP_UP') || !flow.federated) return fail('unknown or non-federated flow');
     if (upstreamError || !code) return fail(`upstream error: ${upstreamError ?? 'missing code'}`);
 
@@ -60,7 +63,7 @@ export class FederatedController {
 
       if (flow.kind === 'STEP_UP') {
         const elevated = await this.federatedStepUpService.complete(flow, identity);
-        reply.status(302).redirect(`${this.loginUrl}?flow_id=${encodeURIComponent(flow.flowId)}&status=STEP_UP_COMPLETE&aal=${elevated.aal}`);
+        reply.status(302).redirect(this.loginRedirect({ flow_id: flow.flowId, status: 'STEP_UP_COMPLETE', aal: elevated.aal }));
         return;
       }
 
@@ -68,16 +71,22 @@ export class FederatedController {
 
       if (result.outcome === 'COMPLETED') {
         for (const cookie of result.cookies) reply.setCookie(cookie.name, cookie.value, cookie.options);
-        reply.status(302).redirect(flow.returnTo ?? '/account');
+        reply.status(302).redirect(returnTo ?? '/account');
         return;
       }
       if (result.outcome === 'CONTINUE') {
-        reply.status(302).redirect(`${this.loginUrl}?flow_id=${encodeURIComponent(result.flowId)}&status=${encodeURIComponent(result.status)}`);
+        reply.status(302).redirect(this.loginRedirect({ flow_id: result.flowId, status: result.status, returnTo }));
         return;
       }
       fail(`flow refused: ${result.status}`);
     } catch (error) {
       fail(error instanceof FederationError ? error.message : `unexpected: ${error instanceof Error ? error.message : String(error)}`);
     }
+  }
+
+  private loginRedirect(params: Record<string, string | undefined>): string {
+    const url = new URL(this.loginUrl);
+    for (const [name, value] of Object.entries(params)) if (value) url.searchParams.set(name, value);
+    return url.toString();
   }
 }

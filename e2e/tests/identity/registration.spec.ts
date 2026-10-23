@@ -65,7 +65,7 @@ test.describe('identity registration', () => {
     await passwordField.fill(STRONG_PASSWORD);
     await page.getByRole('button', { name: 'Create account' }).click();
 
-    // Completion — the success screen, then Continue lands on the signed-in account overview (no returnTo/resumeUrl).
+    // Completion — the success screen, then Continue lands on the signed-in account overview (no returnTo).
     await expect(page.getByRole('heading', { name: /You.re all set/i })).toBeVisible();
     await page.getByRole('button', { name: 'Continue' }).click();
     await expect(page).toHaveURL(/\/account\/?$/);

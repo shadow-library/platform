@@ -83,4 +83,18 @@ test.describe('identity security — open redirect', () => {
     expect(page.url().startsWith(identityUrl), 'must stay on the identity origin').toBe(true);
     expect(page.url()).not.toContain('evil.example.com/');
   });
+
+  test('should carry the parked authorize request from sign-in to sign-up and back', async ({ page }) => {
+    const identityUrl = requireProductUrl('identity');
+    const resume = `${identityUrl}/oauth2/authorize?client_id=e2e&response_type=code`;
+    await page.goto(`${identityUrl}/login?return_to=${encodeURIComponent(resume)}`);
+
+    await page.getByRole('link', { name: 'Create an account' }).first().click();
+    await expect(page).toHaveURL(/\/register/);
+    expect(new URL(page.url()).searchParams.get('return_to'), 'sign-up keeps the resume target').toBe(resume);
+
+    await page.getByRole('link', { name: 'Sign in' }).click();
+    await expect(page).toHaveURL(/\/login/);
+    expect(new URL(page.url()).searchParams.get('return_to'), 'returning to sign-in keeps it too').toBe(resume);
+  });
 });

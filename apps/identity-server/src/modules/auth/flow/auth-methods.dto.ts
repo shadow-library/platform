@@ -20,7 +20,7 @@ export class SocialLoginStartBody {
   @Field({ optional: true })
   deviceId?: string;
 
-  @Field({ optional: true, maxLength: 2048, description: 'Post-login destination; must be a relative path or a URL on this origin.' })
+  @Field({ optional: true, maxLength: 4096, description: 'Post-login destination; must be a relative path or a URL on this origin.' })
   returnTo?: string;
 }
 

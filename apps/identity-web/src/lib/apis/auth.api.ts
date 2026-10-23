@@ -37,8 +37,6 @@ export interface FlowState {
   hasAlternativeMethods?: boolean;
   metadata?: ChallengeMethodMetadata;
   federated?: FederatedLoginOption;
-  /** OIDC handoff: present on COMPLETED when the flow began at `/oauth2/authorize`. */
-  resumeUrl?: string;
 }
 
 export interface WebauthnChallenge {

@@ -7,6 +7,8 @@ import { Config } from '@shadow-library/common';
 import { type ElevationIntent } from '@server/modules/auth/session';
 import { DatabaseService } from '@server/modules/infrastructure/datastore';
 
+const CONTROL_CHARACTERS = /\p{Cc}/u;
+
 export type AuthFlowKind = 'LOGIN' | 'REGISTRATION' | 'RECOVERY' | 'STEP_UP';
 
 export interface DeviceContext {
@@ -45,11 +47,13 @@ export interface AuthFlowContext {
   createdAt: number;
 }
 
-/** Same-origin destinations only: a root-relative path (never protocol-relative) or an absolute url under the issuer. */
+/** Decided by the URL parser, not a prefix check: browsers fold backslashes and strip tabs and newlines, so `/\evil.test` and `/\t/evil.test` leave the origin. */
 export const sanitizeReturnTo = (returnTo: string | undefined, issuer: string): string | undefined => {
-  if (!returnTo) return undefined;
-  if (returnTo.startsWith('/') && !returnTo.startsWith('//')) return returnTo;
-  return returnTo.startsWith(`${issuer}/`) ? returnTo : undefined;
+  if (!returnTo || CONTROL_CHARACTERS.test(returnTo)) return undefined;
+  const origin = new URL(issuer).origin;
+  const target = URL.parse(returnTo, origin);
+  if (target?.origin !== origin || target.pathname.startsWith('//')) return undefined;
+  return `${target.pathname}${target.search}${target.hash}`;
 };
 
 @Injectable()

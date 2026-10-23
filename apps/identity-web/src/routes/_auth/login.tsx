@@ -7,10 +7,9 @@ import { assertPasskey, AuthCard, AuthMedallion, AuthScreen, IdentifierChip, Mfa
 import parts from '@/features/auth/auth-parts.module.css';
 import { authApi, type FlowState, type SocialProvider, useAuthMethodsQuery, useRootDomain } from '@/lib/apis';
 import { useDeviceId } from '@/lib/hooks';
-import { safeReturnTo } from '@/lib/safe-return-to';
+import { type SignInSearch, signInTarget } from '@/lib/safe-return-to';
 
-interface LoginSearch {
-  returnTo?: string;
+interface LoginSearch extends SignInSearch {
   client?: string;
   /** Set by the federated callback when it hands a part-finished flow back through a redirect. */
   flowId?: string;
@@ -31,6 +30,7 @@ const validateIdentifier = (value: string): string | null => {
 export const Route = createFileRoute('/_auth/login')({
   validateSearch: (search: Record<string, unknown>): LoginSearch => ({
     returnTo: typeof search.returnTo === 'string' ? search.returnTo : undefined,
+    return_to: typeof search.return_to === 'string' ? search.return_to : undefined,
     client: typeof search.client === 'string' ? search.client : undefined,
     flowId: typeof search.flow_id === 'string' ? search.flow_id : undefined,
   }),
@@ -88,16 +88,18 @@ function LoginPage(): React.JSX.Element {
     }, 1000);
   };
 
-  const complete = (next: FlowState): void => {
-    if (next.resumeUrl) return window.location.assign(next.resumeUrl);
-    const target = safeReturnTo(search.returnTo, rootDomain);
+  const carried: SignInSearch = { returnTo: search.returnTo, return_to: search.return_to };
+  const destination = (): string | undefined => signInTarget(search, rootDomain) ?? undefined;
+
+  const complete = (): void => {
+    const target = destination();
     if (target) return window.location.assign(target);
     navigate({ to: '/account' });
   };
 
   const advance = async (action: () => Promise<FlowState>): Promise<void> => {
     const next = await run(action);
-    if (next?.status === 'COMPLETED') complete(next);
+    if (next?.status === 'COMPLETED') complete();
   };
 
   const submitIdentifier = (): void => {
@@ -105,7 +107,7 @@ function LoginPage(): React.JSX.Element {
     const invalid = validateIdentifier(trimmed);
     if (invalid) return setError(invalid);
     setOtp('');
-    void advance(() => authApi.loginInit(trimmed, deviceId, search.returnTo));
+    void advance(() => authApi.loginInit(trimmed, deviceId, destination()));
   };
 
   const runPasskey = async (flowId?: string): Promise<void> => {
@@ -137,7 +139,7 @@ function LoginPage(): React.JSX.Element {
   const startSocial = async (provider: SocialProvider): Promise<void> => {
     setError(null);
     try {
-      const started = await authApi.socialStart(provider, deviceId, search.returnTo);
+      const started = await authApi.socialStart(provider, deviceId, destination());
       window.location.assign(started.authorizationUrl);
     } catch {
       setError('Couldn’t reach that provider. Try another method.');
@@ -146,7 +148,10 @@ function LoginPage(): React.JSX.Element {
 
   const footer = (
     <span>
-      New to Shadow? <Link to="/register">Create an account</Link>
+      New to Shadow?{' '}
+      <Link to="/register" search={carried}>
+        Create an account
+      </Link>
     </span>
   );
 
@@ -231,7 +236,10 @@ function LoginPage(): React.JSX.Element {
             </Button>
           ))}
           <p className={parts.otpNote}>
-            New here? <Link to="/register">Create an account</Link>
+            New here?{' '}
+            <Link to="/register" search={carried}>
+              Create an account
+            </Link>
           </p>
         </AuthCard>
       </AuthScreen>
@@ -306,7 +314,7 @@ function LoginPage(): React.JSX.Element {
     return (
       <AuthScreen
         footer={
-          <Link className={parts.footLink} to="/login" onClick={restart}>
+          <Link className={parts.footLink} to="/login" search={carried} onClick={restart}>
             Cancel and start over
           </Link>
         }

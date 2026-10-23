@@ -4,12 +4,11 @@ import { Alert, Button, CheckIcon, FormField, Input, Select } from '@shadow-libr
 
 import { AuthCard, AuthMedallion, AuthScreen, OtpEntry, StepHeader, StepProgress, useFlow } from '@/features/auth';
 import parts from '@/features/auth/auth-parts.module.css';
-import { authApi, type FlowState, useRootDomain } from '@/lib/apis';
+import { authApi, useRootDomain } from '@/lib/apis';
 import { useDeviceId } from '@/lib/hooks';
-import { safeReturnTo } from '@/lib/safe-return-to';
+import { type SignInSearch, signInTarget } from '@/lib/safe-return-to';
 
-interface RegisterSearch {
-  returnTo?: string;
+interface RegisterSearch extends SignInSearch {
   client?: string;
 }
 
@@ -30,6 +29,7 @@ const PASSWORD_RULES: { label: string; test: (value: string) => boolean }[] = [
 export const Route = createFileRoute('/_auth/register')({
   validateSearch: (search: Record<string, unknown>): RegisterSearch => ({
     returnTo: typeof search.returnTo === 'string' ? search.returnTo : undefined,
+    return_to: typeof search.return_to === 'string' ? search.return_to : undefined,
     client: typeof search.client === 'string' ? search.client : undefined,
   }),
   component: RegisterPage,
@@ -50,16 +50,20 @@ function RegisterPage(): React.JSX.Element {
   const [password, setPassword] = useState('');
   const [otp, setOtp] = useState('');
 
-  const complete = (next: FlowState): void => {
-    if (next.resumeUrl) return window.location.assign(next.resumeUrl);
-    const target = safeReturnTo(search.returnTo, rootDomain);
+  const carried: SignInSearch = { returnTo: search.returnTo, return_to: search.return_to };
+
+  const complete = (): void => {
+    const target = signInTarget(search, rootDomain);
     if (target) return window.location.assign(target);
     navigate({ to: '/account' });
   };
 
   const footer = (
     <span>
-      Already have an account? <Link to="/login">Sign in</Link>
+      Already have an account?{' '}
+      <Link to="/login" search={carried}>
+        Sign in
+      </Link>
     </span>
   );
 
@@ -129,7 +133,7 @@ function RegisterPage(): React.JSX.Element {
             <CheckIcon size={30} strokeWidth={2.4} />
           </AuthMedallion>
           <StepHeader title="You’re all set" description="Your Shadow account is ready. We recommend adding a second factor next." align="center" />
-          <Button variant="primary" fullWidth onClick={() => complete(flow)}>
+          <Button variant="primary" fullWidth onClick={complete}>
             Continue
           </Button>
         </AuthCard>
