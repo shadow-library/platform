@@ -1,4 +1,17 @@
+import { globSync } from 'node:fs';
+import { resolve } from 'node:path';
+
 import { type KnipConfig } from 'knip';
+
+const ROOT = import.meta.dirname;
+
+function existing(dir: string, patterns: string[]): string[] {
+  return patterns.filter(pattern => globSync(pattern, { cwd: resolve(ROOT, dir) }).length > 0);
+}
+
+function workspaceDirs(parent: string, suffix: string): string[] {
+  return globSync(`${parent}/*${suffix}`, { cwd: ROOT }).sort();
+}
 
 /**
  * Every package publishes from `dist/`, so knip cannot follow its `exports` map back to source. Each
@@ -24,7 +37,7 @@ const PACKAGE_ENTRIES: Record<string, string[]> = {
   'packages/modules': ['src/index.ts', 'src/bootstrap/index.ts', 'src/http-core/index.ts', 'src/database/index.ts', 'src/cache/index.ts', 'src/storage/index.ts'],
   'packages/sdk': ['src/index.ts', 'src/publishing/index.ts'],
   'packages/synapse': ['src/index.ts', 'src/langchain/index.ts'],
-  'packages/ui': ['src/index.ts', 'src/router.ts', 'src/router.tsx'],
+  'packages/ui': ['src/index.ts'],
   'packages/web': [
     'src/index.ts',
     'src/auth/index.ts',
@@ -49,26 +62,13 @@ const PACKAGE_IGNORED_DEPENDENCIES: Record<string, string[]> = {
 const COLOCATED_TESTS = ['src/**/*.{test,spec}.{ts,tsx}'];
 
 /** Reached by the runtime or the build, never by an import: bun entrypoints, vite configs, and the test tree. */
-const SERVER_ENTRIES = ['src/main.ts', 'src/worker.ts', 'src/migrate.ts', 'tests/**/*.ts', 'drizzle.config.ts'];
+const SERVER_ENTRIES = ['src/main.ts', 'src/worker.ts', 'src/migrate.ts', 'src/dump-openapi.ts', 'tests/**/*.ts', 'drizzle.config.ts'];
 
 /**
  * Route modules are discovered by TanStack Router's generator, service workers by a second vite build, and
  * `main.ts`/`serve.ts` by `bun start` — none of them appear in any import graph knip can walk.
  */
-const WEB_ENTRIES = [
-  'src/router.tsx',
-  'src/routes/**/*.tsx',
-  'src/routes/**/*.ts',
-  'src/routeTree.gen.ts',
-  'src/service-worker.ts',
-  'src/sw.ts',
-  'main.ts',
-  'serve.ts',
-  'vite.config.ts',
-  'vite.sw.config.ts',
-  'vitest.config.ts',
-  'tests/**/*.{ts,tsx}',
-];
+const WEB_ENTRIES = ['src/routes/**/*.tsx', 'src/routes/**/*.ts', 'src/service-worker.ts', 'src/sw.ts', 'vitest.config.ts', 'tests/**/*.{ts,tsx}'];
 
 const config: KnipConfig = {
   workspaces: {
@@ -81,7 +81,6 @@ const config: KnipConfig = {
        */
       ignoreDependencies: [
         'jscpd',
-        'knip',
         'madge',
         '@rollup/plugin-alias',
         '@rollup/plugin-node-resolve',
@@ -96,24 +95,39 @@ const config: KnipConfig = {
         'tsc-alias',
       ],
     },
-    /** `drizzle-kit` is never imported — `scripts/db.ts` resolves its binary out of the workspace that owns the schema. */
-    'apps/*-server': { entry: SERVER_ENTRIES, project: ['src/**/*.ts', 'tests/**/*.ts'], ignoreDependencies: ['drizzle-kit'] },
-    'apps/*-web': { entry: WEB_ENTRIES, project: ['src/**/*.{ts,tsx}', 'tests/**/*.{ts,tsx}', '*.ts'] },
+    ...Object.fromEntries(
+      workspaceDirs('apps', '-server').map(dir => [
+        dir,
+        {
+          entry: existing(dir, SERVER_ENTRIES),
+          project: existing(dir, ['src/**/*.ts', 'tests/**/*.ts']),
+          ignoreDependencies: ['drizzle-kit'],
+        },
+      ]),
+    ),
+    ...Object.fromEntries(
+      workspaceDirs('apps', '-web').map(dir => [
+        dir,
+        {
+          entry: existing(dir, WEB_ENTRIES),
+          project: existing(dir, ['src/**/*.{ts,tsx}', 'tests/**/*.{ts,tsx}', '*.ts']),
+          ignore: ['**/*.gen.ts'],
+        },
+      ]),
+    ),
     ...Object.fromEntries(
       Object.entries(PACKAGE_ENTRIES).map(([dir, entry]) => [
         dir,
         {
-          entry: [...entry, ...COLOCATED_TESTS, 'tests/**/*.{ts,tsx}', '*.config.ts', '.storybook/*.{ts,tsx}'],
-          project: ['src/**/*.{ts,tsx}', 'tests/**/*.{ts,tsx}', '*.config.ts'],
+          entry: [...entry, ...existing(dir, [...COLOCATED_TESTS, 'tests/**/*.{ts,tsx}', '*.config.ts', '.storybook/*.{ts,tsx}'])],
+          project: existing(dir, [dir === 'packages/ui' ? 'src/**/*.{ts,tsx,mdx}' : 'src/**/*.{ts,tsx}', 'tests/**/*.{ts,tsx}', '*.config.ts']),
           ignoreDependencies: PACKAGE_IGNORED_DEPENDENCIES[dir] ?? [],
         },
       ]),
     ),
-    e2e: { entry: ['tests/**/*.ts', 'seed/**/*.ts', 'playwright.config.ts'], project: ['**/*.ts'] },
+    e2e: { entry: ['tests/**/*.ts', 'seed/**/*.ts'], project: ['**/*.ts'] },
   },
-  ignore: ['**/*.gen.ts', '**/dist/**', '**/generated/**', '**/*.stories.tsx'],
-  ignoreDependencies: ['@types/*'],
-  ignoreBinaries: ['docker', 'psql'],
+  ignoreExportsUsedInFile: true,
   /** Spawned by path from another workspace's directory, never imported: `scripts/*.ts` and the e2e seed entry. */
   ignoreUnresolved: [/^scripts\//, 'seed/seed.ts'],
 };
