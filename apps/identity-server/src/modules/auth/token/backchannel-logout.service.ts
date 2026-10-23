@@ -7,12 +7,15 @@ import { AppError, Config, Logger } from '@shadow-library/common';
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { KeyService } from '@server/modules/auth/keys';
-import { DatabaseService, OidcLogoutDelivery, PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
+import { claimLeaseFor, DatabaseService, OidcLogoutDelivery, PrimaryDatabase, recoverExpiredClaims, schema } from '@server/modules/infrastructure/datastore';
 import { WebhookTargetGuard } from '@server/modules/infrastructure/webhook';
 
 const LOGOUT_EVENT = 'http://schemas.openid.net/event/backchannel-logout';
 const LOGOUT_TOKEN_TTL_SECONDS = 120;
 const MAX_ATTEMPTS = 5;
+const DISPATCH_BATCH_SIZE = 20;
+const DELIVERY_TIMEOUT_MS = 10_000;
+export const LOGOUT_CLAIM_LEASE_MS = claimLeaseFor(DISPATCH_BATCH_SIZE, DELIVERY_TIMEOUT_MS);
 const CLAIMABLE_STATUSES: OidcLogoutDelivery.Status[] = ['PENDING', 'FAILED'];
 
 @Injectable()
@@ -57,17 +60,13 @@ export class BackChannelLogoutService {
     return this.keyService.sign(claims).token;
   }
 
-  async recoverStuckDeliveries(): Promise<number> {
-    const recovered = await this.db
-      .update(schema.oidcLogoutDeliveries)
-      .set({ status: 'FAILED', lastError: 'recovered after interrupted delivery' })
-      .where(eq(schema.oidcLogoutDeliveries.status, 'SENDING'))
-      .returning({ id: schema.oidcLogoutDeliveries.id });
-    if (recovered.length > 0) this.logger.warn('Recovered interrupted logout deliveries', { count: recovered.length });
-    return recovered.length;
+  async recoverExpiredClaims(): Promise<number> {
+    const recovered = await recoverExpiredClaims(this.db, schema.oidcLogoutDeliveries, LOGOUT_CLAIM_LEASE_MS);
+    if (recovered > 0) this.logger.warn('Recovered logout deliveries whose claim lease expired', { count: recovered });
+    return recovered;
   }
 
-  async dispatchPending(limit = 20): Promise<number> {
+  async dispatchPending(limit = DISPATCH_BATCH_SIZE): Promise<number> {
     const claimed = await this.db.transaction(async tx => {
       const rows = await tx
         .select()
@@ -79,7 +78,7 @@ export class BackChannelLogoutService {
       if (rows.length === 0) return [];
       await tx
         .update(schema.oidcLogoutDeliveries)
-        .set({ status: 'SENDING' })
+        .set({ status: 'SENDING', claimedAt: sql`now()` })
         .where(
           inArray(
             schema.oidcLogoutDeliveries.id,
@@ -93,7 +92,7 @@ export class BackChannelLogoutService {
     for (const delivery of claimed) {
       try {
         await this.send(delivery);
-        await this.db.update(schema.oidcLogoutDeliveries).set({ status: 'SENT', sentAt: new Date() }).where(eq(schema.oidcLogoutDeliveries.id, delivery.id));
+        await this.db.update(schema.oidcLogoutDeliveries).set({ status: 'SENT', claimedAt: null, sentAt: new Date() }).where(eq(schema.oidcLogoutDeliveries.id, delivery.id));
         sent += 1;
       } catch (error) {
         await this.markFailed(delivery, error);
@@ -111,7 +110,7 @@ export class BackChannelLogoutService {
       redirect: 'manual',
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
       body: `logout_token=${encodeURIComponent(token)}`,
-      signal: AbortSignal.timeout(10_000),
+      signal: AbortSignal.timeout(DELIVERY_TIMEOUT_MS),
     });
     if (response.status >= 300 && response.status < 400)
       throw AppError.internal(`logout endpoint returned a redirect (${response.status}); refusing to follow it into an unvalidated target`);
@@ -126,7 +125,7 @@ export class BackChannelLogoutService {
     const message = error instanceof Error ? error.message : String(error);
     await this.db
       .update(schema.oidcLogoutDeliveries)
-      .set({ status: dead ? 'DEAD' : 'FAILED', attemptCount, lastError: message, nextAttemptAt: new Date(Date.now() + backoffMinutes * 60_000) })
+      .set({ status: dead ? 'DEAD' : 'FAILED', claimedAt: null, attemptCount, lastError: message, nextAttemptAt: new Date(Date.now() + backoffMinutes * 60_000) })
       .where(eq(schema.oidcLogoutDeliveries.id, delivery.id));
     this.logger[dead ? 'error' : 'warn'](`Back-channel logout ${dead ? 'dead-lettered' : 'delivery failed'}`, { id: delivery.id, attemptCount, message });
   }

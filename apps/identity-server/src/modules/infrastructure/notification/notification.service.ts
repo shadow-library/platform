@@ -3,13 +3,15 @@ import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 
 import { APP_NAME } from '@server/constants';
-import { DatabaseService, NotificationOutbox, PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
+import { claimLeaseFor, DatabaseService, NotificationOutbox, PrimaryDatabase, recoverExpiredClaims, schema } from '@server/modules/infrastructure/datastore';
 
-import { NotificationClient, SendNotification } from './notification.client';
+import { NOTIFICATION_SEND_TIMEOUT_MS, NotificationClient, SendNotification } from './notification.client';
 
 type OutboxWriter = Pick<PrimaryDatabase, 'insert'>;
 
 const MAX_ATTEMPTS = 5;
+const DISPATCH_BATCH_SIZE = 20;
+export const NOTIFICATION_CLAIM_LEASE_MS = claimLeaseFor(DISPATCH_BATCH_SIZE, NOTIFICATION_SEND_TIMEOUT_MS);
 const CLAIMABLE_STATUSES: NotificationOutbox.Status[] = ['PENDING', 'FAILED'];
 /** Each row binds 3 parameters; Postgres caps a statement at 65535, so this stays well clear of that ceiling. */
 const ENQUEUE_CHUNK_SIZE = 1000;
@@ -40,22 +42,13 @@ export class NotificationService {
     }
   }
 
-  /**
-   * Requeues rows stranded in SENDING by an interrupted worker: a crash between claim and outcome
-   * would otherwise park them forever, since only PENDING/FAILED rows are claimable. Safe to run
-   * at worker boot because the dispatch loop runs in exactly one process.
-   */
-  async recoverStuckDeliveries(): Promise<number> {
-    const recovered = await this.db
-      .update(schema.notificationOutbox)
-      .set({ status: 'FAILED', lastError: 'recovered after interrupted delivery' })
-      .where(eq(schema.notificationOutbox.status, 'SENDING'))
-      .returning({ id: schema.notificationOutbox.id });
-    if (recovered.length > 0) this.logger.warn('Recovered interrupted notification deliveries', { count: recovered.length });
-    return recovered.length;
+  async recoverExpiredClaims(): Promise<number> {
+    const recovered = await recoverExpiredClaims(this.db, schema.notificationOutbox, NOTIFICATION_CLAIM_LEASE_MS);
+    if (recovered > 0) this.logger.warn('Recovered notification deliveries whose claim lease expired', { count: recovered });
+    return recovered;
   }
 
-  async dispatchPending(limit = 20): Promise<number> {
+  async dispatchPending(limit = DISPATCH_BATCH_SIZE): Promise<number> {
     const claimed = await this.db.transaction(async tx => {
       const rows = await tx
         .select()
@@ -67,7 +60,7 @@ export class NotificationService {
       if (rows.length === 0) return [];
       await tx
         .update(schema.notificationOutbox)
-        .set({ status: 'SENDING' })
+        .set({ status: 'SENDING', claimedAt: sql`now()` })
         .where(
           inArray(
             schema.notificationOutbox.id,
@@ -81,7 +74,7 @@ export class NotificationService {
     for (const row of claimed) {
       try {
         await this.client.send({ templateKey: row.templateKey, recipients: row.recipients, payload: row.payload });
-        await this.db.update(schema.notificationOutbox).set({ status: 'SENT', sentAt: new Date() }).where(eq(schema.notificationOutbox.id, row.id));
+        await this.db.update(schema.notificationOutbox).set({ status: 'SENT', claimedAt: null, sentAt: new Date() }).where(eq(schema.notificationOutbox.id, row.id));
         sent += 1;
       } catch (error) {
         await this.markFailed(row, error);
@@ -97,7 +90,7 @@ export class NotificationService {
     const message = error instanceof Error ? error.message : String(error);
     await this.db
       .update(schema.notificationOutbox)
-      .set({ status: dead ? 'DEAD' : 'FAILED', attemptCount, lastError: message, nextAttemptAt: new Date(Date.now() + backoffMinutes * 60_000) })
+      .set({ status: dead ? 'DEAD' : 'FAILED', claimedAt: null, attemptCount, lastError: message, nextAttemptAt: new Date(Date.now() + backoffMinutes * 60_000) })
       .where(eq(schema.notificationOutbox.id, row.id));
     this.logger[dead ? 'error' : 'warn'](`Notification ${dead ? 'dead-lettered' : 'delivery failed'}`, { id: row.id, attemptCount, message });
   }

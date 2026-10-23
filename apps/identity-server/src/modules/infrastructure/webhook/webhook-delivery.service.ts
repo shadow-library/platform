@@ -6,13 +6,16 @@ import { AppError, Logger } from '@shadow-library/common';
 
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
-import { DatabaseService, PrimaryDatabase, schema, WebhookDelivery } from '@server/modules/infrastructure/datastore';
+import { claimLeaseFor, DatabaseService, PrimaryDatabase, recoverExpiredClaims, schema, WebhookDelivery } from '@server/modules/infrastructure/datastore';
 
 import { WebhookTargetGuard } from './webhook-target.guard';
 import { WEBHOOK_EVENT_HEADER, WEBHOOK_ID_HEADER, WEBHOOK_SIGNATURE_HEADER } from './webhook.constants';
 import { WebhookService } from './webhook.service';
 
 const MAX_ATTEMPTS = 5;
+const DISPATCH_BATCH_SIZE = 20;
+const DELIVERY_TIMEOUT_MS = 10_000;
+export const WEBHOOK_CLAIM_LEASE_MS = claimLeaseFor(DISPATCH_BATCH_SIZE, DELIVERY_TIMEOUT_MS);
 const CLAIMABLE_STATUSES: WebhookDelivery.Status[] = ['PENDING', 'FAILED'];
 
 @Injectable()
@@ -48,24 +51,20 @@ export class WebhookDeliveryService {
   async redeliver(subscriptionId: bigint, deliveryId: bigint): Promise<WebhookDelivery> {
     const [delivery] = await this.db
       .update(schema.webhookDeliveries)
-      .set({ status: 'PENDING', attemptCount: 0, nextAttemptAt: new Date(), lastError: null })
+      .set({ status: 'PENDING', claimedAt: null, attemptCount: 0, nextAttemptAt: new Date(), lastError: null })
       .where(and(eq(schema.webhookDeliveries.id, deliveryId), eq(schema.webhookDeliveries.subscriptionId, subscriptionId)))
       .returning();
     if (!delivery) throw AppErrorCode.WHK_003.create();
     return delivery;
   }
 
-  async recoverStuckDeliveries(): Promise<number> {
-    const recovered = await this.db
-      .update(schema.webhookDeliveries)
-      .set({ status: 'FAILED', lastError: 'recovered after interrupted delivery' })
-      .where(eq(schema.webhookDeliveries.status, 'SENDING'))
-      .returning({ id: schema.webhookDeliveries.id });
-    if (recovered.length > 0) this.logger.warn('Recovered interrupted webhook deliveries', { count: recovered.length });
-    return recovered.length;
+  async recoverExpiredClaims(): Promise<number> {
+    const recovered = await recoverExpiredClaims(this.db, schema.webhookDeliveries, WEBHOOK_CLAIM_LEASE_MS);
+    if (recovered > 0) this.logger.warn('Recovered webhook deliveries whose claim lease expired', { count: recovered });
+    return recovered;
   }
 
-  async dispatchPending(limit = 20): Promise<number> {
+  async dispatchPending(limit = DISPATCH_BATCH_SIZE): Promise<number> {
     const claimed = await this.db.transaction(async tx => {
       const rows = await tx
         .select()
@@ -77,7 +76,7 @@ export class WebhookDeliveryService {
       if (rows.length === 0) return [];
       await tx
         .update(schema.webhookDeliveries)
-        .set({ status: 'SENDING' })
+        .set({ status: 'SENDING', claimedAt: sql`now()` })
         .where(
           inArray(
             schema.webhookDeliveries.id,
@@ -91,7 +90,10 @@ export class WebhookDeliveryService {
     for (const delivery of claimed) {
       try {
         const responseStatus = await this.send(delivery);
-        await this.db.update(schema.webhookDeliveries).set({ status: 'SENT', sentAt: new Date(), responseStatus }).where(eq(schema.webhookDeliveries.id, delivery.id));
+        await this.db
+          .update(schema.webhookDeliveries)
+          .set({ status: 'SENT', claimedAt: null, sentAt: new Date(), responseStatus })
+          .where(eq(schema.webhookDeliveries.id, delivery.id));
         sent += 1;
       } catch (error) {
         await this.markFailed(delivery, error);
@@ -119,7 +121,7 @@ export class WebhookDeliveryService {
         [WEBHOOK_SIGNATURE_HEADER]: this.signatureFor(secrets, timestamp, delivery.payload),
       },
       body: delivery.payload,
-      signal: AbortSignal.timeout(10_000),
+      signal: AbortSignal.timeout(DELIVERY_TIMEOUT_MS),
     });
     if (response.status >= 300 && response.status < 400)
       throw AppError.internal(`webhook endpoint returned a redirect (${response.status}); refusing to follow it into an unvalidated target`);
@@ -134,7 +136,7 @@ export class WebhookDeliveryService {
     const message = error instanceof Error ? error.message : String(error);
     await this.db
       .update(schema.webhookDeliveries)
-      .set({ status: dead ? 'DEAD' : 'FAILED', attemptCount, lastError: message, nextAttemptAt: new Date(Date.now() + backoffMinutes * 60_000) })
+      .set({ status: dead ? 'DEAD' : 'FAILED', claimedAt: null, attemptCount, lastError: message, nextAttemptAt: new Date(Date.now() + backoffMinutes * 60_000) })
       .where(eq(schema.webhookDeliveries.id, delivery.id));
     this.logger[dead ? 'error' : 'warn'](`Webhook ${dead ? 'dead-lettered' : 'delivery failed'}`, { id: delivery.id, attemptCount, message });
   }

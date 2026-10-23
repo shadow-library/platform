@@ -43,6 +43,7 @@ export const webhookDeliveries = pgTable(
     status: webhookDeliveryStatus('status').notNull().default('PENDING'),
     attemptCount: integer('attempt_count').notNull().default(0),
     nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true }).notNull().defaultNow(),
+    claimedAt: timestamp('claimed_at', { withTimezone: true }),
     lastError: varchar('last_error', { length: 512 }),
     responseStatus: integer('response_status'),
     sentAt: timestamp('sent_at', { withTimezone: true }),

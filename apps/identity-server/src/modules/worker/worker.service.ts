@@ -31,10 +31,6 @@ export class WorkerService implements OnApplicationReady, OnApplicationStop {
   ) {}
 
   async onApplicationReady(): Promise<void> {
-    /** Deliveries interrupted by the previous worker's crash re-enter the claimable pool first. */
-    await this.notificationService.recoverStuckDeliveries();
-    await this.backChannelLogoutService.recoverStuckDeliveries();
-    await this.webhookDeliveryService.recoverStuckDeliveries();
     await this.botOwnershipService.recoverCompletedDeletions();
     this.timer = setInterval(() => void this.tick(), this.intervalMs);
     this.logger.info('Worker started', { intervalMs: this.intervalMs });
@@ -60,6 +56,9 @@ export class WorkerService implements OnApplicationReady, OnApplicationStop {
 
   private async run(): Promise<void> {
     try {
+      await this.notificationService.recoverExpiredClaims();
+      await this.backChannelLogoutService.recoverExpiredClaims();
+      await this.webhookDeliveryService.recoverExpiredClaims();
       const sent = await this.notificationService.dispatchPending();
       if (sent > 0) this.logger.debug('Dispatched notifications', { sent });
       const logouts = await this.backChannelLogoutService.dispatchPending();

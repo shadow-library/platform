@@ -18,7 +18,7 @@ interface Tickable {
 
 function buildWorker() {
   const dispatchPending = mock(() => Promise.resolve(0));
-  const recoverStuckDeliveries = mock(() => Promise.resolve(0));
+  const recoverExpiredClaims = mock(() => Promise.resolve(0));
   const remindExpiringKeys = mock(() => Promise.resolve(0));
   const sweepExpiredKeys = mock(() => Promise.resolve(0));
   const purgeStaleContactClaims = mock(() => Promise.resolve(0));
@@ -26,9 +26,9 @@ function buildWorker() {
   const drainTransfers = mock(() => Promise.resolve(0));
   const recoverCompletedDeletions = mock(() => Promise.resolve(0));
 
-  const notificationService = { dispatchPending, recoverStuckDeliveries } as unknown as NotificationService;
-  const backChannelLogoutService = { dispatchPending, recoverStuckDeliveries } as unknown as BackChannelLogoutService;
-  const webhookDeliveryService = { dispatchPending, recoverStuckDeliveries } as unknown as WebhookDeliveryService;
+  const notificationService = { dispatchPending, recoverExpiredClaims } as unknown as NotificationService;
+  const backChannelLogoutService = { dispatchPending, recoverExpiredClaims } as unknown as BackChannelLogoutService;
+  const webhookDeliveryService = { dispatchPending, recoverExpiredClaims } as unknown as WebhookDeliveryService;
   const maintenanceService = { purgeStaleContactClaims, purgeStaleAppSessions } as unknown as MaintenanceService;
   const botKeyExpiryService = { remindExpiringKeys, sweepExpiredKeys } as unknown as BotKeyExpiryService;
   const botOwnershipService = { dispatchPending: drainTransfers, recoverCompletedDeletions } as unknown as BotOwnershipService;
@@ -41,7 +41,17 @@ function buildWorker() {
     botKeyExpiryService,
     botOwnershipService,
   ) as unknown as Tickable;
-  return { worker, drainTransfers, recoverCompletedDeletions, remindExpiringKeys, sweepExpiredKeys, purgeStaleContactClaims, purgeStaleAppSessions };
+  return {
+    worker,
+    dispatchPending,
+    recoverExpiredClaims,
+    drainTransfers,
+    recoverCompletedDeletions,
+    remindExpiringKeys,
+    sweepExpiredKeys,
+    purgeStaleContactClaims,
+    purgeStaleAppSessions,
+  };
 }
 
 describe('WorkerService', () => {
@@ -66,6 +76,16 @@ describe('WorkerService', () => {
     await worker.tick();
 
     expect(drainTransfers).toHaveBeenCalledTimes(2);
+  });
+
+  it('should recover expired outbox claims ahead of dispatch on every tick', async () => {
+    const { worker, dispatchPending, recoverExpiredClaims } = buildWorker();
+
+    await worker.tick();
+    await worker.tick();
+
+    expect(recoverExpiredClaims).toHaveBeenCalledTimes(6);
+    expect(recoverExpiredClaims.mock.invocationCallOrder[2]).toBeLessThan(dispatchPending.mock.invocationCallOrder[0] ?? 0);
   });
 
   /** The boot path is the crash recovery this sweep exists for: a worker killed between a transfer landing and its bot being finalised. */

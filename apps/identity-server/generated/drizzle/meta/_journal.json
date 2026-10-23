@@ -92,6 +92,13 @@
       "when": 1792356017211,
       "tag": "0012_credential_envelopes",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1792781423409,
+      "tag": "0013_outbox_claim_leases",
+      "breakpoints": true
     }
   ]
 }

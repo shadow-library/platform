@@ -6,6 +6,8 @@ import { NotificationOutbox } from '@server/modules/infrastructure/datastore';
 
 import { NotificationTokenService } from './notification-token.service';
 
+export const NOTIFICATION_SEND_TIMEOUT_MS = 10_000;
+
 export interface SendNotification {
   templateKey: string;
   recipients: NotificationOutbox.Recipients;
@@ -24,6 +26,7 @@ export class NotificationClient {
     const response = await APIRequest.post(PULSE_NOTIFICATION_URL)
       .header('authorization', `Bearer ${token}`)
       .body({ ...notification, service: APP_NAME })
+      .timeout(NOTIFICATION_SEND_TIMEOUT_MS)
       .suppressErrors()
       .execute()
       .catch((error: unknown) => {
