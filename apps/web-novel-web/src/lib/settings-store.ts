@@ -17,18 +17,11 @@ export interface WebnovelSettings {
 
 export type ToggleKey = { [K in keyof WebnovelSettings]: WebnovelSettings[K] extends boolean ? K : never }[keyof WebnovelSettings];
 
-/**
- * Device-local app preferences, persisted per browser like the library and reader settings — never synced
- * to an account, never sent to the server. SSR-safe: reads flow through the guarded `local-store` accessors,
- * so importing or calling these on the server yields the defaults instead of ever touching `window`.
- */
 const SETTINGS_STORAGE_KEY = 'webnovel:settings';
 
 /**
- * Per-device confirmation that the reader is an adult. Distinct from the `showMatureContent` preference: that
- * toggle opts mature titles into browse/search, while this records the one-tap "I'm 18+" consent taken at the
- * gate. Either being set lets mature content through. Shares the `webnovel` prefix, so "Clear all local data"
- * (and clearing it by hand) resets the gate.
+ * Adult consent taken at the gate, distinct from the `showMatureContent` browse preference; either lets mature content through. Shares the `webnovel`
+ * prefix, so clearing local data resets it.
  */
 const MATURE_CONSENT_STORAGE_KEY = 'webnovel:mature-consent';
 
@@ -68,11 +61,7 @@ export function grantMatureConsent(): void {
   writeLocal<boolean>(MATURE_CONSENT_STORAGE_KEY, true);
 }
 
-/**
- * Wipe every device-local key this app owns — settings, library, reading progress and reader prefs. The app
- * theme is deliberately not among them: it is a platform-wide preference shared with the other Shadow apps
- * via a cookie, so clearing this device's data resets it separately (see `SettingsScreen.onClearData`).
- */
+/** Excludes theme: it is a platform-wide cookie shared with the other Shadow apps and is reset separately (see `SettingsScreen.onClearData`). */
 export function clearAllLocalData(): void {
   if (typeof window === 'undefined') return;
   const owned = Object.keys(window.localStorage).filter(key => key.startsWith(APP_STORAGE_PREFIX));

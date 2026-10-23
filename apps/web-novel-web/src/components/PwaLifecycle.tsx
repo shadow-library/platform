@@ -15,23 +15,8 @@ const LAST_ACCOUNT_KEY = 'webnovel:last-account';
 
 const rootRoute = getRouteApi('__root__');
 
-/**
- * The PWA plumbing, mounted once at the root:
- * - service worker registration with the prompt-then-reload update UX (never a surprise refresh),
- * - offline / reconnected banners driven by `useOnlineStatus`,
- * - refetch + reading-progress re-sync when connectivity returns,
- * - public-content query-cache persistence into IndexedDB so previously-loaded screens render offline
- *   (per-user state is denylisted by `shouldPersistQueryKey`, see `@/lib/offline/query-persister`).
- */
-
-/**
- * Closes the account-bleed gap on a shared device: when the signed-in reader differs from the one this
- * browser last held, the downloaded-content database and the cache-first chapter cache are purged before the
- * next reader can open them. The first account seen is adopted (its downloads are its own), so a returning
- * reader keeps their offline library; every later change — to a guest or a different account — purges. Decided
- * only on a session this page fetched successfully: a transient fetch failure is never read as a sign-out, and a
- * session hydrated from the precached shell (a previous reader's, offline) never wipes the current reader's downloads.
- */
+/** Purges downloads and cached chapters when the signed-in account differs from the last one seen on this device; the first account seen is adopted. */
+/** Only a session this page fetched decides: a failed fetch, or a session hydrated from the precached shell (a previous reader's), must never purge. */
 function AccountScopeGuard(): null {
   const accessMode = rootRoute.useRouteContext({ select: context => context.accessMode });
   const session = useQuery({ ...sessionQueryOptions(), refetchOnMount: 'always' });
@@ -55,8 +40,7 @@ function QueryCachePersistence(): null {
   useEffect(() => {
     const [unsubscribe] = persistQueryClient({
       queryClient,
-      // The ecosystem persister types `clientState` as `unknown` (no extra peer dep); the shape is the
-      // stable persist-client contract, so widening here is safe.
+      // The ecosystem persister types `clientState` as `unknown`; the persist-client shape is stable, so widening is safe.
       persister: queryPersister as unknown as Parameters<typeof persistQueryClient>[0]['persister'],
       maxAge: PERSIST_MAX_AGE,
       buster: PERSIST_BUSTER,

@@ -1,8 +1,4 @@
-/**
- * Guest-first persistence: the library and reading progress always live on this device (localStorage),
- * matching the design's "saved on this device — sign in to sync" model. SSR-safe: every accessor no-ops
- * without `window`.
- */
+/** Guest-first persistence in localStorage; every accessor no-ops without `window`, so it is SSR-safe. */
 
 /** Partition a mirror key by the signed-in user so one account's on-device state never bleeds into another's. */
 export function namespacedKey(base: string, userId?: string): string {

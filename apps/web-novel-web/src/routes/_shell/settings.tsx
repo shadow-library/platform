@@ -2,10 +2,7 @@ import { createFileRoute } from '@tanstack/react-router';
 
 import { SETTINGS_SECTION_IDS, SettingsScreen, type SettingsSearch, type SettingsSection } from '@/features/settings';
 
-/**
- * Settings are device-local and account-agnostic, so the screen is public. The active section is a search
- * param (`?section=…`) so other screens can deep-link straight to a pane (e.g. Notification preferences).
- */
+/** Public and device-local. The active section is a search param so other screens can deep-link to a pane. */
 function validateSearch(search: Record<string, unknown>): SettingsSearch {
   const section = SETTINGS_SECTION_IDS.includes(search.section as SettingsSection) ? (search.section as SettingsSection) : 'appearance';
   return { section };

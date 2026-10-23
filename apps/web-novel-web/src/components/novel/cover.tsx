@@ -13,11 +13,7 @@ export interface CoverProps {
   children?: React.ReactNode;
 }
 
-/**
- * Cover artwork: the real image when `cover.imageUrl` was resolved server-side, else the deterministic
- * gradient + title glyph placeholder — the same device-independent trick the design prototype uses, so a
- * cover-less novel still renders offline and with zero requests.
- */
+/** Without `cover.imageUrl` a deterministic gradient placeholder renders, so cover-less novels need no request and work offline. */
 export function Cover({ cover, title, showTitle = true, className, children }: CoverProps): React.JSX.Element {
   return (
     <div className={cn(styles.cover, className)} style={cover.imageUrl ? undefined : { background: `linear-gradient(158deg, ${cover.from} 0%, ${cover.to} 100%)` }}>

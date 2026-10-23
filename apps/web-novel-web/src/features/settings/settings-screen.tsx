@@ -24,12 +24,7 @@ interface ThemeOption {
   label: string;
 }
 
-/**
- * The account-agnostic preferences screen from the mockups: a sticky left rail of sections and a right pane
- * of controls. Every toggle and select is device-local (persisted through `settings-store`), except the theme
- * picker: theme is a platform-wide preference shared with the other Shadow apps, so it reads and writes the
- * design-system `useTheme` directly rather than keeping a second copy here that could disagree with it.
- */
+/** Every control is device-local except theme, which is shared platform-wide and so reads and writes `useTheme` directly instead of a second copy here. */
 const SETTINGS_SECTIONS: { id: SettingsSection; label: string }[] = [
   { id: 'appearance', label: 'Appearance' },
   { id: 'reader', label: 'Reader defaults' },

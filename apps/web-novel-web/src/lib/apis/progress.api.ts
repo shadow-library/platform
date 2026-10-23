@@ -6,19 +6,11 @@ import { type ProgressListItem, type ProgressListResponse } from './api-types.ge
 import { type ApiError, APIRequest } from './transport';
 import { type ReadingProgress } from './types';
 
-/**
- * The live `GET /api/me/progress` wire shape comes from the generated contract: a wrapped `{ items }` list of
- * `ProgressListItem`s carrying `novelSlug`/`ordinal`/`position`/`updatedAt`. `toReadingProgress` picks the
- * fields explicitly so future server additions never leak into the localStorage mirror.
- */
 export type ProgressMap = Record<string, ReadingProgress>;
 
 /**
- * Reading progress is local-first (written on every reader scroll, works offline) and mirrored to
- * `GET/PUT /api/novels/:slug/progress` when signed in. Writes that fail (offline) are queued as dirty slugs
- * and re-pushed by `syncPendingProgress` when connectivity returns. The mirror and its pending queue are
- * namespaced by user id (guests fall back to a `guest` namespace) so one account's reading history never
- * leaks into another's.
+ * Local-first: written on every scroll and mirrored to the server when signed in. Failed writes are queued as dirty slugs and re-pushed by
+ * `syncPendingProgress`. Namespaced by user id (`guest` otherwise).
  */
 const PROGRESS_STORAGE_KEY = 'webnovel:progress';
 const PENDING_STORAGE_KEY = 'webnovel:progress-pending';

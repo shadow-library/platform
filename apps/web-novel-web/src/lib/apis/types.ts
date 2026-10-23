@@ -1,18 +1,14 @@
 import { type DarkContentLevel, type SexualContentLevel, type ViolenceLevel } from '@shadow-library/sdk';
 
 /**
- * The reader's internal client view-model — the presentation shapes every screen is built on. It is
- * deliberately distinct from the generated wire contract (`api-types.gen.ts`): it carries derived, client-only
- * fields (gradient covers, humanized labels, the `ongoing`/`completed`/`hiatus` status the UI speaks) that the
- * lean server DTOs do not, and each `*.api.ts` maps the wire response into these shapes at its boundary. When a
- * shape here is a 1:1 mirror of a server DTO, consume the generated type instead of restating it.
+ * The client view-model: derived, client-only fields (gradient covers, humanized labels, the `ongoing`/`completed`/`hiatus` status) the lean server DTOs lack.
+ * Each `*.api.ts` maps wire responses into these; a shape that would be a 1:1 mirror of a server DTO should use the generated type instead.
  */
 
 export type NovelStatus = 'ongoing' | 'completed' | 'hiatus';
 
 export type CatalogSort = 'trending' | 'popular' | 'rating' | 'updated' | 'chapters' | 'title';
 
-/** Cover artwork: the real image when the server resolved one from `coverUrl`, else a deterministic gradient. */
 export interface NovelCover {
   from: string;
   to: string;
@@ -41,14 +37,12 @@ export interface NovelSummary {
   cover: NovelCover;
 }
 
-/** A cast member on the overview panel; `color` is a gradient tuple for the glyph tile. */
 export interface NovelCharacter {
   name: string;
   role: string;
   color?: [string, string];
 }
 
-/** A gradient placeholder illustration until the server hosts real art. */
 export interface NovelIllustration {
   id: string;
   caption?: string;
@@ -91,10 +85,7 @@ export interface NovelDetail extends NovelSummary {
   language: string;
   translator?: string;
   mature: boolean;
-  /**
-   * Enrichment blocks — every field is optional so the detail screen renders unchanged when the live
-   * server omits them (the fixture layer populates them deterministically per slug).
-   */
+  /** Enrichment blocks are optional: the live server may omit them and the detail screen renders without. */
   characters?: NovelCharacter[];
   illustrations?: NovelIllustration[];
   related?: NovelSummary[];
@@ -164,22 +155,14 @@ export interface LibraryEntry {
   novel: NovelSummary;
 }
 
-/**
- * The reader the UI keys everything off. `userId` is mapped from the auth SDK principal's `sub`
- * (`GET /api/auth/session`, 200; signed-out is a plain 401). `email`/`name` are not carried by the SDK
- * session — they come from the separate userinfo query — so treat them as optional presentation extras.
- */
+/** `userId` is the auth principal's `sub`; `email`/`name` come from the separate userinfo query and are optional presentation extras. */
 export interface SessionUser {
   userId: string;
   email?: string;
   name?: string;
 }
 
-/**
- * The reader-facing lore wiki. Spoiler gating (which entries/facets are visible) is decided entirely
- * server-side from the reader's progress — the client only renders what it is given plus the two
- * "more unlock as you read" counters (`lockedCount`, `hiddenFacetCount`).
- */
+/** Spoiler gating is decided server-side from the reader's progress; the client renders what it is given plus the `lockedCount` / `hiddenFacetCount` counters. */
 export type WikiEntryType = 'character' | 'faction' | 'location' | 'item' | 'concept' | 'power_rule';
 
 export interface WikiEntrySummary {

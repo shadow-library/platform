@@ -3,10 +3,6 @@ interface IconProps {
   className?: string;
 }
 
-/**
- * The app's icon set — inline Lucide-style strokes lifted from the design handoff so the built app carries
- * no icon dependency and every glyph matches the mockups.
- */
 function icon(paths: React.ReactNode, fill = 'none'): (props: IconProps) => React.JSX.Element {
   return function Icon({ size = 18, className }: IconProps): React.JSX.Element {
     return (

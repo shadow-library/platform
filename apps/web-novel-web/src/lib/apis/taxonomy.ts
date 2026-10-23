@@ -1,12 +1,6 @@
 import { type Genre, type Tag } from '@shadow-library/sdk';
 
-/**
- * The curated browse taxonomy the discovery surfaces render as static chips — the genres panel and the search
- * overlay's suggestions. This is presentation content, not API data: the live catalog derives the genres it
- * actually holds from the `/api/novels` response, while these lists give the reader a stable set of entry
- * points to explore before any query runs. Typed against the sdk's `Genre`/`Tag` unions so a curated entry
- * can never drift from the real vocabulary the server actually filters on.
- */
+/** Static discovery chips, typed against the sdk's `Genre`/`Tag` unions so an entry cannot drift from the vocabulary the server filters on. */
 export const CATALOG_GENRES: readonly Genre[] = [
   'Fantasy',
   'Romance',

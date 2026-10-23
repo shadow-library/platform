@@ -7,25 +7,11 @@ import { coverFor, STATUS_FROM_SERVER } from './novels.api';
 import { type ApiError, APIRequest } from './transport';
 import { type LibraryEntry, type NovelSummary } from './types';
 
-/**
- * The live `GET /api/library` wire shape comes from the generated contract: a wrapped `{ items }` list of lean
- * `LibraryItem` shelf entries — no rating or chapter count, an optional `author`, `live`/`retired` status — keyed by `slug`, not
- * the client's `novelSlug`. `toLibraryEntry` normalizes each item into the internal model at this boundary.
- */
-
-/**
- * Library entries are local-first (guests get a device library, per the design), mirrored to the server's
- * `GET/POST/DELETE /api/library` when a session exists so a sign-in syncs the shelf. The local mirror keeps
- * a `NovelSummary` snapshot so the shelf renders offline without a catalog fetch. The mirror is namespaced
- * by user id (guests fall back to a `guest` namespace) so one account's device shelf never merges into
- * another's server library.
- */
+/** Local-first: guests get a device shelf, mirrored to the server when a session exists. The mirror is namespaced by user id (`guest` otherwise) so accounts never merge. */
 const LIBRARY_STORAGE_KEY = 'webnovel:library';
 
 const libraryKeys = {
-  // Keyed by user (namespaced like the storage mirror) rather than a static tuple: the loader fires before
-  // `session.data` resolves, so a static key would cache the guest-empty result under the same key a signed-in
-  // fetch reuses and never refetch once the session lands. Mirrors `notificationsKeys.read`.
+  // Keyed by user: the loader fires before `session.data` resolves, and a static key would cache the guest-empty result and never refetch once the session lands.
   all: (userId?: string) => ['library', userId ?? 'guest'] as const,
 };
 
@@ -45,7 +31,6 @@ export function isInLibrary(entries: LibraryEntry[] | undefined, slug: string): 
   return entries?.some(entry => entry.novelSlug === slug) ?? false;
 }
 
-/** The local mirror's richer catalog snapshot wins when present; a lean server item synthesizes catalog-style defaults. */
 export function toLibraryEntry(item: LibraryItem, local?: LibraryEntry): LibraryEntry {
   const novel: NovelSummary = local?.novel ?? {
     slug: item.slug,
@@ -71,8 +56,7 @@ export const libraryQueryOptions = (userId?: string) =>
     queryFn: async () => {
       const local = readLibrary(userId);
       if (!userId) return local;
-      // Merge server truth over this user's mirror; only entries added under this same namespace (e.g. offline
-      // additions) are promoted — guest entries live in a separate namespace and are never pushed to the account.
+      // Merge server truth over this user's mirror; only entries added under this same namespace are promoted, so guest entries never reach the account.
       const response = await APIRequest.get('/library').timeout(10_000).execute<LibraryListResponse>();
       const localBySlug = new Map(local.map(entry => [entry.novelSlug, entry]));
       const remote = response.items.map(item => toLibraryEntry(item, localBySlug.get(item.slug)));

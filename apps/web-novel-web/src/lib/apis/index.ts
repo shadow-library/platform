@@ -11,11 +11,7 @@ export * from './types';
 export * from './wiki.api';
 
 /**
- * `types.ts` holds the internal client view-model — the presentation shapes the mappers in each `*.api.ts`
- * normalize the wire responses into — and two of its names (`NovelSummary`, `ChapterListResponse`) match
- * schemas `api-types.gen.ts` independently exports, so the two star exports above collide for exactly those.
- * Explicit re-exports win over an ambiguous star export, so these keep `types.ts`'s versions: the whole UI is
- * built on the client model, and the generated wire shapes are consumed only inside the api modules (imported
- * directly from `./api-types.gen`, aliased to `Server*` at the boundary), never through the barrel.
+ * `types.ts` shares `NovelSummary` and `ChapterListResponse` with `api-types.gen.ts`, so the star exports collide; explicit re-exports win the ambiguity.
+ * The UI builds on the client model; generated wire shapes are used only inside the api modules, aliased to `Server*`.
  */
 export type { ChapterListResponse, NovelSummary } from './types';

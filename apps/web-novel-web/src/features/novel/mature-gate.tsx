@@ -39,11 +39,8 @@ function getServerMatureAllowed(): boolean {
 }
 
 /**
- * Resolve whether a mature title must stay gated for this device. The decision depends on `localStorage`
- * (consent + the "show mature content" preference), which is unreadable during SSR and the first client
- * render — so a mature title starts gated on both, and the store's real answer lands only once mounted. That
- * keeps server and client markup identical and guarantees mature text is never present in the pre-consent
- * HTML. `reveal` records consent so the choice survives reloads and future visits.
+ * Consent and the mature-content preference live in `localStorage`, unreadable during SSR and the first client render, so a mature title starts gated on
+ * both: server and client markup match and mature text never appears in the pre-consent HTML. `reveal` records consent.
  */
 export function useMatureGate(mature: boolean): MatureGateState {
   const allowed = useSyncExternalStore(subscribeToMatureAccess, getMatureAllowed, getServerMatureAllowed);

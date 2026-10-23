@@ -13,10 +13,6 @@ export interface NovelCardProps {
   downloaded?: boolean;
 }
 
-/**
- * The poster card from the browse grid mockups: 3/4 cover, bookmark toggle top-left, downloaded tick
- * top-right, then author, rating and status underneath.
- */
 export function NovelCard({ novel, downloaded }: NovelCardProps): React.JSX.Element {
   const session = useQuery(sessionQueryOptions());
   const library = useQuery(libraryQueryOptions(session.data?.userId));

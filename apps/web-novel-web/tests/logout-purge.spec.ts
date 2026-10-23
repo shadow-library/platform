@@ -5,12 +5,7 @@ import { purgeIfAccountChanged } from '@shadow-library/web/offline';
 import { getProgress, purgeOnLogout, saveProgress } from '@/lib/apis';
 import { OFFLINE_DB_NAME, PURGE_CACHE_PREFIXES } from '@/lib/offline';
 
-/**
- * WNW-04 / HIGH-009: a shared device must not carry one reader's downloads or gated-chapter cache to the
- * next. The test runtime ships no IndexedDB, Cache Storage or localStorage, so in-memory stubs stand in and
- * record what the purge deletes. The precache (app shell) must survive — clearing it would break offline
- * navigation for everyone.
- */
+/** The test runtime ships no IndexedDB, Cache Storage or localStorage, so in-memory stubs record what the purge deletes; the precache must survive or offline navigation breaks. */
 let deletedDbs: string[] = [];
 let cacheNames: string[] = [];
 let deletedCaches: string[] = [];

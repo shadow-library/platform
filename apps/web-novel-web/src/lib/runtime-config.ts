@@ -1,10 +1,7 @@
 import { getRouteApi } from '@tanstack/react-router';
 import { createServerFn } from '@tanstack/react-start';
 
-/**
- * Read from the server's environment at request time rather than baked in by Vite: one image is promoted
- * through every environment, so a build-time value would point them all at the same deployment.
- */
+/** Read from the server environment at request time: one image is promoted through every environment, so a build-time value would pin them all to one deployment. */
 export interface PublicRuntimeConfig {
   /** Novel Forge's origin for the "write a novel" links (`NOVEL_FORGE_URL`); null hides them rather than guessing a host. */
   novelForgeUrl: string | null;

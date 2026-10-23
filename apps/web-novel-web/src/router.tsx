@@ -5,11 +5,6 @@ import { NotFound } from '@/components/NotFound';
 
 import { routeTree } from './routeTree.gen';
 
-/**
- * TanStack Start calls `getRouter` once per request on the server. `createAppRouter` (from
- * `@shadow-library/web`) owns the per-request QueryClient, the SSR-query integration, and the shared
- * preload/staleness/pending defaults — this app only supplies its error and not-found screens.
- */
 export function getRouter() {
   return createAppRouter(routeTree, {
     router: {

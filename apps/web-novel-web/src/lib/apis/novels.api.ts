@@ -23,20 +23,8 @@ import {
   type NovelSummary,
 } from './types';
 
-/**
- * The live webnovel-server wire shapes come straight from the generated contract (`api-types.gen`), aliased to
- * `Server*` names at the import. The server publishes a leaner model than the client one — no rating/views, an
- * optional `author`, `blurb` for `synopsis`, `live`/`retired` for status, raw `content` text, and `limit`/`offset` paging —
- * so the mappers below normalize every response into the client model at this boundary and the rest of the app
- * stays shape-agnostic.
- */
-
 export type ServerNovelStatus = ServerNovelSummary['status'];
 
-/**
- * The canonical webnovel-server read surface. Every query forwards TanStack Query's abort `signal` into
- * `APIRequest.signal(...)` so navigation cancels in-flight requests.
- */
 const novelKeys = {
   catalog: (query: CatalogQuery) => ['novels', 'catalog', query] as const,
   detail: (slug: string) => ['novels', 'detail', slug] as const,
@@ -44,7 +32,6 @@ const novelKeys = {
   chapter: (slug: string, ordinal: number) => ['novels', 'chapter', slug, ordinal] as const,
 };
 
-/** Fallback gradient palette for a novel with no `coverUrl` yet — deterministic, keyed on the slug. */
 const COVER_PALETTE: NovelCover[] = [
   { from: '#6366f1', to: '#312e81' },
   { from: '#0ea5e9', to: '#0c4a6e' },
@@ -175,11 +162,7 @@ export const chapterListQueryOptions = (slug: string, page = 1, limit = 100) =>
         .then(({ items }) => ({ items: items.map(meta => ({ ordinal: meta.ordinal, title: meta.title, releasedAt: meta.publishedAt ?? '' })), total: items.length })),
   });
 
-/**
- * Chapter content is immutable per `contentHash` (the server's ETag), so it stays fresh for a long time and
- * the service worker caches it cache-first. When the network is unreachable the query falls back to the
- * explicitly-downloaded copy in the `OfflineStore`, keeping downloaded chapters readable with no worker at all.
- */
+/** Chapter content is immutable per `contentHash`; offline, the query falls back to the explicitly downloaded copy in the `OfflineStore`. */
 export const chapterQueryOptions = (slug: string, ordinal: number) =>
   queryOptions<ChapterContent, ApiError>({
     queryKey: novelKeys.chapter(slug, ordinal),
@@ -209,7 +192,6 @@ async function fetchLiveChapter(slug: string, ordinal: number, signal?: AbortSig
   return toChapterContent(chapter, list.items, novel.title);
 }
 
-/** The loader used when explicitly downloading chapters for offline reading. */
 export function fetchChapter(slug: string, ordinal: number): Promise<ChapterContent> {
   return fetchLiveChapter(slug, ordinal);
 }

@@ -16,7 +16,6 @@ export interface LibrarySearch {
 
 type LibraryFilter = 'all' | 'reading' | 'unread' | 'completed' | 'updated';
 
-/** A shelf entry decorated with the reading state the tabs, badges and progress bars all key off. */
 interface ShelfItem {
   entry: LibraryEntry;
   progress?: ReadingProgress;

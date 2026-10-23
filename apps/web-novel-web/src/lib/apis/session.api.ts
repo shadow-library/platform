@@ -13,16 +13,9 @@ import { apiClient, ApiError, isApiError } from './transport';
 import { type SessionUser } from './types';
 
 /**
- * `/api/auth/*` is `@shadow-library/auth`'s surface, not the reader's: webnovel-server mounts the SDK, so
- * `GET /api/auth/session`, `GET /api/auth/access`, `GET /api/auth/login?return_to=` and `POST /api/auth/logout`
- * are the SDK's contract. `createAuthApi` is the client half of it, so the principal shape and the
- * login/logout routes come from there instead of being restated here.
- *
- * The session read is isomorphic: in the browser it is a same-origin call, and during SSR the shared transport
- * forwards the caller's cookie — which is what lets the gates below redirect server-side with a real 302 rather
- * than a client-side flash. The signed-out 401 is folded into a `null` session: on a public deployment a guest
- * browsing the catalog is a valid state for the reader, not a failure. A private deployment never lets one past
- * {@link requireReaderAccess}.
+ * `/api/auth/*` is `@shadow-library/auth`'s surface; `createAuthApi` supplies the principal shape and login/logout routes.
+ * The session read is isomorphic: SSR forwards the caller's cookie so gates redirect with a real 302. The signed-out 401 becomes a `null` session,
+ * since a guest browsing a public deployment is valid; a private deployment never lets one past {@link requireReaderAccess}.
  */
 const authApi = createAuthApi(apiClient.auth);
 
@@ -39,11 +32,7 @@ async function fetchSession(): Promise<SessionUser | null> {
   throw new ApiError(result.failure.status, result.failure, result.failure.retryAfterSeconds);
 }
 
-/**
- * The reader's own profile, from the SDK's userinfo route. Kept off {@link sessionQueryOptions} on
- * purpose: that query gates the library route, and a name is not a reason to fail a gate. The display
- * `name`/`email` the shell shows come from here, not from the session principal (which carries only `sub`).
- */
+/** Kept off {@link sessionQueryOptions}: that query gates the library route and a missing name is not a reason to fail a gate. */
 async function fetchUserInfo(): Promise<UserInfo> {
   return apiClient.auth.get('/userinfo').execute<UserInfo>();
 }
@@ -73,7 +62,6 @@ const requiredSessionQueryOptions = () =>
     },
   });
 
-/** The SSR-safe auth gate for authed routes — redirects guests to `/login?returnTo=…` via `requireAuth`. */
 export function requireSession(queryClient: QueryClient, returnTo: string): Promise<SessionUser> {
   // `requireAuth`'s generic param is invariant over the branded `staleTime` in `queryOptions<T>()`, so the
   // options are widened to the parameter's own type and the (runtime-correct) result narrowed back.
@@ -86,11 +74,6 @@ export function readAccessMode(queryClient: QueryClient): Promise<AuthAccessMode
   return resolveAccessMode(queryClient, authApi.accessQueryOptions());
 }
 
-/**
- * The gate for every reader screen: on a private deployment it demands a session exactly as {@link requireSession}
- * does, on a public one it lets guests through. The resolved mode is what the route hands its children, so the
- * screens and the session guard read the same answer the gate acted on.
- */
 export async function requireReaderAccess(queryClient: QueryClient, returnTo: string): Promise<AuthAccessMode> {
   const session = requiredSessionQueryOptions() as Parameters<typeof requireAuth>[1];
   const gate = await requireAccess(queryClient, { access: authApi.accessQueryOptions(), session, loginTo: '/login', returnTo });
@@ -100,10 +83,7 @@ export async function requireReaderAccess(queryClient: QueryClient, returnTo: st
   return gate.mode;
 }
 
-/**
- * Keeps a private deployment's session live after the gate let the reader in, bouncing to `/login` the moment it
- * ends. Disarmed on a public deployment, where an expired session simply reads as a guest.
- */
+/** Keeps a private deployment's session live after the gate, bouncing to `/login` when it ends; disarmed on a public deployment. */
 export function useReaderSessionGuard(accessMode: AuthAccessMode): SessionGuardStatus {
   return useSessionGuard({ query: requiredSessionQueryOptions(), loginTo: '/login', enabled: accessMode === 'private' });
 }
@@ -114,13 +94,8 @@ export function loginUrl(returnTo: string): string {
 }
 
 /**
- * Ends the server-side app session. The SDK's logout is a `POST` behind webnovel-server's CSRF
- * double-submit, which the shared transport satisfies on the browser path. An already-invalid session still
- * signs the reader out locally, so an expected `ApiError` is swallowed; anything else propagates.
- *
- * Returns identity's end-session URL where the deployment configures RP-initiated logout. The caller
- * navigates there instead of to the catalog root: it ends the central identity session too and bounces
- * back on its own, so skipping it would leave the reader signed in at identity.
+ * A `POST` behind webnovel-server's CSRF double-submit. An already-invalid session still signs out locally, so `ApiError` is swallowed.
+ * Returns identity's end-session URL when RP-initiated logout is configured; the caller must navigate there or the reader stays signed in at identity.
  */
 export async function signOut(): Promise<string | undefined> {
   try {
@@ -132,11 +107,8 @@ export async function signOut(): Promise<string | undefined> {
 }
 
 /**
- * Wipe every on-device trace of the session on sign-out: the in-memory query cache, the IndexedDB query
- * persister, this user's namespaced library/progress/updates mirrors, the downloaded-content database, and
- * the runtime Cache Storage that holds cache-first chapter responses. Without the last two the next person on
- * the device would inherit the previous account's cached shelf, reading history, and any gated chapter it
- * unlocked. The offline store is closed first so its database can be deleted rather than block on an open handle.
+ * Wipes every on-device trace of the session: query cache, persisted cache, user-namespaced mirrors, the downloads database and the cache-first chapter
+ * responses (which may hold gated chapters).
  */
 export async function purgeOnLogout(queryClient: QueryClient, userId?: string): Promise<void> {
   clearLibraryMirror(userId);

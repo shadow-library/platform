@@ -4,12 +4,7 @@ import { clearProgressMirror, getProgress, readProgressMap, saveProgress } from 
 import { namespacedKey } from '@/lib/local-store';
 import { shouldPersistQueryKey } from '@/lib/offline';
 
-/**
- * The on-device partitioning guarantees behind WNW-02/03: per-user state must never reach the persisted
- * query cache, and the localStorage mirror must isolate one account's reading history from another's. The
- * test runtime ships no `localStorage` (the app no-ops without it), so a fresh in-memory Storage is
- * installed per test to exercise the mirror.
- */
+/** The test runtime ships no `localStorage`, so a fresh in-memory Storage is installed per test. */
 function installMemoryStorage(): void {
   const store = new Map<string, string>();
   const storage = {

@@ -60,8 +60,7 @@ const SECONDARY_NAV: NavLeaf[] = [
   { to: '/help', label: 'Help', icon: <HelpIcon size={16} /> },
 ];
 
-// Novel Forge is a separate service, so this is a real external link, not SPA nav. It sits among the
-// destinations rather than in a footer slot, because to a reader it is simply somewhere else to go.
+// Novel Forge is a separate service, so this is a real external link, not SPA nav.
 function navConfig(novelForgeUrl: string | null): NavConfig {
   const secondary = novelForgeUrl ? [...SECONDARY_NAV, { to: novelForgeUrl, label: 'Write a novel', icon: <PencilIcon size={16} />, external: true }] : SECONDARY_NAV;
   return { variant: 'sections', sections: [{ items: MAIN_NAV }, { items: secondary }] };
@@ -96,14 +95,11 @@ export function AppShell({ children }: AppShellProps): React.JSX.Element {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
-  // End the server session, then purge this account's on-device caches so the next person on the device
-  // never inherits the previous user's cached library or reading history, and finally reset the app.
+  // Purge this account's on-device caches so the next person on the device never inherits its library or reading history.
   const onSignOut = async (): Promise<void> => {
     const redirectTo = await signOut();
     await purgeOnLogout(queryClient, user?.userId);
-    // On-device traces are purged first either way; where RP-initiated logout is configured the reader is
-    // then handed to identity to end the central session, rather than dropped back on the catalog still
-    // signed in there.
+    // Where RP-initiated logout is configured, hand the reader to identity so the central session ends too.
     window.location.href = redirectTo ?? '/';
   };
 

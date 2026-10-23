@@ -3,10 +3,6 @@ import { Button } from '@shadow-library/ui';
 
 import styles from './boundary.module.css';
 
-/**
- * The 404 surface from the mockups ("Lost in the shadows") — plain content, so it renders inside whichever
- * layout is already mounted.
- */
 export function NotFound(): React.JSX.Element {
   return (
     <div className={styles.wrap}>

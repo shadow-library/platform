@@ -24,8 +24,7 @@ const NOINDEX = { name: 'robots', content: 'noindex' };
 
 export const Route = createRootRouteWithContext<RouterContext>()({
   /**
-   * Resolved here rather than by the reader gate because a crawler never sees a gated page — it is 302'd to
-   * `/login` — so `noindex` has to ride on the documents outside the gate (login, not-found, errors) too. The
+   * Resolved here because a crawler is 302'd off gated pages, so `noindex` must ride on the documents outside the gate (login, not-found, errors);
    * gated routes refine `accessMode` with the answer their gate acted on.
    */
   beforeLoad: async ({ context }) => ({ accessMode: await readAccessMode(context.queryClient) }),

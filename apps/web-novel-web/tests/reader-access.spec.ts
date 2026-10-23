@@ -5,10 +5,7 @@ import { createAuthApi } from '@shadow-library/web/auth';
 
 import { apiClient, readAccessMode, requireReaderAccess, sessionKeys } from '@/lib/apis';
 
-/**
- * The reader's access gate over the SDK's `/api/auth/access` and `/api/auth/session` routes. The transport's browser
- * path calls the global `fetch`, so a stub answering per path stands in for webnovel-server.
- */
+/** The transport's browser path calls global `fetch`, so a stub answering per path stands in for webnovel-server. */
 type Answer = { status: number; body?: unknown } | 'offline';
 
 const ACCESS_KEY = createAuthApi(apiClient.auth).keys.access;

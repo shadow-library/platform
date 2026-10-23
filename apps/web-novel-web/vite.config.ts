@@ -7,21 +7,11 @@ import viteReact from '@vitejs/plugin-react';
 import { defineConfig, type Plugin } from 'vite';
 import { buildManifest } from '@shadow-library/web/pwa';
 
-/**
- * The browser talks to webnovel-server on the same origin (`/api/...`), so dev proxies `/api` to the backend
- * at `API_ORIGIN` (falling back to `SERVER_URL`, then localhost). Production fronts this Start server and the
- * API with a reverse proxy that routes `/api` to webnovel-server and everything else here.
- */
+/** Dev proxies `/api` to `API_ORIGIN`, then `SERVER_URL`, then localhost; production routes `/api` to webnovel-server at the reverse proxy. */
 const proxyTarget = process.env.API_ORIGIN || process.env.SERVER_URL || 'http://localhost:8080';
 const proxy = { '/api': { target: proxyTarget, changeOrigin: true, secure: false } };
 
-/**
- * Writes the installable manifest, built with the ecosystem's `buildManifest`, to `public/` at build
- * time so Vite copies it into `dist/client` and `serve()` delivers it as `application/manifest+json`.
- * This Start version has no server-route surface, so a static file is the canonical serving path. Runs
- * as a `buildStart` hook (formerly a standalone `scripts/generate-manifest.ts` invoked before `vite
- * build`) so `vite build` alone is a complete, self-contained build step.
- */
+/** Written to `public/` at build time because this Start version has no server-route surface to serve the manifest from. */
 function manifestPlugin(): Plugin {
   return {
     name: 'shadow-webnovel-manifest',

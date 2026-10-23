@@ -4,12 +4,7 @@ import { join } from 'node:path';
 
 import { serve } from '@shadow-library/web/server-entry';
 
-/**
- * The production server — static assets (immutable cache + gzip), SSR streaming, `/sw.js` with
- * service-worker headers, `*.webmanifest` as `application/manifest+json`, a backend-independent liveness
- * probe, and graceful drain — is the shared Bun server from `@shadow-library/web`. This entry only points
- * it at this app's build output; ports come from `PORT` / `HEALTH_PORT`.
- */
+/** Serving (assets, SSR streaming, `/sw.js` headers, manifest type, liveness, drain) is the shared server in `@shadow-library/web`; ports come from `PORT` / `HEALTH_PORT`. */
 const CLIENT_DIR = join(import.meta.dir, 'dist', 'client');
 const SSR_ENTRY = new URL('./dist/server/server.js', import.meta.url);
 

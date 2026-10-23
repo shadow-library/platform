@@ -5,10 +5,8 @@ import { ReaderScreen } from '@/features/reader';
 import { chapterQueryOptions, novelQueryOptions, requireReaderAccess } from '@/lib/apis';
 
 /**
- * The reader owns the full viewport, so it sits outside the shell and carries its own access gate and session
- * guard. Chapter data is seeded server-side with non-blocking prefetches so SSR streams the live chapter, while
- * the in-component query keeps the offline fallback (OfflineStore → downloaded copy) and the offline-blocked
- * state rendering instead of an error boundary when there is no network.
+ * The reader owns the viewport, so it sits outside the shell with its own access gate and session guard. Chapter data is prefetched non-blockingly for SSR;
+ * the in-component query keeps the offline fallback (downloaded copy) and offline-blocked state rendering instead of an error boundary.
  */
 export const Route = createFileRoute('/read/$slug/$ordinal')({
   beforeLoad: async ({ context, location }) => ({ accessMode: await requireReaderAccess(context.queryClient, location.href) }),

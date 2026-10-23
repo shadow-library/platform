@@ -2,11 +2,7 @@ import { fileURLToPath, URL } from 'node:url';
 
 import { defineConfig } from 'vite';
 
-/**
- * The one inherent PWA build step: the service worker must be its own classic script at a stable URL, so a
- * second tiny build emits `src/sw.ts` → `dist/client/sw.js` after the main SSR build. `serve()` (the shared
- * Bun production server) already sends `/sw.js` with `no-cache` + `Service-Worker-Allowed: /` headers.
- */
+/** The worker must be its own classic script at a stable URL, so a second build emits `src/sw.ts` to `dist/client/sw.js` after the SSR build. */
 export default defineConfig({
   resolve: {
     alias: {

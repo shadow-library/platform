@@ -3,13 +3,7 @@ import { queryOptions } from '@tanstack/react-query';
 import { type ApiError, APIRequest } from './transport';
 import { type WikiEntryDetail, type WikiEntryType, type WikiIndex } from './types';
 
-/**
- * The live webnovel-server wiki wire shapes (verified against `WikiListResponse`/`WikiEntryDetailResponse` in
- * `wiki.dto.ts`, and against the regenerated `api-types.gen.ts`). The shapes already match the client model
- * 1:1, so no mapper is needed at this boundary — unlike `novels.api.ts`, which normalizes a leaner server
- * shape. Spoiler gating (which entries/facets are visible, and the two "more unlock as you read" counters)
- * is decided entirely server-side from the reader's progress; the client never filters further.
- */
+/** Wire shapes match the client model 1:1, so no mapper. Spoiler gating is entirely server-side; the client never filters further. */
 interface ServerWikiListItem {
   entryKey: string;
   type: WikiEntryType;
@@ -41,11 +35,8 @@ interface ServerWikiEntryDetailResponse extends ServerWikiListItem {
 }
 
 /**
- * The reader's wiki read surface. Both endpoints forward TanStack Query's abort `signal` so navigation
- * cancels in-flight requests, and paths are surface-relative (`/novels/:slug/wiki`) because `APIRequest` is
- * already rooted at `/api`. A 404 — an unknown novel, or a wiki entry that is missing *or still
- * spoiler-locked* (the server answers both identically so existence can't be probed) — bubbles to the
- * router's default error boundary exactly like an unknown novel slug does.
+ * Paths are surface-relative (`APIRequest` is rooted at `/api`). A 404 for an unknown novel, or a missing or spoiler-locked entry (answered identically
+ * so existence can't be probed), bubbles to the router's error boundary.
  */
 export const wikiKeys = {
   index: (slug: string) => ['novels', 'wiki', slug] as const,

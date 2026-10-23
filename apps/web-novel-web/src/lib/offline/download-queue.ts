@@ -13,15 +13,12 @@ export interface DownloadTask {
 interface StartDownloadInput {
   slug: string;
   title: string;
-  /** Ordinals to fetch, in order. Progress is measured against this length. */
   ordinals: number[];
   /** Fetches and persists a single chapter. A rejection fails the task; already-completed chapters are kept for retry. */
   step: (ordinal: number) => Promise<void>;
-  /** Runs once every ordinal is persisted — the place to update the novel record and refresh the screen. */
   onComplete: () => Promise<void>;
 }
 
-/** The mutable book-keeping the queue keeps per task; never handed out — snapshots are plain {@link DownloadTask}s. */
 interface InternalTask extends DownloadTask {
   ordinals: number[];
   step: (ordinal: number) => Promise<void>;
@@ -31,11 +28,8 @@ interface InternalTask extends DownloadTask {
 }
 
 /**
- * A tiny in-memory, SSR-safe download manager. Real background-download infrastructure does not exist, so this
- * drives the offline-library states (downloading / paused / failed) cooperatively: it walks the requested
- * ordinals, calling the caller's `step` per chapter and honouring pause/resume/cancel between chapters. A short
- * pace between chapters keeps progress observable and pause responsive. Finished downloads leave the queue and
- * become OfflineStore records, so the queue only ever holds in-flight work.
+ * No background-download infrastructure exists, so this walks the ordinals cooperatively, honouring pause/resume/cancel between chapters; finished
+ * downloads leave for the OfflineStore.
  */
 const PACE_MS = 90;
 

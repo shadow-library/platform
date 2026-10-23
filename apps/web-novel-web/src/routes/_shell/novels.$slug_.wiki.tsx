@@ -3,10 +3,7 @@ import { createFileRoute, notFound } from '@tanstack/react-router';
 import { WikiIndexScreen } from '@/features/wiki';
 import { isApiError, novelQueryOptions, wikiIndexQueryOptions } from '@/lib/apis';
 
-/**
- * A restricted or unknown novel slug 404s the same way `novels.$slug` does — mapped to `notFound()` here too
- * so the wiki index doesn't surface it as a 500 through `DefaultCatchBoundary`.
- */
+/** Same 404 mapping as `novels.$slug`, so a restricted or unknown slug does not surface as a 500 through `DefaultCatchBoundary`. */
 export const Route = createFileRoute('/_shell/novels/$slug_/wiki')({
   loader: async ({ context, params }) => {
     void context.queryClient.prefetchQuery(novelQueryOptions(params.slug));

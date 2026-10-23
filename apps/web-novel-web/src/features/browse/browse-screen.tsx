@@ -35,11 +35,9 @@ export interface BrowseSearch {
   sort?: CatalogSort;
   view?: 'grid' | 'list';
   page?: number;
-  /** Minimum star rating, applied client-side over the fetched page. */
   minRating?: number;
   /** Inclusive chapter-count range encoded as `lo-hi`; `hi` at the ceiling means "and up". */
   chapters?: string;
-  /** Recency window for `updatedAt`. */
   updatedWithin?: UpdatedWindow;
   /** Original language — presentational until the catalog DTO carries it (see filterCatalog). */
   language?: string;
@@ -47,9 +45,7 @@ export interface BrowseSearch {
   hideMature?: boolean;
 }
 
-/** The catalog DTO the grid consumes carries only summary fields; the enrichment fields live on the
- *  detail DTO. This view lets the client filters self-activate if a summary ever carries them, and stay
- *  a harmless no-op while it does not. */
+/** Summaries carry no language/mature/translator today; the client filters activate if they ever do and are no-ops until then. */
 type EnrichedSummary = NovelSummary & Partial<Pick<NovelDetail, 'language' | 'mature' | 'translator'>>;
 
 export const BROWSE_PAGE_SIZE = 24;
@@ -63,8 +59,7 @@ const SORT_LABELS: Record<CatalogSort, string> = {
 };
 const STATUS_OPTIONS: NovelStatus[] = ['ongoing', 'completed', 'hiatus'];
 
-/** Grouped-prefix labels, same construction as the forge's publish-screen tag picker (`a878d96d`) — flat
- *  options for `Combobox`'s search, never a second group-aware component. */
+/** Flat grouped-prefix labels for `Combobox` search, rather than a second group-aware component. */
 const TAG_OPTIONS: ComboboxOption[] = NOVEL_TAG_GROUPS.flatMap(({ label, tags }) => tags.map(tag => ({ value: tag, label: `${label} — ${tag}` })));
 
 interface RatingCeilingConfig<D extends ContentRatingDimension> {
@@ -134,8 +129,7 @@ function formatChapterHi(hi: number): string {
   return hi >= CHAPTER_MAX ? `${CHAPTER_MAX.toLocaleString()}+` : hi.toLocaleString();
 }
 
-/** Applies the drawer's post-fetch filters over the current page. Rating, chapter count and recency read
- *  real summary fields; language/mature/translator only fire when a summary actually carries them. */
+/** Post-fetch filters over the current page; language/mature/translator only fire when a summary carries them. */
 function filterCatalog(items: NovelSummary[], search: BrowseSearch): NovelSummary[] {
   const range = parseChapterRange(search.chapters);
   const windowMs = search.updatedWithin ? UPDATED_WINDOW_MS[search.updatedWithin] : undefined;

@@ -21,11 +21,7 @@ export interface ReaderPalette {
   muted: string;
 }
 
-/**
- * Reader typography and theme, persisted per device. The reading surface deliberately has its own palette
- * (paper/sepia/ink, per the mockups) independent of the app theme; system fonts keep chapters readable
- * offline with zero external font fetches.
- */
+/** Per-device reader typography and theme, with a palette independent of the app theme; system fonts keep chapters readable offline. */
 const STORAGE_KEY = 'webnovel:reader-settings';
 
 const READER_DEFAULTS: ReaderSettings = { theme: 'sepia', font: 'serif', fontSize: 19, lineHeight: 1.75, width: 'normal', align: 'left' };

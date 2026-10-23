@@ -12,7 +12,6 @@ import { type LibraryEntry, type ReadingProgress } from './types';
 /** The kinds of update this client can actually observe. Replies and product news have no data source here. */
 export type NotificationType = 'chapter' | 'download';
 
-/** A single entry in the "Updates" feed. `createdAt` is an ISO instant; the relative label is derived at render. */
 export interface Notification {
   id: string;
   type: NotificationType;
@@ -40,18 +39,9 @@ interface DeriveInput {
 }
 
 /**
- * webnovel-server has no notifications endpoint, so rather than invent a feed, this derives one from the
- * signals the client genuinely holds: the reader's own shelf and reading progress (a novel that moved on
- * after they last opened it) and the offline store (chapters actually saved to this device). Nothing is
- * fabricated — when there is no such signal the feed is empty and the screen says so.
- *
- * The only thing persisted is which entry ids have been read, namespaced by user id like the library and
- * progress mirrors. Ids embed the fact that produced them (`chapter:<slug>:<chapterCount>`), so a novel
- * gaining further chapters surfaces as a new, unread entry rather than staying dismissed forever.
- *
- * Known gap: a library entry synced from another device carries no catalog snapshot (`chapterCount: 0`), so
- * it cannot produce a chapter update until this device sees the novel in the catalog. Closing that properly
- * needs the server to expose chapter counts on `GET /library`, not more client-side guessing.
+ * The server has no notifications endpoint, so the feed is derived from the shelf, reading progress and the offline store. Only read ids persist, namespaced by user;
+ * ids embed `chapterCount` so further chapters surface as a new unread entry.
+ * A library entry synced from another device has `chapterCount: 0` and yields no chapter update until this device sees the novel in the catalog.
  */
 const READ_STORAGE_KEY = 'webnovel:notifications-read';
 
@@ -73,10 +63,6 @@ export function clearNotificationsMirror(userId?: string): void {
   removeLocal(namespacedKey(READ_STORAGE_KEY, userId));
 }
 
-/**
- * Builds the feed from the raw signals. Pure and total, so the shell's unread dot and the Updates screen can
- * never disagree, and so it stays trivially testable.
- */
 export function deriveNotifications(input: DeriveInput): Notification[] {
   const { library, progress, downloads, settings, readIds } = input;
   const items: Notification[] = [];
@@ -123,13 +109,7 @@ export function deriveNotifications(input: DeriveInput): Notification[] {
   return items.sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
 }
 
-/**
- * The single source for the Updates feed, shared by the screen and the shell's unread dot.
- *
- * The offline store lives in IndexedDB, which the server has no access to, so that read is a query of its own
- * and resolves to an empty list during SSR — the feed fills in on hydration like the rest of the device-local
- * surfaces.
- */
+/** Shared by the screen and the shell's unread dot. The offline store is IndexedDB, so it resolves empty during SSR and fills in on hydration. */
 export function useNotifications(userId?: string): NotificationsFeed {
   const queryClient = useQueryClient();
   const library = useQuery(libraryQueryOptions(userId));

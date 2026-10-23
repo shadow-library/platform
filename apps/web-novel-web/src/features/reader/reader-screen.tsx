@@ -36,8 +36,7 @@ import styles from './reader-screen.module.css';
 
 const route = getRouteApi('/read/$slug/$ordinal');
 
-// Brightness is a device-local reading dim, persisted through the same local-store primitive as the other
-// reader settings but under its own key so it never rides the synced settings object.
+// Device-local reading dim under its own key, separate from the other reader settings.
 const BRIGHTNESS_KEY = 'webnovel:reader-brightness';
 const BRIGHTNESS_MIN = 50;
 const BRIGHTNESS_MAX = 100;
@@ -217,8 +216,7 @@ export function ReaderScreen(): React.JSX.Element {
       {chapter.data && novel.data && (
         // Gate on `novel.data` too: maturity lives on the novel, so the chapter body must wait until it is
         // known — otherwise a mature chapter could flash if its query wins the race against the novel's.
-        // Tap-anywhere chrome toggle — a redundant pointer affordance (the chrome buttons remain the
-        // accessible path), so the wrapper is presentational rather than a focusable control.
+        // Redundant pointer affordance (the chrome buttons are the accessible path), hence presentational.
         <div role="presentation" style={{ filter: `brightness(${brightness / 100})` }} onClick={() => setChrome(value => !value)}>
           <article
             className={styles.article}
