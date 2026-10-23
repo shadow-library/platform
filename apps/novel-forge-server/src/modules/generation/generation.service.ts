@@ -165,9 +165,8 @@ export class GenerationService {
     await this.assertProjectExists(projectId);
     const limit = body.limit ?? 1;
 
-    // Ordering guard: never run two generation streams at once. Overlapping streams both pick "the next
-    // chapter" and persist drafts out of order (the cause of chapters landing as 9,10,11 with 1–8 missing).
-    // If a generation job is already active, return it unchanged instead of starting a competing one.
+    // Never run two generation streams at once: overlapping streams both pick "the next chapter" and persist drafts out of order.
+    // An active generation job is returned unchanged instead of starting a competing one.
     const activeJob = await this.db.query.jobs.findFirst({
       where: and(eq(schema.jobs.projectId, projectId), eq(schema.jobs.kind, 'generate'), inArray(schema.jobs.status, ['pending', 'in_progress'])),
     });
@@ -179,10 +178,9 @@ export class GenerationService {
     const contradiction = await this.db.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.reviewStatus, 'contradiction')) });
     if (contradiction) throw AppErrorCode.DRF_003.create();
 
-    // Generate strictly in ascending chapter order: the next chapters that have a brief but no draft yet,
-    // truncated at the first unfilled external-write slot or at a chapter with no prose (see `selectGenerationBatch`).
-    // Because each chapter is drafted before the next begins, generation only advances once the previous chapter is
-    // done — no gaps, no skipping ahead.
+    // Strictly ascending: the next chapters with a brief but no draft, truncated at the first unfilled external-write slot or chapter with no prose (see
+    // `selectGenerationBatch`).
+    // Each chapter is drafted before the next begins, so there are no gaps and no skipping ahead.
     const allBriefs = await this.db.query.briefs.findMany({ where: eq(schema.briefs.projectId, projectId), orderBy: asc(schema.briefs.chapter) });
     const existingDrafts = await this.db.query.drafts.findMany({ where: eq(schema.drafts.projectId, projectId), columns: { chapter: true } });
     const finalizedChapters = await this.db.query.chapters.findMany({
@@ -839,11 +837,9 @@ export class GenerationService {
   }
 
   /**
-   * Folds the canon a (usually hand-authored) chapter establishes back into the story bible. Runs the
-   * chapter-extract prompt to derive a change-set of entity/bible ops, then stages it as a normal
-   * refinement proposal so the author reviews it in the chat alongside every other canon edit
-   * — rather than the parallel continuity-proposal path. Throws DRF_005 when the chapter adds nothing new. An isolated chapter is read on
-   * the unrestricted route and its excerpts are withheld from what is staged.
+   * Folds the canon a (usually hand-authored) chapter establishes back into the story bible: the chapter-extract prompt derives a change-set that is staged as a normal
+   * refinement proposal for the author to review in the chat, not through the continuity-proposal path. Throws DRF_005 when the chapter adds nothing new.
+   * An isolated chapter is read on the unrestricted route and its excerpts are withheld from what is staged.
    */
   async extractChapterToBible(projectId: bigint, chapter: number): Promise<Refinement.Proposal> {
     const draft = await this.getDraft(projectId, chapter);
@@ -918,10 +914,8 @@ export class GenerationService {
     const proposalRow = await this.getContinuityProposal(projectId, chapter);
     const delta = proposalRow.proposal;
 
-    // Apply every canon mutation, mark the proposal applied, and flag the chapter in one transaction:
-    // a partial application must never be recorded as `applied`.
-    // A proposal holding low-confidence entries stays `pending` so it remains reachable for review — only a
-    // delta that applied in full becomes `applied`.
+    // One transaction applies every canon mutation, marks the proposal applied and flags the chapter; a partial application is never recorded as `applied`.
+    // A proposal holding low-confidence entries stays `pending` so it remains reachable for review.
     const hasHeldEntries = continuityHasHeldEntries(delta);
 
     const updated = await this.db.transaction(async tx => {

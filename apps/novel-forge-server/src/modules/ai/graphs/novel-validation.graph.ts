@@ -74,7 +74,7 @@ function tryParseValidation(raw: string): ValidationOutput | null {
     const parsed = parseSchema<ValidationOutput>(ValidationSchema, JSON.parse(raw));
     if (parsed.success) return parsed.data;
   } catch {
-    // try extraction
+    // fall through to candidate extraction
   }
   for (const candidate of extractJsonCandidates(raw)) {
     const parsed = parseSchema<ValidationOutput>(ValidationSchema, candidate);

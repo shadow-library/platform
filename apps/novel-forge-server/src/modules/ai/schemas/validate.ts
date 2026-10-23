@@ -56,8 +56,7 @@ function compile(Class: SchemaClass): ValidateFunction {
   return validateFn;
 }
 
-// class-schema replacement for zod's `.safeParse()` — validates `data` against the JSON Schema
-// generated from a @Schema()-decorated class (or `[Class]` for a top-level array).
+// Validates `data` against the JSON Schema generated from a @Schema()-decorated class (or `[Class]` for a top-level array).
 export function parseSchema<T>(Class: SchemaClass, data: unknown): SchemaParseResult<T> {
   const validateFn = compile(Class);
   const valid = validateFn(data);

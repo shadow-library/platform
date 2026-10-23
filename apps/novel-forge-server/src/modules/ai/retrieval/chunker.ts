@@ -11,7 +11,7 @@ function splitAtSentence(text: string, limit: number): [string, string] {
   let match: RegExpExecArray | null;
   while ((match = sentenceEnd.exec(text)) !== null) {
     if (match.index + 1 >= limit) break;
-    lastGoodIdx = match.index + 1; // include the punctuation character, exclude the space
+    lastGoodIdx = match.index + 1;
   }
   if (lastGoodIdx === 0) return [text.slice(0, limit), text.slice(limit)];
   return [text.slice(0, lastGoodIdx), text.slice(lastGoodIdx).trimStart()];

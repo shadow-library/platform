@@ -12,8 +12,7 @@ export interface ScopePlaybook {
 
 // The authoring playbook is the "senior web novelist" of the chat subsystem: it narrows both what good
 // looks like and the op vocabulary the model may propose — a smaller vocabulary keeps weak local models
-// inside the repair ladder's reach. The chat-scope enum still carries its original per-artifact values
-// for legacy rows, but every session now runs this one playbook.
+// inside the repair ladder's reach. The chat-scope enum keeps its per-artifact values, but every session runs this one playbook.
 
 const LATER_MATERIAL = [
   `Organising the author's notes is action.organise_notes, never pages you write yourself: when they hand you their notes or ask you to organise them and the notes run to ${ORGANISE_MIN_WORDS} words or more, propose that action alone, without reading the notes first — it keeps the world as the story opens in the Story Bible and puts what happens later on the private timeline. Shorter notes you organise yourself, by the two rules that follow.`,

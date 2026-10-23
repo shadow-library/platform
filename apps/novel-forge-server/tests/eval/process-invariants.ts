@@ -1,7 +1,5 @@
-// Process/telemetry invariant checks — standalone runnable
-// CLI. Reusable tooling: intended to run later against a real project's data, not as a one-off. All
-// invariant math lives in `@server/modules/eval/process-invariants` (pure, unit-tested); this script only
-// does argument parsing, DB fetch, and report printing.
+// Process/telemetry invariant checks — standalone CLI.
+// Argument parsing, DB fetch and report printing only; the invariant math lives in `@server/modules/eval/process-invariants`.
 //
 // Usage:
 //   bun run eval:invariants -- --project <id> [--from <n> --to <n>] [--since <ISO date>] [--json]
@@ -13,8 +11,7 @@
 //               approximating a "run" window since none of those tables carry a run/batch id of their own
 //   --json      print the full machine-readable report instead of the plain-text summary
 //
-// Connects to `DATABASE_POSTGRES_URL` directly (same convention as `src/migrate.ts`) — an infra script
-// that runs outside the app, exempt from the "read config via Config" rule.
+// Reads `DATABASE_POSTGRES_URL` directly like `src/migrate.ts`: an infra script outside the app, exempt from the Config rule.
 import { and, eq, gte } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 

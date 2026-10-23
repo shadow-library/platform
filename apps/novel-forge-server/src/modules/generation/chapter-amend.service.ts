@@ -91,7 +91,8 @@ export class ChapterAmendService {
 
   /**
    * Every reader of a finalized chapter's prose that goes through its draft (the chapter reader and amend pre-fill, extract-to-bible, the manuscript, a resumed
-   * finalize) must see the amendment, so the final draft takes it under a new revision. Unrestricted fill and legacy rows can leave the finalized body with no
+   * finalize) must see the amendment, so the final draft takes it under a new revision. Unrestricted fill and rows from before history was kept can leave the
+   * finalized body with no
    * history row, so it is snapshotted first; amendments filed before the draft followed them sit above its counter. Its judge verdict described the old prose, so it is cleared.
    */
   private async syncFinalDraft(tx: DbExecutor, projectId: bigint, chapterNumber: number, chapter: Chapter.Row, fields: AmendedDraftFields): Promise<void> {
@@ -141,12 +142,10 @@ export class ChapterAmendService {
   }
 
   /**
-   * Runs after the transaction commits, never inside it: `addProse` calls an embedding model, and a
-   * network round-trip has no business holding a write lock over canon. The failure that buys is a
-   * committed amendment with a stale index, so it is resolved in the safe direction — drop the chunks
-   * and leave the chapter unindexed for `backfill` to pick up. Retrieval that returns nothing is
-   * recoverable; retrieval that returns the sentence the author just deleted is the bug amend exists
-   * to fix. `addProse` reports an isolated chapter, or one the embedder could not fully reach, as unindexed.
+   * Runs after the transaction commits: `addProse` calls an embedding model, and a network round-trip must not hold a write lock over canon.
+   * A failure leaves a committed amendment with a stale index, so it resolves in the safe direction — drop the chunks and leave the chapter unindexed for `backfill`:
+   * retrieval returning nothing is recoverable, retrieval returning the sentence the author just deleted is the bug amend exists to fix. `addProse` reports an
+   * isolated chapter, or one the embedder could not fully reach, as unindexed.
    */
   private async reindex(projectId: bigint, chapterNumber: number, chapter: Chapter.Row): Promise<boolean> {
     try {

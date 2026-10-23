@@ -313,13 +313,9 @@ export class JobService {
     return job;
   }
 
-  // A pending job is claimed by a conditional UPDATE, exactly like `start()` — never read-then-write —
-  // so a cancel racing a dispatch cannot land after the worker has already claimed the row. The two
-  // conditional updates are tried in the order a job actually progresses (pending, then in_progress),
-  // which is why trying both is race-safe rather than a plain if/else on a stale read: whichever state
-  // the row is in by the time each UPDATE runs is the one that matches, and a job never moves backwards.
-  // An `in_progress` job only gets `cancelRequestedAt`: the worker calls `succeed()`/`fail()` when
-  // `runJob` returns and would overwrite a status written underneath it, so this never touches `status`.
+  // A pending job is claimed by a conditional UPDATE like `start()`, never read-then-write, so a cancel racing a dispatch cannot land after the worker claimed the row.
+  // The two conditional updates run in the order a job progresses (pending, then in_progress), so trying both is race-safe and a job never moves backwards.
+  // An `in_progress` job only gets `cancelRequestedAt`: the worker calls `succeed()`/`fail()` when `runJob` returns and would overwrite a status written underneath it.
   async cancel(jobId: string, projectId: bigint): Promise<JobCancelResult | undefined> {
     const cancelledPending = await this.db.transaction(async tx => {
       const [row] = await tx
@@ -368,7 +364,7 @@ export class JobService {
     return this.db.query.jobs.findFirst({ where: eq(schema.jobs.id, jobId), columns: { cancelRequestedAt: true } });
   }
 
-  /** The job with its project's ownership, for `GET /api/v1/jobs/:jobId` to scope by the project's access rules (NF-BOLA-02). */
+  /** The job with its project's ownership, for `GET /api/v1/jobs/:jobId` to scope by the project's access rules. */
   async getWithProject(jobId: string): Promise<{ job: Job.Row; project: ProjectOwnership } | undefined> {
     const [row] = await this.db
       .select({

@@ -344,7 +344,6 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
         routed,
       )) as ContinuityOutput;
 
-      // Upsert continuity proposal.
       await db.transaction(async tx => {
         await assertOwnsClaim(tx, projectId, state.chapter, state.runId, 'extractContinuity');
         await tx
@@ -369,12 +368,9 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
     const projectId = BigInt(state.projectId);
     const delta = state.continuityDelta;
 
-    // Apply every canon mutation, mark the proposal applied, and flag the chapter in one transaction. A
-    // single failed row rolls the whole delta back and leaves the proposal `pending` — never a partial
-    // canon that reports success. Errors propagate so the run fails (and resumes) rather than silently
-    // swallowing.
-    // A proposal holding low-confidence entries stays `pending` so it remains reachable for review — only a
-    // delta that applied in full becomes `applied`.
+    // One transaction applies every canon mutation, marks the proposal applied and flags the chapter: a failed row rolls the whole delta back and leaves it
+    // `pending`, and the error propagates so the run fails and resumes.
+    // A proposal holding low-confidence entries stays `pending` so it remains reachable for review.
     const hasHeldEntries = continuityHasHeldEntries(delta);
 
     // The claim taken in extractContinuity is released here on failure only: a committed transaction leaves

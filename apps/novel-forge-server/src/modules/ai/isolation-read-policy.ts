@@ -70,7 +70,7 @@ export function standardReadableExtraction<T>(extracted: T): T {
 
 const WALLED_OFF_REVIEW = "Findings: walled off. This chapter is isolated, so this review's finding text and evidence are not available here.";
 
-/** Decision P4-39: an isolated chapter's evidence never reaches the chat, on any route — same rule `get_draft` already applies to its prose. */
+/** An isolated chapter's evidence never reaches the chat, on any route — the same rule `get_draft` applies to its prose. */
 const WITHHELD_FINDING = '[withheld: isolated chapter]';
 
 export interface IsolatableFinding {
@@ -109,8 +109,8 @@ export function isReviewRedacted(review: Pick<IsolatableReview, 'isolated'>, cur
 
 /**
  * A chapter review as a chat lookup may read it: findings, evidence, remedy reasons, note and compliance issues walled off when redacted
- * (see `isReviewRedacted`) — a review recorded before the chapter's isolation changed must not carry stale isolated prose either way. There
- * is no unrestricted-route exception: P4-39 holds evidence to the same rule `get_draft` already applies to isolated prose.
+ * (see `isReviewRedacted`) — a review recorded before the chapter's isolation changed must not carry stale isolated prose either way.
+ * There is no unrestricted-route exception: evidence follows the rule `get_draft` applies to isolated prose.
  */
 export function standardReadableReview<F extends IsolatableFinding, R extends IsolatableRemedy, T extends IsolatableReview<F, R>>(review: T, currentlyIsolated = false): T {
   if (!isReviewRedacted(review, currentlyIsolated)) return review;

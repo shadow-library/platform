@@ -27,12 +27,9 @@ export namespace Project {
     min: number;
     max: number;
   }
-  // The row as surfaced by `ProjectService.present`: the stored `config = null` is mapped to an omitted
-  // (`undefined`) field so it satisfies the non-nullable `ProjectConfig` response schema, and the stored
-  // `coverImagePath` ref gains its resolved `coverUrl`. The ref stays on the type for internal callers
-  // (the export packer reads bytes by ref); only `coverUrl` is declared on the response DTO, so the
-  // serialiser is what keeps the ref off the wire. `wordTargetMin`/`wordTargetMax` collapse the same way
-  // into a single optional `wordTarget` object, or an omitted field when either half is null.
+  // The row as `ProjectService.present` surfaces it: a stored `config = null` becomes an omitted field, `coverImagePath` gains its resolved `coverUrl`, and the two
+  // word-target columns collapse into an optional `wordTarget`.
+  // The ref stays on the type for internal callers (the export packer reads bytes by ref); only `coverUrl` is on the response DTO, so the serialiser keeps the ref off the wire.
   export type Presented = Omit<Row, 'config' | 'wordTargetMin' | 'wordTargetMax'> & { config?: ProjectConfigData; coverUrl?: string; wordTarget?: WordTarget };
   export type PresentedDetail = Presented & { defaultInstructions: string; defaultCopyRemoved: boolean };
   export type Kind = InferEnum<typeof projectKind>;

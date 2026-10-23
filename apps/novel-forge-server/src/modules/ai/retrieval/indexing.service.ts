@@ -22,7 +22,8 @@ export class IndexingService {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
 
-  // Add (or re-add) prose chunks for a chapter. Deletes existing chunks first (idempotent). Resolves true only when every chunk
+  // Deletes existing chunks first (idempotent). Resolves true only when every chunk carries an embedding; a chunk stored without one is invisible to retrieval, and
+  // `backfill` retries the chapter.
   // carries an embedding; a chunk stored without one is invisible to retrieval, and `backfill` retries the chapter.
   // Containment keys on `isolated`, never on provenance: hand-pasted firewalled prose is `generator: 'human'`.
   async addProse(projectId: bigint, chapter: number, content: string, isolated: boolean): Promise<boolean> {
@@ -58,8 +59,7 @@ export class IndexingService {
     await this.db.delete(schema.chapterChunks).where(and(eq(schema.chapterChunks.projectId, projectId), eq(schema.chapterChunks.chapter, chapter)));
   }
 
-  // Upsert a single lore chunk by (projectId, kind, refKey).
-  // Best-effort: if embed fails, inserts row with null embedding.
+  // Best-effort: if embed fails, the row is stored with a null embedding.
   async addLore(projectId: bigint, kind: string, refKey: string, text: string, sourceUpdatedAt: Date): Promise<void> {
     const embedding = await this.embeddingService.embed(projectId, text);
     const vector = { embedding, embeddingTask: embedding ? this.embeddingService.task : null };
@@ -73,8 +73,7 @@ export class IndexingService {
       });
   }
 
-  // Backfill: find all non-isolated chapters for projectId with status='done' that have no chapter_chunks rows, or a chunk without an
-  // embedding or embedded by another task than the current one, then addProse for each. A new embedding task is adopted by this re-index.
+  // Re-indexes non-isolated 'done' chapters with no chunks, a chunk without an embedding, or one embedded by another task than the current one.
   async backfill(projectId: bigint): Promise<{ indexed: number; skipped: number }> {
     const doneChapters = await this.db.query.chapters.findMany({
       where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.status, 'done'), isNotNull(schema.chapters.content)),

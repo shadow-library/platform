@@ -99,7 +99,7 @@ describe('expandShortDraft', () => {
 
   it('should not expand a draft that already reaches an overridden floor even though it is under the application default', async () => {
     const { calls, modelRouter } = routerReturning({ body: bodyOfWords(2900) });
-    const short = bodyOfWords(1500); // under the default 1,800 floor
+    const short = bodyOfWords(1500);
     const project = { wordTargetMin: 1200, wordTargetMax: 3500 };
 
     const result = await expandShortDraft(modelRouter, input(short), CTX, project);

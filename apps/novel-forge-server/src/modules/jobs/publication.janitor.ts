@@ -23,13 +23,9 @@ const PUBLISH_SWEEP_INTERVAL_MS = 60_000;
 const ACCESS_SWEEP_BATCH = 20;
 
 /**
- * The ledger-as-outbox sweeper (checkpoint-janitor pattern): on boot and
- * every minute it finds projects whose ledger has due work — scheduled rows past their gate, failed
- * pushes a retry can still clear, or an access revision the reader has not accepted — and
- * (re-)enqueues their `publish` job. The enqueue dedups
- * onto an active job and resets a terminal one, so a reader outage simply keeps the loop turning
- * until it converges. Stale conflicts and malformed pushes wait for an explicit reconcile or
- * republish.
+ * The ledger-as-outbox sweeper: on boot and every minute it finds projects whose ledger has due work — scheduled rows past their gate, failed pushes a retry can still clear,
+ * or an access revision the reader has not accepted — and (re-)enqueues their `publish` job, which dedups onto an active job and resets a terminal one.
+ * Stale conflicts and malformed pushes wait for an explicit reconcile or republish.
  */
 @Injectable()
 export class PublicationJanitor {
@@ -115,9 +111,8 @@ export class PublicationJanitor {
       .from(schema.wikiPublications)
       .where(or(eq(schema.wikiPublications.state, 'pending'), and(eq(schema.wikiPublications.state, 'failed'), retryableFailure(schema.wikiPublications.error))));
 
-    // Access rides the same converge. A share-list change deduped onto a publish job that had already read the list is still owed, and
-    // a narrowing must reach the reader, so a publication whose recorded access revision trails is due until one lands. Batched, because
-    // after the column was added every publication trails at once, on every replica's boot sweep.
+    // Access rides the same converge. A share-list change deduped onto a publish job that had already read the list is still owed, and a narrowing must reach the reader,
+    // so a publication whose recorded access revision trails is due until one lands. Batched, because every publication can trail at once on a boot sweep.
     const accessDue = await this.db
       .select({ projectId: schema.publications.projectId })
       .from(schema.publications)

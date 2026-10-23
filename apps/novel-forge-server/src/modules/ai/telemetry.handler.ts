@@ -184,9 +184,7 @@ export class TelemetryHandler extends BaseCallbackHandler {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
 
-  // Attribution flows in through the invoke config's `metadata` under `nfTelemetry`. Reading it here —
-  // rather than pre-registering by a langchain runId we can't know ahead of a prompt.pipe(llm) chain —
-  // is what keeps every model_calls row tagged with its project/run/node/attempt.
+  // Attribution rides the invoke config `metadata` under `nfTelemetry`, because a langchain runId cannot be pre-registered ahead of a prompt.pipe(llm) chain.
   override async handleLLMStart(
     _llm: Serialized,
     prompts: unknown[],

@@ -24,8 +24,7 @@ export class JobsController {
   @Get('/:jobId')
   @RespondFor(200, JobResponse)
   async getJob(@Params() params: JobIdParams): Promise<JobResponse> {
-    // Jobs are not nested under a project route, so the ownership guard cannot cover them; scope the read by the
-    // same access rule here. A job of a project the caller cannot reach is reported as not found (NF-BOLA-02).
+    // Jobs are not nested under a project route, so the ownership guard cannot cover them; a job of a project the caller cannot reach is reported as not found.
     const found = await this.jobService.getWithProject(params.jobId);
     if (!found || !(await this.projectAccess.canReach(found.project, this.actorService.current()))) throw AppErrorCode.JOB_001.create();
     const { job } = found;

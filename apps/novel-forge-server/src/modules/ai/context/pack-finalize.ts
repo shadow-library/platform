@@ -38,9 +38,7 @@ export async function finalizePack(
     if (hit) throw hardLineError(hit);
   }
   const omitted = [...(opts?.omitted ?? []), ...budgeted.omitted];
-  // Stable sections render first so the prefix stays byte-identical across calls with unchanged
-  // canon (the provider prompt-cache contract); callers list stable sections first, so for the
-  // legacy all-volatile purposes this is a no-op.
+  // Stable sections render first so the prefix stays byte-identical across calls with unchanged canon (the prompt-cache contract); callers already list them first.
   const stableSections = fittingSections.filter(s => s.segment === 'stable');
   const volatileSections = fittingSections.filter(s => s.segment !== 'stable');
   const { renderedStable, renderedVolatile } = splitSegments(fittingSections);
@@ -59,7 +57,6 @@ export async function finalizePack(
     if (inserted) {
       id = inserted.id;
     } else {
-      // Conflict: pack with this hash already exists — fetch existing id.
       const existing = await db.query.contextPacks.findFirst({ where: and(eq(schema.contextPacks.projectId, projectId), eq(schema.contextPacks.hash, hash)) });
       id = existing?.id ?? null;
     }

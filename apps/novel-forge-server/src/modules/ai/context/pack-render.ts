@@ -24,8 +24,6 @@ export function makeSection(key: string, content: string, tier: ContextTier, sou
   return { key, tier, segment, tokens, truncated: false, sourceRefs, rendered };
 }
 
-// Tail variant — keeps the END of `content` (used for prev_ending: the model must see how the
-// previous chapter actually stopped, not how it started).
 function makeSectionTail(key: string, content: string, maxTokens: number, tier: ContextTier, sourceRefs: string[] = []): ContextSection {
   const { text, truncated } = truncateAtParagraphTail(content, maxTokens);
   const rendered = renderSection(key, text);

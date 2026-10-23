@@ -163,8 +163,7 @@ export class CatalogService {
     const [chapters, volumes, entities, worldFacts, plotThreads, mysteries, storedFacts, revealedRows, documents] = await Promise.all([
       this.db.query.chapters.findMany({ where: eq(schema.chapters.projectId, projectId), orderBy: asc(schema.chapters.number) }),
       this.db.query.volumes.findMany({ where: eq(schema.volumes.projectId, projectId), orderBy: asc(schema.volumes.ordinal) }),
-      // Entity deletion is a hard delete; a `ne(origin, 'deleted')` filter here previously crashed
-      // every real render — 'deleted' is not an entity_origin enum value.
+      // Entity deletion is a hard delete and 'deleted' is not an entity_origin value, so no origin filter belongs here.
       this.db.query.entities.findMany({ where: eq(schema.entities.projectId, projectId), orderBy: asc(schema.entities.entityKey) }),
       this.db.query.worldFacts.findMany({ where: eq(schema.worldFacts.projectId, projectId), orderBy: [asc(schema.worldFacts.category), asc(schema.worldFacts.key)] }),
       this.db.query.plotThreads.findMany({

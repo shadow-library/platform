@@ -72,7 +72,7 @@ const PLANNER_ONLY_DOCS: readonly Pick<BibleDocRow, 'section' | 'slug'>[] = [ORG
 
 /**
  * Pages the outliner may still cite but the chapter writer never reads: they lay out every volume, later ones included, so a writer ref to
- * one resolves to nothing. `story_state/volumes` is the address the volume plan had before the manifest.
+ * one resolves to nothing.
  */
 const WRITER_EXCLUDED_DOCS: readonly Pick<BibleDocRow, 'section' | 'slug'>[] = [
   { section: 'story_state', slug: 'volume-plan' },

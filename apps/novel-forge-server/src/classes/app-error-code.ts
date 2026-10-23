@@ -1,9 +1,6 @@
 import { ServerErrorCode } from '@shadow-library/fastify';
 
 export class AppErrorCode extends ServerErrorCode {
-  /*!
-   * Project Errors
-   */
   static readonly PRJ_001 = AppErrorCode.notFound('PRJ_001', 'Project not found');
   static readonly PRJ_004 = AppErrorCode.conflict('PRJ_004', 'Project limit reached for this account — delete an existing project before creating another');
   static readonly PRJ_010 = AppErrorCode.badRequest('PRJ_010', 'wordTarget.max must be greater than wordTarget.min');
@@ -12,14 +9,8 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly PRJ_013 = AppErrorCode.badRequest('PRJ_013', 'Unknown checklist item {key}');
   static readonly PRJ_014 = AppErrorCode.badRequest('PRJ_014', 'The title cannot be blank');
 
-  /*!
-   * Export Errors
-   */
   static readonly EXP_001 = AppErrorCode.badRequest('EXP_001', 'Nothing to export — this project has no chapters yet');
 
-  /*!
-   * Chapter Errors
-   */
   static readonly CHP_001 = AppErrorCode.notFound('CHP_001', 'Chapter not found');
   static readonly CHP_003 = AppErrorCode.badRequest('CHP_003', 'Insert position is behind the write frontier — only chapters ahead of the last finalized chapter can be inserted');
   static readonly CHP_004 = AppErrorCode.conflict('CHP_004', 'A chapter is being written, planned or finalized for this novel — wait for it to finish before inserting a chapter');
@@ -33,17 +24,11 @@ export class AppErrorCode extends ServerErrorCode {
   );
   static readonly CHP_010 = AppErrorCode.badRequest('CHP_010', 'Chapter {chapter} has no summary — write one or summarise with AI');
 
-  /*!
-   * Brief Errors
-   */
   static readonly BRF_001 = AppErrorCode.badRequest('BRF_001', 'No brief exists for the requested chapter(s) — outline the plan before generating');
   static readonly BRF_002 = AppErrorCode.badRequest('BRF_002', 'Brief is stale for chapter(s) {chapters} — refresh the outline or clear staleness before generating');
   static readonly BRF_003 = AppErrorCode.badRequest('BRF_003', 'Ending contract is incomplete — {fields} must not be empty');
   static readonly BRF_004 = AppErrorCode.badRequest('BRF_004', 'Chapter plan scenes are malformed — {reason}');
 
-  /*!
-   * Plan Rule Errors
-   */
   static readonly PLN_001 = AppErrorCode.badRequest('PLN_001', 'The plan for chapter {chapter} reveals facts that are still locked there: {violations}');
   static readonly PLN_002 = AppErrorCode.conflict('PLN_002', 'Chapter {chapter} is already planned as the ending — clear its ending flag first');
   static readonly PLN_003 = AppErrorCode.badRequest('PLN_003', 'The plan for chapter {chapter} cannot claim these milestones: {reason}');
@@ -57,9 +42,6 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly PLN_008 = AppErrorCode.conflict('PLN_008', 'The plan for chapter {chapter} is out of date — the story has moved on to chapter {next}; plan again');
   static readonly PLN_009 = AppErrorCode.conflict('PLN_009', 'A plan for chapter {chapter} is already being made — wait for it or cancel it');
 
-  /*!
-   * Draft Errors
-   */
   static readonly DRF_001 = AppErrorCode.notFound('DRF_001', 'Draft not found');
   static readonly DRF_002 = AppErrorCode.badRequest('DRF_002', 'Draft is already finalized');
   static readonly DRF_003 = AppErrorCode.badRequest('DRF_003', 'Unresolved contradiction — repair or regenerate the contradicted draft before generating further chapters');
@@ -93,9 +75,6 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly DRF_020 = AppErrorCode.badRequest('DRF_020', 'A save made against an earlier read must send baseDraftId, baseRevision and baseSaveSeq together');
   static readonly DRF_021 = AppErrorCode.conflict('DRF_021', 'This save collided with another save happening at the same time — try again');
 
-  /*!
-   * Finalize Errors
-   */
   static readonly FIN_001 = AppErrorCode.badRequest('FIN_001', 'Chapters must be finalized in order');
   static readonly FIN_002 = AppErrorCode.badRequest('FIN_002', 'An earlier chapter needs re-validation after a bible or chapter change — run validation before finalizing');
   static readonly FIN_003 = AppErrorCode.badRequest('FIN_003', 'The latest validation report has an unresolved error for this chapter — resolve it before finalizing');
@@ -104,9 +83,6 @@ export class AppErrorCode extends ServerErrorCode {
     'Chapter {chapter} has a blocking review finding still open — change the text, dismiss the finding or approve over it before finalizing',
   );
 
-  /*!
-   * AI Errors
-   */
   static readonly AI_001 = AppErrorCode.badRequest('AI_001', 'AI model returned unparseable response');
   static readonly AI_002 = AppErrorCode.badRequest('AI_002', 'Role or model is not one this server can route');
   static readonly AI_003 = AppErrorCode.badRequest('AI_003', 'No model can serve this call under its model type and cost tier');
@@ -132,9 +108,6 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly AI_022 = AppErrorCode.badRequest('AI_022', "Model '{alias}' is not offered for this chat's model type and cost tier");
   static readonly AI_023 = new AppErrorCode('AI_023', 'Embeddings of {dimensions} dimensions do not fit the {expected}-dimension vector columns', 500);
 
-  /*!
-   * Illustration Errors
-   */
   static readonly ILL_001 = AppErrorCode.notFound('ILL_001', 'Illustration not found');
   static readonly ILL_002 = AppErrorCode.badRequest('ILL_002', 'Illustration is no longer active — start a new one to keep iterating');
   static readonly ILL_003 = AppErrorCode.badRequest('ILL_003', 'Select a candidate before saving the illustration');
@@ -154,45 +127,27 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly ILL_017 = AppErrorCode.badRequest('ILL_017', 'Only an entity illustration can be drawn as of a chapter');
   static readonly ILL_018 = AppErrorCode.badRequest('ILL_018', 'Reference for {source} depicts chapter {depicts}, later than chapter {chapter} this image is drawn as of');
 
-  /*!
-   * Continuity Errors
-   */
   static readonly CNT_001 = AppErrorCode.notFound('CNT_001', 'No pending continuity proposal for this chapter');
   static readonly CNT_002 = AppErrorCode.badRequest('CNT_002', 'Adding a chapter to the Story Bible is never applied automatically — select the action and apply it deliberately');
   static readonly CNT_003 = AppErrorCode.badRequest('CNT_003', 'The continuity proposal is malformed: {reason}');
 
-  /*!
-   * Entity Errors
-   */
   static readonly ENT_001 = AppErrorCode.notFound('ENT_001', 'Entity not found');
   static readonly ENT_002 = AppErrorCode.notFound('ENT_002', 'Entity image not found');
 
-  /*!
-   * Volume Errors
-   */
   static readonly VOL_001 = AppErrorCode.notFound('VOL_001', 'Volume not found');
   static readonly VOL_002 = AppErrorCode.conflict('VOL_002', 'Volume is still assigned to the plan for chapter {chapter} — move or remove the chapter plans in it first');
   static readonly VOL_003 = AppErrorCode.conflict('VOL_003', 'Only the active volume’s goal can be marked met — this volume is not active');
   static readonly VOL_004 = AppErrorCode.badRequest('VOL_004', 'Goal met — start next is never applied automatically — select the action and apply it deliberately');
 
-  /*!
-   * Bible Document Errors
-   */
   static readonly DOC_001 = AppErrorCode.notFound('DOC_001', 'Bible document not found');
   static readonly DOC_002 = AppErrorCode.conflict('DOC_002', 'The Story Bible changed since the tidy-up preview — reload the preview and choose again');
 
-  /*!
-   * Job Errors
-   */
   static readonly JOB_001 = AppErrorCode.notFound('JOB_001', 'Job not found');
   static readonly JOB_002 = AppErrorCode.conflict(
     'JOB_002',
     'A chapter is being written, planned or finalized for this novel — wait for it to finish or cancel it, then try again',
   );
 
-  /*!
-   * Chat Errors
-   */
   static readonly CHT_001 = AppErrorCode.notFound('CHT_001', 'Chat session not found');
   static readonly CHT_002 = AppErrorCode.badRequest('CHT_002', 'Chat session is archived');
   static readonly CHT_003 = AppErrorCode.badRequest('CHT_003', 'Invalid chat scope reference');
@@ -209,9 +164,6 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly CHT_014 = AppErrorCode.unavailable('CHT_014', 'The turn finished, but its live stream lost the reply — the conversation has it');
   static readonly CHT_015 = AppErrorCode.unavailable('CHT_015', 'The turn failed, and its live stream lost the reason — the conversation shows what was kept');
 
-  /*!
-   * Refinement Proposal Errors
-   */
   static readonly RFN_001 = AppErrorCode.notFound('RFN_001', 'Refinement proposal not found');
   static readonly RFN_002 = AppErrorCode.badRequest('RFN_002', 'Refinement proposal is not pending');
   static readonly RFN_003 = AppErrorCode.conflict('RFN_003', 'Refinement proposal conflicts with the current artifact state — the artifact changed since the proposal was made');
@@ -245,20 +197,11 @@ export class AppErrorCode extends ServerErrorCode {
     'The rewrite of {passage} in chapter {chapter} no longer matches the chapter — uncheck it to apply the others, or ask again',
   );
 
-  /*!
-   * Context Errors
-   */
   static readonly CTX_001 = AppErrorCode.notFound('CTX_001', 'No context pack is linked to this run');
   static readonly CTX_002 = AppErrorCode.badRequest('CTX_002', "The writer's required material does not fit — {detail}.");
 
-  /*!
-   * Premise Errors
-   */
   static readonly PRM_001 = AppErrorCode.badRequest('PRM_001', 'No overview available — provide an overview or set the project brief or premise first');
 
-  /*!
-   * Canon Fact Errors
-   */
   static readonly FCT_001 = AppErrorCode.notFound('FCT_001', 'Canon fact not found');
   static readonly FCT_002 = AppErrorCode.badRequest('FCT_002', 'Unknown entity key referenced by the knowledge operation');
   static readonly FCT_003 = AppErrorCode.badRequest('FCT_003', 'Canon fact has ledgered reveals — retract them before removing the fact');
@@ -266,24 +209,15 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly FCT_005 = AppErrorCode.badRequest('FCT_005', 'Unlock condition is malformed — {reason}');
   static readonly FCT_006 = AppErrorCode.badRequest('FCT_006', 'An allowed clue names a give-away term of its fact — {reason}');
 
-  /*!
-   * Milestone Errors
-   */
   static readonly MIL_001 = AppErrorCode.notFound('MIL_001', 'Milestone not found');
   static readonly MIL_002 = AppErrorCode.conflict('MIL_002', 'A milestone with this key already exists in the project');
   static readonly MIL_003 = AppErrorCode.conflict('MIL_003', 'Milestone {milestoneKey} is still referenced by {references} — remove those references first');
   static readonly MIL_004 = AppErrorCode.badRequest('MIL_004', 'Milestone subject {entityKey} is not an entity of this novel');
 
-  /*!
-   * Promise Errors
-   */
   static readonly PMS_001 = AppErrorCode.notFound('PMS_001', 'Promise not found');
   static readonly PMS_002 = AppErrorCode.conflict('PMS_002', 'A {kind} with this key already exists in the project');
   static readonly PMS_003 = AppErrorCode.badRequest('PMS_003', 'lastAdvancedChapter ({lastAdvancedChapter}) cannot be ahead of the latest chapter ({latest})');
 
-  /*!
-   * Decision Ledger Errors
-   */
   static readonly LDG_001 = AppErrorCode.notFound('LDG_001', 'Ledger entry not found');
   static readonly LDG_002 = AppErrorCode.conflict('LDG_002', 'Ledger entry is already superseded or withdrawn — change the active entry on its topic instead');
   static readonly LDG_003 = AppErrorCode.badRequest('LDG_003', 'Only a decision or a system detail can be rewritten as a decision');
@@ -296,9 +230,6 @@ export class AppErrorCode extends ServerErrorCode {
     'This change touches no Story Bible record, so it cannot be turned down for this version only — choose "never" or "not now"',
   );
 
-  /*!
-   * Notes Errors
-   */
   static readonly NTS_001 = AppErrorCode.badRequest('NTS_001', 'What you kept from your organised notes cannot be written: {issues}');
   static readonly NTS_002 = AppErrorCode.badRequest('NTS_002', 'Option "{optionId}" is not one the organised notes offered');
   static readonly NTS_003 = AppErrorCode.badRequest('NTS_003', 'There are no notes long enough to organise yet — organising needs at least {words} words of your notes');
@@ -318,9 +249,6 @@ export class AppErrorCode extends ServerErrorCode {
   // A user-facing 500: applying the card would write the organised pages again, and the author should know why nothing happened.
   static readonly NTS_009 = new AppErrorCode('NTS_009', 'This organise card has lost the record of what it organised, so applying it could write your pages twice', 500);
 
-  /*!
-   * Chapter Review Errors
-   */
   static readonly REV_001 = AppErrorCode.notFound('REV_001', 'Review not found');
   static readonly REV_002 = AppErrorCode.notFound('REV_002', 'That finding is not part of this review');
   static readonly REV_003 = AppErrorCode.conflict('REV_003', 'The chapter changed after this review — review the current text again before answering its findings');
@@ -329,9 +257,6 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly REV_006 = AppErrorCode.badRequest('REV_006', 'Chapter {chapter} has no prose to review yet');
   static readonly REV_007 = AppErrorCode.conflict('REV_007', 'Chapter {chapter} is still being written — review it once the draft is ready');
 
-  /*!
-   * Story Bible Audit Errors
-   */
   static readonly AUD_001 = AppErrorCode.notFound('AUD_001', 'Audit report not found');
   static readonly AUD_002 = AppErrorCode.notFound('AUD_002', 'That finding is not part of this audit report');
   static readonly AUD_003 = AppErrorCode.conflict(
@@ -343,47 +268,31 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly AUD_006 = AppErrorCode.badRequest('AUD_006', 'An audit card applies only changes from findings you kept — keep the finding first');
   static readonly AUD_007 = AppErrorCode.badRequest('AUD_007', 'An audit card changes only by keeping or skipping its findings — run the audit again for different changes');
 
-  /*!
-   * Publishing Errors
-   */
   static readonly PUB_001 = AppErrorCode.notFound('PUB_001', 'Publication not found');
   static readonly PUB_002 = AppErrorCode.badRequest('PUB_002', 'Chapter is not finalized — only reviewed, finalized chapters can be published');
   static readonly PUB_003 = AppErrorCode.badRequest('PUB_003', 'Chapters must be published contiguously — publish or restore every earlier chapter first');
   // A user-facing 500: the push failure detail must reach the client, so it stays out of the internal() mask
   static readonly PUB_004 = new AppErrorCode('PUB_004', 'Reader service push failed — see the publication ledger error', 500);
-  // Same reasoning as PUB_004: the author needs to know sharing failed because identity was unreachable,
-  // not that "something went wrong", since the fix is to retry rather than to change the share list.
+  // Same as PUB_004: the author must learn sharing failed because identity was unreachable; the fix is to retry.
   static readonly PUB_005 = new AppErrorCode('PUB_005', 'Could not resolve the people to share with — the identity service is unavailable', 503);
   static readonly PUB_006 = AppErrorCode.badRequest('PUB_006', 'Organisation visibility requires the session to be acting in an organisation');
   static readonly PUB_007 = AppErrorCode.conflict('PUB_007', 'That novel slug already belongs to another project');
   static readonly PUB_008 = AppErrorCode.conflict('PUB_008', 'No free novel slug remains near “{base}” — publish with an explicit novelSlug');
-  // Refused rather than auto-raised: the novel-level rating is the author's published promise to readers, and
-  // silently rewriting it from a chapter edit changes what the catalog advertises without anyone deciding to.
+  // Refused rather than auto-raised: the novel rating is the author's promise to readers and must not change from a chapter edit.
   static readonly PUB_009 = AppErrorCode.badRequest('PUB_009', 'The novel rating is below a published chapter’s — raise it first ({violations})');
-  // Attribution to someone outside the platform is a curation decision, not an authoring one: it is what tells readers
-  // the work is not the author's own, so an ordinary publisher may clear it but never assert one.
+  // Naming an outside original author is a curation decision: an ordinary publisher may clear it but never assert one.
   static readonly PUB_010 = AppErrorCode.forbidden('PUB_010', 'Naming an original author requires the curate permission');
   static readonly PUB_011 = AppErrorCode.conflict('PUB_011', 'The reader refused the push as a conflict — {reason}');
 
-  /*!
-   * Plugin Errors
-   */
   static readonly PLG_001 = AppErrorCode.notFound('PLG_001', 'Plugin is not loaded on this deployment');
-  // Deliberately the same 404 as PLG_001, so a probe cannot tell "no such plugin on this deploy" from
-  // "installed but not enabled on this novel" by the response status.
+  // Same 404 as PLG_001 so a probe cannot tell an unloaded plugin from one not enabled on this novel.
   static readonly PLG_002 = AppErrorCode.notFound('PLG_002', 'Plugin is not enabled on this novel');
   static readonly PLG_003 = AppErrorCode.badRequest('PLG_003', 'Plugin configuration was rejected — {reason}');
   static readonly PLG_004 = AppErrorCode.conflict('PLG_004', 'Another enabled plugin already claims an exclusive decision point this plugin claims: {decisionPoint}');
   static readonly PLG_005 = AppErrorCode.badRequest('PLG_005', 'Plugin proposed a change it is not allowed to propose — {reason}');
 
-  /*!
-   * Writer snapshot errors
-   */
   static readonly WSN_001 = AppErrorCode.notFound('WSN_001', 'Writer snapshot not found');
 
-  /*!
-   * Finalize review errors
-   */
   static readonly FRV_001 = AppErrorCode.notFound('FRV_001', 'This chapter has no finalize review — approve it first');
   static readonly FRV_002 = AppErrorCode.conflict('FRV_002', 'The Story Bible updates are still being read from the approved revision — try again in a moment');
   static readonly FRV_003 = AppErrorCode.conflict('FRV_003', 'Reading the Story Bible updates from this chapter failed — prepare the review again');
@@ -404,23 +313,14 @@ export class AppErrorCode extends ServerErrorCode {
     'This chapter reveals {facts}, which needs milestone {milestone} — undoing its updates would leave the reveal without it',
   );
 
-  /*!
-   * Draft version errors
-   */
   static readonly VER_001 = AppErrorCode.notFound('VER_001', 'Chapter {chapter} has no stored version {revision}');
   static readonly VER_002 = AppErrorCode.badRequest(
     'VER_002',
     'Chapter {chapter} is final — its prose is locked, so an earlier version cannot be restored; change it through Amend',
   );
 
-  /*!
-   * Isolation bridge errors
-   */
   static readonly BRG_001 = AppErrorCode.badRequest('BRG_001', 'Chapter {chapter} is not an unrestricted chapter, so it has no bridge — standard chapters read its prose directly');
   static readonly BRG_002 = AppErrorCode.badRequest('BRG_002', 'Chapter {chapter} is not final — its bridge is read when you approve it');
 
-  /*!
-   * Novel import errors
-   */
   static readonly IMP_001 = AppErrorCode.badRequest('IMP_001', 'Too many novel imports are running right now — try again shortly', 429);
 }

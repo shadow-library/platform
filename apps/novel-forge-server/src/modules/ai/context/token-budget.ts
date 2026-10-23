@@ -1,6 +1,5 @@
 import { getEncoding } from 'js-tiktoken';
 
-// Shared encoder instance — o200k_base for consistency across all token counting.
 const enc = getEncoding('o200k_base');
 
 export function countTokens(text: string): number {

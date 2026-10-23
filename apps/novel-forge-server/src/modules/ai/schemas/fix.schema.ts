@@ -11,8 +11,7 @@ export class FixPatch {
   replace: string;
 }
 
-// patch requires at least one patches entry; rewrite requires body — expressed as an if/then/else so
-// AJV enforces the same cross-field rule zod's `.refine()` used to.
+// patch requires at least one patches entry; rewrite requires body — an if/then/else so AJV enforces the cross-field rule.
 @Schema({
   if: { properties: { action: { const: 'patch' } }, required: ['action'] },
   then: { properties: { patches: { type: 'array', minItems: 1 } }, required: ['patches'] },

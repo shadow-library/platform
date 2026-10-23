@@ -1,8 +1,6 @@
-// Deterministic prose metrics — pure, synchronous
-// functions over already-fetched chapter/draft text. No DB, no LLM: everything here is re-derivable
-// from prose alone, which is the point — mechanical properties need no model judgment.
+// Deterministic prose metrics — pure functions over already-fetched chapter/draft text; no DB, no LLM.
 //
-// Definitions, so a future reader can trust the numbers without re-reading the code:
+// Definitions:
 // - Word count: whitespace-split tokens, matches the target band the generation prompt was given —
 //   the application default (1,800–2,600) unless the project overrides it (see `resolveWordTarget`).
 // - Sentence-length band: 6–22 words per sentence, the band named in `authoring-preamble.ts`'s
@@ -574,9 +572,8 @@ export interface DeterministicMetricsReport {
 }
 
 /**
- * Computes the full Track-2 report for a chapter span. `priorWindowSize` controls how many chapters
- * immediately before the span (fetched by the caller and passed in `priorBodiesByChapter`) count toward
- * each chapter's cross-chapter n-gram comparison — the report recommends "prior ~10 chapters".
+ * Computes the full report for a chapter span; `priorWindowSize` chapters before the span (fetched by the caller into `priorBodiesByChapter`) feed each chapter's cross-
+ * chapter n-gram comparison.
  */
 export function computeDeterministicMetricsReport(
   chapters: ChapterMetricsInput[],

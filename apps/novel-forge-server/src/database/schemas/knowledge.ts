@@ -245,10 +245,8 @@ export const characterStates = pgTable(
 // Per-chapter history behind "How <name> has changed": one row per entity per chapter per changed kind, replayed
 // in chapter order. `detailKey` distinguishes multiple events of the same kind in one chapter (a relationship
 // event's target+kind) and is `''` where a kind is already one-per-chapter. `status`/`draftRevision` mirror
-// `character_knowledge` (T05) for a provisional row bound to an approval and dropped by `revokeProvisionalReveals`
-// on revise — `applyContinuityDelta` writes `committed` today since it only runs once a chapter is already
-// finalized; the manual propose→apply path can commit from an unapproved draft, which is fine for now since
-// nothing here is provisional yet. T26's event-apply service is what will actually write `provisional` rows.
+// `character_knowledge` for a provisional row bound to an approval and dropped on revise; every writer today commits (`applyContinuityDelta` runs once a chapter is finalized),
+// so nothing writes `provisional` events yet.
 export const characterEvents = pgTable(
   'character_events',
   {

@@ -53,11 +53,8 @@ const BOUNDARY_ECHO_WINDOW_WORDS = 60;
 const BOUNDARY_ECHO_NGRAM_SIZE = 6;
 
 /**
- * Detects a chapter opening by repeating the previous chapter's closing verbatim (or near-verbatim) —
- * a "no time skip, no recap" instruction taken too literally: the model echoes the shown context
- * instead of continuing past it. Compares only the immediate boundary (last ~60 words of the prior
- * chapter vs first ~60 of this one), not the whole chapter — unlike ordinary cross-chapter phrase
- * reuse, a shared run right at the seam is never coincidental.
+ * Detects an opening that repeats the previous chapter's closing (last ~60 words vs first ~60): the model echoed the shown context instead of continuing; a shared run at
+ * the seam is never coincidental.
  */
 export function findBoundaryEcho(body: string, prevBody: string | undefined): string | null {
   if (!prevBody) return null;
@@ -90,11 +87,8 @@ function excerpt(text: string, length = 80): string {
 }
 
 /**
- * Deterministic mechanical checks over a finished draft. Hard findings are structural defects that
- * must ride the repair ladder; soft findings are prose-quality signals that surface at review without
- * blocking. `priorBodies` is the raw text of the last ~10 finished chapters, newest first — an empty array
- * simply skips the cross-chapter comparison. `target` defaults to the application band; pass the
- * project's resolved target (`resolveWordTarget(projectRow)`) to check against its override instead.
+ * Deterministic checks over a finished draft: hard findings ride the repair ladder, soft ones surface at review. `priorBodies` is the last ~10 finished chapters, newest
+ * first; `target` defaults to the application band.
  */
 export function checkDraftMechanics(body: string, priorBodies: string[] = [], target: ResolvedWordTarget = resolveWordTarget()): JudgeFinding[] {
   const findings: JudgeFinding[] = [];

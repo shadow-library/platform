@@ -175,7 +175,7 @@ export const modelCalls = pgTable(
     attempt: smallint('attempt').notNull().default(0),
     rawOutput: text('raw_output'),
     error: jsonb('error').$type<Record<string, unknown>>(),
-    // Null on every plugin-free call, which is what keeps the pre-host rows and the pre-host generate path identical.
+    // Null on every plugin-free call, so a project without plugins records and hashes exactly as before.
     plugins: jsonb('plugins').$type<{ id: string; version: string; configHash: string }[]>(),
     policyDigest: varchar('policy_digest'),
     // The chapter this call was made on behalf of; null for a call with no single chapter (chat, bible-builder, …) or predating this column.

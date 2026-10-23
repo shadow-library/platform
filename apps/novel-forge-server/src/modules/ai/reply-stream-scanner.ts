@@ -34,18 +34,10 @@ function parseElement(raw: string): ChangeSetElement | null {
 }
 
 /**
- * `done` is terminal only once the top-level object closes with the reply string seen (`replySeen` true) —
- * reaching the end of a still-unmatched object before that (the `{` wasn't really the start of the payload)
- * instead resets to `preamble` so the scanner resyncs on the next real `{`, since a model narrating "I'll
- * fill the `{reply}` field…" is not exotic and must not kill the stream permanently.
- *
- * Every returned string is well-formed UTF-16: a `\uXXXX` escape or a literal surrogate pair split
- * across `push()` calls has its lone high surrogate held back and prepended to the next call's output
- * rather than ever being returned on its own — callers that UTF-8-encode a frame directly (not only
- * ones that round-trip it through `JSON.stringify`) depend on that.
- *
- * Each object element of the top-level `changeSet` array is captured raw and parsed the moment its closing
- * brace arrives; `takeChangeSetElements` hands over the ones completed so far.
+ * `done` is terminal only once the top-level object closes with the reply seen; hitting the end of a still-unmatched object resets to `preamble`,
+ * because a model narrating "fill the `{reply}` field" is not exotic.
+ * Every returned string is well-formed UTF-16: a lone high surrogate split across `push()` calls is held back for the next call, since callers UTF-8-encode frames directly.
+ * Each element of the top-level `changeSet` array is parsed the moment it closes; `takeChangeSetElements` hands over the completed ones.
  */
 export class ReplyStreamScanner {
   private state: ScanState = 'preamble';

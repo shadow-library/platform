@@ -54,11 +54,8 @@ export interface ClassifiedCost {
   estimatedCostUsd: number;
 }
 
-// Shared by every cost aggregation (project, chapter, run, job, chat turn, account) so a legacy
-// pre-classification row is priced identically everywhere: a row already classified `estimate` has its
-// list-price estimate frozen into `recordedCostUsd` at write time — recomputing it here would drift from
-// the recorded figure whenever historical prices change since. Only a row with no `cost_source` at all still
-// needs a fresh estimate, and only for the unpriced share left uncounted.
+// Shared by every cost aggregation so a pre-classification row is priced identically everywhere: an `estimate` row's list price is frozen into `recordedCostUsd` at write time.
+// Only a row with no `cost_source` still needs a fresh estimate, for its unpriced share.
 export function classifyRowCost(row: CostClassifiableRow): ClassifiedCost {
   const legacyEstimate = row.costSource === null ? estimateCallCostUsd(row.model, row.unpricedInputTokens, row.unpricedOutputTokens) : 0;
   const estimatedCostUsd = row.costSource === 'estimate' ? row.recordedCostUsd : legacyEstimate;
@@ -66,9 +63,7 @@ export function classifyRowCost(row: CostClassifiableRow): ClassifiedCost {
   return { costUsd, estimatedCostUsd };
 }
 
-// A row's `recordedCostUsd` (provider-reported or frozen-at-write-time estimate, for any call kind)
-// is authoritative over recomputing it here; the token-based estimate only ever covers rows that
-// still carry no recorded cost, so a call is never counted twice.
+// `recordedCostUsd` is authoritative; the token-based estimate covers only rows with no recorded cost, so a call is never counted twice.
 export function computeWindowUsage(rows: WindowUsageRow[]): WindowUsage {
   let calls = 0;
   let costUsd = 0;

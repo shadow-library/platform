@@ -105,7 +105,6 @@ describe('WriterSnapshotService — a later Bible edit', () => {
     await Promise.resolve();
     const [before] = await svc.list(7n, 5);
 
-    // The Story Bible changes, and the chapter is regenerated against it — a second, later attempt.
     svc.onMessages(baseMeta({ draftRevision: 1, attempt: 0, bibleHash: 'hash-after-the-edit' }))([new HumanMessage('the chapter rewritten after the edit')], ROUTE);
     await Promise.resolve();
     await Promise.resolve();

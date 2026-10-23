@@ -1,7 +1,5 @@
 // Deterministic prose metrics — standalone runnable CLI.
-// Reusable tooling: intended to run later against a real generated project/arc, not as a one-off. All
-// metric math lives in `@server/modules/eval/deterministic-metrics` (pure, unit-tested); this script only
-// does argument parsing, DB fetch, and report printing.
+// Argument parsing, DB fetch and report printing only; the metric math lives in `@server/modules/eval/deterministic-metrics`.
 //
 // Usage:
 //   bun run eval:metrics -- --project <id> [--from <n> --to <n> | --all] [--source final|draft]
@@ -14,9 +12,7 @@
 //                     cross-chapter n-gram comparison (default 10)
 //   --json           print the full machine-readable report instead of the plain-text summary
 //
-// Connects to `DATABASE_POSTGRES_URL` directly (same convention as `src/migrate.ts`) — this is an infra
-// script that runs outside the app, not application code, so it is exempt from the "read config via
-// Config" rule.
+// Reads `DATABASE_POSTGRES_URL` directly like `src/migrate.ts`: an infra script outside the app, exempt from the Config rule.
 import { asc, eq, gte, inArray, lte } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 

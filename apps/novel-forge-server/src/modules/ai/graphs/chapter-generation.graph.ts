@@ -58,7 +58,6 @@ export interface GraphServices {
 }
 
 const ChapterGenAnnotation = Annotation.Root({
-  // inputs (immutable — reducer just replaces)
   projectId: Annotation<string>({ reducer: (_, n) => n, default: () => '0' }),
   chapter: Annotation<number>({ reducer: (_, n) => n, default: () => 0 }),
   volumeKey: Annotation<string>({ reducer: (_, n) => n, default: () => '' }),
@@ -66,7 +65,6 @@ const ChapterGenAnnotation = Annotation.Root({
   autoFix: Annotation<boolean>({ reducer: (_, n) => n, default: () => false }),
   maxFixes: Annotation<number>({ reducer: (_, n) => n, default: () => 3 }),
   runId: Annotation<string>({ reducer: (_, n) => n, default: () => '' }),
-  // working data
   contextPackId: Annotation<string | null>({ reducer: (_, n) => n, default: () => null }),
   prose: Annotation<string>({ reducer: (_, n) => n, default: () => '' }),
   title: Annotation<string>({ reducer: (_, n) => n, default: () => '' }),
@@ -92,7 +90,6 @@ const ChapterGenAnnotation = Annotation.Root({
   writerClassRaised: Annotation<boolean>({ reducer: (a, n) => a || n, default: () => false }),
   // Settled once from the plan when the run starts, so a plan edited mid-run cannot move later nodes off the route the prose was written on.
   contentMode: Annotation<Project.ContentMode | null>({ reducer: (_, n) => n, default: () => null }),
-  // outcome
   draftId: Annotation<string | null>({ reducer: (_, n) => n, default: () => null }),
   outcome: Annotation<string | null>({ reducer: (_, n) => n, default: () => null }),
   // The real path taken through the graph, in execution order — each node appends its own name so
@@ -231,12 +228,10 @@ export async function setOpenDraftReview(db: Pick<PrimaryDatabase, 'update'>, dr
 // `judge` and `fix` reload the assembled pack from `context_packs` rather than building their own, so the `minWriterClass` guard runs against the lowest of the three classes.
 export const CHAPTER_PACK_CONSUMERS = ['generation', 'judge', 'fix'] as const;
 
-// Normalize finding text for dedup comparison.
 function normalizeFinding(text: string): string {
   return text.toLowerCase().trim().replace(/\s+/g, ' ');
 }
 
-// True if any finding in `findings` exactly matches (same severity, same normalized text) a finding in `previousFindings`.
 export function sameFinding(findings: JudgeFinding[], previousFindings: JudgeFinding[]): boolean {
   if (previousFindings.length === 0) return false;
   for (const f of findings) {
@@ -281,13 +276,11 @@ export function routeAfterJudge(
   return 'repairPatch';
 }
 
-// Routing function after repairPatch — exported for testing.
 export function routeAfterPatch(state: Pick<ChapterGenState, 'patchApplied'>): string {
   return state.patchApplied ? 'persistDraft' : 'repairRewrite';
 }
 
-// Merges the deterministic leak pre-scan with the judge's own knowledgeCompliance — exported for
-// testing. A pre-scan hit forces non-compliance regardless of what the model reported.
+// Merges the deterministic leak pre-scan with the judge's own knowledgeCompliance; a pre-scan hit forces non-compliance whatever the model reported.
 export function mergeKnowledgeCompliance(
   compliance: { compliant: boolean; issues: string[] } | undefined,
   prescan: KnowledgeLeakIssue[],
@@ -617,12 +610,10 @@ export function createChapterGenerationNodes(services: Omit<GraphServices, 'chec
       ? `\n\n## ENDING CONTRACT\n${renderedContract}\n\nAlso assess the draft ending against this contract and include endingCompliance in your JSON.`
       : '';
 
-    // The judge — unlike the drafter — sees the full forbidden list:
-    // asymmetric visibility is what lets it catch leaks the pack-level filtering cannot prevent.
+    // The judge, unlike the drafter, sees the full forbidden list: asymmetric visibility catches leaks pack-level filtering cannot prevent.
     const knowledgeContract = parseKnowledgeContract(brief?.knowledgeContract);
     const knowledgeView = knowledgeContract ? await loadKnowledgeView(db, projectId, state.chapter, knowledgeContract) : null;
-    // Open canon is scheduled (`revealChapter <= OPEN_FROM_CHAPTER`), never marked by source — nothing writes
-    // `source: 'seed'` any more, so this filter only guards facts an older install minted.
+    // Open canon is scheduled (`revealChapter <= OPEN_FROM_CHAPTER`), never marked by source; the filter only skips stored `seed` facts.
     const forbidden = (knowledgeView?.hidden ?? []).filter(fact => fact.source !== 'seed');
     const knowledgeBlock =
       forbidden.length > 0

@@ -14,11 +14,8 @@ export const AUTHORING_STYLE = `AUTHORING GUIDELINES:
 const VOICE_AND_CANON_RULES = `- Maintain established character voice and speech patterns exactly as recorded in their entity card.
 - Canon always wins over dramatic convenience — if the brief says the character cannot use this power, they cannot. Canon is the world's rules and what has already happened; the themes, where the story ends up, and a character's stated ideals are not rules a character must obey in a given scene.`;
 
-// Planning-time subset of AUTHORING_STYLE: POV and canon-consistency rules still apply when plotting,
-// but sentence-length, paragraph, dialogue-mechanics, and description craft rules are noise before any
-// prose exists. Used by the bible-build, outline, premise-enhance, and chat-refine prompts.
-// generation.prompt.ts uses neither constant; its craft rules come entirely from the context pack's
-// `writing_style` section.
+// Planning-time subset of AUTHORING_STYLE: POV and canon-consistency rules still apply when plotting, but prose-craft rules are noise before any prose exists.
+// Used by the bible-build, outline, premise-enhance and chat-refine prompts; generation.prompt.ts takes its craft rules from the pack's `writing_style` section.
 export const AUTHORING_STYLE_PLANNING = `AUTHORING GUIDELINES:
 - Write in third-person limited, past tense, from the POV character's perspective.
 ${VOICE_AND_CANON_RULES}`;

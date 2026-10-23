@@ -15,8 +15,7 @@ import { type AssembledPack, type ContextSection } from './sections';
 export const ILLUSTRATION_BUDGET = 6_000;
 export const ILLUSTRATION_WORLD_FACTS_MAX = 30;
 
-// The project's art direction lives in one conventional bible document; every illustration prompt is
-// bound by it when it exists. Authors create it like any other bible doc — no bespoke table.
+// The project's art direction is one conventional bible document that binds every illustration prompt when it exists; no bespoke table.
 export const ART_STYLE_DOC = { section: 'project', slug: 'art-style' } as const;
 
 export interface IllustrationPackOptions extends PackPolicyOptions {
@@ -28,11 +27,10 @@ export class IllustrationPackBuilder {
   constructor(private readonly db: PrimaryDatabase) {}
 
   /**
-   * Pack for composing one image prompt. The art-style bible and the project premise are stable (they
-   * bind every illustration in the project); the subject card and the canon that describes how the
-   * subject looks are volatile. `subjectKey` is the entity key, the chapter number as text, or null
-   * for the project cover. Reader-facing art reads only what the reader has by its chapter (P4-51): with `depiction`, every section passes
-   * that policy's scrub, the art style and premise as copied pages, and an entity's changes stop at the chapter with its present-day status left out.
+   * Pack for composing one image prompt. The art-style bible and project premise are stable (they bind every illustration); the subject card and the canon describing
+   * how it looks are volatile.
+   * `subjectKey` is the entity key, the chapter number as text, or null for the project cover. Reader-facing art reads only what the reader has by its chapter: with `depiction`,
+   * every section passes that policy's scrub, the art style and premise as copied pages, and an entity's changes stop at the chapter with its present-day status left out.
    */
   async forIllustration(
     projectId: bigint,

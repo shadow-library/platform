@@ -1,34 +1,18 @@
-// Process/telemetry invariant checks — pure functions
-// over already-fetched rows (drafts, model_calls, workflow_runs, jobs, validation_reports). No DB access
-// here; the CLI script under tests/eval/process-invariants.ts owns the querying.
+// Process/telemetry invariant checks — pure functions over already-fetched rows (drafts, model_calls, workflow_runs, jobs, validation_reports).
+// The CLI script under tests/eval/process-invariants.ts owns the querying.
 //
 // What each check verifies:
-// - Fail-open judge acceptances: `chapter-generation.graph.ts`'s judge() node and
-//   `chapter-review.service.ts`'s ChapterReviewService judge both set `verdict = judgeResult?.verdict ?? 'evaluation_failed'`
-//   — a draft's `judge` column can only read 'consistent' when the judge output parsed successfully, and
-//   `evaluation_failed` always routes to `reviewStatus: 'contradiction'` (never a clean accept) via
-//   `routeAfterJudge` returning 'awaitReview'. The only way an `evaluation_failed` draft reaches
-//   `reviewStatus: 'approved'`/`'final'` is through `GenerationService.approveDraft`, which always inserts
-//   a `user_feedback` row with `disposition: 'approved'` in the same transaction. So the fail-open bug
-//   that was removed would show up here as an `evaluation_failed` draft that is approved/final WITHOUT
-//   a matching approval row — structurally impossible now, and this check asserts that against real data
-//   rather than just trusting the code.
-// - `evaluation_failed` rate: straightforward count/percentage of drafts with judge = 'evaluation_failed'.
-// - Repair attempts per chapter / patch-cycle counts: `model_calls.node` is 'repairPatch' or
-//   'repairRewrite' for every repair-ladder call (see chapter-generation.graph.ts's TelemetryContext
-//   values); grouping by `runId` (joined to `workflow_runs.target`, e.g. "chapter-42") gives attempts per
-//   chapter. `workflow_runs.nodeTrace` is NOT used here — `workflow-run.service.ts`'s
-//   `runChapterGeneration` pushes a hardcoded trace (`assembleContext, draftChapter, persistDraft, judge,
-//   finish`) after `graph.invoke` regardless of what the graph actually did, so repair paths never appear there. `model_calls` is the reliable
-//   source.
-// - Batch halts on findings: `job.executor.ts`'s `runGenerate` halts a batch by writing
-//   `jobs.progress = { done, total, current, phase: 'awaiting_review', skipped: number[] }` — this module
-//   counts `generate` jobs whose stored progress matches that shape.
-// - Validation coverage: `novel-validation.graph.ts`'s `persistReport` writes
-//   `validation_reports.payload = { windowsRequested, windowsSucceeded, failedRanges, ... }`.
-// - Stale/briefless generations rejected: NOT checked here — see the CLI script's printed note. A
-//   rejected `generate()` call throws an HTTP error (`BRF_001`/`BRF_002`) and nothing is persisted to
-//   prove the rejection happened, so this invariant has no queryable trace; `tests/generation/generation-gate.spec.ts` covers it.
+// - Fail-open judge acceptances: the judge nodes set `verdict = judgeResult?.verdict ?? 'evaluation_failed'`, and `evaluation_failed` always routes to
+//   `reviewStatus: 'contradiction'`. The only way such a draft reaches `approved`/`final` is `GenerationService.approveDraft`, which inserts a
+//   `user_feedback` row with `disposition: 'approved'` in the same transaction; an approved/final `evaluation_failed` draft with no approval row is a violation.
+// - `evaluation_failed` rate: count/percentage of drafts with judge = 'evaluation_failed'.
+// - Repair attempts per chapter / patch-cycle counts: `model_calls.node` is 'repairPatch' or 'repairRewrite' for every repair-ladder call; grouping by `runId`
+//   (joined to `workflow_runs.target`, e.g. "chapter-42") gives attempts per chapter.
+// - Batch halts on findings: `runGenerate` halts a batch by writing `jobs.progress = { done, total, current, phase: 'awaiting_review', skipped }`;
+//   this module counts `generate` jobs whose progress matches.
+// - Validation coverage: `persistReport` writes `validation_reports.payload = { windowsRequested, windowsSucceeded, failedRanges, ... }`.
+// - Stale/briefless generations rejected: not checked — a rejected `generate()` throws an HTTP error (`BRF_001`/`BRF_002`) and persists nothing;
+//   `tests/generation/generation-gate.spec.ts` covers it.
 
 export interface DraftJudgeRow {
   chapter: number;

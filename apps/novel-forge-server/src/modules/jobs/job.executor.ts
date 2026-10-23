@@ -27,9 +27,7 @@ interface GeneratePayload {
   guidance?: string;
 }
 
-// Staged on `jobs.payload` by `NovelImportService.import` inside the same transaction that creates the
-// project — kept as a local shape (not imported from the novel-import module) exactly like every other
-// payload interface above, so JobExecutor never depends on the enqueuing feature module.
+// Staged on `jobs.payload` by `NovelImportService.import` in the transaction that creates the project; a local shape, so JobExecutor never depends on the feature module.
 interface ImportPayload {
   chapters: { title: string; content: string; volumeKey?: string }[];
   cover?: { mimeType: string; dataBase64: string };

@@ -75,9 +75,9 @@ export namespace Illustration {
     createdAt: string;
     /** sha256 of the instruction list that produced this candidate — identifies which revision it belongs to. */
     instructionsHash: string;
-    /** Storage refs of the references sent alongside this generation, in the order sent. Backfilled to `[]` for pre-existing candidates by migration 0033. */
+    /** Storage refs of the references sent alongside this generation, in the order sent. */
     referenceRefs: string[];
-    /** The references exactly as sent with this generation — role, note, label, origin and reason — index-aligned with `referenceRefs`. Backfilled to `[]` by migration 0034. */
+    /** The references exactly as sent with this generation — role, note, label, origin and reason — index-aligned with `referenceRefs`. */
     references: Reference[];
   }
 }

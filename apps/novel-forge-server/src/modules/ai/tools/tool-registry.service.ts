@@ -50,7 +50,6 @@ export function toolsForNode(nodeName: string, web: WebMode = 'off'): Registered
 
 @Injectable()
 export class ToolRegistryService {
-  // The ctx is captured in each tool's func closure.
   forNode(nodeName: string, ctx: ToolContext): DynamicStructuredTool[] {
     return toolsForNode(nodeName).map(
       rawTool =>

@@ -109,7 +109,7 @@ interface ComposeRequest {
   references: Illustration.Reference[];
   described?: DescribedAppearance;
   depiction?: DepictionPoint;
-  /** What the image prompt may carry (P4-51): the depiction's policy for an entity, else that of the chapter or, for a cover, the latest final one. */
+  /** What the image prompt may carry: the depiction's policy for an entity, else that of the chapter or, for a cover, the latest final one. */
   disclosure: WriterDisclosurePolicy;
 }
 
@@ -460,7 +460,7 @@ export class IllustrationService {
     return loadArtDisclosurePolicy(this.db, projectId, chapter);
   }
 
-  /** The art policy a stored image is drawn under (P4-51): its depicted chapter's for an entity, else that of its chapter or the latest final one. */
+  /** The art policy a stored image is drawn under: its depicted chapter's for an entity, else that of its chapter or the latest final one. */
   private async storedDisclosure(projectId: bigint, row: Illustration.Row): Promise<WriterDisclosurePolicy> {
     if (row.depictsChapter !== null) return loadArtDisclosurePolicy(this.db, projectId, row.depictsChapter);
     return this.artDisclosureFor(projectId, row.subjectType, row.subjectKey);
@@ -596,7 +596,7 @@ function mergeReferenceLedger(ledger: Illustration.Reference[], sent: Illustrati
   return [...byRef.values()];
 }
 
-/** What the image models may read of the references (P4-51): every label, note and name scrubbed; which images are allowed is the resolver's call. */
+/** What the image models may read of the references: every label, note and name scrubbed; which images are allowed is the resolver's call. */
 function readableReferences(resolved: ResolvedReferences, disclosure: WriterDisclosurePolicy): ResolvedReferences {
   return { ...resolved, references: resolved.references.map(reference => scrubReference(reference, disclosure)) };
 }

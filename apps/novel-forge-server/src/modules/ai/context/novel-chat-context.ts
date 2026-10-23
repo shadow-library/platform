@@ -293,7 +293,7 @@ function promiseLine(
 
 /**
  * A promise stands "due" once an authored chapter window is reached, its payoff milestone is reached, or its payoff volume is active or
- * has already met its goal (P4-41b) — the same due-ness the obligations selector (`chapter-plan.ts`) uses for the recap, though this coarser
+ * has already met its goal — the same due-ness the obligations selector (`chapter-plan.ts`) uses for the recap, though this coarser
  * inventory does not distinguish due from overdue the way the recap's wording does.
  */
 export function renderPromises(

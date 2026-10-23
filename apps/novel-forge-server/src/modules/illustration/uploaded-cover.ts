@@ -8,9 +8,8 @@ import { hashInstructions } from './prompt-spec';
 export const UPLOADED_COVER_PROMPT_KEY = 'uploaded-cover';
 
 /**
- * No composer ran for a cover the author supplied, so refinement leans on the image itself: every render
- * carries the current selection as its image-to-image reference, and this spec only tells the model to rework it.
- * The `0032` backfill migration writes this exact spec in SQL — change both together.
+ * No composer ran for a cover the author supplied, so refinement leans on the image itself: every render carries the current selection as its image-to-image reference,
+ * and this spec only tells the model to rework it.
  */
 export function uploadedCoverPromptSpec(): Illustration.PromptSpec {
   return {
@@ -35,7 +34,7 @@ export function illustrationReferences(ref: string): SQL | undefined {
  * so the project row lock serialises concurrent writers.
  */
 export async function trackUploadedCover(tx: DbExecutor, projectId: bigint, ref: string, owner: OwnedRow): Promise<void> {
-  // Stricter than the 0032 backfill on purpose: at write time a saved illustration, or a stale candidate ref, must not leave the new cover unprocessable.
+  // At write time a saved illustration, or a stale candidate ref, must not leave the new cover unprocessable.
   const tracked = await tx.$count(
     schema.illustrations,
     and(

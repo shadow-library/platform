@@ -185,8 +185,7 @@ function normalizeForSchema(schema: SchemaClass, data: unknown): unknown {
   return arrays.length === 1 ? arrays[0] : data;
 }
 
-// Runs postValidate (if declared) after schema validation succeeds, folding any returned issue
-// messages into the same success/failure shape so the repair ladder treats them identically.
+// Folds the module postValidate issues into the same success/failure shape so the repair ladder treats them identically.
 function applyPostValidate<T>(result: SchemaParseResult<T>, postValidate?: (data: T) => string[]): SchemaParseResult<T> {
   if (!result.success || !postValidate) return result;
   const messages = postValidate(result.data);
@@ -353,11 +352,7 @@ export class ModelRouterService {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
 
-  /**
-   * Opens the cancellation channel for a run: every subsequent call carrying this `runId` in its
-   * telemetry context is made under the returned signal. `WorkflowRunService` owns the pairing and must
-   * call `releaseRunSignal` on every exit path.
-   */
+  /** Opens the cancellation channel for a run; `WorkflowRunService` must call `releaseRunSignal` on every exit path. */
   bindRunSignal(runId: string): AbortSignal {
     const controller = this.runAborts.get(runId) ?? new AbortController();
     this.runAborts.set(runId, controller);
@@ -396,10 +391,7 @@ export class ModelRouterService {
     return runSignal ? (llm.withConfig({ signal: runSignal }) as unknown as BaseChatModel) : llm;
   }
 
-  /**
-   * A Synapse chat model for `role` on `route`: the role's group is the task, the route's tier and content mode its selectors. Reasoning
-   * effort, structured-output mode and prompt-cache handling are the task's and the served model's business, so none of them is chosen here.
-   */
+  /** A Synapse chat model for `role` on `route`: the role is the task, the route's tier and content mode its selectors; effort, structured mode and caching are Synapse's. */
   buildSynapseClient(role: AiRole, route: ModelRoute, opts: SynapseModelOptions): SynapseChatModel {
     const { alias } = opts;
     const guard = this.hardLineGuard(route);
@@ -433,10 +425,7 @@ export class ModelRouterService {
     return this.runStructured(promptModule, input, ctx, project, policy);
   }
 
-  /**
-   * `structured` with one image attached to the prompt's last human message. `image` is an HTTP(S) or `data:` URL; it is kept
-   * out of `input` so the debug snapshot and request hash never carry it, and the response is never served from `llm_cache`.
-   */
+  /** `structured` with one image on the last human message, kept out of `input` so the debug snapshot and request hash never carry it; never served from `llm_cache`. */
   async structuredWithImage<T>(
     promptModule: PromptModule<T>,
     input: Record<string, unknown>,
@@ -489,8 +478,7 @@ export class ModelRouterService {
     }
     const refuses = route.contentMode === 'unrestricted' ? (text: string) => findHardLine([text], outputScope(role)) !== null : undefined;
     const relay = stream ? new ReplyStreamRelay(stream, err => this.logger.warn('Reply stream sink failed — finishing the turn unstreamed', { role, err }), refuses) : null;
-    // Input carries the rendered context pack and user prose — sensitive/large, so it rides on debug
-    // (dev-only) as a full snapshot to reproduce the exact model call locally.
+    // Input carries the rendered context pack and user prose, so it rides on debug only.
     this.logger.debug('structured: invoking model', {
       role,
       task: route.task,
@@ -526,10 +514,7 @@ export class ModelRouterService {
     const rawOutput1 = relay
       ? await this.streamOnce(llm, messages, firstConfig, role, relay, runSignal, ctx.onAnswered)
       : await this.invokeOnce(llm, messages, firstConfig, role, runSignal, ctx.onAnswered);
-    // A response carrying no top-level `reply` string produced no delta at all, so the author
-    // saw a dead composer until `done`. (The scanner is key-order agnostic — `changeSet` first only costs
-    // latency — so this is the whole of the degradation.) Logged per task/prompt to make it
-    // measurable; never a failure, since the ladder still returns a reply.
+    // A response with no top-level `reply` string streams no delta, so the composer sat dead until `done`; logged to measure it, never a failure.
     if (relay && !relay.replyFound) {
       this.logger.warn('Model defeated the reply stream — no delta was emitted', {
         task: route.task,
@@ -604,15 +589,13 @@ export class ModelRouterService {
       issues2,
       rawOutput1: rawOutput1.slice(0, 200),
     });
-    // Full outputs only on debug (dev) — an operator can read the exact prose the model returned.
     this.logger.debug('All parse attempts failed — full raw outputs', { role, runId: ctx.runId, rawOutput1, rawOutput2 });
     throw AppErrorCode.AI_001.create();
   }
 
   /**
-   * Image generation through Synapse's images endpoint, which speaks its own wire format rather than chat completions — so it cannot ride
-   * LangChain's callback telemetry and writes its own `model_calls` row instead. A refusal keeps its own `AI_*` code; references Synapse
-   * will not take are `AI_010`; any other failure is the image give-up `AI_005`. The call is made once, as Synapse fails over itself.
+   * Image generation through Synapse's images endpoint, which cannot ride LangChain callbacks, so it writes its own `model_calls` row. A refusal keeps its `AI_*` code;
+   * rejected references are `AI_010`; anything else is `AI_005`.
    */
   async images(request: ImageRequest, ctx: TelemetryContext, project?: ProjectConfig): Promise<GeneratedImage[]> {
     const route = this.routeModel('image', project);
@@ -680,8 +663,6 @@ export class ModelRouterService {
       .catch(insertErr => this.logger.warn('Failed to write model_calls row for an image call', { err: insertErr }));
   }
 
-  // Normalise the raw parsed value for the module's schema (unwrapping object-wrapped arrays),
-  // validate it, then fold in any postValidate business rules.
   private parseOutput<T>(promptModule: PromptModule<T>, data: unknown): SchemaParseResult<T> {
     const normalized = normalizeForSchema(promptModule.schema, data);
     return applyPostValidate(parseSchema<T>(promptModule.schema, normalized), promptModule.postValidate);
@@ -700,12 +681,8 @@ export class ModelRouterService {
     return { parsed: { success: false, issues }, usable: blocking.length === 0 ? parsed.data : undefined };
   }
 
-  // Formats the module's template into messages. cacheStrategy modules get cache_control breakpoints, which Synapse keeps or strips per
-  // model, and every call carries the required JSON schema in-band — without it
-  // the creative roles, whose prompts never mention JSON, answer with plain prose. The in-band schema
-  // carries the descriptions and constraints the AJV pass judges the reply against. It closes the
-  // conversation, except on a call the gateway keeps a session for: there it is a system message, so a
-  // conversation that grows by appending keeps every earlier message where it was.
+  // cacheStrategy modules get cache_control breakpoints (Synapse keeps or strips them per model). The JSON schema always travels in-band, since creative prompts never
+  // mention JSON; it closes the conversation, except on a gateway-session call, where it is a system message so appended turns keep earlier messages in place.
   private async buildMessages<T>(
     promptModule: PromptModule<T>,
     input: Record<string, unknown>,

@@ -25,8 +25,8 @@ function delta(overrides: Partial<ContinuityOutput> = {}): ContinuityOutput {
 }
 
 /**
- * A transaction over in-memory thread/mystery tables good enough for `applyContinuityDelta`'s upsert calls: the `set` clauses it builds
- * are plain values now (P4-41 review), save for the summary/question `COALESCE` fragment, which this fake resolves the same way SQL would.
+ * A transaction over in-memory thread/mystery tables good enough for `applyContinuityDelta`'s upsert calls; its `set` clauses are plain values, save for the
+ * summary/question `COALESCE` fragment, which this fake resolves as SQL would.
  */
 function fakeTx(seed: { plotThreads?: Row[]; mysteries?: Row[] } = {}) {
   const tables = new Map<unknown, Row[]>([

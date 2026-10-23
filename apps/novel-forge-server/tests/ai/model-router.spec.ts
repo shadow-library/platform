@@ -24,7 +24,6 @@ describe('ModelRouterService.structured (repair ladder)', () => {
   function makeRouter(fakeChain: { invoke: ReturnType<typeof mock> }): ModelRouterService {
     const stubTelemetry = {} as never;
     const router = new ModelRouterService(stubTelemetry, stubDatabaseService(), new FakeSynapse().client);
-    // The router invokes the returned client directly with the formatted messages, so Synapse is never reached.
     (router as unknown as Record<string, unknown>)['buildSynapseClient'] = () => fakeChain;
     return router;
   }

@@ -46,7 +46,7 @@ const words = (...terms: string[]): RegExp[] => terms.map(term => new RegExp(`\\
 
 // Conservative on purpose: it guards the unrestricted route only, a false refusal costs a rephrase, and a miss is not recoverable. Terms common in
 // ordinary prose in another sense ("minor", "kid", "baby", "naked", "nude", "lust", "arouse") are left out of the pairings, and "sex" and "molest"
-// pair only on the supplied scope (policy P4-27: a survivor's backstory in the author's own words can refuse, until the owner revisits it).
+// pair only on the supplied scope (a survivor's backstory in the author's own words can refuse, until the owner revisits it).
 export const HARD_LINE_LEXICON: HardLineLexicon = {
   standalone: words('lolicon', 'shotacon', 'loli', 'shota', 'csam', 'child porn(?:ography)?', 'pedophilic', 'paedophilic'),
   minor: [

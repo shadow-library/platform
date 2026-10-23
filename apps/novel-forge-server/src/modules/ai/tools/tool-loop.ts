@@ -21,7 +21,6 @@ export interface ToolLoopResult {
   toolCallCount: number;
 }
 
-// ToolCapableModel narrows BaseChatModel to those that implement bindTools.
 type ToolCapableModel = BaseChatModel & Required<Pick<BaseChatModel, 'bindTools'>>;
 
 const logger = Logger.getLogger(APP_NAME, 'runToolLoop');
@@ -30,8 +29,6 @@ const rethrowModelFailure = (err: unknown): never => {
   throw fromSynapseFailure(err);
 };
 
-// Bounded tool loop for verification nodes.
-// Binds tools to model, runs up to maxRounds, writes audit rows per tool call.
 export async function runToolLoop(
   model: BaseChatModel,
   tools: DynamicStructuredTool[],
@@ -43,10 +40,7 @@ export async function runToolLoop(
 ): Promise<ToolLoopResult> {
   const maxRounds = opts?.maxRounds ?? 6;
 
-  // `bindTools` is optional on BaseChatModel and this loop accepts any of them, so a model without
-  // native tool-calling stays usable: it answers from the context already assembled in the prompt
-  // instead of looking canon up through tools. Degraded but functional — and this check is what
-  // narrows the model to ToolCapableModel below.
+  // `bindTools` is optional on BaseChatModel; a model without native tool-calling stays usable, answering from the context already in the prompt.
   if (typeof model.bindTools !== 'function') {
     logger.debug('runToolLoop: model has no bindTools — running tool-free', { node: ctx.node, runId: ctx.runId });
     const response = await model.invoke(messages).catch(rethrowModelFailure);

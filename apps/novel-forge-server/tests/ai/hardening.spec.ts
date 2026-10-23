@@ -35,7 +35,6 @@ function makeAssembler() {
 
 describe('applyBudget — edge cases', () => {
   it('force-includes the first section when it alone exceeds the budget (at-least-one guarantee)', () => {
-    // Single section with 200 tokens, budget of 10 — must still be included.
     const sections = [{ tokens: 200, key: 'only' }];
     const { fitting, omitted } = applyBudget(sections, 10);
     expect(fitting).toHaveLength(1);
@@ -49,7 +48,6 @@ describe('applyBudget — edge cases', () => {
       { tokens: 100, key: 'beta' },
     ];
     const { fitting, omitted } = applyBudget(sections, 5);
-    // Only first is force-included; the rest still cannot fit.
     expect(fitting[0]?.key).toBe('alpha');
     expect(fitting.every(s => s.key !== 'beta')).toBe(true);
     expect(omitted).toEqual([{ key: 'beta', reason: 'budget', tokens: 100 }]);
@@ -62,17 +60,14 @@ describe('applyBudget — edge cases', () => {
 
 describe('truncateAtParagraph — edge cases', () => {
   it('truncates at word boundary when text has no paragraph breaks', () => {
-    // A single long line (no \n\n) that exceeds maxTokens.
     const words = Array.from({ length: 50 }, (_, i) => `word${i}`);
     const text = words.join(' ');
     const fullTokens = countTokens(text);
 
-    // Halve the budget so the text must be truncated.
     const maxTokens = Math.floor(fullTokens / 2);
     const { text: result, truncated } = truncateAtParagraph(text, maxTokens);
 
     expect(truncated).toBe(true);
-    // Result must be a prefix of the original (word boundary, no mid-word cuts).
     expect(text.startsWith(result)).toBe(true);
     expect(countTokens(result)).toBeLessThanOrEqual(maxTokens);
   });
@@ -101,7 +96,7 @@ describe('routeAfterJudge', () => {
     expect(routeAfterJudge({ ...base, verdict: 'consistent', endingCompliant: false, autoFix: false })).toBe('awaitReview');
     expect(routeAfterJudge({ ...base, verdict: 'consistent', endingCompliant: false, attempt: 3 })).toBe('acceptAsIs');
     expect(routeAfterJudge({ ...base, verdict: 'consistent', endingCompliant: true })).toBe('accept');
-    // Legacy callers without the flag keep today's behavior.
+    // A caller omitting the ending-compliance flag still accepts.
     expect(routeAfterJudge({ ...base, verdict: 'consistent' })).toBe('accept');
   });
 });
@@ -123,10 +118,8 @@ describe('ContextAssembler.resolveRefs — unknown ref type', () => {
 
   it('resolves known prefixes and marks unknown ones as unresolved in the same call', async () => {
     const assembler = makeAssembler();
-    // entity:missing-key won't resolve because DB returns [], but unknowntype:x goes straight to unresolved.
     const { unresolved } = await assembler.resolveRefs(1n, ['unknowntype:x', 'entity:missing']);
     expect(unresolved).toContain('unknowntype:x');
-    // entity:missing fails to find a row — also ends up in unresolved.
     expect(unresolved).toContain('entity:missing');
   });
 });

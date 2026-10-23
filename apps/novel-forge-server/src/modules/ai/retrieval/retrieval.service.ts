@@ -40,7 +40,7 @@ export class RetrievalService {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
 
-  // Search prose index. Excludes isolated chapters, whatever their provenance. Returns [] on embed failure.
+  // Excludes isolated chapters, whatever their provenance. Returns [] on embed failure.
   async searchProse(projectId: bigint, query: string, k = DEFAULT_PROSE_K): Promise<RetrievalHit[]> {
     try {
       const embedding = await this.embeddingService.embed(projectId, query);
@@ -73,7 +73,7 @@ export class RetrievalService {
     }
   }
 
-  // Search lore index. Filter by kinds[] if provided. Returns [] on embed failure.
+  // Returns [] on embed failure.
   async searchLore(projectId: bigint, query: string, k = DEFAULT_LORE_K, opts?: { kinds?: string[] }): Promise<RetrievalHit[]> {
     try {
       const embedding = await this.embeddingService.embed(projectId, query);

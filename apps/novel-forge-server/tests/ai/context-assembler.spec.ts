@@ -27,7 +27,6 @@ describe('countTokens', () => {
 
 describe('truncateAtParagraph', () => {
   it('keeps paragraphs that fit and drops those that exceed maxTokens', () => {
-    // Three paragraphs; para1 + para2 fit together, para3 would exceed.
     const para1 = 'Alpha paragraph with some words here.';
     const para2 = 'Beta paragraph with some words here too.';
     const para3 = 'Gamma paragraph with some words here as well, bringing the total over budget.';
@@ -59,7 +58,6 @@ describe('truncateAtParagraph', () => {
 
 describe('truncateAtParagraphTail', () => {
   it('keeps paragraphs that fit and drops those that exceed maxTokens, from the front', () => {
-    // Three paragraphs; para2 + para3 fit together, para1 would exceed — the TAIL is kept.
     const para1 = 'Alpha paragraph with some words here.';
     const para2 = 'Beta paragraph with some words here too.';
     const para3 = 'Gamma paragraph with some words here as well, bringing the total over budget.';
@@ -233,7 +231,6 @@ describe('ContextAssembler.forChapter — isolated-adjacency', () => {
 
 describe('ContextAssembler.forChapter — prev_ending tail truncation', () => {
   it('keeps the END of the previous chapter, not its opening, when content exceeds PREV_ENDING_TAIL', async () => {
-    // Build enough paragraphs that the opening and closing paragraphs can't both fit in the budget.
     const openingPara = 'OPENING_MARKER: '.repeat(80);
     const closingPara = 'CLOSING_MARKER: '.repeat(80);
     const content = [openingPara, closingPara].join('\n\n');

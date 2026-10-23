@@ -50,8 +50,7 @@ export class ReadabilityComplianceSchema {
   issues: string[];
 }
 
-// A contradiction verdict must include at least one hard finding — expressed declaratively as a
-// JSON Schema if/then so AJV enforces the same cross-field rule zod's `.refine()` used to.
+// A contradiction verdict must include at least one hard finding — a JSON Schema if/then so AJV enforces the cross-field rule.
 @Schema({
   if: { properties: { verdict: { const: 'contradiction' } }, required: ['verdict'] },
   then: {

@@ -20,7 +20,6 @@ describe('chunkText', () => {
   });
 
   it('produces 2+ chunks for text spanning multiple paragraphs beyond targetChars', () => {
-    // 4 paragraphs, each ~600 chars. Para1+Para2 < 2000, Para1+Para2+Para3 > 2000.
     const para = (n: number) => `Paragraph ${n}: ${'X'.repeat(560)}`;
     const text = [para(1), para(2), para(3), para(4)].join('\n\n');
 

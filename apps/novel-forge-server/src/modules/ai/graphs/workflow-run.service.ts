@@ -131,7 +131,6 @@ export class WorkflowRunService {
   }
 
   async onModuleInit(): Promise<void> {
-    // Ensure the LangGraph checkpoint tables exist for the connected database (idempotent).
     await this.checkpointer.setup();
   }
 
@@ -149,10 +148,10 @@ export class WorkflowRunService {
     };
   }
 
-  // Create a workflow_run row, or reuse the one left behind by a crashed prior attempt of the same
-  // job/target. Reusing its id (used as the checkpoint thread_id) is what lets a retried job resume
-  // from the last completed graph node instead of re-executing — and re-calling — the LLM.
-  /** A run opened under a job is resumed, not duplicated, by that job's later `runChain` on the same graph and target. */
+  /**
+   * Reuses the run a crashed attempt of the same job and target left behind: its id is the checkpoint thread_id, so a retried job resumes from the last completed node
+   * instead of re-calling the LLM.
+   */
   async createRun(projectId: bigint, graph: string, target: string, input: unknown, jobId?: string, parentRunId?: string): Promise<string> {
     if (jobId) {
       const existing = await this.db.query.workflowRuns.findFirst({
@@ -302,10 +301,8 @@ export class WorkflowRunService {
   }
 
   /**
-   * Runs a plain (non-graph, non-checkpointed) chain under workflow_runs bookkeeping — the rule-11
-   * seam for the refinement chains (chat-turn, premise-enhance, bible-audit): every turn
-   * gets a fresh runId that correlates its model_calls and context pack, and failures land in the
-   * same audit trail as graph runs.
+   * Runs a plain, non-checkpointed chain under workflow_runs bookkeeping, so the refinement chains get a fresh runId correlating their model_calls and context pack,
+   * and failures reach the same audit trail as graph runs.
    */
   async runChain<T>(
     projectId: bigint,

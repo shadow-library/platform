@@ -66,13 +66,9 @@ interface ShiftTarget {
 }
 
 /**
- * Every column in `src/database/schemas` that stores a forge chapter number, shifted by the same
- * two-phase pass. The list is an allow-list on purpose: an earlier version reasoned about which columns
- * could hold a value above the write frontier and got it wrong twice — `character_knowledge` is written
- * at draft approval, and `applyContinuityDelta` writes the entity/thread/mystery columns from a draft —
- * so "does this column store a chapter number?" is the only question asked here. A column is left out
- * only by an explicit entry in the deny-list below.
- *
+ * Every column in `src/database/schemas` that stores a forge chapter number, shifted by the same two-phase pass. The list is an allow-list on purpose:
+ * guessing which columns can hold a value above the write frontier was wrong before (`character_knowledge` is written at draft approval, and `applyContinuityDelta`
+ * writes the entity/thread/mystery columns from a draft), so the only question is "does this column store a chapter number?"; a column is left out only by an explicit entry below.
  * Deny-list, with the reason each is not shifted:
  * - `chapter_publications.chapter`, `.published_ordinal` — frozen historical pointers; moving one moves a reader's URL.
  * - `projects.story_current_chapter` — a cursor over finalized prose, never above the frontier.
