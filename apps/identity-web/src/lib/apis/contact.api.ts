@@ -3,7 +3,6 @@ import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryCl
 import { type AddContactResponse, type ContactItemDto, type ContactListResponse } from './api-types.gen';
 import { type ApiError, APIRequest } from './transport';
 
-/** An email or phone the user has claimed; `verifiedAt` present once proven. */
 export type ContactItem = ContactItemDto;
 export type AddContactResult = AddContactResponse;
 export type { ContactListResponse };

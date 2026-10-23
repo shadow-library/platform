@@ -81,7 +81,6 @@ export type BotGrantLevel = BotGrantBody['level'];
 export type BotActivityAction = NonNullable<ListActivityQueryParams['action']>;
 export type BotActivityOutcome = NonNullable<ListActivityQueryParams['outcome']>;
 
-/** Query params for `GET /organisations/:organisationId/bots/:botId/activity` — cursor-based pagination. */
 export interface BotActivityParams {
   limit?: number;
   cursor?: string;

@@ -6,15 +6,10 @@ import { isApiError } from '@/lib/apis';
 
 import styles from './boundary.module.css';
 
-/**
- * The router's `defaultErrorComponent` surfaces a safe message — `ApiError` messages are curated for
- * users, anything else collapses to a generic sentence so stack traces / internal details never reach the
- * page — and offers retry (re-runs the failed loaders) plus an escape hatch. A 401 that escaped the route
- * guards means the session lapsed mid-view, so it points at sign-in instead of a pointless retry.
- */
+/** `ApiError` messages are curated for users; anything else collapses to a generic sentence so internal details never reach the page. */
 export function DefaultCatchBoundary({ error, reset }: ErrorComponentProps): React.JSX.Element {
   const router = useRouter();
-  /** `isApiError` (web 0.2) instead of `instanceof` — holds across the SSR/client dual-bundle class split. */
+  /** `isApiError` instead of `instanceof`: the SSR and client bundles each carry their own `ApiError` class. */
   const sessionExpired = isApiError(error) && error.status === 401;
   const message = isApiError(error) ? error.message : 'Something went wrong on our end. Please try again.';
 

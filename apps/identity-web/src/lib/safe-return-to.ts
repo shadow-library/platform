@@ -1,7 +1,6 @@
 /**
- * A browser folds backslashes into slashes, so the candidate is normalised before the protocol-relative
- * (`//host`) check. A relative same-origin path is always safe; an absolute URL is allowed only for the
- * current origin or a first-party app under the ecosystem root domain — never an arbitrary origin.
+ * Browsers fold backslashes into slashes, so the candidate is normalised before the protocol-relative (`//host`) check.
+ * Absolute URLs are limited to the current origin and first-party apps under the root domain.
  */
 export function safeReturnTo(candidate: string | undefined, rootDomain: string): string | null {
   if (!candidate) return null;

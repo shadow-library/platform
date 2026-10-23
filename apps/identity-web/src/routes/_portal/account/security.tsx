@@ -303,10 +303,6 @@ function SecurityPage(): React.JSX.Element {
   );
 }
 
-/**
- * Collects the current password plus a new one and rotates the credential. The server re-proves the current
- * password (a wrong one comes back as a 401) and signs out every other session, so a success toast says so.
- */
 function ChangePasswordDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }): React.JSX.Element {
   const changePassword = useChangePasswordMutation();
   const [current, setCurrent] = useState('');

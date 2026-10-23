@@ -21,10 +21,7 @@ import { displayName } from '@/lib/format';
 import styles from './index.module.css';
 
 export const Route = createFileRoute('/_portal/account/')({
-  /**
-   * `me` is already ensured by the `_portal` guard; fetch the four tile queries in parallel so the whole
-   * overview server-renders in one shot instead of firing a five-query waterfall after hydration.
-   */
+  /** `me` is ensured by the `_portal` guard; the tile queries run in parallel so the overview server-renders without a waterfall. */
   loader: ({ context }) =>
     Promise.all([
       context.queryClient.ensureQueryData(mfaQueryOptions()),

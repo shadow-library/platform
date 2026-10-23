@@ -104,11 +104,7 @@ export function QueryState({ isLoading, error, isEmpty, emptyTitle = 'Nothing he
   return children;
 }
 
-/**
- * The light/dark switch every shell carries in its top bar. `ThemeProvider` renders the default theme on
- * the server and on the first client pass, adopting the stored choice only in a mount effect — so the icon
- * settles a beat after hydration rather than mismatching it.
- */
+/** `ThemeProvider` adopts the stored theme in a mount effect, so the icon settles after hydration instead of mismatching it. */
 export function ThemeToggle(): ReactElement {
   const { theme, toggleTheme } = useTheme();
   const dark = theme === 'dark';

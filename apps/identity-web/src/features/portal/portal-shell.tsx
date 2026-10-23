@@ -40,11 +40,6 @@ function activeLabel(nav: NavConfig, pathname: string): string {
   return match != null && 'label' in match ? match.label : 'Account';
 }
 
-/**
- * The account-portal chrome. `AppShell` owns the rail, the top bar, the account menu, and the sub-md nav
- * drawer; the portal supplies its destinations and the session-assurance badge, plus the auth gate — an
- * unauthenticated visitor is bounced to the hosted sign-in.
- */
 export function PortalShell({ children }: { children: ReactNode }): React.JSX.Element {
   const me = useMeQuery();
   const adminContext = useAdminContextQuery();

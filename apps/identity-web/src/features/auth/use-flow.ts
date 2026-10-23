@@ -8,7 +8,6 @@ export interface FlowUiState {
   busy: boolean;
   /** Human-ready inline error for the current step; cleared on the next action. */
   error: string | null;
-  /** Set when the flow is unrecoverable (expired/terminated) — the page offers a restart. */
   dead: boolean;
   /** Distinguishes the death cause so the page can show a lock-out card instead of the generic expiry one. */
   deadReason: DeadReason | null;
@@ -21,11 +20,6 @@ export interface FlowActions {
   setError(message: string | null): void;
 }
 
-/**
- * Shared state-machine plumbing for the login / registration / recovery pages. Every transition runs
- * through `run`, which folds the identity API's typed non-2xx bodies (rejected proofs, rate limits,
- * expired flows) into inline step state so the pages stay declarative.
- */
 export function useFlow(): FlowUiState & FlowActions {
   const [flow, setFlow] = useState<FlowState | null>(null);
   const [busy, setBusy] = useState(false);
@@ -47,7 +41,7 @@ export function useFlow(): FlowUiState & FlowActions {
       if (rejected) setError(rejected);
       return next;
     } catch (cause) {
-      /** `isApiError` (web 0.2) instead of `instanceof` — the guard still holds when the SSR and client bundles each carry their own `ApiError` class identity. */
+      /** `isApiError` instead of `instanceof`: the SSR and client bundles each carry their own `ApiError` class. */
       const outcome = flowFailureOutcome(isApiError(cause) ? cause : null);
       if (outcome.kind === 'dead') {
         setDead(true);

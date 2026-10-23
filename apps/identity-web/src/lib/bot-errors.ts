@@ -29,7 +29,6 @@ const BOT_FIELD_ERRORS: Partial<Record<string, BotFieldErrorTarget>> = {
   BOT_008: 'transferToUserId',
 };
 
-/** Maps a conflict/validation code with no server-side field detail onto the form field it concerns. */
 export function botFieldError(error: ApiError): { field: BotFieldErrorTarget; message: string } | null {
   const field = Object.hasOwn(BOT_FIELD_ERRORS, error.code) ? BOT_FIELD_ERRORS[error.code] : undefined;
   return field ? { field, message: botErrorMessage(error) } : null;

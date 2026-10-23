@@ -2,12 +2,7 @@ import { startAuthentication, startRegistration } from '@simplewebauthn/browser'
 
 import { type JsonObject } from '@/types';
 
-/**
- * The server speaks @simplewebauthn's JSON wire format (base64url throughout), so the matching browser
- * package handles all encoding; these wrappers only pin the option shapes and surface cancellation as
- * a typed outcome instead of an exception. The blobs are opaque JSON (`JsonObject`) so they round-trip
- * through the server functions that mint and verify them.
- */
+/** The server speaks @simplewebauthn's base64url JSON format, so the browser package does all encoding; cancellation is a typed outcome, not an exception. */
 
 type PublicKeyOptions = JsonObject;
 

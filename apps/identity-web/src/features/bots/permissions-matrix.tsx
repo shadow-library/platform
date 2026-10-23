@@ -15,11 +15,7 @@ function disabledReasonText(level: BotCatalogLevelItem, hasReadLevel: boolean): 
   return `${levelLabel(level.level, hasReadLevel)}: ${reason}`;
 }
 
-/**
- * Adds a synthetic, always-disabled entry for the currently-granted level when the catalog no longer
- * lists it (the role stopped being bot-grantable, or an admin lost the underlying permission) — so the
- * control still shows the true current state instead of silently defaulting to "No access".
- */
+/** Adds a disabled synthetic entry for a granted level the catalog no longer lists, so the control shows the true state instead of "No access". */
 function displayLevelsFor(resource: BotCatalogResourceItem, currentGrant: BotGrantItem | undefined): BotCatalogLevelItem[] {
   const levels = [...resource.levels];
   if (currentGrant?.level !== undefined && !levels.some(level => level.level === currentGrant.level)) {
@@ -140,13 +136,7 @@ export function PermissionsMatrix({ applications, grants = [], desired, onDesire
 
   const catalogLevels = useMemo(() => catalogLevelsBySlot(applications), [applications]);
 
-  /**
-   * Two roles can occupy the same resource slot at once — a staff-assigned grant alongside an
-   * admin-managed one, or two managed grants at different levels (nothing in `replaceGrants` prevents
-   * either). The row's control always drives off the highest-level *managed* grant, since that's the one
-   * the admin can actually act on; a staff grant sharing the slot is surfaced as its own read-only note
-   * instead of silently winning the row and leaving the managed grant with no control at all.
-   */
+  /** Grants can share a resource slot; the control drives off the highest managed grant, and a staff grant in the slot shows as a read-only note. */
   const { managedBySlot, lockedBySlot } = useMemo(() => {
     const managed = new Map<string, BotGrantItem>();
     const locked = new Map<string, BotGrantItem>();

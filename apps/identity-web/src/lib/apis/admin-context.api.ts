@@ -9,11 +9,7 @@ const adminContextKeys = {
   all: ['admin', 'context'] as const,
 };
 
-/**
- * The caller's granted platform-admin permissions. Session-only and never 403 — a non-admin gets an
- * empty list — so first-party surfaces can reveal the operator console to staff only, without the
- * client making authorization decisions: the identity server still enforces every privileged endpoint.
- */
+/** Session-only and never 403 (a non-admin gets an empty list); the identity server still enforces every privileged endpoint. */
 const adminContextQueryOptions = (enabled = true) =>
   queryOptions<AdminContextResponse, ApiError>({
     queryKey: adminContextKeys.all,

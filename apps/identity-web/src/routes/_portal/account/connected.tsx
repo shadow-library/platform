@@ -12,7 +12,6 @@ export const Route = createFileRoute('/_portal/account/connected')({
   component: ConnectedPage,
 });
 
-/** First-party apps are auto-granted; admin grants are provisioned for you — both are worth labelling. */
 const SOURCE_LABEL: Record<ConsentRecord['source'], string | null> = {
   USER: null,
   FIRST_PARTY_POLICY: 'Shadow app',

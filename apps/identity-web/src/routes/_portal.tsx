@@ -9,12 +9,7 @@ export const Route = createFileRoute('/_portal')({
   component: PortalGroup,
 });
 
-/**
- * `beforeLoad` guarantees a valid session on entry, but TanStack never re-runs it while navigating inside the
- * portal. `useSessionGuard` keeps re-validating for as long as the shell is mounted and flips to `redirecting`
- * once the session is gone — at which point the chrome is withheld and a spinner shown until the bounce to
- * `/login` completes, so a session that ends mid-use never keeps rendering the portal.
- */
+/** `beforeLoad` does not re-run inside the portal, so `useSessionGuard` withholds the chrome behind a spinner once the session is gone, until the bounce to `/login`. */
 function PortalGroup(): React.JSX.Element {
   const status = useSessionGuard();
 

@@ -10,11 +10,7 @@ export const meKeys = {
   all: ['me'] as const,
 };
 
-/**
- * Route-critical: the signed-in identity. A 401 here means "no session" — the portal/console guards
- * read that to bounce to the hosted sign-in — so this query never retries (a retry would just re-confirm
- * the 401). Loaders ensure it; components read the warm cache.
- */
+/** A 401 means "no session" and the portal/console guards read it, so this query never retries. */
 export const meQueryOptions = (enabled = true) =>
   queryOptions<MeResponse, ApiError>({
     queryKey: meKeys.all,
@@ -35,11 +31,7 @@ export function useUpdateProfileMutation(): UseMutationResult<MeResponse, ApiErr
   });
 }
 
-/**
- * Rotates the signed-in user's password after re-proving the current one. The server signs out every other
- * session, so the sessions list is invalidated to drop the ones that just ended. A wrong current password
- * surfaces as a thrown `ApiError` (401) the caller maps to a field message.
- */
+/** The server signs out every other session, so the sessions list is invalidated; a wrong current password throws `ApiError` (401). */
 export function useChangePasswordMutation(): UseMutationResult<ChangePasswordResponse, ApiError, ChangePasswordBody> {
   const queryClient = useQueryClient();
   return useMutation<ChangePasswordResponse, ApiError, ChangePasswordBody>({

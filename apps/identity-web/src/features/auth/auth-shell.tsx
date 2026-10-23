@@ -7,7 +7,6 @@ import styles from './auth-shell.module.css';
 
 interface AuthScreenProps {
   children: ReactNode;
-  /** Page-specific footer row (e.g. "New to Shadow? Create an account"). */
   footer?: ReactNode;
 }
 

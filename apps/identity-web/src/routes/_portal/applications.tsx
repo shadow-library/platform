@@ -52,7 +52,7 @@ function ApplicationsPage(): React.JSX.Element {
                 ) : (
                   <StatusChip intent="neutral">Inactive</StatusChip>
                 )}
-                {/* An accessible-but-unused app has no last-used timestamp (D-A1): show it as new rather than a bogus time. */}
+                {/* An accessible-but-unused app has no last-used timestamp: show it as new rather than a bogus time. */}
                 <span className={styles.cardTime}>{app.lastUsedAt ? `Used ${relativeTime(app.lastUsedAt)}` : 'Never used'}</span>
               </div>
             </a>

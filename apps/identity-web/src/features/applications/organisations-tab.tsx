@@ -12,10 +12,7 @@ const RELEASE_SOURCE: Record<ApplicationOrganisationItem['source'], { label: str
   ORG_ASSIGNMENT: { label: 'Org-assigned', intent: 'neutral' },
 };
 
-/**
- * Releases of a RESTRICTED application (D-A1). A PLATFORM_RELEASE row is one the platform admin controls
- * here; an ORG_ASSIGNMENT row is the organisation's own downstream choice of who gets it, shown read-only.
- */
+/** A PLATFORM_RELEASE row is controlled by the platform admin; an ORG_ASSIGNMENT row is the organisation's own downstream choice, shown read-only. */
 export function OrganisationsTab(props: { appId: string; require: Require }): React.JSX.Element {
   const { appId, require } = props;
   const orgs = useApplicationOrganisationsQuery(appId);

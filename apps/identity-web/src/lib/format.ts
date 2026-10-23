@@ -1,9 +1,4 @@
-/**
- * Date/time formatting is pinned to a single locale. `toLocale*(undefined, …)` resolves to the
- * host's locale, which differs between the SSR runtime and the browser (e.g. `Jul 19, 2026` vs
- * `19 Jul 2026`) and triggers a React hydration mismatch. A fixed locale renders identically on
- * both sides.
- */
+/** Pinned to one locale: `toLocale*(undefined, …)` follows the host locale, which differs between SSR and browser and causes hydration mismatches. */
 const DATE_LOCALE = 'en-US';
 
 export function relativeTime(iso?: string | null): string {

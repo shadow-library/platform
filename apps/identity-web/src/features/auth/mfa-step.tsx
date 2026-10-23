@@ -6,7 +6,6 @@ import { MethodRow, StepHeader } from './auth-parts';
 import styles from './auth-parts.module.css';
 import { AuthCard, AuthMedallion } from './auth-shell';
 
-/** Which entry a second factor collects — the chooser is the upfront "pick a step" surface. */
 type MfaView = 'chooser' | 'totp' | 'recovery';
 
 interface MfaStepProps {
@@ -22,7 +21,6 @@ interface MfaStepProps {
 }
 
 interface MfaLockedCardProps {
-  /** ISO instant the lock lifts; drives the live countdown when present. */
   lockedUntil?: string;
   /** Offered only while a recoverable flow survives the lock — a terminated flow can only restart. */
   onRecovery?: () => void;
@@ -34,13 +32,7 @@ const formatCountdown = (ms: number): string => {
   return `${Math.floor(total / 60)}:${(total % 60).toString().padStart(2, '0')}`;
 };
 
-/**
- * The second-factor step shared by login and recovery. It opens on a method chooser listing the factors
- * this backend actually verifies at the MFA step — authenticator (TOTP), passkey, and recovery code —
- * then drills into the picked entry; each entry can return to the chooser. SMS/email are first-factor
- * methods here (not second factors), so they never appear. The parent's flow status decides when this
- * is shown (`AWAITING_TOTP` / `AWAITING_MFA_WEBAUTHN`); this component only collects the proof.
- */
+/** SMS and email are first-factor methods here, so only authenticator, passkey and recovery code are offered as second factors. */
 export function MfaStep({ error, busy, attemptsLeft, canPasskey, onTotp, onRecovery, onPasskey, onCancel }: MfaStepProps): React.JSX.Element {
   const [view, setView] = useState<MfaView>('chooser');
   const [code, setCode] = useState('');
@@ -110,11 +102,7 @@ export function MfaStep({ error, busy, attemptsLeft, canPasskey, onTotp, onRecov
   );
 }
 
-/**
- * The "Too many attempts" lock-out card (design A4 · locked). The backend surfaces the MFA lock only as a
- * terminated flow, so the countdown renders when a `lockedUntil` is supplied and otherwise degrades to a
- * plain "try again later"; the way out is a recovery code when the flow survives, else a fresh start.
- */
+/** The backend surfaces the MFA lock only as a terminated flow, so without `lockedUntil` the countdown degrades to a plain "try again later". */
 export function MfaLockedCard({ lockedUntil, onRecovery, onRestart }: MfaLockedCardProps): React.JSX.Element {
   /** Computed on the client only so the SSR pass and first hydration agree (no server/client clock skew). */
   const [remaining, setRemaining] = useState<number | null>(null);

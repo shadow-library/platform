@@ -32,7 +32,6 @@ export const Route = createFileRoute('/console/users/$userId')({
 
 type HoldKind = 'SUSPENDED' | 'BLOCKED';
 
-/** The two holds differ in intent rather than mechanics, so the dialog has to say which one the administrator is choosing. */
 const HOLD_COPY: Record<HoldKind, string> = {
   SUSPENDED: 'A temporary hold. Sessions and tokens are revoked immediately, and the account is expected to come back — set a lift date, or restore it manually.',
   BLOCKED: 'A punitive, indefinite bar for policy or security violations. Sessions and tokens are revoked immediately and only an administrator can lift it.',

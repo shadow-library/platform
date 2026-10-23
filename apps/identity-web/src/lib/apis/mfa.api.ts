@@ -18,11 +18,7 @@ export interface StepUpMethodsResponse {
   methods: StepUpMethod[];
 }
 
-/**
- * The application a step-up is performed *for* (D-19, T-801). Carried on the hosted `/step-up` prompt
- * so the elevation window it opens names its beneficiary; omitted for the console's own step-up, whose
- * window no application can claim.
- */
+/** The application a step-up is performed for; omitted for the console's own step-up, whose window no application can claim. */
 export interface StepUpIntent {
   clientId?: string;
   resource?: string;
@@ -94,8 +90,7 @@ export function useStepUpMethodsQuery(enabled = true): UseQueryResult<StepUpMeth
   );
 }
 
-/** Resolves a client id to its owning application's display name for the hosted step-up prompt (D-19, T-801).
- *  `applicationName` is absent for an unknown/tampered id — the prompt renders that as a neutral failure. */
+/** `applicationName` is absent for an unknown or tampered id; the prompt renders that as a neutral failure. */
 export const stepUpIntentQueryOptions = (clientId: string, enabled = true) =>
   queryOptions<StepUpIntentResponse, ApiError>({
     queryKey: [...mfaKeys.all, 'step-up-intent', clientId],
@@ -123,8 +118,7 @@ export function requestPasskeyStepUpOptions(): Promise<WebauthnOptions> {
     .then(result => result.options);
 }
 
-/** Completes a passkey step-up with the browser's assertion, elevating the session to AAL2. An `intent`
- *  binds the resulting window to the application it names (D-19, T-801); omitted for a console step-up. */
+/** An `intent` binds the resulting window to the application it names; omitted for a console step-up. */
 export function verifyPasskeyStepUp(assertion: WebauthnAttestation, intent?: StepUpIntent): Promise<StepUpState> {
   return APIRequest.post('/me/webauthn/step-up')
     .body({ ...assertion, clientId: intent?.clientId, resource: intent?.resource })

@@ -28,11 +28,7 @@ export const Route = createFileRoute('/console/applications/')({
   component: ApplicationsPage,
 });
 
-/**
- * Creating an application provisions its single OAuth client and its `api://<app>` resource server-side
- * (D-21, T-807): there is no separate client or resource to register. The returned secret is the client's,
- * shown exactly once here; everything else is edited later from the application page.
- */
+/** Creating an application provisions its OAuth client and `api://<app>` resource server-side; the returned client secret is shown exactly once. */
 function CreateAppDialog({
   open,
   onOpenChange,
@@ -135,10 +131,7 @@ function ApplicationsPage(): React.JSX.Element {
 
   const goToApp = (id: number): void => void navigate({ to: '/console/applications/$appId', params: { appId: String(id) } });
 
-  /**
-   * The provisioned client's secret is shown once; only then do we open the new application. A client
-   * without a secret (there shouldn't be one here) skips straight through.
-   */
+  /** The client secret is shown once before the new application opens; a client without one skips straight through. */
   const onCreated = (result: CreateApplicationResponse): void => {
     if (result.clientSecret) setCreated(result);
     else goToApp(result.id);

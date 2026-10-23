@@ -6,14 +6,10 @@ import { type ApiError, APIRequest } from './transport';
 
 export type { OrganisationApplicationItem, OrganisationApplicationsResponse };
 
-/** How an organisation grants apps to its members: every visible app, or a managed allowlist (D-A1). */
+/** How an organisation grants apps to its members: every visible app, or a managed allowlist. */
 export type AppAccessMode = OrganisationApplicationsResponse['appAccessMode'];
 
-/**
- * Reading the list is an org-ADMIN surface;
- * assigning/unassigning apps needs ADMIN + step-up, and flipping the access mode is OWNER + step-up —
- * so callers gate the affordances the same way and the server remains the authority.
- */
+/** Reading is org-ADMIN; assigning needs ADMIN + step-up and flipping the access mode OWNER + step-up; the server remains the authority. */
 const orgApplicationKeys = {
   list: (orgId: string) => [...orgKeys.detail(orgId), 'applications'] as const,
 };

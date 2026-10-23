@@ -10,7 +10,7 @@ interface ErrorSearch {
   error?: string;
   error_description?: string;
   request_id?: string;
-  /** Set by the authorize deny redirect (D-A3): the display name of the app access was refused to. */
+  /** Set by the authorize deny redirect: the display name of the app access was refused to. */
   application?: string;
   /** The OAuth client that triggered the denial; absent on the SAML deny path. */
   client_id?: string;
@@ -71,10 +71,6 @@ function ErrorPage(): React.JSX.Element {
   const search = Route.useSearch();
   const code = search.error ?? 'server_error';
   const base = code in VARIANTS ? VARIANTS[code as keyof typeof VARIANTS] : VARIANTS.server_error;
-  /**
-   * The authorize deny redirect names the app it refused (D-A3); when present we say which app and why,
-   * so a refused customer knows exactly whom to ask rather than seeing a generic wall.
-   */
   const variant: Variant =
     code === 'access_denied' && search.application
       ? {

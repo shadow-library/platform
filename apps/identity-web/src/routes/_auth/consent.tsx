@@ -17,13 +17,8 @@ interface ConsentSearch {
   state?: string;
 }
 
-/**
- * The interactive step of the consent card once the prompt has loaded. Loading/invalid/first-party are
- * derived from the query, so only the states the user drives live here — never as parallel booleans.
- */
 type ConsentPhase = { step: 'review' } | { step: 'stepup' } | { step: 'denied'; redirectTo?: string };
 
-/** How long the denied confirmation lingers before handing control back — long enough to read, short enough not to stall. */
 const DENIED_REDIRECT_DELAY_MS = 1400;
 
 export const Route = createFileRoute('/_auth/consent')({
@@ -64,7 +59,7 @@ function ConsentPage(): React.JSX.Element {
     mutationFn: (decision: 'APPROVE' | 'DENY') =>
       authApi.consentDecide({ clientId: clientId ?? '', scopeNames: prompt.data?.scopes.map(item => item.name) ?? [], decision, redirectUri, state }),
     onSuccess: result => {
-      /** Denials pause on a confirmation screen; the effect below fires the validated access_denied redirect. */
+      /** Denials pause on a confirmation screen; the effect below then follows the server's `access_denied` redirect. */
       if (result.decision === 'DENY') return setPhase({ step: 'denied', redirectTo: result.redirectTo });
       if (result.redirectTo) window.location.assign(result.redirectTo);
       else navigate({ to: '/account' });

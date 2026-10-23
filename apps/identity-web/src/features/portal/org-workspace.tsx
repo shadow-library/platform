@@ -12,10 +12,6 @@ interface OrgWorkspaceProps {
   children: ReactNode;
 }
 
-/**
- * Domains only exist for team organisations, and identity providers are an org-admin surface —
- * tabs the server would refuse are hidden rather than left to error.
- */
 const TABS = [
   { to: '/organizations/$orgId/settings', label: 'Settings', teamOnly: false, manageOnly: false },
   { to: '/organizations/$orgId/members', label: 'Members & roles', teamOnly: false, manageOnly: false },

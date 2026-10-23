@@ -13,11 +13,7 @@ export interface AssignmentListParams {
   roleId?: number;
 }
 
-/**
- * Role and permission *definitions* are owned by each application and pushed declaratively through the
- * SDK's catalog sync (`PUT /api/v1/authz/catalog`); the console can only read them. What it still drives
- * is *assignment* — granting a defined role to a principal.
- */
+/** Role and permission definitions are pushed by each application's catalog sync (`PUT /api/v1/authz/catalog`); the console only reads them and drives assignment. */
 const adminRoleKeys = {
   permissions: (applicationId: number) => ['admin', 'permissions', applicationId] as const,
   assignments: (params?: AssignmentListParams) => ['admin', 'role-assignments', params] as const,

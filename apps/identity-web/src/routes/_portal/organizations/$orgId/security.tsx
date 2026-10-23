@@ -68,9 +68,8 @@ function SecurityPage(): React.JSX.Element {
 }
 
 /**
- * One policy, rendered from its registry metadata alone: a boolean key is a switch, an integer key a
- * duration editor. A new key of either kind renders here with no extra code. The fold-strategy hint
- * spells out how the setting combines across a member's organisations.
+ * Rendered from registry metadata alone: a boolean key is a switch, an integer key a duration editor.
+ * The fold-strategy hint says how the setting combines across a member's organisations.
  */
 function PolicyRow({ orgId, policy, require }: { orgId: string; policy: PolicyItem; require: RequireGate }): React.JSX.Element {
   const set = useSetPolicyMutation();

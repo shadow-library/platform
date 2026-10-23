@@ -12,7 +12,7 @@ import styles from './portal.module.css';
 interface StepUpFieldsProps {
   methods: StepUpMethod[] | undefined;
   loading?: boolean;
-  /** Binds the elevation to the application it is performed for (D-19, T-801); absent opens a console-only window. */
+  /** Binds the elevation to the application it is performed for; absent opens a console-only window. */
   intent?: StepUpIntent;
   onElevated: () => void;
 }
@@ -35,12 +35,7 @@ const METHOD_REASON: Record<StepUpMethod, string> = {
   PASSWORD: 'This is a sensitive change. Re-enter your password to continue.',
 };
 
-/**
- * The interactive step-up form. It renders only the factor the account can actually satisfy: an
- * authenticator code, a passkey assertion, or — for accounts with no second factor — a password
- * re-entry. An account with no usable method (e.g. federated with no MFA) is sent to enrol one.
- * Shared by the console step-up dialog and the consent screen so both negotiate factors identically.
- */
+/** Shared by the console step-up dialog and the consent screen; an account with no usable method is sent to enrol one. */
 export function StepUpFields({ methods, loading, intent, onElevated }: StepUpFieldsProps): ReactElement {
   const queryClient = useQueryClient();
   const stepUp = useStepUpMutation();
@@ -138,10 +133,6 @@ export function StepUpFields({ methods, loading, intent, onElevated }: StepUpFie
   );
 }
 
-/**
- * The AAL2 step-up prompt, shown when a sensitive action needs a fresh factor proof. The identity
- * server decides which factors this account may elevate with; the fields adapt to that set.
- */
 function StepUpDialog({ open, onOpenChange, title = 'Confirm it’s you', methods, methodsLoading, onElevated }: StepUpDialogProps): ReactElement {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -169,11 +160,7 @@ function StepUpDialog({ open, onOpenChange, title = 'Confirm it’s you', method
   );
 }
 
-/**
- * Gate a sensitive action behind AAL2. `require(action)` runs it immediately if the session is
- * already elevated, otherwise it opens the step-up dialog and runs the action once elevation
- * succeeds. Render the returned `dialog` somewhere in the page.
- */
+/** Runs the action at once if the session is already elevated, otherwise opens the step-up dialog (render `dialog` in the page) and runs it after elevation. */
 export function useStepUpGate(): { require: (action: () => void) => void; dialog: ReactElement } {
   const me = useMeQuery();
   const [pending, setPending] = useState<(() => void) | null>(null);

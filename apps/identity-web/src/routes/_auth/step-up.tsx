@@ -17,11 +17,8 @@ interface StepUpSearch {
 }
 
 /**
- * The hosted step-up prompt (D-19, T-801). A first-party SDK redirects the browser here — same origin
- * as the issuer — when a protected route needs AAL2 and no elevation is left to claim. The SDK carries
- * the application it acts for as `client_id`/`resource`; those ride into the step-up so the window it
- * opens names its beneficiary and cannot be claimed by another application. Reached without them (the
- * console's own step-up), it opens a window no application can claim.
+ * A first-party SDK redirects here when a protected route needs AAL2; `client_id`/`resource` ride into the step-up
+ * so the window it opens cannot be claimed by another application.
  */
 export const Route = createFileRoute('/_auth/step-up')({
   validateSearch: (search: Record<string, unknown>): StepUpSearch => ({

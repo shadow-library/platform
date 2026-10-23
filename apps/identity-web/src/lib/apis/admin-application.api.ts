@@ -27,7 +27,7 @@ export type {
   UpdateApplicationBody,
 };
 
-/** An application's platform visibility: who could ever be granted it (D-A1). */
+/** An application's platform visibility: who could ever be granted it. */
 export type ApplicationVisibility = ApplicationDetailResponse['visibility'];
 
 const adminApplicationKeys = {

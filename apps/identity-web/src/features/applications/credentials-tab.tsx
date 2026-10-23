@@ -14,11 +14,7 @@ const AUTH_METHOD_LABEL: Record<string, string> = {
   workload_identity: 'Workload identity (Kubernetes)',
 };
 
-/**
- * The application's single OAuth client, presented as its credential surface. Redirect URIs are derived
- * from the application's public URLs (editing the origins rewrites them server-side), so they are shown
- * read-only; the secret, back-channel logout URI, and any workload-identity subjects are edited here.
- */
+/** Redirect URIs derive from the application's public URLs (editing the origins rewrites them server-side), so they are read-only here. */
 export function CredentialsTab(props: {
   appId: string;
   appName: string;

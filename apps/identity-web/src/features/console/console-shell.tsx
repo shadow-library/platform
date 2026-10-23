@@ -72,8 +72,6 @@ export function ConsoleShell({ children }: { children: ReactNode }): React.JSX.E
           Privileged access
         </span>
       }
-      /* The console is a detour out of the portal, so leaving it is a first-class action rather than a
-         menu entry. On a phone the bar has no room for it and the account menu carries the exit. */
       actions={
         <span className={styles.backAction}>
           <Button variant="ghost" size="sm" prefix={<ArrowLeftIcon size={15} />} onClick={() => navigate({ to: '/account' })}>

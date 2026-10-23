@@ -9,11 +9,8 @@ import styles from './portal.module.css';
 interface SecretOncePanelProps {
   title?: ReactNode;
   description?: ReactNode;
-  /** A batch of one-time codes (recovery codes). */
   codes?: string[];
-  /** A single secret string (client/webhook secret). */
   secret?: string;
-  /** When provided, gate a confirm button behind a "saved it" checkbox. */
   confirmLabel?: string;
   onConfirm?: () => void;
   downloadName?: string;

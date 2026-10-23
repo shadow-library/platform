@@ -7,11 +7,6 @@ import { AddScopeDialog } from './add-scope-dialog';
 import { type Require } from './application-detail.types';
 import styles from '@/features/console/console.module.css';
 
-/**
- * The application's `api://<app>` resource: the scopes its own API defines (each optionally sensitive),
- * and — separately — the scopes an admin has granted this application on *other* applications' APIs,
- * which are the ceiling for its delegated calls (D-22).
- */
 export function ApiScopesTab(props: { appName: string; resource?: ResourceItem; resources: ResourceItem[]; client?: ClientDetailResponse; require: Require }): React.JSX.Element {
   const { appName, resource, resources, client, require } = props;
   const createScope = useCreateScopeMutation();

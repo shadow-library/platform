@@ -20,10 +20,7 @@ const EMAIL_PATTERN = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const PHONE_PATTERN = /^\+[1-9]\d{6,14}$/;
 const USERNAME_PATTERN = /^[a-zA-Z0-9._-]{3,32}$/;
 
-/**
- * Branches on the same shapes the server resolves, so a mistyped identifier is caught before a flow is created rather than surfacing as a generic
- * failure a step later. Shape-only by design — it never signals whether the identifier maps to an account (D-12).
- */
+/** Shape-only by design: it never signals whether the identifier maps to an account. */
 const validateIdentifier = (value: string): string | null => {
   if (!value) return 'Enter your email or phone number.';
   if (value.startsWith('+')) return PHONE_PATTERN.test(value) ? null : 'Enter a valid phone number in international format, like +14155550123.';

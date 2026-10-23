@@ -17,12 +17,7 @@ import {
 } from './api-types.gen';
 import { type ApiError, APIRequest } from './transport';
 
-/**
- * The interactive-auth DTOs come from the generated OpenAPI schema (`api-types.gen.ts`); the client-only
- * abstractions below (`FlowState`, `ChallengeProof`, `WebauthnChallenge`) compose them into the shapes the
- * flow pages actually render. Flow endpoints answer 200/401/429 with typed bodies rather than error
- * envelopes, so those statuses are `modeled` on the request and resolve to a `FlowState`, not a throw.
- */
+/** Flow endpoints answer 200/401/429 with typed bodies rather than error envelopes, so those statuses are `modeled` and resolve to a `FlowState`, not a throw. */
 
 export type { AuthMethodsResponse, ChallengeMethod, ConsentDecisionBody, SocialLoginStartResponse };
 export type SocialProvider = SocialProviderOptionDto['provider'];
@@ -33,7 +28,6 @@ export type ConsentScope = ConsentScopeDto;
 export type ConsentPrompt = ConsentPromptResponse;
 export type ConsentDecision = ConsentDecisionResponse;
 
-/** The single source of truth the flow pages render from — clients switch on `status`, never sequence. */
 export interface FlowState {
   flowId: string;
   status: string;
@@ -68,11 +62,6 @@ export const consentPromptQueryOptions = (clientId: string, scope: string, enabl
     enabled: enabled && Boolean(clientId && scope),
   });
 
-/**
- * The interactive-auth flow client. Unlike the rest of the API these are imperative (a login walks a
- * server-driven state machine, not a cache), so they are plain async functions the `useFlow` hook
- * drives — not TanStack Query hooks.
- */
 export const authApi = {
   loginInit(identifier: string, deviceId?: string, returnTo?: string): Promise<FlowState> {
     return APIRequest.post('/auth/login/init').body({ identifier, deviceId, returnTo }).execute<FlowState>();

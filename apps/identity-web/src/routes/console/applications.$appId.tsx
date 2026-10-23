@@ -54,12 +54,7 @@ interface VisibilityMeta {
   intent: ChipIntent;
 }
 
-/**
- * The application is the unit of identity (D-21): it is provisioned with exactly one OAuth client and
- * one `api://<app>` resource, so the console administers those *through* the application rather than as
- * standalone objects. The credentials tab manages the client (secret, public URLs, workload subjects);
- * the API tab manages the resource's scopes and this application's grants on other applications (D-22).
- */
+/** An application owns exactly one provisioned OAuth client and one `api://<app>` resource; the console administers them through the application. */
 export const Route = createFileRoute('/console/applications/$appId')({
   /** The open tab lives in the URL (`?tab=`) so it survives refresh and is deep-linkable; absent means overview. */
   validateSearch: (search: Record<string, unknown>): { tab?: Tab } => {
@@ -85,10 +80,7 @@ const TABS: { key: Tab; label: string }[] = [
   { key: 'organisations', label: 'Organisations' },
 ];
 
-/**
- * Visibility decides who could ever be granted the app (D-A1): PUBLIC to everyone, RESTRICTED only to the
- * organisations a platform admin releases it to, INTERNAL to platform staff alone (hidden from the rest).
- */
+/** PUBLIC to everyone, RESTRICTED only to organisations a platform admin releases it to, INTERNAL to platform staff alone. */
 const VISIBILITY: Record<ApplicationVisibility, VisibilityMeta> = {
   PUBLIC: { label: 'Public', description: 'Generally available — every organisation and personal workspace can use it.', intent: 'success' },
   RESTRICTED: { label: 'Restricted', description: 'Only organisations you release it to can use it. Manage releases in the Organisations tab.', intent: 'warning' },
@@ -126,10 +118,7 @@ function ApplicationDetailPage(): React.JSX.Element {
   const [membersPage, setMembersPage] = useState(1);
 
   const data = app.data;
-  /**
-   * Under D-21 an application owns exactly one provisioned client and one resource; we resolve them by
-   * ownership rather than by id so the page never has to know the derived client-id/audience convention.
-   */
+  /** Resolved by ownership rather than id, so the page never needs the derived client-id/audience convention. */
   const clientSummary = useMemo(() => (clientsQuery.data?.items ?? []).find(client => client.applicationId === data?.id), [clientsQuery.data, data?.id]);
   const clientDetail = useClientQuery(clientSummary?.id ?? '', Boolean(clientSummary));
   const resource = useMemo(() => (resourcesQuery.data?.items ?? []).find(item => item.applicationId === data?.id), [resourcesQuery.data, data?.id]);

@@ -7,11 +7,7 @@ import parts from '@/features/auth/auth-parts.module.css';
 import { meQueryOptions, useAcceptInvitationMutation, useDeclineInvitationMutation, useMeQuery } from '@/lib/apis';
 import { displayName } from '@/lib/format';
 
-/**
- * The organisation-invite landing, reached from an email link. The server exposes no invitation
- * preview (neutrality, D-12), so the organisation's name only appears after acceptance — before that
- * the page adapts purely to whether a session exists for the invited address.
- */
+/** The server exposes no invitation preview, so the organisation's name appears only after acceptance. */
 export const Route = createFileRoute('/invite/$token')({
   /**
    * Prefetch the session so the invite SSRs its signed-in / signed-out branch directly; a missing session

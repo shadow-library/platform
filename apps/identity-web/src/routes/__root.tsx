@@ -47,15 +47,10 @@ function RootComponent(): React.JSX.Element {
 
 function RootDocument({ children }: { children: React.ReactNode }): React.JSX.Element {
   return (
-    /**
-     * `themeInitScript` sets `data-theme`/`dark` on <html> before hydration, so the root element's
-     * attributes intentionally differ from the server markup — suppress the warning here (only for this
-     * element's own attributes) so React doesn't treat it as a mismatch and regenerate the whole tree.
-     */
+    /** `themeInitScript` sets `data-theme`/`dark` on <html> before hydration, so its attributes intentionally differ from the server markup. */
     <html lang="en" suppressHydrationWarning>
       <head>
         <HeadContent />
-        {/* Applies the persisted theme before paint so there is no flash and no `data-theme` hydration mismatch. */}
         <script dangerouslySetInnerHTML={{ __html: themeInitScript({ legacyStorageKey: 'shadow-identity-theme' }) }} />
       </head>
       <body>

@@ -9,11 +9,7 @@ export const Route = createFileRoute('/console')({
   component: ConsoleGroup,
 });
 
-/**
- * As with the portal, the entry gate does not re-run while navigating inside the console. `useSessionGuard`
- * keeps the session live for as long as the console shell is mounted and bounces to `/login` the moment it
- * ends, withholding the console chrome behind a spinner until the redirect completes.
- */
+/** The entry gate does not re-run inside the console, so `useSessionGuard` withholds the chrome behind a spinner once the session ends. */
 function ConsoleGroup(): React.JSX.Element {
   const status = useSessionGuard();
 

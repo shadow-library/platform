@@ -47,10 +47,7 @@ function AssignDialog({ role, open, onOpenChange }: { role: ApplicationRoleItem;
   const [principalId, setPrincipalId] = useState('');
   const [organisationId, setOrganisationId] = useState('');
 
-  /**
-   * An ORGANISATION grant is scoped to the org itself: its principal *is* the organisation, so the one
-   * identifier serves as both principal and scope (the server derives the scope either way — D-A5).
-   */
+  /** An ORGANISATION grant's principal is the organisation itself, so one identifier serves as both principal and scope. */
   const isOrg = principalType === 'ORGANISATION';
 
   const submit = (): void => {

@@ -14,7 +14,6 @@ interface InvalidRequestSearch {
   client_id?: string;
   /** The rejected `redirect_uri`, verbatim. Rendered as inert text only — never as a link. */
   redirect_uri?: string;
-  /** Display name of the application, when the client was recognised. */
   application?: string;
 }
 

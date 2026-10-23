@@ -8,7 +8,6 @@ import { type ApiError, APIRequest } from './transport';
 export type { UserAuditEventsResponse, UserDetailResponse, UserSearchResponse, UserSummaryItem };
 export type UserStatus = UserSummaryItem['status'];
 
-/** Query params for the admin user search (`GET /admin/users`) — offset-based pagination. */
 export interface UserSearchParams {
   email?: string;
   status?: UserStatus;
@@ -73,7 +72,6 @@ export function useUserAuditQuery(userId: string, enabled = true): UseQueryResul
   return useQuery(adminUserAuditQueryOptions(userId, enabled));
 }
 
-/** Refreshes both the searched list and the affected user's detail after a lifecycle action (AAL2). */
 function useUserActionMutation<V extends { userId: string }>(action: (vars: V) => Promise<unknown>): UseMutationResult<unknown, ApiError, V> {
   const queryClient = useQueryClient();
   return useMutation<unknown, ApiError, V>({
