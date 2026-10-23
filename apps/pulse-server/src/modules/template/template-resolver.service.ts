@@ -9,49 +9,35 @@ import { Notification, PrimaryDatabase, schema, Template } from '@server/databas
 
 export interface ResolvedTemplate {
   template: Template.Template;
-  /** The single PUBLISHED version, or null when the template has never been published. */
   publishedVersion: Template.Version | null;
-  /** Channels the template fans out to — enabled settings on an active template; empty for an inactive template. */
   enabledChannels: Notification.Channel[];
 }
 
 export interface RenderBundle {
   subject: string | null;
   body: string;
-  /** The published layout shell (EMAIL only), or null to deliver the fragment unwrapped. */
   layout: string | null;
-  /** Every published partial, keyed by partialKey, available to `{% render %}`. */
   partials: Record<string, string>;
 }
 
-/** The neutral, language-agnostic base locale; every template must have en-ZZ content, so it is the universal fallback. */
+/** Every template must have en-ZZ content, so it is the universal fallback. */
 export const DEFAULT_LOCALE = 'en-ZZ';
 
-/** Bounds on the immutable per-version content and per-key layout caches, so a long-lived worker can never grow unboundedly. */
 const CONTENT_CACHE_CAPACITY = 2000;
 const LAYOUT_CACHE_CAPACITY = 200;
 const PARTIALS_STORE_KEY = 'published-partials';
 
-/**
- * Resolves the renderable artifacts for a send. Two responsibilities:
- *
- *  1. **Send-time resolution** ({@link resolveForSend}) — the stable published version + enabled channels a producer
- *     addresses by `templateKey`. The caller pins the returned `publishedVersion.id` onto the job so a retry re-renders
- *     byte-identical content even after the template is re-edited.
- *  2. **Render-bundle assembly** ({@link loadRenderBundle}) — the immutable content of a pinned version composed with the
- *     *currently* published design system (layout + partials). Published content is immutable per version id, so it is
- *     cached indefinitely; the design system can be re-published, so its caches are invalidated on publish.
- */
+/** The caller pins `publishedVersion.id` onto the job so a retry re-renders identical content after a re-edit; layout and partials are always the currently published ones. */
 @Injectable()
 export class TemplateResolverService {
   private readonly logger = Logger.getLogger(APP_NAME, TemplateResolverService.name);
   private readonly db: PrimaryDatabase;
 
-  /** Keyed by `${versionId}:${channel}:${requestedLocale}` → resolved content (or null). Safe forever: version ids are immutable, so a bounded LRU only ever evicts cold entries. */
+  /** Safe to cache indefinitely: published content is immutable per version id. */
   private readonly contentCache = new LRUCache(CONTENT_CACHE_CAPACITY);
-  /** Keyed by layoutKey → published body (or null). Cleared when any layout is (re)published. */
+  /** Cleared on layout publish in this process only. */
   private readonly layoutCache = new LRUCache(LAYOUT_CACHE_CAPACITY);
-  /** Holds the full published-partial set under a single key; dropped when any partial is (re)published. */
+  /** Dropped on partial publish in this process only. */
   private readonly partialStore = new InMemoryStore();
 
   constructor(private readonly databaseService: DatabaseService) {

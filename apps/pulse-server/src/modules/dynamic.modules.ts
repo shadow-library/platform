@@ -10,38 +10,19 @@ import { NotificationModule } from '@modules/notification';
 import { TemplateModule } from '@modules/template';
 import { CUSTOM_DATA_TRANSFORMERS } from '@server/common';
 
-/**
- * Controllers carry explicit, full paths (`/api/v1/*`, `/api/auth/*`) instead of a global
- * `routePrefix` + `prefixVersioning`: the first-party session surface is bound to the unversioned
- * `/api/auth/*` contract pulse-web is coded against, which a module-wide version prefix cannot
- * express.
- */
+/** Controllers carry full paths instead of a global version prefix, which cannot express the unversioned `/api/auth/*` surface. */
 const AppHttpCoreModule = HttpCoreModule.forRoot({
   openapi: {
     normalizeSchemaIds: true,
   },
 });
 
-/**
- * Deferred with `forwardRef` so `AuthModule.forRoot`'s config resolution runs at application scan
- * time rather than at import time — this is what lets a test point the SDK at its per-file mock IdP
- * (issuer, app id, credential) before the module graph loads. The SDK registers its live `AuthClient`
- * via `useFactory`, so the root `@Module`'s metadata deep-freeze never reaches the instance or its
- * caches. The cast bridges `forwardRef`'s class-oriented typing to the dynamic module it actually
- * resolves — the module scanner handles both.
- */
+/** Deferred so `AuthModule.forRoot` resolves its config at scan time, letting tests point the SDK at a per-file mock IdP before the module graph loads. */
 const DeferredSessionModule = forwardRef(() => SessionModule.forRoot()) as unknown as Import;
 
 /**
- * `HttpCoreModule` and the auth SDK both construct a provider that injects the `FASTIFY_INSTANCE`
- * factory token, and both import `FastifyModule` — so each forms an init cycle with it. The app
- * framework breaks such a cycle by initialising the module with the smallest import count first, and
- * a factory-provided token cannot stand in as a cycle-breaking prototype: whichever of the two the
- * ordering places *before* `FastifyModule` fails to construct. Bundling both under a single
- * `FastifyModule` child collapses them into one cyclic import, so `FastifyModule`'s far higher
- * `requiredBy` wins the tie and it — and thus `FASTIFY_INSTANCE` — initialises before either
- * consumer. Kept as a `FastifyModule` descendant (not a sibling) so its controllers still register
- * with the router.
+ * `HttpCoreModule` and the auth SDK each form an init cycle with `FastifyModule` through the factory-provided `FASTIFY_INSTANCE`, and whichever initialises first fails.
+ * Bundling both under one `FastifyModule` child lets `FastifyModule`'s higher `requiredBy` initialise it first; it must stay a descendant so its controllers register.
  */
 @Module({ imports: [AppHttpCoreModule, DeferredSessionModule] })
 class PlatformModule {}

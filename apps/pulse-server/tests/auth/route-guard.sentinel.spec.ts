@@ -9,12 +9,6 @@ import { ContextService } from '@shadow-library/fastify';
 import { AUTH_ROUTES_BASE_PATH, PUBLIC_ROUTE_METADATA, RouteGuardSentinel } from '@modules/auth';
 import { AppErrorCode } from '@server/classes';
 
-/**
- * The sentinel is pulse's default-deny layer over the SDK's guard. It must let every route that
- * declares an access through the SDK (`AUTH_ROUTE_METADATA`, the SDK's own sign-in routes included)
- * or pulse's `@Public()` through, and fail every undeclared route closed.
- * Pulse exposes nothing to bots, so a bot principal is refused on every guarded route as well.
- */
 const context = new ContextService();
 extendContextWithAuth(context);
 const sentinel = new RouteGuardSentinel(context);

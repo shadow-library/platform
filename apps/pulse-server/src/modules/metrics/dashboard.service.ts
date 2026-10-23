@@ -19,11 +19,7 @@ type DeliveryCounts = Omit<NotificationDeliveryStats, 'total'>;
 const TREND_DAYS = 7;
 const DAY_MS = 86_400_000;
 
-/**
- * `FAILED` is the retryable state and `PERMANENTLY_FAILED` the terminal one (see
- * `NotificationJobExecutor.execute`), so a job that will be retried counts as pending, not
- * failed. Every status maps to exactly one bucket, which is what makes `total` equal `count(*)`.
- */
+/** `FAILED` is retryable, so it counts as pending; every status maps to exactly one bucket, which keeps `total` equal to `count(*)`. */
 const SUCCEEDED_STATUSES = ['SENT'] satisfies Notification.Status[];
 const FAILED_STATUSES = ['PERMANENTLY_FAILED'] satisfies Notification.Status[];
 const PENDING_STATUSES = ['PENDING', 'PROCESSING', 'FAILED'] satisfies Notification.Status[];
@@ -39,7 +35,6 @@ const accumulate = (target: NotificationDeliveryStats, counts: DeliveryCounts): 
   target.total = target.succeeded + target.failed + target.pending;
 };
 
-/** The wire format is a `YYYYMMDD` integer; `@Transform({ output: 'date:iso' })` renders it as `YYYY-MM-DD`. */
 const toDayNumber = (date: Date): number => date.getUTCFullYear() * 10_000 + (date.getUTCMonth() + 1) * 100 + date.getUTCDate();
 
 const startOfUtcDay = (date: Date): Date => new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
@@ -52,12 +47,7 @@ export class DashboardService {
     this.db = databaseService.getPostgresClient();
   }
 
-  /**
-   * `notification_jobs.created_at` is a naive `timestamp` written by `now()`, so its day boundaries
-   * follow the database's clock while the buckets below are derived in UTC. The two agree because
-   * every deployment runs both in UTC; a database on another timezone would shift the window by its
-   * offset.
-   */
+  /** `created_at` is a naive `timestamp` in the database's clock while the buckets are UTC; they agree only because every deployment runs the database in UTC. */
   async getStats(): Promise<DashboardStats> {
     const todayStart = startOfUtcDay(new Date());
     const windowStart = new Date(todayStart.getTime() - (TREND_DAYS - 1) * DAY_MS);
@@ -83,11 +73,7 @@ export class DashboardService {
     return { today: { date: today, overall, channels }, trend: { fromDate: days[0] ?? today, toDate: today, stats } };
   }
 
-  /**
-   * Every day and channel is zero-filled by the caller: the response DTO requires all three channels,
-   * and the trend chart lays its bars out by array index, so a sparse series would render as a
-   * continuous one.
-   */
+  /** The caller zero-fills every day and channel: the DTO requires all three channels and the trend chart lays bars out by index. */
   private aggregate(windowStart: Date): Promise<AggregateRow[]> {
     const day = sql<string>`to_char(${schema.notificationJobs.createdAt}, 'YYYYMMDD')`;
     const countWhere = (statuses: Notification.Status[]): SQL<string> => sql<string>`count(*) filter (where ${inArray(schema.notificationJobs.status, statuses)})`;

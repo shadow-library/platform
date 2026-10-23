@@ -2,11 +2,6 @@ import { describe, expect, it } from 'bun:test';
 
 import { BASELINE_TEMPLATES } from '@server/database/seed/baseline.data';
 
-/**
- * §17's forbidden-notification list, verbatim: no re-engagement copy, no "we miss you", no streak-loss or
- * slip-framed language, no Recovery-quest nudges. Matched case-insensitively against literal template source
- * and rendered output alike.
- */
 const FORBIDDEN_PHRASES = [
   're-engage',
   're-engagement',
@@ -26,10 +21,7 @@ const FORBIDDEN_PHRASES = [
   'fell behind',
 ];
 
-/**
- * Strips the layout shell's `<!doctype>`, the CSS-inliner's `!important`, and Liquid's `!=`/`{% ... %}` tags —
- * none of these is authored copy, so none counts toward the no-exclamation-marks rule.
- */
+/** Strips the non-copy `!` sources: the layout's `<!doctype>`, the CSS-inliner's `!important` and Liquid's `!=` and tags. */
 function stripNonCopyExclamations(text: string): string {
   return text
     .replace(/\{%[^%]*%\}/g, '')

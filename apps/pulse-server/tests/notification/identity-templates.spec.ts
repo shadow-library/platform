@@ -3,11 +3,7 @@ import { describe, expect, it } from 'bun:test';
 import { buildRenderGlobals, resolvePayload, TemplateEngineService } from '@modules/template';
 import { BASELINE_TEMPLATES } from '@server/database/seed/baseline.data';
 
-/**
- * Every template key identity-server sends, declared there as `*_TEMPLATE` constants beside their callers
- * (`rg "const \w*TEMPLATE\w* = '" apps/identity-server/src`). Add a key here when identity adds one: this test then fails until the baseline
- * has its fixture, marked `producer: 'identity'` so the console send refuses it.
- */
+/** Mirrors the `*_TEMPLATE` constants in identity-server; a key added there must be added here, which then requires a baseline fixture marked `producer: 'identity'`. */
 const IDENTITY_TEMPLATE_KEYS = [
   'auth.login.otp',
   'auth.mfa.disabled',

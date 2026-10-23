@@ -1,9 +1,7 @@
 import { AppErrorCode } from '@server/classes';
 import { type Template } from '@server/database';
 
-/** Representative values used to exercise a template at publish time — proves the content renders before it goes live. */
 const TYPE_SAMPLE: Record<Template.VariableDefinition['type'], unknown> = { string: 'sample', number: 42, boolean: true };
-/** Neutral defaults injected for declared-but-absent optionals so a live strict render never fails on a legitimately-omitted variable. */
 const TYPE_FALLBACK: Record<Template.VariableDefinition['type'], unknown> = { string: '', number: 0, boolean: false };
 
 export function buildSampleData(schema: Template.VariableSchema): Record<string, unknown> {
@@ -12,11 +10,7 @@ export function buildSampleData(schema: Template.VariableSchema): Record<string,
   return data;
 }
 
-/**
- * Validates a send payload against the template's variable contract: every required variable must be present, and
- * declared optionals that are absent are pre-filled so the sandboxed strict render only ever fails on an *undeclared*
- * reference (a template defect caught at publish, never at send). Throws {@link AppErrorCode.NTF_004} on a breach.
- */
+/** Absent optionals are pre-filled so the strict render only fails on an undeclared reference, which publish already catches. */
 export function resolvePayload(schema: Template.VariableSchema, payload: Record<string, unknown> | null | undefined): Record<string, unknown> {
   const data: Record<string, unknown> = { ...(payload ?? {}) };
   const missing: string[] = [];
@@ -30,7 +24,6 @@ export function resolvePayload(schema: Template.VariableSchema, payload: Record<
   return data;
 }
 
-/** Extracts the offending variable name from a LiquidJS strict-variable render error, walking the cause chain the engine wraps. */
 export function parseUndefinedVariable(error: unknown): string | null {
   const messages: string[] = [];
   let current: unknown = error;

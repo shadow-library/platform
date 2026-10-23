@@ -22,7 +22,7 @@ export type BaselineStep =
   | { action: 'keep'; reason: BaselineKeepReason };
 
 export interface BaselinePlanOptions {
-  /** Set when the stored variable contract differs from the fixture's: content written against one contract never goes live under another. */
+  /** Content written against one variable contract must never go live under another. */
   contractChanged?: boolean;
 }
 
@@ -65,11 +65,7 @@ export function hashTemplateContents(contents: BaselineContent[]): string {
   return hashBaseline(canonical);
 }
 
-/**
- * Decides what the seed does to one layout, partial or template. It owns an entity only while the PUBLISHED version is one it wrote
- * (`baselineHash` set): an operator's publish or rollback always creates a version without one, and from then on the entity is theirs.
- * An owned version whose stored content already matches the fixture is adopted (its hash stamped) rather than republished.
- */
+/** The seed owns an entity only while its PUBLISHED version carries a `baselineHash`; an operator's publish or rollback creates one without, ending ownership. */
 export async function planBaselineStep<V extends BaselineVersion>(
   fixtureHash: string,
   versions: V[],

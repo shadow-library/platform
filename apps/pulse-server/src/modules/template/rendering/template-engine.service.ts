@@ -8,15 +8,11 @@ import { Notification } from '@server/database';
 
 export interface RenderInput {
   channel: Notification.Channel;
-  /** Plain-text subject line (EMAIL) / notification title (PUSH); null for SMS. */
   subject: string | null;
-  /** The content fragment — Liquid source authored in the CMS. */
   body: string;
-  /** EMAIL only: the layout shell (Liquid) with a `{{ content | raw }}` slot. Null → deliver the fragment unwrapped. */
+  /** EMAIL only: the layout shell with a `{{ content | raw }}` slot; null delivers the fragment unwrapped. */
   layout?: string | null;
-  /** Published partials available to `{% render 'key' %}`, keyed by partialKey. */
   partials?: Record<string, string>;
-  /** The complete, schema-validated variable set (optionals pre-filled) rendered into the templates. */
   data: Record<string, unknown>;
 }
 
@@ -26,7 +22,7 @@ export interface RenderOutput {
 }
 
 const LOGGER_NAMESPACE = `${APP_NAME}/rendering`;
-/** Hard ceiling so a pathological template can never hang a worker; Liquid aborts a render past this. */
+/** Liquid aborts a render past this so a pathological template cannot hang a worker. */
 const RENDER_LIMIT_MS = 1000;
 
 /** The framework's pre-rendered content fragment; the only value the HTML engine emits unescaped. Unforgeable from author data, which is never a class instance. */
@@ -43,10 +39,8 @@ const escapeHtml = (value: unknown): string => String(value).replace(/[&<>"']/g,
 const renderSafeHtml = (value: unknown): string => (value instanceof SafeHtml ? value.value : escapeHtml(value));
 
 /**
- * LiquidJS drops `outputEscape` whenever the last filter is `raw`, so any body/partial author writing
- * `{{ payload.field | raw }}` injects unescaped markup into transactional/OTP emails and into pulse-web.
- * Overriding `raw` to escape everything except the framework's {@link SafeHtml} `content` slot closes that
- * bypass at render time — covering already-stored templates — while `{{ content | raw }}` keeps working.
+ * LiquidJS drops `outputEscape` whenever the last filter is `raw`, so `{{ payload.field | raw }}` would inject unescaped markup into emails and pulse-web.
+ * Overriding `raw` to escape everything except {@link SafeHtml} closes that bypass at render time, including for already-stored templates.
  */
 const HTML_RAW_FILTER: FilterImplOptions = {
   raw: true,
@@ -54,10 +48,8 @@ const HTML_RAW_FILTER: FilterImplOptions = {
 };
 
 /**
- * `{% echo %}` — and `{% liquid %}`, whose `echo` statements dispatch through this same registered tag —
- * renders through LiquidJS's `Value`, never `Output`, so `outputEscape` never runs and {@link HTML_RAW_FILTER}
- * never sees it. This HTML-engine override escapes echo output like `{{ x }}`, emitting only {@link SafeHtml}
- * unescaped, so the emit path cannot inject markup; `{% assign %}`/`{% if %}`/`{% for %}` control flow is untouched.
+ * `{% echo %}` (and `echo` inside `{% liquid %}`) renders through LiquidJS's `Value`, never `Output`, so neither `outputEscape` nor
+ * {@link HTML_RAW_FILTER} applies; this override escapes echo output like `{{ x }}`.
  */
 class HtmlEchoTag extends Tag {
   private readonly value: Value | null;
@@ -74,19 +66,7 @@ class HtmlEchoTag extends Tag {
   }
 }
 
-/**
- * The template rendering engine. Renders CMS-authored content (and, for email, composes it into a
- * layout with reusable partials) using a **sandboxed** LiquidJS: no code execution, no filesystem or
- * network access, bounded render time, and — for HTML — **auto-escaped** variables so recipient data
- * can never inject markup. Every author value path is escaped: `{{ x }}` via LiquidJS's `outputEscape`,
- * the `| raw` filter via {@link HTML_RAW_FILTER}, and `{% echo %}` / `{% liquid %}` via {@link HtmlEchoTag};
- * only the framework's pre-rendered {@link SafeHtml} `content` slot is emitted unescaped. SMS/PUSH render in
- * a plain-text engine (no HTML escaping). Email output is CSS-inlined with juice for client compatibility.
- *
- * The service is pure: it takes content/layout/partials as strings (loaded from the datastore by the
- * caller) and returns the rendered `{ subject, body }` — so it is trivially unit-testable and holds no
- * per-tenant state.
- */
+/** Sandboxed LiquidJS (no filesystem or network, bounded render time); HTML output escapes every author value path, SMS/PUSH render unescaped. */
 @Injectable()
 export class TemplateEngineService {
   private readonly logger = Logger.getLogger(LOGGER_NAMESPACE, TemplateEngineService.name);
@@ -97,18 +77,17 @@ export class TemplateEngineService {
     const engine = this.createEngine(partials, isHtml);
 
     try {
-      /** Subject / push title are always plain text — render them un-escaped regardless of channel. */
+      // Subject and push title always render unescaped (plain text), whatever the channel.
       const subject = input.subject != null ? await this.textEngine(partials).parseAndRender(input.subject, input.data) : null;
       const content = await engine.parseAndRender(input.body, input.data);
 
       if (!isHtml) return { subject, body: content };
 
       const composed = input.layout ? await engine.parseAndRender(input.layout, { ...input.data, content: new SafeHtml(content) }) : content;
-      /** Inline the layout's <style> onto elements so email clients that strip <head> CSS still render the brand. */
+      /** Email clients that strip <head> CSS need the layout's styles inlined. */
       const body = juice(composed);
       return { subject, body };
     } catch (error) {
-      /** A render failure is a template/data defect, not an infra fault — surface it as a domain-level internal error with context. */
       this.logger.error('template render failed', { channel: input.channel, error });
       throw AppError.internal('Template render failed', error instanceof Error ? error : undefined);
     }
@@ -121,7 +100,6 @@ export class TemplateEngineService {
   private createEngine(partials: Record<string, string>, isHtml: boolean): Liquid {
     const read = (file: string): string => {
       const value = partials[file];
-      /** Thrown inside Liquid's render; caught + re-wrapped by {@link render}'s try/catch. */
       if (value == null) throw new Error(`Unknown partial '${file}'`);
       return value;
     };

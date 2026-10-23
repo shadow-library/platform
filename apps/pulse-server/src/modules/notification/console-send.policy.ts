@@ -17,9 +17,8 @@ const REFUSED_CATEGORIES = new Set(['auth', 'security']);
 const normalise = (value: string | null): string => (value ?? '').trim().toLowerCase();
 
 /**
- * Everything identity sends, operator templates squatting on its account-security namespaces, the legacy reset link, any one-time code and
- * anything filed as auth or security: a console send of one reaches an arbitrary recipient with a caller-chosen payload under the platform's
- * brand, which is a phishing or spoofed-notice kit.
+ * Identity, auth, security and OTP templates, operator templates squatting on those namespaces, and the legacy reset link are refused:
+ * a console send reaches any recipient with a caller-chosen payload under the platform's brand, a phishing/spoofed-notice kit.
  */
 export function isConsoleSendable(template: Pick<Template.Template, 'templateKey' | 'messageType' | 'category'>): boolean {
   const key = normalise(template.templateKey);

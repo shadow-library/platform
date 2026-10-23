@@ -17,7 +17,6 @@ export namespace Template {
   export type MessageType = InferEnum<typeof messageTypes>;
   export type VersionStatus = InferEnum<typeof versionStatus>;
 
-  /** Declared per template — the producer↔template contract; validated at send and author time. */
   export interface VariableSchema {
     variables: Record<string, VariableDefinition>;
   }
@@ -31,25 +30,17 @@ export namespace Template {
 
 export const messageTypes = pgEnum('message_types', ['OTP', 'TRANSACTIONAL', 'PROMOTIONAL']);
 
-/** The CMS publishing lifecycle. Exactly one PUBLISHED version per entity is used for live sends. */
 export const versionStatus = pgEnum('version_status', ['DRAFT', 'PUBLISHED', 'ARCHIVED']);
 
-/**
- * A template — the logical message addressed by `templateKey`. This is the stable aggregate root that
- * `notification_jobs` references; its metadata + variable contract live here, while the renderable
- * content lives in immutable {@link templateVersions}. Channel enablement (which channels fan out) is a
- * per-template setting in {@link templateChannelSettings}.
- */
 export const templates = pgTable('templates', {
   id: bigserial('id', { mode: 'bigint' }).primaryKey(),
   templateKey: varchar('template_key', { length: 255 }).notNull().unique(),
   name: varchar('name', { length: 255 }).notNull(),
   description: varchar('description', { length: 500 }),
   messageType: messageTypes('message_type').notNull().default('TRANSACTIONAL'),
-  /** Delivery priority — an axis independent of messageType; sets the job's retry backoff aggressiveness. */
+  /** Independent of messageType; sets the job's retry backoff aggressiveness. */
   priority: priorityEnum('priority').notNull().default('MEDIUM'),
   category: varchar('category', { length: 100 }),
-  /** The declared variable contract (see {@link Template.VariableSchema}); `{}` means "no declared variables". */
   variableSchema: jsonb('variable_schema').$type<Template.VariableSchema>().notNull().default({ variables: {} }),
   isActive: boolean('is_active').notNull().default(true),
   createdAt: timestamp('created_at').notNull().defaultNow(),
@@ -72,12 +63,6 @@ export const templateChannelSettings = pgTable(
   t => [primaryKey({ columns: [t.templateId, t.channel] })],
 );
 
-/**
- * An immutable snapshot of a template's renderable content. Editing opens/updates a DRAFT; publishing
- * stamps a monotonic version, marks it PUBLISHED, and demotes the previous PUBLISHED to ARCHIVED
- * (retained for history + rollback). A partial unique index enforces at most one PUBLISHED and one
- * DRAFT per template; live sends resolve the PUBLISHED version.
- */
 export const templateVersions = pgTable(
   'template_versions',
   {
@@ -90,10 +75,7 @@ export const templateVersions = pgTable(
     notes: varchar('notes', { length: 1000 }),
     editedBy: varchar('edited_by', { length: 255 }),
     publishedAt: timestamp('published_at'),
-    /**
-     * The baseline fixture hash this version was seeded from (`legacy` for one seeded before hashes were recorded); null on every version
-     * an operator authored. The seed supersedes a PUBLISHED version only while it carries one, so an operator's publish or rollback ends it.
-     */
+    /** Baseline fixture hash the seed created this version from (`legacy` if seeded before hashes existed); null when operator-authored, which stops the seed superseding it. */
     baselineHash: varchar('baseline_hash', { length: 64 }),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
@@ -101,7 +83,6 @@ export const templateVersions = pgTable(
   t => [unique('template_versions_template_id_version_unique').on(t.templateId, t.version)],
 );
 
-/** Per (version, channel, locale) renderable content. `body` is unbounded text (real templates exceed any varchar cap). */
 export const templateContents = pgTable(
   'template_contents',
   {
@@ -114,7 +95,6 @@ export const templateContents = pgTable(
 
     subject: varchar('subject', { length: 255 }),
     body: text('body').notNull(),
-    /** Which layout wraps this content (EMAIL only); references {@link layouts.layoutKey}. Null → no layout. */
     layoutKey: varchar('layout_key', { length: 255 }),
 
     createdAt: timestamp('created_at').notNull().defaultNow(),
@@ -123,11 +103,6 @@ export const templateContents = pgTable(
   t => [unique('template_contents_version_channel_locale_unique').on(t.templateVersionId, t.channel, t.locale)],
 );
 
-/**
- * A layout — the branded shell / design-system theme that wraps EMAIL content. The renderable body,
- * with a `{{ content }}` slot and CSS, lives in immutable {@link layoutVersions}; live sends resolve
- * the PUBLISHED version. Layouts are edited under a higher permission than template content.
- */
 export const layouts = pgTable('layouts', {
   id: bigserial('id', { mode: 'bigint' }).primaryKey(),
   layoutKey: varchar('layout_key', { length: 255 }).notNull().unique(),
@@ -151,10 +126,7 @@ export const layoutVersions = pgTable(
     notes: varchar('notes', { length: 1000 }),
     editedBy: varchar('edited_by', { length: 255 }),
     publishedAt: timestamp('published_at'),
-    /**
-     * The baseline fixture hash this version was seeded from (`legacy` for one seeded before hashes were recorded); null on every version
-     * an operator authored. The seed supersedes a PUBLISHED version only while it carries one, so an operator's publish or rollback ends it.
-     */
+    /** Baseline fixture hash the seed created this version from (`legacy` if seeded before hashes existed); null when operator-authored, which stops the seed superseding it. */
     baselineHash: varchar('baseline_hash', { length: 64 }),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
@@ -162,7 +134,6 @@ export const layoutVersions = pgTable(
   t => [unique('layout_versions_layout_id_version_unique').on(t.layoutId, t.version)],
 );
 
-/** A reusable content block (button, OTP block, alert panel, footer), rendered from templates/layouts via Liquid `{% render %}`. */
 export const partials = pgTable('partials', {
   id: bigserial('id', { mode: 'bigint' }).primaryKey(),
   partialKey: varchar('partial_key', { length: 255 }).notNull().unique(),
@@ -186,10 +157,7 @@ export const partialVersions = pgTable(
     notes: varchar('notes', { length: 1000 }),
     editedBy: varchar('edited_by', { length: 255 }),
     publishedAt: timestamp('published_at'),
-    /**
-     * The baseline fixture hash this version was seeded from (`legacy` for one seeded before hashes were recorded); null on every version
-     * an operator authored. The seed supersedes a PUBLISHED version only while it carries one, so an operator's publish or rollback ends it.
-     */
+    /** Baseline fixture hash the seed created this version from (`legacy` if seeded before hashes existed); null when operator-authored, which stops the seed superseding it. */
     baselineHash: varchar('baseline_hash', { length: 64 }),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),

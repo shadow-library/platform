@@ -23,7 +23,7 @@ describe('TemplateEngineService', () => {
     expect(out.subject).toBe('Your code 482913');
     expect(out.body).toContain('<h1>Sign in</h1>');
     expect(out.body).toContain('<div class="otp">482913</div>');
-    expect(out.body).toContain('Shadow'); // layout header rendered
+    expect(out.body).toContain('Shadow');
     expect(out.body).toMatch(/<div class="wrap"[^>]*style="[^"]*background/i);
   });
 

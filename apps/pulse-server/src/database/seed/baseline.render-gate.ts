@@ -20,7 +20,6 @@ export interface BaselineCatalogue {
   templates: TemplateFixture[];
 }
 
-/** The same content the layout publish path wraps to prove a shell renders. */
 const LAYOUT_PROBE_CONTENT = '<p>preview</p>';
 
 const logger = Logger.getLogger(APP_NAME, 'BaselineRenderGate');
@@ -46,11 +45,7 @@ export async function loadPublishedDesignSystem(db: PrimaryDatabase): Promise<De
   return { layouts: Object.fromEntries(layouts.map(row => [row.key, row.body])), partials: Object.fromEntries(partials.map(row => [row.key, row.body])) };
 }
 
-/**
- * The seed's stand-in for the publish path's render gate: nothing it writes goes live without first rendering against sample data.
- * Layouts and templates render against the design system already live in the datastore, exactly as their publish does. Partial publish has
- * no gate of its own, so a partial is admitted only while the whole fixture catalogue renders against the fixture design system.
- */
+/** Partial publish has no render gate of its own, so a partial is admitted only while the whole fixture catalogue renders against the fixture design system. */
 export class BaselineRenderGate {
   constructor(
     private readonly engine: TemplateEngineService,
@@ -95,7 +90,6 @@ export async function renderLayout(engine: TemplateEngineService, body: string, 
   await engine.render({ channel: 'EMAIL', subject: null, body: LAYOUT_PROBE_CONTENT, layout: body, partials: design.partials, data });
 }
 
-/** Renders every channel of the fixture as its template publish would: its own sample data, the design system's partials, its layout if live. */
 export async function renderTemplate(engine: TemplateEngineService, fixture: TemplateFixture, design: DesignSystem): Promise<void> {
   const data = { ...buildRenderGlobals(), ...buildSampleData({ variables: fixture.variables }) };
   for (const content of fixture.channels) {

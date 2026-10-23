@@ -9,28 +9,16 @@ import { APP_NAME } from '@server/constants';
 import { PUBLIC_ROUTE_METADATA } from './public.decorator';
 
 /**
- * PULSE-SPECIFIC DELTA over `@shadow-library/auth/module`: in the SDK's `public` access mode a
- * controller route added without a decorator is silently anonymous, so this sentinel is kept from
- * the pre-migration guard stack: it fails such routes closed whatever the mode.
- *
- * A route passes the sentinel two ways: it declares an access through the SDK's decorators — the SDK
- * guard enforces `optional` and `required`, and `public` (which the SDK's own sign-in routes carry)
- * is a declaration in its own right — or it carries pulse's `@Public()` marker. A route reaching the
- * deny path is genuinely undeclared, so it is logged at `warn` — once when the route is registered
- * (to surface the misconfiguration at boot) and again on every rejected request.
- *
- * Pulse exposes nothing to bots, so on guarded routes the sentinel also refuses a bot principal. The
- * SDK already denies a bot on any route without `@BotPermission`; this keeps pulse closed even if one
- * is ever added by mistake.
+ * In the SDK's `public` access mode a controller route without a decorator is silently anonymous, so this sentinel fails undeclared routes closed.
+ * Guarded routes also refuse bot principals: the SDK already denies bots without `@BotPermission`, and this keeps pulse closed if one is added by mistake.
  */
-
 @Middleware({ type: 'preHandler', weight: 100 })
 export class RouteGuardSentinel implements MiddlewareGenerator {
   private readonly logger = Logger.getLogger(APP_NAME, RouteGuardSentinel.name);
 
   constructor(private readonly context: ContextService) {}
 
-  /** Namespaced so the router's per-metadata handler cache never collides with the auth guard's entries */
+  /** Namespaced so the router's handler cache never collides with the auth guard's entries. */
   cacheKey(metadata: HandlerMetadata): string {
     return `pulse-sentinel:${String(metadata.method)}:${String(metadata.path)}`;
   }

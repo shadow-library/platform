@@ -43,11 +43,7 @@ export interface ChannelSendResult {
   status: ChannelNotificationStatus;
   locale?: string;
   jobId?: string;
-  /**
-   * Already the wire shape (`AppError.toResponse()`): the fastify 2.0 response-transform pipeline
-   * `structuredClone`s the payload, which strips custom properties off `Error` instances, so a live
-   * `AppError` cannot survive to an output transformer.
-   */
+  /** Already the wire shape (`AppError.toResponse()`): the response-transform pipeline `structuredClone`s the payload, which strips custom properties off `Error` instances. */
   error?: AppErrorObject;
 }
 
@@ -64,7 +60,7 @@ export interface ListMessagesQuery extends Partial<OffsetPagination> {
 export interface NotificationMessage {
   id: bigint;
   channel: Notification.Channel;
-  /** Masked at the source: the dev log exposes delivery metadata only, never the raw recipient or the rendered body/subject/payload (OTP codes, reset links). */
+  /** Masked at the source: the log exposes delivery metadata only, never the raw recipient or rendered content (OTP codes, reset links). */
   recipient: string;
   locale: string;
   templateKey: string;
@@ -164,7 +160,6 @@ export class NotificationService {
   async sendResolved(resolved: ResolvedTemplate, config: SendNotificationConfig): Promise<SendNotificationResult> {
     if (resolved.enabledChannels.length === 0) return { status: NotificationStatus.ACCEPTED, channelResults: [] };
 
-    /** The variable contract is enforced once for the whole send — a breach is a producer bug, not a per-channel outcome. */
     const payload = resolvePayload(resolved.template.variableSchema, config.payload ?? {});
     const promises = resolved.enabledChannels.map(channel => this.sendChannelNotification(channel, resolved, payload, config));
     const results = await Promise.all(promises);

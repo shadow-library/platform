@@ -33,7 +33,6 @@ export interface ChannelContent {
   layoutKey?: string;
 }
 
-/** The application whose code sends a baseline template; unset for demo templates nothing sends. */
 export type TemplateProducer = 'identity' | 'memoir';
 
 export interface TemplateFixture {
@@ -44,22 +43,14 @@ export interface TemplateFixture {
   messageType: Template.MessageType;
   priority: Notification.Priority;
   category?: string;
-  /** Defaults to true; an inactive template resolves to zero enabled channels and sends nothing. */
   isActive?: boolean;
   variables: Record<string, Template.VariableDefinition>;
   channels: ChannelContent[];
 }
 
-/**
- * The baseline design system + notification catalogue that pulse bootstraps into every datastore. It is authored here
- * purely as data — no message content lives in application code. An edit here reaches existing environments as a new
- * published version on the next migration, until an operator publishes their own version of that item through the CMS;
- * from then on the seed never touches it (see `planBaselineStep`).
- */
-
 const DEFAULT_LAYOUT_KEY = 'default';
 
-/** A declared variable in a template's contract. `example` doubles as the value used to gate the template at publish. */
+/** `example` doubles as the value used to gate the template at publish. */
 function variable(type: Template.VariableDefinition['type'], required: boolean, example?: string): Template.VariableDefinition {
   return example === undefined ? { type, required } : { type, required, example };
 }
@@ -77,11 +68,6 @@ function securityEmail(heading: string, body: string, action = 'If this wasn’t
 <div class="email-panel email-panel--warn">${action}</div>`;
 }
 
-/**
- * The branded, theme-aware Shadow email shell — the ported `@shadow-library/ui` design system, now a first-class CMS
- * layout. `{{ content | raw }}` receives the already-rendered fragment; brand + year come from the render globals.
- * Self-contained (no external assets) and CSS-inlined by juice at render, with the dark-mode block preserved.
- */
 export const DEFAULT_LAYOUT_BODY = `<!doctype html>
 <html lang="en">
 <head>
@@ -162,11 +148,6 @@ export const BASELINE_PARTIALS: PartialFixture[] = [
   { partialKey: 'button', name: 'Primary button', description: 'A branded call-to-action button.', body: '<a class="email-btn" href="{{ href }}">{{ label }}</a>' },
 ];
 
-/**
- * The catch-all sender profile: a `DEV` endpoint per channel, so a fresh deployment can deliver every baseline
- * template (`notificationChannel` covers EMAIL, SMS, and PUSH) without an operator wiring a real provider first.
- * `DEV` just logs the rendered message to `notification_messages` — see `DevNotificationProvider`.
- */
 export const BASELINE_SENDER_PROFILE: SenderProfileFixture = {
   key: 'default',
   displayName: 'Default (dev)',

@@ -1,10 +1,5 @@
 import { type Notification } from '@server/database';
 
-/**
- * The overwritable production baseline (layouts, partials, the template catalogue and their fixture types) now lives in
- * `src/database/seed` so the deployed migrate step can ensure it — re-exported here unchanged so tests keep importing it
- * from the same place. Only the test-only fixtures below (demo messages) still live here.
- */
 export * from '@server/database/seed';
 
 export interface MessageFixture {

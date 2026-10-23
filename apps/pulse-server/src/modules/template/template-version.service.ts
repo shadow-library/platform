@@ -36,13 +36,6 @@ export interface PreviewInput {
   data?: Record<string, unknown>;
 }
 
-/**
- * Owns a template's publishing lifecycle: an editable DRAFT is opened (cloned from the current PUBLISHED version),
- * its per-channel content edited, then published — which stamps a monotonic version, promotes the draft to PUBLISHED,
- * and archives the previous one. Every publish is gated by a real sandboxed render against sample data, so a template
- * that references an undeclared variable or a broken partial can never reach live traffic. Rollback re-publishes a copy
- * of any historical version, preserving immutability and the monotonic version sequence.
- */
 @Injectable()
 export class TemplateVersionService {
   private readonly logger = Logger.getLogger(APP_NAME, TemplateVersionService.name);
@@ -170,6 +163,7 @@ export class TemplateVersionService {
     return published;
   }
 
+  /** Rollback publishes a copy of a historical version, so versions stay immutable and monotonic. */
   async rollback(templateId: bigint, targetVersion: number, options: PublishOptions = {}): Promise<Template.Version> {
     const template = await this.templateService.getTemplateOrThrow(templateId);
     const target = await this.getVersion(templateId, targetVersion);

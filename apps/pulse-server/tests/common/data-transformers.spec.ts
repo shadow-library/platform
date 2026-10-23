@@ -14,11 +14,6 @@ describe('date:iso', () => {
     expect(toIsoDate(2025_03_07)).toBe('2025-03-07');
   });
 
-  /**
-   * The output feeds `Date` in the consuming web app, which reads an unrecognised `DD-MM-YYYY` as either
-   * an invalid date or — whenever the day is =< 12 — as US `MM-DD-YYYY`. Both failures are silent, so
-   * this asserts day and month cannot transpose for the pair that would collide under that reading.
-   */
   it('should keep the day and the month distinguishable', () => {
     expect(toIsoDate(2025_03_07)).not.toBe(toIsoDate(2025_07_03));
     expect(new Date(toIsoDate(2025_03_07)).getUTCMonth()).toBe(2);

@@ -25,12 +25,6 @@ export interface PartialPublishOptions {
   editedBy?: string;
 }
 
-/**
- * Manages the reusable content blocks (buttons, OTP panels, footers) that templates and layouts pull in via Liquid
- * `{% render 'key' %}`, and their publishing lifecycle. Publishing a partial invalidates the resolver's partial set so
- * the next render sees the new block. A partial is validated indirectly: any template that renders it is gated at its
- * own publish, so a partial that breaks a live template surfaces there.
- */
 @Injectable()
 export class PartialService {
   private readonly logger = Logger.getLogger(APP_NAME, PartialService.name);

@@ -1,24 +1,17 @@
-/**
- * The authoritative pulse RBAC catalog. Route decorators reference these strings and the identity
- * BootstrapService seeds the matching application permissions and roles — the two must stay in sync.
- * The service audience (`api://pulse`) is no longer restated here: the SDK derives it, the redirect
- * URIs, and the granted scopes from `GET {issuer}/api/v1/apps/me` at boot.
- */
-
+/** Identity's BootstrapService seeds the matching permissions and roles; these strings must stay in sync with it. */
 export const PULSE_PERMISSIONS = {
   templatesRead: 'pulse:templates:read',
   templatesWrite: 'pulse:templates:write',
-  /** The higher bar that gates draft → published transitions and rollbacks (a live-traffic change, unlike drafting) */
+  /** Gates publishes and rollbacks, which change live traffic, unlike drafting. */
   templatesPublish: 'pulse:templates:publish',
-  /** Governs the shared design-system assets (layouts + partials) every template renders through */
   layoutsWrite: 'pulse:layouts:write',
   sendersRead: 'pulse:senders:read',
   sendersWrite: 'pulse:senders:write',
   metricsRead: 'pulse:metrics:read',
   logsRead: 'pulse:logs:read',
-  /** High-trust: the dev message log exposes recipient PII and rendered bodies (OTP codes, reset links), so it is admin-only, unlike the viewer-held logsRead */
+  /** Admin-only: the message log exposes recipient PII and rendered bodies (OTP codes, reset links), unlike the viewer-held logsRead. */
   messagesRead: 'pulse:messages:read',
-  /** The console's manual send, which the service-only producer route never admits; admin-only */
+  /** Admin-only manual send from the console; the service-only producer route never admits it. */
   notificationsSend: 'pulse:notifications:send',
 } as const;
 

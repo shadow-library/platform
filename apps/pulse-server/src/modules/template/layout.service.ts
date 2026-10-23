@@ -28,15 +28,8 @@ export interface LayoutPublishOptions {
   editedBy?: string;
 }
 
-/** A minimal, valid content fragment used to exercise a layout's `{{ content }}` slot when gating a publish. */
 const PROBE_CONTENT = '<p>preview</p>';
 
-/**
- * Manages the branded EMAIL shells (the design-system layouts) and their publishing lifecycle. Structurally mirrors
- * {@link TemplateVersionService} — draft body → publish → archive previous — but a layout version carries the body
- * directly (no per-channel content). Publishing a layout invalidates the resolver's layout cache so the next render
- * picks up the new shell, and is gated by a real render so a broken layout can never take down every email.
- */
 @Injectable()
 export class LayoutService {
   private readonly logger = Logger.getLogger(APP_NAME, LayoutService.name);

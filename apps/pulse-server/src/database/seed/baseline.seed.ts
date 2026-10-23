@@ -43,11 +43,7 @@ export type BaselineGate = Pick<BaselineRenderGate, 'catalogueRenders' | 'layout
 
 const BASELINE_NOTES = 'Baseline';
 
-/**
- * Nothing goes live without passing the render gate. A superseding publish mirrors `publishDraft`: every PUBLISHED version of the item is
- * archived and the new one inserted in one transaction, so there is never a moment with two or none. A failed update is logged and skipped
- * rather than failing the migration, since the old copy keeps serving.
- */
+/** Superseding archives the old PUBLISHED version and inserts the new one in one transaction; a failed update is logged, not thrown, because the old copy keeps serving. */
 async function applyBaselineStep(db: PrimaryDatabase, subject: string, step: BaselineStep, writer: VersionWriter): Promise<void> {
   if (step.action === 'keep') {
     if (step.reason === 'draft-open' || step.reason === 'contract-changed') logger.warn('baseline update withheld', { subject, reason: step.reason });
@@ -121,10 +117,7 @@ export async function bootstrapLayouts(db: PrimaryDatabase, gate: BaselineGate, 
   }
 }
 
-/**
- * Template metadata, variable contract and channel enablement are created once and never updated: they are not versioned, so the seed
- * cannot tell an operator's edit from an older fixture. Content is versioned (see `planBaselineStep`).
- */
+/** Metadata, variable contract and channel enablement are insert-only: they are unversioned, so the seed cannot tell an operator's edit from an older fixture. */
 export async function bootstrapTemplates(db: PrimaryDatabase, gate: BaselineGate, fixtures: TemplateFixture[] = BASELINE_TEMPLATES): Promise<void> {
   for (const fixture of fixtures) {
     const variableSchema: Template.VariableSchema = { variables: fixture.variables };
@@ -173,21 +166,8 @@ export async function bootstrapTemplates(db: PrimaryDatabase, gate: BaselineGate
 }
 
 /**
- * Bootstraps the catch-all sender profile, its per-channel `DEV` endpoints, and a global fallback routing rule
- * (`service`/`region`/`messageType` all `NULL`) so `resolveSenderRoutingRule` always has a lowest-priority match to
- * fall back to — without one, every notification job hits `SND_RTR_001` and is marked `PERMANENTLY_FAILED` on a
- * fresh deployment. Gated on the sender-profile table being completely empty rather than per-row `onConflictDoNothing`
- * (as the other bootstrap* steps use): `sender_routing_rules`' unique constraint doesn't dedupe all-`NULL` rows
- * (Postgres treats `NULL` as distinct from `NULL`), so there's no constraint to upsert against, and a from-scratch
- * table is the only signal this step can use for "nobody has configured sending yet". Once any sender profile
- * exists — operator-created or seeded by something else — this step steps back permanently and touches nothing.
- *
- * Also gated on `!Config.isProductionDeployment()`: the `DEV` provider only writes to `notification_messages`
- * and never actually sends, so on a real deployment this catch-all would turn every unrouted OTP or security
- * alert into a silent `SENT` — worse than the loud `SND_RTR_001`/`PERMANENTLY_FAILED` it's meant to replace,
- * because that failure is at least alertable. A fresh prod deployment must still have an operator wire up a
- * real sender profile before anything can send; dev, staging, and the CI template DB (which set `APP_STAGE=dev`)
- * keep getting the baseline row so the fixtures that assume it exist stay valid.
+ * Skipped in production: the `DEV` provider only writes to `notification_messages`, so a catch-all rule there would turn an unrouted OTP or security alert into a
+ * silent `SENT` instead of the loud, alertable `SND_RTR_001` failure. Gated on an empty profile table because all-`NULL` routing rules never conflict on the unique constraint.
  */
 async function bootstrapSenderConfiguration(db: PrimaryDatabase): Promise<void> {
   if (Config.isProductionDeployment()) return;
@@ -210,19 +190,10 @@ async function bootstrapSenderConfiguration(db: PrimaryDatabase): Promise<void> 
   await db.insert(schema.senderRoutingRules).values({ senderProfileId: profile.id, service: null, region: null, messageType: null });
 }
 
-/** Re-syncs every serial sequence to its column's current max, so explicit-id inserts elsewhere never leave a sequence behind. */
 export async function resetSequences(db: PrimaryDatabase): Promise<void> {
   await db.execute(SEQUENCE_RESET);
 }
 
-/**
- * Idempotently bootstraps the datastore to its baseline — the branded layouts, reusable partials, and the template catalogue (including the
- * identity `auth.*`/`security.*`/`user.*` keys) run on every environment, partials first so layouts and templates are gated against them.
- * Each is created when absent and, while the seed still owns its PUBLISHED version, superseded by a new version when its fixture changes;
- * once an operator publishes their own version it is never touched again. Nothing is written that fails `BaselineRenderGate`. The catch-all `DEV` sender profile and its global fallback routing rule are dev/staging/CI-only (`!Config.isProductionDeployment()`):
- * a fresh *production* deployment gets none of it, so a misrouted OTP or security alert fails loudly instead of being silently swallowed by
- * the `DEV` provider. It seeds no demo messages.
- */
 export async function seedBaseline(db: PrimaryDatabase): Promise<void> {
   const gate = new BaselineRenderGate(new TemplateEngineService(), () => loadPublishedDesignSystem(db));
   await bootstrapPartials(db, gate);
