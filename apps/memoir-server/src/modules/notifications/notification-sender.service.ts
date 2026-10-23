@@ -55,6 +55,13 @@ export class NotificationSenderService implements OnModuleInit {
   }
 
   private async deliver(row: NotificationOutbox.Row): Promise<boolean> {
+    const maxAttempts = Config.get('notifications.sender-max-attempts');
+    if (row.attempts > maxAttempts) {
+      await this.outbox.markFailed(row.id, `claim lease lapsed after ${maxAttempts} attempts`);
+      logMetric(this.logger, 'Notification outbox row exhausted its retry budget', 'notifications.exhausted', 1, { templateKey: row.templateKey, outcome: 'lease-lapsed' }, 'warn');
+      return false;
+    }
+
     const recipient = await this.outbox.accountRecipient(row.accountId);
     if (!recipient || recipient.deletionState !== 'none' || !recipient.email) {
       await this.outbox.markFailed(row.id, 'no eligible recipient (account deleted or has no email)');
@@ -67,7 +74,7 @@ export class NotificationSenderService implements OnModuleInit {
       return true;
     }
 
-    if (row.attempts >= Config.get('notifications.sender-max-attempts')) {
+    if (row.attempts >= maxAttempts) {
       await this.outbox.markFailed(row.id, `${outcome} after ${row.attempts} attempts`);
       logMetric(this.logger, 'Notification outbox row exhausted its retry budget', 'notifications.exhausted', 1, { templateKey: row.templateKey, outcome }, 'warn');
       return false;

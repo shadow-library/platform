@@ -17,6 +17,9 @@ export interface AccountRecipient {
   deletionState: string;
 }
 
+/** Generous bound on one send, which is otherwise unbounded: memoir sets no `auth.timeout`, so `AuthClient` puts no deadline on the pulse call. */
+const CLAIM_LEASE_MINUTES = 30;
+
 const CLAIM_QUERY = sql`(SELECT id FROM notification_outbox WHERE status = 'pending' AND next_attempt_at <= now() ORDER BY next_attempt_at FOR UPDATE SKIP LOCKED LIMIT 1)`;
 
 @Injectable()
@@ -35,17 +38,11 @@ export class NotificationOutboxRepository {
       .onConflictDoNothing({ target: [schema.notificationOutbox.accountId, schema.notificationOutbox.category, schema.notificationOutbox.dedupeKey] });
   }
 
-  /**
-   * Multi-replica-safe claim (`FOR UPDATE SKIP LOCKED`), mirroring `AiWorkerRepository.claimNext` — safe
-   * to run concurrently with itself once the worker split (ADR-0002) lands. The row stays `pending`
-   * through the claim itself (only `attempts` moves), so a crash between claim and outcome leaves it
-   * eligible for the next sweep tick rather than stuck; the bumped `attempts` is what the cap eventually
-   * catches even if every crash happens before a terminal `markRetry`/`markFailed` write.
-   */
+  /** Leased via `next_attempt_at` instead of a `sending` status, so a crash mid-send retries once the lease lapses. */
   async claimNext(): Promise<NotificationOutbox.Row | null> {
     const [row] = await this.db
       .update(schema.notificationOutbox)
-      .set({ attempts: sql`${schema.notificationOutbox.attempts} + 1` })
+      .set({ attempts: sql`${schema.notificationOutbox.attempts} + 1`, nextAttemptAt: sql`now() + make_interval(mins => ${CLAIM_LEASE_MINUTES}::int)` })
       .where(eq(schema.notificationOutbox.id, CLAIM_QUERY))
       .returning();
     return (row as NotificationOutbox.Row) ?? null;

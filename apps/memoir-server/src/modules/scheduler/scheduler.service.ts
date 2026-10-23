@@ -5,6 +5,7 @@ import { APP_NAME } from '@server/constants';
 import { logMetric } from '@server/telemetry';
 
 import { type Gauge, type GaugeFn, type Sweep, type SweepFn } from './scheduler.types';
+import { SweepRunRepository } from './sweep-run.repository';
 
 @Injectable()
 export class SchedulerService implements OnApplicationReady, OnApplicationStop {
@@ -19,9 +20,11 @@ export class SchedulerService implements OnApplicationReady, OnApplicationStop {
   private running = false;
   private ticks = 0;
 
+  constructor(private readonly sweepRuns: SweepRunRepository) {}
+
   registerSweep(name: string, cadenceMs: number, fn: SweepFn): void {
     if (this.sweeps.some(sweep => sweep.name === name)) throw AppError.internal(`Sweep "${name}" is already registered`);
-    this.sweeps.push({ name, cadenceMs, fn, lastRunAt: 0 });
+    this.sweeps.push({ name, cadenceMs, fn, seeded: false, lastRunAt: 0 });
   }
 
   /**
@@ -40,6 +43,7 @@ export class SchedulerService implements OnApplicationReady, OnApplicationStop {
       this.logger.info('Scheduler disabled by config; tick loop not started', { sweeps: this.sweeps.map(sweep => sweep.name) });
       return;
     }
+    await this.seedNewSweeps();
     this.timer = setInterval(() => void this.tick(), this.tickIntervalMs);
     this.logger.info('Scheduler started', { intervalMs: this.tickIntervalMs, sweeps: this.sweeps.map(sweep => sweep.name) });
   }
@@ -72,15 +76,39 @@ export class SchedulerService implements OnApplicationReady, OnApplicationStop {
     }
   }
 
+  private async seedNewSweeps(): Promise<void> {
+    const unseeded = this.sweeps.filter(sweep => !sweep.seeded);
+    if (unseeded.length === 0) return;
+    try {
+      const lastRuns = await this.sweepRuns.seed(unseeded.map(sweep => sweep.name));
+      for (const sweep of unseeded) {
+        const lastRunAt = lastRuns.get(sweep.name);
+        if (!lastRunAt) continue;
+        sweep.lastRunAt = lastRunAt.getTime();
+        sweep.seeded = true;
+      }
+    } catch (error) {
+      this.logger.error('Sweep seeding failed; retrying next tick', { sweeps: unseeded.map(sweep => sweep.name), error });
+    }
+  }
+
+  /** Mirrors the stored row's database-clock `lastRunAt` so a not-yet-due sweep costs no query; clock skew shifts when a claim is tried, never who wins. */
   private async runDueSweeps(): Promise<void> {
+    await this.seedNewSweeps();
     const now = Date.now();
-    const due = this.sweeps.filter(sweep => now - sweep.lastRunAt >= sweep.cadenceMs);
+    const due = this.sweeps.filter(sweep => sweep.seeded && now - sweep.lastRunAt >= sweep.cadenceMs);
     const ran: string[] = [];
     const failed: string[] = [];
 
     for (const sweep of due) {
-      sweep.lastRunAt = now;
       try {
+        const run = await this.sweepRuns.claim(sweep.name, sweep.cadenceMs);
+        if (!run) {
+          sweep.seeded = false;
+          continue;
+        }
+        sweep.lastRunAt = run.lastRunAt.getTime();
+        if (!run.claimed) continue;
         await sweep.fn();
         ran.push(sweep.name);
       } catch (error) {

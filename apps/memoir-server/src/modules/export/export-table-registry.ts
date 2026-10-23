@@ -72,4 +72,5 @@ export const EXPORT_TABLE_EXCLUSIONS: Readonly<Record<string, string>> = {
   export_jobs: 'the export bookkeeping table itself, not exported data',
   notification_outbox:
     'transient delivery bookkeeping (T-34) — its content-free variables are already reflected in the source data the export covers, not exportable content itself',
+  sweep_runs: 'scheduler bookkeeping with no account column, not user content',
 };
