@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type ComponentPropsWithoutRef } from 'react';
 
-/**
- * Defining types
- */
 export type BadgeIntent = 'neutral' | 'info' | 'success' | 'warning' | 'danger';
 export type BadgeVariant = 'soft' | 'outline' | 'count' | 'dot';
 export type BadgeSize = 'sm' | 'md';

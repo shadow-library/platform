@@ -1,17 +1,7 @@
-/**
- * Importing npm packages
- */
 import { expect, test } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { apiContext, readSeedManifest, requireProductUrl } from '../../lib';
 import { scopedMutate } from './helpers';
-
-/**
- * Defining types
- */
 
 interface ProjectSummary {
   readonly id: string;

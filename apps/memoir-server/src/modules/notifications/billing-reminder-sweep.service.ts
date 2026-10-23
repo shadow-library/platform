@@ -1,31 +1,17 @@
-/**
- * Importing npm packages
- */
 import { Injectable, type OnModuleInit } from '@shadow-library/app';
 import { Config } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { SchedulerService } from '@modules/scheduler';
 import { type Entitlement } from '@server/database';
 
 import { BillingReminderRepository } from './billing-reminder.repository';
 import { NotificationClient } from './notification-client.service';
 
-/**
- * Defining types
- */
-
 interface ReminderCandidate {
   accountId: bigint;
   state: Entitlement.State;
   dueDate: Date;
 }
-
-/**
- * Declaring the constants
- */
 
 const SWEEP_NAME = 'billing-reminder-due';
 const MS_PER_MINUTE = 60_000;

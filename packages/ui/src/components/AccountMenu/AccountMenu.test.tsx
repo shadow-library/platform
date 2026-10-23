@@ -1,7 +1,3 @@
-/**
- * Importing npm packages
- */
-
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
@@ -9,14 +5,8 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { AccountMenu } from './AccountMenu';
 
-/**
- * Declaring the constants
- */
 const css = readFileSync(path.join(import.meta.dirname, 'AccountMenu.module.css'), 'utf-8');
 
 describe('AccountMenu', () => {

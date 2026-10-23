@@ -1,20 +1,10 @@
-/**
- * Importing npm packages
- */
 import { eq } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 
-/**
- * Importing user defined packages
- */
 import { OwnerScopedRepository } from '@modules/auth';
 import { type DatabaseTransaction, type Metric, schema } from '@server/database';
 
 import { currentThresholdOffers, type ThresholdOffer } from './threshold-offer';
-
-/**
- * Defining types
- */
 
 interface BuiltinMetric {
   name: string;
@@ -36,10 +26,6 @@ export interface MetricCreate {
 }
 
 export type MetricEdit = Partial<Pick<MetricCreate, 'name' | 'unit' | 'valueType' | 'direction' | 'defaultValue' | 'glyph'>>;
-
-/**
- * Declaring the constants
- */
 
 /** The built-in health set (ARCHITECTURE §18, PRODUCT.md §6.1) — steps, calories burned, sleep, water — all `is_health: true`, none deletable through `metric.delete` (§9). */
 const BUILTIN_METRICS: readonly BuiltinMetric[] = [

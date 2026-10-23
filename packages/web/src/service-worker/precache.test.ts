@@ -1,16 +1,7 @@
-/**
- * Importing npm packages
- */
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { PrecacheError, precacheUrls } from './precache';
 
-/**
- * Declaring the constants
- */
 const written = new Map<string, Response>();
 const cache = { put: async (url: string, response: Response) => void written.set(url, response) } as unknown as Cache;
 

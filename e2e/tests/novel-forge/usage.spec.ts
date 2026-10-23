@@ -1,17 +1,7 @@
-/**
- * Importing npm packages
- */
 import { type APIRequestContext, expect, test } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { apiContext, requireProductUrl, storageStateFor } from '../../lib';
 import { createNovel, deleteProjectQuietly, uniqueSuffix } from './forge-helpers';
-
-/**
- * Defining types
- */
 
 interface UsageTotals {
   totalCostUsd: number;

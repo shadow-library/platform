@@ -1,20 +1,11 @@
-/**
- * Importing npm packages
- */
 import { type ChangeEvent, type ClipboardEvent, forwardRef, type KeyboardEvent, useId, useRef, useState } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { useControllableState } from '@/hooks';
 import { cn, mergeRefs } from '@/lib';
 
 import styles from './TokenInput.module.css';
 import { type TokenInputProps, type TokenValue } from './TokenInput.types';
 
-/**
- * Declaring the constants
- */
 function RemoveIcon() {
   return (
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden="true">

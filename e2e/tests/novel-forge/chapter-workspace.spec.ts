@@ -1,6 +1,3 @@
-/**
- * Importing user defined packages
- */
 import { mutate, requireProductUrl } from '../../lib';
 import { expect, type ForgeActor, type ForgeHarness, test } from './forge-actors';
 import { assertSpendGuarded, listDispatchedModelCalls } from './forge-db';
@@ -19,10 +16,6 @@ import {
   startNextChapter,
   uniqueSuffix,
 } from './forge-helpers';
-
-/**
- * Defining types
- */
 
 interface ChapterReview {
   kind: string;

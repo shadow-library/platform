@@ -1,23 +1,13 @@
-/**
- * Importing npm packages
- */
 import { Injectable } from '@shadow-library/app';
 import { AppError, Config, Logger } from '@shadow-library/common';
 import { StorageService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { AccountContext } from '@modules/auth';
 import { AppErrorCode } from '@server/classes';
 import { type ExportJob } from '@server/database';
 import { APP_NAME } from '@server/constants';
 
 import { ExportJobRepository } from './export-job.repository';
-
-/**
- * Defining types
- */
 
 export interface ExportJobView {
   id: string;
@@ -27,10 +17,6 @@ export interface ExportJobView {
   downloadUrl: string | null;
   expiresAt: string | null;
 }
-
-/**
- * Declaring the constants
- */
 
 const MS_PER_DAY = 86_400_000;
 

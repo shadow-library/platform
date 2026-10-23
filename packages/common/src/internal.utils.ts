@@ -1,19 +1,4 @@
-/**
- * Importing npm packages
- */
 import colors from '@colors/colors';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 /* istanbul ignore next */
 class InternalUtils {

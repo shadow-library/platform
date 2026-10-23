@@ -1,19 +1,4 @@
-/**
- * Importing npm packages
- */
 import { ErrorCode } from '@shadow-library/common';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 /** The object-storage error catalog. Infra faults stay `AppError.internal`; these are the domain-shaped keys callers can branch on. */
 export class StorageErrorCode extends ErrorCode {

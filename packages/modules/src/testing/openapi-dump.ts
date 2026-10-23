@@ -1,6 +1,3 @@
-/**
- * Importing npm packages
- */
 import { writeFile } from 'node:fs/promises';
 
 import { Dispatcher, type Provider, ShadowApplication } from '@shadow-library/app';
@@ -8,14 +5,7 @@ import { type ConfigValues } from '@shadow-library/common/testing';
 import { type FastifyRouter } from '@shadow-library/fastify';
 import { type Class } from 'type-fest';
 
-/**
- * Importing user defined packages
- */
 import { TestingErrorCode } from './testing.errors';
-
-/**
- * Defining types
- */
 
 export interface OpenApiDumpOptions {
   /** Where the document is written; a dump entry passes its first command-line argument through */
@@ -25,9 +15,6 @@ export interface OpenApiDumpOptions {
   overrides?: Provider[];
 }
 
-/**
- * Declaring the constants
- */
 const OPENAPI_DOCUMENT_ROUTE = '/dev/api-docs/openapi.json';
 
 /**

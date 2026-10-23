@@ -1,19 +1,9 @@
-/**
- * Importing npm packages
- */
 import { randomBytes } from 'node:crypto';
 
 import { type APIRequestContext, type APIResponse } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { identityDb } from './db';
 import { identityMutate } from './identity-auth';
-
-/**
- * Defining types
- */
 
 export type WebhookDeliveryStatus = 'PENDING' | 'SENDING' | 'SENT' | 'FAILED' | 'DEAD';
 

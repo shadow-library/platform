@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { createContext, forwardRef, type KeyboardEvent, useContext, useEffect, useId, useState } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { cn } from '@/lib';
 
 import { Tag } from '../Tag';
@@ -20,9 +14,6 @@ import {
   type RTEFieldToolbarProps,
 } from './RTEField.types';
 
-/**
- * Declaring the constants
- */
 const RTEFieldContext = createContext<RTEFieldContextValue | null>(null);
 
 /** Access the field's a11y ids and state to wire an engine's editable element (aria-labelledby, etc.). */

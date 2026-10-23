@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { randomBytes } from 'node:crypto';
 
 import { type APIRequestContext, type APIResponse } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import {
   ACCESS_TOKEN_TYPE,
   addOrganisationMember,
@@ -35,10 +29,6 @@ import {
   verifyJwt,
 } from '../../lib';
 import { expect, type IdentityHarness, test } from './fixtures';
-
-/**
- * Defining types
- */
 
 interface ExchangeFixture {
   /** The application whose audience every subject token below is minted for, and whose confidential client performs the exchange. */

@@ -1,17 +1,8 @@
-/**
- * Importing npm packages
- */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { type DownloadOptions, type DownloadProgress, OfflineContentManager, type RemoveOptions } from './download-manager';
 import { type OfflineEntryMeta } from './offline-store';
 
-/**
- * Defining types
- */
 export interface UseOfflineDownload {
   /** Metadata for everything currently downloaded, refreshed after each download/remove. */
   entries: OfflineEntryMeta[];
@@ -24,10 +15,6 @@ export interface UseOfflineDownload {
   /** Re-read the downloaded entries (e.g. after an external change). */
   refresh: () => Promise<void>;
 }
-
-/**
- * Declaring the constants
- */
 
 /**
  * React binding over {@link OfflineContentManager}: exposes the list of downloaded content plus `download`/

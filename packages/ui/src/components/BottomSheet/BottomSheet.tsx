@@ -1,20 +1,11 @@
-/**
- * Importing npm packages
- */
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { type CSSProperties, type KeyboardEvent, type PointerEvent, type ReactElement, useRef, useState } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { cn } from '@/lib';
 
 import styles from './BottomSheet.module.css';
 import { type BottomSheetProps, type BottomSheetSnap } from './BottomSheet.types';
 
-/**
- * Declaring the constants
- */
 const FLICK_VELOCITY = 0.5; // px/ms — a downward flick past this dismisses from any height
 const RUBBER_BAND = 0.4; // resistance factor when dragging past the tallest snap
 

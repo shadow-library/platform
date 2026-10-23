@@ -1,19 +1,9 @@
-/**
- * Importing npm packages
- */
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
 import { beforeAll, describe, expect, it } from 'vitest';
 
-/**
- * Importing user defined packages
- */
-
-/**
- * Declaring the constants
- */
 const rootDir = path.join(import.meta.dirname, '..');
 const distDir = path.join(rootDir, 'dist');
 const srcDir = path.join(rootDir, 'src');

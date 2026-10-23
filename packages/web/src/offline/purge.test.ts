@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { type SwRequest } from '../pwa/protocol';
 import { purgeIfAccountChanged, purgeOfflineData } from './purge';
 

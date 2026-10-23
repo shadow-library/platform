@@ -1,24 +1,10 @@
-/**
- * Importing npm packages
- */
 import { RequireElevation, RequireScope } from '@shadow-library/auth/module';
 import { Get, HttpController, HttpStatus, Post, RespondFor } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { AllowDuringDeletion } from '@modules/auth';
 
 import { DeletionStatusDto } from './deletion.dto';
 import { DeletionService } from './deletion.service';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 /**
  * The one destructive surface (ARCHITECTURE §4.4, §21). `@RequireElevation()` and

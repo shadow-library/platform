@@ -1,18 +1,9 @@
-/**
- * Importing npm packages
- */
 import { type Meta, type StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { Button } from '../Button';
 import { ActionSheet } from './ActionSheet';
 
-/**
- * Declaring the constants
- */
 function CameraIcon() {
   return (
     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

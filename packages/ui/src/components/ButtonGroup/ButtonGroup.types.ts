@@ -1,16 +1,7 @@
-/**
- * Importing npm packages
- */
 import { type HTMLAttributes } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { type ButtonSize, type ButtonVariant } from '../Button/Button.types';
 
-/**
- * Defining types
- */
 export type ButtonGroupOrientation = 'horizontal' | 'vertical';
 
 export interface ButtonGroupProps extends HTMLAttributes<HTMLDivElement> {

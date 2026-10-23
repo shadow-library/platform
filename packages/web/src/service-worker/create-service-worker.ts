@@ -1,22 +1,8 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { SW_PROTOCOL, type SwEnvelope, type SwRequest, type SwResponse } from '../pwa/protocol';
 import { precacheUrls } from './precache';
 import { runStrategy } from './strategies';
 import { type RuntimeCachingRule, type ServiceWorkerConfig, type ServiceWorkerScope } from './types';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 function isEnvelope(data: unknown): data is SwEnvelope {
   return typeof data === 'object' && data !== null && (data as { channel?: unknown }).channel === SW_PROTOCOL;
 }

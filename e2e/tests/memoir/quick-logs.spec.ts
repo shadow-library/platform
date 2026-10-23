@@ -1,21 +1,11 @@
-/**
- * Importing npm packages
- */
 import { randomUUID } from 'node:crypto';
 
-/**
- * Importing user defined packages
- */
 import { memoirDb } from '../../lib';
 import { expectApplied } from './concurrency-helpers';
 import { expect, test } from './fixtures';
 import { dailyQuestDraft, submitCommand } from './helpers';
 import { addDays, heroEvents, localToday, rolloverAccount, rolloverSubject } from './rollover-helpers';
 import { type CommandSpec, expectFailed, MemoirRowMissingError, occurrenceOf, raceCommands, replayCommand, submitSpec } from './quest-helpers';
-
-/**
- * Defining types
- */
 
 type QuickLogModule = 'journal' | 'meal' | 'weight';
 

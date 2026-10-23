@@ -1,23 +1,10 @@
-/**
- * Importing npm packages
- */
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { type AppError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { AuthClient, RoleCatalogManifest, RoleManifest } from '@shadow-library/auth';
 import { createTestIdP, TestIdP } from '@shadow-library/auth/testing';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const AUDIENCE = 'api://pulse';
 const CLIENT = { id: 'svc-pulse', secret: 's3cr3t' };
 const MANIFEST: RoleCatalogManifest = {

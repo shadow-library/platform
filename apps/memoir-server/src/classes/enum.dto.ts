@@ -1,20 +1,6 @@
-/**
- * Importing npm packages
- */
 import { EnumType } from '@shadow-library/class-schema';
 
-/**
- * Importing user defined packages
- */
 import { schema } from '@server/database';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 export const AuthProvider = EnumType.create('AuthProvider', schema.authProvider.enumValues);
 export const Theme = EnumType.create('Theme', schema.theme.enumValues);

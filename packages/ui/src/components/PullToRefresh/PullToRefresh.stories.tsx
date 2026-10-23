@@ -1,17 +1,8 @@
-/**
- * Importing npm packages
- */
 import { type Meta, type StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { PullToRefresh } from './PullToRefresh';
 
-/**
- * Declaring the constants
- */
 const wait = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
 
 function DemoList({ stamp }: { stamp: string }) {

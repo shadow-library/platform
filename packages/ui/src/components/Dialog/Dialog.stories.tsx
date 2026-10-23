@@ -1,20 +1,10 @@
-/**
- * Importing npm packages
- */
-
 import { type Meta, type StoryObj } from '@storybook/react-vite';
 
-/**
- * Importing user defined packages
- */
 import { Button } from '../Button';
 import { FormField } from '../FormField';
 import { Input } from '../Input';
 import { ConfirmDialog, Dialog } from './Dialog';
 
-/**
- * Declaring the constants
- */
 const meta = {
   title: 'Components/Dialog',
   component: Dialog,

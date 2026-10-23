@@ -1,19 +1,10 @@
-/**
- * Importing npm packages
- */
 import { type CSSProperties, forwardRef, type PointerEvent, useCallback, useRef, useState } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { cn, mergeRefs } from '@/lib';
 
 import styles from './PullToRefresh.module.css';
 import { type PullToRefreshProps, type PullToRefreshStatus } from './PullToRefresh.types';
 
-/**
- * Declaring the constants
- */
 const RESISTANCE = 0.5; // finger travel is halved so the pull feels elastic
 const DIRECTION_SLOP = 8; // px of travel before the gesture commits to pull vs scroll
 

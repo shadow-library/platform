@@ -1,24 +1,10 @@
-/**
- * Importing npm packages
- */
 import { and, eq, gte, inArray, type SQL } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { type PrimaryDatabase, schema } from '@server/database';
 
-/**
- * Defining types
- */
-
 export type Rows = Record<string, unknown>[];
-
-/**
- * Declaring the constants
- */
 
 /**
  * The §15.5 read scope, expressed one class at a time. `includeText` and the health/journal split exist so

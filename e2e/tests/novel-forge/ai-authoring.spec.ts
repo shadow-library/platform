@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type APIRequestContext, expect, test } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { apiContext, mutate, novelForgeDb } from '../../lib';
 import { readProposalRow } from './forge-bible';
 import {
@@ -33,10 +27,6 @@ import {
   useEconomyTier,
   writeChapterByHand,
 } from './forge-helpers';
-
-/**
- * Defining types
- */
 
 interface ChapterReview {
   kind: string;

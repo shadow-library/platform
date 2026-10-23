@@ -1,15 +1,4 @@
-/**
- * Importing npm packages
- */
 import { type ButtonHTMLAttributes, type ReactNode } from 'react';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 
 /** Prominence ladder — never encodes size or color (Foundations §12 API standards). */
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'text' | 'danger';

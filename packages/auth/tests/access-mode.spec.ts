@@ -1,6 +1,3 @@
-/**
- * Importing npm packages
- */
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
 import 'reflect-metadata';
 import { Dispatcher, Module, type ShadowApplication, ShadowFactory } from '@shadow-library/app';
@@ -8,9 +5,6 @@ import { AppError } from '@shadow-library/common';
 import { type RestoreConfig, setConfig } from '@shadow-library/common/testing';
 import { type ContextService, FastifyModule } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { AuthClient, AuthErrorCode } from '@shadow-library/auth';
 import {
   AppSessionService,
@@ -24,17 +18,10 @@ import {
 } from '@shadow-library/auth/module';
 import { createTestIdP, type TestIdP } from '@shadow-library/auth/testing';
 
-/**
- * Defining types
- */
-
 interface MockRouter {
   mockRequest(options: { method: string; url: string }): Promise<{ statusCode: number; payload: string }>;
 }
 
-/**
- * Declaring the constants
- */
 const CLIENT = { id: 'svc-reports', secret: 's3cr3t' };
 const AUDIENCE = 'api://reports';
 

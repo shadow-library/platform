@@ -1,21 +1,11 @@
-/**
- * Importing npm packages
- */
 import { createHash, randomBytes } from 'node:crypto';
 
 import { type APIRequestContext, type APIResponse } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { identityDb } from './db';
 import { identityMutate } from './identity-auth';
 import { createIdentitySession, type IdentitySession, identitySessionContext, type IdentitySessionOptions, updateIdentitySession } from './identity-sessions';
 import { readSeedManifest } from './personas';
-
-/**
- * Defining types
- */
 
 export interface AdminApi {
   readonly ctx: APIRequestContext;

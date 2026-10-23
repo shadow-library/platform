@@ -1,8 +1,5 @@
-/**
- * Importing npm packages
- */
 import eslintJs from '@eslint/js';
-import { type Linter } from 'eslint';
+import { type AST, type Linter, type Rule } from 'eslint';
 import jsxA11y from 'eslint-plugin-jsx-a11y';
 import nodePlugin from 'eslint-plugin-n';
 import perfectionist from 'eslint-plugin-perfectionist';
@@ -12,13 +9,6 @@ import { defineConfig } from 'eslint/config';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 /** Which runtime globals the config treats as defined — a Node workspace, a browser workspace, or both. */
 export type GlobalsEnv = 'node' | 'browser' | 'both';
 
@@ -44,13 +34,51 @@ export interface LintOptions {
   overrides?: LintOverride[];
 }
 
-/**
- * Declaring the constants
- */
 const DEFAULT_IGNORES = ['**/dist/**', '**/node_modules/**', '**/*.gen.ts', '**/coverage/**'];
 const SOURCE_FILES = '*.{ts,tsx}';
 const JSX_FILES = '*.{tsx,jsx}';
 const TEST_FILES = ['**/tests/**/*.{ts,tsx}', '**/*.{test,spec}.{ts,tsx}'];
+
+const SECTION_BANNERS = new Set([
+  'Importing packages with side effects',
+  'Importing side-effect packages',
+  'Importing npm packages',
+  'Importing user defined packages',
+  'Defining types',
+  'Declaring the constants',
+  'Declaring the variables',
+  'Declaring the tests',
+  'Declaring the server',
+]);
+
+const noSectionBanner: Rule.RuleModule = {
+  meta: {
+    type: 'suggestion',
+    fixable: 'code',
+    schema: [],
+    messages: { banner: 'Remove the section banner "{{text}}"; files open directly with their imports.' },
+  },
+  create(context) {
+    const { sourceCode } = context;
+    return {
+      Program() {
+        for (const comment of sourceCode.getAllComments()) {
+          const text = comment.value
+            .split('\n')
+            .map(line => line.replace(/^\s*\*+/, '').trim())
+            .filter(Boolean)
+            .join(' ');
+          if (!SECTION_BANNERS.has(text)) continue;
+          const [start, end] = comment.range as [number, number];
+          const lineStart = sourceCode.text.lastIndexOf('\n', start - 1) + 1;
+          const ownsLine = sourceCode.text.slice(lineStart, start).trim() === '';
+          const trailing = ownsLine ? (/^\s*/.exec(sourceCode.text.slice(end))?.[0].length ?? 0) : 0;
+          context.report({ loc: comment.loc as AST.SourceLocation, messageId: 'banner', data: { text }, fix: fixer => fixer.removeRange([start, end + trailing]) });
+        }
+      },
+    };
+  },
+};
 
 /**
  * Concrete React version for `eslint-plugin-react`. Never `'detect'`: the plugin's auto-detection calls
@@ -112,9 +140,8 @@ export function reactLayer(version: string = DEFAULT_REACT_VERSION, scope = '**'
 
 /**
  * The shared flat config every workspace lints with, so tooling versions and rules stay identical across the
- * platform. Covers `.ts` and `.tsx`; import ordering is delegated to `eslint-plugin-perfectionist` (not
- * `eslint-plugin-import`), with `partitionByComment` keeping the four import banner blocks intact while sorting
- * within each. A workspace layers its own rules, ignores, overrides and globals by calling this from its own
+ * platform. Covers `.ts` and `.tsx`; import declarations keep their authored order and only named-import
+ * specifiers are sorted (`eslint-plugin-perfectionist`). A workspace layers its own rules, ignores, overrides and globals by calling this from its own
  * `eslint.config.ts`; ESLint's per-file config lookup then picks the nearest one.
  */
 export function createConfig(options: LintOptions = {}): Linter.Config[] {
@@ -174,6 +201,9 @@ export default defineConfig([
   ...baseConfig,
   ...reactLayer(DEFAULT_REACT_VERSION, WEB_APP_SCOPE),
   { files: [`${WEB_APP_SCOPE}/${SOURCE_FILES}`], languageOptions: { globals: globals.browser } },
+
+  /** Comment policy: the legacy section banners are noise; the autofix deletes them. */
+  { files: ['**/*.{ts,tsx}'], plugins: { local: { rules: { 'no-section-banner': noSectionBanner } } }, rules: { 'local/no-section-banner': 'error' } },
 
   /** Browser code: `common/crypto` is server-only — it runs on `node:crypto` and handles master keys, neither of which may reach a client bundle. */
   {

@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import { Injectable } from '@shadow-library/app';
 import { Config, Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { logMetric } from '@server/telemetry';
@@ -14,17 +8,9 @@ import { logMetric } from '@server/telemetry';
 import { BillingProviderAdapter, type BillingWebhookRequest, type NormalizedBillingEvent } from './billing.types';
 import { BillingRepository } from './billing.repository';
 
-/**
- * Defining types
- */
-
 export interface WebhookOutcome {
   received: true;
 }
-
-/**
- * Declaring the constants
- */
 
 /**
  * `POST /billing/webhooks/{provider}` (ARCHITECTURE §16, §25). The route carries **no identity auth** —

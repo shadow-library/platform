@@ -1,27 +1,14 @@
-/**
- * Importing npm packages
- */
 import { fastifyCookie } from '@fastify/cookie';
 import { PartialDeep } from 'type-fest';
 import { DynamicModule, Inject, Module, OnModuleInit } from '@shadow-library/app';
 import { Config, LogData, Logger } from '@shadow-library/common';
 import { ContextService, FASTIFY_INSTANCE, FastifyModule, type ServerInstance } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { DEFAULT_CONFIGS, HTTP_CORE_CONFIGS, LOGGER_NAMESPACE } from './http-core.constants';
 import { type HttpCoreModuleOptions } from './http-core.types';
 import { CsrfProtectionMiddleware, RequestInitializerMiddleware } from './middlewares';
 import { CSRFTokenService, HealthService, OpenApiService } from './services';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const DEFAULT_HTTP_CORE_CONFIGS = {
   csrf: {
     cookieName: 'csrf-token',

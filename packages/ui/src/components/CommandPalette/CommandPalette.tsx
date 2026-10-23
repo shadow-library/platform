@@ -1,21 +1,12 @@
-/**
- * Importing npm packages
- */
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { type KeyboardEvent, type ReactElement, useEffect, useId, useMemo, useRef, useState } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { useControllableState } from '@/hooks';
 
 import { Kbd } from '../Kbd';
 import styles from './CommandPalette.module.css';
 import { type CommandItem, type CommandPaletteProps } from './CommandPalette.types';
 
-/**
- * Declaring the constants
- */
 function fold(text: string): string {
   return text
     .normalize('NFD')

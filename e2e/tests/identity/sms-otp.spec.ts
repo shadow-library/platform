@@ -1,20 +1,10 @@
-/**
- * Importing npm packages
- */
 import { randomInt } from 'node:crypto';
 
 import { type APIRequestContext } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { type AuthModeSnapshot, changeChallenge, loginInit, restoreAuthMode, setAuthMode, snapshotAuthMode, verifyChallenge } from '../../lib';
 import { expect, test } from './fixtures';
 import { countOutboxRows, expectErrorCode, expectSessionCookie, flowChallenges, flowStepOf, pollSmsOtp } from './helpers';
-
-/**
- * Defining types
- */
 
 /**
  * Declaring the constants

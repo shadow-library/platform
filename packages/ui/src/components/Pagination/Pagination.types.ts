@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type ComponentPropsWithoutRef } from 'react';
 
-/**
- * Defining types
- */
 export interface PaginationProps extends Omit<ComponentPropsWithoutRef<'nav'>, 'onChange'> {
   /** Current 1-based page (page mode). */
   page?: number;

@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import { Injectable } from '@shadow-library/app';
 import { AppError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { AccountContext } from '@modules/auth';
 import { EntitlementService } from '@modules/billing';
 import { AppErrorCode } from '@server/classes';
@@ -14,14 +8,6 @@ import { type AiScheduledQuery } from '@server/database';
 
 import { AiScheduledQueryRepository } from './ai-scheduled-query.repository';
 import { type AiScheduledQueryUpsertDto } from './ai.dto';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 /** Paid-gated end to end (ARCHITECTURE §25: "memoir:account + paid" on both PUT and DELETE) — a lapsed account's existing row is simply never materialized by the worker (§15.7), but managing it still requires the subscription. */
 @Injectable()

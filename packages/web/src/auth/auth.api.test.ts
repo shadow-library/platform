@@ -1,17 +1,8 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { createApiClient } from '../lib/api-client';
 import { createAuthApi } from './auth.api';
 
-/**
- * Declaring the constants
- */
 const api = createAuthApi(createApiClient({ surfaces: { auth: '/api/auth' } }).auth, { keyPrefix: ['app', 'auth'] });
 
 describe('createAuthApi accessQueryOptions', () => {

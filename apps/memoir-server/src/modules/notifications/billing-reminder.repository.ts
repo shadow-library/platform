@@ -1,18 +1,8 @@
-/**
- * Importing npm packages
- */
 import { and, inArray, lte, or } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { type Entitlement, type PrimaryDatabase, schema } from '@server/database';
-
-/**
- * Defining types
- */
 
 export interface DueEntitlement {
   accountId: bigint;

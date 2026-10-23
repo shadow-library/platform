@@ -1,21 +1,7 @@
-/**
- * Importing npm packages
- */
 import { Module, OnApplicationReady, OnApplicationStop, OnModuleDestroy, OnModuleInit } from '@shadow-library/app';
 
-/**
- * Importing user defined packages
- */
 import { OutputService } from './output.service';
 import { StorageService } from './storage.service';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Module({
   providers: [OutputService, StorageService],

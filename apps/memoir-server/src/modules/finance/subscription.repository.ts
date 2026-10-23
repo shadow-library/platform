@@ -1,18 +1,8 @@
-/**
- * Importing npm packages
- */
 import { eq } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 
-/**
- * Importing user defined packages
- */
 import { OwnerScopedRepository } from '@modules/auth';
 import { type DatabaseTransaction, schema, type Subscription } from '@server/database';
-
-/**
- * Defining types
- */
 
 export interface SubscriptionCreate {
   accountId: bigint;
@@ -48,10 +38,6 @@ export type SubscriptionEdit = Partial<
     | 'monthlyEquivalentMinor'
   > & { active: boolean }
 >;
-
-/**
- * Declaring the constants
- */
 
 @Injectable()
 export class SubscriptionRepository extends OwnerScopedRepository {

@@ -1,18 +1,7 @@
-/**
- * Importing npm packages
- */
-
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { Skeleton } from './Skeleton';
-
-/**
- * Declaring the constants
- */
 
 describe('Skeleton', () => {
   it('renders a decorative ghost with the shape and size', () => {

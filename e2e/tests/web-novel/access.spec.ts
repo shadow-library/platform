@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type APIRequestContext } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { apiContext, pollUntil, runAll } from '../../lib';
 import { test as base, expect, type WebNovelReader } from './fixtures';
 import {
@@ -23,10 +17,6 @@ import {
   setForgeAccess,
 } from './forge-publication';
 import { accessAuditSince, auditWatermark, readServedAccess, reverseServedGrantOrder, setServedAccessRevision, uniqueNovelSlug, UNKNOWN_SLUG } from './helpers';
-
-/**
- * Defining types
- */
 
 /**
  * Declaring the constants

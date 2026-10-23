@@ -1,17 +1,7 @@
-/**
- * Importing npm packages
- */
 import { expect, test } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { PERSONAS, requireProductUrl } from '../../lib';
 import { loginIdentity, scopedMutate } from './helpers';
-
-/**
- * Defining types
- */
 
 /**
  * Declaring the constants

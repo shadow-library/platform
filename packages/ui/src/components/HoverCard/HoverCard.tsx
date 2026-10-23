@@ -1,18 +1,9 @@
-/**
- * Importing npm packages
- */
 import * as HoverCardPrimitive from '@radix-ui/react-hover-card';
 import { type CSSProperties, type ReactElement, useRef, useState } from 'react';
 
-/**
- * Importing user defined packages
- */
 import styles from './HoverCard.module.css';
 import { type HoverCardProps } from './HoverCard.types';
 
-/**
- * Declaring the constants
- */
 type LoadState<T> = { status: 'idle' } | { status: 'loading' } | { status: 'loaded'; data: T } | { status: 'error' };
 
 /**

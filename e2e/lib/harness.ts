@@ -1,16 +1,4 @@
 /**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
  * Declaring the constants
  *
  * What every per-test harness needs from its teardown: a step that throws must not stop the steps after it, or a

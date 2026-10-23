@@ -1,22 +1,9 @@
-/**
- * Importing npm packages
- */
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, type Mock, setSystemTime, spyOn } from 'bun:test';
 import { utils } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { AuthClient, CheckPrincipal, type FetchLike } from '@shadow-library/auth';
 import { createTestIdP, TestIdP } from '@shadow-library/auth/testing';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const AUDIENCE = 'api://pulse';
 const ORG = '7';
 

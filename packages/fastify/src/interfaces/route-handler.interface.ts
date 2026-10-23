@@ -1,20 +1,5 @@
-/**
- * Importing npm packages
- */
 import { DoneFuncWithErrOrRes, FastifyReply, FastifyRequest } from 'fastify';
 import { SyncValue } from '@shadow-library/common';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 export type HttpRequest = FastifyRequest;
 

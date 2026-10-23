@@ -1,23 +1,14 @@
-/**
- * Importing npm packages
- */
 import { act } from '@testing-library/react';
 import { type ReactElement } from 'react';
 import { hydrateRoot } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { Calendar } from '@/components/Calendar';
 import { Kbd } from '@/components/Kbd';
 import { NotificationList } from '@/components/NotificationCenter';
 import { Statistic } from '@/components/Statistic';
 
-/**
- * Declaring the constants
- */
 const HYDRATION_NOISE = /hydrat|did not match|server (rendered|HTML|-rendered)|text content does not match|tree hydrated/i;
 
 /** Render on the "server", hydrate on the "client", and fail if React reports any hydration mismatch. */

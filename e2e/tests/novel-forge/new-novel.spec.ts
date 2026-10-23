@@ -1,17 +1,7 @@
-/**
- * Importing npm packages
- */
 import { type APIRequestContext, expect, type Request, test } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { apiContext, requireProductUrl, storageStateFor } from '../../lib';
 import { createNovel, deleteProjectQuietly, NOVEL_NOTES, uniqueSuffix } from './forge-helpers';
-
-/**
- * Defining types
- */
 
 interface ChatSession {
   id: string;

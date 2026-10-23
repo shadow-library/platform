@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { and, eq, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { type CommandLog, type DatabaseTransaction, type PrimaryDatabase, schema } from '@server/database';
 
 import { type CommandEnvelope, type CommandResult } from './command.types';

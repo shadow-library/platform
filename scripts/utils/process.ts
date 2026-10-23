@@ -1,17 +1,7 @@
-/**
- * Importing npm packages
- */
 import { spawnSync, type SpawnSyncOptions } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 export interface RunOptions {
   cwd: string;
   env?: NodeJS.ProcessEnv;
@@ -24,10 +14,6 @@ export interface RunResult {
   stdout: string;
   stderr: string;
 }
-
-/**
- * Declaring the constants
- */
 
 /**
  * Strips `GIT_*` variables (`GIT_DIR`, `GIT_WORK_TREE`, `GIT_INDEX_FILE`, …) from `env`. Git sets these

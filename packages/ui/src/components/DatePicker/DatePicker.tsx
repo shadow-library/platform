@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import * as Popover from '@radix-ui/react-popover';
 import { type KeyboardEvent, type ReactElement, useEffect, useMemo, useRef, useState } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { useControllableState } from '@/hooks';
 import { addDays, addMonths, buildMonthMatrix, cn, DEFAULT_LOCALE, formatLongDate, isSameDay, parseISODate, startOfMonth, toISODate } from '@/lib';
 
@@ -14,9 +8,6 @@ import { Input } from '../Input';
 import styles from './DatePicker.module.css';
 import { type DatePickerProps } from './DatePicker.types';
 
-/**
- * Declaring the constants
- */
 function CalendarIcon() {
   return (
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

@@ -1,6 +1,3 @@
-/**
- * Importing npm packages
- */
 import assert from 'node:assert';
 
 import { SerializerFactory, SerializerSelector } from '@fastify/fast-json-stringify-compiler';
@@ -11,25 +8,15 @@ import { JsonObject } from 'type-fest';
 import { JSONSchema } from '@shadow-library/class-schema';
 import { MaybeUndefined, utils, ValidationError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { FieldErrorMessage } from '../interfaces';
 import { ServerErrorCode } from '../server.error';
 import { FastifyConfig, FastifyModuleOptions } from './fastify-module.interface';
-
-/**
- * Defining types
- */
 
 export interface AjvValidators {
   strictValidator: Ajv;
   lenientValidator: Ajv;
 }
 
-/**
- * Declaring the constants
- */
 const keywords = ['x-fastify', 'errorMessage'];
 const allowedHttpParts = ['body', 'params', 'querystring'];
 const defaultAjvOptions: AjvOptions = { allErrors: true, useDefaults: true, removeAdditional: true, strict: true, keywords };

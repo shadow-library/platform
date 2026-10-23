@@ -1,18 +1,9 @@
-/**
- * Importing npm packages
- */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { PullToRefresh } from './PullToRefresh';
 
-/**
- * Declaring the constants
- */
 // happy-dom has no pointer-capture implementation; the component calls these on every pull.
 beforeAll(() => {
   Element.prototype.setPointerCapture = () => undefined;

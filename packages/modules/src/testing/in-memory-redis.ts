@@ -1,15 +1,4 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { TestingErrorCode } from './testing.errors';
-
-/**
- * Defining types
- */
 
 export type RedisArgument = string | number;
 
@@ -39,9 +28,6 @@ type CommandHandler = (args: string[]) => unknown;
 
 type FindCommand = (command: string) => CommandHandler | undefined;
 
-/**
- * Declaring the constants
- */
 const INTEGER_REGEX = /^-?\d+$/;
 
 function parseInteger(value: string): number {

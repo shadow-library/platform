@@ -1,10 +1,3 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { type CsrfConfig } from '../lib/csrf';
 import { type ServerFetch } from '../lib/transport';
 import { createServerFetch } from './server-fetch';
@@ -37,10 +30,6 @@ export interface SsrTransportOptions {
 export interface SsrTransport {
   serverFetch: ServerFetch;
 }
-
-/**
- * Declaring the constants
- */
 
 /** The platform gateway the SSR transport falls back to when neither an env var nor an app default names an origin. */
 const DEFAULT_BACKEND_ORIGIN = 'http://localhost:8080';

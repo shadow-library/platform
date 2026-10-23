@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type ComponentPropsWithoutRef, type ReactNode } from 'react';
 
-/**
- * Defining types
- */
 export interface EmptyStateAction {
   label: string;
   onClick: () => void;

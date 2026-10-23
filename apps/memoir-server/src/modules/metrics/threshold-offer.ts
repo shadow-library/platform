@@ -1,17 +1,7 @@
-/**
- * Importing npm packages
- */
 import { and, eq } from 'drizzle-orm';
 
-/**
- * Importing user defined packages
- */
 import { type SqlExecutor } from '@modules/auth';
 import { type Metric, type MetricEntry, type PrimaryDatabase, schema } from '@server/database';
-
-/**
- * Defining types
- */
 
 /** `quests.health_threshold`'s shape (ARCHITECTURE §18) — kept opaque at the schema layer (T-18), interpreted only here. */
 interface HealthThreshold {
@@ -29,10 +19,6 @@ export interface ThresholdOffer {
   currentValue: number;
   comparison: HealthThreshold['comparison'];
 }
-
-/**
- * Declaring the constants
- */
 
 function parseHealthThreshold(raw: unknown): HealthThreshold | null {
   if (typeof raw !== 'object' || raw === null) return null;

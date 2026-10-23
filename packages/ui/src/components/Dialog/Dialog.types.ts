@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import type * as DialogPrimitive from '@radix-ui/react-dialog';
 import { type ComponentPropsWithoutRef, type ReactNode } from 'react';
 
-/**
- * Defining types
- */
 export type DialogSize = 'sm' | 'md' | 'lg';
 
 export type DialogProps = ComponentPropsWithoutRef<typeof DialogPrimitive.Root>;

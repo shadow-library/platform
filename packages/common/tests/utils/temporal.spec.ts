@@ -1,20 +1,6 @@
-/**
- * Importing npm packages
- */
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { utils } from '@lib/utils';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 describe('Temporal Utils', () => {
   let setTimeoutSpy: ReturnType<typeof spyOn>;

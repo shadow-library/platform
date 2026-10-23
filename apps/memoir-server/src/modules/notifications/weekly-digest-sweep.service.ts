@@ -1,26 +1,12 @@
-/**
- * Importing npm packages
- */
 import { Injectable, type OnModuleInit } from '@shadow-library/app';
 import { Config } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { addDays, formatLocalDate, localDateAt, startOfMondayWeek, weekdayOf } from '@modules/rules';
 import { SchedulerService } from '@modules/scheduler';
 
 import { NotificationClient } from './notification-client.service';
 import { type WeeklyDigestVariables } from './notification.types';
 import { WeeklyDigestRepository, type WeekQuestLog } from './weekly-digest.repository';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 const SWEEP_NAME = 'weekly-digest-assembly';
 const MS_PER_MINUTE = 60_000;

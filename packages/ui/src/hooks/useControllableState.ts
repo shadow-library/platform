@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { useCallback, useState } from 'react';
 
-/**
- * Defining types
- */
 export interface ControllableStateOptions<T> {
   /** The controlled value. When it is not `undefined`, the component is controlled and owns the value. */
   value: T | undefined;
@@ -14,10 +8,6 @@ export interface ControllableStateOptions<T> {
   /** Called with the next value on every change, in both controlled and uncontrolled modes. */
   onChange?: (next: T) => void;
 }
-
-/**
- * Declaring the constants
- */
 
 /**
  * The controlled-or-uncontrolled value pattern in one place, so every value-bearing component resolves

@@ -1,23 +1,8 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { Config, type ConfigRecords } from '../services/config.service';
-
-/**
- * Defining types
- */
 
 export type ConfigValues = { [K in keyof ConfigRecords]?: ConfigRecords[K] | undefined };
 
 export type RestoreConfig = () => void;
-
-/**
- * Declaring the constants
- */
 
 /**
  * Sets config values for a test and returns the function that puts back exactly what was there before.

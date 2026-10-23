@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type ComponentPropsWithoutRef } from 'react';
 
-/**
- * Defining types
- */
 export type SpinnerSize = 'sm' | 'md' | 'lg';
 
 export interface SpinnerProps extends ComponentPropsWithoutRef<'span'> {

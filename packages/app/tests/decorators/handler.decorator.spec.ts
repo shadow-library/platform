@@ -1,21 +1,7 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { HANDLER_METADATA } from '@lib/constants';
 import { Handler } from '@shadow-library/app';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 describe('HandlerDecorator', () => {
   const handlerMetadataOne = { op: 'GET', auth: { jwt: true } };

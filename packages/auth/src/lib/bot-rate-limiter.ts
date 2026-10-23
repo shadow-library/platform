@@ -1,15 +1,3 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
 export type BotRateDecision = { allowed: true } | { allowed: false; retryAfterSeconds: number };
 
 export interface BotRateLimiterOptions {

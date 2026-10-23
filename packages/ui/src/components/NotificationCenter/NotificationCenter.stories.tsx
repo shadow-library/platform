@@ -1,18 +1,9 @@
-/**
- * Importing npm packages
- */
 import { type Meta, type StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { NotificationCenter } from './NotificationCenter';
 import { type NotificationItem } from './NotificationCenter.types';
 
-/**
- * Declaring the constants
- */
 const seed: NotificationItem[] = [
   {
     id: '1',

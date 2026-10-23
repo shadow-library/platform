@@ -1,21 +1,6 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 export interface ContextId {
   readonly id: number;
 }
-
-/**
- * Declaring the constants
- */
 
 export function createContextId(): ContextId {
   /**

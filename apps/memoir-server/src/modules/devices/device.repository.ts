@@ -1,18 +1,8 @@
-/**
- * Importing npm packages
- */
 import { eq } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 
-/**
- * Importing user defined packages
- */
 import { OwnerScopedRepository } from '@modules/auth';
 import { type Device, schema } from '@server/database';
-
-/**
- * Defining types
- */
 
 export interface DeviceUpsert {
   userAgent?: string | null;
@@ -20,10 +10,6 @@ export interface DeviceUpsert {
   pushOptIn: boolean;
   reminderPrefs?: Record<string, unknown> | null;
 }
-
-/**
- * Declaring the constants
- */
 
 @Injectable()
 export class DeviceRepository extends OwnerScopedRepository {

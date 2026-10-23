@@ -1,15 +1,3 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
 export type Theme = 'light' | 'dark';
 
 /** What the user chose, as opposed to the `Theme` it currently resolves to: `system` follows the OS preference. */

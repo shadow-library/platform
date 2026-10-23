@@ -1,21 +1,10 @@
-/**
- * Importing npm packages
- */
-
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createRef } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { Button } from '../Button';
 import { ButtonGroup } from './ButtonGroup';
-
-/**
- * Declaring the constants
- */
 
 describe('ButtonGroup', () => {
   it('renders an attached group with the role and label', () => {

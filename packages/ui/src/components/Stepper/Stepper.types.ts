@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type ReactNode } from 'react';
 
-/**
- * Defining types
- */
 export type StepperOrientation = 'horizontal' | 'vertical';
 
 export type StepState = 'completed' | 'current' | 'upcoming' | 'error' | 'skipped';

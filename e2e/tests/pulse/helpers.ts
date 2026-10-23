@@ -1,18 +1,8 @@
-/**
- * Importing npm packages
- */
 import { randomBytes } from 'node:crypto';
 
 import { type APIRequestContext, type APIResponse } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { mintServiceAccountToken, mutate, pulseDb, requireProductUrl, type TokenResponseBody, workloadGrant } from '../../lib';
-
-/**
- * Defining types
- */
 
 export interface TemplateOverrides {
   templateKey: string;

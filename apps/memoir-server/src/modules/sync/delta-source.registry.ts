@@ -1,21 +1,7 @@
-/**
- * Importing npm packages
- */
 import { Injectable } from '@shadow-library/app';
 import { AppError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { type DeltaSource } from './sync.types';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 /**
  * The extension seam for `GET /sync/delta`: a module owning a syncable table registers its own

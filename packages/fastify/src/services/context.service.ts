@@ -1,29 +1,16 @@
-/**
- * Importing npm packages
- */
 import { AsyncLocalStorage } from 'node:async_hooks';
 
 import { onRequestHookHandler } from 'fastify';
 import { Injectable } from '@shadow-library/app';
 import { AppError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { HttpRequest, HttpResponse } from '../interfaces';
-
-/**
- * Defining types
- */
 
 type Key = string | symbol;
 
 /* eslint-disable-next-line @typescript-eslint/no-empty-object-type */
 export interface ContextExtension {}
 
-/**
- * Declaring the constants
- */
 const REQUEST = Symbol('request');
 const RESPONSE = Symbol('response');
 const RID = Symbol('rid');

@@ -1,15 +1,4 @@
-/**
- * Importing npm packages
- */
 import 'bun:test';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 
 /**
  * Shared ambient augmentation for every workspace's `bun:test`: widens `Expect`'s callable signature to accept a

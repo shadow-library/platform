@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import * as TabsPrimitive from '@radix-ui/react-tabs';
 import { forwardRef } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { cn } from '@/lib';
 
 import styles from './Tabs.module.css';

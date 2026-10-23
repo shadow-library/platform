@@ -1,27 +1,12 @@
-/**
- * Importing npm packages
- */
 import { Injectable, UseInterceptor } from '@shadow-library/app';
 
 import { CacheInterceptor } from './cache.interceptor';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 
 export interface Cat {
   id: string;
   name: string;
   age: number;
 }
-
-/**
- * Declaring the constants
- */
 
 @Injectable()
 export class CatService {

@@ -1,21 +1,7 @@
-/**
- * Importing npm packages
- */
 import { Body, Delete, Get, HttpController, HttpStatus, Patch, Post, Put, RespondFor, ServerErrorCode } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { HelloBody } from './hello-body.dto';
 import { HelloResponse } from './hello-response.dto';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @HttpController()
 export class HelloController {

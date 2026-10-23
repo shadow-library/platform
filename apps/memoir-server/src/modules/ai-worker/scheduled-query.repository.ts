@@ -1,6 +1,3 @@
-/**
- * Importing npm packages
- */
 import { createHash } from 'node:crypto';
 
 import { eq } from 'drizzle-orm';
@@ -9,18 +6,10 @@ import { DatabaseService } from '@shadow-library/modules';
 
 import { type PrimaryDatabase, schema } from '@server/database';
 
-/**
- * Defining types
- */
-
 export interface ScheduledQueryRow {
   accountId: bigint;
   queryText: string;
 }
-
-/**
- * Declaring the constants
- */
 
 /** The UUIDv5 namespace for scheduled-run task ids — a fixed constant, because changing it would re-materialize every account's standing query as a new task. */
 const SCHEDULED_TASK_NAMESPACE = 'a5f0d5f2-7b3c-5e2a-9c1e-3f6b2d8c4a71';

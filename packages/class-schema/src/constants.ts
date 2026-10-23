@@ -1,19 +1,3 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
-
 let counter = 0;
 export const getCounterId = (): number => counter++;
 

@@ -1,15 +1,4 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { FlowErrorCode } from './flow.error';
-
-/**
- * Defining types
- */
 
 export type ContextUpdater<Context> = Partial<Context> | ((currentContext: Context) => Partial<Context>);
 
@@ -58,10 +47,6 @@ export interface FlowStatus<StateNames extends string = string> {
   isComplete: boolean;
   history: StateNames[];
 }
-
-/**
- * Declaring the constants
- */
 
 export class FlowManager<StateNames extends string = string, Context extends Record<string, any> = Record<string, any>> {
   private constructor(

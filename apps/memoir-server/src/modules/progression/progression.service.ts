@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { and, between, eq, isNotNull, or } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { HeroLedger } from '@modules/commands';
 import {
   type AchievementId,
@@ -28,10 +22,6 @@ import { cosmeticsUnlockedByAchievement } from './cosmetic.catalogue';
 import { GrantsRepository } from './grants.repository';
 import { type CountersEnvelope, ProgressCountersRepository } from './progress-counters.repository';
 
-/**
- * Defining types
- */
-
 export interface QuestCompletionSignal {
   date: string;
   strictness: Strictness;
@@ -39,10 +29,6 @@ export interface QuestCompletionSignal {
   priorStreakDays: number;
   postStreakDays: number;
 }
-
-/**
- * Declaring the constants
- */
 
 const RESCHEDULE_REASON_WINDOW_DAYS = 90;
 

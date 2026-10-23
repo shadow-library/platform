@@ -1,23 +1,9 @@
-/**
- * Importing npm packages
- */
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { AppError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { AuthClient } from '@shadow-library/auth';
 import { createTestIdP, TestIdP } from '@shadow-library/auth/testing';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 const AUDIENCE = 'api://pulse';
 

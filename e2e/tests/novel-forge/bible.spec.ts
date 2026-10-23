@@ -1,21 +1,11 @@
-/**
- * Importing npm packages
- */
 import { type APIRequestContext } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { mutate, novelForgeDb } from '../../lib';
 import { expect, test } from './forge-actors';
 import { expectCode, guardedProject, newProject } from './forge-arrange';
 import { computeBibleDocHash, ForgeArrangeError, insertChapterRow, insertRawBibleDoc, readBibleDocRow, readChapterFlags, readProposalRow } from './forge-bible';
 import { assertSpendGuarded, listDispatchedModelCalls } from './forge-db';
 import { expectStatus } from './forge-helpers';
-
-/**
- * Defining types
- */
 
 interface BibleDocResponse {
   section: string;

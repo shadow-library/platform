@@ -1,18 +1,8 @@
-/**
- * Importing npm packages
- */
 import { eq, isNull } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 
-/**
- * Importing user defined packages
- */
 import { OwnerScopedRepository } from '@modules/auth';
 import { type DatabaseTransaction, type Expense, schema, syncStamped } from '@server/database';
-
-/**
- * Defining types
- */
 
 export interface ExpenseCreate {
   id: string;
@@ -36,10 +26,6 @@ export interface ExpenseCreate {
 }
 
 export type ExpenseEdit = Partial<Pick<ExpenseCreate, 'amountMinor' | 'amountText' | 'fxRate' | 'homeAmountMinor' | 'categoryId' | 'merchant' | 'note' | 'occurredOn'>>;
-
-/**
- * Declaring the constants
- */
 
 @Injectable()
 export class ExpenseRepository extends OwnerScopedRepository {

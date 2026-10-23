@@ -1,19 +1,10 @@
-/**
- * Importing npm packages
- */
 import { forwardRef, type ReactNode } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { cn } from '@/lib';
 
 import styles from './Badge.module.css';
 import { type BadgeProps } from './Badge.types';
 
-/**
- * Declaring the constants
- */
 function formatCount(children: ReactNode, max: number | undefined): ReactNode {
   if (max == null) return children;
   const value = typeof children === 'number' ? children : Number(children);

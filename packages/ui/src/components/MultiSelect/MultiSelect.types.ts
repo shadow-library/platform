@@ -1,14 +1,3 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 export type MultiSelectSize = 'sm' | 'md' | 'lg';
 
 export interface MultiSelectOption {

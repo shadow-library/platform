@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { Controller, EnableIf, Handler } from '@shadow-library/app';
 import { AppError, Logger } from '@shadow-library/common';
 import { Body, ContextService, Get, HttpController, type HttpResponse, Post, Query, RespondFor } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { NAMESPACE } from '../constants';
 import { AuthErrorCode } from '../errors';
 import { isThrottled, retryAfterHint } from '../lib/transport';
@@ -31,10 +25,6 @@ import { AuthRoutePaths } from './config';
 import { parseCookies } from './cookie';
 import { Public } from './decorators';
 import { AuthGuardErrorCode } from './errors';
-
-/**
- * Defining types
- */
 
 type RouteName = keyof Omit<AuthRoutePaths, 'basePath'>;
 

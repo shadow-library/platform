@@ -1,18 +1,8 @@
-/**
- * Importing npm packages
- */
 import { AppError, Logger, throwError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { NAMESPACE } from '../constants';
 import { AuthErrorCode } from '../errors';
 import { DiscoveryDocument, FetchLike } from '../interfaces';
-
-/**
- * Defining types
- */
 
 /**
  * Declaring the constants

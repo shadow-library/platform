@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type APIRequestContext } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { mutate, novelForgeDb, pollUntil } from '../../lib';
 import { expect, type ForgeActor, test } from './forge-actors';
 import { expectCode } from './forge-arrange';
@@ -49,10 +43,6 @@ import {
   writeBrief,
   writeFact,
 } from './forge-story';
-
-/**
- * Defining types
- */
 
 interface ReviewView {
   readonly status: string;

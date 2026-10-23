@@ -1,17 +1,6 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { findSetCookie, requireProductUrl } from '../../lib';
 import { expect, test } from './fixtures';
 import { createDailyQuest, hasQuestLogFor, memoirCsrfHeaders, pullDelta } from './helpers';
-
-/**
- * Defining types
- */
 
 /**
  * Declaring the constants

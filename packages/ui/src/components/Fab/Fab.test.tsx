@@ -1,6 +1,3 @@
-/**
- * Importing npm packages
- */
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
@@ -8,14 +5,8 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { Fab } from './Fab';
 
-/**
- * Declaring the constants
- */
 const icon = (
   <svg viewBox="0 0 16 16" aria-hidden="true">
     <path d="M8 3v10M3 8h10" />

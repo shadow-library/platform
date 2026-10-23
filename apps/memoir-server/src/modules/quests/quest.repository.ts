@@ -1,25 +1,11 @@
-/**
- * Importing npm packages
- */
 import { and, eq } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { OwnerScopedRepository } from '@modules/auth';
 import { type DatabaseTransaction, type Quest, schema } from '@server/database';
 
 import { type QuestDraftInput } from './quest-command.types';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Injectable()
 export class QuestRepository extends OwnerScopedRepository {

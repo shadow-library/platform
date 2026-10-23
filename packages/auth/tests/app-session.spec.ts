@@ -1,23 +1,10 @@
-/**
- * Importing npm packages
- */
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { type AppError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { AccessTokenCache, AppSessionClient, type AppSessionToken, AuthClient, hashSessionHandle } from '@shadow-library/auth';
 import { AppSessionService, decodeLoginState, encodeLoginState, type LoginState, matchesState, resolveAuthRoutes, resolveBrowserAuthConfig } from '@shadow-library/auth/module';
 import { createTestIdP, TestIdP } from '@shadow-library/auth/testing';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const CLIENT = { id: 'svc-reports', secret: 's3cr3t' };
 const AUDIENCE = 'api://reports';
 const OTHER_AUDIENCE = 'api://billing';

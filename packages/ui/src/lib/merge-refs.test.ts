@@ -1,17 +1,7 @@
-/**
- * Importing npm packages
- */
 import { createRef } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { mergeRefs } from './merge-refs';
-
-/**
- * Declaring the constants
- */
 
 describe('mergeRefs', () => {
   it('assigns the node to object refs', () => {

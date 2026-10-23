@@ -1,21 +1,11 @@
-/**
- * Importing npm packages
- */
 import { createHash } from 'node:crypto';
 
 import { type APIRequestContext, type APIResponse, expect } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { mutate, novelForgeDb, pollUntil } from '../../lib';
 import { type ForgeActor, type ForgeHarness } from './forge-actors';
 import { assertSpendGuarded } from './forge-db';
 import { approveChapter, type Draft, type EntitySeed, expectStatus, readDraft, uniqueSuffix } from './forge-helpers';
-
-/**
- * Defining types
- */
 
 export type VolumeState = 'not_started' | 'active' | 'goal_met';
 

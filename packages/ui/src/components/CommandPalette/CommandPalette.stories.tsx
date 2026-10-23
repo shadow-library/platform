@@ -1,20 +1,10 @@
-/**
- * Importing npm packages
- */
-
 import { type Meta, type StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { Button } from '../Button';
 import { CommandPalette } from './CommandPalette';
 import { type CommandItem } from './CommandPalette.types';
 
-/**
- * Declaring the constants
- */
 const meta = {
   title: 'Components/CommandPalette',
   component: CommandPalette,

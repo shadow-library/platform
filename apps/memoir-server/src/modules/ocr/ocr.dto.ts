@@ -1,15 +1,4 @@
-/**
- * Importing npm packages
- */
 import { Field, Schema } from '@shadow-library/class-schema';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 
 @Schema()
 export class OcrParseDto {

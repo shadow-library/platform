@@ -1,19 +1,8 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { mutate, requireProductUrl } from '../../lib';
 import { expectCode } from './forge-arrange';
 import { buildBundle, expect, readZip, test } from './forge-bundles';
 import { readProjectRow, UNREGISTERED_MODEL } from './forge-db';
 import { createNovel, errorCode } from './forge-helpers';
-
-/**
- * Defining types
- */
 
 /**
  * Declaring the constants

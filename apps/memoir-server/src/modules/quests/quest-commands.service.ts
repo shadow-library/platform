@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { eq } from 'drizzle-orm';
 import { Injectable, type OnModuleInit } from '@shadow-library/app';
 import { AppError, ValidationError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { applyStreakTransition, CommandBus, type CommandContext, type CommandResult, HeroLedger } from '@modules/commands';
 import { ProgressionService } from '@modules/progression';
 import {
@@ -49,10 +43,6 @@ import { QuestLogRepository, type QuestLogWrite } from './quest-log.repository';
 import { QuestRepository } from './quest.repository';
 import { QuestStreakRepository } from './quest-streak.repository';
 
-/**
- * Defining types
- */
-
 interface AccountSnapshot {
   timezone: TimeZone;
   intensityMode: IntensityMode;
@@ -70,10 +60,6 @@ interface ResolvedTiming {
   daysElapsed: number;
   performedAt: Date | null;
 }
-
-/**
- * Declaring the constants
- */
 
 /** PRD §2.2: the reschedule cap is a command-layer policy, not a versioned reward number, so it does not live in `Ruleset`. */
 const RESCHEDULE_CAP_PER_WINDOW = 2;

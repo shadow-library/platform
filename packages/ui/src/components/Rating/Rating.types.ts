@@ -1,6 +1,3 @@
-/**
- * Defining types
- */
 export type RatingSize = 'sm' | 'md' | 'lg';
 
 export interface RatingProps {

@@ -1,17 +1,7 @@
-/**
- * Importing npm packages
- */
 import { type APIRequestContext, expect, test } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { apiContext, mutate, requireProductUrl } from '../../lib';
 import { createProject, deleteProjectQuietly, jsonOrUndefined, uniqueSuffix } from './forge-helpers';
-
-/**
- * Defining types
- */
 
 /**
  * Declaring the constants

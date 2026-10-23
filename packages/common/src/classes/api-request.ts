@@ -1,23 +1,13 @@
-/**
- * Importing npm packages
- */
 import { type IncomingHttpHeaders } from 'node:http';
 import qs from 'node:querystring';
 import { Dispatcher, request } from 'undici';
 import deepmerge from 'deepmerge';
 import { JsonObject, JsonValue } from 'type-fest';
 
-/**
- * Importing user defined packages
- */
 import { NAMESPACE } from '@lib/constants';
 import { AppError, ErrorCode } from '@lib/errors';
 import { Logger, ServiceDiscovery } from '@lib/services';
 import { utils } from '@lib/utils';
-
-/**
- * Defining types
- */
 
 export type BodyFormat = 'json' | 'form';
 
@@ -45,10 +35,6 @@ export interface CustomAPIRequest {
   new (options?: APIRequestOptions): APIRequest;
   setOptions(options: Omit<APIRequestOptions, 'baseURL' | 'path' | 'method'>): void;
 }
-
-/**
- * Declaring the constants
- */
 
 export class APIRequest {
   private static readonly logger = Logger.getLogger(NAMESPACE, 'APIRequest');

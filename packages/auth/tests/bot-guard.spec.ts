@@ -1,6 +1,3 @@
-/**
- * Importing npm packages
- */
 import { afterAll, afterEach, beforeAll, describe, expect, it, spyOn } from 'bun:test';
 import { createHash } from 'node:crypto';
 import 'reflect-metadata';
@@ -9,9 +6,6 @@ import { Dispatcher, type HandlerMetadata, Module, type ShadowApplication, Shado
 import { AppError, Logger } from '@shadow-library/common';
 import { ContextService, FastifyModule, Get, HttpController, Post } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { AuthClient } from '@shadow-library/auth';
 import {
   AuthAccessPolicy,
@@ -27,19 +21,12 @@ import {
 } from '@shadow-library/auth/module';
 import { createTestIdP, type TestIdP } from '@shadow-library/auth/testing';
 
-/**
- * Defining types
- */
-
 type RouteMetadataRecord = Record<string, unknown>;
 
 interface MockRouter {
   mockRequest(options: { method: string; url: string; headers?: Record<string, string> }): Promise<MockResponse>;
 }
 
-/**
- * Declaring the constants
- */
 const AUDIENCE = 'api://novel-forge';
 const CLIENT = { id: 'novel-forge', secret: 's3cr3t' };
 const ORG = '7';

@@ -1,15 +1,4 @@
-/**
- * Importing npm packages
- */
 import { type ComponentPropsWithoutRef, type ReactNode } from 'react';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 
 /** Gesture lifecycle: resting → finger-down travel → past-threshold → awaiting `onRefresh`. */
 export type PullToRefreshStatus = 'idle' | 'pulling' | 'armed' | 'refreshing';

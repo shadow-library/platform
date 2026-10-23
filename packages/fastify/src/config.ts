@@ -1,17 +1,6 @@
-/**
- * Importing npm packages
- */
-
 import { Config, Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { NAMESPACE } from './constants';
-
-/**
- * Defining types
- */
 
 export type TrustProxy = boolean | string[];
 
@@ -26,9 +15,6 @@ declare module '@shadow-library/common' {
   }
 }
 
-/**
- * Declaring the constants
- */
 const isDevValue = String(Config.isDev());
 const logger = Logger.getLogger(NAMESPACE, 'Config');
 

@@ -1,15 +1,4 @@
-/**
- * Importing npm packages
- */
 import { type ButtonHTMLAttributes, type ComponentPropsWithoutRef, type ReactNode } from 'react';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 
 /** Which action rail is revealed — `leading` sits at the start edge, `trailing` at the end edge. */
 export type SwipeActionsSide = 'leading' | 'trailing';

@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type ComponentPropsWithoutRef } from 'react';
 
-/**
- * Defining types
- */
 export type TagSize = 'sm' | 'md' | 'lg';
 
 export interface TagProps extends ComponentPropsWithoutRef<'span'> {

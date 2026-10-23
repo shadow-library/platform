@@ -1,21 +1,7 @@
-/**
- * Importing npm packages
- */
 import { Class } from 'type-fest';
 import { AppError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { ProviderToken } from '../../interfaces';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 export class DIErrorsStatic {
   private getTokenName(token: ProviderToken): string {

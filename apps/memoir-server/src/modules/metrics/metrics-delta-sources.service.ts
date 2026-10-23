@@ -1,25 +1,11 @@
-/**
- * Importing npm packages
- */
 import { Injectable, type OnModuleInit } from '@shadow-library/app';
 
-/**
- * Importing user defined packages
- */
 import { AccountContext } from '@modules/auth';
 import { DeltaRepository, DeltaSourceRegistry, type KeysetDeltaSource, type SnapshotDeltaSource } from '@modules/sync';
 import { type Metric, schema } from '@server/database';
 
 import { MetricRepository } from './metric.repository';
 import { serializeOffer } from './threshold-offer';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 function toMetricRow(metric: Metric.Row): Record<string, unknown> {
   return {

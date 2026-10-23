@@ -1,16 +1,6 @@
-/**
- * Importing npm packages
- */
 import { Handler } from '@shadow-library/app';
 
-/**
- * Importing user defined packages
- */
 import { ApiOperation } from './api-operation.decorator';
-
-/**
- * Defining types
- */
 
 export enum HttpMethod {
   GET = 'GET',
@@ -27,10 +17,6 @@ export interface RouteOptions {
   method: HttpMethod;
   path?: string;
 }
-
-/**
- * Declaring the constants
- */
 
 export function HttpRoute(options: RouteOptions): MethodDecorator {
   if (options.path && options.path.charAt(0) !== '/') options.path = `/${options.path}`;

@@ -1,18 +1,8 @@
-/**
- * Importing npm packages
- */
 import { type APIRequestContext, type APIResponse } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { identityDb } from './db';
 import { identityMutate } from './identity-auth';
 import { redisDel } from './redis';
-
-/**
- * Defining types
- */
 
 export type BuiltInAuthMode = 'PASSWORD' | 'WEBAUTHN' | 'EMAIL_OTP' | 'SMS_OTP';
 

@@ -1,18 +1,9 @@
 /// <reference types="bun" />
-/**
- * Importing npm packages
- */
 import { join, normalize, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-/**
- * Importing user defined packages
- */
 import { Logger } from '@shadow-library/common';
 
-/**
- * Defining types
- */
 interface SsrEntry {
   fetch(request: Request): Promise<Response>;
 }
@@ -98,10 +89,6 @@ async function serveStatic(req: Request, pathname: string, clientDir: string, se
   }
   return withGzip(new Response(file, { headers }), req);
 }
-
-/**
- * Declaring the server
- */
 
 /**
  * Serve a built Shadow SSR app on Bun. The framework's SSR entry is only the fetch handler — served alone

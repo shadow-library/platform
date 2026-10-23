@@ -1,21 +1,11 @@
-/**
- * Importing npm packages
- */
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test';
 import { type HandlerMetadata } from '@shadow-library/app';
 import { AppError } from '@shadow-library/common';
 import { ContextService } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { AuthClient, type FetchLike } from '@shadow-library/auth';
 import { AuthAccessPolicy, AuthGuard, type AuthGuardHandler, extendContextWithAuth, type GuardedRequest, type GuardedResponse } from '@shadow-library/auth/module';
 import { createTestIdP, type TestIdP } from '@shadow-library/auth/testing';
-
-/**
- * Defining types
- */
 
 interface Interception {
   status: number;

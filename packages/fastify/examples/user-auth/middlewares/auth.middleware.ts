@@ -1,20 +1,6 @@
-/**
- * Importing npm packages
- */
 import { AsyncHttpMiddleware, ContextService, HttpRequest, Middleware } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { UserService } from '../user.service';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Middleware()
 export class AuthMiddleware implements AsyncHttpMiddleware {

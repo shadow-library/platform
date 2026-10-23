@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type ComponentPropsWithoutRef, type ReactNode } from 'react';
 
-/**
- * Defining types
- */
 export type AvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 export type AvatarShape = 'circle' | 'square';
 export type AvatarPresence = 'online' | 'offline' | 'away' | 'busy';

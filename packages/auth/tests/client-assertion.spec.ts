@@ -1,24 +1,11 @@
-/**
- * Importing npm packages
- */
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-/**
- * Importing user defined packages
- */
 import { AuthClient } from '@shadow-library/auth';
 import { createTestIdP, TestIdP } from '@shadow-library/auth/testing';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const AUDIENCE = 'api://pulse';
 const CLIENT_ID = 'svc-pulse';
 const ASSERTION_TYPE = 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer';

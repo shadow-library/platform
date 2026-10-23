@@ -1,21 +1,11 @@
-/**
- * Importing npm packages
- */
-
 import { type Meta, type StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { Button } from '../Button';
 import { Dialog } from '../Dialog';
 import { FormField } from '../FormField';
 import { TimePicker } from './TimePicker';
 
-/**
- * Declaring the constants
- */
 const meta = {
   title: 'Components/TimePicker',
   component: TimePicker,

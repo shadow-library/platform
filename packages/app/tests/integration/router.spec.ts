@@ -1,24 +1,10 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { AppModule } from '@examples/router/app.module';
 import { CommandRouter } from '@examples/router/command-router';
 import { OutputService } from '@examples/router/output.service';
 import { StorageService } from '@examples/router/storage.service';
 import { Dispatcher, ShadowApplication, ShadowFactory } from '@shadow-library/app';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 describe('Dispatcher', () => {
   let app: ShadowApplication;

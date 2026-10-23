@@ -1,15 +1,8 @@
-/**
- * Importing npm packages
- */
-
 import { type ClientRequest } from 'node:http';
 import { request as httpsRequest } from 'node:https';
 
 import { type APIRequestContext, type APIResponse } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { csrfHeaders, novelForgeDb, pollUntil, requireProductUrl } from '../../lib';
 import { expectCode } from './forge-arrange';
 import {
@@ -31,10 +24,6 @@ import {
 } from './forge-bundles';
 import { errorCode } from './forge-helpers';
 import { readJobRow } from './forge-rows';
-
-/**
- * Defining types
- */
 
 interface ImportedProjectRow {
   coverImagePath: string | null;

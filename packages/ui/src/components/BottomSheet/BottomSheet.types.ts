@@ -1,11 +1,4 @@
-/**
- * Importing npm packages
- */
 import { type ReactNode } from 'react';
-
-/**
- * Defining types
- */
 
 /** Resting heights: `content` (intrinsic, capped at 60% of the viewport), `half` (50%), `full` (the viewport minus safe-area top). */
 export type BottomSheetSnap = 'content' | 'half' | 'full';

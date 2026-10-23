@@ -1,19 +1,9 @@
-/**
- * Importing npm packages
- */
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { Config } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { type AuthClientConfig } from '@shadow-library/auth';
 import { resolveAuthClientConfig, resolveAuthRoutes, resolveBrowserAuthConfig } from '@shadow-library/auth/module';
-
-/**
- * Defining types
- */
 
 /**
  * Declaring the constants

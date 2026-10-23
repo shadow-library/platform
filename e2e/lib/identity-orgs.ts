@@ -1,21 +1,11 @@
-/**
- * Importing npm packages
- */
 import { randomBytes } from 'node:crypto';
 
 import { type APIRequestContext, type APIResponse } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { identityDb } from './db';
 import { identityMutate } from './identity-auth';
 import { OAUTH_REDIRECT_URI, type OAuthTestClient } from './identity-oauth';
 import { redisCommand } from './redis';
-
-/**
- * Defining types
- */
 
 export type AppAccessMode = 'ALL_APPS' | 'ASSIGNED_ONLY';
 

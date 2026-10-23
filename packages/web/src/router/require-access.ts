@@ -1,17 +1,8 @@
-/**
- * Importing npm packages
- */
 import { type EnsureQueryDataOptions, type QueryClient, type QueryKey } from '@tanstack/react-query';
 
-/**
- * Importing user defined packages
- */
 import { type AuthAccess, type AuthAccessMode } from '../auth';
 import { requireAuth, type RequireAuthOptions } from './require-auth';
 
-/**
- * Defining types
- */
 export interface RequireAccessOptions<
   TQueryFnData = unknown,
   TError = unknown,
@@ -27,10 +18,6 @@ export interface RequireAccessOptions<
 }
 
 export type AccessGate<TSession> = { mode: 'public' } | { mode: 'private'; session: TSession };
-
-/**
- * Declaring the constants
- */
 
 /**
  * Fails closed: anything other than an exact `public` answer — a failed read (network, 5xx, endpoint missing) or an

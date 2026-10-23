@@ -1,16 +1,7 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { type BuildCheckTiming, buildIdResponse, canCheckNow, isChunkLoadError, isDifferentBuild, nextCheckDelay, readBuildId, resolveBuildId, retryDelay } from './build-update';
 
-/**
- * Declaring the constants
- */
 const TIMING: BuildCheckTiming = { intervalMs: 1000, minGapMs: 100, maxBackoffMs: 5000 };
 
 describe('resolveBuildId', () => {

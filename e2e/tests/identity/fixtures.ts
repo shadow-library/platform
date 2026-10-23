@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type APIRequestContext, test as base } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import {
   addOrganisationMember,
   type AdminApi,
@@ -64,10 +58,6 @@ import {
   type WebhookSubscription,
 } from '../../lib';
 
-/**
- * Defining types
- */
-
 export interface IdentityHarness {
   /** This test's own client address; every context below is charged to it. */
   readonly clientIp: string;
@@ -122,10 +112,6 @@ export interface IdentityTeam extends TeamOrganisation {
   /** The owner on a self-service-elevated session, as org-admin routes (assignment, org OAuth apps) require. */
   readonly ownerCtx: APIRequestContext;
 }
-
-/**
- * Declaring the constants
- */
 
 export interface IdentityTeamMember {
   readonly user: IdentityUser;

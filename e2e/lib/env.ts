@@ -1,17 +1,6 @@
-/**
- * Importing npm packages
- */
 import { existsSync } from 'node:fs';
 
 import { test } from '@playwright/test';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 
 /** One of the five platform products the e2e suite targets. */
 export type ProductKey = 'identity' | 'memoir' | 'novelForge' | 'pulse' | 'webNovel';

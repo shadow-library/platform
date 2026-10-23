@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type APIRequestContext, test as base, request } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import {
   addOrganisationMember,
   clearIpState,
@@ -24,10 +18,6 @@ import {
   runAll,
 } from '../../lib';
 import { deleteReaderData, followRedirect, WEB_NOVEL_SESSION_COOKIE, WebNovelSessionError } from './helpers';
-
-/**
- * Defining types
- */
 
 export interface WebNovelReader {
   readonly user: IdentityUser;

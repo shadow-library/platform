@@ -1,17 +1,7 @@
-/**
- * Importing npm packages
- */
 import { Injectable } from '@shadow-library/app';
 
-/**
- * Importing user defined packages
- */
 import { NOTIFICATION_CATEGORIES, type NotificationCategory, type NotificationCategoryVariables } from './notification.types';
 import { NotificationOutboxRepository } from './notification-outbox.repository';
-
-/**
- * Declaring the constants
- */
 
 /**
  * The single choke point every notification producer (the AI-completion hook, the billing-due sweep,

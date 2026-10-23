@@ -1,16 +1,6 @@
-/**
- * Importing npm packages
- */
 import { type HTMLAttributes } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { type InputSize } from '../Input';
-
-/**
- * Defining types
- */
 
 /** Preset character allow-lists. A custom `allowedPattern` overrides the preset. */
 export type OtpAllowed = 'numeric' | 'alphanumeric' | 'alphabetic';

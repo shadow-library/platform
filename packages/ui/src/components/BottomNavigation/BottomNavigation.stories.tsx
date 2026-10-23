@@ -1,18 +1,9 @@
-/**
- * Importing npm packages
- */
 import { type Meta, type StoryObj } from '@storybook/react-vite';
 import { type CSSProperties, type ReactNode, useState } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { Badge } from '../Badge';
 import { BottomNavigation } from './BottomNavigation';
 
-/**
- * Declaring the constants
- */
 function HomeIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

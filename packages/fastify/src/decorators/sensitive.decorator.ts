@@ -1,22 +1,7 @@
-/**
- * Importing npm packages
- */
 import { FieldMetadata } from '@shadow-library/class-schema';
 import { MaskOptions } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
 export type SensitiveDataType = 'secret' | 'email' | 'number' | 'words';
-
-/**
- * Declaring the constants
- */
 
 export function Sensitive(type?: SensitiveDataType): PropertyDecorator;
 export function Sensitive(maskOptions: MaskOptions): PropertyDecorator;

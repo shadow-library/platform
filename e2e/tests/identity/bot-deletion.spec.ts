@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type APIRequestContext, type APIResponse } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import {
   addOrganisationMember,
   assignApplicationRole,
@@ -36,10 +30,6 @@ import {
 } from '../../lib';
 import { expect, type IdentityHarness, type IdentityTeam, teamMember, test } from './fixtures';
 import { expectRefused } from './helpers';
-
-/**
- * Defining types
- */
 
 interface OwnershipApplication {
   applicationId: number;

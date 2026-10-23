@@ -1,6 +1,3 @@
-/**
- * Importing npm packages
- */
 import assert from 'node:assert';
 
 import { FastifyDynamicSwaggerOptions } from '@fastify/swagger';
@@ -10,19 +7,9 @@ import { Inject, Injectable } from '@shadow-library/app';
 import { JSONSchema } from '@shadow-library/class-schema';
 import { AppError, Config, utils } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { DEFAULT_CONFIGS, HTTP_CORE_CONFIGS } from '../http-core.constants';
 import { type HttpCoreModuleOptions, type OpenAPIOptions } from '../http-core.types';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const COMPONENT_PREFIX = '#/components/schemas/';
 const COMPOSED_SCHEMA_ID = /^class-schema:(oneOf|anyOf)\?/;
 

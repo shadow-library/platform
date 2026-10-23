@@ -1,24 +1,11 @@
-/**
- * Importing npm packages
- */
 import { Authenticated, RequireScope } from '@shadow-library/auth/module';
 import { Config } from '@shadow-library/common';
 import { Body, Get, Header, HttpController, HttpStatus, Post, Query, RespondFor } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { type DeltaPage } from './sync.types';
 import { SyncCommandBatchDto, SyncCommandBatchResponseDto, SyncDeltaQueryDto, SyncDeltaResponseDto } from './sync.dto';
 import { type BatchOutcome, SyncService } from './sync.service';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const SYNC_EPOCH_HEADER = 'x-sync-epoch';
 
 /**

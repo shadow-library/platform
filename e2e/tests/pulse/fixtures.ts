@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type APIRequestContext, test as base, type BrowserContext, request } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import {
   type AdminApi,
   apiContext,
@@ -28,10 +22,6 @@ import {
   useClientIp,
 } from '../../lib';
 import { deleteNotificationJobs, deleteTemplates } from './helpers';
-
-/**
- * Defining types
- */
 
 export interface PulseHarness {
   /** This test's own client address; every identity-facing call below is charged to it. */

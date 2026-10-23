@@ -1,18 +1,8 @@
-/**
- * Importing npm packages
- */
 import * as TooltipPrimitive from '@radix-ui/react-tooltip';
 import { type ReactElement } from 'react';
 
-/**
- * Importing user defined packages
- */
 import styles from './Tooltip.module.css';
 import { type TooltipProps, type TooltipProviderProps } from './Tooltip.types';
-
-/**
- * Declaring the constants
- */
 
 /**
  * One provider per app gives every tooltip a shared hover-intent delay and the "open instantly once a

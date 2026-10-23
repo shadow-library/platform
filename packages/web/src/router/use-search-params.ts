@@ -1,16 +1,6 @@
-/**
- * Importing npm packages
- */
 import { useRouter, useRouterState } from '@tanstack/react-router';
 import { useCallback, useMemo } from 'react';
 
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 type SearchParams = Record<string, string>;
 
 type SearchInput = Record<string, string | boolean | number | undefined>;
@@ -21,9 +11,6 @@ export interface UseSearchParams {
   setSearch: (params: SearchInput) => void;
 }
 
-/**
- * Declaring the constants
- */
 function cleanParams(params: SearchInput): SearchParams {
   const cleaned: SearchParams = {};
   for (const [key, value] of Object.entries(params)) {

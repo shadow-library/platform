@@ -1,27 +1,13 @@
-/**
- * Importing npm packages
- */
 import { eq } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 
-/**
- * Importing user defined packages
- */
 import { OwnerScopedRepository } from '@modules/auth';
 import { type DatabaseTransaction, type ExpenseCategory, schema } from '@server/database';
-
-/**
- * Defining types
- */
 
 interface BuiltinCategory {
   key: string;
   label: string;
 }
-
-/**
- * Declaring the constants
- */
 
 /** The 9 fixed categories (PRD §2.5); user-scoped rows rather than a code constant so a later product change to custom categories needs no migration (ARCHITECTURE §10.3 O-5). */
 const BUILTIN_CATEGORIES: readonly BuiltinCategory[] = [

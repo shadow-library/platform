@@ -1,20 +1,6 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it, jest } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { AppError, Task } from '@shadow-library/common';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 describe('Task', () => {
   it('should execute successfully without retry', async () => {

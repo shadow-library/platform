@@ -1,16 +1,7 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { ApiError, isApiError } from './api-error';
 
-/**
- * Declaring the constants
- */
 describe('ApiError', () => {
   it('should fold field problems into the message', () => {
     const error = new ApiError(400, {

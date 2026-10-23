@@ -1,16 +1,6 @@
-/**
- * Importing npm packages
- */
 import { Class, Promisable } from 'type-fest';
 
-/**
- * Importing user defined packages
- */
 import { ProviderToken } from './provider.interface';
-
-/**
- * Defining types
- */
 
 export interface InterceptorConfig<T = any> {
   /** The interceptor token to be resolved from the dependency injection container */
@@ -19,10 +9,6 @@ export interface InterceptorConfig<T = any> {
   /** Optional configuration options for the interceptor */
   options?: T;
 }
-
-/**
- * Declaring the constants
- */
 
 export interface InterceptorContext {
   /** Class whose method is being intercepted */

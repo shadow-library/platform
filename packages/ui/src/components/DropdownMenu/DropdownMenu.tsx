@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu';
 import { forwardRef } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { CheckIcon, ChevronRightIcon } from '@/icons';
 import { cn } from '@/lib';
 
@@ -22,9 +16,6 @@ import {
   type DropdownMenuSubTriggerProps,
 } from './DropdownMenu.types';
 
-/**
- * Declaring the constants
- */
 function DotIcon() {
   return (
     <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">

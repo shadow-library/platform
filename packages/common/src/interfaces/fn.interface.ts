@@ -1,16 +1,6 @@
-/**
- * Importing npm packages
- */
 import { Promisable } from 'type-fest';
 
-/**
- * Importing user defined packages
- */
 import { SyncValue } from './value.interface';
-
-/**
- * Defining types
- */
 
 export type Fn<T = any, U = any> = (...args: U[]) => Promisable<T>;
 

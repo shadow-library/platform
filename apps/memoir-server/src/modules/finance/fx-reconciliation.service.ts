@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import { Injectable, type OnModuleInit } from '@shadow-library/app';
 import { Config, Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { AccountRepository } from '@modules/auth';
 import { SchedulerService } from '@modules/scheduler';
 import { APP_NAME } from '@server/constants';
@@ -17,14 +11,6 @@ import { logMetric } from '@server/telemetry';
 import { type CurrencyPair, HttpFxRateClient } from './fx-rate-client';
 import { ExpenseRepository } from './expense.repository';
 import { FxRateRepository } from './fx-rate.repository';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 const SWEEP_NAME = 'fx-reconciliation';
 const NULL_RATE_PAGE_SIZE = 200;

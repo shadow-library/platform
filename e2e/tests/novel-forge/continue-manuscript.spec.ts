@@ -1,18 +1,8 @@
-/**
- * Importing npm packages
- */
 import { type APIRequestContext } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { pollUntil, requireProductUrl } from '../../lib';
 import { buildBundle, expect, FINAL_BUNDLE, test } from './forge-bundles';
 import { CHAPTER_ONE, saveChapter, startNextChapter, uniqueSuffix } from './forge-helpers';
-
-/**
- * Defining types
- */
 
 interface ProjectJob {
   readonly id: string;

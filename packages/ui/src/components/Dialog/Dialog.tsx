@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import * as AlertDialogPrimitive from '@radix-ui/react-alert-dialog';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { forwardRef, type ReactElement, useState } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { cn } from '@/lib';
 
 import { Button } from '../Button';
@@ -17,9 +11,6 @@ import { Input } from '../Input';
 import styles from './Dialog.module.css';
 import { type ConfirmDialogProps, type DialogBodyProps, type DialogContentProps, type DialogFooterProps, type DialogHeaderProps, type DialogProps } from './Dialog.types';
 
-/**
- * Declaring the constants
- */
 function CloseIcon() {
   return (
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" aria-hidden="true">

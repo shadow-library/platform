@@ -1,21 +1,6 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { Logger } from '../services/logger/logger.service';
 
-/**
- * Defining types
- */
-
 export type RestoreLogger = () => void;
-
-/**
- * Declaring the constants
- */
 
 /**
  * Mutes every logger, including child loggers created earlier and transports attached later, and returns

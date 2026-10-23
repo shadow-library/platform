@@ -1,19 +1,9 @@
-/**
- * Importing npm packages
- */
-
 import { type Meta, type StoryObj } from '@storybook/react-vite';
 
-/**
- * Importing user defined packages
- */
 import { Button } from '../Button';
 import { IconButton } from '../IconButton';
 import { ButtonGroup } from './ButtonGroup';
 
-/**
- * Declaring the constants
- */
 function SearchIcon() {
   return (
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" aria-hidden="true">

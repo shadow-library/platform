@@ -1,19 +1,3 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
-
 export interface BaseFieldSchema<T> {
   /** Allowed values */
   enum?: T[];

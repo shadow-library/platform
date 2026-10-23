@@ -1,19 +1,9 @@
-/**
- * Importing npm packages
- */
 import { Injectable } from '@shadow-library/app';
 import { AppError, Config, Logger } from '@shadow-library/common';
 import { isSynapseError, type SynapseChatResponse, SynapseClient, type SynapseErrorCode } from '@shadow-library/synapse';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
-
-/**
- * Defining types
- */
 
 export type InferenceTask = 'memoir.insight' | 'memoir.receipt-structuring';
 
@@ -34,10 +24,6 @@ export interface InferenceResult {
   content: unknown;
   model: string;
 }
-
-/**
- * Declaring the constants
- */
 
 const TEMPERATURE = 0.2;
 

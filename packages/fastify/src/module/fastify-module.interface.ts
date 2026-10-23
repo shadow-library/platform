@@ -1,21 +1,11 @@
-/**
- * Importing npm packages
- */
 import { FastifyInstance, FastifyServerOptions } from 'fastify';
 import { Promisable } from 'type-fest';
 import { FactoryProvider, ModuleMetadata } from '@shadow-library/app';
 import { JSONSchema } from '@shadow-library/class-schema';
 
-/**
- * Importing user defined packages
- */
 import { CustomTransformers } from '../decorators';
 import { ErrorHandler } from '../interfaces';
 import { ContextService } from '../services';
-
-/**
- * Defining types
- */
 
 export interface FastifyConfig extends FastifyServerOptions {
   /**

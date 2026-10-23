@@ -1,18 +1,8 @@
-/**
- * Importing npm packages
- */
-
 import { type Meta, type StoryObj } from '@storybook/react-vite';
 
-/**
- * Importing user defined packages
- */
 import { FileUpload } from './FileUpload';
 import { type UploadHandle } from './FileUpload.types';
 
-/**
- * Declaring the constants
- */
 function fakeUpload(_file: File, { onProgress, signal }: UploadHandle): Promise<void> {
   return new Promise((resolve, reject) => {
     let percent = 0;

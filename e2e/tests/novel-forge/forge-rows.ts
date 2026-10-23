@@ -1,12 +1,5 @@
-/**
- * Importing user defined packages
- */
 import { novelForgeDb } from '../../lib';
 import { ForgeDbError, type JobKind, type JobStatus } from './forge-db';
-
-/**
- * Defining types
- */
 
 export type JobEventType = 'queued' | 'started' | 'step' | 'retrying' | 'done' | 'failed' | 'cancelled';
 

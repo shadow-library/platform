@@ -1,18 +1,8 @@
-/**
- * Importing npm packages
- */
 import { and, asc, eq, gt, lt, notInArray, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { type Account, type PrimaryDatabase, schema } from '@server/database';
-
-/**
- * Defining types
- */
 
 export interface DeletionRemnant {
   accountId: bigint;
@@ -25,10 +15,6 @@ export interface StalledDeletion {
   accountId: bigint;
   deletionState: Account.DeletionState;
 }
-
-/**
- * Declaring the constants
- */
 
 /**
  * FK-safe relational purge order (ARCHITECTURE §21, step 4). Children precede parents, so a batch never

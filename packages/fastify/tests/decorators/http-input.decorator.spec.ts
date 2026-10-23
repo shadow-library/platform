@@ -1,21 +1,8 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it, jest, mock } from 'bun:test';
 import { Field, Schema } from '@shadow-library/class-schema';
 
-/**
- * Importing user defined packages
- */
 import { HTTP_CONTROLLER_INPUTS } from '@lib/constants';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const app = await import('@shadow-library/app');
 const decorator = jest.fn();
 const Handler = jest.fn(() => decorator);

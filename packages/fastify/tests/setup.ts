@@ -1,24 +1,6 @@
-/**
- * Importing packages with side effects
- */
 import 'reflect-metadata';
 
-/**
- * Importing npm packages
- */
 import { afterEach, jest, mock } from 'bun:test';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 /** Config (from @shadow-library/common) watches files via chokidar; stub it so tests don't spawn watchers. */
 mock.module('chokidar', () => ({

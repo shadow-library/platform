@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type ComponentPropsWithoutRef } from 'react';
 
-/**
- * Defining types
- */
 export type SkeletonShape = 'line' | 'rect' | 'circle';
 
 export interface SkeletonProps extends ComponentPropsWithoutRef<'span'> {

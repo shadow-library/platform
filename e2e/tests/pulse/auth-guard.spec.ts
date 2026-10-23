@@ -1,16 +1,5 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { authorizeCode, exchangeCode, introspect, relyingPartyClient, requireProductUrl } from '../../lib';
 import { expect, test } from './fixtures';
-
-/**
- * Defining types
- */
 
 /**
  * Declaring the constants

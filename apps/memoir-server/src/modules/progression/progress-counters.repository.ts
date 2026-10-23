@@ -6,10 +6,6 @@ import { EMPTY_PROGRESS_COUNTERS, type ProgressCounters } from '@modules/rules';
 import { type DatabaseTransaction, type PrimaryDatabase, schema } from '@server/database';
 
 /**
- * Defining types
- */
-
-/**
  * The counters this table actually stores — everything `ProgressCounters` needs except the fields
  * already mirrored on `accounts` (`totalXp`, `level`, `stats`) and `reschedulesWithReasonIn90Days`,
  * which is a rolling window computed live off `reschedule_events` rather than an incremental total
@@ -60,10 +56,6 @@ function normalize(raw: unknown): CountersEnvelope {
     returnerPending: value.returnerPending ?? false,
   };
 }
-
-/**
- * Declaring the constants
- */
 
 /**
  * One row per account (ARCHITECTURE §26's incremental Title/Achievement projection). Every call takes

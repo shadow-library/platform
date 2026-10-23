@@ -1,21 +1,11 @@
-/**
- * Importing npm packages
- */
 import * as AvatarPrimitive from '@radix-ui/react-avatar';
 import { Children, forwardRef, isValidElement, useContext } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { cn, getInitials } from '@/lib';
 
 import { AvatarGroupContext } from './Avatar.context';
 import styles from './Avatar.module.css';
 import { type AvatarGroupProps, type AvatarProps } from './Avatar.types';
-
-/**
- * Declaring the constants
- */
 
 /** Stable tint per name — a char-code sum picks one of the two muted palettes. */
 function getTint(name: string): 'indigo' | 'neutral' {

@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import { Injectable } from '@shadow-library/app';
 import { AppError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { QuestRepository } from '@modules/quests';
 import { AppErrorCode } from '@server/classes';
 import { type AppliedSuggestion, type Quest } from '@server/database';
@@ -14,17 +8,9 @@ import { type AppliedSuggestion, type Quest } from '@server/database';
 import { AiResultRepository } from './ai-result.repository';
 import { AppliedSuggestionRepository } from './applied-suggestion.repository';
 
-/**
- * Defining types
- */
-
 interface Suggestion {
   questId?: string | number;
 }
-
-/**
- * Declaring the constants
- */
 
 /** JSON-safe snapshot of the fields a Quest edit could plausibly touch — the raw Drizzle row carries bigints and Dates neither `jsonb` value round-trips as-is. */
 function toQuestSnapshot(quest: Quest.Row): Record<string, unknown> {

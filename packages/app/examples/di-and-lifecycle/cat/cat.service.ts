@@ -1,23 +1,9 @@
-/**
- * Importing npm packages
- */
 import { type ForwardRef, forwardRef, Inject, Injectable, OnApplicationReady, OnApplicationStop, OnModuleDestroy, OnModuleInit } from '@shadow-library/app';
 
-/**
- * Importing user defined packages
- */
 import { OutputService } from '../common/output.service';
 import { StorageService } from '../common/storage.service';
 import { DogService } from '../dog/dog.service';
 import { CatInternalService } from './cat-internal.service';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Injectable()
 export class CatService implements OnModuleInit, OnModuleDestroy, OnApplicationReady, OnApplicationStop {

@@ -1,18 +1,8 @@
-/**
- * Importing npm packages
- */
 import { randomBytes } from 'node:crypto';
 
-/**
- * Importing user defined packages
- */
 import { pulseDb, requireProductUrl } from '../../lib';
 import { expect, test } from './fixtures';
 import { createPublishedTemplate, insertNotificationJob, insertNotificationMessage } from './helpers';
-
-/**
- * Defining types
- */
 
 /**
  * Declaring the constants

@@ -1,21 +1,11 @@
-/**
- * Importing npm packages
- */
 import crypto from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 import postgres, { type Sql } from 'postgres';
 
-/**
- * Importing user defined packages
- */
 import { loadDotEnv } from '../lib/load-env';
 import { ADMIN_EMAIL, AUTH_DIR, type Persona, PERSONAS, SEED_MANIFEST_PATH, type SeedManifest, type SeedManifestUser } from '../lib/personas';
-
-/**
- * Defining types
- */
 
 /** The five platform databases this seed populates, keyed by logical name. */
 type DatabaseKey = 'identity' | 'memoir' | 'pulse' | 'webNovel' | 'novelForge';

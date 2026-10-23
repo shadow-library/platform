@@ -1,16 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type CookieSerializeOptions } from '@fastify/cookie';
 import { type DurationLike } from 'luxon';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 
 export interface CSRFOptions {
   disabled?: boolean;

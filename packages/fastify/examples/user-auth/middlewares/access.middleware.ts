@@ -1,21 +1,7 @@
-/**
- * Importing npm packages
- */
 import { HandlerMetadata } from '@shadow-library/app';
 import { AsyncRouteHandler, ContextService, Middleware, MiddlewareGenerator, ServerErrorCode } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { User } from '../user.service';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Middleware()
 export class AccessMiddleware implements MiddlewareGenerator {

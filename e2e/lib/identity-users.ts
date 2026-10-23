@@ -1,18 +1,8 @@
-/**
- * Importing npm packages
- */
 import { randomBytes } from 'node:crypto';
 
-/**
- * Importing user defined packages
- */
 import { deletePulseNotificationsTo, identityDb } from './db';
 import { PERSONAS } from './personas';
 import { deleteAuthFlowsFor, redisDel } from './redis';
-
-/**
- * Defining types
- */
 
 export type UserStatus = 'ACTIVE' | 'INACTIVE' | 'DISABLED' | 'BLOCKED' | 'SUSPENDED' | 'CLOSED';
 

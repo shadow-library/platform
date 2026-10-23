@@ -1,15 +1,4 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { ErrorCode } from '@lib/errors';
-
-/**
- * Defining types
- */
 
 /**
  * Declaring the constants

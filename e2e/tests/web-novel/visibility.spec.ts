@@ -1,16 +1,6 @@
-/**
- * Importing npm packages
- */
 import { expect, test } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { apiContext, readSeedManifest } from '../../lib';
-
-/**
- * Defining types
- */
 
 /**
  * Declaring the constants

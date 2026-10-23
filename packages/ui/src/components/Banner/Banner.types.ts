@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type ComponentPropsWithoutRef, type ReactNode } from 'react';
 
-/**
- * Defining types
- */
 export type BannerIntent = 'info' | 'success' | 'warning' | 'danger';
 
 /** The single action — a link or a callback. A second action means it's a Dialog's job. */

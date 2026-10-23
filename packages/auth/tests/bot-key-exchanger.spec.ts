@@ -1,26 +1,13 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { AuthErrorCode, type AuthPrincipal, BotKeyExchanger, type BotPrincipal, BotRateLimiter, formatBotKey } from '@shadow-library/auth';
 import { AppError } from '@shadow-library/common';
-
-/**
- * Defining types
- */
 
 interface ExchangeCall {
   botKey: string;
   clientIp?: string;
 }
 
-/**
- * Declaring the constants
- */
 const START = 1_700_000_000_000;
 const IP = '203.0.113.7';
 const KEY_UUID = '0190f5a2-7c3e-7d4b-9a1f-2b3c4d5e6f70';

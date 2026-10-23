@@ -1,14 +1,3 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 export interface ManifestIcon {
   src: string;
   sizes: string;
@@ -72,9 +61,6 @@ export interface HeadMeta {
   content: string;
 }
 
-/**
- * Declaring the constants
- */
 const MANIFEST_DEFAULTS = { start_url: '/', scope: '/', display: 'standalone' } as const satisfies Partial<WebAppManifest>;
 
 /**

@@ -1,18 +1,8 @@
-/**
- * Importing npm packages
- */
 import { type APIResponse } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { addOrganisationMember, assignApplicationRole, findApplicationRoleId, findSetCookie, identityMutate, mutate, pollUntil, requireProductUrl } from '../../lib';
 import { expect, test, untilIdentityAdmits } from './forge-actors';
 import { expectCode } from './forge-arrange';
-
-/**
- * Defining types
- */
 
 interface SessionBody {
   readonly sub: string;

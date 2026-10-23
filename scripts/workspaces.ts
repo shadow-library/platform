@@ -1,16 +1,7 @@
-/**
- * Importing npm packages
- */
 import path from 'node:path';
 
-/**
- * Importing user defined packages
- */
 import { type PackageExport, type PackageJson, readPackageJson, ShadowError } from './utils/index.ts';
 
-/**
- * Defining types
- */
 /**
  * What a workspace is, which decides how `build.ts` builds it:
  *  - `library`   — a package consumed by other workspaces → `tsc` + `tsc-alias` into a flat `dist/` with exports.
@@ -84,9 +75,6 @@ export interface Workspace {
   dependencies: string[];
 }
 
-/**
- * Declaring the constants
- */
 /** The monorepo root — `scripts/` sits directly below it, so this holds wherever the repo is checked out. */
 export const REPO_ROOT = path.resolve(import.meta.dir, '..');
 

@@ -1,16 +1,5 @@
-/**
- * Importing npm packages
- */
 import 'reflect-metadata';
 import deepmerge, { type Options as DeepMergeOpts } from 'deepmerge';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 
 type MetadataKey = string | symbol;
 
@@ -20,10 +9,6 @@ export interface UpdateMetadataOptions {
    */
   arrayStrategy?: 'merge' | 'replace';
 }
-
-/**
- * Declaring the constants
- */
 
 class ReflectorService {
   decorate = Reflect.decorate;

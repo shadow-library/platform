@@ -1,25 +1,11 @@
-/**
- * Importing npm packages
- */
 import { and, asc, eq, gt, type SQL } from 'drizzle-orm';
 import { type AnyPgTable } from 'drizzle-orm/pg-core';
 import { Injectable } from '@shadow-library/app';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { type Account, type PrimaryDatabase, schema } from '@server/database';
 
 import { type ExportTableEntry } from './export-table-registry';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 /**
  * The export assembler's machine-path reader: like `RolloverRepository`, it deliberately sits outside

@@ -1,18 +1,8 @@
-/**
- * Importing npm packages
- */
 import { type ReactNode } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { useHydrated } from '@/hooks';
 
 import { type ClientOnlyProps } from './ClientOnly.types';
-
-/**
- * Declaring the constants
- */
 
 /**
  * Renders its children only after the client has mounted. `useHydrated` is `false` on the server and

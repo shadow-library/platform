@@ -1,19 +1,4 @@
-/**
- * Importing npm packages
- */
 import { useCallback, useSyncExternalStore } from 'react';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 /**
  * Tracks a CSS media query, re-rendering when it flips. SSR- and pre-hydration-safe: the server

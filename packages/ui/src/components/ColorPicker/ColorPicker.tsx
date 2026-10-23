@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import * as Popover from '@radix-ui/react-popover';
 import { type KeyboardEvent, type PointerEvent, type ReactElement, useState } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { useControllableState } from '@/hooks';
 import { CheckIcon, ChevronDownIcon } from '@/icons';
 import { cn } from '@/lib';
@@ -14,9 +8,6 @@ import { cn } from '@/lib';
 import styles from './ColorPicker.module.css';
 import { type ColorPickerProps } from './ColorPicker.types';
 
-/**
- * Declaring the constants
- */
 const DEFAULT_PALETTE = [
   { label: 'Red', value: '#dc2626' },
   { label: 'Orange', value: '#ea580c' },

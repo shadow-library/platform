@@ -1,21 +1,11 @@
-/**
- * Importing npm packages
- */
 import { type APIResponse } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { mutate } from '../../lib';
 import { readForgeLedger, readForgePublication, readPublishJob, reviseForgeChapter, settlePublishJob } from '../web-novel/forge-publication';
 import { type ForgeActor } from './forge-actors';
 import { expectCode } from './forge-arrange';
 import { buildBundle, expect, holdForgeSlug, ladderSlugs, setPublicationAuthor, test } from './forge-bundles';
 import { uniqueSuffix } from './forge-helpers';
-
-/**
- * Defining types
- */
 
 interface PublicationView {
   novelSlug: string;

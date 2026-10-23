@@ -1,20 +1,10 @@
-/**
- * Importing npm packages
- */
 import { Injectable } from '@shadow-library/app';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { type AiConsent } from '@server/database';
 
 import { type AiConsentDecision, AiConsentRepository } from './ai-consent.repository';
 import { type AiConsentGrantDto, type AiConsentUpdateDto } from './ai.dto';
-
-/**
- * Defining types
- */
 
 export interface AiConsentView {
   dataClass: AiConsent.DataClass;
@@ -22,10 +12,6 @@ export interface AiConsentView {
   grantedAt: Date | null;
   withdrawnAt: Date | null;
 }
-
-/**
- * Declaring the constants
- */
 
 const CONSENT_DATA_CLASSES: AiConsent.DataClass[] = ['journal_reflection_reason', 'health'];
 

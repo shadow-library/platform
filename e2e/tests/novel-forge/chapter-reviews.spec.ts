@@ -1,21 +1,11 @@
-/**
- * Importing npm packages
- */
 import { createHash } from 'node:crypto';
 
-/**
- * Importing user defined packages
- */
 import { mutate, novelForgeDb } from '../../lib';
 import { expect, test } from './forge-actors';
 import { expectCode } from './forge-arrange';
 import { assertSpendGuarded, listDispatchedModelCalls } from './forge-db';
 import { pollJobStatus, saveChapter, startNextChapter, writeChapterByHand } from './forge-helpers';
 import { createGuardedProject } from './forge-story';
-
-/**
- * Defining types
- */
 
 interface ReviewFinding {
   readonly id: string;

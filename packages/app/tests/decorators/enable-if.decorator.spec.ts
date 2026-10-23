@@ -1,22 +1,8 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 import { Reflector } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { INTERNAL_OPERATION_METADATA } from '@lib/constants';
 import { EnableIf } from '@shadow-library/app';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 describe('EnableIf Decorator', () => {
   it('should add enableIf metadata to a class', () => {

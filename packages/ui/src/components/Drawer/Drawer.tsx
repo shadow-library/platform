@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { type KeyboardEvent, useContext, useId } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { cn } from '@/lib';
 
 import { Button } from '../Button';
@@ -15,9 +9,6 @@ import { DrawerContext } from './Drawer.context';
 import styles from './Drawer.module.css';
 import { type DrawerBodyProps, type DrawerFooterProps, type DrawerHeaderProps, type DrawerProps } from './Drawer.types';
 
-/**
- * Declaring the constants
- */
 function CloseIcon() {
   return (
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" aria-hidden="true">

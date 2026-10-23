@@ -1,21 +1,11 @@
-/**
- * Importing npm packages
- */
 import { createHash, randomBytes } from 'node:crypto';
 
 import { type APIRequestContext, type BrowserContext, request } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { clientIpHeaders } from './client-ip';
 import { identityDb } from './db';
 import { requireProductUrl } from './env';
 import { evictSessionCache } from './redis';
-
-/**
- * Defining types
- */
 
 export type SessionAal = 'AAL1' | 'AAL2';
 

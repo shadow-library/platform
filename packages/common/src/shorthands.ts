@@ -1,20 +1,4 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
 export type TryResult<TError, TResult> = { success: true; data: TResult } | { success: false; error: TError };
-
-/**
- * Declaring the constants
- */
 
 export function throwError(error: Error): never {
   throw error;

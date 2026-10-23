@@ -1,23 +1,9 @@
-/**
- * Importing npm packages
- */
 import { afterAll, beforeAll, beforeEach, describe, expect, it, jest } from 'bun:test';
 import { Dispatcher, Module, ShadowApplication, ShadowFactory } from '@shadow-library/app';
 import { Field, Schema } from '@shadow-library/class-schema';
 
-/**
- * Importing user defined packages
- */
 import { FASTIFY_CONFIG, FASTIFY_INSTANCE } from '@lib/constants';
 import { Body, ContextService, FastifyModule, FastifyRouter, HttpController, Post, RespondFor } from '@shadow-library/fastify';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 describe('FastifyModule', () => {
   beforeEach(() => {

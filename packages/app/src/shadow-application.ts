@@ -1,19 +1,9 @@
-/**
- * Importing npm packages
- */
 import { Class } from 'type-fest';
 import { AppError, Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { NAMESPACE } from './constants';
 import { InstanceWrapper, ModuleRef, ModuleRegistry } from './injector';
 import { Provider, ProviderToken, TokenValue } from './interfaces';
-
-/**
- * Defining types
- */
 
 export interface ShadowApplicationOptions {
   enableShutdownHooks?: false | NodeJS.Signals[];
@@ -25,9 +15,6 @@ export interface ShadowApplicationOptions {
   overrides?: Provider[];
 }
 
-/**
- * Declaring the constants
- */
 const DEFAULT_OPTIONS: ShadowApplicationOptions = { enableShutdownHooks: ['SIGINT', 'SIGTERM'] };
 
 export class ShadowApplication {

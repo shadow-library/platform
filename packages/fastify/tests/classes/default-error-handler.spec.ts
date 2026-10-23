@@ -1,22 +1,8 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it, jest } from 'bun:test';
 import { errorCodes } from 'fastify';
 import { AppError, Config, Logger, ValidationError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { DefaultErrorHandler, sanitizeCause, ServerErrorCode } from '@shadow-library/fastify';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 describe('DefaultErrorHandler', () => {
   const request = {} as any;

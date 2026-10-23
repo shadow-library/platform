@@ -1,20 +1,4 @@
 /**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
-
-/**
  * Decorator that assigns metadata to the class/function using the
  * specified `key`.
  *

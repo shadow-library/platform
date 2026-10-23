@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { forwardRef, useContext, useMemo, useState } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { useMediaQuery } from '@/hooks';
 import { cn, mergeRefs } from '@/lib';
 
@@ -14,9 +8,6 @@ import { ShellContentContext, ShellMobileNavAreaContext, ShellMobileNavContext }
 import styles from './Shell.module.css';
 import { type PageProps, type ShellNav, type ShellProps } from './Shell.types';
 
-/**
- * Declaring the constants
- */
 const NO_SHELL_NAV: ShellNav = { hasSidebar: false, open: false, setOpen: () => undefined };
 
 /**

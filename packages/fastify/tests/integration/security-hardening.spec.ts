@@ -1,21 +1,8 @@
-/**
- * Importing npm packages
- */
 import { afterAll, beforeAll, describe, expect, it, jest } from 'bun:test';
 import { Dispatcher, Module, ShadowApplication, ShadowFactory } from '@shadow-library/app';
 
-/**
- * Importing user defined packages
- */
 import { Body, FastifyModule, FastifyRouter, Get, HttpController, type HttpRequest, Post, Req } from '@shadow-library/fastify';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const SPOOFED_IP = '1.2.3.4';
 const PROXY_ATTACHED_IP = '203.0.113.7';
 

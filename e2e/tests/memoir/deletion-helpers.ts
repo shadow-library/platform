@@ -1,20 +1,10 @@
-/**
- * Importing npm packages
- */
 import { randomUUID } from 'node:crypto';
 
 import { type APIRequestContext, request } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { authorizeCode, createAppSessionApi, exchangeCode, findResourceScopeId, grantClientScope, memoirDb, type OAuthTestClient, pollUntil, stepUp } from '../../lib';
 import { type MemoirHarness, type MemoirPersona } from './fixtures';
 import { createDailyQuest, memoirMutate, submitCommand, todayLocal } from './helpers';
-
-/**
- * Defining types
- */
 
 export type DeletionState = 'none' | 'pending' | 'blobs_deleted' | 'data_deleted' | 'identity_closed' | 'done';
 
@@ -53,10 +43,6 @@ export interface ObjectFetch {
   readonly status: number;
   readonly body: Buffer;
 }
-
-/**
- * Declaring the constants
- */
 
 export const MEMOIR_AUDIENCE = 'api://memoir';
 export const ACCOUNT_SCOPE = 'memoir:account';

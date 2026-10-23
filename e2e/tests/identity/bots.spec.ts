@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { randomBytes } from 'node:crypto';
 
 import { type APIRequestContext, type APIResponse } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import {
   auditChain,
   botKeySecretHash,
@@ -31,10 +25,6 @@ import {
 } from '../../lib';
 import { expect, type IdentityHarness, teamMember, test } from './fixtures';
 import { expectErrorCode, expectRefused } from './helpers';
-
-/**
- * Defining types
- */
 
 interface BotUserItem {
   id: string;

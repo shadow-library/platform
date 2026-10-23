@@ -1,18 +1,8 @@
-/**
- * Importing npm packages
- */
 import { expect, test } from '@playwright/test';
 import { type TransactionSql } from 'postgres';
 
-/**
- * Importing user defined packages
- */
 import { novelForgeDb } from '../../lib';
 import { uniqueSuffix } from './forge-helpers';
-
-/**
- * Defining types
- */
 
 class ThrowawayInsertError extends Error {
   override readonly name = 'ThrowawayInsertError';

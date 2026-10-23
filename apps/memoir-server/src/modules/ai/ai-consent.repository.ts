@@ -1,27 +1,13 @@
-/**
- * Importing npm packages
- */
 import { and, eq, isNotNull, isNull, TransactionRollbackError } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 
-/**
- * Importing user defined packages
- */
 import { OwnerScopedRepository } from '@modules/auth';
 import { type AiConsent, nextSyncSeq, schema } from '@server/database';
-
-/**
- * Defining types
- */
 
 export interface AiConsentDecision {
   dataClass: AiConsent.DataClass;
   granted: boolean;
 }
-
-/**
- * Declaring the constants
- */
 
 const CONSENT_KEY = [schema.aiConsents.accountId, schema.aiConsents.dataClass];
 

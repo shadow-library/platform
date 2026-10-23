@@ -1,15 +1,4 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { AuthErrorCode } from '../errors';
-
-/**
- * Defining types
- */
 
 export type SameSitePolicy = 'Lax' | 'Strict' | 'None';
 

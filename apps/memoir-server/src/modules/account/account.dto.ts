@@ -1,20 +1,6 @@
-/**
- * Importing npm packages
- */
 import { Field, Integer, Schema } from '@shadow-library/class-schema';
 
-/**
- * Importing user defined packages
- */
 import { AuthProvider, DeletionState, IntensityMode, Theme, WarmthState } from '@server/classes';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 /** A pattern rather than `format: 'date-time'`-adjacent IANA validation — the class-schema layer has no timezone format; `AccountService` validates via `Intl.DateTimeFormat`. */
 const CURRENCY_PATTERN = '^[A-Za-z]{3}$';

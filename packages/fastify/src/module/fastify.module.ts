@@ -1,14 +1,8 @@
-/**
- * Importing npm packages
- */
 import { v4 as uuid } from 'uuid';
 import { Dispatcher, DynamicModule, Module, Provider, ProviderToken } from '@shadow-library/app';
 import { ClassSchema } from '@shadow-library/class-schema';
 import { Config, utils } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { DefaultErrorHandler } from '../classes';
 import { FASTIFY_CONFIG, FASTIFY_INSTANCE } from '../constants';
 import { ContextService } from '../services';
@@ -16,14 +10,6 @@ import { DevErrorResponseDto, ErrorResponseDto } from './error-response.dto';
 import { FastifyConfig, FastifyModuleAsyncOptions, FastifyModuleOptions } from './fastify-module.interface';
 import { FastifyRouter } from './fastify-router';
 import { collapseDuplicatePathSlashes, createFastifyInstance } from './fastify.utils';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Module({})
 export class FastifyModule {

@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import { Authenticated, RequireScope } from '@shadow-library/auth/module';
 import { Body, Delete, Get, HttpController, HttpStatus, Params, Post, Put, RespondFor } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { type AiScheduledQuery, type AiTask, type AppliedSuggestion } from '@server/database';
 
 import { AiConsentService, type AiConsentView } from './ai-consent.service';
@@ -25,14 +19,6 @@ import {
   AiTaskSubmitDto,
   AppliedSuggestionResponseDto,
 } from './ai.dto';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @HttpController('/api/v1/ai')
 @Authenticated()

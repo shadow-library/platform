@@ -1,21 +1,7 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 import { ClassSchema, Field, Schema } from '@shadow-library/class-schema';
 
-/**
- * Importing user defined packages
- */
 import { Transform } from '@shadow-library/fastify';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 describe('@Transform', () => {
   it('should add transform metadata to a field', () => {

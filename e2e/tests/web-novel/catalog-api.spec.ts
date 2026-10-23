@@ -1,19 +1,9 @@
-/**
- * Importing npm packages
- */
 import { createHash, randomBytes } from 'node:crypto';
 
 import { expect, test } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { apiContext, readSeedManifest } from '../../lib';
 import { arrangeNovel, deleteNovels, readAccessMode, uniqueNovelSlug, updateServedChapter } from './helpers';
-
-/**
- * Defining types
- */
 
 /**
  * Declaring the constants

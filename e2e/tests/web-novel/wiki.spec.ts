@@ -1,17 +1,6 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { apiContext, readSeedManifest } from '../../lib';
 import { expect, test } from './fixtures';
 import { arrangeNovel, arrangeWikiEntry, deleteNovels, fakeImageRef, grantNovel, readAccessMode, setFurthestOrdinal, uniqueNovelSlug, UNKNOWN_SLUG } from './helpers';
-
-/**
- * Defining types
- */
 
 /**
  * Declaring the constants

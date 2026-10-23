@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type APIRequestContext, request } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { clientIpHeaders } from './client-ip';
 import { identityDb } from './db';
 import { requireProductUrl } from './env';
@@ -13,10 +7,6 @@ import { addOrganisationMember, findPlatformOrganisationId } from './identity-or
 import { assignApplicationRole, createApplicationRole, findApplicationIdByName } from './identity-roles';
 import { createIdentitySession, type IdentitySession, identityStorageState, type SessionAal } from './identity-sessions';
 import { createIdentityUser, deleteIdentityUser, type IdentityUser } from './identity-users';
-
-/**
- * Defining types
- */
 
 export interface PulseStaffOptions {
   /** Readable tag embedded in the generated email and role name, e.g. `logs-only`. */

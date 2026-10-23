@@ -1,23 +1,9 @@
-/**
- * Importing npm packages
- */
 import { and, asc, eq, gte, inArray, lt } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { OwnerScopedRepository } from '@modules/auth';
 import { type ExportJob, schema } from '@server/database';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Injectable()
 export class ExportJobRepository extends OwnerScopedRepository {

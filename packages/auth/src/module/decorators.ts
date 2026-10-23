@@ -1,18 +1,8 @@
-/**
- * Importing npm packages
- */
 import { Handler } from '@shadow-library/app';
 import { Reflector } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { AuthErrorCode } from '../errors';
 import { AUTH_ROUTE_METADATA } from './constants';
-
-/**
- * Defining types
- */
 
 export type AuthRouteAccess = 'public' | 'optional' | 'required';
 

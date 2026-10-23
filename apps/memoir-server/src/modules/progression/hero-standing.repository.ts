@@ -1,28 +1,14 @@
-/**
- * Importing npm packages
- */
 import { and, between, eq } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { type DailyState, type PrimaryDatabase, type Quest, schema } from '@server/database';
-
-/**
- * Defining types
- */
 
 export interface ShieldHolder {
   strictness: Quest.Strictness;
   optionalStreakOptIn: boolean;
   shieldsAvailable: number;
 }
-
-/**
- * Declaring the constants
- */
 
 @Injectable()
 export class HeroStandingRepository {

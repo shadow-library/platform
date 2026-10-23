@@ -1,19 +1,4 @@
-/**
- * Importing npm packages
- */
 import { Injectable, OnApplicationReady, OnApplicationStop, OnModuleDestroy, OnModuleInit } from '@shadow-library/app';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 const DIVIDER = '-'.repeat(60);
 

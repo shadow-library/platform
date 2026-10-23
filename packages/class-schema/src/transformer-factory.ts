@@ -1,19 +1,9 @@
-/**
- * Importing npm packages
- */
 import assert from 'node:assert';
 
 import { AppError, MaybeNull } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { ClassSchema } from './class-schema';
 import { JSONSchema, JSONSchemaType, ParsedSchema } from './interfaces';
-
-/**
- * Defining types
- */
 
 export interface TransformerContext {
   parent: object;
@@ -58,9 +48,6 @@ interface FieldDefinition {
   variants: Record<string, FieldVariantSpec>;
 }
 
-/**
- * Declaring the constants
- */
 const noop: Transformer = value => value;
 
 /** Renders a bracketed member access so arbitrary keys (kebab-case, quotes, reserved words) stay valid in generated code */

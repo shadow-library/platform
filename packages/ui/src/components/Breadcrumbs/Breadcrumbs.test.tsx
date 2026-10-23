@@ -1,19 +1,8 @@
-/**
- * Importing npm packages
- */
-
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { Breadcrumbs } from './Breadcrumbs';
-
-/**
- * Declaring the constants
- */
 
 describe('Breadcrumbs', () => {
   it('renders the WAI-ARIA breadcrumb structure', () => {

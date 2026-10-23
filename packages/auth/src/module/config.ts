@@ -1,19 +1,9 @@
-/**
- * Importing npm packages
- */
 import { Config, Logger, utils } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { NAMESPACE } from '../constants';
 import { type AuthAccessMode, type AuthClientConfig } from '../interfaces';
 import { assertValidCookieName, type CookieAttributes, type SameSitePolicy } from './cookie';
 import { LOGIN_STATE_TTL_SECONDS } from './login-state';
-
-/**
- * Defining types
- */
 
 declare module '@shadow-library/common' {
   export interface ConfigRecords {

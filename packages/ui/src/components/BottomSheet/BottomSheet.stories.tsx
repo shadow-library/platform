@@ -1,18 +1,9 @@
-/**
- * Importing npm packages
- */
 import { type Meta, type StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { Button } from '../Button';
 import { BottomSheet } from './BottomSheet';
 
-/**
- * Declaring the constants
- */
 const meta = {
   title: 'Components/BottomSheet',
   component: BottomSheet,

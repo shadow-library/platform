@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { randomBytes } from 'node:crypto';
 
 import { type APIRequestContext, type APIResponse } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import {
   authorize,
   type AuthorizeRedirect,
@@ -22,10 +16,6 @@ import {
 } from '../../lib';
 import { expect, test } from './fixtures';
 import { expectErrorCode } from './helpers';
-
-/**
- * Defining types
- */
 
 type ConsentDecision = 'APPROVE' | 'DENY';
 

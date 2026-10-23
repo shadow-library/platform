@@ -1,22 +1,12 @@
-/**
- * Importing npm packages
- */
 import { createHash } from 'node:crypto';
 
 import { type APIRequestContext, type APIResponse } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { mutate, novelForgeDb } from '../../lib';
 import { expect } from './forge-actors';
 import { assertSpendGuarded, ForgeDbError } from './forge-db';
 import { type Draft } from './forge-helpers';
 import { readyFinalizeReview } from './forge-story';
-
-/**
- * Defining types
- */
 
 export type ReviewCategory = 'entity' | 'appearance' | 'character_state' | 'relationship' | 'promise' | 'knowledge' | 'milestone' | 'summary';
 

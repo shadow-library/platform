@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type KnipConfig } from 'knip';
 
-/**
- * Declaring the constants
- */
 /**
  * Every package publishes from `dist/`, so knip cannot follow its `exports` map back to source. Each
  * package therefore lists the `src/` file behind every subpath export — anything else in the package is

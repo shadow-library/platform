@@ -1,23 +1,9 @@
-/**
- * Importing npm packages
- */
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 import { Inject, Injectable } from '@shadow-library/app';
 
-/**
- * Importing user defined packages
- */
 import { type ConfigModuleOptions } from './config.module';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Injectable()
 export class ConfigService {

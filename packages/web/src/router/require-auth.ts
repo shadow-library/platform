@@ -1,27 +1,14 @@
-/**
- * Importing npm packages
- */
 import { type EnsureQueryDataOptions, type QueryClient, type QueryKey } from '@tanstack/react-query';
 import { redirect } from '@tanstack/react-router';
 
-/**
- * Importing user defined packages
- */
 import { isApiError } from '../lib/api-error';
 
-/**
- * Defining types
- */
 export interface RequireAuthOptions {
   /** Where to send an unauthenticated visitor, e.g. `/login`. */
   loginTo: string;
   /** The destination to preserve as a `returnTo` search param. */
   returnTo: string;
 }
-
-/**
- * Declaring the constants
- */
 
 /**
  * The SSR-safe auth gate for protected route groups. Run from `beforeLoad`, it ensures `query` server-side

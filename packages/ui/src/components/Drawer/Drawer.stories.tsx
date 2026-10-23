@@ -1,20 +1,10 @@
-/**
- * Importing npm packages
- */
-
 import { type Meta, type StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { Button } from '../Button';
 import { Drawer } from './Drawer';
 import { type DrawerPlacement } from './Drawer.types';
 
-/**
- * Declaring the constants
- */
 const meta = {
   title: 'Components/Drawer',
   component: Drawer,

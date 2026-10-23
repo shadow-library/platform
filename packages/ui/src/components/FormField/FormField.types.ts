@@ -1,15 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type HTMLAttributes, type ReactNode } from 'react';
 
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 export interface FormFieldProps extends Omit<HTMLAttributes<HTMLDivElement>, 'children'> {
   /** Field label, rendered above the control and linked via `htmlFor`. */
   label?: ReactNode;

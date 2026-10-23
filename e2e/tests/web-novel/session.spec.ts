@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { createHash } from 'node:crypto';
 
 import { type APIResponse } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { findPlatformOrganisationId, findSetCookie, readSessionStatus, requireProductUrl } from '../../lib';
 import { expect, test } from './fixtures';
 import {
@@ -20,10 +14,6 @@ import {
   WEB_NOVEL_SESSION_COOKIE,
   webNovelMutate,
 } from './helpers';
-
-/**
- * Defining types
- */
 
 interface PendingLogin {
   state: string;

@@ -1,19 +1,9 @@
-/**
- * Importing npm packages
- */
 import { type ChangeEvent, forwardRef, useCallback, useEffect, useId, useRef, useState } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { cn, mergeRefs } from '@/lib';
 
 import styles from './Textarea.module.css';
 import { type TextareaProps } from './Textarea.types';
-
-/**
- * Declaring the constants
- */
 
 /** Clamp the element's height to its content between minRows and maxRows, toggling internal scroll. */
 function fitToContent(el: HTMLTextAreaElement, twin: HTMLTextAreaElement, minRows: number, maxRows: number): void {

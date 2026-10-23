@@ -1,19 +1,4 @@
-/**
- * Importing npm packages
- */
 import { type ClassValue, clsx } from 'clsx';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 /**
  * Composes conditional class names. With CSS Modules there are no utility-class conflicts to

@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import { Injectable } from '@shadow-library/app';
 import { AppError, Config, Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { AccountContext } from '@modules/auth';
 import { CommandBus, type CommandEnvelope, RolloverGate } from '@modules/commands';
 import { AppErrorCode } from '@server/classes';
@@ -16,10 +10,6 @@ import { logMetric, pseudoAccountId, TelemetryService } from '@server/telemetry'
 import { DeltaRepository } from './delta.repository';
 import { DeltaSourceRegistry } from './delta-source.registry';
 import { type DeltaPage, type DeltaRow } from './sync.types';
-
-/**
- * Defining types
- */
 
 export interface BatchOutcome {
   commandId: string;
@@ -34,10 +24,6 @@ export interface DeltaRequest {
   domains?: string[];
   limit?: number;
 }
-
-/**
- * Declaring the constants
- */
 
 @Injectable()
 export class SyncService {

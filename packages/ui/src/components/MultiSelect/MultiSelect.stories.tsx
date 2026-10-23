@@ -1,19 +1,9 @@
-/**
- * Importing npm packages
- */
-
 import { type Meta, type StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { MultiSelect } from './MultiSelect';
 import { type MultiSelectOption } from './MultiSelect.types';
 
-/**
- * Declaring the constants
- */
 const teams: MultiSelectOption[] = [
   { value: 'design', label: 'Design' },
   { value: 'platform', label: 'Platform' },

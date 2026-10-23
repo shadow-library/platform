@@ -1,15 +1,4 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { type AsyncModuleOptions } from '../internal.utils';
-
-/**
- * Defining types
- */
 
 declare module '@shadow-library/common' {
   export interface ConfigRecords {

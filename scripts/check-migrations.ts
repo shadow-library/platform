@@ -1,21 +1,7 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { runDbCommand } from './db.ts';
 import { log, reportError, run, ShadowError } from './utils/index.ts';
 import { findWorkspace, MIGRATIONS_DIR, type Workspace } from './workspaces.ts';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const USAGE = `Usage: bun scripts/check-migrations.ts <workspace>
 
   workspace   repo-relative directory (apps/identity-server) or package name`;

@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { APIRequest, type APIResponse, AppError, Logger, ServiceDiscovery, throwError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { NAMESPACE } from '../constants';
 import { AuthErrorCode } from '../errors';
 import {
@@ -46,10 +40,6 @@ import { ServiceAccessClient } from './service-access';
 import { ServiceTokenManager } from './token-manager';
 import { assertValidTimeout, retryAfterSecondsOf, TOO_MANY_REQUESTS, withTimeout } from './transport';
 
-/**
- * Defining types
- */
-
 interface IntrospectionResponse {
   active?: boolean;
   sub?: string;
@@ -68,9 +58,6 @@ interface TokenExchangeResponse {
   audience?: string;
 }
 
-/**
- * Declaring the constants
- */
 const DEFAULT_CLOCK_SKEW_SECONDS = 60;
 const DEFAULT_JWKS_TTL_SECONDS = 43_200;
 const DEFAULT_DECISION_TTL_SECONDS = 900;

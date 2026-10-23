@@ -1,16 +1,5 @@
-/**
- * Importing npm packages
- */
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 
 /** Every seeded identity persona — the four that receive a saved browser session plus the two negative-path accounts. */
 export type Persona = 'user1' | 'user2' | 'viewer' | 'admin' | 'locked' | 'suspended';

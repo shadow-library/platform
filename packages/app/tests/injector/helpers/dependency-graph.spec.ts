@@ -1,21 +1,7 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import '@shadow-library/app';
 import { DependencyGraph } from '@lib/injector';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 describe('DependencyGraph', () => {
   let graph: DependencyGraph<string>;

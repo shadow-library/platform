@@ -1,15 +1,3 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
 export interface MaskOptions {
   /** Character to use for masking. Default: '*' */
   maskChar?: string;

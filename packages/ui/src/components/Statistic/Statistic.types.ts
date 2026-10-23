@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type ComponentPropsWithoutRef, type ReactNode } from 'react';
 
-/**
- * Defining types
- */
 export type StatisticSize = 'sm' | 'md' | 'lg';
 
 /** Which direction is the good one — declared, never inferred from the delta's sign. */

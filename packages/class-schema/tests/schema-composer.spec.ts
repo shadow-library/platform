@@ -1,20 +1,6 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { ClassSchema, Field, Schema, SchemaComposer } from '@shadow-library/class-schema';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 describe('Schema Composer', () => {
   @Schema({ $id: NativeUser.name })

@@ -1,17 +1,7 @@
-/**
- * Importing npm packages
- */
 import { type AnyPgColumn } from 'drizzle-orm/pg-core';
 
-/**
- * Importing user defined packages
- */
 import { type OwnedTable } from '@modules/auth';
 import { schema } from '@server/database';
-
-/**
- * Defining types
- */
 
 /**
  * One entry per user-owned table the export assembler streams (ARCHITECTURE §20). `cursor` is a column

@@ -1,16 +1,6 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { AppError, FlowDefinition, FlowManager, FlowState } from '@shadow-library/common';
-
-/**
- * Defining types
- */
 
 type OrderState = 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
 
@@ -20,10 +10,6 @@ interface OrderContext {
   totalAmount: number;
   trackingNumber?: string;
 }
-
-/**
- * Declaring the constants
- */
 
 const orderFlowDefinition: FlowDefinition<OrderState, OrderContext> = {
   name: 'OrderFlow',

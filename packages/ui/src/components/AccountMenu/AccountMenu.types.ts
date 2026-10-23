@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type ComponentPropsWithoutRef, type ReactNode } from 'react';
 
-/**
- * Defining types
- */
 export interface AccountMenuItem {
   /** Stable identity for the row — also the React key. */
   id: string;

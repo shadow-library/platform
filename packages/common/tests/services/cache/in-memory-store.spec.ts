@@ -1,20 +1,6 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { AppError, InMemoryStore } from '@shadow-library/common';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 describe('InMemoryStore', () => {
   let store: InMemoryStore;

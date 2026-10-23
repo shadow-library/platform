@@ -1,20 +1,10 @@
-/**
- * Importing npm packages
- */
 import type Memcached from 'memcached';
 import type Redis from 'ioredis';
 
-/**
- * Importing user defined packages
- */
 import { DatabaseService } from '../database/database.service';
 import { type PostgresClient } from '../database/database.types';
 import { InMemoryRedis } from './in-memory-redis';
 import { TestingErrorCode } from './testing.errors';
-
-/**
- * Defining types
- */
 
 export interface FakeDatabaseOptions {
   /** Whatever stands in for the Drizzle client — usually a hand-built object with just the chain the unit calls */
@@ -25,10 +15,6 @@ export interface FakeDatabaseOptions {
 
   redis?: InMemoryRedis;
 }
-
-/**
- * Declaring the constants
- */
 
 /**
  * Stands in for a client nobody supplied. Services capture the client and even prepare statements in

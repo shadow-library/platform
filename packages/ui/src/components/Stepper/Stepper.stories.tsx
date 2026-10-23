@@ -1,17 +1,8 @@
-/**
- * Importing npm packages
- */
 import { type Meta, type StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { Stepper } from './Stepper';
 
-/**
- * Declaring the constants
- */
 const meta = {
   title: 'Components/Stepper',
   component: Stepper,

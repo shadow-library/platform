@@ -1,21 +1,7 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { INJECTABLE_METADATA } from '@lib/constants';
 import { Injectable } from '@shadow-library/app';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 describe('@Injectable', () => {
   class Data {}

@@ -1,15 +1,4 @@
-/**
- * Importing npm packages
- */
 import postgres, { type Sql } from 'postgres';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 
 /** The platform databases, keyed by the logical name that maps to both an env override and a physical db name. */
 type DatabaseKey = 'identity' | 'memoir' | 'pulse' | 'webNovel' | 'novelForge' | 'synapse';

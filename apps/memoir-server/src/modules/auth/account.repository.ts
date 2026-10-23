@@ -1,19 +1,9 @@
-/**
- * Importing npm packages
- */
 import { and, asc, eq, gt, inArray, isNull, lt, ne, or, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { type Account, type PrimaryDatabase, schema } from '@server/database';
-
-/**
- * Defining types
- */
 
 /** Captured once, at first contact, from identity's userinfo (ARCHITECTURE §9.1, §10.2); never re-fetched. */
 export interface ProfileSnapshot {
@@ -22,9 +12,6 @@ export interface ProfileSnapshot {
   photoUrl?: string | null;
 }
 
-/**
- * Declaring the constants
- */
 const DEFAULT_TIMEZONE = 'UTC';
 const DEFAULT_CURRENCY = 'USD';
 

@@ -1,18 +1,8 @@
-/**
- * Importing npm packages
- */
 import { randomUUID } from 'node:crypto';
 
-/**
- * Importing user defined packages
- */
 import { memoirDb, pollUntil } from '../../lib';
 import { expect, test } from './fixtures';
 import { createDailyQuest, dailyQuestDraft, type DeltaPage, getAccount, memoirMutate, pullFullDelta, submitCommand, todayLocal, waitersBlockedBy } from './helpers';
-
-/**
- * Defining types
- */
 
 interface CheckCase {
   readonly label: string;

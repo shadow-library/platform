@@ -1,15 +1,4 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { isApiError } from '../lib/api-error';
-
-/**
- * Defining types
- */
 
 /**
  * The query the identity provider appends when it turns a user away from an application it will not
@@ -25,10 +14,6 @@ export interface AccessDeniedSearch {
   application?: string;
   client_id?: string;
 }
-
-/**
- * Declaring the constants
- */
 
 /** RFC 6749 §4.1.2.1. The provider sends it verbatim, so callers compare against this rather than a literal. */
 export const ACCESS_DENIED = 'access_denied';

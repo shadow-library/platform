@@ -1,20 +1,10 @@
-/**
- * Importing npm packages
- */
-
 import { type Meta, type StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { Badge } from '../Badge';
 import { IconButton } from '../IconButton';
 import { Sidebar, useSidebar } from './Sidebar';
 
-/**
- * Declaring the constants
- */
 function Dot() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">

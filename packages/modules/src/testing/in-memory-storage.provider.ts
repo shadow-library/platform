@@ -1,25 +1,11 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { StorageErrorCode } from '../storage/storage.errors';
 import { type HeadResult, type StorageObject, type StorageProvider } from '../storage/storage.types';
-
-/**
- * Defining types
- */
 
 export interface InMemoryStorageProviderOptions {
   /** Origin the fake presigned URLs point at */
   presignOrigin?: string;
 }
 
-/**
- * Declaring the constants
- */
 const DEFAULT_PRESIGN_ORIGIN = 'https://presigned.storage.test';
 
 /**

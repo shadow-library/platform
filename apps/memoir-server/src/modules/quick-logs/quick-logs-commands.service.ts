@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { eq } from 'drizzle-orm';
 import { Injectable, type OnModuleInit } from '@shadow-library/app';
 import { AppError, ValidationError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { CommandBus, type CommandContext, type CommandResult, HeroLedger } from '@modules/commands';
 import { accountToday, formatLocalDate } from '@modules/rules';
 import { AppErrorCode } from '@server/classes';
@@ -22,19 +16,11 @@ import { findLinkageMatch, serializeLinkageMatch } from './quest-linkage';
 import { type SideQuestDraft, SideQuestRepository } from './side-quest.repository';
 import { WeightRepository } from './weight.repository';
 
-/**
- * Defining types
- */
-
 interface RewardOutcome {
   rewarded: boolean;
   xpAwarded: number;
   coinsAwarded: number;
 }
-
-/**
- * Declaring the constants
- */
 
 const JOURNAL_SAVE = 'journal.save';
 const MEAL_LOG = 'meal.log';

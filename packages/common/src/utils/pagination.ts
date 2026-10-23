@@ -1,16 +1,6 @@
-/**
- * Importing npm packages
- */
 import assert from 'node:assert';
 
-/**
- * Importing user defined packages
- */
 import { CursorPagination, NormalizedPagination, OffsetPagination, PagePagination, PaginationMode, PaginationResult, SortOrder } from '@lib/interfaces';
-
-/**
- * Defining types
- */
 
 export interface NormalizeOptions<T extends PaginationMode = PaginationMode> {
   mode: T;
@@ -27,10 +17,6 @@ export interface PaginationInput {
 }
 
 export type GetCursor<Item> = (item: Item) => string;
-
-/**
- * Declaring the constants
- */
 
 class PaginationUtils {
   normalise<T extends PaginationMode>(input: PaginationInput, options: NormalizeOptions<T>): NormalizedPagination<T> {

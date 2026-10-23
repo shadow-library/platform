@@ -1,9 +1,5 @@
 import { type NotificationOutbox } from '@server/database';
 
-/**
- * Defining types
- */
-
 interface AiResultReadyVariables {
   resultId: string;
   suggestionCount: number;
@@ -39,10 +35,6 @@ export interface NotificationCategoryDefinition {
   templateKey: string;
   prefKey: 'aiReadiness' | 'weeklyDigest' | 'billingReminders';
 }
-
-/**
- * Declaring the constants
- */
 
 /**
  * The complete, closed set of notification categories this app may ever send (ARCHITECTURE §17, T-34).

@@ -1,18 +1,8 @@
-/**
- * Importing npm packages
- */
 import { and, eq, lt } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 
-/**
- * Importing user defined packages
- */
 import { OwnerScopedRepository } from '@modules/auth';
 import { appendExpenseAudit, type DatabaseTransaction, type Receipt, schema } from '@server/database';
-
-/**
- * Defining types
- */
 
 export interface ReceiptCreate {
   ref: string;
@@ -20,10 +10,6 @@ export interface ReceiptCreate {
   contentType: string;
   sizeBytes: number;
 }
-
-/**
- * Declaring the constants
- */
 
 @Injectable()
 export class ReceiptRepository extends OwnerScopedRepository {

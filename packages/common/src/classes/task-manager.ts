@@ -1,20 +1,10 @@
-/**
- * Importing npm packages
- */
 import assert from 'node:assert';
 
-/**
- * Importing user defined packages
- */
 import { NAMESPACE } from '@lib/constants';
 import { Fn } from '@lib/interfaces';
 import { Logger } from '@lib/services';
 
 import { Task } from './task';
-
-/**
- * Defining types
- */
 
 export interface TaskManagerOptions {
   rollbackOnError: boolean;
@@ -22,10 +12,6 @@ export interface TaskManagerOptions {
 }
 
 export type ITask = Task<any> | Fn;
-
-/**
- * Declaring the constants
- */
 
 export class TaskManager {
   private static readonly logger = Logger.getLogger(NAMESPACE, 'TaskManager');

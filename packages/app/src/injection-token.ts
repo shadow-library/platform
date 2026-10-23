@@ -1,20 +1,4 @@
 /**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
-
-/**
  * A unique, typed provider token.
  *
  * Unlike a bare string or symbol, an `InjectionToken<T>` carries the type of the value it resolves to,

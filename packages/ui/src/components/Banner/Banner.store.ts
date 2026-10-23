@@ -1,11 +1,5 @@
-/**
- * Importing user defined packages
- */
 import { type BannerConfig, type BannerIntent } from './Banner.types';
 
-/**
- * Declaring the constants
- */
 type Listener = () => void;
 
 const SEVERITY: Record<BannerIntent, number> = { danger: 3, warning: 2, info: 1, success: 0 };

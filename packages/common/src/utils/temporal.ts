@@ -1,20 +1,5 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
 export type TimeUnit = 'ms' | 's' | 'm' | 'h';
 
-/**
- * Declaring the constants
- */
 const TimeUnitMultiplier: Record<TimeUnit, number> = {
   ms: 1,
   s: 1000,

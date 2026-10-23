@@ -1,18 +1,8 @@
-/**
- * Importing npm packages
- */
 import { Class } from 'type-fest';
 import { Reflector } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { getCounterId, METADATA_KEYS } from '@lib/constants';
 import { JSONSchema } from '@lib/interfaces';
-
-/**
- * Defining types
- */
 
 export interface SchemaOptions {
   /** ID of the schema */
@@ -41,10 +31,6 @@ export interface SchemaOptions {
   then?: JSONSchema;
   else?: JSONSchema;
 }
-
-/**
- * Declaring the constants
- */
 
 export function Schema(options: SchemaOptions = {}): ClassDecorator {
   const { additionalProperties, patternProperties, ...objectProperties } = options;

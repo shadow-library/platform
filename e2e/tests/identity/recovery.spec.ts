@@ -1,20 +1,10 @@
-/**
- * Importing npm packages
- */
 import { randomBytes } from 'node:crypto';
 
 import { type APIRequestContext } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { enrollTotp, findSessionBySecret, readSessionStatus, recoverInit, recoverReset, registerInit, signInWithPassword, uniqueEmail, verifyChallenge } from '../../lib';
 import { expect, test } from './fixtures';
 import { countOutboxRows, expectErrorCode, expectNoSessionCookie, expectSessionCookie, flowChallenges, flowStepOf, pollOtp } from './helpers';
-
-/**
- * Defining types
- */
 
 /**
  * Declaring the constants

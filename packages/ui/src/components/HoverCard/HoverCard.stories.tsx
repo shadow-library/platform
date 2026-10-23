@@ -1,19 +1,10 @@
-/**
- * Importing npm packages
- */
 import { type Meta, type StoryObj } from '@storybook/react-vite';
 
-/**
- * Importing user defined packages
- */
 import { Avatar } from '../Avatar';
 import { Badge } from '../Badge';
 import { Button } from '../Button';
 import { HoverCard } from './HoverCard';
 
-/**
- * Declaring the constants
- */
 const meta = {
   title: 'Components/HoverCard',
   component: HoverCard,

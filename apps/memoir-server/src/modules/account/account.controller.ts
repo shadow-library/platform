@@ -1,22 +1,8 @@
-/**
- * Importing npm packages
- */
 import { Authenticated, RequireScope } from '@shadow-library/auth/module';
 import { Body, Get, HttpController, Patch, Post, RespondFor } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { AccountPatchDto, AccountResponseDto, OnboardingDto } from './account.dto';
 import { AccountService, type AccountView } from './account.service';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @HttpController('/api/v1/account')
 @Authenticated()

@@ -1,16 +1,6 @@
-/**
- * Importing npm packages
- */
 import { Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { NAMESPACE } from '../constants';
-
-/**
- * Defining types
- */
 
 interface RegisteredSession {
   sub: string;

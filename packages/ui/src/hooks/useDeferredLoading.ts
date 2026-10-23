@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { useEffect, useRef, useState } from 'react';
 
-/**
- * Defining types
- */
 export interface DeferredLoadingOptions {
   /** Don't show loading UI until the wait exceeds this (ms) — instant responses never flash. @default 150 */
   grace?: number;

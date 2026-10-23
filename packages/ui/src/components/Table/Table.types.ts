@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type ReactNode } from 'react';
 
-/**
- * Defining types
- */
 export type TableAlign = 'start' | 'center' | 'end';
 export type SortDirection = 'asc' | 'desc';
 export type TableDensity = 'comfortable' | 'compact' | 'relaxed';

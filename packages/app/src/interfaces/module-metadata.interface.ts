@@ -1,21 +1,7 @@
-/**
- * Importing npm packages
- */
 import { Class } from 'type-fest';
 
-/**
- * Importing user defined packages
- */
 import { ForwardReference } from '../utils';
 import { Provider, ProviderToken } from './provider.interface';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 export type Import = Class<unknown> | ForwardReference<Class<unknown>> | DynamicModule;
 

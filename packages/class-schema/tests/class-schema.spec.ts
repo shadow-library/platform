@@ -1,25 +1,11 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
 import { Class } from 'type-fest';
 
-/**
- * Importing user defined packages
- */
 import { BRAND } from '@lib/constants';
 import { EnumType } from '@lib/enum-type';
 import { ClassSchema, Field, Integer, Schema } from '@shadow-library/class-schema';
 import { type AsType } from '@shadow-library/common';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 describe('ClassSchema', () => {
   @Schema({ $id: Sample.name })

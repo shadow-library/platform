@@ -1,18 +1,8 @@
-/**
- * Importing npm packages
- */
 import { SQL } from 'bun';
 import { drizzle } from 'drizzle-orm/bun-sql';
 import { migrate } from 'drizzle-orm/bun-sql/migrator';
 import { Config, Logger } from '@shadow-library/common';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const logger = Logger.getLogger('Scripts', 'Migrate');
 
 /**

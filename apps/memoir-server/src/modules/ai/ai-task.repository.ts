@@ -1,18 +1,8 @@
-/**
- * Importing npm packages
- */
 import { and, eq, gte, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 
-/**
- * Importing user defined packages
- */
 import { OwnerScopedRepository } from '@modules/auth';
 import { type AiTask, type DatabaseTransaction, schema } from '@server/database';
-
-/**
- * Defining types
- */
 
 export interface AiTaskDraft {
   id: string;
@@ -22,10 +12,6 @@ export interface AiTaskDraft {
   quotaMonth: string | null;
   quotaConsumed: boolean;
 }
-
-/**
- * Declaring the constants
- */
 
 @Injectable()
 export class AiTaskRepository extends OwnerScopedRepository {

@@ -1,20 +1,11 @@
-/**
- * Importing npm packages
- */
 import { type KeyboardEvent, type ReactElement, useEffect, useMemo, useRef, useState } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { useControllableState, useHydrated } from '@/hooks';
 import { addDays, addMonths, buildMonthMatrix, cn, DEFAULT_LOCALE, formatLongDate, isSameDay, parseISODate, startOfMonth, toISODate } from '@/lib';
 
 import styles from './Calendar.module.css';
 import { type CalendarProps, type CalendarValue, type DateRange } from './Calendar.types';
 
-/**
- * Declaring the constants
- */
 function ChevronLeft() {
   return (
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

@@ -1,20 +1,6 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { INBUILT_TRANSFORMERS } from '@lib/module/data-transformers';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 describe('data-transformers', () => {
   describe('string:trim', () => {

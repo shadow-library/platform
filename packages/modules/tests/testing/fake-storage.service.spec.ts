@@ -1,23 +1,10 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
 import { AppError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { StorageErrorCode } from '@shadow-library/modules/storage';
 import { FakeStorageService, InMemoryStorageProvider } from '@shadow-library/modules/testing';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const bytes = new TextEncoder().encode('fake storage');
 
 describe('FakeStorageService', () => {

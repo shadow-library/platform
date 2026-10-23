@@ -1,19 +1,9 @@
-/**
- * Importing npm packages
- */
 import { readFile } from 'node:fs/promises';
 
 import { throwError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { AuthErrorCode } from '../errors';
 import { type AuthClientCredential } from '../interfaces';
-
-/**
- * Defining types
- */
 
 export interface ClientAuthentication {
   /** Request headers carrying the credential, when it travels in one (HTTP Basic) */

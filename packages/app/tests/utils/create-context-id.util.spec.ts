@@ -1,20 +1,6 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { createContextId } from '@shadow-library/app';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 describe('createContentId', () => {
   it('should return a random number', () => {

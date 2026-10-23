@@ -1,6 +1,3 @@
-/**
- * Importing user defined packages
- */
 import { mutate, novelForgeDb } from '../../lib';
 import { expect, test } from './forge-actors';
 import { expectCode, guardedProject } from './forge-arrange';

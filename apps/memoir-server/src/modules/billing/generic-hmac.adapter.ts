@@ -1,14 +1,8 @@
-/**
- * Importing npm packages
- */
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
 import { Injectable } from '@shadow-library/app';
 import { Config } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 
 import {
@@ -20,10 +14,6 @@ import {
   type NormalizedBillingEvent,
 } from './billing.types';
 
-/**
- * Defining types
- */
-
 interface SignedEnvelope {
   id?: unknown;
   type?: unknown;
@@ -32,10 +22,6 @@ interface SignedEnvelope {
   customerId?: unknown;
   periodEndsAt?: unknown;
 }
-
-/**
- * Declaring the constants
- */
 
 export const BILLING_SIGNATURE_HEADER = 'x-billing-signature';
 

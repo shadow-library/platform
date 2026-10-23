@@ -1,16 +1,5 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { AuthErrorCode } from '../errors';
 import { JwtPayload } from '../interfaces';
-
-/**
- * Defining types
- */
 
 export interface JwtHeader {
   alg?: string;

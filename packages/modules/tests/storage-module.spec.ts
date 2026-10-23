@@ -1,6 +1,3 @@
-/**
- * Importing npm packages
- */
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -8,9 +5,6 @@ import { join } from 'node:path';
 
 import { Module, ShadowFactory } from '@shadow-library/app';
 
-/**
- * Importing user defined packages
- */
 import { StorageErrorCode, StorageModule, StorageService } from '@shadow-library/modules/storage';
 
 describe('Storage Module', () => {

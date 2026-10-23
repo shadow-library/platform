@@ -1,16 +1,5 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { ADMIN_EMAIL, findPlatformOrganisationId, identityDb, PLATFORM_AUDIENCE, readCatalogRoles, requireProductUrl } from '../../lib';
 import { expect, test } from './fixtures';
-
-/**
- * Defining types
- */
 
 interface ApplicationRow {
   id: number;

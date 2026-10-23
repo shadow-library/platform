@@ -1,16 +1,6 @@
-/**
- * Importing npm packages
- */
 import { crc32 } from 'node:zlib';
 
-/**
- * Importing user defined packages
- */
 import { AuthErrorCode } from '../errors';
-
-/**
- * Defining types
- */
 
 export interface ParsedBotKey {
   keyId: string;

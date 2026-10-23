@@ -1,19 +1,8 @@
-/**
- * Importing npm packages
- */
-
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { EmptyState } from './EmptyState';
-
-/**
- * Declaring the constants
- */
 
 describe('EmptyState', () => {
   it('renders the title and description', () => {

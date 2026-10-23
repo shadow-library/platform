@@ -1,22 +1,7 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { objectUtils } from './object';
 import { paginationUtils } from './pagination';
 import { stringUtils } from './string';
 import { temporalUtils } from './temporal';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 class Utils {
   readonly object = objectUtils;

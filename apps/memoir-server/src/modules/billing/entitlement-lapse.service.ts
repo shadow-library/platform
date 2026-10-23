@@ -1,25 +1,11 @@
-/**
- * Importing npm packages
- */
 import { Injectable, type OnModuleInit } from '@shadow-library/app';
 import { Config, Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { SchedulerService } from '@modules/scheduler';
 import { APP_NAME } from '@server/constants';
 import { logMetric } from '@server/telemetry';
 
 import { BillingRepository } from './billing.repository';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 const SWEEP_NAME = 'entitlement-lapse';
 

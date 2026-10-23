@@ -1,19 +1,9 @@
-/**
- * Importing npm packages
- */
 import { and, eq, gte, lte, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { OwnerScopedRepository } from '@modules/auth';
 import { type DatabaseTransaction, type Quest, schema, type SideQuest } from '@server/database';
-
-/**
- * Defining types
- */
 
 export interface SideQuestDraft {
   id: string;
@@ -21,10 +11,6 @@ export interface SideQuestDraft {
   name: string;
   statAffinity: Quest.StatAffinity | null;
 }
-
-/**
- * Declaring the constants
- */
 
 @Injectable()
 export class SideQuestRepository extends OwnerScopedRepository {

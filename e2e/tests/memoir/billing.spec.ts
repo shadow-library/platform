@@ -1,20 +1,10 @@
-/**
- * Importing npm packages
- */
 import { randomUUID } from 'node:crypto';
 
 import { type APIResponse } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { memoirDb, probeMemoirConfigKeys } from '../../lib';
 import { expect, test } from './fixtures';
 import { errorCodeOf, memoirMutate, pullDeltaWith } from './helpers';
-
-/**
- * Defining types
- */
 
 interface EntitlementRow {
   tier: string;

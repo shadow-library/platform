@@ -1,21 +1,7 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it, Mock, mock, spyOn } from 'bun:test';
 import { request } from 'undici';
 
-/**
- * Importing user defined packages
- */
 import { APIRequest, AppError, ErrorCode, Logger } from '@shadow-library/common';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 mock.module('undici', () => ({ request: mock(() => Promise.resolve({ statusCode: 200, headers: {} })) }));
 

@@ -1,17 +1,7 @@
-/**
- * Importing npm packages
- */
 import { type APIRequestContext } from '@playwright/test';
 import { type Sql, type TransactionSql } from 'postgres';
 
-/**
- * Importing user defined packages
- */
 import { novelForgeDb, synapseDb } from '../../lib';
-
-/**
- * Defining types
- */
 
 export type ForgeOwnerKind = 'user' | 'bot';
 

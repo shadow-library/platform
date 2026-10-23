@@ -1,21 +1,11 @@
-/**
- * Importing npm packages
- */
-
 import { createMemoryHistory, createRootRoute, createRoute, createRouter, Outlet, RouterProvider } from '@tanstack/react-router';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { AppShell } from './AppShell';
 import { type AppShellProps } from './AppShell.types';
 
-/**
- * Declaring the constants
- */
 const PATHS = ['/', '/account', '/account/security', '/account/sessions', '/console', '/novels/$novelId/overview', '/novels/$novelId/chat'];
 
 /**

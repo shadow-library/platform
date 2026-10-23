@@ -1,23 +1,9 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { AppModule } from '@examples/interceptors/app.module';
 import { CacheService } from '@examples/interceptors/cache.service';
 import { CatService } from '@examples/interceptors/cat.service';
 import { ShadowApplication, ShadowFactory } from '@shadow-library/app';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 describe('Interceptor', () => {
   let app: ShadowApplication;

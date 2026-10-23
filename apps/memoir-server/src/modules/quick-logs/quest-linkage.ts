@@ -1,18 +1,8 @@
-/**
- * Importing npm packages
- */
 import { and, eq } from 'drizzle-orm';
 
-/**
- * Importing user defined packages
- */
 import { type SqlExecutor } from '@modules/auth';
 import { occursOn, parseLocalDate, type RecurrenceRule } from '@modules/rules';
 import { type Quest, schema } from '@server/database';
-
-/**
- * Defining types
- */
 
 export type LinkableModule = Extract<Quest.ModuleLink, 'journal' | 'meal' | 'weight'>;
 
@@ -24,10 +14,6 @@ export interface LinkageMatch {
   questName: string;
   date: string;
 }
-
-/**
- * Declaring the constants
- */
 
 const COMPLETED_STATES: readonly string[] = ['completed', 'partial', 'late'];
 

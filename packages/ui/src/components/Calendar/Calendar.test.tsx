@@ -1,19 +1,8 @@
-/**
- * Importing npm packages
- */
-
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { Calendar } from './Calendar';
-
-/**
- * Declaring the constants
- */
 
 describe('Calendar', () => {
   it('renders a date grid for the selected month', () => {

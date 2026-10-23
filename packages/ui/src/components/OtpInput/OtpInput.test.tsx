@@ -1,20 +1,10 @@
-/**
- * Importing npm packages
- */
-
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createRef } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { OtpInput } from './OtpInput';
 
-/**
- * Declaring the constants
- */
 const boxes = () => screen.getAllByRole<HTMLInputElement>('textbox');
 const box = (index: number): HTMLInputElement => {
   const el = boxes()[index];

@@ -1,21 +1,7 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { performance } from 'node:perf_hooks';
 
-/**
- * Importing user defined packages
- */
 import { AppError, LRUCache } from '@shadow-library/common';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 describe('LRUCache', () => {
   let cache: LRUCache;

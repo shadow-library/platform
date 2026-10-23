@@ -1,19 +1,9 @@
-/**
- * Importing npm packages
- */
-
 import { type Meta, type StoryObj } from '@storybook/react-vite';
 
-/**
- * Importing user defined packages
- */
 import { Button } from '../Button';
 import { Input } from '../Input';
 import { Popover } from './Popover';
 
-/**
- * Declaring the constants
- */
 const meta = {
   title: 'Components/Popover',
   component: Popover,

@@ -1,16 +1,6 @@
-/**
- * Importing npm packages
- */
 import { type APIResponse, expect, type Page } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { findSetCookie, type FlowStepBody, identityDb, pulseDb } from '../../lib';
-
-/**
- * Defining types
- */
 
 type OutboxRecipient = 'email' | 'phone';
 

@@ -1,15 +1,5 @@
-/**
- * Importing npm packages
- */
 import { useSyncExternalStore } from 'react';
 
-/**
- * Importing user defined packages
- */
-
-/**
- * Declaring the constants
- */
 function subscribe(callback: () => void): () => void {
   window.addEventListener('online', callback);
   window.addEventListener('offline', callback);

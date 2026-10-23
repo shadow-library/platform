@@ -1,19 +1,9 @@
-/**
- * Importing npm packages
- */
-
 import { type Meta, type StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { type DateRange } from '../Calendar';
 import { DateRangePicker } from './DateRangePicker';
 
-/**
- * Declaring the constants
- */
 const presets = [
   { label: 'Last 7 days', range: { start: '2026-06-01', end: '2026-06-07' } },
   { label: 'Last 30 days', range: { start: '2026-05-09', end: '2026-06-07' } },

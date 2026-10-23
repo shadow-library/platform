@@ -1,19 +1,10 @@
-/**
- * Importing npm packages
- */
 import { forwardRef } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { cn } from '@/lib';
 
 import styles from './Timeline.module.css';
 import { type TimelineItemProps, type TimelineProps, type TimelineStatus } from './Timeline.types';
 
-/**
- * Declaring the constants
- */
 const STATUS_LABEL: Record<TimelineStatus, string> = {
   default: '',
   completed: 'Completed',

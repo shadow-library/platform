@@ -1,11 +1,4 @@
-/**
- * Importing npm packages
- */
 import { type ComponentPropsWithoutRef, type ReactNode } from 'react';
-
-/**
- * Defining types
- */
 
 /** An inline decision that fits in one click; resolves the item optimistically. */
 export interface NotificationAction {

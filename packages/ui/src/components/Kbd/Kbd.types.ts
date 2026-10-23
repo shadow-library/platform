@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type ComponentPropsWithoutRef } from 'react';
 
-/**
- * Defining types
- */
 export interface KbdProps extends ComponentPropsWithoutRef<'kbd'> {
   /** Binding string like `mod+shift+K` — parsed to platform glyphs (mod → ⌘ on macOS, Ctrl elsewhere). */
   keys?: string;

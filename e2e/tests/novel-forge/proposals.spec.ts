@@ -1,6 +1,3 @@
-/**
- * Importing user defined packages
- */
 import { mutate, novelForgeDb } from '../../lib';
 import { expect, test } from './forge-actors';
 import { expectCode, guardedProject, newProject } from './forge-arrange';
@@ -17,10 +14,6 @@ import {
   rebaselineProposal,
 } from './forge-bible';
 import { createEntity, expectStatus, pasteChapter, uniqueSuffix } from './forge-helpers';
-
-/**
- * Defining types
- */
 
 interface ApplyResponseBody {
   proposal: { id: string; status: string };

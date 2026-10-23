@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import * as Popover from '@radix-ui/react-popover';
 import { type KeyboardEvent, type MouseEvent, type ReactElement, useId, useMemo, useRef, useState } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { useControllableState } from '@/hooks';
 import { CheckIcon, ChevronDownIcon } from '@/icons';
 import { cn } from '@/lib';
@@ -14,9 +8,6 @@ import { cn } from '@/lib';
 import styles from './MultiSelect.module.css';
 import { type MultiSelectOption, type MultiSelectProps } from './MultiSelect.types';
 
-/**
- * Declaring the constants
- */
 function CloseIcon() {
   return (
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden="true">

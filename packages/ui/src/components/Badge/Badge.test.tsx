@@ -1,18 +1,7 @@
-/**
- * Importing npm packages
- */
-
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { Badge } from './Badge';
-
-/**
- * Declaring the constants
- */
 
 describe('Badge', () => {
   it('renders its label with the default soft/neutral variant', () => {

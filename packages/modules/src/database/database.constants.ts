@@ -1,19 +1,4 @@
-/**
- * Importing npm packages
- */
 import { ConfigOptions, ConfigRecords } from '@shadow-library/common';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 export const DATABASE_MODULE_OPTIONS = Symbol('DATABASE_MODULE_OPTIONS');
 

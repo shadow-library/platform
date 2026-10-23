@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
 import { type SQL } from 'bun';
 
-/**
- * Importing user defined packages
- */
 import { createMigrationClient, toMigrationConnectionString } from '@shadow-library/modules/bootstrap';
 
 const URL_STRING = 'postgresql://migrator:secret@localhost:5432/app';

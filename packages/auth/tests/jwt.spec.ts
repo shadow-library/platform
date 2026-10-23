@@ -1,23 +1,10 @@
-/**
- * Importing npm packages
- */
 import { beforeAll, describe, expect, it } from 'bun:test';
 
 import { AppError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { AuthErrorCode, ClaimExpectations, decodeJwt, JwtPayload, verifyJwt } from '@shadow-library/auth';
 import { createTestSigner, TestSigner } from '@shadow-library/auth/testing';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const ISSUER = 'https://identity.test';
 const AUDIENCE = 'api://self';
 

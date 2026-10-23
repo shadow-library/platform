@@ -1,20 +1,10 @@
-/**
- * Importing npm packages
- */
 import { type ClientRequest, type IncomingMessage } from 'node:http';
 import https from 'node:https';
 
 import { type APIRequestContext } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { clientIpHeaders, requireProductUrl } from '../../lib';
 import { expect, test as forgeTest } from './forge-actors';
-
-/**
- * Defining types
- */
 
 export interface SseFrame {
   readonly event: string;

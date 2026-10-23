@@ -1,22 +1,12 @@
-/**
- * Importing npm packages
- */
 import { createHash } from 'node:crypto';
 
 import { AppError, Logger, LRUCache } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { NAMESPACE } from '../constants';
 import { AuthErrorCode } from '../errors';
 import { AuthPrincipal, BotPrincipal } from '../interfaces';
 import { botKeyIdToUuid, parseBotKey } from './bot-key';
 import { isThrottled, retryAfterHint } from './transport';
-
-/**
- * Defining types
- */
 
 export interface BotKeyExchangerOptions {
   /** Exchanges the key at identity and returns the bot access token */

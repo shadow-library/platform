@@ -1,19 +1,4 @@
-/**
- * Importing npm packages
- */
 import { Field, Schema } from '@shadow-library/class-schema';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 /** A pattern rather than `format: 'uuid'` — fastify's route schema compiler registers no formats and refuses to build a route carrying one. */
 const UUID_PATTERN = '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$';

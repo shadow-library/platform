@@ -1,20 +1,9 @@
-/**
- * Importing npm packages
- */
-
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createRef } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { Textarea } from './Textarea';
-
-/**
- * Declaring the constants
- */
 
 describe('Textarea', () => {
   it('renders a native textarea reachable by its accessible name', () => {

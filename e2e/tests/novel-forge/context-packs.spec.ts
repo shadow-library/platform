@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type APIRequestContext } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { mutate, novelForgeDb } from '../../lib';
 import { expect, type ForgeActor, test } from './forge-actors';
 import { assertSpendGuarded, insertJob, listDispatchedModelCalls } from './forge-db';
@@ -34,10 +28,6 @@ import {
   writerPack,
   writerPrompt,
 } from './forge-story';
-
-/**
- * Defining types
- */
 
 interface FactView {
   readonly allowedClues?: string[] | null;

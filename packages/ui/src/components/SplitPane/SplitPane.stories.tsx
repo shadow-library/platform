@@ -1,16 +1,7 @@
-/**
- * Importing npm packages
- */
 import { type Meta, type StoryObj } from '@storybook/react-vite';
 
-/**
- * Importing user defined packages
- */
 import { SplitPane } from './SplitPane';
 
-/**
- * Declaring the constants
- */
 const meta = {
   title: 'Components/SplitPane',
   component: SplitPane,

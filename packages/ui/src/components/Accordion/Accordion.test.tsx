@@ -1,19 +1,8 @@
-/**
- * Importing npm packages
- */
-
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { Accordion } from './Accordion';
-
-/**
- * Declaring the constants
- */
 
 describe('Accordion', () => {
   it('renders heading buttons that toggle their panel', async () => {

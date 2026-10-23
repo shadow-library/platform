@@ -1,20 +1,6 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { applyDecorators } from '@shadow-library/app';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 describe('applyDecorators', () => {
   function testDecorator1(param: number): ClassDecorator {

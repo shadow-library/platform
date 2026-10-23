@@ -1,20 +1,11 @@
-/**
- * Importing npm packages
- */
 import { forwardRef } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { cn, DEFAULT_LOCALE } from '@/lib';
 
 import { Select } from '../Select';
 import styles from './Pagination.module.css';
 import { type PaginationProps } from './Pagination.types';
 
-/**
- * Declaring the constants
- */
 type PageSlot = number | 'ellipsis-left' | 'ellipsis-right';
 
 function ChevronLeft() {

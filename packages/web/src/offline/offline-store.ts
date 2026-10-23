@@ -1,15 +1,5 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { idbClear, type IdbConfig, idbDelete, idbGet, idbGetAll, idbSet, openDatabase } from './idb';
 
-/**
- * Defining types
- */
 export interface OfflineEntryMeta {
   key: string;
   label?: string;
@@ -24,9 +14,6 @@ export interface OfflineStoreOptions {
   version?: number;
 }
 
-/**
- * Declaring the constants
- */
 const CONTENT_STORE = 'content';
 const META_STORE = 'meta';
 

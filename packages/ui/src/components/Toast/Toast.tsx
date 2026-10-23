@@ -1,21 +1,12 @@
-/**
- * Importing npm packages
- */
 import { type ReactElement, useEffect, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 
-/**
- * Importing user defined packages
- */
 import { useHydrated } from '@/hooks';
 
 import styles from './Toast.module.css';
 import { toastStore } from './Toast.store';
 import { type ToastData, type ToasterProps, type ToastIntent } from './Toast.types';
 
-/**
- * Declaring the constants
- */
 const DEFAULT_DURATION: Record<ToastIntent, number> = {
   neutral: 5000,
   info: 5000,

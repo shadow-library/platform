@@ -1,6 +1,3 @@
-/**
- * Importing npm packages
- */
 import { and, eq } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError } from '@shadow-library/common';
@@ -9,10 +6,6 @@ import { currentRuleset, levelFor, type QuestLogState, type StatAffinity } from 
 import { AppErrorCode } from '@server/classes';
 import { type DatabaseTransaction, type HeroEvent, schema } from '@server/database';
 import { pseudoAccountId, TelemetryService } from '@server/telemetry';
-
-/**
- * Defining types
- */
 
 export interface GrantIntent {
   /** The deterministic natural key from PRD §3.4 — the same user action must always derive the same string. */

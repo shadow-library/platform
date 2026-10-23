@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { randomBytes, randomInt } from 'node:crypto';
 
 import { type APIRequestContext, type APIResponse } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import {
   authorizeCode,
   findIdentityUserByEmail,
@@ -26,10 +20,6 @@ import {
 } from '../../lib';
 import { expect, test } from './fixtures';
 import { countOutboxRows, expectErrorCode, expectSessionCookie, flowStepOf, maxOutboxId, pollOtp, pollOutboxRowAfter, pollSmsOtp } from './helpers';
-
-/**
- * Defining types
- */
 
 interface AccountRow {
   status: string;

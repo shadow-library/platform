@@ -1,20 +1,10 @@
-/**
- * Importing npm packages
- */
-
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { CommandPalette } from './CommandPalette';
 import { type CommandItem } from './CommandPalette.types';
 
-/**
- * Declaring the constants
- */
 function makeCommands(): CommandItem[] {
   return [
     { id: 'restart', group: 'Actions', label: 'Restart service', onRun: vi.fn() },

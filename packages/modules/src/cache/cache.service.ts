@@ -1,26 +1,11 @@
-/**
- * Importing npm packages
- */
-
 import { Promisable } from 'type-fest';
 import { Inject, Injectable } from '@shadow-library/app';
 import { Logger, LRUCache, LRUCacheOptions, Nullable } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { CACHE_MODULE_OPTIONS, LOGGER_NAMESPACE } from './cache.constants';
 import { type CacheModuleOptions, type ICacheStore } from './cache.types';
 import { MemcacheService } from './memcache.service';
 import { RedisCacheService } from './redis-cache.service';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Injectable()
 export class CacheService {

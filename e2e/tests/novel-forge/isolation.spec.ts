@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { randomBytes } from 'node:crypto';
 
 import { type APIRequestContext, type APIResponse } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { mutate } from '../../lib';
 import { expect, type ForgeActor, test } from './forge-actors';
 import { guardedProject } from './forge-arrange';
@@ -15,10 +9,6 @@ import { assertSpendGuarded } from './forge-db';
 import { type ChapterText, errorCode, pasteChapter, readDraft, writeChapterByHand } from './forge-helpers';
 import { insertWriterSnapshot } from './forge-rows';
 import { writerPrompt } from './forge-story';
-
-/**
- * Defining types
- */
 
 interface Marked {
   readonly body: string;

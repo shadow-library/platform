@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type APIRequestContext, type APIResponse, type BrowserContext, expect, request, test } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import {
   apiContext,
   createIdentitySession,
@@ -20,10 +14,6 @@ import {
   requireProductUrl,
 } from '../../lib';
 import { organisationBoundContext, scopedMutate } from './helpers';
-
-/**
- * Defining types
- */
 
 interface CatalogLevel {
   readonly roleId: number;

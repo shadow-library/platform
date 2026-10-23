@@ -1,19 +1,9 @@
-/**
- * Importing npm packages
- */
-
 import { type Meta, type StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { Calendar } from './Calendar';
 import { type DateRange } from './Calendar.types';
 
-/**
- * Declaring the constants
- */
 const meta = {
   title: 'Components/Calendar',
   component: Calendar,

@@ -1,21 +1,7 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it, mock } from 'bun:test';
 import { Module, ShadowFactory } from '@shadow-library/app';
 
-/**
- * Importing user defined packages
- */
 import { Cookie, FastifyModule, Get, HttpController } from '@shadow-library/fastify';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 /** Simulate `@fastify/cookie` not being installed: the lazy import inside the router rejects. */
 mock.module('@fastify/cookie', () => {

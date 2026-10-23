@@ -1,16 +1,6 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { getInitials, toPositiveInt } from './utils';
-
-/**
- * Declaring the constants
- */
 
 describe('getInitials', () => {
   it('takes the first letter of the first two words, uppercased', () => {

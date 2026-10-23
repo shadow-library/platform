@@ -1,16 +1,6 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { cn } from './cn';
-
-/**
- * Declaring the constants
- */
 
 describe('cn', () => {
   it('joins multiple class values', () => {

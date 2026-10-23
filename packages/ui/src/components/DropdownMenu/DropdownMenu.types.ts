@@ -1,16 +1,6 @@
-/**
- * Importing npm packages
- */
 import type * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu';
 import { type ComponentPropsWithoutRef, type ReactNode } from 'react';
 
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 export type DropdownMenuContentProps = ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Content>;
 
 export interface DropdownMenuItemProps extends ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Item> {

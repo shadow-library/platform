@@ -1,15 +1,3 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
 /** The provider-agnostic vocabulary every adapter normalizes its own event names into (ARCHITECTURE §16.1). */
 export type BillingEventType = 'trial.started' | 'subscription.activated' | 'subscription.renewed' | 'subscription.past_due' | 'subscription.cancelled' | 'subscription.expired';
 

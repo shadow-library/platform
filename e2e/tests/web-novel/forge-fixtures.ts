@@ -1,19 +1,9 @@
-/**
- * Importing npm packages
- */
 import { type APIRequestContext, test as base } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { apiContext, clearIpState, freshClientIp, runAll } from '../../lib';
 import { expectImportLanded, startFinalImport } from '../novel-forge/forge-bundles';
 import { createForgeProject, type ForgePublication, type ForgeSession, openCuratorSession, removeForgePublication } from './forge-publication';
 import { deleteNovels, uniqueNovelSlug } from './helpers';
-
-/**
- * Defining types
- */
 
 export interface ForgeProjectOptions {
   /** Lands the three finalized chapters of `FINAL_BUNDLE` through a novel import, so chapters can be published without a model. */

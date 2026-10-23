@@ -1,21 +1,7 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { SELF_DECLARED_DEPS_METADATA } from '@lib/constants';
 import { Inject } from '@shadow-library/app';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 describe('@Inject', () => {
   const symbol = Symbol('test');

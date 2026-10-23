@@ -1,20 +1,10 @@
-/**
- * Importing npm packages
- */
 import { Slot } from '@radix-ui/react-slot';
 import { forwardRef } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { cn } from '@/lib';
 
 import styles from './Fab.module.css';
 import { type FabProps } from './Fab.types';
-
-/**
- * Declaring the constants
- */
 
 /**
  * Floating Action Button — the screen's single promoted action on touch layouts. Floats above the

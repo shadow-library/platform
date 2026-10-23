@@ -1,17 +1,6 @@
 /* istanbul ignore file */
-/**
- * Importing npm packages
- */
 import colors from '@colors/colors';
 import { format, Logform } from 'winston';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 
 export type Format = Logform.Format;
 
@@ -34,9 +23,6 @@ declare module 'winston' {
   }
 }
 
-/**
- * Declaring the constants
- */
 let timestamp: number;
 
 const ERROR_KEYS = ['name', 'message', 'stack', 'code'] as const;

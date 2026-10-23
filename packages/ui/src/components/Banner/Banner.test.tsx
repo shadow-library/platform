@@ -1,20 +1,11 @@
-/**
- * Importing npm packages
- */
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { Banner } from './Banner';
 import { BannerOutlet, useBanner } from './Banner.provider';
 import { bannerStore } from './Banner.store';
 
-/**
- * Declaring the constants
- */
 afterEach(() => bannerStore.reset());
 
 describe('Banner', () => {

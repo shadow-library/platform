@@ -1,16 +1,5 @@
-/**
- * Importing npm packages
- */
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 
 export interface ServiceAccountTokenOptions {
   /** Requested `aud` values. Omitting them yields the cluster's own default audiences, which identity must refuse. */

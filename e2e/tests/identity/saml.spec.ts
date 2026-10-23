@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type APIRequestContext, type APIResponse } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import {
   getSamlMetadata,
   getSamlSp,
@@ -32,10 +26,6 @@ import {
 } from '../../lib';
 import { expect, type IdentityHarness, test } from './fixtures';
 import { expectRefused } from './helpers';
-
-/**
- * Defining types
- */
 
 interface SamlActor {
   readonly user: IdentityUser;

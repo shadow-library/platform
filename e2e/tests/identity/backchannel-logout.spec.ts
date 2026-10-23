@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { randomBytes } from 'node:crypto';
 
 import { type APIRequestContext, type APIResponse } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import {
   CLUSTER_HOST_CANDIDATES,
   type ConfigKeysProbe,
@@ -30,10 +24,6 @@ import {
 } from '../../lib';
 import { expect, type IdentityHarness, test } from './fixtures';
 import { expectRefused } from './helpers';
-
-/**
- * Defining types
- */
 
 interface DeliveryRow {
   readonly id: string;

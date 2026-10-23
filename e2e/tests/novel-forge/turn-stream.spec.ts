@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { randomUUID } from 'node:crypto';
 
 import { type APIRequestContext } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { mutate, pollUntil } from '../../lib';
 import { type ForgeActor } from './forge-actors';
 import { expectCode, guardedProject, newChatSession, newProject, quotaRefusedChat, SHORT_TURN, startTurn } from './forge-arrange';

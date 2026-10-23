@@ -1,19 +1,5 @@
-/**
- * Importing npm packages
- */
 import { useSyncExternalStore } from 'react';
 
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const subscribe = (): (() => void) => () => undefined;
 const getClientSnapshot = (): boolean => true;
 const getServerSnapshot = (): boolean => false;

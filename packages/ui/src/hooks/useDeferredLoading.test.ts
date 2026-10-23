@@ -1,18 +1,8 @@
-/**
- * Importing npm packages
- */
-
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { useDeferredLoading } from './useDeferredLoading';
 
-/**
- * Declaring the constants
- */
 beforeEach(() => {
   vi.useFakeTimers();
 });

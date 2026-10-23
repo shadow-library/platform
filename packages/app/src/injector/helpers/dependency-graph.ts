@@ -1,15 +1,4 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { ProviderToken } from '../../interfaces';
-
-/**
- * Defining types
- */
 
 interface NodeMetadata<T = unknown> {
   node: T;
@@ -17,10 +6,6 @@ interface NodeMetadata<T = unknown> {
   dependsOn: number;
   requiredBy: number;
 }
-
-/**
- * Declaring the constants
- */
 
 function tieBreakerSort(a: NodeMetadata, b: NodeMetadata): number {
   if (a.dependsOn !== b.dependsOn) return a.dependsOn - b.dependsOn;

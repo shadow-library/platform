@@ -1,22 +1,8 @@
-/**
- * Importing npm packages
- */
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { Dispatcher, ShadowApplication, ShadowFactory } from '@shadow-library/app';
 
-/**
- * Importing user defined packages
- */
 import { AppModule } from '@examples/child-routes/app.module';
 import { FastifyRouter } from '@shadow-library/fastify';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 describe('Child Routes', () => {
   let app: ShadowApplication;

@@ -1,14 +1,3 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 export interface ErrorField {
   field: string;
   msg: string;
@@ -21,10 +10,6 @@ export interface ErrorResponse {
   message: string;
   fields?: ErrorField[] | null;
 }
-
-/**
- * Declaring the constants
- */
 
 /**
  * The single error surface every transport raises on the client — the direct `APIRequest` client and the

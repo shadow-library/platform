@@ -1,21 +1,11 @@
-/**
- * Importing npm packages
- */
-
 import { type Meta, type StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { Input } from '../Input';
 import { Select } from '../Select';
 import { Textarea } from '../Textarea';
 import { FormField } from './FormField';
 
-/**
- * Declaring the constants
- */
 const meta = {
   title: 'Components/FormField',
   component: FormField,

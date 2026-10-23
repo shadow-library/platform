@@ -1,17 +1,6 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { PERSONAS, readSeedManifest, requireProductUrl, storageStateFor, useClientIp } from '../../lib';
 import { expect, test } from './fixtures';
 import { capturePasswordCredential, deleteNotificationsAfter, maxOutboxId, pollOutboxRowAfter, restorePasswordCredential } from './helpers';
-
-/**
- * Defining types
- */
 
 /**
  * Declaring the constants

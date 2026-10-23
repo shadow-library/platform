@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type APIRequestContext } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { mutate } from '../../lib';
 import { expect, test } from './forge-actors';
 import { expectCode, guardedProject, newChatSession, newProject } from './forge-arrange';
@@ -13,10 +7,6 @@ import { assertSpendGuarded, insertWorkflowRun, listDispatchedModelCalls } from 
 import { insertChatMessage, insertChatSession, settleWorkflowRun } from './forge-bible';
 import { listWorkflowRuns } from './forge-rows';
 import { HAIKU_ALIAS } from './forge-helpers';
-
-/**
- * Defining types
- */
 
 interface ChatSession {
   id: string;

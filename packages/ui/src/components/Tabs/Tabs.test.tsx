@@ -1,19 +1,9 @@
-/**
- * Importing npm packages
- */
-
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { Tabs } from './Tabs';
 
-/**
- * Declaring the constants
- */
 function Example(props: { onValueChange?: (value: string) => void; defaultValue?: string }) {
   return (
     <Tabs defaultValue={props.defaultValue ?? 'overview'} onValueChange={props.onValueChange}>

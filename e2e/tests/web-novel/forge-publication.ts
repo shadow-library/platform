@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type APIRequestContext, type APIResponse, request } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import {
   clientIpHeaders,
   createIdentitySession,
@@ -23,10 +17,6 @@ import {
 } from '../../lib';
 import { createProject, type ReconcileResult } from '../novel-forge/forge-helpers';
 import { deleteNovels, type NovelVisibility } from './helpers';
-
-/**
- * Defining types
- */
 
 export interface ForgePublication {
   /** The author's novel-forge context; every access change goes through its public API. */

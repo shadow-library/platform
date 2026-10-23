@@ -1,6 +1,3 @@
-/**
- * Importing npm packages
- */
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -8,15 +5,9 @@ import path from 'node:path';
 import openapiTS, { astToString } from 'openapi-typescript';
 import prettier from 'prettier';
 
-/**
- * Importing user defined packages
- */
 import { log, reportError, ShadowError, stripGitEnv } from './utils/index.ts';
 import { API_TYPES_PATH, findWorkspace, findWorkspaces, type Workspace } from './workspaces.ts';
 
-/**
- * Defining types
- */
 interface OpenApiParameter {
   in: string;
   schema?: { type?: string | string[] };
@@ -34,9 +25,6 @@ export interface OpenApiDocument {
   [key: string]: unknown;
 }
 
-/**
- * Declaring the constants
- */
 /** The running server every web app generates against during development, in non-`--check` single-target mode. */
 const DEFAULT_URL = 'http://localhost:8080/dev/api-docs/openapi.json';
 

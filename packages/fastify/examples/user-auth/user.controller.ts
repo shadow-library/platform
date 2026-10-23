@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { Body, ContextService, Delete, Get, HttpController, Params, Patch, Post, RespondFor, Version } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { AuthGuard } from './decorators/auth-guard.decorator';
 import { CreateUserBody } from './dtos/create-user-body.dto';
 import { UpdateUserBody } from './dtos/update-user-body.dto';
@@ -13,14 +7,6 @@ import { UserParams } from './dtos/user-params.dto';
 import { UserRawResponse } from './dtos/user-raw-response.dto';
 import { UserResponse } from './dtos/user-response.dto';
 import { User, UserService } from './user.service';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @HttpController('/api/users')
 export class UserController {

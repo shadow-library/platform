@@ -1,18 +1,7 @@
-/**
- * Importing npm packages
- */
 import { type JsonObject } from 'type-fest';
 
 import { Dispatcher, Inject } from '@shadow-library/app';
 import { ContextService, FastifyRouter, Get, HttpController, Query } from '@shadow-library/fastify';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 
 export interface RouteResponse {
   message: string;
@@ -22,10 +11,6 @@ export interface RouteResponse {
 export interface UnifiedRouteResponse extends RouteResponse {
   results: JsonObject[];
 }
-
-/**
- * Declaring the constants
- */
 
 @HttpController('/api')
 export class RoutesController {

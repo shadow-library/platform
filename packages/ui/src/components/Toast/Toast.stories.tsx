@@ -1,19 +1,9 @@
-/**
- * Importing npm packages
- */
-
 import { type Meta, type StoryObj } from '@storybook/react-vite';
 
-/**
- * Importing user defined packages
- */
 import { Button } from '../Button';
 import { Toaster } from './Toast';
 import { toast } from './Toast.store';
 
-/**
- * Declaring the constants
- */
 const meta = {
   title: 'Components/Toast',
   component: Toaster,

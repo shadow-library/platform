@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { existsSync, mkdirSync } from 'node:fs';
 
 import { expect, type Page, request, test as setup } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import {
   addIdentitySessionCookies,
   AUTH_DIR,
@@ -20,10 +14,6 @@ import {
   type SessionAal,
   storageStateFor,
 } from '../lib';
-
-/**
- * Defining types
- */
 
 /**
  * Declaring the constants

@@ -1,17 +1,8 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { ApiError } from '../lib/api-error';
 import { ACCESS_DENIED, isAccessDeniedError, isAccessDeniedSearch, parseAccessDeniedSearch } from './access-denied';
 
-/**
- * Declaring the constants
- */
 const problem = (code: string, message: string) => ({ code, type: 'Error', message });
 
 describe('parseAccessDeniedSearch', () => {

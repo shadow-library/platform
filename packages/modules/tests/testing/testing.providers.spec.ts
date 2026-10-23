@@ -1,25 +1,11 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
 import { Injectable, Module, ShadowFactory } from '@shadow-library/app';
 import { AppError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { DatabaseModule, DatabaseService } from '@shadow-library/modules/database';
 import { StorageModule, StorageService } from '@shadow-library/modules/storage';
 import { fakeDatabaseProvider, FakeDatabaseService, fakeStorageProvider, FakeStorageService, withoutStartupHooks } from '@shadow-library/modules/testing';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 describe('testing providers', () => {
   it('should boot a module graph wired to postgres, redis and s3 with no infrastructure', async () => {

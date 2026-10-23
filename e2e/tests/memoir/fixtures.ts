@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { randomBytes } from 'node:crypto';
 
 import { type APIRequestContext, test as base, type BrowserContext, request } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import {
   type AdminApi,
   clearIpState,
@@ -33,10 +27,6 @@ import {
   useClientIp,
 } from '../../lib';
 import { type AccountView, ensureOnboarded } from './helpers';
-
-/**
- * Defining types
- */
 
 export interface MemoirPersonaOptions {
   /** Readable tag embedded in the generated identity email, e.g. `jit-race`. */

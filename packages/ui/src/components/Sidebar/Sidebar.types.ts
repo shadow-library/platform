@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type ComponentPropsWithoutRef, type ReactNode } from 'react';
 
-/**
- * Defining types
- */
 export interface SidebarProps extends Omit<ComponentPropsWithoutRef<'nav'>, 'title'> {
   /** Product identity shown in the fixed header. */
   workspace?: ReactNode;

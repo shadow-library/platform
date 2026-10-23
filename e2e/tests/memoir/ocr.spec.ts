@@ -1,18 +1,8 @@
-/**
- * Importing npm packages
- */
 import { type APIRequestContext, type APIResponse } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { memoirDb } from '../../lib';
 import { expect, test } from './fixtures';
 import { errorCodeOf, memoirCsrfHeaders, memoirMutate } from './helpers';
-
-/**
- * Defining types
- */
 
 interface OcrQuotaView {
   cap: number;

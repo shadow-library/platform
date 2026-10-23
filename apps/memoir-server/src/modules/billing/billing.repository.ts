@@ -1,31 +1,17 @@
-/**
- * Importing npm packages
- */
 import { and, eq, isNotNull, lt, ne, or, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { type Entitlement, type PrimaryDatabase, schema } from '@server/database';
 
 import { type NormalizedBillingEvent } from './billing.types';
 import { applyBillingEvent, type EntitlementProjection, FREE_PROJECTION } from './entitlement-lifecycle';
-
-/**
- * Defining types
- */
 
 export interface WebhookApplyResult {
   duplicate: boolean;
   quarantined: boolean;
   applied: boolean;
 }
-
-/**
- * Declaring the constants
- */
 
 function toProjection(row: Entitlement.Row | undefined): EntitlementProjection {
   if (!row) return FREE_PROJECTION;

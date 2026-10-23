@@ -1,28 +1,10 @@
-/**
- * Importing npm packages
- */
 import path from 'node:path';
 
 import { storybookTest } from '@storybook/addon-vitest/vitest-plugin';
 import { playwright } from '@vitest/browser-playwright';
 import { defineConfig } from 'vitest/config';
 
-/**
- * Declaring the constants
- */
 const alias = { '@': path.resolve(import.meta.dirname, 'src') };
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 export default defineConfig({
   test: {

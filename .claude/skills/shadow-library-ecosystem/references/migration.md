@@ -164,7 +164,7 @@ When a workspace already uses _some_ of the ecosystem, look specifically for the
 
 ## Guardrails
 
-- Keep the file/section-banner conventions (`references/backend.md` §Style) as you touch each file.
+- Keep the file conventions (`references/backend.md` §Style) as you touch each file; do not add section banners.
 - MUST NOT mix paradigms in the same layer (half DI, half manual singletons) longer than one stage.
 - Preserve public API/route shapes during migration; refactor internals, not contracts.
 - After each stage: typecheck, run the app, exercise the touched path before moving on.

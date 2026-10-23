@@ -1,19 +1,8 @@
-/**
- * Importing npm packages
- */
-
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { TokenInput } from './TokenInput';
-
-/**
- * Declaring the constants
- */
 
 describe('TokenInput', () => {
   it('adds a token on Enter', async () => {

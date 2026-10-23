@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import { Injectable } from '@shadow-library/app';
 import { AppError, Config } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { AccountContext, AccountRepository } from '@modules/auth';
 import { EntitlementService } from '@modules/billing';
 import { ProgressionService } from '@modules/progression';
@@ -16,14 +10,6 @@ import type { Account } from '@server/database';
 
 import { type OcrParseDto, type OcrQuotaResponseDto } from './ocr.dto';
 import { OcrStructuringClient, type OcrStructuringResult } from './ocr-structuring.client';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Injectable()
 export class OcrService {

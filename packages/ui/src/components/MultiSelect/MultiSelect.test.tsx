@@ -1,21 +1,11 @@
-/**
- * Importing npm packages
- */
-
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { MultiSelect } from './MultiSelect';
 import { type MultiSelectOption } from './MultiSelect.types';
 
-/**
- * Declaring the constants
- */
 beforeAll(() => {
   Element.prototype.hasPointerCapture ??= () => false;
   Element.prototype.setPointerCapture ??= () => {};

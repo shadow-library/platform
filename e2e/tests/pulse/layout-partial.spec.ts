@@ -1,17 +1,7 @@
-/**
- * Importing npm packages
- */
 import { expect, test } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { apiContext, mutate, requireProductUrl } from '../../lib';
 import { createLayout, createPartial, deleteLayouts, deletePartials, publishLayout, publishPartial, saveLayoutDraft, savePartialDraft, uniqueKey } from './helpers';
-
-/**
- * Defining types
- */
 
 /**
  * Declaring the constants

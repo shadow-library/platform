@@ -1,21 +1,11 @@
-/**
- * Importing npm packages
- */
-
 import { type Meta, type StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { Badge, type BadgeIntent } from '../Badge';
 import { Button } from '../Button';
 import { Table } from './Table';
 import { type TableColumn, type TableSort } from './Table.types';
 
-/**
- * Declaring the constants
- */
 interface Service {
   id: string;
   name: string;

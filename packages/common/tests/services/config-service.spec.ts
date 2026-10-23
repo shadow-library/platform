@@ -1,20 +1,10 @@
-/**
- * Importing npm packages
- */
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, mock } from 'bun:test';
 import fs from 'node:fs';
 import path from 'node:path';
 
-/**
- * Importing user defined packages
- */
 import { Utils } from '@lib/internal.utils';
 import { throwError } from '@lib/shorthands';
 import { AppError, Config, type ConfigRecords, ConfigService } from '@shadow-library/common';
-
-/**
- * Defining types
- */
 
 interface CustomConfigRecords extends ConfigRecords {
   'custom.key': string;
@@ -32,9 +22,6 @@ interface CustomConfigRecords extends ConfigRecords {
   'reloadable.key': string;
 }
 
-/**
- * Declaring the constants
- */
 mock.module('chokidar', () => {
   return {
     watch: () => ({

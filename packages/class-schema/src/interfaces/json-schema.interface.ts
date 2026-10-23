@@ -1,15 +1,4 @@
-/**
- * Importing npm packages
- */
 import { SetRequired } from 'type-fest';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 
 export type JSONSchemaType = 'string' | 'number' | 'integer' | 'boolean' | 'array' | 'object' | 'null';
 

@@ -1,6 +1,3 @@
-/**
- * Importing npm packages
- */
 import { gunzipSync } from 'node:zlib';
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it, spyOn } from 'bun:test';
@@ -11,14 +8,7 @@ import { Field, Schema, SchemaComposer } from '@shadow-library/class-schema';
 import { Config } from '@shadow-library/common';
 import { FastifyModule, FastifyRouter, Get, HttpController, type HttpResponse, HttpStatus, Post, Res, RespondFor } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { CSRFTokenService, HealthService, HttpCoreModule } from '@shadow-library/modules/http-core';
-
-/**
- * Defining types
- */
 
 interface CSRFToken {
   token: string;
@@ -26,10 +16,6 @@ interface CSRFToken {
 }
 
 type OpenAPIOverrides = NonNullable<Parameters<typeof HttpCoreModule.forRoot>[0]>['openapi'];
-
-/**
- * Declaring the constants
- */
 
 function generateCSRFToken(expiryOffset: number): CSRFToken {
   const token = '0'.repeat(64);

@@ -1,11 +1,5 @@
-/**
- * Importing user defined packages
- */
 import { type ToastData, type ToastIntent, type ToastOptions, type ToastPromiseMessages } from './Toast.types';
 
-/**
- * Declaring the constants
- */
 type Listener = () => void;
 
 let toasts: ToastData[] = [];

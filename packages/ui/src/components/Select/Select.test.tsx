@@ -1,7 +1,3 @@
-/**
- * Importing npm packages
- */
-
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
@@ -10,15 +6,9 @@ import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { Select } from './Select';
 import styles from './Select.module.css';
 
-/**
- * Declaring the constants
- */
 // Radix Select relies on pointer-capture, scrollIntoView, and ResizeObserver, none of which
 // happy-dom implements — shim them so the listbox can open in tests.
 beforeAll(() => {

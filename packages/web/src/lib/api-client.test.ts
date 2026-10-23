@@ -1,18 +1,9 @@
-/**
- * Importing npm packages
- */
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { createApiClient } from './api-client';
 import { ApiError } from './api-error';
 import { type ServerFetchSpec } from './transport';
 
-/**
- * Defining types
- */
 interface RecordedFetch {
   url: string;
   init: RequestInit;

@@ -1,19 +1,3 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
-
 export const NAMESPACE = '@shadow-library/app';
 
 export const RETURN_TYPE_METADATA = 'design:returntype';

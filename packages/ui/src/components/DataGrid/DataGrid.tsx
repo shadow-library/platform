@@ -1,17 +1,8 @@
-/**
- * Importing npm packages
- */
 import { type KeyboardEvent, type PointerEvent, type ReactElement, useEffect, useRef, useState } from 'react';
 
-/**
- * Importing user defined packages
- */
 import styles from './DataGrid.module.css';
 import { type DataGridProps, type GridColumn, type GridSort } from './DataGrid.types';
 
-/**
- * Declaring the constants
- */
 const ARIA_SORT: Record<'asc' | 'desc', 'ascending' | 'descending'> = { asc: 'ascending', desc: 'descending' };
 
 function cellValue<T>(column: GridColumn<T>, row: T): string {

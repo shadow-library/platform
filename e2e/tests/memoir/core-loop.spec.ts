@@ -1,17 +1,6 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { requireProductUrl } from '../../lib';
 import { expect, test } from './fixtures';
 import { createDailyQuest, hasQuestLogFor, memoirMutate, pullDelta, submitCommand } from './helpers';
-
-/**
- * Defining types
- */
 
 /**
  * Declaring the constants

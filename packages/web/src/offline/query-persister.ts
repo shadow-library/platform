@@ -1,10 +1,3 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { type IdbConfig, idbDelete, idbGet, idbSet, isIndexedDbAvailable, openDatabase } from './idb';
 
 /**
@@ -33,9 +26,6 @@ export interface IDBPersisterOptions {
   key?: string;
 }
 
-/**
- * Declaring the constants
- */
 const STORE_NAME = 'query-cache';
 
 /**

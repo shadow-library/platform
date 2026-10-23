@@ -1,19 +1,9 @@
-/**
- * Importing npm packages
- */
 import { type APIRequestContext, type APIResponse } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { mutate } from '../../lib';
 import { expect, type ForgeBot, type ForgeTeam, test } from './forge-actors';
 import { assertSpendGuarded, insertProject, listDispatchedModelCalls, readProjectRow, updateProjectOwnership } from './forge-db';
 import { CHAPTER_ONE, errorCode, readDraft, saveChapter, startNextChapter, uniqueSuffix } from './forge-helpers';
-
-/**
- * Defining types
- */
 
 interface ProjectBody {
   readonly id: string;

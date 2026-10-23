@@ -1,17 +1,7 @@
-/**
- * Importing npm packages
- */
-
 import { type Meta, type StoryObj } from '@storybook/react-vite';
 
-/**
- * Importing user defined packages
- */
 import { EmptyState } from './EmptyState';
 
-/**
- * Declaring the constants
- */
 function RepoArt() {
   return (
     <svg width="96" height="96" viewBox="0 0 96 96" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">

@@ -1,21 +1,7 @@
-/**
- * Importing npm packages
- */
 import { AppError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { AuthErrorCode } from '../errors';
 import { type FetchLike } from '../interfaces';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 /** Identity's rate limiters answer with this status and a `Retry-After` header */
 export const TOO_MANY_REQUESTS = 429;

@@ -1,19 +1,10 @@
-/**
- * Importing npm packages
- */
 import { forwardRef, useEffect, useState } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { cn } from '@/lib';
 
 import styles from './Kbd.module.css';
 import { type KbdProps } from './Kbd.types';
 
-/**
- * Declaring the constants
- */
 interface Cap {
   glyph: string;
   spoken: string;

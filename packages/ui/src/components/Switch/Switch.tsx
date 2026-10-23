@@ -1,20 +1,10 @@
-/**
- * Importing npm packages
- */
 import * as SwitchPrimitive from '@radix-ui/react-switch';
 import { forwardRef, useId } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { cn } from '@/lib';
 
 import styles from './Switch.module.css';
 import { type SwitchProps } from './Switch.types';
-
-/**
- * Declaring the constants
- */
 
 /**
  * On/off with immediate effect — no Save button. Built on Radix Switch (`role="switch"`, announced

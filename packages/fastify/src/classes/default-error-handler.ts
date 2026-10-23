@@ -1,20 +1,10 @@
-/**
- * Importing npm packages
- */
 import { FastifyError } from 'fastify';
 import { AppError, AppErrorObject, Config, Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { NAMESPACE } from '@lib/constants';
 
 import { ErrorHandler, HttpRequest, HttpResponse } from '../interfaces';
 import { ServerErrorCode } from '../server.error';
-
-/**
- * Defining types
- */
 
 export interface ParsedFastifyError {
   statusCode: number;
@@ -28,9 +18,6 @@ interface BoundQueryError {
   params: unknown[];
 }
 
-/**
- * Declaring the constants
- */
 const unexpectedError = ServerErrorCode.S001.create();
 const invalidRequestError = ServerErrorCode.S006.create();
 const STACK_FRAME_LINE = /^\s*at\s/;

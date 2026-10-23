@@ -1,24 +1,10 @@
-/**
- * Importing npm packages
- */
 import assert from 'node:assert';
 
 import { Class } from 'type-fest';
 
-/**
- * Importing user defined packages
- */
 import { METADATA_KEYS } from './constants';
 import { Schema } from './decorators';
 import { SchemaComposerMetadata } from './internal.types';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 export class SchemaComposer {
   private static createClass(metadata: SchemaComposerMetadata): Class<unknown> {

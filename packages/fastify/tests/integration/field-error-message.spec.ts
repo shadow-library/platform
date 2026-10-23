@@ -1,22 +1,8 @@
-/**
- * Importing npm packages
- */
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { Dispatcher, Module, ShadowApplication, ShadowFactory } from '@shadow-library/app';
 import { ClassSchema, Field, Schema } from '@shadow-library/class-schema';
 
-/**
- * Importing user defined packages
- */
 import { Body, FastifyModule, FastifyRouter, HttpController, Params, Post } from '@shadow-library/fastify';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Schema()
 class AddressDto {

@@ -1,6 +1,3 @@
-/**
- * Defining types
- */
 export interface ColorSwatch {
   /** Meaningful label (accessible name) — never a bare hex. */
   label: string;

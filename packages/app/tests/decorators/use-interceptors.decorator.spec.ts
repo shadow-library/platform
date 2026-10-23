@@ -1,21 +1,7 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { INTERCEPTOR_METADATA } from '@lib/constants';
 import { CallHandler, Interceptor, InterceptorConfig, InterceptorContext, UseInterceptor, UseInterceptors } from '@shadow-library/app';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 describe('UseInterceptors', () => {
   class LoggingInterceptor {}

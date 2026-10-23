@@ -1,19 +1,9 @@
-/**
- * Importing npm packages
- */
 import assert from 'node:assert';
 
 import { Handler } from '@shadow-library/app';
 import { JSONSchema, SchemaClass } from '@shadow-library/class-schema';
 
-/**
- * Importing user defined packages
- */
 import { HTTP_CONTROLLER_INPUTS, PARAMTYPES_METADATA } from '../constants';
-
-/**
- * Defining types
- */
 
 export enum RouteInputType {
   BODY = 'body',
@@ -27,10 +17,6 @@ export enum RouteInputType {
 }
 
 export type RouteInputSchemas = Partial<Record<'body' | 'params' | 'query', JSONSchema | SchemaClass>>;
-
-/**
- * Declaring the constants
- */
 
 export function HttpInput(type: RouteInputType, schema?: JSONSchema): ParameterDecorator {
   return (target, propertyKey, index) => {

@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { createHash, randomBytes } from 'node:crypto';
 
 import { type APIRequestContext, type APIResponse } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import {
   authorize,
   authorizeCode,
@@ -40,10 +34,6 @@ import {
 } from '../../lib';
 import { expect, test } from './fixtures';
 import { expectErrorCode } from './helpers';
-
-/**
- * Defining types
- */
 
 interface FamilyRow {
   id: string;

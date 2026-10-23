@@ -1,14 +1,3 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 export type CacheStrategy = 'network-first' | 'cache-first' | 'stale-while-revalidate' | 'network-only' | 'cache-only';
 
 export interface RuntimeCachingRule {

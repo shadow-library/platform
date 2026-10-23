@@ -1,17 +1,7 @@
-/**
- * Importing npm packages
- */
 import { type APIRequestContext } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { findSetCookie, mutate, requireProductUrl } from '../../lib';
 import { expect, test } from './fixtures';
-
-/**
- * Defining types
- */
 
 /**
  * Declaring the constants

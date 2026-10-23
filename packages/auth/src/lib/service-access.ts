@@ -1,18 +1,8 @@
-/**
- * Importing npm packages
- */
 import { AppError, Logger, throwError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { NAMESPACE } from '../constants';
 import { AuthErrorCode } from '../errors';
 import { FetchLike, ServiceAccessRule } from '../interfaces';
-
-/**
- * Defining types
- */
 
 export interface ServiceAccessClientOptions {
   /** Where identity is reached over the back channel; the public issuer unless `identityUrl` overrides it */

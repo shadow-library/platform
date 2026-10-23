@@ -1,18 +1,9 @@
-/**
- * Importing npm packages
- */
 import { type Meta, type StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { Button } from '../Button';
 import { RTEField, useRTEField } from './RTEField';
 
-/**
- * Declaring the constants
- */
 const meta = {
   title: 'Components/RTEField',
   component: RTEField,

@@ -1,19 +1,9 @@
-/**
- * Importing npm packages
- */
-
 import { type Meta, type StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { TreeView } from './TreeView';
 import { type TreeNode } from './TreeView.types';
 
-/**
- * Declaring the constants
- */
 const tree: TreeNode[] = [
   {
     id: 'eng',

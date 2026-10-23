@@ -1,20 +1,11 @@
-/**
- * Importing npm packages
- */
 import { Slot } from '@radix-ui/react-slot';
 import { forwardRef } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { cn } from '@/lib';
 
 import styles from './Tag.module.css';
 import { type TagProps } from './Tag.types';
 
-/**
- * Declaring the constants
- */
 function RemoveIcon() {
   return (
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden="true">

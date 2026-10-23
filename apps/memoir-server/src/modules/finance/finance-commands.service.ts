@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { and, eq } from 'drizzle-orm';
 import { Injectable, type OnModuleInit } from '@shadow-library/app';
 import { AppError, ValidationError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { CommandBus, type CommandContext, type CommandResult, HeroLedger } from '@modules/commands';
 import { ProgressionService } from '@modules/progression';
 import { ReceiptService } from '@modules/receipts';
@@ -22,19 +16,11 @@ import { FxRateRepository } from './fx-rate.repository';
 import { advanceDueDate } from './subscription-cycle';
 import { SubscriptionRepository } from './subscription.repository';
 
-/**
- * Defining types
- */
-
 interface FxCapture {
   fxRate: string | null;
   homeAmountMinor: bigint | null;
   fxRateDate: string | null;
 }
-
-/**
- * Declaring the constants
- */
 
 const EXPENSE_CREATE = 'expense.create';
 const EXPENSE_UPDATE = 'expense.update';

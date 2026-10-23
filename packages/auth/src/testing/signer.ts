@@ -1,15 +1,4 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { Jwk, JwtPayload } from '../interfaces';
-
-/**
- * Defining types
- */
 
 export interface TestSigner {
   kid: string;
@@ -17,9 +6,6 @@ export interface TestSigner {
   sign(claims: JwtPayload): Promise<string>;
 }
 
-/**
- * Declaring the constants
- */
 const encoder = new TextEncoder();
 
 const encodeSegment = (value: object): string => Buffer.from(JSON.stringify(value)).toString('base64url');

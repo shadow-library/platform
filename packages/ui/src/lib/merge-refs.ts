@@ -1,15 +1,4 @@
-/**
- * Importing npm packages
- */
 import { type Ref } from 'react';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 
 /**
  * Merges several refs into one callback ref so a component can both forward a caller's ref and

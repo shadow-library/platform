@@ -1,21 +1,7 @@
-/**
- * Importing npm packages
- */
 import { AppError, utils } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { MODULE_METADATA } from '../constants';
 import { ModuleMetadata } from '../interfaces';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 export function Module(metadata: ModuleMetadata = {}): ClassDecorator {
   return target => {

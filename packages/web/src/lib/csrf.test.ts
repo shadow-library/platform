@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { csrfSetCookie, ensureCsrfToken, resolveCsrfConfig } from './csrf';
 
 /**

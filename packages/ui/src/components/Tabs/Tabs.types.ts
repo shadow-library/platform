@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import type * as TabsPrimitive from '@radix-ui/react-tabs';
 import { type ComponentPropsWithoutRef, type ReactNode } from 'react';
 
-/**
- * Defining types
- */
 export interface TabsProps extends Omit<ComponentPropsWithoutRef<typeof TabsPrimitive.Root>, 'activationMode'> {
   /** `automatic` selects on arrow focus (default); `manual` moves focus and selects on Enter/Space. @default 'automatic' */
   activation?: 'automatic' | 'manual';

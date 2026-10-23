@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { randomBytes } from 'node:crypto';
 
 import { type APIRequestContext, type APIResponse } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import {
   clearIpState,
   clientCredentialsGrant,
@@ -34,10 +28,6 @@ import {
 } from '../../lib';
 import { expect, test as identityTest } from './fixtures';
 import { countOutboxRows, expectRefused, flowStepOf } from './helpers';
-
-/**
- * Defining types
- */
 
 interface Budget {
   readonly bucket: string;

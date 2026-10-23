@@ -1,20 +1,7 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it, jest, mock } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { type ApiOperationMetadata } from '@shadow-library/fastify';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const app = await import('@shadow-library/app');
 const decorator = jest.fn();
 const Handler = jest.fn(() => decorator);

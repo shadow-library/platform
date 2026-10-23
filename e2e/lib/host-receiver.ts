@@ -1,17 +1,7 @@
-/**
- * Importing npm packages
- */
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { type AddressInfo } from 'node:net';
 
-/**
- * Importing user defined packages
- */
 import { type WaitOptions, waitUntil } from './wait';
-
-/**
- * Defining types
- */
 
 export interface ReceivedRequest {
   readonly method: string;

@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { type HandlerMetadata } from '@shadow-library/app';
 import { AppError, Logger, throwError } from '@shadow-library/common';
 import { ContextService, Middleware, ServerErrorCode } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { NAMESPACE } from '../constants';
 import { AuthErrorCode } from '../errors';
 import { AuthPrincipal, BotPrincipal, ServicePrincipal, UserPrincipal } from '../interfaces';
@@ -21,10 +15,6 @@ import { AUTH_PRINCIPAL } from './context';
 import { parseCookies } from './cookie';
 import { type RequiredAuthRoute } from './decorators';
 import { AuthGuardErrorCode } from './errors';
-
-/**
- * Defining types
- */
 
 export interface GuardedRequest {
   headers: Record<string, string | string[] | undefined>;

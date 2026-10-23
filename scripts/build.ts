@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import fs from 'node:fs';
 import path from 'node:path';
 
-/**
- * Importing user defined packages
- */
 import { formatDuration, log, type PackageJson, reportError, resolveBin, run, runAsync, ShadowError } from './utils/index.ts';
 import {
   BACKEND_ENTRY,
@@ -22,9 +16,6 @@ import {
   type WorkspaceType,
 } from './workspaces.ts';
 
-/**
- * Defining types
- */
 /** A {@link CssOptions} with every field resolved to its default. */
 interface ResolvedCss {
   scopedName: string;
@@ -34,9 +25,6 @@ interface ResolvedCss {
   layer?: string;
 }
 
-/**
- * Declaring the constants
- */
 const USAGE = `Usage: bun scripts/build.ts [workspace | glob | --all] [--deps]
 
   workspace   repo-relative directory (packages/common) or package name (@shadow-library/common)

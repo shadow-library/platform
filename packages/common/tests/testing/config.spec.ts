@@ -1,21 +1,7 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { Config } from '@shadow-library/common';
 import { setConfig } from '@shadow-library/common/testing';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 describe('setConfig', () => {
   it('should set a value and restore the previous one', () => {

@@ -1,16 +1,6 @@
-/**
- * Importing npm packages
- */
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { APIRequest, AppError, ErrorCode } from '@shadow-library/common';
-
-/**
- * Defining types
- */
 
 interface EchoBody {
   method: string;
@@ -18,10 +8,6 @@ interface EchoBody {
   body: string;
   headers: Record<string, string>;
 }
-
-/**
- * Declaring the constants
- */
 
 const json = (data: object): Response => new Response(JSON.stringify(data), { headers: { 'content-type': 'application/json' } });
 const redirect = (location: string, status: number): Response => new Response('moved', { status, headers: { location } });

@@ -1,24 +1,10 @@
-/**
- * Importing npm packages
- */
 import { Injectable, type OnModuleInit } from '@shadow-library/app';
 import { Config, Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 
 import { type TelemetryEvent } from './events';
 import { assertTelemetryPseudoIdSecret } from './pseudo-id';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 /**
  * The single emitter for the closed analytics taxonomy (ARCHITECTURE §23–24). `TelemetryEvent`'s payload

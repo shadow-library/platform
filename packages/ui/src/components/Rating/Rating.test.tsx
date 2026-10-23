@@ -1,19 +1,8 @@
-/**
- * Importing npm packages
- */
-
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { Rating } from './Rating';
-
-/**
- * Declaring the constants
- */
 
 describe('Rating', () => {
   it('renders an input radio group with per-star radios', () => {

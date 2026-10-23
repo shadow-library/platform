@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { randomBytes } from 'node:crypto';
 
-/**
- * Importing user defined packages
- */
 import {
   findSessionBySecret,
   findSetCookie,
@@ -19,10 +13,6 @@ import {
 } from '../../lib';
 import { expect, test } from './fixtures';
 import { expectErrorCode } from './helpers';
-
-/**
- * Defining types
- */
 
 interface MeSession {
   id: string | number;

@@ -1,18 +1,7 @@
-/**
- * Importing npm packages
- */
 import { randomBytes, randomUUID } from 'node:crypto';
 import { deflateRawSync } from 'node:zlib';
 
 import { SignedXml } from 'xml-crypto';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 
 export interface AuthnRequestOptions {
   /** The SP's `entityId`, sent as the request's `Issuer`; identity resolves the registered service provider from it. */

@@ -1,18 +1,7 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { mutate, novelForgeDb } from '../../lib';
 import { expectCode } from './forge-arrange';
 import { buildBundle, countBibleDocuments, countEntities, countProjectsOwnedBy, expect, readVolumeRows, solidPng, storageRef, test } from './forge-bundles';
 import { createEntity, errorCode } from './forge-helpers';
-
-/**
- * Defining types
- */
 
 interface ProjectView {
   id: string;

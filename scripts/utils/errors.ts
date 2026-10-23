@@ -1,24 +1,10 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { log } from './logger.ts';
 
-/**
- * Defining types
- */
 export interface ShadowErrorOptions {
   /** Process exit code this error should surface as. Defaults to 1. */
   exitCode?: number;
   cause?: unknown;
 }
-
-/**
- * Declaring the constants
- */
 
 /**
  * Domain error for tooling failures. Every entrypoint catches this at the top level, prints `message`

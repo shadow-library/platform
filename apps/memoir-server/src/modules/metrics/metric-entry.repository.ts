@@ -1,19 +1,9 @@
-/**
- * Importing npm packages
- */
 import { and, eq, isNotNull, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { OwnerScopedRepository } from '@modules/auth';
 import { type DatabaseTransaction, type MetricEntry, schema } from '@server/database';
-
-/**
- * Defining types
- */
 
 export interface MetricEntryRegister {
   metricId: bigint;
@@ -22,10 +12,6 @@ export interface MetricEntryRegister {
   source: MetricEntry.Source;
   questLogId: bigint | null;
 }
-
-/**
- * Declaring the constants
- */
 
 @Injectable()
 export class MetricEntryRepository extends OwnerScopedRepository {

@@ -1,17 +1,7 @@
-/**
- * Importing npm packages
- */
-
 import { type Meta, type StoryObj } from '@storybook/react-vite';
 
-/**
- * Importing user defined packages
- */
 import { Spinner } from './Spinner';
 
-/**
- * Declaring the constants
- */
 const meta = {
   title: 'Components/Spinner',
   component: Spinner,

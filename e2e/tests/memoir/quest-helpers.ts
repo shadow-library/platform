@@ -1,18 +1,8 @@
-/**
- * Importing npm packages
- */
 import { type APIRequestContext, expect } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { csrfHeaders, memoirDb } from '../../lib';
 import { submitCommandWithHeaders, withAccountLockHeld } from './concurrency-helpers';
 import { type CommandOutcome, submitCommand } from './helpers';
-
-/**
- * Defining types
- */
 
 export type StatAffinity = 'discipline' | 'body' | 'wealth' | 'mind';
 

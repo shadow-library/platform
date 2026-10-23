@@ -1,16 +1,6 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { formatDuration, log, reportError, resolveBin, run, ShadowError } from './utils/index.ts';
 import { REPO_ROOT } from './workspaces.ts';
 
-/**
- * Defining types
- */
 interface Check {
   /** Label, and the identifier accepted on the command line. */
   name: string;
@@ -25,9 +15,6 @@ interface CheckResult {
   durationMs: number;
 }
 
-/**
- * Declaring the constants
- */
 const USAGE = `Usage: bun scripts/code-health.ts [check ...]
 
   knip         unreferenced files, exports, types and dependencies

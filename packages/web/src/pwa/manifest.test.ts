@@ -1,16 +1,7 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { buildManifest, manifestResponse, pwaHeadLinks, pwaHeadMeta } from './manifest';
 
-/**
- * Declaring the constants
- */
 describe('buildManifest', () => {
   it('should apply defaults and fall short_name back to name', () => {
     expect(buildManifest({ name: 'Shadow App' })).toMatchObject({ name: 'Shadow App', short_name: 'Shadow App', start_url: '/', scope: '/', display: 'standalone' });

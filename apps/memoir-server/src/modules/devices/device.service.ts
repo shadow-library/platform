@@ -1,25 +1,11 @@
-/**
- * Importing npm packages
- */
 import { Injectable, type OnModuleInit } from '@shadow-library/app';
 
-/**
- * Importing user defined packages
- */
 import { type DeltaRow, DeltaSourceRegistry, type SnapshotDeltaSource } from '@modules/sync';
 import { AppErrorCode } from '@server/classes';
 import { type Device } from '@server/database';
 
 import { DeviceRepository } from './device.repository';
 import { type DeviceUpsertDto } from './device.dto';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 function toDeltaRow(device: Device.Row): DeltaRow {
   return {

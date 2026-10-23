@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { forwardRef, type ReactElement } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { cn } from '@/lib';
 
 import { Avatar } from '../Avatar';
@@ -14,9 +8,6 @@ import { DropdownMenu } from '../DropdownMenu';
 import styles from './AccountMenu.module.css';
 import { type AccountMenuProps } from './AccountMenu.types';
 
-/**
- * Declaring the constants
- */
 function SignOutIcon(): ReactElement {
   return (
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

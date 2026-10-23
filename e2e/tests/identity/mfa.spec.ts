@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type APIRequestContext, type APIResponse } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import {
   enrollTotp,
   findSessionBySecret,
@@ -21,10 +15,6 @@ import {
 } from '../../lib';
 import { expect, test } from './fixtures';
 import { expectErrorCode, expectNoSessionCookie, expectSealedEnvelope, expectSessionCookie, flowStepOf, maxOutboxId, pollOutboxRowAfter } from './helpers';
-
-/**
- * Defining types
- */
 
 interface MfaSummary {
   enrollments: { type: string; label: string }[];

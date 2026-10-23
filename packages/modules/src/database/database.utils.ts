@@ -1,19 +1,3 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
-
 export function renderPostgresQuery(query: string, params: unknown[]): string {
   /**
    * Substituting parameters from the last to the first to avoid replacing $10 as $1 followed by a literal 0.

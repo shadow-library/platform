@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type APIResponse } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import {
   clusterTokensAvailable,
   decodeJwt,
@@ -25,10 +19,6 @@ import {
   workloadSubject,
 } from '../../lib';
 import { expect, type IdentityHarness, test } from './fixtures';
-
-/**
- * Defining types
- */
 
 interface WorkloadClient {
   readonly application: OAuthApplication;

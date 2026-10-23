@@ -1,23 +1,9 @@
-/**
- * Importing npm packages
- */
 import { and, eq } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 
-/**
- * Importing user defined packages
- */
 import { OwnerScopedRepository } from '@modules/auth';
 import { EMPTY_STREAK_STATE, type StreakState } from '@modules/rules';
 import { type DatabaseTransaction, schema, syncStamped } from '@server/database';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Injectable()
 export class QuestStreakRepository extends OwnerScopedRepository {

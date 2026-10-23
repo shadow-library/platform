@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { forwardRef } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { cn } from '@/lib';
 
 import styles from './Progress.module.css';

@@ -1,16 +1,6 @@
-/**
- * Importing npm packages
- */
 import { createHash, generateKeyPairSync, type KeyObject, randomBytes, sign } from 'node:crypto';
 
-/**
- * Importing user defined packages
- */
 import { requireProductUrl } from './env';
-
-/**
- * Defining types
- */
 
 /** The parts of identity's `register/options` answer an authenticator needs. */
 export interface RegistrationOptionsLike {

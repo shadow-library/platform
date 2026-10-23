@@ -1,25 +1,10 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { FlowDefinition, FlowManager, FlowState } from './flow-manager';
 import { FlowErrorCode } from './flow.error';
-
-/**
- * Defining types
- */
 
 interface ParsedSnapshot<StateNames extends string = string, Context extends Record<string, any> = Record<string, any>> {
   flowName: string;
   state: FlowState<StateNames, Context>;
 }
-
-/**
- * Declaring the constants
- */
 
 export class FlowRegistry {
   private readonly flows = new Map<string, FlowDefinition<any, any>>();

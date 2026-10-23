@@ -1,22 +1,8 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { METADATA_KEYS } from '@lib/constants';
 import { EnumType } from '@lib/enum-type';
 import { Field } from '@shadow-library/class-schema';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 describe('@Field', () => {
   class Custom {}

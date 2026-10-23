@@ -27,33 +27,9 @@ src/
 - Kebab-case files with role suffix (`*.service.ts`, `*.controller.ts`, `*.dto.ts`, `*.module.ts`, `*.spec.ts`).
 - Named exports + a barrel `index.ts` per folder. `PascalCase` types/classes, `camelCase` values,
   `UPPER_SNAKE_CASE` module constants. `interface` for object shapes, `type` for unions.
-- 2-space indent, semicolons, 180-col width. Comment the *why*, never the *what*.
-- Every source file (except barrels) MUST open with the section banners, in order, keeping empty ones:
-
-```ts
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
-```
-
-- Imports: external/npm block first, then internal (aliases + relative), separated by a blank line.
-  `node:` prefix for built-ins; inline `import { type X }` for type-only imports.
+- 2-space indent, semicolons, 180-col width. Comments follow the policy in `AGENTS.md` (default none).
+- Files open directly with the two import blocks: external/npm first, then internal (aliases + relative), separated by a blank line.
+  No section banners (a lint rule forbids them). `node:` prefix for built-ins; inline `import { type X }` for type-only imports.
 
 ## Entry files (canonical)
 

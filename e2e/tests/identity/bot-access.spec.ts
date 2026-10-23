@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { randomBytes } from 'node:crypto';
 
 import { type APIRequestContext, type APIResponse } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import {
   BOT_ACCESS_TOKEN_TTL_SECONDS,
   BOT_API_BUCKET,
@@ -44,10 +38,6 @@ import {
 } from '../../lib';
 import { expect, type IdentityHarness, type IdentityTeam, teamMember, test } from './fixtures';
 import { expectRefused } from './helpers';
-
-/**
- * Defining types
- */
 
 interface TokenBody {
   access_token?: string;

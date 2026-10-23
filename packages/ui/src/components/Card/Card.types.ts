@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type ComponentPropsWithoutRef, type ReactNode } from 'react';
 
-/**
- * Defining types
- */
 export type CardPadding = 'sm' | 'md' | 'lg';
 
 export interface CardProps extends ComponentPropsWithoutRef<'div'> {

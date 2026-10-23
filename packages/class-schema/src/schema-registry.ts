@@ -1,21 +1,7 @@
-/**
- * Importing npm packages
- */
 import { Class } from 'type-fest';
 
-/**
- * Importing user defined packages
- */
 import { ClassSchema } from './class-schema';
 import { METADATA_KEYS } from './constants';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 export class SchemaRegistry {
   private readonly schemas: Map<string, ClassSchema>;

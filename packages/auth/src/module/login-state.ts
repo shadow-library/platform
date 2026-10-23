@@ -1,18 +1,8 @@
-/**
- * Importing npm packages
- */
 import { timingSafeEqual } from 'node:crypto';
 
 import { Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { NAMESPACE } from '../constants';
-
-/**
- * Defining types
- */
 
 /** Everything an in-flight login needs to survive the round trip to identity and back */
 export interface LoginState {

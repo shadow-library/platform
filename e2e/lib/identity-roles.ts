@@ -1,16 +1,6 @@
-/**
- * Importing npm packages
- */
 import { randomBytes } from 'node:crypto';
 
-/**
- * Importing user defined packages
- */
 import { identityDb } from './db';
-
-/**
- * Defining types
- */
 
 export type RolePrincipalType = 'USER' | 'SERVICE_ACCOUNT' | 'ORGANISATION';
 

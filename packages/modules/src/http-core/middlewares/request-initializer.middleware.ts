@@ -1,19 +1,5 @@
-/**
- * Importing npm packages
- */
 import { AsyncHttpMiddleware, HttpRequest, HttpResponse, Middleware } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const HEADER_X_CORRELATION_ID = 'x-correlation-id';
 
 @Middleware({ type: 'onRequest', weight: 100 })

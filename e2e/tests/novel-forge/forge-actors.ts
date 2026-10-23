@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type APIRequestContext, test as base, request } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import {
   addOrganisationMember,
   assignApplicationRole,
@@ -52,10 +46,6 @@ import {
   readQuotaLimits,
   releaseBudgetPins,
 } from './forge-db';
-
-/**
- * Defining types
- */
 
 export type ForgeRole = 'NovelForgeCurator' | 'NovelForgeAdmin';
 

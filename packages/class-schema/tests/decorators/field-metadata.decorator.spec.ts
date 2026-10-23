@@ -1,21 +1,7 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { METADATA_KEYS } from '@lib/constants';
 import { FieldMetadata } from '@shadow-library/class-schema';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 describe('@FieldMetadata', () => {
   it('should set field metadata options', () => {

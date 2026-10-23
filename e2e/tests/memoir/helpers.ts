@@ -1,16 +1,6 @@
-/**
- * Importing npm packages
- */
 import { type APIRequestContext, type APIResponse } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { getProductUrl, memoirDb } from '../../lib';
-
-/**
- * Defining types
- */
 
 type MutationMethod = 'post' | 'put' | 'patch' | 'delete';
 

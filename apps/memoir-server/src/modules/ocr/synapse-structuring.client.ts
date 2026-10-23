@@ -1,25 +1,11 @@
-/**
- * Importing npm packages
- */
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { InferenceClient } from '@modules/inference';
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 
 import { type OcrLineItem, OcrStructuringClient, type OcrStructuringRequest, type OcrStructuringResult } from './ocr-structuring.client';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 const SYSTEM_PROMPT = [
   'You convert the raw text of a shop receipt into structured JSON. You never invent a value that is not in the text.',

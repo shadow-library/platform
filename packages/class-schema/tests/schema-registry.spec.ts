@@ -1,20 +1,6 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { ClassSchema, Field, Schema, SchemaRegistry } from '@shadow-library/class-schema';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 describe('SchemaRegistry', () => {
   let registry: SchemaRegistry;

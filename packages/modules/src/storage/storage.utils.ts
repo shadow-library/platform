@@ -1,19 +1,4 @@
-/**
- * Importing npm packages
- */
 import { createHash } from 'node:crypto';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 const CONTENT_TYPE_TO_EXT: Record<string, string> = {
   'image/jpeg': 'jpg',

@@ -1,15 +1,4 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { INJECTABLE_METADATA } from '../constants';
-
-/**
- * Defining types
- */
 
 export interface InjectableOptions {
   /**
@@ -17,10 +6,6 @@ export interface InjectableOptions {
    */
   transient?: boolean;
 }
-
-/**
- * Declaring the constants
- */
 
 export function Injectable(options: InjectableOptions = {}): ClassDecorator {
   return target => Reflect.defineMetadata(INJECTABLE_METADATA, options, target);

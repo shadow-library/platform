@@ -1,6 +1,3 @@
-/**
- * Importing npm packages
- */
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -8,15 +5,9 @@ import path from 'node:path';
 
 import { ESLint } from 'eslint';
 
-/**
- * Importing user defined packages
- */
 import { findScript, log, reportError, reportTestBudget, resolveBin, run, ShadowError } from './utils/index.ts';
 import { findWorkspace, findWorkspaces, REPO_ROOT, type Workspace } from './workspaces.ts';
 
-/**
- * Defining types
- */
 interface VerifyOptions {
   /** Apply fixes in place (prettier `--write`, eslint `--fix`) instead of only reporting. */
   fix: boolean;
@@ -51,9 +42,6 @@ interface VerifyTarget {
   ciScoped: boolean;
 }
 
-/**
- * Declaring the constants
- */
 const USAGE = `Usage: bun scripts/verify.ts [workspace | scripts | --all] [--fix] [--fast] [--unit] [--ci]
 
   workspace   repo-relative directory (packages/common) or package name (@shadow-library/common)

@@ -1,21 +1,7 @@
-/**
- * Importing npm packages
- */
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
 import { AppError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { Module, ModuleRef, ShadowApplication } from '@shadow-library/app';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 describe('ShadowApplication', () => {
   let app: ShadowApplication;

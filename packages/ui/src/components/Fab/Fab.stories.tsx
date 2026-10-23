@@ -1,17 +1,8 @@
-/**
- * Importing npm packages
- */
 import { type Meta, type StoryObj } from '@storybook/react-vite';
 import { type CSSProperties, type ReactNode } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { Fab } from './Fab';
 
-/**
- * Declaring the constants
- */
 function PlusIcon() {
   return (
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" aria-hidden="true">

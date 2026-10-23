@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import { Inject, Injectable, OnModuleInit } from '@shadow-library/app';
 import { AppError, Config, Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { LocalStorageProvider } from './providers/local-storage.provider';
 import { S3StorageProvider } from './providers/s3-storage.provider';
 import { DEFAULT_CONFIGS, LOGGER_NAMESPACE, STORAGE_MODULE_OPTIONS } from './storage.constants';
@@ -22,14 +16,6 @@ import {
   type StorageProvider,
 } from './storage.types';
 import { extFromContentType, sha256Hex } from './storage.utils';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 /**
  * The public object-storage surface. Refs are content-addressed (`<sha256hex>.<ext>`) so a re-upload of

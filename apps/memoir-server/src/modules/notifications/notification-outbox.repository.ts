@@ -1,18 +1,8 @@
-/**
- * Importing npm packages
- */
 import { eq, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { type NotificationOutbox, type PrimaryDatabase, schema } from '@server/database';
-
-/**
- * Defining types
- */
 
 export interface OutboxDraft {
   accountId: bigint;
@@ -26,10 +16,6 @@ export interface AccountRecipient {
   email: string | null;
   deletionState: string;
 }
-
-/**
- * Declaring the constants
- */
 
 const CLAIM_QUERY = sql`(SELECT id FROM notification_outbox WHERE status = 'pending' AND next_attempt_at <= now() ORDER BY next_attempt_at FOR UPDATE SKIP LOCKED LIMIT 1)`;
 

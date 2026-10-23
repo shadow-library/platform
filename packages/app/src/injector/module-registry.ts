@@ -1,22 +1,12 @@
-/**
- * Importing npm packages
- */
 import assert from 'node:assert';
 
 import { Class } from 'type-fest';
 import { AppError, Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { MODULE_METADATA, NAMESPACE } from '../constants';
 import { DynamicModule, ModuleMetadata, Provider, ProviderToken } from '../interfaces';
 import { DependencyGraph, DIErrors, getProviderToken } from './helpers';
 import { HookTypes, Module } from './module';
-
-/**
- * Defining types
- */
 
 type TModule = Class<unknown>;
 
@@ -29,9 +19,6 @@ interface ParsedModuleMetadata extends ModuleMetadata {
   imports?: TParsedModule[];
 }
 
-/**
- * Declaring the constants
- */
 const getModuleClass = (module: TParsedModule): TModule => ('module' in module ? module.module : module);
 const isDynamicModule = (module: TParsedModule): module is DynamicModule => 'module' in module;
 

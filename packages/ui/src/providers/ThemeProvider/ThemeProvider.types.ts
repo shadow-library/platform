@@ -1,16 +1,7 @@
-/**
- * Importing npm packages
- */
 import { type ReactNode } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { type Theme, type ThemeMode } from '@/types';
 
-/**
- * Defining types
- */
 export interface ThemeContextValue {
   /** The active theme — what `mode` currently resolves to. */
   theme: Theme;

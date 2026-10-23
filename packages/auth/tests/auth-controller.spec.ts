@@ -1,25 +1,12 @@
-/**
- * Importing npm packages
- */
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import 'reflect-metadata';
 import { type AppError } from '@shadow-library/common';
 import { type ContextService } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { AuthClient, type FetchLike } from '@shadow-library/auth';
 import { AppSessionService, AuthAccessPolicy, AuthController, resolveAuthRoutes, resolveBrowserAuthConfig } from '@shadow-library/auth/module';
 import { createTestIdP, TestIdP } from '@shadow-library/auth/testing';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const CLIENT = { id: 'svc-reports', secret: 's3cr3t' };
 const INJECTED = 'Your session expired, sign in again at https://evil.test';
 

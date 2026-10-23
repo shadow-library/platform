@@ -1,21 +1,10 @@
-/**
- * Importing npm packages
- */
-
 import { Slot, Slottable } from '@radix-ui/react-slot';
 import { forwardRef } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { cn } from '@/lib';
 
 import styles from './IconButton.module.css';
 import { type IconButtonProps } from './IconButton.types';
-
-/**
- * Declaring the constants
- */
 
 /**
  * A square, icon-only specialization of Button for scarce space and conventional actions.

@@ -1,23 +1,9 @@
-/**
- * Importing npm packages
- */
 import { and, eq, gte, lte, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { OwnerScopedRepository } from '@modules/auth';
 import { type DatabaseTransaction, schema, type Weight } from '@server/database';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Injectable()
 export class WeightRepository extends OwnerScopedRepository {

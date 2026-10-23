@@ -1,20 +1,10 @@
-/**
- * Importing npm packages
- */
-
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { Combobox } from './Combobox';
 import { type ComboboxOption } from './Combobox.types';
 
-/**
- * Declaring the constants
- */
 const people: ComboboxOption[] = [
   { value: '1', label: 'Maya Kim' },
   { value: '2', label: 'Jo Tan' },

@@ -1,10 +1,3 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { csrfHeaders, memoirDb } from '../../lib';
 import { expectApplied, submitCommandWithHeaders, withAccountLockHeld } from './concurrency-helpers';
 import { expect, test } from './fixtures';
@@ -42,10 +35,6 @@ import {
   setAccountSettings,
   startOfLocalDay,
 } from './rollover-helpers';
-
-/**
- * Defining types
- */
 
 interface DstDay {
   timeZone: string;

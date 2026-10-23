@@ -1,29 +1,15 @@
-/**
- * Importing npm packages
- */
 import { mkdir, readFile, stat, unlink, writeFile } from 'node:fs/promises';
 import { isAbsolute, join, resolve } from 'node:path';
 
 import { AppError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { StorageErrorCode } from '../storage.errors';
 import { type HeadResult, type StorageObject, type StorageProvider } from '../storage.types';
 import { contentTypeFromRef } from '../storage.utils';
 
-/**
- * Defining types
- */
-
 export interface LocalStorageProviderConfig {
   dir: string;
 }
-
-/**
- * Declaring the constants
- */
 
 /**
  * Disk-backed provider for tests and cluster-less development. Refs are content-addressed flat

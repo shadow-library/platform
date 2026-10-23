@@ -1,15 +1,9 @@
-/**
- * Importing npm packages
- */
 import assert from 'node:assert';
 
 import merge from 'deepmerge';
 import { Class } from 'type-fest';
 import { AppError, Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { InternalOperationMetadata } from '@lib/internal.types';
 
 import { Dispatcher, DispatchMetadata } from '../classes';
@@ -20,10 +14,6 @@ import { ContextId, createContextId } from '../utils';
 import { DependencyGraph, DIErrors, getProviderToken } from './helpers';
 import { InstanceWrapper } from './instance-wrapper';
 import { ModuleRef } from './module-ref';
-
-/**
- * Defining types
- */
 
 type Controller = Record<string, any>;
 
@@ -37,10 +27,6 @@ export enum HookTypes {
 interface ParsedInternalMetadata {
   enabled: boolean;
 }
-
-/**
- * Declaring the constants
- */
 
 export class Module {
   private readonly logger = Logger.getLogger(NAMESPACE, 'Module');

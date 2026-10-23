@@ -1,19 +1,9 @@
-/**
- * Importing npm packages
- */
-
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { SegmentedControl } from './SegmentedControl';
 
-/**
- * Declaring the constants
- */
 function Example(props: { onValueChange?: (value: string) => void }) {
   return (
     <SegmentedControl defaultValue="1w" aria-label="Chart period" onValueChange={props.onValueChange}>

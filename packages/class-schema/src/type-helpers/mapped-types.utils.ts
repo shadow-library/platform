@@ -1,24 +1,10 @@
-/**
- * Importing npm packages
- */
 import { Class } from 'type-fest';
 import { Reflector } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { METADATA_KEYS } from '@lib/constants';
 import { FieldSchema } from '@lib/interfaces';
 
-/**
- * Defining types
- */
-
 type IsPropertyInherited = (key: string) => boolean;
-
-/**
- * Declaring the constants
- */
 
 export function cloneClassSchema(sourceClass: Class<unknown>, fieldSchema: FieldSchema, isPropertyInherited: IsPropertyInherited = () => true): Class<unknown> {
   /* eslint-disable-next-line @typescript-eslint/no-extraneous-class */

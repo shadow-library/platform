@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type ReactNode } from 'react';
 
-/**
- * Defining types
- */
 export interface SliderProps {
   /** Single value, or `[lo, hi]` for a range. */
   value?: number | number[];

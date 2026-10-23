@@ -1,21 +1,7 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { getProviderToken, isClassProvider, isFactoryProvider, isValueProvider } from '@lib/injector/helpers';
 import { ClassProvider, FactoryProvider, ValueProvider } from '@shadow-library/app';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 describe('Provider Classifier', () => {
   describe('isValueProvider', () => {

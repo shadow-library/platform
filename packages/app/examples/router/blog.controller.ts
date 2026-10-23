@@ -1,22 +1,8 @@
-/**
- * Importing npm packages
- */
 import { Controller, Handler } from '@shadow-library/app';
 import { utils } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { OutputService } from './output.service';
 import { type BlogPost, StorageService } from './storage.service';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Controller({ cmd: 'blog' })
 export class BlogController {

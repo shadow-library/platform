@@ -1,21 +1,7 @@
-/**
- * Importing npm packages
- */
 import { Injectable } from '@shadow-library/app';
 
-/**
- * Importing user defined packages
- */
 import { OwnerScopedRepository } from '@modules/auth';
 import { type AiScheduledQuery, schema } from '@server/database';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Injectable()
 export class AiScheduledQueryRepository extends OwnerScopedRepository {

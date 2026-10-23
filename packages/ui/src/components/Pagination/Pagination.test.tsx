@@ -1,19 +1,8 @@
-/**
- * Importing npm packages
- */
-
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { Pagination } from './Pagination';
-
-/**
- * Declaring the constants
- */
 
 describe('Pagination', () => {
   it('renders a labelled nav with a range summary and the current page marked', () => {

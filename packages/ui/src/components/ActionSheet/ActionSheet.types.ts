@@ -1,15 +1,4 @@
-/**
- * Importing npm packages
- */
 import { type ButtonHTMLAttributes, type ComponentPropsWithoutRef, type ReactNode } from 'react';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 
 /** Row emphasis — `danger` marks destructive actions. */
 export type ActionSheetItemIntent = 'neutral' | 'danger';

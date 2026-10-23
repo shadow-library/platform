@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { Injectable } from '@shadow-library/app';
 
-/**
- * Importing user defined packages
- */
 import {
   accountToday,
   type CrownCadence,
@@ -24,10 +18,6 @@ import {
 import { type Account, type DailyState } from '@server/database';
 
 import { HeroStandingRepository, type ShieldHolder } from './hero-standing.repository';
-
-/**
- * Defining types
- */
 
 export type HeroPersona = 'active' | 'returner' | 'recovery';
 
@@ -55,10 +45,6 @@ export interface HeroStanding {
   persona: HeroPersona;
   comeback: ComebackStanding | null;
 }
-
-/**
- * Declaring the constants
- */
 
 const CROWN_LABELS: Record<CrownCadence, string> = { daily: 'today', weekly: 'this week' };
 

@@ -1,15 +1,3 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
 export type LoggableModule = 'journal' | 'meals' | 'weight' | 'sidequests';
 
 type EntryCapLevel = 'clear' | 'approaching' | 'reached';
@@ -24,10 +12,6 @@ export interface EntryCapAdvisory {
   /** Structural, not incidental (PRD §4.13): the cap is advisory, so no caller can read a blocking value here. */
   blocksSave: false;
 }
-
-/**
- * Declaring the constants
- */
 
 const MONTHLY_ENTRY_CAP = 100;
 

@@ -1,20 +1,10 @@
-/**
- * Importing npm packages
- */
-
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { Table } from './Table';
 import { type TableColumn } from './Table.types';
 
-/**
- * Declaring the constants
- */
 interface Service {
   id: string;
   name: string;

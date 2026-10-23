@@ -1,20 +1,4 @@
 /**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
-
-/**
  * An explicit override for the theme cookie's domain, read from `VITE_THEME_COOKIE_DOMAIN`.
  *
  * **Optional, and normally unset.** `ThemeProvider` derives the registrable parent of the current host on its

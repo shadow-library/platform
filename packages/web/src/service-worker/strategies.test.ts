@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { runStrategy } from './strategies';
 import { type CacheStrategy, type RuntimeCachingRule } from './types';
 

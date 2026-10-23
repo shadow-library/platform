@@ -1,21 +1,11 @@
-/**
- * Importing npm packages
- */
 import { randomUUID } from 'node:crypto';
 
 import { type APIRequestContext } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { pollUntil } from '../../lib';
 import { createMemoirTokenIssuer, fetchObject, RECEIPT_PNG, storeReceipt, wipeAccount } from './deletion-helpers';
 import { expect, test } from './fixtures';
 import { createDailyQuest, errorCodeOf, getAccount, memoirMutate, submitCommand, todayLocal } from './helpers';
-
-/**
- * Defining types
- */
 
 interface ExportJobView {
   id: string;

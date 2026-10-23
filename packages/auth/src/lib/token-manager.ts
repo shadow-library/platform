@@ -1,20 +1,10 @@
-/**
- * Importing npm packages
- */
 import { AppError, Logger, throwError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { NAMESPACE } from '../constants';
 import { AuthErrorCode } from '../errors';
 import { AuthClientCredential, FetchLike, ServiceTokenOptions } from '../interfaces';
 import { buildClientAuthentication } from './client-auth';
 import { DiscoveryClient } from './discovery';
-
-/**
- * Defining types
- */
 
 export interface ServiceTokenManagerOptions {
   discovery: DiscoveryClient;

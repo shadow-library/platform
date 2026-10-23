@@ -1,21 +1,10 @@
-/**
- * Importing npm packages
- */
-
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { Input } from '../Input';
 import { Select } from '../Select';
 import { FormField } from './FormField';
-
-/**
- * Declaring the constants
- */
 
 describe('FormField', () => {
   it('links the label to the control so clicking it focuses the field', async () => {

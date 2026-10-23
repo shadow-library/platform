@@ -1,19 +1,9 @@
-/**
- * Importing npm packages
- */
 import { and, asc, between, eq, getTableColumns, gt, inArray, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 
-/**
- * Importing user defined packages
- */
 import { OwnerScopedRepository } from '@modules/auth';
 import { type DeltaRecord, serializeDeltaRow } from '@modules/sync';
 import { type Account, type DatabaseTransaction, type Quest, type QuestLog, schema, syncStamped } from '@server/database';
-
-/**
- * Defining types
- */
 
 /** The terminal snapshot every `quest_logs` write carries, per ARCHITECTURE §10.3's snapshot columns. */
 export interface QuestLogWrite {
@@ -33,10 +23,6 @@ export interface QuestLogWrite {
   postponedToDate?: string | null;
   performedAt?: Date | null;
 }
-
-/**
- * Declaring the constants
- */
 
 /** States that never occupy the (account, quest, date) row against a genuine user action: a system miss (T-19) and a bare reschedule marker both yield to the real outcome. */
 const YIELDING_STATES: readonly QuestLog.State[] = ['missed', 'rescheduled'];

@@ -1,16 +1,7 @@
-/**
- * Importing npm packages
- */
 import { useCallback, useState, useSyncExternalStore } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { isServiceWorkerSupported, registerServiceWorker, type RegisterServiceWorkerOptions, type ServiceWorkerController } from './register';
 
-/**
- * Defining types
- */
 export interface UseServiceWorker {
   isSupported: boolean;
   isRegistered: boolean;
@@ -33,9 +24,6 @@ interface ServiceWorkerStore {
   applyUpdate: () => void;
 }
 
-/**
- * Declaring the constants
- */
 const SERVER_SNAPSHOT: ServiceWorkerSnapshot = { isSupported: false, isRegistered: false, updateAvailable: false, controller: null };
 
 function getServerSnapshot(): ServiceWorkerSnapshot {

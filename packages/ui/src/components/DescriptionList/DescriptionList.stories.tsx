@@ -1,18 +1,9 @@
-/**
- * Importing npm packages
- */
 import { type Meta, type StoryObj } from '@storybook/react-vite';
 
-/**
- * Importing user defined packages
- */
 import { Badge } from '../Badge';
 import { Button } from '../Button';
 import { DescriptionList } from './DescriptionList';
 
-/**
- * Declaring the constants
- */
 const meta = {
   title: 'Components/DescriptionList',
   component: DescriptionList,

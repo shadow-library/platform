@@ -1,15 +1,4 @@
-/**
- * Importing npm packages
- */
 import { type APIResponse } from '@playwright/test';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 
 export interface SetCookie {
   readonly name: string;
@@ -17,10 +6,6 @@ export interface SetCookie {
   /** Attribute names lower-cased; a flag attribute such as `HttpOnly` maps to `''`. */
   readonly attributes: ReadonlyMap<string, string>;
 }
-
-/**
- * Declaring the constants
- */
 
 export function parseSetCookie(header: string): SetCookie {
   const [pair = '', ...rest] = header.split(';');

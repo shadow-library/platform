@@ -1,20 +1,10 @@
-/**
- * Importing npm packages
- */
-
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { TreeView } from './TreeView';
 import { type TreeNode } from './TreeView.types';
 
-/**
- * Declaring the constants
- */
 const tree: TreeNode[] = [
   {
     id: 'eng',

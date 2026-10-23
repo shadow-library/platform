@@ -1,6 +1,3 @@
-/**
- * Importing side-effect packages
- */
 import 'reflect-metadata';
 import './config';
 

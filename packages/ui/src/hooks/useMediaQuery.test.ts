@@ -1,17 +1,8 @@
-/**
- * Importing npm packages
- */
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { useMediaQuery } from './useMediaQuery';
 
-/**
- * Declaring the constants
- */
 function stubMatchMedia(initial: boolean) {
   let matches = initial;
   const listeners = new Set<() => void>();

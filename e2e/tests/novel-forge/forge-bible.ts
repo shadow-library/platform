@@ -1,20 +1,10 @@
-/**
- * Importing npm packages
- */
 import { createHash } from 'node:crypto';
 
 import { type APIRequestContext } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { mutate, novelForgeDb } from '../../lib';
 import { expect } from './forge-actors';
 import { ForgeDbError } from './forge-db';
-
-/**
- * Defining types
- */
 
 export type ChapterRowStatus = 'done' | 'failed' | 'skipped';
 

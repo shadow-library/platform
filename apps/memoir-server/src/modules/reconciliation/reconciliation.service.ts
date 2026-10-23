@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import { Injectable, type OnModuleInit } from '@shadow-library/app';
 import { Config, Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { currentRuleset, EMPTY_STREAK_STATE, levelFor, recomputeStreak, type StreakEvent } from '@modules/rules';
 import { SchedulerService } from '@modules/scheduler';
 import { APP_NAME } from '@server/constants';
@@ -14,18 +8,10 @@ import { logMetric, pseudoAccountId } from '@server/telemetry';
 
 import { type AccountMirrorRow, ReconciliationRepository } from './reconciliation.repository';
 
-/**
- * Defining types
- */
-
 interface MirrorDrift {
   accountId: bigint;
   fields: string[];
 }
-
-/**
- * Declaring the constants
- */
 
 const DRIFT_SWEEP = 'reconciliation-drift';
 const STREAK_SAMPLE_SWEEP = 'reconciliation-streak-sample';

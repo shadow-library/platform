@@ -1,16 +1,5 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { requireProductUrl } from '../../lib';
 import { expect, test } from './fixtures';
-
-/**
- * Defining types
- */
 
 test.describe('memoir quick capture', () => {
   test('should log an expense through the command palette and show it on the Finance screen', async ({ page, context, memoir }) => {

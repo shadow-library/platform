@@ -1,15 +1,4 @@
-/**
- * Importing npm packages
- */
 import { existsSync, readFileSync } from 'node:fs';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 
 /**
  * Declaring the constants

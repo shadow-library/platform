@@ -1,21 +1,11 @@
-/**
- * Importing npm packages
- */
 import { type APIRequestContext, type APIResponse } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { csrfHeaders, mutate, novelForgeDb } from '../../lib';
 import { expect, test } from './forge-actors';
 import { expectCode } from './forge-arrange';
 import { listDispatchedModelCalls } from './forge-db';
 import { createEntity } from './forge-helpers';
 import { createGuardedProject, insertMystery, insertThread, insertVolumes, putBrief, writeBrief, writeFact } from './forge-story';
-
-/**
- * Defining types
- */
 
 interface Milestone {
   readonly milestoneKey: string;

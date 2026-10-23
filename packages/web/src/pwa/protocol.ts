@@ -1,12 +1,4 @@
 /**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
  * Defining types
  *
  * The message protocol shared by the client (`@shadow-library/web/pwa`) and the service worker
@@ -28,10 +20,6 @@ export interface SwEnvelope {
   channel: typeof SW_PROTOCOL;
   request: SwRequest;
 }
-
-/**
- * Declaring the constants
- */
 
 /** Tag stamped on every request envelope so the worker only reacts to this library's protocol. */
 export const SW_PROTOCOL = 'shadow-pwa';

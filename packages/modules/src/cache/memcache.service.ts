@@ -1,28 +1,14 @@
-/**
- * Importing npm packages
- */
 import type Memcached from 'memcached';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger, MaybeNull } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { DatabaseService } from '../database/database.service';
 import { LOGGER_NAMESPACE } from './cache.constants';
 import { type ICacheStore } from './cache.types';
 
-/**
- * Defining types
- */
-
 type MemcachedCallback<T> = (err: unknown, result: T) => void;
 
 type AdjustOperation = 'incr' | 'decr';
-
-/**
- * Declaring the constants
- */
 
 @Injectable()
 export class MemcacheService implements ICacheStore {

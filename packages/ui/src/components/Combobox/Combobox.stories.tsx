@@ -1,20 +1,10 @@
-/**
- * Importing npm packages
- */
-
 import { type Meta, type StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { Avatar } from '../Avatar';
 import { Combobox } from './Combobox';
 import { type ComboboxOption } from './Combobox.types';
 
-/**
- * Declaring the constants
- */
 const people: ComboboxOption[] = [
   { value: '1', label: 'Maya Kim', description: 'Platform', media: <Avatar size="xs" name="Maya Kim" /> },
   { value: '2', label: 'Jo Tan', description: 'Billing', media: <Avatar size="xs" name="Jo Tan" /> },

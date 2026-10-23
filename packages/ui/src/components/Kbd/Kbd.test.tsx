@@ -1,18 +1,7 @@
-/**
- * Importing npm packages
- */
-
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { Kbd } from './Kbd';
-
-/**
- * Declaring the constants
- */
 
 describe('Kbd', () => {
   it('renders a semantic kbd element', () => {

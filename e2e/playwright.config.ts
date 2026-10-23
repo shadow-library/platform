@@ -1,18 +1,8 @@
-/**
- * Importing npm packages
- */
 import path from 'node:path';
 
 import { defineConfig, devices } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { loadDotEnv } from './lib';
-
-/**
- * Defining types
- */
 
 /**
  * Declaring the constants

@@ -1,18 +1,9 @@
-/**
- * Importing npm packages
- */
 import { createContext, type ReactElement, useContext, useEffect, useState } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { type Theme, type ThemeMode } from '@/types';
 
 import { type ThemeContextValue, type ThemeInitScriptOptions, type ThemeProviderProps } from './ThemeProvider.types';
 
-/**
- * Declaring the constants
- */
 const DEFAULT_COOKIE_NAME = 'shadow-theme';
 
 /** A year — long enough that the choice outlives any realistic gap between visits to two of the apps. */

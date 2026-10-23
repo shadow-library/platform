@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { forwardRef, type ReactElement } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { cn } from '@/lib';
 
 import { IconButton } from '../IconButton';
@@ -13,9 +7,6 @@ import { Spinner } from '../Spinner';
 import styles from './Banner.module.css';
 import { type BannerIntent, type BannerProps } from './Banner.types';
 
-/**
- * Declaring the constants
- */
 const INTENT_PREFIX: Record<BannerIntent, string> = { info: '', success: '', warning: 'Warning: ', danger: 'Error: ' };
 
 const INTENT_GLYPH: Record<BannerIntent, ReactElement> = {

@@ -1,18 +1,8 @@
-/**
- * Importing npm packages
- */
 import { type APIRequestContext } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { memoirDb } from '../../lib';
 import { type MemoirHarness, type MemoirPersona } from './fixtures';
 import { dailyQuestDraft, memoirMutate, pullDelta, submitCommand } from './helpers';
-
-/**
- * Defining types
- */
 
 export type Strictness = 'anchor' | 'routine' | 'goal' | 'optional';
 export type IntensityMode = 'standard' | 'low_intensity' | 'high_intensity';

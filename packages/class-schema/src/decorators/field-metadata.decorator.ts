@@ -1,22 +1,8 @@
-/**
- * Importing npm packages
- */
 import assert from 'node:assert';
 
 import { Reflector } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { METADATA_KEYS } from '@lib/constants';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 export function FieldMetadata(options: Record<string, any>): PropertyDecorator {
   return (target, propertyKey) => {

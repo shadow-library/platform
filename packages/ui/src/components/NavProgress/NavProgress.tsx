@@ -1,17 +1,7 @@
-/**
- * Importing npm packages
- */
 import { useRouterState } from '@tanstack/react-router';
 import { type ReactElement } from 'react';
 
-/**
- * Importing user defined packages
- */
 import styles from './NavProgress.module.css';
-
-/**
- * Declaring the constants
- */
 
 /**
  * A thin, non-blocking progress bar pinned to the top of the viewport that reflects the router's real

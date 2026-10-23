@@ -1,20 +1,11 @@
-/**
- * Importing npm packages
- */
 import { QueryClient, queryOptions } from '@tanstack/react-query';
 import { isRedirect } from '@tanstack/react-router';
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { type AuthAccess, type AuthPrincipal } from '../auth';
 import { ApiError } from '../lib/api-error';
 import { requireAccess, resolveAccessMode } from './require-access';
 
-/**
- * Declaring the constants
- */
 const PRINCIPAL: AuthPrincipal = { sub: 'user-1', scopes: [] };
 const GATE = { loginTo: '/login', returnTo: '/library' };
 

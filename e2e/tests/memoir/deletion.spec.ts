@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { randomUUID } from 'node:crypto';
 
 import { type APIResponse } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { decodeJwt, memoirDb, pollUntil, stepUpThroughApp } from '../../lib';
 import {
   ACCOUNT_SCOPE,
@@ -29,10 +23,6 @@ import {
 } from './deletion-helpers';
 import { type DisposableAccount, expect, test } from './fixtures';
 import { errorCodeOf, getAccount, memoirMutate } from './helpers';
-
-/**
- * Defining types
- */
 
 interface StaleSeed {
   readonly accountId: string;

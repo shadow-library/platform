@@ -1,17 +1,6 @@
-/**
- * Importing npm packages
- */
 import { createHmac, createPublicKey, generateKeyPairSync, type JsonWebKey, randomBytes, sign, verify } from 'node:crypto';
 
 import { type APIRequestContext } from '@playwright/test';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 
 export type JwtClaims = Record<string, unknown>;
 

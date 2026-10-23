@@ -1,19 +1,8 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { mutate, novelForgeDb } from '../../lib';
 import { expect, test } from './forge-actors';
 import { expectCode } from './forge-arrange';
 import { writeChapterByHand } from './forge-helpers';
 import { createGuardedProject, insertThread, writeBrief } from './forge-story';
-
-/**
- * Defining types
- */
 
 interface SourceChapter {
   readonly id: string;

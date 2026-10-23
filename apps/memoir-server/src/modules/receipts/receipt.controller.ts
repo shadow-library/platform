@@ -1,22 +1,8 @@
-/**
- * Importing npm packages
- */
 import { Authenticated, RequireScope } from '@shadow-library/auth/module';
 import { Body, Get, HttpController, HttpStatus, Params, Post, RespondFor } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { ReceiptConfirmResponseDto, ReceiptCreateDto, ReceiptCreateResponseDto, ReceiptDownloadResponseDto, ReceiptRefParams } from './receipt.dto';
 import { ReceiptService } from './receipt.service';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @HttpController('/api/v1/receipts')
 @Authenticated()

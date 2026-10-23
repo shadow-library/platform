@@ -1,12 +1,4 @@
 /**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
  * Defining types
  *
  * Every Shadow backend guards mutations with a CSRF double-submit: the request must carry a header whose
@@ -31,9 +23,6 @@ export interface CsrfToken {
   mintedValue?: string;
 }
 
-/**
- * Declaring the constants
- */
 export const CSRF_COOKIE = 'csrf-token';
 export const CSRF_HEADER = 'x-csrf-token';
 export const CSRF_TTL_SECONDS = 3600;

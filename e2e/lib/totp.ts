@@ -1,16 +1,6 @@
-/**
- * Importing npm packages
- */
 import { createHmac } from 'node:crypto';
 
-/**
- * Importing user defined packages
- */
 import { sleep } from './wait';
-
-/**
- * Defining types
- */
 
 /**
  * Declaring the constants

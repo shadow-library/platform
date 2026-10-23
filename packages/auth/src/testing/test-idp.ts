@@ -1,17 +1,6 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { AppRegistration, AssuranceLevel, FetchLike, Jwk, JwtPayload, PrincipalKind, ServiceAccessRule } from '../interfaces';
 import { formatBotKey } from '../lib/bot-key';
 import { createTestSigner, TestSigner } from './signer';
-
-/**
- * Defining types
- */
 
 export interface TestIdPOptions {
   /** Overrides the issuer advertised in discovery; defaults to the bound server url, or `https://identity.test` when not serving */
@@ -258,9 +247,6 @@ export interface TestIdP {
   stop(): void;
 }
 
-/**
- * Declaring the constants
- */
 const DEFAULT_ACCESS_TOKEN_TTL_SECONDS = 600;
 const DEFAULT_APP_SESSION_TTL_SECONDS = 3600;
 const DEFAULT_AUDIENCE = 'shadow-identity';

@@ -1,20 +1,10 @@
-/**
- * Importing npm packages
- */
 import { type FocusEvent, forwardRef, type KeyboardEvent, useEffect, useMemo, useRef } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { cn, mergeRefs } from '@/lib';
 
 import { ButtonGroupContext, type ButtonGroupContextValue } from './ButtonGroup.context';
 import styles from './ButtonGroup.module.css';
 import { type ButtonGroupProps } from './ButtonGroup.types';
-
-/**
- * Declaring the constants
- */
 
 /** Direct children that participate in roving focus — enabled buttons/links only. */
 function getRovingItems(container: HTMLElement): HTMLElement[] {

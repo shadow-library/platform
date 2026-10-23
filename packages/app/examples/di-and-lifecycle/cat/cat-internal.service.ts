@@ -1,20 +1,6 @@
-/**
- * Importing npm packages
- */
 import { Inject, Injectable, OnApplicationReady, OnApplicationStop, OnModuleDestroy, OnModuleInit, Optional } from '@shadow-library/app';
 
-/**
- * Importing user defined packages
- */
 import { OutputService } from '../common/output.service';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Injectable()
 export class CatInternalService implements OnModuleInit, OnModuleDestroy, OnApplicationReady, OnApplicationStop {

@@ -1,21 +1,11 @@
-/**
- * Importing npm packages
- */
 import { and, eq, isNotNull, lt, lte, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { type AiConsent, type AiResult, type AiTask, type AiTaskAudit, nextSyncSeq, type PrimaryDatabase, schema } from '@server/database';
 
 import { type ConsentSnapshot } from './ai-worker.types';
-
-/**
- * Defining types
- */
 
 export interface ExecutionAccount {
   id: bigint;
@@ -36,10 +26,6 @@ export interface AiResultDraft {
   modelId: string;
   promptVersion: string;
 }
-
-/**
- * Declaring the constants
- */
 
 const NO_CONSENT: ConsentSnapshot = { journal_reflection_reason: false, health: false };
 

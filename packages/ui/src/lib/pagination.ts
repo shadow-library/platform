@@ -1,15 +1,4 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { type PaginationUpdate } from '@/types';
-
-/**
- * Defining types
- */
 
 /** Resolved pagination state for a list — everything a pager and a range summary need. */
 export interface PaginationInfo {
@@ -19,10 +8,6 @@ export interface PaginationInfo {
   totalPages: number;
   currentPage: number;
 }
-
-/**
- * Declaring the constants
- */
 
 /**
  * Derive page state from a total count and the current `page`/`limit`. Pure and framework-agnostic — the

@@ -1,17 +1,7 @@
-/**
- * Importing npm packages
- */
 import { Injectable } from '@shadow-library/app';
 import { APIRequest, Config, Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
-
-/**
- * Defining types
- */
 
 export interface CurrencyPair {
   base: string;
@@ -31,10 +21,6 @@ export interface FetchedRate extends CurrencyPair {
 interface FxRateClient {
   fetchRates(pairs: readonly CurrencyPair[], date?: string): Promise<FetchedRate[]>;
 }
-
-/**
- * Declaring the constants
- */
 
 interface ProviderResponse {
   rates?: Record<string, number>;

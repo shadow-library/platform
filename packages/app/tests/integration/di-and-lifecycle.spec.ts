@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it, jest } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { AppModule } from '@examples/di-and-lifecycle/app.module';
 import { CatInternalService } from '@examples/di-and-lifecycle/cat/cat-internal.service';
 import { CatModule } from '@examples/di-and-lifecycle/cat/cat.module';
@@ -14,14 +8,6 @@ import { OutputService } from '@examples/di-and-lifecycle/common/output.service'
 import { DogModule } from '@examples/di-and-lifecycle/dog/dog.module';
 import { DogService } from '@examples/di-and-lifecycle/dog/dog.service';
 import { ShadowApplication, ShadowFactory } from '@shadow-library/app';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 describe('Lifecycle', () => {
   let app: ShadowApplication;

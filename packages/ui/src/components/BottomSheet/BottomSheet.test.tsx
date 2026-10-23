@@ -1,19 +1,10 @@
-/**
- * Importing npm packages
- */
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { BottomSheet } from './BottomSheet';
 
-/**
- * Declaring the constants
- */
 function Harness({ onOpenChange, ...rest }: { onOpenChange?: (open: boolean) => void } & Partial<Parameters<typeof BottomSheet>[0]>) {
   const [open, setOpen] = useState(true);
   return (

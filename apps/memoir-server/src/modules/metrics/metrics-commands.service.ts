@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { and, eq } from 'drizzle-orm';
 import { Injectable, type OnModuleInit } from '@shadow-library/app';
 import { ValidationError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { CommandBus, type CommandContext, type CommandResult } from '@modules/commands';
 import { AppErrorCode } from '@server/classes';
 import { type Metric, type MetricEntry, schema } from '@server/database';
@@ -16,14 +10,6 @@ import { pseudoAccountId, TelemetryService } from '@server/telemetry';
 import { MetricEntryRepository } from './metric-entry.repository';
 import { MetricRepository } from './metric.repository';
 import { findThresholdOffers, serializeOffer } from './threshold-offer';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 const METRIC_CREATE = 'metric.create';
 const METRIC_UPDATE = 'metric.update';

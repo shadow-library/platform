@@ -1,20 +1,11 @@
-/**
- * Importing npm packages
- */
 import { createContext, type CSSProperties, forwardRef, type KeyboardEvent, type MouseEvent, type PointerEvent, useContext, useEffect, useRef, useState } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { useIsomorphicLayoutEffect } from '@/hooks';
 import { cn, mergeRefs } from '@/lib';
 
 import styles from './SwipeActions.module.css';
 import { type SwipeActionsActionProps, type SwipeActionsProps, type SwipeActionsSide } from './SwipeActions.types';
 
-/**
- * Defining types
- */
 interface SwipeActionsContextValue {
   openSide: SwipeActionsSide | null;
   close: () => void;
@@ -30,9 +21,6 @@ interface DragState {
   offset: number;
 }
 
-/**
- * Declaring the constants
- */
 const DIRECTION_SLOP = 8; // px of travel before the gesture commits to swipe vs scroll
 const RUBBER_BAND = 0.25; // resistance past the rail's full width
 const FULL_SWIPE_FRACTION = 0.6; // fraction of the row width that commits the first action

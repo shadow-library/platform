@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import * as Popover from '@radix-ui/react-popover';
 import { type KeyboardEvent, type PointerEvent, type ReactElement, useCallback, useId, useMemo, useRef, useState } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { useControllableState } from '@/hooks';
 import { CheckIcon } from '@/icons';
 import { cn, pad2 } from '@/lib';
@@ -14,9 +8,6 @@ import { cn, pad2 } from '@/lib';
 import styles from './TimePicker.module.css';
 import { type TimePickerProps } from './TimePicker.types';
 
-/**
- * Defining types
- */
 type Interaction = 'idle' | 'typed' | 'navigated';
 
 interface ClockParts {
@@ -24,9 +15,6 @@ interface ClockParts {
   minutes: number;
 }
 
-/**
- * Declaring the constants
- */
 function toMinutes(value: string): number | null {
   const match = /^(\d{2}):(\d{2})$/.exec(value);
   if (!match) return null;

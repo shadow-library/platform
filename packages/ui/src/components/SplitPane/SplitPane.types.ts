@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type ReactNode } from 'react';
 
-/**
- * Defining types
- */
 export type SplitDirection = 'horizontal' | 'vertical';
 
 /** A size in px (number) or a percentage of the container (`'25%'`). */

@@ -1,23 +1,9 @@
-/**
- * Importing npm packages
- */
 import { Injectable, type OnModuleInit } from '@shadow-library/app';
 
-/**
- * Importing user defined packages
- */
 import { DeltaRepository, DeltaSourceRegistry, type KeysetDeltaSource, type SnapshotDeltaSource } from '@modules/sync';
 import { type ExpenseCategory, schema } from '@server/database';
 
 import { ExpenseCategoryRepository } from './expense-category.repository';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 function toCategoryRow(category: ExpenseCategory.Row): Record<string, unknown> {
   const archivedAt = category.archivedAt?.toISOString() ?? null;

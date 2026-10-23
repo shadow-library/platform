@@ -1,24 +1,10 @@
-/**
- * Importing npm packages
- */
 import { forwardRef, Module, OnApplicationReady, OnApplicationStop, OnModuleDestroy, OnModuleInit } from '@shadow-library/app';
 
-/**
- * Importing user defined packages
- */
 import { CatModule } from '../cat/cat.module';
 import { CommonModule } from '../common/common.module';
 import { OutputService } from '../common/output.service';
 import { DogController } from './dog.controller';
 import { DogService } from './dog.service';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Module({
   imports: [CommonModule, forwardRef(() => CatModule)],

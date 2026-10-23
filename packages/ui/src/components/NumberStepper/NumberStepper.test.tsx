@@ -1,21 +1,11 @@
-/**
- * Importing npm packages
- */
-
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { type ReactElement, useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { NumberStepper } from './NumberStepper';
 import { type NumberStepperProps } from './NumberStepper.types';
 
-/**
- * Declaring the constants
- */
 function FallbackStepper({ fallback, onValueChange, ...props }: NumberStepperProps & { fallback: number }): ReactElement {
   const [value, setValue] = useState<number | null>(null);
   return (

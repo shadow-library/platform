@@ -1,18 +1,7 @@
-/**
- * Importing npm packages
- */
-
 import { type Decorator, definePreview } from '@storybook/react-vite';
 import { useEffect } from 'react';
 
-/**
- * Importing user defined packages
- */
 import '@/styles/index.css';
-
-/**
- * Declaring the constants
- */
 
 /** Applies the toolbar-selected theme to the preview root, exactly as a consumer would. */
 const withTheme: Decorator = (Story, context) => {

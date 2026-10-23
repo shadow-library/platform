@@ -1,16 +1,6 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { matchPath } from './match-path';
-
-/**
- * Declaring the constants
- */
 
 describe('matchPath', () => {
   it('matches the destination itself', () => {

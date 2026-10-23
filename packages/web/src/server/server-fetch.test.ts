@@ -1,15 +1,5 @@
-/**
- * Importing npm packages
- */
 import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 interface RecordedFetch {
   url: string;
   init: RequestInit;

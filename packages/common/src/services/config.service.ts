@@ -1,24 +1,14 @@
-/**
- * Importing npm packages
- */
 import fs from 'node:fs';
 import path from 'node:path';
 
 import { FSWatcher, watch } from 'chokidar';
 
-/**
- * Importing user defined packages
- */
 import { AppError } from '@lib/errors';
 import { Utils } from '@lib/internal.utils';
 import { tryCatch } from '@lib/shorthands';
 import { utils } from '@lib/utils';
 
 import { type LoggerInstance } from './logger/logger.types';
-
-/**
- * Defining types
- */
 
 export interface ConfigOptions<T = any> {
   envKey?: string;
@@ -57,9 +47,6 @@ export interface ConfigRecords {
   'log.dir': string;
 }
 
-/**
- * Declaring the constants
- */
 const DEFAULT_CONFIG_OPTIONS: ConfigOptions = {};
 const INTEGER_REGEX = /^-?\d+$/;
 const NUMBER_REGEX = /^-?\d+(\.\d+)?$/;

@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type ReactNode } from 'react';
 
-/**
- * Defining types
- */
 export interface TokenValue {
   value: string;
   valid: boolean;

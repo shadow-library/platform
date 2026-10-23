@@ -1,18 +1,8 @@
-/**
- * Importing npm packages
- */
 import { afterEach, describe, expect, it } from 'bun:test';
 
 import Fastify, { type FastifyInstance } from 'fastify';
 
-/**
- * Importing user defined packages
- */
 import { EventStream, type EventStreamOptions, type HttpResponse } from '@shadow-library/fastify';
-
-/**
- * Defining types
- */
 
 interface OpenedStream {
   response: Response;
@@ -20,10 +10,6 @@ interface OpenedStream {
   disconnect: () => void;
   stream: () => EventStream;
 }
-
-/**
- * Declaring the constants
- */
 
 describe('EventStream', () => {
   let app: FastifyInstance | undefined;

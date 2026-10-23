@@ -1,19 +1,5 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { ErrorCode } from '@lib/errors';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const SERVICE_SCHEME = 'svc://';
 
 /** A DNS label, optionally dotted so `pulse-server.<namespace>` can target another namespace */

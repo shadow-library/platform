@@ -1,17 +1,7 @@
-/**
- * Importing npm packages
- */
 import { type APIResponse, expect, request, test } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { apiContext, readSeedManifest, requireProductUrl } from '../../lib';
 import { cookieFromStorageState, scopedMutate } from './helpers';
-
-/**
- * Defining types
- */
 
 /**
  * Declaring the constants

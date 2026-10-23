@@ -1,20 +1,9 @@
-/**
- * Importing npm packages
- */
-
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createRef } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { Switch } from './Switch';
-
-/**
- * Declaring the constants
- */
 
 describe('Switch', () => {
   it('exposes a switch role named by its label', () => {

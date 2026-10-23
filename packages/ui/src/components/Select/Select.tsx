@@ -1,21 +1,12 @@
-/**
- * Importing npm packages
- */
 import * as SelectPrimitive from '@radix-ui/react-select';
 import { type ComponentPropsWithoutRef, forwardRef } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { CheckIcon, ChevronDownIcon } from '@/icons';
 import { cn } from '@/lib';
 
 import styles from './Select.module.css';
 import { type SelectGroupProps, type SelectItemProps, type SelectProps } from './Select.types';
 
-/**
- * Declaring the constants
- */
 /**
  * Single choice from an enumerable list, built on Radix Select. The trigger inherits the Input
  * field surface; the listbox defines the overlay surface (radius 8, e2 shadow, 4px inset, 32px

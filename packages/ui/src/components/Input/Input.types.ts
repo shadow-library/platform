@@ -1,15 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type InputHTMLAttributes, type ReactNode } from 'react';
 
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 export type InputSize = 'sm' | 'md' | 'lg';
 
 export interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'size' | 'prefix'> {

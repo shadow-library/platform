@@ -1,20 +1,11 @@
-/**
- * Importing npm packages
- */
 import { type KeyboardEvent, type ReactElement, useState } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { useControllableState } from '@/hooks';
 import { cn } from '@/lib';
 
 import styles from './Rating.module.css';
 import { type RatingProps } from './Rating.types';
 
-/**
- * Declaring the constants
- */
 function StarIcon() {
   return (
     <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">

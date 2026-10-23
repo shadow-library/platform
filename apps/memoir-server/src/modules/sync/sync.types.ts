@@ -1,15 +1,3 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
 /** A row already reduced to JSON-safe values: the delta envelope is serialized free-form, so bigints and Dates must be resolved by the source. */
 export type DeltaRow = Record<string, unknown>;
 

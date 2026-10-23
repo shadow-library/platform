@@ -1,18 +1,7 @@
-/**
- * Importing npm packages
- */
-
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { Avatar, AvatarGroup } from './Avatar';
-
-/**
- * Declaring the constants
- */
 
 describe('Avatar', () => {
   it('renders initials with an accessible name', () => {

@@ -1,18 +1,8 @@
-/**
- * Importing npm packages
- */
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, type Mock, spyOn } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { AuthClient } from '@shadow-library/auth';
 import { AppSessionService } from '@shadow-library/auth/module';
 import { createOfflineAuth, createTestIdP, type OfflineAuth } from '@shadow-library/auth/testing';
-
-/**
- * Defining types
- */
 
 /**
  * Declaring the constants

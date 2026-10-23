@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { createContext } from 'react';
 
-/**
- * Declaring the constants
- */
 export interface DrawerContextValue {
   modal: boolean;
   titleId: string;

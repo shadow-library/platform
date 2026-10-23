@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import type * as ContextMenuPrimitive from '@radix-ui/react-context-menu';
 import { type ComponentPropsWithoutRef, type ReactNode } from 'react';
 
-/**
- * Defining types
- */
 export type ContextMenuContentProps = ComponentPropsWithoutRef<typeof ContextMenuPrimitive.Content>;
 
 export interface ContextMenuItemProps extends ComponentPropsWithoutRef<typeof ContextMenuPrimitive.Item> {

@@ -1,10 +1,3 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { type JsonObject, type JsonValue, type QueryValue, type VoidFn } from '../types';
 import { ApiError, type ErrorResponse } from './api-error';
 import { type ApiResult } from './api-result';
@@ -97,10 +90,6 @@ interface RequestSpec {
   signal?: AbortSignal;
   timeoutMs?: number;
 }
-
-/**
- * Declaring the constants
- */
 
 /**
  * SSR is the absence of a browser, not the presence of Node — the check must hold under Bun, workers and

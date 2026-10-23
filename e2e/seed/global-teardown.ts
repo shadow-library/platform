@@ -1,15 +1,4 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { closeDbs } from '../lib/db';
-
-/**
- * Defining types
- */
 
 /**
  * Declaring the constants

@@ -1,16 +1,6 @@
-/**
- * Importing npm packages
- */
 import type * as SelectPrimitive from '@radix-ui/react-select';
 import { type ComponentPropsWithoutRef, type ReactNode } from 'react';
 
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 export type SelectSize = 'sm' | 'md' | 'lg';
 
 type RootProps = Pick<

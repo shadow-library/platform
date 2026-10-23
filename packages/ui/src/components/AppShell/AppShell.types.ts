@@ -1,19 +1,9 @@
-/**
- * Importing npm packages
- */
 import { type ReactNode } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { type AccountMenuProps } from '../AccountMenu';
 import { type BadgeIntent } from '../Badge';
 import { type ShellContentPadding } from '../Shell';
 import { type SidebarSwitcherOption } from '../Sidebar';
-
-/**
- * Defining types
- */
 
 /** A single destination. `to` is a TanStack route path; `params` fills its `$segments`. */
 export interface NavLeaf {

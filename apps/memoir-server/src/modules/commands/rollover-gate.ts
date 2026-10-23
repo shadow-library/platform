@@ -1,21 +1,6 @@
-/**
- * Importing npm packages
- */
 import { Injectable } from '@shadow-library/app';
 
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
 export type EnsureRolloverCurrent = (accountId: bigint) => Promise<void>;
-
-/**
- * Declaring the constants
- */
 
 /**
  * The lazy-invocation seam of ARCHITECTURE §13.1: every account-scoped command and every delta pull

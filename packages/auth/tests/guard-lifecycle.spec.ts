@@ -1,7 +1,3 @@
-/**
- * Importing npm packages
- */
-
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import 'reflect-metadata';
 import { type Response as MockResponse } from 'light-my-request';
@@ -9,15 +5,8 @@ import { Dispatcher, Module, ShadowApplication, ShadowFactory } from '@shadow-li
 import { type JSONSchema } from '@shadow-library/class-schema';
 import { Body, ContextService, FastifyModule, HttpController, Post } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { Authenticated, AuthModule } from '@shadow-library/auth/module';
 import { createTestIdP, TestIdP } from '@shadow-library/auth/testing';
-
-/**
- * Defining types
- */
 
 interface MockRouter {
   mockRequest(options: { method: string; url: string; headers?: Record<string, string>; payload?: string }): Promise<MockResponse>;

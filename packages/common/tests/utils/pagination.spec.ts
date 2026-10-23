@@ -1,21 +1,7 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { CursorPagination, OffsetPagination, PagePagination } from '@lib/interfaces';
 import { utils } from '@shadow-library/common';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 describe('Pagination Utils', () => {
   describe('normalise', () => {

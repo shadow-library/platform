@@ -1,22 +1,7 @@
-/**
- * Importing npm packages
- */
 import path from 'node:path';
 
 import { defineMain } from '@storybook/react-vite/node';
 import { mergeConfig } from 'vite';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 export default defineMain({
   stories: ['../src/**/*.stories.@(ts|tsx)', './foundations/**/*.stories.@(ts|tsx)'],

@@ -1,17 +1,7 @@
-/**
- * Importing npm packages
- */
 import { type APIRequestContext, expect, test } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { apiContext, mutate, requireProductUrl, storageStateFor } from '../../lib';
 import { type ContentMode, type CostTier, type CreatedNovel, createNovel, deleteProjectQuietly, uniqueSuffix } from './forge-helpers';
-
-/**
- * Defining types
- */
 
 interface ProjectModels {
   contentMode: ContentMode;

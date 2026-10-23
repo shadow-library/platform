@@ -1,19 +1,9 @@
-/**
- * Importing npm packages
- */
 import { renderHook } from '@testing-library/react';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { useHydrated } from './useHydrated';
-
-/**
- * Declaring the constants
- */
 
 describe('useHydrated', () => {
   it('reports true once rendered in the browser', () => {

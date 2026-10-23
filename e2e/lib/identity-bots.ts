@@ -1,14 +1,8 @@
-/**
- * Importing npm packages
- */
 import { createHash, randomBytes } from 'node:crypto';
 import { crc32 } from 'node:zlib';
 
 import { type APIRequestContext, type APIResponse, request } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { clientIpHeaders } from './client-ip';
 import { identityDb } from './db';
 import { type ProductKey, requireProductUrl } from './env';
@@ -17,10 +11,6 @@ import { type OAuthClientCredentials, TOKEN_EXCHANGE_GRANT } from './identity-oa
 import { deleteRoleAssignmentsFor, findApplicationIdByName, PLATFORM_APPLICATION_NAME } from './identity-roles';
 import { type IdentitySession, identityStorageState } from './identity-sessions';
 import { redisGet } from './redis';
-
-/**
- * Defining types
- */
 
 export type BotGrantLevel = 'read' | 'write';
 

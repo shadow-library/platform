@@ -1,19 +1,8 @@
-/**
- * Importing npm packages
- */
-
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { Alert } from './Alert';
-
-/**
- * Declaring the constants
- */
 
 describe('Alert', () => {
   it('renders the title and body with the intent set', () => {

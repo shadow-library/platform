@@ -1,6 +1,3 @@
-/**
- * Importing npm packages
- */
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -8,14 +5,8 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { TimePicker } from './TimePicker';
 
-/**
- * Declaring the constants
- */
 const ROW_HEIGHT = 36;
 const LIST_HEIGHT = 240;
 const COMPONENTS_DIR = path.join(import.meta.dirname, '..');

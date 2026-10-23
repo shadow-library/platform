@@ -1,25 +1,10 @@
-/**
- * Importing npm packages
- */
 import { type SQL, sql } from 'drizzle-orm';
 import { type AnyPgColumn } from 'drizzle-orm/pg-core';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 
 /** Any table whose rows carry a `sync_seq` drawn from the global sequence (ARCHITECTURE §10.1). */
 export interface SyncSeqTable {
   syncSeq: AnyPgColumn;
 }
-
-/**
- * Declaring the constants
- */
 
 export function nextSyncSeq(): SQL {
   return sql`nextval('sync_seq')`;

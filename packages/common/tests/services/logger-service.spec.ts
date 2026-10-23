@@ -1,20 +1,6 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it, jest, spyOn } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { ConsoleTransport, Logger } from '@shadow-library/common';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 describe('Logger Service', () => {
   const winstonLogger = Logger['logger'];

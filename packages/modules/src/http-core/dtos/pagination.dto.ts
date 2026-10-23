@@ -1,18 +1,7 @@
-/**
- * Importing npm packages
- */
 import assert from 'node:assert';
 
 import { Class } from 'type-fest';
 import { EnumType, Field, Schema } from '@shadow-library/class-schema';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 
 export type SortOrder = 'asc' | 'desc';
 
@@ -29,10 +18,6 @@ export interface IPaginationQuery<T extends string = string> {
   sortOrder: SortOrder;
   sortBy: T;
 }
-
-/**
- * Declaring the constants
- */
 
 const SortOrder = EnumType.create<SortOrder>('SortOrder', ['asc', 'desc']);
 

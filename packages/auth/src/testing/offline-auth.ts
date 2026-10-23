@@ -1,20 +1,10 @@
-/**
- * Importing npm packages
- */
 import { type Provider } from '@shadow-library/app';
 
-/**
- * Importing user defined packages
- */
 import { type AuthClientConfig } from '../interfaces';
 import { AuthClient } from '../lib/auth-client';
 import { AppSessionService } from '../module/app-session.service';
 import { type AuthRoutePaths, type BrowserAuthOptions, resolveAuthRoutes, resolveBrowserAuthConfig } from '../module/config';
 import { createTestIdP, type TestIdP, type TestIdPOptions, type TestTokenInput } from './test-idp';
-
-/**
- * Defining types
- */
 
 export interface OfflineAuthOptions extends Omit<TestIdPOptions, 'serve'> {
   browser?: BrowserAuthOptions;
@@ -39,9 +29,6 @@ export interface OfflineAuth {
   stop(): void;
 }
 
-/**
- * Declaring the constants
- */
 const DEFAULT_APP_ID = 'offline-app';
 const DEFAULT_CLIENT_SECRET = 'offline-secret';
 

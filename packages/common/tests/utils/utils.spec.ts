@@ -1,20 +1,6 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { utils } from '@lib/utils';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 describe('Utils', () => {
   describe('isValid', () => {

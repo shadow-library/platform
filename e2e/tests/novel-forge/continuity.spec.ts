@@ -1,21 +1,11 @@
-/**
- * Importing npm packages
- */
 import { type APIResponse } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { mutate, novelForgeDb } from '../../lib';
 import { expect, type ForgeActor, test } from './forge-actors';
 import { expectCode } from './forge-arrange';
 import { insertChapterRow } from './forge-bible';
 import { readChapterRow } from './forge-review';
 import { countKnowledge, createGuardedProject, insertEntities } from './forge-story';
-
-/**
- * Defining types
- */
 
 interface Delta {
   appeared?: string[];

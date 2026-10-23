@@ -1,19 +1,10 @@
-/**
- * Importing npm packages
- */
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { NotificationCenter } from './NotificationCenter';
 import { type NotificationItem } from './NotificationCenter.types';
 
-/**
- * Declaring the constants
- */
 const items: NotificationItem[] = [
   {
     id: '1',

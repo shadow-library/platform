@@ -1,18 +1,8 @@
-/**
- * Importing npm packages
- */
 import assert from 'node:assert';
 
 import { Controller } from '@shadow-library/app';
 
-/**
- * Importing user defined packages
- */
 import { HTTP_CONTROLLER_TYPE } from '../constants';
-
-/**
- * Defining types
- */
 
 export type MiddlewareType = 'onRequest' | 'preParsing' | 'preValidation' | 'preHandler' | 'preSerialization' | 'onSend' | 'onResponse' | 'onError';
 
@@ -32,9 +22,6 @@ export interface MiddlewareMetadata extends MiddlewareOptions {
   generates: boolean;
 }
 
-/**
- * Declaring the constants
- */
 const propertyKeys = ['generate', 'use'];
 
 export function Middleware(options: Partial<MiddlewareOptions> = {}): ClassDecorator {

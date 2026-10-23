@@ -1,10 +1,3 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import {
   addOrganisationMember,
   botApi,
@@ -21,10 +14,6 @@ import {
 } from '../../lib';
 import { expect, test } from './fixtures';
 import { expectErrorCode } from './helpers';
-
-/**
- * Defining types
- */
 
 /**
  * Declaring the constants

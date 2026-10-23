@@ -1,14 +1,8 @@
-/**
- * Importing npm packages
- */
 import { randomUUID } from 'node:crypto';
 
 import { Injectable, type OnModuleInit } from '@shadow-library/app';
 import { AppError, Config, Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { EntitlementService } from '@modules/billing';
 import { InferenceClient } from '@modules/inference';
 import { NotificationClient } from '@modules/notifications';
@@ -25,15 +19,7 @@ import { buildPrompt, parseDraft } from './prompt-contract';
 import { ReadAssemblyService } from './read-assembly.service';
 import { ScheduledQueryRepository, scheduledTaskId } from './scheduled-query.repository';
 
-/**
- * Defining types
- */
-
 type Outcome = 'done' | 'failed' | 'retried' | 'held' | 'dropped';
-
-/**
- * Declaring the constants
- */
 
 const BATCH_SWEEP = 'ai-batch-window';
 const RETRY_SWEEP = 'ai-retry-poll';

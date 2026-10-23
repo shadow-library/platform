@@ -1,17 +1,7 @@
-/**
- * Importing npm packages
- */
 import { type APIResponse } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { expect, test } from './fixtures';
 import { type AccountView, errorCodeOf, getAccount, memoirMutate } from './helpers';
-
-/**
- * Defining types
- */
 
 /**
  * Declaring the constants

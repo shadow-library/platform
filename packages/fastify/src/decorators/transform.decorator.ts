@@ -1,16 +1,4 @@
-/**
- * Importing npm packages
- */
-
 import { FieldMetadata, TransformerContext } from '@shadow-library/class-schema';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 
 export interface TransformOptions {
   input?: TransformTypes;
@@ -34,10 +22,6 @@ export interface InbuiltTransformers {
 export type TransformTypes = keyof CustomTransformers | keyof InbuiltTransformers;
 
 export type TransformerFn = (value: any, ctx: TransformerContext) => any;
-
-/**
- * Declaring the constants
- */
 
 export function Transform(type: TransformTypes | TransformOptions): PropertyDecorator {
   const options = typeof type === 'string' ? { input: type, output: type } : type;

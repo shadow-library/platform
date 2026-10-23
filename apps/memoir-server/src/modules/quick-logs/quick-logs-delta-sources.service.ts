@@ -1,23 +1,9 @@
-/**
- * Importing npm packages
- */
 import { Injectable, type OnModuleInit } from '@shadow-library/app';
 
-/**
- * Importing user defined packages
- */
 import { DeltaRepository, DeltaSourceRegistry, type KeysetDeltaSource, type SnapshotDeltaSource } from '@modules/sync';
 import { type MealPreset, schema } from '@server/database';
 
 import { MealPresetRepository } from './meal-preset.repository';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 function toPresetRow(preset: MealPreset.Row): Record<string, unknown> {
   return { id: String(preset.id), name: preset.name, calories: preset.calories, mealType: preset.mealType, note: preset.note };

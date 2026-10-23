@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { queryOptions, type UseQueryOptions } from '@tanstack/react-query';
 
-/**
- * Importing user defined packages
- */
 import { type ApiSurface } from '../lib/api-client';
 import { ApiError } from '../lib/api-error';
 import { type AuthAccess, type AuthLogoutResult, type AuthOrganisation, type AuthPrincipal, type AuthSwitchOrganisationResult } from './auth.types';
@@ -68,9 +62,6 @@ export interface AuthApi {
   loginUrl(returnTo?: string): string;
 }
 
-/**
- * Declaring the constants
- */
 const DEFAULT_KEY_PREFIX = ['auth'] as const;
 
 /**

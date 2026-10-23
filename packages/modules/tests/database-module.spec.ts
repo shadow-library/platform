@@ -1,15 +1,9 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
 
 import { Module, ShadowFactory } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { setConfig } from '@shadow-library/common/testing';
 
-/**
- * Importing user defined packages
- */
 import { DatabaseModule, DatabaseService, type PostgresClient } from '@shadow-library/modules/database';
 
 describe('Database Module', () => {

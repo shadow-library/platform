@@ -1,16 +1,9 @@
-/**
- * Importing user defined packages
- */
 import { mutate } from '../../lib';
 import { expect, test } from './forge-actors';
 import { expectCode } from './forge-arrange';
 import { listDispatchedModelCalls } from './forge-db';
 import { importDraft, startNextChapter, writeChapterByHand } from './forge-helpers';
 import { approveAsRead, createGuardedProject, finalizeChapterNoReview, readStaleDraft, restoreVersionAsRead } from './forge-story';
-
-/**
- * Defining types
- */
 
 interface DraftVersion {
   readonly revision: number;
@@ -26,10 +19,6 @@ interface VersionComparison {
   readonly wordsAdded: number;
   readonly wordsRemoved: number;
 }
-
-/**
- * Declaring the constants
- */
 
 function versionsPath(projectId: string, chapter: number, suffix = ''): string {
   return `/api/v1/projects/${projectId}/drafts/${chapter}/versions${suffix}`;

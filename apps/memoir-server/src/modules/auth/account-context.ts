@@ -1,26 +1,13 @@
-/**
- * Importing npm packages
- */
 import { Injectable } from '@shadow-library/app';
 import { AuthClient } from '@shadow-library/auth';
 import { Config, Logger, LRUCache } from '@shadow-library/common';
 import { ContextService } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 
 import { AccountRepository, type ProfileSnapshot } from './account.repository';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const ACCOUNT_ID_CACHE_CAPACITY = 4096;
 const ACCOUNT_CONTEXT: unique symbol = Symbol('memoir:account-context');
 

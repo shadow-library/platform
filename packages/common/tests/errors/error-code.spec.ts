@@ -1,20 +1,6 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { AppError, ErrorCode } from '@shadow-library/common';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 class CatalogErrorCode extends ErrorCode {
   static readonly NOT_FOUND_001 = CatalogErrorCode.notFound('NF_001', 'Thing not found');

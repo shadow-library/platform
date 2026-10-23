@@ -1,19 +1,9 @@
-/**
- * Importing npm packages
- */
 import { randomUUID } from 'node:crypto';
 
-/**
- * Importing user defined packages
- */
 import { csrfHeaders, memoirDb } from '../../lib';
 import { expectApplied, submitCommandWithHeaders, withAccountLockHeld } from './concurrency-helpers';
 import { expect, test } from './fixtures';
 import { getAccount, pullFullDelta, submitCommand, todayLocal } from './helpers';
-
-/**
- * Defining types
- */
 
 interface ExpenseAuditRow {
   id: string;

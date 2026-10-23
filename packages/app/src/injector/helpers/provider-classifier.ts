@@ -1,19 +1,4 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { AliasProvider, ClassProvider, FactoryProvider, Provider, ProviderToken, ValueProvider } from '../../interfaces';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 export function isClassProvider<T = any>(provider: Provider): provider is ClassProvider<T> {
   return 'useClass' in provider && typeof provider?.useClass === 'function';

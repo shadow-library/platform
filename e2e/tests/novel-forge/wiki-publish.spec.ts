@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type APIRequestContext } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { apiContext, mutate, runAll, subFor, webNovelDb } from '../../lib';
 import { expect, test } from '../web-novel/forge-fixtures';
 import {
@@ -21,10 +15,6 @@ import {
 import { auditWatermark, publishAuditSince, readServedWikiEntry, setServedWikiRevision } from '../web-novel/helpers';
 import { expectImportLanded, startFinalImport } from './forge-bundles';
 import { createEntity, type EntitySeed, pollWebNovel, reconcileUntilConverged, uniqueSuffix } from './forge-helpers';
-
-/**
- * Defining types
- */
 
 interface WikiIndex {
   items: { entryKey: string; type: string; name: string; imageUrl?: string }[];

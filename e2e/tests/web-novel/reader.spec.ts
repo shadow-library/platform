@@ -1,17 +1,6 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { apiContext, readSeedManifest, requireProductUrl, storageStateFor } from '../../lib';
 import { expect, test } from './fixtures';
 import { listShelf, webNovelMutate } from './helpers';
-
-/**
- * Defining types
- */
 
 /**
  * Declaring the constants

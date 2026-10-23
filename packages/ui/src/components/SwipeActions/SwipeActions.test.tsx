@@ -1,18 +1,9 @@
-/**
- * Importing npm packages
- */
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { SwipeActions } from './SwipeActions';
 
-/**
- * Declaring the constants
- */
 // happy-dom has no pointer-capture implementation; the component calls these on every swipe.
 beforeAll(() => {
   Element.prototype.setPointerCapture = () => undefined;

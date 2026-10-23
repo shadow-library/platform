@@ -1,16 +1,6 @@
-/**
- * Importing npm packages
- */
 import { AppError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { HttpResponse } from '../interfaces';
-
-/**
- * Defining types
- */
 
 export interface EventStreamOptions {
   /** Interval for the comment line an idle stream writes so proxy idle timeouts never cut it. Defaults to 20 seconds; `0` disables it. */
@@ -32,9 +22,6 @@ export interface EventStreamMessage {
 
 type HttpServer = HttpResponse['server'];
 
-/**
- * Declaring the constants
- */
 const DEFAULT_HEARTBEAT_MS = 20_000;
 const DEFAULT_MAX_LIFETIME_MS = 15 * 60_000;
 const DEFAULT_RETRY_MS = 3_000;

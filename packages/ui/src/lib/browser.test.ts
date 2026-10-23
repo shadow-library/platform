@@ -1,16 +1,7 @@
-/**
- * Importing npm packages
- */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { copyText, downloadTextFile } from './browser';
 
-/**
- * Declaring the constants
- */
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();

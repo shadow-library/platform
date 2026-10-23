@@ -1,6 +1,3 @@
-/**
- * Defining types
- */
 export interface BuildCheckTiming {
   /** Interval between routine checks, and the base of the failure backoff. */
   intervalMs: number;
@@ -15,9 +12,6 @@ export interface BuildCheckState {
   failures: number;
 }
 
-/**
- * Declaring the constants
- */
 export const BUILD_ID_ENDPOINT = '/build-id';
 
 export const DEFAULT_BUILD_CHECK_TIMING: BuildCheckTiming = { intervalMs: 5 * 60_000, minGapMs: 30_000, maxBackoffMs: 60 * 60_000 };

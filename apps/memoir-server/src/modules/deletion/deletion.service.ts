@@ -1,15 +1,9 @@
-/**
- * Importing npm packages
- */
 import { Injectable, Optional } from '@shadow-library/app';
 import { AppSessionService, parseCookies } from '@shadow-library/auth/module';
 import { AppError, Config, Logger } from '@shadow-library/common';
 import { ContextService } from '@shadow-library/fastify';
 import { StorageService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { AccountContext } from '@modules/auth';
 import { APP_NAME } from '@server/constants';
 import { type Account } from '@server/database';
@@ -18,16 +12,8 @@ import { logMetric, pseudoAccountId } from '@server/telemetry';
 import { DeletionRepository } from './deletion.repository';
 import { IdentityCloseClient } from './identity-close.client';
 
-/**
- * Defining types
- */
-
 /** Row absence is the terminal state — step 6 removes the row the machine lives on (see `DeletionRepository.removeAccount`). */
 export type DeletionStatus = Account.DeletionState;
-
-/**
- * Declaring the constants
- */
 
 /** One `drive` call may cross every state once, plus a re-read per contended transition. */
 const MAX_TRANSITIONS = 12;

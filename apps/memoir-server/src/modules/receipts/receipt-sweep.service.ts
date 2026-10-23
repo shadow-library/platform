@@ -1,27 +1,13 @@
-/**
- * Importing npm packages
- */
 import { Injectable, type OnModuleInit } from '@shadow-library/app';
 import { Config, Logger } from '@shadow-library/common';
 import { StorageService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { AccountRepository } from '@modules/auth';
 import { SchedulerService } from '@modules/scheduler';
 import { APP_NAME } from '@server/constants';
 import { logMetric } from '@server/telemetry';
 
 import { ReceiptRepository } from './receipt.repository';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 const PENDING_UPLOAD_SWEEP_NAME = 'receipts-pending-upload-orphans';
 const OBJECT_SWEEP_NAME = 'receipts-object-orphans';

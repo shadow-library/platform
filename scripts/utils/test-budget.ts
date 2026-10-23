@@ -1,16 +1,7 @@
-/**
- * Importing npm packages
- */
 import fs from 'node:fs';
 
-/**
- * Importing user defined packages
- */
 import { formatDuration, log } from './logger.ts';
 
-/**
- * Defining types
- */
 export interface TestCaseTiming {
   /** Repo-relative test file, taken from the `<testcase>` element's own `file` attribute. */
   file: string;
@@ -35,9 +26,6 @@ export interface TestBudgetOptions {
   ciCapMs?: number;
 }
 
-/**
- * Declaring the constants
- */
 export const DEFAULT_BUDGET_MS = 10;
 export const DEFAULT_CI_CAP_MS = 50;
 

@@ -1,18 +1,8 @@
-/**
- * Importing npm packages
- */
 import { createHash } from 'node:crypto';
 
 import { expect, test } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { createIdentitySession, createIdentityUser, deleteIdentityUser, identityDb, identitySessionContext, type IdentityUser, redisGet, updateIdentitySession } from '../lib';
-
-/**
- * Defining types
- */
 
 interface MeResponse {
   readonly userId: string;

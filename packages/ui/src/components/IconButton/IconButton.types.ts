@@ -1,15 +1,4 @@
-/**
- * Importing npm packages
- */
 import { type ButtonHTMLAttributes, type ReactNode } from 'react';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 
 /** No `text` variant — a bare icon with no hover surface has no affordance. */
 export type IconButtonVariant = 'ghost' | 'secondary' | 'primary' | 'danger';

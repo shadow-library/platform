@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { randomBytes } from 'node:crypto';
 
 import { type APIRequestContext, type APIResponse } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import {
   type ApplicationVisibility,
   auditChain,
@@ -22,10 +16,6 @@ import {
   updateApplication,
 } from '../../lib';
 import { expect, type IdentityHarness, type IdentityTeam, test } from './fixtures';
-
-/**
- * Defining types
- */
 
 /**
  * Declaring the constants

@@ -1,6 +1,3 @@
-/**
- * Defining types
- */
 export type TimePickerSize = 'sm' | 'md' | 'lg';
 
 export interface TimePickerProps {

@@ -1,20 +1,5 @@
-/**
- * Importing npm packages
- */
 import { Field, Integer, Schema } from '@shadow-library/class-schema';
 import { Sensitive } from '@shadow-library/fastify';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Schema()
 export class CreateUserBody {

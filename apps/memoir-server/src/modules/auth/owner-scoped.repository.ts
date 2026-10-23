@@ -1,31 +1,17 @@
-/**
- * Importing npm packages
- */
 import { and, eq, type SQL } from 'drizzle-orm';
 import { type AnyPgColumn, type AnyPgTable } from 'drizzle-orm/pg-core';
 import { Injectable } from '@shadow-library/app';
 import { AppError } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { type DatabaseTransaction, type PrimaryDatabase, schema, syncStamped } from '@server/database';
 
 import { AccountContext } from './account-context';
-
-/**
- * Defining types
- */
 
 /** A user-owned table: every row is scoped by a not-null `account_id` foreign key back to `accounts`. */
 export type OwnedTable = AnyPgTable & { accountId: AnyPgColumn };
 
 export type SqlExecutor = PrimaryDatabase | DatabaseTransaction;
-
-/**
- * Declaring the constants
- */
 
 /**
  * The only entry point domain repositories use to touch a user-owned table (ARCHITECTURE §8.3, §5.3).

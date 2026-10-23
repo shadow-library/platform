@@ -1,17 +1,6 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { type Entitlement } from '@server/database';
 
 import { type NormalizedBillingEvent } from './billing.types';
-
-/**
- * Defining types
- */
 
 export interface EntitlementProjection {
   tier: Entitlement.Tier;
@@ -23,10 +12,6 @@ export interface EntitlementProjection {
   trialUsed: boolean;
   appliedEventAt: Date | null;
 }
-
-/**
- * Declaring the constants
- */
 
 const MILLISECONDS_PER_DAY = 86_400_000;
 

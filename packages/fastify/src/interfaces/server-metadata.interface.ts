@@ -1,19 +1,9 @@
-/**
- * Importing npm packages
- */
 import { FastifyInstance, RouteShorthandOptions } from 'fastify';
 import { HandlerMetadata } from '@shadow-library/app';
 import { JSONSchema, SchemaClass } from '@shadow-library/class-schema';
 
-/**
- * Importing user defined packages
- */
 import { HTTP_CONTROLLER_TYPE } from '../constants';
 import { ApiOperationMetadata, HttpMethod, RouteInputSchemas } from '../decorators';
-
-/**
- * Defining types
- */
 
 declare module '@shadow-library/app' {
   export interface HandlerMetadata extends Omit<RouteShorthandOptions, 'config'> {

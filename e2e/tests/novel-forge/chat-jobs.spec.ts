@@ -1,21 +1,11 @@
-/**
- * Importing npm packages
- */
 import { type APIRequestContext, type APIResponse } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { mutate } from '../../lib';
 import { type ForgeActor } from './forge-actors';
 import { expectCode, newChatSession, newProject } from './forge-arrange';
 import { insertJob } from './forge-db';
 import { appendJobEvents, chatOrigin, readJobRow } from './forge-rows';
 import { expect, expectRefusedStream, framesOf, type SseClient, type SseFrame, type SseStream, test } from './forge-sse';
-
-/**
- * Defining types
- */
 
 interface JobEventBody {
   readonly seq: number;

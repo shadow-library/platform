@@ -1,20 +1,4 @@
 /**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
-
-/**
  * The only file in `scripts/` permitted to call `console.*` directly — every script imports these
  * instead, keeping `no-console` meaningful everywhere else while still letting tooling do its one
  * job of talking to the terminal.

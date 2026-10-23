@@ -1,18 +1,9 @@
-/**
- * Importing npm packages
- */
 import { type QueryKey, useQuery, type UseQueryOptions } from '@tanstack/react-query';
 import { useLocation, useNavigate } from '@tanstack/react-router';
 import { useEffect, useRef } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { isApiError } from '../lib/api-error';
 
-/**
- * Defining types
- */
 export type SessionGuardStatus = 'authenticated' | 'redirecting';
 
 export interface UseSessionGuardOptions<TQueryFnData = unknown, TError = unknown, TData = TQueryFnData, TQueryKey extends QueryKey = QueryKey> {
@@ -29,10 +20,6 @@ export interface UseSessionGuardOptions<TQueryFnData = unknown, TError = unknown
    */
   enabled?: boolean;
 }
-
-/**
- * Declaring the constants
- */
 
 /** The default expiry test: the session read failed with the backend's 401. */
 function isSessionExpired(error: unknown): boolean {

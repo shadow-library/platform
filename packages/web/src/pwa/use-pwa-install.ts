@@ -1,15 +1,5 @@
-/**
- * Importing npm packages
- */
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>;
   readonly userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
@@ -26,9 +16,6 @@ export interface PwaInstall {
   promptInstall: () => Promise<InstallOutcome>;
 }
 
-/**
- * Declaring the constants
- */
 const STANDALONE_QUERY = '(display-mode: standalone)';
 
 /** `appinstalled` fires in the tab that triggered the install, which itself keeps running in the browser display mode. */

@@ -1,28 +1,16 @@
-/**
- * Importing npm packages
- */
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { Slot } from '@radix-ui/react-slot';
 import { createContext, forwardRef, type MouseEvent, type ReactElement, useCallback, useContext, useMemo } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { cn } from '@/lib';
 
 import styles from './ActionSheet.module.css';
 import { type ActionSheetGroupProps, type ActionSheetItemProps, type ActionSheetProps } from './ActionSheet.types';
 
-/**
- * Defining types
- */
 interface ActionSheetContextValue {
   close: () => void;
 }
 
-/**
- * Declaring the constants
- */
 const ActionSheetContext = createContext<ActionSheetContextValue | null>(null);
 
 /**

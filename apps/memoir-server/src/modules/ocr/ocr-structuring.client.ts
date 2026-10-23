@@ -1,17 +1,7 @@
-/**
- * Importing npm packages
- */
 import { Injectable } from '@shadow-library/app';
 
-/**
- * Importing user defined packages
- */
 import { type InferencePlan } from '@modules/inference';
 import { AppErrorCode } from '@server/classes';
-
-/**
- * Defining types
- */
 
 export interface OcrLineItem {
   label: string;

@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type ReactNode } from 'react';
 
-/**
- * Defining types
- */
 export interface HoverCardProps<T = unknown> {
   /** The trigger — an entity reference (mention, link, avatar). Rendered via Slot. */
   children: ReactNode;

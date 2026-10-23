@@ -1,15 +1,5 @@
-/**
- * Importing npm packages
- */
 import { createContext } from 'react';
 
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 export interface ShellMobileNavContextValue {
   /** Whether the shell has a sidebar to project into the mobile nav drawer. */
   hasSidebar: boolean;
@@ -22,10 +12,6 @@ export interface ShellMobileNavAreaContextValue {
   /** Closes the mobile nav drawer — Sidebar items call it after navigating. */
   close: () => void;
 }
-
-/**
- * Declaring the constants
- */
 
 /** Provided by Shell; lets TopNavigation surface the hamburger that opens the mobile nav drawer. */
 export const ShellMobileNavContext = createContext<ShellMobileNavContextValue | null>(null);

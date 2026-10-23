@@ -1,20 +1,10 @@
-/**
- * Importing npm packages
- */
 import { Injectable } from '@shadow-library/app';
 
-/**
- * Importing user defined packages
- */
 import { type Entitlement } from '@server/database';
 
 import { AiReadRepository, type Rows } from './ai-read.repository';
 import { type ExecutionAccount } from './ai-worker.repository';
 import { type AssembledContext, type ConsentSnapshot, type ReadAssembly, type ReadDataClass } from './ai-worker.types';
-
-/**
- * Defining types
- */
 
 export interface AssemblyRequest {
   account: ExecutionAccount;
@@ -22,10 +12,6 @@ export interface AssemblyRequest {
   consents: ConsentSnapshot;
   now: Date;
 }
-
-/**
- * Declaring the constants
- */
 
 /** `jsonb` and `JSON.stringify` both refuse a bigint, and every id in this schema is one. */
 function jsonSafe(rows: Rows): Record<string, unknown>[] {

@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type APIResponse } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { mutate, novelForgeDb } from '../../lib';
 import { expect, type ForgeActor, test } from './forge-actors';
 import { expectCode, newProject } from './forge-arrange';
@@ -20,10 +14,6 @@ import {
   rebaselineProposal,
 } from './forge-bible';
 import { expectStatus, uniqueSuffix } from './forge-helpers';
-
-/**
- * Defining types
- */
 
 interface LedgerEntryResponse {
   id: string;

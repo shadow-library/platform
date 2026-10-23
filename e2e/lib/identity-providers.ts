@@ -1,17 +1,7 @@
-/**
- * Importing npm packages
- */
 import { type APIRequestContext, type APIResponse } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { identityDb } from './db';
 import { identityMutate } from './identity-auth';
-
-/**
- * Defining types
- */
 
 export type SocialProviderKind = 'GOOGLE' | 'MICROSOFT' | 'APPLE';
 

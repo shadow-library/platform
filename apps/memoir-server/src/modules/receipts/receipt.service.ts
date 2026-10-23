@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { Injectable } from '@shadow-library/app';
 import { AppError, Config, Logger } from '@shadow-library/common';
 import { StorageService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { AccountContext } from '@modules/auth';
 import { AppErrorCode } from '@server/classes';
 import { type DatabaseTransaction, type Receipt } from '@server/database';
@@ -16,10 +10,6 @@ import { logMetric } from '@server/telemetry';
 
 import { type ReceiptCreateDto } from './receipt.dto';
 import { ReceiptRepository } from './receipt.repository';
-
-/**
- * Defining types
- */
 
 interface UploadIssued {
   ref: string;
@@ -31,10 +21,6 @@ interface DownloadIssued {
   url: string;
   expiresAt: string;
 }
-
-/**
- * Declaring the constants
- */
 
 const PRESIGN_EXPIRES_SECONDS = 900;
 

@@ -1,19 +1,4 @@
-/**
- * Importing npm packages
- */
 import { useEffect, useLayoutEffect } from 'react';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 /**
  * `useLayoutEffect` warns when it runs during SSR — the server can't run layout effects — so libraries

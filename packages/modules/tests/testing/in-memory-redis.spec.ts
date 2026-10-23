@@ -1,22 +1,8 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it } from 'bun:test';
 
 import { AppError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { InMemoryRedis, TestingErrorCode } from '@shadow-library/modules/testing';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 describe('InMemoryRedis', () => {
   let now: number;

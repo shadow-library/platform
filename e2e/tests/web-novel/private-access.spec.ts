@@ -1,18 +1,8 @@
-/**
- * Importing npm packages
- */
 import { type APIRequestContext } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { findApplicationIdByName, identityDb, readSeedManifest, requireProductUrl } from '../../lib';
 import { expect, test } from './fixtures';
 import { followRedirect, readAccessMode, WEB_NOVEL_SESSION_COOKIE } from './helpers';
-
-/**
- * Defining types
- */
 
 /**
  * Declaring the constants

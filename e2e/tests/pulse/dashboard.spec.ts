@@ -1,20 +1,10 @@
-/**
- * Importing npm packages
- */
 import { randomBytes } from 'node:crypto';
 
 import { type APIRequestContext } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { requireProductUrl } from '../../lib';
 import { expect, test } from './fixtures';
 import { createPublishedTemplate, insertNotificationJob, type NotificationChannel, type NotificationJobStatus } from './helpers';
-
-/**
- * Defining types
- */
 
 interface DeliveryStats {
   total: number;

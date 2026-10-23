@@ -1,19 +1,5 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { type RuntimeCachingRule } from './types';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 /** Header stamped on cached responses so `maxAgeSeconds` freshness can be checked without extra bookkeeping. */
 const TIMESTAMP_HEADER = 'x-shadow-sw-cached-at';
 

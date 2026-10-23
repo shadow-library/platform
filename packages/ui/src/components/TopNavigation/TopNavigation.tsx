@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import { Slot } from '@radix-ui/react-slot';
 import { Children, forwardRef, isValidElement, type ReactElement, useContext } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { cn } from '@/lib';
 
 import { IconButton } from '../IconButton';
@@ -16,9 +10,6 @@ import { TopNavigationOverflowContext } from './TopNavigation.context';
 import styles from './TopNavigation.module.css';
 import { type TopNavigationItemProps, type TopNavigationProps } from './TopNavigation.types';
 
-/**
- * Declaring the constants
- */
 function MenuIcon() {
   return (
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" aria-hidden="true">

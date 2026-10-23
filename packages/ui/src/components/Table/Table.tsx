@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type KeyboardEvent, type MouseEvent, type ReactElement } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { cn } from '@/lib';
 
 import { Button } from '../Button';
@@ -13,9 +7,6 @@ import { Checkbox } from '../Checkbox';
 import styles from './Table.module.css';
 import { type TableAlign, type TableColumn, type TableProps } from './Table.types';
 
-/**
- * Declaring the constants
- */
 function SortArrow({ direction }: { direction: 'asc' | 'desc' | undefined }) {
   if (direction == null) return null;
   return (

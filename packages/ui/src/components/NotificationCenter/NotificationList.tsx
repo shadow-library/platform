@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { forwardRef, type KeyboardEvent, type MouseEvent, useState } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { useHydrated } from '@/hooks';
 import { addDays, cn, DEFAULT_LOCALE, formatLongDate, isSameDay } from '@/lib';
 
@@ -15,9 +9,6 @@ import { EmptyState } from '../EmptyState';
 import styles from './NotificationCenter.module.css';
 import { type NotificationItem, type NotificationListProps } from './NotificationCenter.types';
 
-/**
- * Declaring the constants
- */
 interface DayGroup {
   key: string;
   label: string | null;

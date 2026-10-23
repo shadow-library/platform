@@ -1,19 +1,9 @@
-/**
- * Importing npm packages
- */
 import { createHash } from 'node:crypto';
 
 import { Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { NAMESPACE } from '../constants';
 import { AppSessionToken } from '../interfaces';
-
-/**
- * Defining types
- */
 
 export interface AccessTokenKey {
   /** Hash of the session handle — the handle itself never becomes a map key */

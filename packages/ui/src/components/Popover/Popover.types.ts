@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import type * as PopoverPrimitive from '@radix-ui/react-popover';
 import { type ComponentPropsWithoutRef, type ReactNode } from 'react';
 
-/**
- * Defining types
- */
 export type PopoverProps = ComponentPropsWithoutRef<typeof PopoverPrimitive.Root>;
 
 export interface PopoverContentProps extends ComponentPropsWithoutRef<typeof PopoverPrimitive.Content> {

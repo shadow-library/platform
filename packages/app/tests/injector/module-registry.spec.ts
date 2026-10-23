@@ -1,23 +1,9 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it, jest, mock } from 'bun:test';
 import { Class } from 'type-fest';
 import { AppError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { HookTypes, InstanceWrapper, ModuleRegistry } from '@lib/injector';
 import { Controller, DynamicModule, forwardRef, Handler, Injectable, Module } from '@shadow-library/app';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 describe('ModuleRegistry', () => {
   let moduleRegistry: ModuleRegistry;

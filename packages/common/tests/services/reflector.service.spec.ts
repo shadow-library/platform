@@ -1,20 +1,6 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { Reflector } from '@shadow-library/common';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 const METADATA_KEYS = { ROUTE: 'route', INJECTABLE: Symbol('injectable'), PARAM_TYPES: 'design:paramtypes' };
 

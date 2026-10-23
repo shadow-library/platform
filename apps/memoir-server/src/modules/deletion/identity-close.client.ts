@@ -1,24 +1,10 @@
-/**
- * Importing npm packages
- */
 import { Injectable } from '@shadow-library/app';
 import { AuthClient } from '@shadow-library/auth';
 import { Config, Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 
-/**
- * Defining types
- */
-
 export type IdentityCloseOutcome = 'closed' | 'unconfigured' | 'unavailable';
-
-/**
- * Declaring the constants
- */
 
 /**
  * Step 5's seam (ARCHITECTURE §21.3). A class token rather than a TS interface so DI has something to

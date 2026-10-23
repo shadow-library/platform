@@ -1,16 +1,6 @@
-/**
- * Importing npm packages
- */
 import type * as RadioGroupPrimitive from '@radix-ui/react-radio-group';
 import { type ComponentPropsWithoutRef, type ReactNode } from 'react';
 
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 export interface RadioGroupProps extends ComponentPropsWithoutRef<typeof RadioGroupPrimitive.Root> {
   /** Optional group heading (a `<legend>`-style label); omit when wrapped by Form Field. */
   label?: ReactNode;

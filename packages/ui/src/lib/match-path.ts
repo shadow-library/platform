@@ -1,22 +1,8 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 export interface MatchPathOptions {
   /** Match the destination only, never its descendants. Always true for the root path. @default false */
   exact?: boolean;
 }
 
-/**
- * Declaring the constants
- */
 /** Drops the query, the hash and any trailing slash so `/a/`, `/a?x=1` and `/a` compare equal. */
 function normalize(path: string): string {
   const bare = path.split(/[?#]/, 1)[0] ?? '';

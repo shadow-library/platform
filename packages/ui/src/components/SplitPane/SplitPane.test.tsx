@@ -1,18 +1,9 @@
-/**
- * Importing npm packages
- */
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { SplitPane } from './SplitPane';
 
-/**
- * Declaring the constants
- */
 function Workspace({ collapsible = false }: { collapsible?: boolean }) {
   return (
     <SplitPane direction="horizontal">

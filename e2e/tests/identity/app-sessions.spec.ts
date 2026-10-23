@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { randomBytes } from 'node:crypto';
 
 import { type APIRequestContext, type APIResponse } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import {
   addOrganisationMember,
   type AppSessionApi,
@@ -36,10 +30,6 @@ import {
 } from '../../lib';
 import { expect, type IdentityHarness, test } from './fixtures';
 import { expectErrorCode } from './helpers';
-
-/**
- * Defining types
- */
 
 interface SessionApp {
   readonly application: OAuthApplication;

@@ -1,19 +1,9 @@
-/**
- * Importing npm packages
- */
 import { Promisable } from 'type-fest';
 
 import { CallHandler, Injectable, Interceptor, InterceptorContext } from '@shadow-library/app';
 
-/**
- * Importing user defined packages
- */
 import { CacheService } from './cache.service';
 import { LoggerService } from './logger.service';
-
-/**
- * Defining types
- */
 
 export type CacheKey = string | ((...args: any[]) => string);
 
@@ -21,10 +11,6 @@ export interface CacheOptions {
   key: CacheKey;
   ttl?: number;
 }
-
-/**
- * Declaring the constants
- */
 
 @Injectable()
 export class CacheInterceptor implements Interceptor {

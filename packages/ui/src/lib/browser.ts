@@ -1,20 +1,4 @@
 /**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
-
-/**
  * Copy text to the clipboard, resolving to whether it succeeded — drive a "Copied" affordance off the
  * result. Reads `navigator.clipboard` lazily, so importing this module is safe on the server; only call
  * it from a client event handler.

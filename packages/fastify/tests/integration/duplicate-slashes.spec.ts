@@ -1,21 +1,7 @@
-/**
- * Importing npm packages
- */
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { Dispatcher, Module, ShadowApplication, ShadowFactory } from '@shadow-library/app';
 
-/**
- * Importing user defined packages
- */
 import { FastifyModule, FastifyRouter, Get, HttpController, Query } from '@shadow-library/fastify';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @HttpController('/api')
 class EchoController {

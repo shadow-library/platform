@@ -1,20 +1,6 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { AuthErrorCode } from '../errors';
 import { BotGrantLevel, RoleCatalogManifest, RoleManifest } from '../interfaces';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const BOT_GRANT_LEVELS: readonly BotGrantLevel[] = ['read', 'write'];
 
 const invalid = (reason: string): never => {

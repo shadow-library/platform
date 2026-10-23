@@ -6,14 +6,6 @@ import { type AchievementId } from '@modules/rules';
 import { type CosmeticUnlock, type DatabaseTransaction, type PrimaryDatabase, schema } from '@server/database';
 
 /**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
-
-/**
  * `achievements_earned`/`titles_earned`/`cosmetic_unlocks` are grant-frozen (ARCHITECTURE §10.4: INSERT
  * + SELECT only), so this repository never updates or deletes them — every write is an `onConflictDoNothing`
  * insert against the natural-key `U`, which is what makes every grant idempotent under replay. The one

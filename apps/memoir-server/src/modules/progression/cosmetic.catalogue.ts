@@ -1,9 +1,5 @@
 import { type AchievementId } from '@modules/rules';
 
-/**
- * Defining types
- */
-
 type CosmeticKind = 'badge' | 'hero_accent' | 'theme_accent';
 
 export interface CosmeticDefinition {
@@ -14,10 +10,6 @@ export interface CosmeticDefinition {
   readonly priceCoins: number | null;
   readonly unlockedByAchievementId?: AchievementId;
 }
-
-/**
- * Declaring the constants
- */
 
 /**
  * Reference data, not user data (ADR-0009) — a code-side constant rather than a seeded table, mirroring

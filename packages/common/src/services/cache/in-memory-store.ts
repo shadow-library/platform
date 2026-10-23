@@ -1,19 +1,4 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { AppError } from '../../errors';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 export class InMemoryStore {
   private readonly store = new Map<string, any>();

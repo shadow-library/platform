@@ -1,18 +1,8 @@
-/**
- * Importing npm packages
- */
-
 import { type Meta, type StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { Pagination } from './Pagination';
 
-/**
- * Declaring the constants
- */
 const meta = {
   title: 'Components/Pagination',
   component: Pagination,

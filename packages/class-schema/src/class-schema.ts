@@ -1,21 +1,11 @@
-/**
- * Importing npm packages
- */
 import merge from 'deepmerge';
 import { Class } from 'type-fest';
 
-/**
- * Importing user defined packages
- */
 import { BRAND, Integer, METADATA_KEYS } from './constants';
 import { SchemaOptions } from './decorators';
 import { EnumType } from './enum-type';
 import { AnyFieldSchema, JSONSchema, JSONSchemaType, ParsedSchema } from './interfaces';
 import { SchemaComposerMetadata } from './internal.types';
-
-/**
- * Defining types
- */
 
 export type SchemaClass = EnumType | Class<unknown> | [Class<unknown>];
 
@@ -24,9 +14,6 @@ export interface ClassSchemaOptions {
   dependencies?: Set<Class<unknown>>;
 }
 
-/**
- * Declaring the constants
- */
 const primitiveTypes: Class<unknown>[] = [String, Number, Boolean, Object, Array];
 
 /** Maps the runtime type tokens to their JSON Schema `type`, including the library-defined `Integer` marker */

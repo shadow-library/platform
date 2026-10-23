@@ -1,23 +1,8 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
 export interface PkcePair {
   verifier: string;
   challenge: string;
 }
 
-/**
- * Declaring the constants
- */
 const encoder = new TextEncoder();
 
 export function randomUrlSafeString(bytes = 32): string {

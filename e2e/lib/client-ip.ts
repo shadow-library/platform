@@ -1,18 +1,8 @@
-/**
- * Importing npm packages
- */
 import { randomInt } from 'node:crypto';
 
 import { type BrowserContext } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { clearIpState } from './redis';
-
-/**
- * Defining types
- */
 
 /**
  * Declaring the constants

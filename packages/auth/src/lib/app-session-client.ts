@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { AppError, Logger, throwError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { NAMESPACE } from '../constants';
 import { AuthErrorCode } from '../errors';
 import {
@@ -19,10 +13,6 @@ import {
   SwitchedOrganisation,
 } from '../interfaces';
 import { retryAfterSecondsOf, TOO_MANY_REQUESTS } from './transport';
-
-/**
- * Defining types
- */
 
 export interface AppSessionClientOptions {
   /** Where identity is reached over the back channel; the public issuer unless `identityUrl` overrides it */

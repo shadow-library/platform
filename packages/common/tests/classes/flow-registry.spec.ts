@@ -1,16 +1,6 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { AppError, FlowDefinition, FlowManager, FlowRegistry } from '@shadow-library/common';
-
-/**
- * Defining types
- */
 
 type AuthState = 'start' | 'credentials-verified' | 'mfa-pending' | 'mfa-verified' | 'authenticated' | 'failed';
 type ApprovalState = 'pending' | 'approved' | 'rejected';
@@ -27,10 +17,6 @@ interface ApprovalContext {
   approver?: string;
   reason?: string;
 }
-
-/**
- * Declaring the constants
- */
 
 const authFlowDefinition: FlowDefinition<AuthState, AuthContext> = {
   name: 'auth',

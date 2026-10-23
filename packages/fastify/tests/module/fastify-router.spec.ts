@@ -1,25 +1,11 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it, jest, type Mock } from 'bun:test';
 import { fastify, FastifyInstance } from 'fastify';
 import { DispatchMetadata } from '@shadow-library/app';
 import { ClassSchema, Field, Schema } from '@shadow-library/class-schema';
 import { AppError, Config, Fn, Logger, utils, withThis } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { HTTP_CONTROLLER_TYPE } from '@lib/constants';
 import { ContextService, FastifyModule, FastifyRouter, HttpMethod, Sensitive, ServerMetadata, Transform } from '@shadow-library/fastify';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 describe('FastifyRouter', () => {
   let router: FastifyRouter;

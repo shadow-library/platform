@@ -1,15 +1,3 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
 export type SortOrder = 'asc' | 'desc';
 
 export type PaginationMode = 'offset' | 'page' | 'cursor';

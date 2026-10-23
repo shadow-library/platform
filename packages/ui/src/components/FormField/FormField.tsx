@@ -1,20 +1,11 @@
-/**
- * Importing npm packages
- */
 import { cloneElement, forwardRef, isValidElement, type ReactElement, useId } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { cn } from '@/lib';
 
 import { FormFieldContext } from './FormField.context';
 import styles from './FormField.module.css';
 import { type FormFieldProps } from './FormField.types';
 
-/**
- * Declaring the constants
- */
 function AlertIcon() {
   return (
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" aria-hidden="true">

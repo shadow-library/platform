@@ -1,22 +1,8 @@
-/**
- * Importing npm packages
- */
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import Transport from 'winston-transport';
 
-/**
- * Importing user defined packages
- */
 import { Logger } from '@shadow-library/common';
 import { silenceLogger } from '@shadow-library/common/testing';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 describe('silenceLogger', () => {
   const messages: string[] = [];

@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type ComponentPropsWithoutRef, type ReactNode } from 'react';
 
-/**
- * Defining types
- */
 export type ShellContentPadding = 'none' | 'sm' | 'md' | 'lg';
 
 export interface ShellProps extends ComponentPropsWithoutRef<'div'> {

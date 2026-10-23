@@ -1,15 +1,4 @@
-/**
- * Importing npm packages
- */
 import { type ButtonHTMLAttributes, type ComponentPropsWithoutRef, type ReactNode } from 'react';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 
 export interface BottomNavigationProps extends ComponentPropsWithoutRef<'nav'> {
   /** Controlled selected item value. */

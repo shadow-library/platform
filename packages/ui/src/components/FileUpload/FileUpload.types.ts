@@ -1,6 +1,3 @@
-/**
- * Defining types
- */
 export type FileStatus = 'queued' | 'uploading' | 'complete' | 'error';
 
 export interface FileItem {

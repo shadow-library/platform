@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type APIRequestContext, type APIResponse } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { apiContext, csrfHeaders, mutate, PERSONAS, runAll, subFor } from '../../lib';
 import { expect, test } from '../web-novel/forge-fixtures';
 import {
@@ -38,10 +32,6 @@ import {
 } from '../web-novel/helpers';
 import { expectImportLanded, startFinalImport } from './forge-bundles';
 import { createEntity, type EntitySeed, jsonOrUndefined, pollWebNovel, reconcileUntilConverged, uniqueSuffix } from './forge-helpers';
-
-/**
- * Defining types
- */
 
 interface NovelDetail {
   title: string;

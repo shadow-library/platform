@@ -1,16 +1,6 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { type ServiceWorkerController } from '../pwa/register';
 import { type OfflineEntryMeta, OfflineStore } from './offline-store';
 
-/**
- * Defining types
- */
 export interface DownloadProgress {
   /** `'data'` while the payload is fetched/stored, `'assets'` while asset URLs are cached, `'done'` at the end. */
   phase: 'data' | 'assets' | 'done';
@@ -35,10 +25,6 @@ export interface RemoveOptions {
   assets?: string[];
   controller?: ServiceWorkerController;
 }
-
-/**
- * Declaring the constants
- */
 
 /**
  * Orchestrates downloading content for offline use: it persists the payload in the {@link OfflineStore}

@@ -1,16 +1,6 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { addDays, addMonths, buildMonthMatrix, isSameDay, pad2, parseISODate, startOfMonth, toISODate } from './date';
-
-/**
- * Declaring the constants
- */
 
 describe('pad2', () => {
   it('zero-pads single digits', () => {

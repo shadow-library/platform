@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import { Injectable, type OnModuleInit } from '@shadow-library/app';
 import { AppError, ValidationError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { AccountContext, AccountRepository } from '@modules/auth';
 import { type HeroStanding, HeroStandingService } from '@modules/progression';
 import { type DeltaRow, DeltaSourceRegistry, type SnapshotDeltaSource } from '@modules/sync';
@@ -15,15 +9,7 @@ import { type Account, schema } from '@server/database';
 
 import { type AccountPatchDto, type NotificationPrefsDto, type OnboardingDto } from './account.dto';
 
-/**
- * Defining types
- */
-
 export type AccountView = Account.Row & { notificationPrefs: NotificationPrefsDto };
-
-/**
- * Declaring the constants
- */
 
 /** ARCHITECTURE §10.3: the three account-level email categories, all default OFF; stored jsonb starts `{}`. */
 function withDefaultNotificationPrefs(prefs: unknown): NotificationPrefsDto {

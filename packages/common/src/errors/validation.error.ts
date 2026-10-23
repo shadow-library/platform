@@ -1,18 +1,8 @@
-/**
- * Importing npm packages
- */
 import { JsonObject } from 'type-fest';
 
-/**
- * Importing user defined packages
- */
 import { utils } from '@lib/utils';
 
 import { AppError, AppErrorObject, ErrorCode, SerializedAppError } from './app.error';
-
-/**
- * Defining types
- */
 
 export interface FieldError {
   field: string;

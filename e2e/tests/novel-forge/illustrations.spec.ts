@@ -1,20 +1,10 @@
-/**
- * Importing npm packages
- */
 import { type APIResponse } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { mutate, novelForgeDb } from '../../lib';
 import { type ForgeActor } from './forge-actors';
 import { expectCode } from './forge-arrange';
 import { expect, insertUnselectedIllustration, readIllustrationRows, setIllustrationStatus, solidPng, storageRef, test } from './forge-bundles';
 import { createEntity, jsonOrUndefined } from './forge-helpers';
-
-/**
- * Defining types
- */
 
 interface IllustrationView {
   id: string;

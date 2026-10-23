@@ -1,19 +1,9 @@
-/**
- * Importing npm packages
- */
 import { Logger, utils } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { NAMESPACE } from '../constants';
 import { AuthErrorCode } from '../errors';
 import { CheckInput, CheckOptions, FetchLike } from '../interfaces';
 import { isThrottled, retryAfterHint, retryAfterSecondsOf, TOO_MANY_REQUESTS } from './transport';
-
-/**
- * Defining types
- */
 
 export interface PdpClientOptions {
   /** Where identity is reached over the back channel; the public issuer unless `identityUrl` overrides it */

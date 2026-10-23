@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import { eq } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 
-/**
- * Importing user defined packages
- */
 import { OwnerScopedRepository } from '@modules/auth';
 import { appendExpenseAudit, type DatabaseTransaction, type ExpenseAuditEntry, schema } from '@server/database';
 

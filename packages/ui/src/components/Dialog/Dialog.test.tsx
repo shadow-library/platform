@@ -1,19 +1,8 @@
-/**
- * Importing npm packages
- */
-
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { ConfirmDialog, Dialog } from './Dialog';
-
-/**
- * Declaring the constants
- */
 
 describe('Dialog', () => {
   it('opens from its trigger with the title as the accessible name', async () => {

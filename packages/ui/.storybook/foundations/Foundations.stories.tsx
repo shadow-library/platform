@@ -1,28 +1,15 @@
-/**
- * Importing npm packages
- */
-
 import { type Meta, type StoryObj } from '@storybook/react-vite';
 import { type ReactNode } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { cn } from '@/lib';
 
 import styles from './Foundations.module.css';
 
-/**
- * Defining types
- */
 interface TokenRow {
   name: string;
   cssVar: string;
 }
 
-/**
- * Declaring the constants
- */
 const surfaces: TokenRow[] = [
   { name: 'surface-app', cssVar: '--sh-surface-app' },
   { name: 'surface-card', cssVar: '--sh-surface-card' },

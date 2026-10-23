@@ -1,6 +1,3 @@
-/**
- * Importing npm packages
- */
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
@@ -9,14 +6,8 @@ import userEvent from '@testing-library/user-event';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { Sidebar, useSidebar } from './Sidebar';
 
-/**
- * Declaring the constants
- */
 const css = readFileSync(path.join(import.meta.dirname, 'Sidebar.module.css'), 'utf-8');
 
 function makeStorage(): Storage {

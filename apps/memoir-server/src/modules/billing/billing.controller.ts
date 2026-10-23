@@ -1,23 +1,9 @@
-/**
- * Importing npm packages
- */
 import { RequireScope } from '@shadow-library/auth/module';
 import { Body, Headers, HttpController, Params, Post, RawBody, RespondFor } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { CheckoutDto, CheckoutResponseDto, WebhookParamsDto, WebhookResponseDto } from './billing.dto';
 import { BillingWebhookService, type WebhookOutcome } from './billing-webhook.service';
 import { type CheckoutResult, EntitlementService } from './entitlement.service';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 /**
  * Two routes with deliberately different principals (ARCHITECTURE §25). Checkout is an ordinary user

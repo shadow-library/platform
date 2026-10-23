@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type APIRequestContext } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import {
   CLUSTER_HOST_CANDIDATES,
   fastForwardWebhookDelivery,
@@ -31,10 +25,6 @@ import {
 } from '../../lib';
 import { expect, test } from './fixtures';
 import { expectRefused } from './helpers';
-
-/**
- * Defining types
- */
 
 /**
  * Declaring the constants

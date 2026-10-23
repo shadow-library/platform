@@ -1,17 +1,8 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { ApiError } from './api-error';
 import { type ApiResult, call } from './api-result';
 
-/**
- * Declaring the constants
- */
 describe('call', () => {
   it('should return the typed body on an ok result', async () => {
     const result: ApiResult<{ id: string }> = { ok: true, data: { id: 'abc' } };

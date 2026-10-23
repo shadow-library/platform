@@ -1,6 +1,3 @@
-/**
- * Importing npm packages
- */
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import 'reflect-metadata';
 import { type Response as MockResponse } from 'light-my-request';
@@ -8,9 +5,6 @@ import { Dispatcher, type HandlerMetadata, Module, type ShadowApplication, Shado
 import { AppError } from '@shadow-library/common';
 import { FastifyModule, Get, HttpController, HttpMethod } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { AuthErrorCode } from '@shadow-library/auth';
 import {
   AuthAccessPolicy,
@@ -25,17 +19,10 @@ import {
 } from '@shadow-library/auth/module';
 import { createTestIdP, type TestIdP } from '@shadow-library/auth/testing';
 
-/**
- * Defining types
- */
-
 interface MockRouter {
   mockRequest(options: { method: string; url: string; headers?: Record<string, string> }): Promise<MockResponse>;
 }
 
-/**
- * Declaring the constants
- */
 const CLIENT = { id: 'svc-reports', secret: 's3cr3t' };
 const AUDIENCE = 'api://reports';
 

@@ -1,10 +1,3 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { memoirDb } from '../../lib';
 import { expectApplied } from './concurrency-helpers';
 import { expect, test } from './fixtures';

@@ -1,17 +1,7 @@
-/**
- * Importing npm packages
- */
 import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { useControllableState } from './useControllableState';
-
-/**
- * Declaring the constants
- */
 
 describe('useControllableState', () => {
   it('starts from the default value when uncontrolled', () => {

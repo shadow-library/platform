@@ -1,16 +1,6 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { type ServiceWorkerController } from '../pwa/register';
 import { deleteDatabase, isIndexedDbAvailable } from './idb';
 
-/**
- * Defining types
- */
 export interface PurgeOfflineDataOptions {
   /** IndexedDB databases to delete outright — the app's offline stores (mirror, downloads, query cache). */
   databases?: string[];
@@ -32,10 +22,6 @@ export interface PurgeIfAccountChangedOptions extends PurgeOfflineDataOptions {
   /** The signed-in account id, or `null` when signed out — signed-out is its own marked state, distinct from "never seen". */
   accountId: string | null;
 }
-
-/**
- * Declaring the constants
- */
 
 /** Delete each named database, guarded: an SSR/unsupported runtime has no IndexedDB, and a database that never opened cannot leak. */
 async function deleteDatabases(names: string[]): Promise<void> {

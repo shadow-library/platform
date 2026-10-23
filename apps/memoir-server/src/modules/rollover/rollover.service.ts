@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import { Injectable, type OnModuleInit } from '@shadow-library/app';
 import { AppError, Config, Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { applyStreakTransition, type GrantIntent, HeroLedger, RolloverGate } from '@modules/commands';
 import { ProgressionService } from '@modules/progression';
 import {
@@ -47,10 +41,6 @@ import { type Account, type DailyState, type DatabaseTransaction, type Quest, ty
 
 import { RolloverRepository } from './rollover.repository';
 
-/**
- * Defining types
- */
-
 type WalkStep = 'advanced' | 'current';
 
 interface DayContext {
@@ -71,10 +61,6 @@ interface CrownDayOutcome {
   bankedXp: number | null;
   bankedCoins: number | null;
 }
-
-/**
- * Declaring the constants
- */
 
 const ROLLOVER_ENGINE_VERSION = '1';
 

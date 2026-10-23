@@ -1,16 +1,5 @@
-/**
- * Importing npm packages
- */
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 
 /**
  * Declaring the constants

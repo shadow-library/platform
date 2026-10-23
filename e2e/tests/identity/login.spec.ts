@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { randomBytes, randomInt } from 'node:crypto';
 
 import { type APIResponse, type Page, type Response } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import {
   changeChallenge,
   enrollTotp,
@@ -26,10 +20,6 @@ import {
 } from '../../lib';
 import { expect, test } from './fixtures';
 import { expectErrorCode, maxOutboxId, pollOtp } from './helpers';
-
-/**
- * Defining types
- */
 
 interface ErrorBody {
   code?: string;

@@ -1,18 +1,8 @@
-/**
- * Importing npm packages
- */
 import { existsSync, readFileSync } from 'node:fs';
 
 import { type APIRequestContext, type APIResponse, type Browser, type BrowserContext, expect, test } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { type LoginPersona, storageStateFor } from '../../lib';
-
-/**
- * Defining types
- */
 
 /** A mutating HTTP method — the ones the CSRF double-submit guard applies to once a cookie is present. */
 type MutationMethod = 'post' | 'put' | 'patch' | 'delete';

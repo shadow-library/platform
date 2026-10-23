@@ -1,16 +1,6 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { calculatePageUpdate, derivePaginationState } from './pagination';
-
-/**
- * Declaring the constants
- */
 
 describe('derivePaginationState', () => {
   it('derives page state from total, page, and limit', () => {

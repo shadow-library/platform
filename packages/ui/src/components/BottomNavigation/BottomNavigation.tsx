@@ -1,28 +1,16 @@
-/**
- * Importing npm packages
- */
 import { Slot, Slottable } from '@radix-ui/react-slot';
 import { createContext, forwardRef, type MouseEvent, useCallback, useContext, useMemo, useState } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { cn } from '@/lib';
 
 import styles from './BottomNavigation.module.css';
 import { type BottomNavigationItemProps, type BottomNavigationProps } from './BottomNavigation.types';
 
-/**
- * Defining types
- */
 interface BottomNavigationContextValue {
   selected: string | undefined;
   select: (value: string) => void;
 }
 
-/**
- * Declaring the constants
- */
 const BottomNavigationContext = createContext<BottomNavigationContextValue | null>(null);
 
 /**

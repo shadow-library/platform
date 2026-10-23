@@ -1,26 +1,11 @@
-/**
- * Importing npm packages
- */
 import fs from 'node:fs';
 
 import { format, Logform, transports } from 'winston';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 
 export interface FileTransportOptions extends transports.FileTransportOptions {
   dirname: string;
   filename: string;
 }
-
-/**
- * Declaring the constants
- */
 
 /* istanbul ignore next */
 export class FileTransport extends transports.File {

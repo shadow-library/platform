@@ -1,20 +1,6 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { AppError, ErrorCode } from '@shadow-library/common';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 class TestErrorCode extends ErrorCode {
   static readonly CUSTOM = TestErrorCode.conflict('CUSTOM_ERROR', 'Custom error: {message}');

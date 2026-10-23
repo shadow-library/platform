@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import * as Popover from '@radix-ui/react-popover';
 import { type KeyboardEvent, type ReactElement, useEffect, useId, useMemo, useRef, useState } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { useControllableState } from '@/hooks';
 import { CheckIcon, ChevronDownIcon } from '@/icons';
 import { cn } from '@/lib';
@@ -14,9 +8,6 @@ import { cn } from '@/lib';
 import styles from './Combobox.module.css';
 import { type ComboboxOption, type ComboboxProps } from './Combobox.types';
 
-/**
- * Declaring the constants
- */
 function fold(text: string): string {
   return text
     .normalize('NFD')

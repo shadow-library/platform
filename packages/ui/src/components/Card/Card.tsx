@@ -1,20 +1,11 @@
-/**
- * Importing npm packages
- */
 import { Slot } from '@radix-ui/react-slot';
 import { createContext, forwardRef, useContext } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { cn } from '@/lib';
 
 import styles from './Card.module.css';
 import { type CardBodyProps, type CardFooterProps, type CardHeaderProps, type CardPadding, type CardProps } from './Card.types';
 
-/**
- * Declaring the constants
- */
 const PaddingContext = createContext<CardPadding>('md');
 
 /**

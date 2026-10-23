@@ -1,22 +1,12 @@
-/**
- * Importing npm packages
- */
 import { randomUUID } from 'node:crypto';
 
 import { type APIRequestContext, type APIResponse } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { mutate } from '../../lib';
 import { expect, type ForgeActor, test } from './forge-actors';
 import { expectCode } from './forge-arrange';
 import { insertContextPack, insertModelCalls, insertToolCall, insertWorkflowRun, readWorkflowRun } from './forge-db';
 import { uniqueSuffix } from './forge-helpers';
-
-/**
- * Defining types
- */
 
 interface SeededProject {
   readonly projectId: string;

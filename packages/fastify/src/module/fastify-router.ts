@@ -1,6 +1,3 @@
-/**
- * Importing npm packages
- */
 import assert from 'node:assert';
 
 import {
@@ -20,9 +17,6 @@ import { Dispatcher, DispatchMetadata, HandlerMetadata, Inject, Injectable } fro
 import { ClassSchema, JSONSchema, ParsedSchema, SchemaClass, Transformer, TransformerAction, TransformerFactory } from '@shadow-library/class-schema';
 import { AppError, Config, Fn, Logger, MaybeUndefined, utils } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { EventStream } from '../classes';
 import { FASTIFY_CONFIG, FASTIFY_INSTANCE, HTTP_CONTROLLER_INPUTS, HTTP_CONTROLLER_TYPE, NAMESPACE } from '../constants';
 import { HttpMethod, MiddlewareMetadata, MiddlewareType, SensitiveDataType, TransformerFn } from '../decorators';
@@ -30,10 +24,6 @@ import { AsyncRouteHandler, CallbackRouteHandler, HttpRequest, HttpResponse, Ser
 import { ContextService } from '../services';
 import { INBUILT_TRANSFORMERS } from './data-transformers';
 import { type FastifyConfig } from './fastify-module.interface';
-
-/**
- * Defining types
- */
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -116,9 +106,6 @@ interface RouteArtifacts {
   transformers: Transformers;
 }
 
-/**
- * Declaring the constants
- */
 const httpMethods = Object.values(HttpMethod).filter(m => m !== HttpMethod.ALL) as Exclude<HttpMethod, HttpMethod.ALL>[];
 const DEFAULT_ARTIFACTS: RouteArtifacts = { masks: {}, transformers: {} };
 const isClassSchema = (schema: object): schema is SchemaClass => typeof schema === 'function' || (Array.isArray(schema) && typeof schema[0] === 'function');

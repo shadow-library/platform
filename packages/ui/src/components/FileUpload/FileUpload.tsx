@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type DragEvent, type ReactElement, useEffect, useRef, useState } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { cn } from '@/lib';
 
 import { Button } from '../Button';
@@ -13,9 +7,6 @@ import { Progress } from '../Progress';
 import styles from './FileUpload.module.css';
 import { type FileItem, type FileUploadProps } from './FileUpload.types';
 
-/**
- * Declaring the constants
- */
 let counter = 0;
 
 function formatBytes(bytes: number): string {

@@ -1,7 +1,3 @@
-/**
- * Importing npm packages
- */
-
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
@@ -9,16 +5,10 @@ import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { Sidebar } from '../Sidebar';
 import { TopNavigation } from '../TopNavigation';
 import { Page, Shell, useShellNav } from './Shell';
 
-/**
- * Declaring the constants
- */
 function stubMatchMedia(desktop: boolean) {
   let matches = desktop;
   const listeners = new Set<() => void>();

@@ -1,11 +1,4 @@
-/**
- * Importing npm packages
- */
 import { type ComponentPropsWithoutRef, type ReactNode } from 'react';
-
-/**
- * Defining types
- */
 
 /** Row is the default detail-panel grammar; column stacks for narrow contexts; grid tiles facts. */
 export type DescriptionListLayout = 'row' | 'column' | 'grid';

@@ -1,17 +1,7 @@
-/**
- * Importing packages with side effects
- */
-
-/**
- * Importing npm packages
- */
 import { Config } from '@shadow-library/common';
 import { FastifyModule } from '@shadow-library/fastify';
 import { HttpCoreModule } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { ActionJobsModule } from '@modules/actions';
 import { AiModule } from '@modules/ai';
 import { BibleAuditModule } from '@modules/audit';
@@ -36,14 +26,6 @@ import { PublishingHttpModule } from '@modules/publishing/publishing-http.module
 import { RefinementModule } from '@modules/refinement';
 import { ReviewModule } from '@modules/review';
 import { CUSTOM_DATA_TRANSFORMERS } from '@server/common';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 const AppHttpCoreModule = HttpCoreModule.forRoot({
   openapi: { normalizeSchemaIds: true },

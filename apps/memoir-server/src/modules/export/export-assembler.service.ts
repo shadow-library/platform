@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { Injectable, type OnModuleInit } from '@shadow-library/app';
 import { AppError, Config, Logger } from '@shadow-library/common';
 import { StorageService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { SchedulerService } from '@modules/scheduler';
 import { APP_NAME } from '@server/constants';
 import { type Account, type ExportJob, getSensitivityManifest } from '@server/database';
@@ -16,10 +10,6 @@ import { logMetric } from '@server/telemetry';
 import { ExportAssemblyRepository } from './export-assembly.repository';
 import { ExportJobRepository } from './export-job.repository';
 import { EXPORT_TABLE_REGISTRY, type ExportTableEntry } from './export-table-registry';
-
-/**
- * Defining types
- */
 
 interface AccountSnapshot {
   id: string;
@@ -34,10 +24,6 @@ interface AccountSnapshot {
   coins: number;
   createdAt: string;
 }
-
-/**
- * Declaring the constants
- */
 
 const EXPORT_SCHEMA_VERSION = 1;
 const ASSEMBLE_SWEEP_NAME = 'export-assemble';

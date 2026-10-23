@@ -1,17 +1,6 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { StorageService } from '../storage/storage.service';
 import { type StorageProvider } from '../storage/storage.types';
 import { InMemoryStorageProvider } from './in-memory-storage.provider';
-
-/**
- * Defining types
- */
 
 export interface FakeStorageOptions {
   publicOrigin?: string;
@@ -20,9 +9,6 @@ export interface FakeStorageOptions {
   provider?: StorageProvider;
 }
 
-/**
- * Declaring the constants
- */
 const DEFAULT_PUBLIC_ORIGIN = 'https://storage.test';
 
 /**

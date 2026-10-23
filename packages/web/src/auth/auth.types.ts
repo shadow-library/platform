@@ -1,12 +1,4 @@
 /**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
  * Defining types
  *
  * The wire contract of the browser-facing auth surface every non-identity backend inherits from

@@ -1,20 +1,11 @@
-/**
- * Importing npm packages
- */
 import { Children, isValidElement, type KeyboardEvent, type PointerEvent, type ReactElement, type ReactNode, useRef, useState } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { useIsomorphicLayoutEffect } from '@/hooks';
 import { cn } from '@/lib';
 
 import styles from './SplitPane.module.css';
 import { type SplitPaneHandleProps, type SplitPanePaneProps, type SplitPaneProps, type SplitSize } from './SplitPane.types';
 
-/**
- * Declaring the constants
- */
 const COLLAPSE_SLOP = 40; // drag this many px past a collapsible pane's min to snap it collapsed
 const KEY_STEP = 16; // px moved per arrow key
 

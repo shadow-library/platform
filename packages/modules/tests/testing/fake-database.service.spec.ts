@@ -1,18 +1,8 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
 import { AppError, ErrorCode } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { FakeDatabaseService, InMemoryRedis, TestingErrorCode } from '@shadow-library/modules/testing';
-
-/**
- * Defining types
- */
 
 interface QueryChain {
   (...args: unknown[]): QueryChain;
@@ -26,9 +16,6 @@ interface QueryChain {
   transaction: QueryChain;
 }
 
-/**
- * Declaring the constants
- */
 const rejectionOf = (query: unknown): Promise<unknown> =>
   Promise.resolve(query).then(
     () => null,

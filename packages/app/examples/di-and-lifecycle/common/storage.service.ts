@@ -1,20 +1,6 @@
-/**
- * Importing npm packages
- */
 import { Injectable, OnApplicationReady, OnApplicationStop, OnModuleDestroy, OnModuleInit } from '@shadow-library/app';
 
-/**
- * Importing user defined packages
- */
 import { OutputService } from './output.service';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Injectable({ transient: true })
 export class StorageService implements OnModuleInit, OnModuleDestroy, OnApplicationReady, OnApplicationStop {

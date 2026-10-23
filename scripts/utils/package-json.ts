@@ -1,17 +1,8 @@
-/**
- * Importing npm packages
- */
 import fs from 'node:fs';
 import path from 'node:path';
 
-/**
- * Importing user defined packages
- */
 import { ShadowError } from './errors.ts';
 
-/**
- * Defining types
- */
 /** An `exports` entry: either a raw asset path (`"./dist/styles.css"`) or a conditions map. */
 export type PackageExport = string | Record<string, string>;
 
@@ -29,10 +20,6 @@ export interface PackageJson {
   bin?: string | Record<string, string>;
   [key: string]: unknown;
 }
-
-/**
- * Declaring the constants
- */
 
 /** Reads and parses `<dir>/package.json`, failing with a diagnostic message rather than a raw JSON parse error. */
 export function readPackageJson(dir: string): PackageJson {

@@ -1,15 +1,3 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
 /** Minimal JWK shape; declared locally because the WebCrypto `JsonWebKey` lib type is not loaded */
 export interface Jwk {
   kty?: string;

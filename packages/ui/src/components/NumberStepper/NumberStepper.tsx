@@ -1,20 +1,11 @@
-/**
- * Importing npm packages
- */
 import { type ChangeEvent, forwardRef, type KeyboardEvent, useEffect, useRef, useState } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { useControllableState, useIsomorphicLayoutEffect } from '@/hooks';
 import { cn } from '@/lib';
 
 import styles from './NumberStepper.module.css';
 import { type NumberStepperProps } from './NumberStepper.types';
 
-/**
- * Declaring the constants
- */
 const PARTIAL = /^-?\d*\.?\d*$/;
 
 function decimalsOf(input: number): number {

@@ -1,21 +1,7 @@
-/**
- * Importing npm packages
- */
 import { AppError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { addDays, addMonths, formatLocalDate, localDateOf, parseLocalDate } from '@modules/rules';
 import { type Subscription } from '@server/database';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 const DEFAULT_CUSTOM_INTERVAL_DAYS = 30;
 

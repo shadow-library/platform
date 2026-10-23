@@ -1,16 +1,6 @@
-/**
- * Importing npm packages
- */
 import { performance } from 'node:perf_hooks';
 
-/**
- * Importing user defined packages
- */
 import { AppError } from '../../errors';
-
-/**
- * Defining types
- */
 
 type UintArray = Uint8Array | Uint16Array | Uint32Array;
 
@@ -21,9 +11,6 @@ export interface LRUCacheOptions {
   ttl?: number;
 }
 
-/**
- * Declaring the constants
- */
 const MAX_8BIT_INTEGER = Math.pow(2, 8);
 const MAX_16BIT_INTEGER = Math.pow(2, 16);
 const MAX_32BIT_INTEGER = Math.pow(2, 32);

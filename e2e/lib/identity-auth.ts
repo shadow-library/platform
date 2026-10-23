@@ -1,20 +1,10 @@
-/**
- * Importing npm packages
- */
 import { type APIRequestContext, type APIResponse, request } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { mutate } from './api';
 import { clientIpHeaders } from './client-ip';
 import { requireProductUrl } from './env';
 import { TotpAuthenticator, totpCode } from './totp';
 import { type AssertionBody, type RegistrationOptionsLike, type SoftAuthenticator } from './webauthn';
-
-/**
- * Defining types
- */
 
 type MutationMethod = 'post' | 'put' | 'patch' | 'delete';
 

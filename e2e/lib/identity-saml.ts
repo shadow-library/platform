@@ -1,21 +1,11 @@
-/**
- * Importing npm packages
- */
 import { randomBytes } from 'node:crypto';
 
 import { type APIRequestContext, type APIResponse } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { identityDb } from './db';
 import { requireProductUrl } from './env';
 import { identityMutate } from './identity-auth';
 import { type AuthnRequest } from './saml-sp';
-
-/**
- * Defining types
- */
 
 export type SamlNameIdFormat = 'EMAIL' | 'PERSISTENT';
 

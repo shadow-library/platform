@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { and, asc, between, eq, isNull, lte, min, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { EMPTY_STREAK_STATE, type StreakState } from '@modules/rules';
 import {
   type Account,
@@ -22,10 +16,6 @@ import {
   schema,
   syncStamped,
 } from '@server/database';
-
-/**
- * Defining types
- */
 
 export interface AccountCurrency {
   timezone: string;
@@ -65,10 +55,6 @@ export interface ReturnerEventDraft {
   shieldPending: boolean;
   intensityMode: Account.IntensityMode;
 }
-
-/**
- * Declaring the constants
- */
 
 /**
  * Rollover is a system process: it runs for an account nobody is necessarily requesting as, so — like

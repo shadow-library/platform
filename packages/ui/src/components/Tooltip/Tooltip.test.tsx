@@ -1,18 +1,7 @@
-/**
- * Importing npm packages
- */
-
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { Tooltip, TooltipProvider } from './Tooltip';
-
-/**
- * Declaring the constants
- */
 
 describe('Tooltip', () => {
   it('renders the trigger and shows content when open', () => {

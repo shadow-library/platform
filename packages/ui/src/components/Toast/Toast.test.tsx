@@ -1,6 +1,3 @@
-/**
- * Importing npm packages
- */
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
@@ -10,14 +7,8 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { Toaster } from './Toast';
-/**
- * Importing user defined packages
- */
 import { toast } from './Toast.store';
 
-/**
- * Declaring the constants
- */
 const css = readFileSync(path.join(import.meta.dirname, 'Toast.module.css'), 'utf-8');
 
 afterEach(() => {

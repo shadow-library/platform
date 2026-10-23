@@ -1,21 +1,7 @@
-/**
- * Importing npm packages
- */
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { Dispatcher, Module, ShadowApplication, ShadowFactory } from '@shadow-library/app';
 
-/**
- * Importing user defined packages
- */
 import { Cookie, FastifyModule, FastifyRouter, Get, Headers, HttpController, Post, RawBody } from '@shadow-library/fastify';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @HttpController('/inputs')
 class InputsController {

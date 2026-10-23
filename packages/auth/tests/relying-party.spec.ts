@@ -1,24 +1,11 @@
-/**
- * Importing npm packages
- */
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { createHash } from 'node:crypto';
 
 import { AppError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { createPkcePair, RelyingParty } from '@shadow-library/auth/rp';
 import { createTestIdP, TestIdP } from '@shadow-library/auth/testing';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const CLIENT_ID = 'web-app';
 const CLIENT_SECRET = 'web-secret';
 const REDIRECT_URI = 'https://app.test/auth/callback';

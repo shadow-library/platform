@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { Injectable } from '@shadow-library/app';
 import { AppError } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { AppErrorCode } from '@server/classes';
 
 import { CommandLogRepository } from './command-log.repository';

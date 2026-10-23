@@ -1,20 +1,10 @@
-/**
- * Importing npm packages
- */
-
 import { type Meta, type StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { Badge } from '../Badge';
 import { DataGrid } from './DataGrid';
 import { type GridColumn } from './DataGrid.types';
 
-/**
- * Declaring the constants
- */
 interface Service {
   id: string;
   name: string;

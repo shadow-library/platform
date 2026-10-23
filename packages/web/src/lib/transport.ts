@@ -1,10 +1,3 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { type ApiResult } from './api-result';
 
 /**
@@ -29,7 +22,3 @@ export interface ServerFetchSpec {
 }
 
 export type ServerFetch = <T>(spec: ServerFetchSpec) => Promise<ApiResult<T>>;
-
-/**
- * Declaring the constants
- */

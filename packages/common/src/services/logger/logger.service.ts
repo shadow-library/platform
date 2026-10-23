@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import fastRedact from 'fast-redact';
 import { createLogger, format as customFormat, Logform } from 'winston';
 import Transport from 'winston-transport';
 
-/**
- * Importing user defined packages
- */
 import { AppError } from '@lib/errors';
 import { MaybeUndefined } from '@lib/interfaces';
 
@@ -15,10 +9,6 @@ import { Config } from '../config.service';
 import { format as formats } from './formats';
 import { type LoggerInstance } from './logger.types';
 import { ConsoleTransport, FileTransport } from './transports';
-
-/**
- * Defining types
- */
 
 export type LogData = Record<string | number | symbol, unknown>;
 
@@ -36,9 +26,6 @@ interface ContextProviderConfig {
 /** Declared in `logger.types` so `ConfigService` can name it without importing this module, which needs `Config` at construction */
 export type Logger = LoggerInstance;
 
-/**
- * Declaring the constants
- */
 const noop = new Transport({ log: () => {} }); // eslint-disable-line @typescript-eslint/no-empty-function
 
 class LoggerStatic {

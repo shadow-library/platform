@@ -1,12 +1,5 @@
-/**
- * Importing npm packages
- */
-
 import { type APIRequestContext, type APIResponse } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import {
   APPLE_ISSUER,
   type AuthModeSnapshot,
@@ -36,10 +29,6 @@ import {
 } from '../../lib';
 import { expect, test } from './fixtures';
 import { expectErrorCode, expectSealedEnvelope } from './helpers';
-
-/**
- * Defining types
- */
 
 interface SocialStart {
   flowId: string;

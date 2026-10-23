@@ -1,17 +1,8 @@
-/**
- * Importing npm packages
- */
 import { type Meta, type StoryObj } from '@storybook/react-vite';
 import { type CSSProperties, useState } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { SwipeActions } from './SwipeActions';
 
-/**
- * Declaring the constants
- */
 function ArchiveIcon() {
   return (
     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

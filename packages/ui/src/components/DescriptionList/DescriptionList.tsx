@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { forwardRef, type ReactNode, useRef, useState } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { CheckIcon } from '@/icons';
 import { cn } from '@/lib';
 
@@ -14,9 +8,6 @@ import { toast } from '../Toast';
 import styles from './DescriptionList.module.css';
 import { type DescriptionListItemProps, type DescriptionListProps } from './DescriptionList.types';
 
-/**
- * Declaring the constants
- */
 function CopyIcon() {
   return (
     <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

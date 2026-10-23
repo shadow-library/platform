@@ -1,15 +1,4 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { type AsyncModuleOptions } from '../internal.utils';
-
-/**
- * Defining types
- */
 
 export interface ICacheStore {
   get<T = any>(key: string): Promise<T | null>;

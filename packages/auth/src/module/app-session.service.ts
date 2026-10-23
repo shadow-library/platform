@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { AppError, Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { NAMESPACE } from '../constants';
 import { AuthErrorCode } from '../errors';
 import { AppRegistration, AppSessionOrganisation, AppSessionToken, AuthPrincipal, UserInfo } from '../interfaces';
@@ -17,10 +11,6 @@ import { ResolvedBrowserAuthConfig } from './config';
 import { expireCookie, serializeCookie } from './cookie';
 import { decodeLoginState, encodeLoginState, LoginState, matchesState } from './login-state';
 import { SessionRegistry } from './session-registry';
-
-/**
- * Defining types
- */
 
 export interface LoginRedirect {
   url: string;

@@ -1,21 +1,11 @@
-/**
- * Importing npm packages
- */
-
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { Button } from '../Button';
 import { DropdownMenu } from './DropdownMenu';
 
-/**
- * Declaring the constants
- */
 beforeAll(() => {
   Element.prototype.hasPointerCapture ??= () => false;
   Element.prototype.setPointerCapture ??= () => {};

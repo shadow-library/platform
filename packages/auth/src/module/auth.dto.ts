@@ -1,16 +1,6 @@
-/**
- * Importing npm packages
- */
 import { Field, Schema } from '@shadow-library/class-schema';
 
-/**
- * Importing user defined packages
- */
 import { type AuthAccessMode } from '../interfaces';
-
-/**
- * Defining types
- */
 
 /**
  * Declaring the constants

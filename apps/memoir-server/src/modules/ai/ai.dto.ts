@@ -1,20 +1,5 @@
-/**
- * Importing npm packages
- */
 import { Field, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 const UUID_PATTERN = '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$';
 const CONSENT_DATA_CLASSES = ['journal_reflection_reason', 'health'];

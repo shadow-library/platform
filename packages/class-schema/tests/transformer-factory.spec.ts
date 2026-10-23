@@ -1,23 +1,9 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it, mock } from 'bun:test';
 
 import { AppError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { BRAND } from '@lib/constants';
 import { TransformerFactory } from '@shadow-library/class-schema';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 describe('TransformerFactory', () => {
   it('should throw error for custom schemas', () => {

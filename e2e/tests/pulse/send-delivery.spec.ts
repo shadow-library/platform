@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { randomInt } from 'node:crypto';
 
 import { type APIRequestContext, type APIResponse } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import {
   clusterTokensAvailable,
   deletePulseNotificationsTo,
@@ -23,10 +17,6 @@ import {
 } from '../../lib';
 import { expect, type PulseHarness, test } from './fixtures';
 import { createPublishedTemplate, createTemplate, memoirSendToken, uniqueKey } from './helpers';
-
-/**
- * Defining types
- */
 
 interface SendBody {
   status?: string;

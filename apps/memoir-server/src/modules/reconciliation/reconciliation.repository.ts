@@ -1,18 +1,8 @@
-/**
- * Importing npm packages
- */
 import { and, eq, exists, lt, or, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { type Account, type PrimaryDatabase, type Quest, type QuestLog, schema } from '@server/database';
-
-/**
- * Defining types
- */
 
 export interface AccountMirrorRow {
   accountId: bigint;
@@ -46,10 +36,6 @@ export interface StreakLogRow {
   strictness: Quest.Strictness;
   intensityModeAtLog: Account.IntensityMode;
 }
-
-/**
- * Declaring the constants
- */
 
 /**
  * Every method here reads or prunes across every account rather than one caller's own — the same

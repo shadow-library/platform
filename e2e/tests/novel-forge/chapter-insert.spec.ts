@@ -1,21 +1,11 @@
-/**
- * Importing npm packages
- */
 import { type APIResponse } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { mutate, novelForgeDb } from '../../lib';
 import { expect, type ForgeActor, test } from './forge-actors';
 import { expectCode } from './forge-arrange';
 import { holdAuthoringClaim, insertContextPack, insertModelCalls, releaseAuthoringClaim } from './forge-db';
 import { CHAPTER_TWO, expectStatus, writeChapterByHand } from './forge-helpers';
 import { createGuardedProject, insertEntities, insertFinalDraft, insertVolumes, insertWorldFacts, readStaleDraft } from './forge-story';
-
-/**
- * Defining types
- */
 
 interface BriefRow {
   readonly chapter: number;

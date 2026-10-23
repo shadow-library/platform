@@ -1,6 +1,3 @@
-/**
- * Importing npm packages
- */
 import crypto from 'node:crypto';
 
 import { DateTime } from 'luxon';
@@ -8,16 +5,9 @@ import { Inject, Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { HttpRequest } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { HTTP_CORE_CONFIGS, LOGGER_NAMESPACE } from '../http-core.constants';
 import { type HttpCoreModuleOptions } from '../http-core.types';
 import { type CSRFCookie, type CSRFOptions } from './csrf-token.types';
-
-/**
- * Defining types
- */
 
 type InvalidCookieReason = 'missing' | 'invalid' | 'expired';
 
@@ -31,10 +21,6 @@ interface ParsedCSRFCookie {
   token: string;
   expiresAt: number;
 }
-
-/**
- * Declaring the constants
- */
 
 @Injectable()
 export class CSRFTokenService {

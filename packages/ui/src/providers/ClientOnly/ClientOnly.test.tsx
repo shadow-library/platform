@@ -1,18 +1,8 @@
-/**
- * Importing npm packages
- */
 import { render, screen } from '@testing-library/react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { ClientOnly } from './ClientOnly';
-
-/**
- * Declaring the constants
- */
 
 describe('ClientOnly', () => {
   it('renders its children once mounted in the browser', () => {

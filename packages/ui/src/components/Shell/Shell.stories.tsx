@@ -1,21 +1,11 @@
-/**
- * Importing npm packages
- */
-
 import { type Meta, type StoryObj } from '@storybook/react-vite';
 
-/**
- * Importing user defined packages
- */
 import { BottomNavigation } from '../BottomNavigation';
 import { Button } from '../Button';
 import { Sidebar } from '../Sidebar';
 import { TopNavigation } from '../TopNavigation';
 import { Page, Shell } from './Shell';
 
-/**
- * Declaring the constants
- */
 function Dot() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">

@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { eq } from 'drizzle-orm';
 import { Injectable, type OnModuleInit } from '@shadow-library/app';
 import { ValidationError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { AccountContext } from '@modules/auth';
 import { CommandBus, type CommandContext, type CommandResult, HeroLedger } from '@modules/commands';
 import { DeltaRepository, DeltaSourceRegistry, serializeDeltaRow, type SnapshotDeltaSource } from '@modules/sync';
@@ -17,14 +11,6 @@ import { schema } from '@server/database';
 import { findCosmetic } from './cosmetic.catalogue';
 import { GrantsRepository } from './grants.repository';
 import { ProgressCountersRepository } from './progress-counters.repository';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 const TITLE_DISPLAY = 'title.display';
 const COSMETIC_PURCHASE = 'cosmetic.purchase';

@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { randomUUID } from 'node:crypto';
 
-/**
- * Importing user defined packages
- */
 import { memoirDb } from '../../lib';
 import { expect, test } from './fixtures';
 import {
@@ -23,14 +17,6 @@ import {
   submitCommands,
   todayLocal,
 } from './helpers';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 /** level.ts: level 2 costs `round(100 * 1^1.5)` = 100 XP; level 3 costs a further `round(100 * 2^1.5)` = 283 XP (ruleset.ts v1's curve, `xpToAdvance`). */
 const LEVEL_TWO_XP = 100;
@@ -87,10 +73,6 @@ async function countQuests(accountId: string): Promise<number> {
   const [row] = await memoirDb()<{ count: number }[]>`SELECT count(*)::int AS count FROM quests WHERE account_id = ${accountId}`;
   return row?.count ?? 0;
 }
-
-/**
- * Declaring the tests
- */
 
 test.describe('mixed-type command batches (memoir-sync-1)', () => {
   test('should apply a mixed-type batch in submitted order, one outcome per command, a later command observing an earlier write in the same batch, and carry x-sync-epoch on every response', async ({

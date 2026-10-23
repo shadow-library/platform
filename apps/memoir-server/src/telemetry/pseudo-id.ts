@@ -1,24 +1,10 @@
-/**
- * Importing npm packages
- */
 import { createHmac } from 'node:crypto';
 
 import { AppError, Config } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { DEV_PSEUDO_ID_SECRET } from '@server/constants';
 
 import { type PseudoId } from './events';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 /**
  * Keys every analytics event to an HMAC of the account id (ARCHITECTURE §23) instead of the id itself, so

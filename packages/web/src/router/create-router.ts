@@ -1,27 +1,13 @@
-/**
- * Importing npm packages
- */
 import { QueryClient, type QueryClientConfig } from '@tanstack/react-query';
 import { type AnyRoute, createRouter, type Router } from '@tanstack/react-router';
 import { setupRouterSsrQueryIntegration } from '@tanstack/react-router-ssr-query';
 
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 export interface CreateAppRouterOptions {
   /** Extra QueryClient config merged over the Shadow defaults. */
   queryClient?: QueryClientConfig;
   /** Additional TanStack Router options merged over (and overriding) the Shadow defaults, e.g. `defaultErrorComponent` / `defaultNotFoundComponent`. */
   router?: object;
 }
-
-/**
- * Declaring the constants
- */
 
 /**
  * Build a router the Shadow way. TanStack Start calls this once per request on the server, so the

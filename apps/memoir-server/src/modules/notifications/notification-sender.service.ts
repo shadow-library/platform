@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import { Injectable, type OnModuleInit } from '@shadow-library/app';
 import { Config, Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { SchedulerService } from '@modules/scheduler';
 import { APP_NAME } from '@server/constants';
 import { type NotificationOutbox } from '@server/database';
@@ -14,10 +8,6 @@ import { logMetric } from '@server/telemetry';
 
 import { NotificationOutboxRepository } from './notification-outbox.repository';
 import { PulseTransport } from './pulse-transport';
-
-/**
- * Declaring the constants
- */
 
 const SWEEP_NAME = 'notification-outbox-drain';
 const MS_PER_MINUTE = 60_000;

@@ -1,21 +1,7 @@
-/**
- * Importing npm packages
- */
 import { Class } from 'type-fest';
 
-/**
- * Importing user defined packages
- */
 import { ProviderToken, TokenValue } from '../interfaces';
 import { ContextId } from '../utils';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 export abstract class ModuleRef {
   /**

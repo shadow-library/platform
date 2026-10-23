@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { randomUUID } from 'node:crypto';
 
 import { type APIRequestContext, type APIResponse, request } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import {
   apiContext,
   authorizeCode,
@@ -27,10 +21,6 @@ import {
 import { cookieFromStorageState } from '../cross-app/helpers';
 import { clearClientRateLimits, expect, type MemoirPersona, test } from './fixtures';
 import { type CommandOutcome, dailyQuestDraft, type DeltaPage, errorCodeOf, getAccount, memoirMutate, pullFullDelta, submitCommand, todayLocal, waitersBlockedBy } from './helpers';
-
-/**
- * Defining types
- */
 
 type DeletionState = 'none' | 'pending' | 'blobs_deleted' | 'data_deleted' | 'identity_closed' | 'done';
 

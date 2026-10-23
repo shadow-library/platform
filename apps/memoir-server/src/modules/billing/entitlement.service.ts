@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import { Injectable, type OnModuleInit } from '@shadow-library/app';
 import { AppError, Config } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { AccountContext, AccountRepository } from '@modules/auth';
 import { type DeltaRow, DeltaSourceRegistry, type SnapshotDeltaSource } from '@modules/sync';
 import { type Entitlement } from '@server/database';
@@ -14,10 +8,6 @@ import { type Entitlement } from '@server/database';
 import { BillingProviderAdapter, type CheckoutPlan } from './billing.types';
 import { resolveEffectiveState, tierFor } from './entitlement-lifecycle';
 import { EntitlementRepository } from './entitlement.repository';
-
-/**
- * Defining types
- */
 
 export interface EntitlementView {
   tier: Entitlement.Tier;
@@ -30,10 +20,6 @@ export interface CheckoutResult {
   url: string;
   expiresAt: Date;
 }
-
-/**
- * Declaring the constants
- */
 
 const FREE_VIEW: EntitlementView = { tier: 'free', state: 'free', expiresAt: null, trialUsed: false };
 

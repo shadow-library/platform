@@ -1,18 +1,8 @@
-/**
- * Importing npm packages
- */
 import { createHash, randomBytes } from 'node:crypto';
 
 import { type APIRequestContext, type APIResponse } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { getProductUrl, identityDb, webNovelDb } from '../../lib';
-
-/**
- * Defining types
- */
 
 export type AccessMode = 'public' | 'private';
 
@@ -141,10 +131,6 @@ interface ReaderListing {
 interface ProgressListing {
   items: { novelSlug: string }[];
 }
-
-/**
- * Declaring the constants
- */
 
 export const WEB_NOVEL_CLIENT_ID = 'web-novel';
 

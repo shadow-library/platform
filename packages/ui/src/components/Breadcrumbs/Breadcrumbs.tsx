@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import { Slot } from '@radix-ui/react-slot';
 import { Children, forwardRef, isValidElement, type ReactElement, useContext } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { cn } from '@/lib';
 
 import { Popover } from '../Popover';
@@ -14,9 +8,6 @@ import { BreadcrumbsOverflowContext } from './Breadcrumbs.context';
 import styles from './Breadcrumbs.module.css';
 import { type BreadcrumbsItemProps, type BreadcrumbsProps } from './Breadcrumbs.types';
 
-/**
- * Declaring the constants
- */
 function SeparatorIcon() {
   return (
     <svg className={styles.separator} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

@@ -1,18 +1,8 @@
-/**
- * Importing npm packages
- */
 import { FastifyCompressOptions } from '@fastify/compress';
 import { FastifyHelmetOptions } from '@fastify/helmet';
 import { OpenAPIV3 } from 'openapi-types';
 
-/**
- * Importing user defined packages
- */
 import { type CSRFOptions } from './services/csrf-token.types';
-
-/**
- * Defining types
- */
 
 declare module '@shadow-library/common' {
   export interface ConfigRecords {

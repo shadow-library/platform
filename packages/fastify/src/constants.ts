@@ -1,18 +1,3 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 export const NAMESPACE = '@shadow-library/fastify';
 
 export const PARAMTYPES_METADATA = 'design:paramtypes';

@@ -1,20 +1,10 @@
-/**
- * Importing npm packages
- */
-
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createRef, useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { Input } from './Input';
 
-/**
- * Declaring the constants
- */
 const Icon = () => <svg data-testid="icon" viewBox="0 0 16 16" aria-hidden="true" />;
 
 describe('Input', () => {

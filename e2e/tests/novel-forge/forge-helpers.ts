@@ -1,19 +1,9 @@
-/**
- * Importing npm packages
- */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 import { type APIRequestContext, type APIResponse, expect } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { apiContext, AUTH_DIR, csrfHeaders, type LoginPersona, mutate, novelForgeDb, pollUntil } from '../../lib';
-
-/**
- * Defining types
- */
 
 export interface ModelRef {
   readonly provider: string;

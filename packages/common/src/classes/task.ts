@@ -1,29 +1,15 @@
-/**
- * Importing npm packages
- */
 import { Promisable } from 'type-fest';
 
-/**
- * Importing user defined packages
- */
 import { NAMESPACE } from '@lib/constants';
 import { AppError } from '@lib/errors';
 import { Fn } from '@lib/interfaces';
 import { Logger } from '@lib/services';
-
-/**
- * Defining types
- */
 
 export type RetryCallback = (error: unknown, attempt: number) => Promisable<unknown>;
 
 export type RollbackFn<T> = (data: T) => Promisable<unknown>;
 
 export type ShouldRetryFn = (error: unknown, attempt: number) => Promisable<boolean>;
-
-/**
- * Declaring the constants
- */
 
 export class Task<T> {
   private static readonly logger = Logger.getLogger(NAMESPACE, 'Task');

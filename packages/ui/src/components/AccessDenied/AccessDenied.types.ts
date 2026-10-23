@@ -1,16 +1,7 @@
-/**
- * Importing npm packages
- */
 import { type ComponentPropsWithoutRef, type ReactNode } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { type EmptyStateAction } from '../EmptyState';
 
-/**
- * Defining types
- */
 export interface AccessDeniedProps extends Omit<ComponentPropsWithoutRef<'div'>, 'title'> {
   /**
    * The application access was refused to. Naming it is the difference between a wall and a request

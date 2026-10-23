@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type APIRequestContext } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { expect, test } from './fixtures';
 import {
   arrangeNovel,
@@ -20,10 +14,6 @@ import {
   UNKNOWN_SLUG,
   webNovelMutate,
 } from './helpers';
-
-/**
- * Defining types
- */
 
 /**
  * Declaring the constants

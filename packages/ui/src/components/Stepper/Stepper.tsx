@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { Children, isValidElement, type ReactElement, type ReactNode, useRef, useState } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { useControllableState } from '@/hooks';
 import { cn } from '@/lib';
 
@@ -13,9 +7,6 @@ import { Button } from '../Button';
 import styles from './Stepper.module.css';
 import { type StepperProps, type StepperStepProps, type StepState } from './Stepper.types';
 
-/**
- * Declaring the constants
- */
 const STATE_WORD: Record<StepState, string> = { completed: 'completed', current: 'current', upcoming: 'upcoming', error: 'needs review', skipped: 'skipped' };
 
 /** Marker component — the parent reads its props and renders the current step's children. */

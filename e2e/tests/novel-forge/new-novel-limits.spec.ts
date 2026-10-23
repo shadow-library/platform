@@ -1,6 +1,3 @@
-/**
- * Importing user defined packages
- */
 import { mutate } from '../../lib';
 import { expect, test } from './forge-actors';
 import { expectCode, newChatSession, newProject } from './forge-arrange';

@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { randomBytes } from 'node:crypto';
 
 import { type APIRequestContext, type APIResponse } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import {
   addOrganisationMember,
   assignApplicationRole,
@@ -39,10 +33,6 @@ import {
 } from '../../lib';
 import { expect, type IdentityHarness, type IdentityTeam, test } from './fixtures';
 import { expectErrorCode, expectSessionCookie, pollInviteToken, pollOtp } from './helpers';
-
-/**
- * Defining types
- */
 
 interface MemberItem {
   userId: string;

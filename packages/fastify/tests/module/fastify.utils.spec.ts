@@ -1,24 +1,11 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it, jest, mock } from 'bun:test';
 import Ajv from 'ajv';
 import { FastifyInstance } from 'fastify';
 import { AppError, ValidationError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { type AjvValidators } from '@lib/module/fastify.utils';
 import { type JSONSchema } from '@shadow-library/class-schema';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const fastifyModule = await import('fastify');
 const instanceStub = {
   setNotFoundHandler: jest.fn(),

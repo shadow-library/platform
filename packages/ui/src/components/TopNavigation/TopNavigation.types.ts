@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type ComponentPropsWithoutRef, type ReactNode } from 'react';
 
-/**
- * Defining types
- */
 export interface TopNavigationProps extends Omit<ComponentPropsWithoutRef<'header'>, 'title'> {
   /** Brand / product identity at the left. */
   brand?: ReactNode;

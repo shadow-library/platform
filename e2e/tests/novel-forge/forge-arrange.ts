@@ -1,19 +1,9 @@
-/**
- * Importing npm packages
- */
 import { type APIResponse } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { mutate } from '../../lib';
 import { expect, type ForgeActor, type ForgeHarness } from './forge-actors';
 import { assertSpendGuarded } from './forge-db';
 import { errorCode, uniqueSuffix } from './forge-helpers';
-
-/**
- * Defining types
- */
 
 export interface QuotaRefusedChat {
   readonly projectId: string;

@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type ReactNode } from 'react';
 
-/**
- * Defining types
- */
 export type GridAlign = 'start' | 'center' | 'end';
 
 export interface GridSort {

@@ -1,16 +1,6 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { BOT_KEY_PREFIX, botKeyIdToUuid, formatBotKey, isBotKeyShaped, parseBotKey } from '@shadow-library/auth';
-
-/**
- * Defining types
- */
 
 /**
  * Declaring the constants

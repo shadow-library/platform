@@ -1,15 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type TextareaHTMLAttributes } from 'react';
 
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 export type TextareaSize = 'sm' | 'md' | 'lg';
 
 export type TextareaVariant = 'field' | 'bare';

@@ -1,25 +1,12 @@
-/**
- * Importing npm packages
- */
 import { Handler, type HandlerMetadata } from '@shadow-library/app';
 import { AuthAccessPolicy, AuthGuardErrorCode } from '@shadow-library/auth/module';
 import { Logger } from '@shadow-library/common';
 import { type AsyncRouteHandler, ContextService, Middleware } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
 
 import { AccountContext } from './account-context';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const ALLOW_DURING_DELETION: unique symbol = Symbol('memoir:allow-during-deletion');
 
 /**

@@ -1,21 +1,11 @@
-/**
- * Importing npm packages
- */
-
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useRef, useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { FileUpload } from './FileUpload';
 import { type FileItem } from './FileUpload.types';
 
-/**
- * Declaring the constants
- */
 function fileInput(container: HTMLElement): HTMLInputElement {
   const input = container.querySelector('input[type="file"]');
   if (!input) throw new Error('no file input');

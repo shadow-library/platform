@@ -1,19 +1,9 @@
-/**
- * Importing npm packages
- */
 import { type APIResponse } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { memoirDb } from '../../lib';
 import { expect, test } from './fixtures';
 import { errorCodeOf, memoirMutate, submitCommand, todayLocal } from './helpers';
 import { fetchPresignedUrl, type MintedReceipt, mintReceipt, uploadAndConfirm } from './receipt-helpers';
-
-/**
- * Defining types
- */
 
 /**
  * Declaring the constants

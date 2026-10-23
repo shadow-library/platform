@@ -1,20 +1,10 @@
-/**
- * Importing npm packages
- */
 import { createHash, randomBytes } from 'node:crypto';
 
 import { type APIRequestContext, type BrowserContext, expect, test } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { apiContext, identityDb, PERSONAS, readSeedManifest, requireProductUrl, webNovelDb } from '../../lib';
 import { pollOtp } from '../identity/helpers';
 import { loginIdentity, scopedMutate } from './helpers';
-
-/**
- * Defining types
- */
 
 interface FlowState {
   readonly flowId: string;

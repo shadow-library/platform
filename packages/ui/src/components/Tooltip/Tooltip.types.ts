@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type ReactNode } from 'react';
 
-/**
- * Defining types
- */
 export type TooltipSide = 'top' | 'right' | 'bottom' | 'left';
 export type TooltipAlign = 'start' | 'center' | 'end';
 

@@ -1,20 +1,11 @@
-/**
- * Importing npm packages
- */
 import * as PopoverPrimitive from '@radix-ui/react-popover';
 import { createContext, forwardRef, useContext, useId } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { cn } from '@/lib';
 
 import styles from './Popover.module.css';
 import { type PopoverContentProps, type PopoverHeaderProps, type PopoverProps } from './Popover.types';
 
-/**
- * Declaring the constants
- */
 const TitleContext = createContext<string | undefined>(undefined);
 
 function PopoverRoot(props: PopoverProps) {

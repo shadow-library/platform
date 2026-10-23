@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import { Slot, Slottable } from '@radix-ui/react-slot';
 import { Children, forwardRef, type MouseEvent, type ReactNode, useContext, useEffect, useId, useRef, useState } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { useControllableState } from '@/hooks';
 import { cn } from '@/lib';
 
@@ -17,9 +11,6 @@ import { SidebarContext } from './Sidebar.context';
 import styles from './Sidebar.module.css';
 import { type SidebarGroupProps, type SidebarItemProps, type SidebarProps, type SidebarSectionProps, type SidebarSwitcherOption, type SidebarSwitcherProps } from './Sidebar.types';
 
-/**
- * Declaring the constants
- */
 /** Read the sidebar's collapsed state — lets a custom header/footer mark render icon-only in rail. */
 export function useSidebar(): { collapsed: boolean } {
   return useContext(SidebarContext);

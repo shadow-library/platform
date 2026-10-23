@@ -1,15 +1,4 @@
-/**
- * Importing npm packages
- */
 import { ErrorCode } from '@shadow-library/common';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 
 /**
  * Declaring the constants

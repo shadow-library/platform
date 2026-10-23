@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { useCallback, useEffect, useState } from 'react';
 
-/**
- * Importing user defined packages
- */
 import {
   BUILD_ID_ENDPOINT,
   type BuildCheckState,
@@ -18,9 +12,6 @@ import {
   readBuildId,
 } from './build-update';
 
-/**
- * Defining types
- */
 export interface UseBuildUpdateOptions extends Partial<BuildCheckTiming> {
   /** The id stamped into this client bundle at build time. */
   buildId: string;

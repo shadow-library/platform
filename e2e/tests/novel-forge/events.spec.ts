@@ -1,15 +1,8 @@
-/**
- * Importing user defined packages
- */
 import { csrfHeaders, mutate } from '../../lib';
 import { type ForgeActor } from './forge-actors';
 import { guardedProject, newProject, quotaRefusedChat, startTurn } from './forge-arrange';
 import { assertSpendGuarded, listDispatchedModelCalls } from './forge-db';
 import { expect, expectRefusedStream, framesOf, type SseClient, type SseFrame, type SseStream, test } from './forge-sse';
-
-/**
- * Defining types
- */
 
 interface RunEvent {
   readonly type: 'run';

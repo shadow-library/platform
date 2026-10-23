@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import * as RadioGroupPrimitive from '@radix-ui/react-radio-group';
 import { forwardRef } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { cn } from '@/lib';
 
 import styles from './SegmentedControl.module.css';

@@ -1,19 +1,8 @@
-/**
- * Importing npm packages
- */
-
 import { render, screen } from '@testing-library/react';
 import { createRef } from 'react';
 import { describe, expect, it } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { Card } from './Card';
-
-/**
- * Declaring the constants
- */
 
 describe('Card', () => {
   it('renders its content inside the surface', () => {

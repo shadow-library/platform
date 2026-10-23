@@ -1,20 +1,10 @@
-/**
- * Importing npm packages
- */
 import { existsSync } from 'node:fs';
 
 import { type APIRequestContext, type APIResponse, request } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { clientIpHeaders } from './client-ip';
 import { type ProductKey, requireProductUrl } from './env';
 import { type LoginPersona, storageStateFor } from './personas';
-
-/**
- * Defining types
- */
 
 /** A mutating HTTP method — the ones the CSRF double-submit guard applies to. */
 type MutationMethod = 'post' | 'put' | 'patch' | 'delete';

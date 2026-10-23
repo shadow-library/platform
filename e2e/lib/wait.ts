@@ -1,15 +1,3 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
 export interface WaitOptions {
   /** Default 30 s — six ticks of identity's 5 s worker loop. */
   timeoutMs?: number;
@@ -18,10 +6,6 @@ export interface WaitOptions {
   /** Prefixes the timeout error, naming what never happened. */
   message?: string;
 }
-
-/**
- * Declaring the constants
- */
 
 export class WaitTimeoutError extends Error {
   override readonly name = 'WaitTimeoutError';

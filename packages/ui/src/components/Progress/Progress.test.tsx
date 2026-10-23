@@ -1,18 +1,7 @@
-/**
- * Importing npm packages
- */
-
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { Progress } from './Progress';
-
-/**
- * Declaring the constants
- */
 
 describe('Progress', () => {
   it('exposes progressbar semantics with the current value', () => {

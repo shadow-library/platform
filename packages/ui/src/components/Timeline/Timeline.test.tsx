@@ -1,18 +1,7 @@
-/**
- * Importing npm packages
- */
-
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { Timeline } from './Timeline';
-
-/**
- * Declaring the constants
- */
 
 describe('Timeline', () => {
   it('renders an ordered list of entries', () => {

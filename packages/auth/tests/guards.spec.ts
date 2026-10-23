@@ -1,13 +1,6 @@
-/**
- * Importing npm packages
- */
-
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import 'reflect-metadata';
 
-/**
- * Importing user defined packages
- */
 import { type HandlerMetadata } from '@shadow-library/app';
 import { AuthClient, type FetchLike } from '@shadow-library/auth';
 import {
@@ -28,15 +21,8 @@ import { createTestIdP, TestIdP } from '@shadow-library/auth/testing';
 import { AppError } from '@shadow-library/common';
 import { ContextService } from '@shadow-library/fastify';
 
-/**
- * Defining types
- */
-
 type RouteMetadataRecord = Record<string, unknown>;
 
-/**
- * Declaring the constants
- */
 const AUDIENCE = 'api://pulse';
 const ORG = '7';
 

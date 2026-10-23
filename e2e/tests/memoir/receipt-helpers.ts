@@ -1,16 +1,6 @@
-/**
- * Importing npm packages
- */
 import { type APIRequestContext, request } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { memoirMutate } from './helpers';
-
-/**
- * Defining types
- */
 
 export interface MintedReceipt {
   ref: string;

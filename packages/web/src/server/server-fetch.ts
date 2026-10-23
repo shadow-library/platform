@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { getRequest, getResponseHeaders, setResponseHeader } from '@tanstack/react-start/server';
 
-/**
- * Importing user defined packages
- */
 import { type ErrorResponse } from '../lib/api-error';
 import { type ApiResult } from '../lib/api-result';
 import { type CsrfConfig, csrfSetCookie, ensureCsrfToken, resolveCsrfConfig } from '../lib/csrf';
@@ -47,9 +41,6 @@ export interface ServerFetchConfig {
 /** The request/response contract is declared browser-side in `lib/transport` — see the note there for why — and surfaced here for apps that import it from `@shadow-library/web/server`. */
 export type { ServerFetch, ServerFetchSpec };
 
-/**
- * Declaring the constants
- */
 const DEFAULT_FORWARD_HEADERS = ['user-agent', 'accept-language', 'x-forwarded-for'];
 
 /** The correlation header both this web tier and every Shadow backend propagate, so an SSR call stitches to the backend's logs for that request. */

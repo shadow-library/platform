@@ -1,21 +1,12 @@
-/**
- * Importing npm packages
- */
 import * as AccordionPrimitive from '@radix-ui/react-accordion';
 import { type ComponentPropsWithoutRef, forwardRef, useContext } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { cn } from '@/lib';
 
 import { AccordionContext } from './Accordion.context';
 import styles from './Accordion.module.css';
 import { type AccordionItemProps, type AccordionProps } from './Accordion.types';
 
-/**
- * Declaring the constants
- */
 function ChevronDown() {
   return (
     <svg className={styles.chevron} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

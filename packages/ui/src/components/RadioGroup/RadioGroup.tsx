@@ -1,21 +1,11 @@
-/**
- * Importing npm packages
- */
 import * as RadioGroupPrimitive from '@radix-ui/react-radio-group';
 import { forwardRef, useId } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { cn } from '@/lib';
 
 import { RadioGroupContext, useRadioGroupContext } from './RadioGroup.context';
 import styles from './RadioGroup.module.css';
 import { type RadioGroupProps, type RadioItemProps } from './RadioGroup.types';
-
-/**
- * Declaring the constants
- */
 
 /**
  * One choice from a small, always-visible set — the circular sibling of Checkbox with exclusive

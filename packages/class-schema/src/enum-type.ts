@@ -1,24 +1,10 @@
-/**
- * Importing npm packages
- */
 import { AppError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { getCounterId } from './constants';
 import { EnumFieldSchema } from './interfaces';
 import { type ParsedSchema } from './interfaces/json-schema.interface';
 
-/**
- * Defining types
- */
-
 type ValidEnumType = 'string' | 'number';
-
-/**
- * Declaring the constants
- */
 
 export class EnumType<T extends string | number = string | number> {
   readonly id: string;

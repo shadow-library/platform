@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type APIResponse } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { mutate, novelForgeDb } from '../../lib';
 import {
   holdPublishJob,
@@ -25,10 +19,6 @@ import { listDispatchedModelCalls } from './forge-db';
 import { CHAPTER_ONE, readDraft, writeChapterByHand } from './forge-helpers';
 import { readChapterRow } from './forge-review';
 import { createGuardedProject, finalizeChapterNoReview, insertFinalChapters } from './forge-story';
-
-/**
- * Defining types
- */
 
 interface AmendAnswer {
   readonly chapter: number;

@@ -1,15 +1,4 @@
-/**
- * Importing npm packages
- */
 import { type Logger } from '@shadow-library/common';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 /**
  * The one shape every operational counter log line takes (ARCHITECTURE §24): a `metric` name, a numeric

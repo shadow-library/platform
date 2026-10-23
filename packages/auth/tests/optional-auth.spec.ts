@@ -1,15 +1,9 @@
-/**
- * Importing npm packages
- */
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import 'reflect-metadata';
 import { type HandlerMetadata } from '@shadow-library/app';
 import { AppError } from '@shadow-library/common';
 import { ContextService, HttpMethod } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { type AuthAccessMode, AuthClient, AuthErrorCode, type AuthPrincipal } from '@shadow-library/auth';
 import {
   AppSessionService,
@@ -23,9 +17,6 @@ import {
 } from '@shadow-library/auth/module';
 import { createTestIdP, type TestIdP } from '@shadow-library/auth/testing';
 
-/**
- * Declaring the constants
- */
 const CLIENT = { id: 'svc-catalog', secret: 's3cr3t' };
 const AUDIENCE = 'api://catalog';
 const REDIRECT_URI = 'https://catalog.test/auth/callback';

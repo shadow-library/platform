@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type ReactElement, useState } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { Button } from '../Button';
 import { IconButton } from '../IconButton';
 import { Popover } from '../Popover';
@@ -14,9 +8,6 @@ import styles from './NotificationCenter.module.css';
 import { type NotificationCenterProps, type NotificationItem } from './NotificationCenter.types';
 import { NotificationList } from './NotificationList';
 
-/**
- * Declaring the constants
- */
 function BellIcon() {
   return (
     <svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

@@ -1,22 +1,8 @@
-/**
- * Importing npm packages
- */
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { Dispatcher, Module, ShadowApplication, ShadowFactory } from '@shadow-library/app';
 import { Field, OmitType, PartialType, PickType, Schema, SchemaComposer } from '@shadow-library/class-schema';
 
-/**
- * Importing user defined packages
- */
 import { FastifyModule, FastifyRouter, Get, HttpController, RespondFor } from '@shadow-library/fastify';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Schema()
 class Leaf {

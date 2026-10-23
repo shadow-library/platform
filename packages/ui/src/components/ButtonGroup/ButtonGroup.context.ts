@@ -1,26 +1,13 @@
-/**
- * Importing npm packages
- */
 import { createContext, useContext } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { type ButtonSize, type ButtonVariant } from '../Button/Button.types';
 
-/**
- * Defining types
- */
 export interface ButtonGroupContextValue {
   /** Variant every member inherits — overrides a child's own `variant`. */
   variant: ButtonVariant;
   /** Size every member inherits — overrides a child's own `size`. */
   size: ButtonSize;
 }
-
-/**
- * Declaring the constants
- */
 
 /**
  * Shared by ButtonGroup so member Buttons inherit one variant/size. Lives in its own module (not

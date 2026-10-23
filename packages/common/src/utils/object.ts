@@ -1,20 +1,5 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
 export type PropertyFilter<T = string> = (key: string | T, desc: PropertyDescriptor) => boolean;
 
-/**
- * Declaring the constants
- */
 const IS_CLASS_REGEX = /^class\s/;
 
 class ObjectUtils {

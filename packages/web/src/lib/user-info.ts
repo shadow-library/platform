@@ -1,16 +1,6 @@
-/**
- * Importing npm packages
- */
 import { queryOptions, type UseQueryOptions } from '@tanstack/react-query';
 
-/**
- * Importing user defined packages
- */
 import { type ApiError } from './api-error';
-
-/**
- * Defining types
- */
 
 /**
  * The signed-in person, as `GET /api/auth/userinfo` answers — the route `AuthModule.forRoot()` mounts
@@ -31,10 +21,6 @@ export interface UserInfo {
   email?: string;
   email_verified?: boolean;
 }
-
-/**
- * Declaring the constants
- */
 
 /** One key for every app, so a profile cached by a route loader is the one a component reads. */
 export const userInfoQueryKey = ['auth', 'userinfo'] as const;

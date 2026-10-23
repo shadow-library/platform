@@ -1,15 +1,4 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { type DraftSuggestion, type InferenceDraft } from './ai-worker.types';
-
-/**
- * Defining types
- */
 
 export type GuardrailViolation = 'verbatim_quote' | 'identity_assertion' | 'shame_copy' | 'mechanic_mutation';
 
@@ -26,10 +15,6 @@ export type GuardrailOutcome =
   | { status: 'sanitized'; result: InferenceDraft; violations: GuardrailViolation[] }
   | { status: 'crisis'; result: InferenceDraft }
   | { status: 'blocked'; violations: GuardrailViolation[] };
-
-/**
- * Declaring the constants
- */
 
 /**
  * The closed set of things a suggestion may propose (PRD §6.6.4): every member maps onto a field the

@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { randomUUID } from 'node:crypto';
 
 import { type APIRequestContext, expect } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { memoirDb, pollUntil } from '../../lib';
 import { type CommandEnvelopeInput, type CommandOutcome, todayLocal } from './helpers';
 

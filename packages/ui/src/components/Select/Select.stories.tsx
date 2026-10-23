@@ -1,18 +1,8 @@
-/**
- * Importing npm packages
- */
-
 import { type Meta, type StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { Select } from './Select';
 
-/**
- * Declaring the constants
- */
 function Dot({ color }: { color: string }) {
   return <span style={{ width: 8, height: 8, borderRadius: 999, background: color, display: 'inline-block' }} aria-hidden="true" />;
 }

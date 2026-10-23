@@ -1,21 +1,6 @@
-/**
- * Importing npm packages
- */
 import { AppError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
 type Decorator = ClassDecorator | MethodDecorator | PropertyDecorator;
-
-/**
- * Declaring the constants
- */
 
 export function applyDecorators(...decorators: Decorator[]): Decorator {
   return (target: object, propertyKey?: string | symbol, descriptor?: TypedPropertyDescriptor<object>) => {

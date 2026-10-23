@@ -1,10 +1,3 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { mutate, pollUntil } from '../../lib';
 import {
   FORGE_CLIENT_ID,
@@ -26,10 +19,6 @@ import { type ForgeActor } from './forge-actors';
 import { expectCode } from './forge-arrange';
 import { buildBundle, expect, ladderSlugs, type PublishingLane, reassignServedPublisher, test, wipeServedNovel, writePublicationVocabulary } from './forge-bundles';
 import { createEntity, type EntitySeed, reconcileUntilConverged, uniqueSuffix } from './forge-helpers';
-
-/**
- * Defining types
- */
 
 /**
  * Declaring the constants

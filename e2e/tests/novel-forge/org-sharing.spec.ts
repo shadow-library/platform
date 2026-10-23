@@ -1,21 +1,11 @@
-/**
- * Importing npm packages
- */
 import { randomInt } from 'node:crypto';
 
 import { type APIRequestContext, type APIResponse } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { mutate } from '../../lib';
 import { expect, test } from './forge-actors';
 import { insertJob, insertProject, listProjectIdsOwnedBy, readProjectRow, updateProjectOwnership } from './forge-db';
 import { errorCode, uniqueSuffix } from './forge-helpers';
-
-/**
- * Defining types
- */
 
 interface ProjectItem {
   readonly id: string;

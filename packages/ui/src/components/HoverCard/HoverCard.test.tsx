@@ -1,18 +1,8 @@
-/**
- * Importing npm packages
- */
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { HoverCard } from './HoverCard';
-
-/**
- * Declaring the constants
- */
 
 describe('HoverCard', () => {
   it('opens a labelled preview on hover and leaves the trigger a plain link', async () => {

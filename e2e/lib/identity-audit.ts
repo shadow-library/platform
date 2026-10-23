@@ -1,15 +1,4 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { identityDb } from './db';
-
-/**
- * Defining types
- */
 
 export interface AuditRow {
   id: string;

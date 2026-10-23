@@ -1,20 +1,10 @@
-/**
- * Importing npm packages
- */
 import { S3Client } from 'bun';
 
 import { AppError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { StorageErrorCode } from '../storage.errors';
 import { type HeadResult, type StorageObject, type StorageProvider } from '../storage.types';
 import { contentTypeFromRef } from '../storage.utils';
-
-/**
- * Defining types
- */
 
 export interface S3StorageProviderConfig {
   endpoint: string;
@@ -24,10 +14,6 @@ export interface S3StorageProviderConfig {
   accessKeyId: string;
   secretAccessKey: string;
 }
-
-/**
- * Declaring the constants
- */
 
 /**
  * S3-compatible provider backed by Bun's built-in `S3Client` (Garage in production). Reads and writes

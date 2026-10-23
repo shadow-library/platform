@@ -1,19 +1,10 @@
-/**
- * Importing npm packages
- */
 import { type ChangeEvent, forwardRef, useRef, useState } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { cn, mergeRefs } from '@/lib';
 
 import styles from './Input.module.css';
 import { type InputProps } from './Input.types';
 
-/**
- * Declaring the constants
- */
 function ClearIcon() {
   return (
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" aria-hidden="true">

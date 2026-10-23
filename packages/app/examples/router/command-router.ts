@@ -1,19 +1,8 @@
-/**
- * Importing npm packages
- */
 import { createInterface } from 'node:readline/promises';
 
 import { Dispatcher, DispatchMetadata, Injectable } from '@shadow-library/app';
 
 import { OutputService } from './output.service';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 
 export interface Command {
   cmd: string;
@@ -21,10 +10,6 @@ export interface Command {
   children: Command[];
   handler: (options?: object) => void | Promise<void>;
 }
-
-/**
- * Declaring the constants
- */
 
 @Injectable()
 export class CommandRouter extends Dispatcher {

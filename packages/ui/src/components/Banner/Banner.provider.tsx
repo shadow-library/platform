@@ -1,19 +1,9 @@
-/**
- * Importing npm packages
- */
 import { type ReactElement, useEffect, useSyncExternalStore } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { Banner } from './Banner';
 import styles from './Banner.module.css';
 import { bannerStore } from './Banner.store';
 import { type BannerConfig } from './Banner.types';
-
-/**
- * Declaring the constants
- */
 
 /**
  * Declaratively register an app-level banner. The provider owns severity ordering, the one-visible

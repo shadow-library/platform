@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type APIRequestContext, expect, test } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { apiContext, mutate, requireProductUrl, storageStateFor } from '../../lib';
 import { type ForgeActor, type ForgeHarness, test as forgeTest } from './forge-actors';
 import { assertSpendGuarded, listDispatchedModelCalls } from './forge-db';
@@ -27,10 +21,6 @@ import {
   useEconomyTier,
   writeChapterByHand,
 } from './forge-helpers';
-
-/**
- * Defining types
- */
 
 interface Bridge {
   chapter: number;

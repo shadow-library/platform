@@ -1,15 +1,4 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { utils } from '../utils';
-
-/**
- * Defining types
- */
 
 export interface AppErrorObject {
   code: string;

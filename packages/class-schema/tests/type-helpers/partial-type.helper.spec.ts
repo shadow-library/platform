@@ -1,20 +1,6 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { ClassSchema, Field, PartialType, Schema } from '@shadow-library/class-schema';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 describe('PartialType', () => {
   @Schema({ $id: User.name, additionalProperties: true, maxProperties: 5 })

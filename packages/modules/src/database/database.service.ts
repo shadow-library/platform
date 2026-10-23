@@ -1,30 +1,16 @@
-/**
- * Importing npm packages
- */
 import { type DrizzleConfig } from 'drizzle-orm';
 import type Redis from 'ioredis';
 import type Memcached from 'memcached';
 import { Inject, Injectable, OnModuleDestroy, OnModuleInit } from '@shadow-library/app';
 import { AppError, Config, Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { DATABASE_MODULE_OPTIONS, DEFAULT_CONFIGS, LOGGER_NAMESPACE } from './database.constants';
 import { type DatabaseModuleOptions, MemcacheConfig, PostgresClient, PostgresConnectionConfig, PostgresError, RedisConfig } from './database.types';
 import { renderPostgresQuery } from './database.utils';
 
-/**
- * Defining types
- */
-
 type ConfigKey = 'database.postgres.url' | 'database.redis.url' | 'database.memcache.hosts';
 
 export type LinkedWithParent<T, U> = T & { getParent: () => U };
-
-/**
- * Declaring the constants
- */
 
 @Injectable()
 export class DatabaseService implements OnModuleInit, OnModuleDestroy {

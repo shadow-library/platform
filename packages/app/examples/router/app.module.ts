@@ -1,24 +1,10 @@
-/**
- * Importing npm packages
- */
 import { Dispatcher, Module } from '@shadow-library/app';
 
-/**
- * Importing user defined packages
- */
 import { BlogController } from './blog.controller';
 import { CommandRouter } from './command-router';
 import { OutputService } from './output.service';
 import { StorageService } from './storage.service';
 import { UserController } from './user.controller';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Module({
   controllers: [BlogController, UserController],

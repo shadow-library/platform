@@ -1,24 +1,10 @@
-/**
- * Importing npm packages
- */
 import { Inject } from '@shadow-library/app';
 import { Config, Logger } from '@shadow-library/common';
 import { AsyncRouteHandler, Middleware, MiddlewareGenerator, ServerErrorCode } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { DEFAULT_CONFIGS, HTTP_CORE_CONFIGS, LOGGER_NAMESPACE } from '../http-core.constants';
 import { type HttpCoreModuleOptions } from '../http-core.types';
 import { CSRFTokenService } from '../services';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Middleware({ type: 'onRequest', weight: 90 })
 export class CsrfProtectionMiddleware implements MiddlewareGenerator {

@@ -1,19 +1,10 @@
-/**
- * Importing npm packages
- */
 import { type ChangeEvent, type ClipboardEvent, forwardRef, type KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { cn, mergeRefs } from '@/lib';
 
 import styles from './OtpInput.module.css';
 import { type OtpInputProps } from './OtpInput.types';
 
-/**
- * Declaring the constants
- */
 const PRESET_PATTERN: Record<'numeric' | 'alphanumeric' | 'alphabetic', RegExp> = {
   numeric: /[0-9]/,
   alphanumeric: /[a-zA-Z0-9]/,

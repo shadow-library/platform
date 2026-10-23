@@ -1,18 +1,8 @@
-/**
- * Importing npm packages
- */
 import { type APIRequestContext, type APIResponse } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { identityDb } from './db';
 import { type BotGrantLevel } from './identity-bots';
 import { findResourceScopeId, grantClientScope, type OAuthApplication, type OAuthClientCredentials, PLATFORM_AUDIENCE, serviceToken } from './identity-oauth';
-
-/**
- * Defining types
- */
 
 export type AuthzScope = 'authz:check' | 'authz:roles:sync';
 

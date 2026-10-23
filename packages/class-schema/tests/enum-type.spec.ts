@@ -1,22 +1,8 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
 import { AppError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { EnumType } from '@lib/enum-type';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 describe('EnumType', () => {
   describe('create', () => {

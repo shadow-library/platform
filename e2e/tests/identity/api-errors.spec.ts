@@ -1,17 +1,6 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { csrfHeaders, IDENTITY_CSRF_SEED_PATH, identityMutate, readSessionStatus } from '../../lib';
 import { expect, test } from './fixtures';
 import { expectErrorCode } from './helpers';
-
-/**
- * Defining types
- */
 
 /**
  * Declaring the constants

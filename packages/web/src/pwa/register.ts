@@ -1,15 +1,5 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { SW_PROTOCOL, type SwRequest, type SwResponse } from './protocol';
 
-/**
- * Defining types
- */
 export interface RegisterServiceWorkerOptions {
   /** URL of the built service worker script. @default '/sw.js' */
   url?: string;
@@ -45,10 +35,6 @@ export interface ServiceWorkerController {
   /** Send a protocol request to the controlling worker and await its terminal reply. */
   message(request: SwRequest, options?: MessageOptions): Promise<SwResponse>;
 }
-
-/**
- * Declaring the constants
- */
 
 /** Whether the current runtime can host a service worker (false during SSR and in unsupported browsers). */
 export function isServiceWorkerSupported(): boolean {

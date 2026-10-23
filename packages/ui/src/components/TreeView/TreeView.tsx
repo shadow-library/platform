@@ -1,19 +1,10 @@
-/**
- * Importing npm packages
- */
 import { type KeyboardEvent, type MouseEvent, type ReactElement, useEffect, useMemo, useRef, useState } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { cn } from '@/lib';
 
 import styles from './TreeView.module.css';
 import { type TreeNode, type TreeViewProps } from './TreeView.types';
 
-/**
- * Declaring the constants
- */
 interface FlatNode {
   node: TreeNode;
   level: number;

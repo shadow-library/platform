@@ -1,18 +1,8 @@
-/**
- * Importing npm packages
- */
 import { randomBytes } from 'node:crypto';
 
-/**
- * Importing user defined packages
- */
 import { identityDb, registerInit, requireProductUrl, uniqueEmail, useClientIp, verifyChallenge } from '../../lib';
 import { expect, test } from './fixtures';
 import { countOutboxRows, expectErrorCode, expectSessionCookie, fillOtp, flowChallenges, flowStepOf, pollOtp, uniqueRegistrationEmail } from './helpers';
-
-/**
- * Defining types
- */
 
 /**
  * Declaring the constants

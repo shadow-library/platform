@@ -1,15 +1,5 @@
-/**
- * Importing npm packages
- */
 import { useCallback, useMemo, useSyncExternalStore } from 'react';
 
-/**
- * Importing user defined packages
- */
-
-/**
- * Declaring the constants
- */
 const DEFAULT_STORAGE_KEY = 'shadow-device-id';
 
 const deviceIds = new Map<string, string>();

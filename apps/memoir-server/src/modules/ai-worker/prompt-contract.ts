@@ -1,23 +1,8 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { type InferencePrompt } from '@modules/inference';
 import { AppErrorCode } from '@server/classes';
 
 import { type AssembledContext, type InferenceDraft } from './ai-worker.types';
 import { ALLOWED_SUGGESTION_KINDS } from './guardrails';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 /**
  * The prompt half of the §6.6 contract — the post-filter is the half that is enforced. Everything here

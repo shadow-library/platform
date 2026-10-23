@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import { Link, useRouterState } from '@tanstack/react-router';
 import { type ReactElement, type ReactNode } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { cn, matchPath } from '@/lib';
 
 import { AccountMenu } from '../AccountMenu';
@@ -17,9 +11,6 @@ import { TopNavigation } from '../TopNavigation';
 import styles from './AppShell.module.css';
 import { type AppShellBrand, type AppShellProps, type NavBranch, type NavLeaf, type NavNode, type NavSection } from './AppShell.types';
 
-/**
- * Declaring the constants
- */
 function ExternalIcon(): ReactElement {
   return (
     <svg className={styles.externalIcon} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

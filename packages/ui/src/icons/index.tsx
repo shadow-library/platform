@@ -1,11 +1,4 @@
-/**
- * Importing npm packages
- */
 import { type ReactElement, type SVGProps } from 'react';
-
-/**
- * Declaring the constants
- */
 
 /**
  * Internal, shared glyph set. These are not part of the public API — components import them so a

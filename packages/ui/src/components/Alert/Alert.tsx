@@ -1,19 +1,10 @@
-/**
- * Importing npm packages
- */
 import { forwardRef } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { cn } from '@/lib';
 
 import styles from './Alert.module.css';
 import { type AlertIntent, type AlertProps } from './Alert.types';
 
-/**
- * Declaring the constants
- */
 const GLYPH: Record<AlertIntent, string> = { info: 'i', success: '✓', warning: '!', danger: '!' };
 
 function DismissIcon() {

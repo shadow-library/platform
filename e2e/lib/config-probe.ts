@@ -1,17 +1,7 @@
-/**
- * Importing npm packages
- */
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
-/**
- * Importing user defined packages
- */
 import { KUBE_CONTEXT } from './k8s-tokens';
-
-/**
- * Defining types
- */
 
 export interface ConfigKeysProbe {
   /** Whether any of the probed keys is set anywhere among the probed sources. Meaningless when `probeFailed`. */

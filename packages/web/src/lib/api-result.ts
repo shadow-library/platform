@@ -1,15 +1,4 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { ApiError, type ErrorResponse } from './api-error';
-
-/**
- * Defining types
- */
 
 /**
  * The serializable failure a server function reports for a non-2xx, non-modeled response. Server functions
@@ -24,10 +13,6 @@ export interface ApiFailure extends ErrorResponse {
 
 /** A server-function result: the typed body on success (including modeled non-2xx), or a failure envelope. */
 export type ApiResult<T> = { ok: true; data: T } | { ok: false; failure: ApiFailure };
-
-/**
- * Declaring the constants
- */
 
 /**
  * Unwraps a server-function result: returns the typed body, or rehydrates the failure envelope into a

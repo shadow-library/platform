@@ -1,18 +1,8 @@
-/**
- * Importing npm packages
- */
 import { Injectable } from '@shadow-library/app';
 import { AuthClient } from '@shadow-library/auth';
 import { Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { APP_NAME } from '@server/constants';
-
-/**
- * Defining types
- */
 
 export interface PulseNotificationRequest {
   templateKey: string;
@@ -21,10 +11,6 @@ export interface PulseNotificationRequest {
 }
 
 export type PulseSendOutcome = 'sent' | 'rejected' | 'unavailable';
-
-/**
- * Declaring the constants
- */
 
 const PULSE_SERVICE = 'pulse-server';
 const PULSE_RESOURCE = 'api://pulse';

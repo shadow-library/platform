@@ -1,22 +1,11 @@
-/**
- * Importing npm packages
- */
-
 import { Slot } from '@radix-ui/react-slot';
 import { forwardRef } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { cn } from '@/lib';
 
 import { useButtonGroupContext } from '../ButtonGroup/ButtonGroup.context';
 import styles from './Button.module.css';
 import { type ButtonProps } from './Button.types';
-
-/**
- * Declaring the constants
- */
 
 /**
  * The atomic unit of action. Renders a native `<button>` (or, with `asChild`, the child element),

@@ -1,20 +1,10 @@
-/**
- * Importing npm packages
- */
-
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { FormField } from '../FormField';
 import { DateRangePicker } from './DateRangePicker';
 
-/**
- * Declaring the constants
- */
 const presets = [
   { label: 'This week', range: { start: '2026-06-08', end: '2026-06-14' } },
   { label: 'Last 7 days', range: { start: '2026-06-01', end: '2026-06-07' } },

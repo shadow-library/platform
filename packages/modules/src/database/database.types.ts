@@ -1,20 +1,10 @@
-/**
- * Importing npm packages
- */
 import { type DrizzleConfig } from 'drizzle-orm';
 import { type PgDatabase } from 'drizzle-orm/pg-core';
 import { type RedisOptions } from 'ioredis';
 import type Memcached from 'memcached';
 import { Promisable } from 'type-fest';
 
-/**
- * Importing user defined packages
- */
 import { type AsyncModuleOptions } from '../internal.utils';
-
-/**
- * Defining types
- */
 
 declare module '@shadow-library/common' {
   export interface ConfigRecords {

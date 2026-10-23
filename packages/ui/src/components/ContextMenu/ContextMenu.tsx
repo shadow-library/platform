@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import * as ContextMenuPrimitive from '@radix-ui/react-context-menu';
 import { forwardRef } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { CheckIcon, ChevronRightIcon } from '@/icons';
 import { cn } from '@/lib';
 
@@ -23,9 +17,6 @@ import {
   type ContextMenuSubTriggerProps,
 } from './ContextMenu.types';
 
-/**
- * Declaring the constants
- */
 function DotIcon() {
   return (
     <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">

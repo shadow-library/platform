@@ -1,19 +1,9 @@
-/**
- * Importing npm packages
- */
 import { eq } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { OwnerScopedRepository } from '@modules/auth';
 import { type DatabaseTransaction, type Meal, type MealPreset, schema } from '@server/database';
-
-/**
- * Defining types
- */
 
 export interface MealPresetDraft {
   name: string;
@@ -21,10 +11,6 @@ export interface MealPresetDraft {
   mealType: Meal.MealType;
   note: string | null;
 }
-
-/**
- * Declaring the constants
- */
 
 @Injectable()
 export class MealPresetRepository extends OwnerScopedRepository {

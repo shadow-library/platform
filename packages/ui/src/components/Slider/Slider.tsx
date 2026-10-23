@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import * as SliderPrimitive from '@radix-ui/react-slider';
 import { forwardRef, useMemo } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { cn } from '@/lib';
 
 import styles from './Slider.module.css';

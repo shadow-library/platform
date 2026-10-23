@@ -1,16 +1,7 @@
-/**
- * Importing npm packages
- */
 import { AbstractClass, Class } from 'type-fest';
 
-/**
- * Importing user defined packages
- */
 import { InjectionToken } from '../injection-token';
 
-/**
- * Defining types
- */
 export type ClassToken<T = unknown> = Class<T> | AbstractClass<T>;
 
 export type ProviderToken<T = unknown> = string | symbol | ClassToken<T> | InjectionToken<T>;

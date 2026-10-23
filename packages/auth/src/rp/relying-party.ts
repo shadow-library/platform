@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { AppError, Logger, throwError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { NAMESPACE } from '../constants';
 import { AuthErrorCode } from '../errors';
 import { AuthCacheOptions, AuthClientCredential, FetchLike, JwtPayload } from '../interfaces';
@@ -15,10 +9,6 @@ import { verifyJwt } from '../lib/jwt';
 import { assertValidTimeout, withTimeout } from '../lib/transport';
 import { buildAuthorizationUrl } from './authorization-url';
 import { createPkcePair, randomUrlSafeString } from './pkce';
-
-/**
- * Defining types
- */
 
 export interface RelyingPartyConfig {
   issuer: string;

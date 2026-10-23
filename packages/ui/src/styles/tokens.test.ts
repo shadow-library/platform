@@ -1,14 +1,8 @@
-/**
- * Importing npm packages
- */
 import fs from 'node:fs';
 import path from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-/**
- * Declaring the constants
- */
 const tokensPath = path.join(import.meta.dirname, 'tokens.css');
 const tokensSource = fs.readFileSync(tokensPath, 'utf-8');
 

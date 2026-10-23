@@ -1,6 +1,3 @@
-/**
- * Importing npm packages
- */
 import 'reflect-metadata';
 
 /**

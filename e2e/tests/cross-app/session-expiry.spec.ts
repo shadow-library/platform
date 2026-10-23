@@ -1,16 +1,7 @@
-/**
- * Importing npm packages
- */
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { requireProductUrl, storageStateFor } from '../../lib';
 
-/**
- * Defining types
- */
 interface AppUnderTest {
   readonly label: string;
   readonly product: 'novelForge' | 'pulse' | 'webNovel' | 'identity';

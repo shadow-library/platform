@@ -1,19 +1,9 @@
-/**
- * Importing npm packages
- */
-
 import { type Meta, type StoryObj } from '@storybook/react-vite';
 
-/**
- * Importing user defined packages
- */
 import { Avatar } from '../Avatar';
 import { Button } from '../Button';
 import { TopNavigation } from './TopNavigation';
 
-/**
- * Declaring the constants
- */
 const meta = {
   title: 'Components/TopNavigation',
   component: TopNavigation,

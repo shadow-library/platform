@@ -1,23 +1,9 @@
-/**
- * Importing npm packages
- */
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { Dispatcher, ShadowApplication, ShadowFactory } from '@shadow-library/app';
 import { utils } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { AppModule } from '@examples/user-auth/app.module';
 import { FastifyRouter } from '@shadow-library/fastify';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 describe('User Auth', () => {
   let app: ShadowApplication;

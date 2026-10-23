@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type ComponentPropsWithoutRef, type ReactNode } from 'react';
 
-/**
- * Defining types
- */
 export type RTECountMode = 'characters' | 'words';
 
 export interface RTEFieldContextValue {

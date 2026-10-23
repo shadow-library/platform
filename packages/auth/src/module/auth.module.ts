@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { DynamicModule, Inject, Injectable, Module, type OnModuleDestroy, type OnModuleInit } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { ContextService, FASTIFY_INSTANCE, FastifyModule } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { NAMESPACE } from '../constants';
 import { AuthErrorCode } from '../errors';
 import { type AuthClientConfig } from '../interfaces';
@@ -18,10 +12,6 @@ import { AuthGuard } from './auth-guard';
 import { AuthController, configureAuthRoutes } from './auth.controller';
 import { AuthModuleOptions, resolveAccessMode, resolveAuthClientConfig, resolveAuthRoutes, resolveBrowserAuthConfig, type ResolvedBrowserAuthConfig } from './config';
 import { extendContextWithAuth } from './context';
-
-/**
- * Defining types
- */
 
 /**
  * The slice of the Fastify instance the module needs. Typed structurally so the SDK does not have to

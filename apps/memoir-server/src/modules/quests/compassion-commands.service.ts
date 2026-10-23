@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { and, eq, inArray } from 'drizzle-orm';
 import { Injectable, type OnModuleInit } from '@shadow-library/app';
 import { AppError, ValidationError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { CommandBus, type CommandContext, type CommandResult, HeroLedger } from '@modules/commands';
 import { ProgressionService } from '@modules/progression';
 import {
@@ -28,10 +22,6 @@ import {
 import { RolloverRepository } from '@modules/rollover';
 import { AppErrorCode } from '@server/classes';
 import { schema } from '@server/database';
-
-/**
- * Declaring the constants
- */
 
 const HOLD_STATES: readonly QuestLogState[] = ['completed', 'partial', 'late', 'recovery'];
 

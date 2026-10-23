@@ -1,28 +1,14 @@
 /* eslint-disable @typescript-eslint/no-invalid-void-type, @typescript-eslint/no-wrapper-object-types */
-/**
- * Importing npm packages
- */
 import assert from 'node:assert';
 
 import { Class } from 'type-fest';
 import { Reflector } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { Integer, METADATA_KEYS } from '@lib/constants';
 import { EnumType } from '@lib/enum-type';
 import { ArrayFieldSchema, BooleanFieldSchema, EnumFieldSchema, FieldSchema, NumberFieldSchema, ObjectFieldSchema, StringFieldSchema } from '@lib/interfaces';
 
-/**
- * Defining types
- */
-
 export type ReturnTypeFunc = (returns?: void) => EnumType | EnumType[] | Class<any> | Class<any>[];
-
-/**
- * Declaring the constants
- */
 
 export function Field(options?: FieldSchema): PropertyDecorator;
 export function Field(returnTypeFn: (returns?: void) => EnumType, options?: EnumFieldSchema): PropertyDecorator;

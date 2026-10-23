@@ -1,11 +1,5 @@
-/**
- * Importing user defined packages
- */
 import { type DateRange } from '../Calendar';
 
-/**
- * Defining types
- */
 export type { DateRange };
 
 export interface RangePreset {

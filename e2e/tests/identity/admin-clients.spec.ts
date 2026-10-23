@@ -1,13 +1,7 @@
-/**
- * Importing npm packages
- */
 import { randomBytes } from 'node:crypto';
 
 import { type APIRequestContext } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import {
   addOrganisationMember,
   assignApplicationRole,
@@ -25,10 +19,6 @@ import {
 } from '../../lib';
 import { expect, type IdentityHarness, test } from './fixtures';
 import { expectErrorCode } from './helpers';
-
-/**
- * Defining types
- */
 
 interface ClientDetail {
   id: string;

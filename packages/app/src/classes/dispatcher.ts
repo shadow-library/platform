@@ -1,16 +1,6 @@
-/**
- * Importing npm packages
- */
 import { Class } from 'type-fest';
 
-/**
- * Importing user defined packages
- */
 import { ControllerMetadata, HandlerMetadata, Injectable } from '../decorators';
-
-/**
- * Defining types
- */
 
 export interface HandlerDescriptor {
   metadata: HandlerMetadata;
@@ -26,10 +16,6 @@ export interface DispatchMetadata {
   instance: object;
   handlers: HandlerDescriptor[];
 }
-
-/**
- * Declaring the constants
- */
 
 @Injectable()
 export abstract class Dispatcher {

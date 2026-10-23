@@ -1,12 +1,6 @@
-/**
- * Importing npm packages
- */
 import type * as RadioGroupPrimitive from '@radix-ui/react-radio-group';
 import { type ComponentPropsWithoutRef } from 'react';
 
-/**
- * Defining types
- */
 export type SegmentedControlSize = 'sm' | 'md';
 
 export interface SegmentedControlProps extends Omit<ComponentPropsWithoutRef<typeof RadioGroupPrimitive.Root>, 'orientation'> {

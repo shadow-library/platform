@@ -1,25 +1,11 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { Inject, Injectable, InjectionToken, Module, ShadowFactory } from '@shadow-library/app';
-
-/**
- * Defining types
- */
 
 interface AppConfig {
   name: string;
   port: number;
 }
-
-/**
- * Declaring the constants
- */
 
 describe('InjectionToken', () => {
   it('should expose its description', () => {

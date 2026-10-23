@@ -1,20 +1,11 @@
-/**
- * Importing npm packages
- */
 import { type ElementType, forwardRef } from 'react';
 
-/**
- * Importing user defined packages
- */
 import { cn, DEFAULT_LOCALE } from '@/lib';
 
 import { Skeleton } from '../Skeleton';
 import styles from './Statistic.module.css';
 import { type StatisticPositiveIs, type StatisticProps } from './Statistic.types';
 
-/**
- * Declaring the constants
- */
 type Sentiment = 'good' | 'bad' | 'neutral';
 
 function sentimentOf(delta: number, positiveIs: StatisticPositiveIs): Sentiment {

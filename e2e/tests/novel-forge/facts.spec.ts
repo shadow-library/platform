@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type APIRequestContext, type APIResponse } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { mutate } from '../../lib';
 import { expect, test } from './forge-actors';
 import { expectCode } from './forge-arrange';
@@ -25,10 +19,6 @@ import {
   writeBrief,
   writeFact,
 } from './forge-story';
-
-/**
- * Defining types
- */
 
 interface KnowledgeEntry {
   readonly entityKey: string;

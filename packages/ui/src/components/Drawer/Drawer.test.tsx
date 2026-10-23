@@ -1,19 +1,8 @@
-/**
- * Importing npm packages
- */
-
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { Drawer } from './Drawer';
-
-/**
- * Declaring the constants
- */
 
 describe('Drawer', () => {
   it('modal renders a dialog labelled by its title and closes via the close button', async () => {

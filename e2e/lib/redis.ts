@@ -1,16 +1,5 @@
-/**
- * Importing npm packages
- */
 import { createHash } from 'node:crypto';
 import net from 'node:net';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
 
 export type RespValue = string | number | null | RespValue[];
 

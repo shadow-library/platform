@@ -1,20 +1,7 @@
-/**
- * Importing npm packages
- */
 import { beforeEach, describe, expect, it } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { AppError, ErrorCode, ServiceDiscovery, ServiceDiscoveryService } from '@shadow-library/common';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const ENV_KEYS = ['SERVICE_URL_PULSE_SERVER', 'SERVICE_URL_IDENTITY_SERVER_IDENTITY', 'SERVICE_DISCOVERY_SCHEME'];
 
 describe('ServiceDiscovery', () => {

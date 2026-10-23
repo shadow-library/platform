@@ -1,20 +1,6 @@
-/**
- * Importing npm packages
- */
 import { describe, expect, it, jest } from 'bun:test';
 
-/**
- * Importing user defined packages
- */
 import { Task, TaskManager } from '@shadow-library/common';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 describe('TaskManager', () => {
   it('should execute tasks in order', async () => {

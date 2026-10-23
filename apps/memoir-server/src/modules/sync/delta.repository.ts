@@ -1,26 +1,12 @@
-/**
- * Importing npm packages
- */
 import { asc, gt, inArray } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 
-/**
- * Importing user defined packages
- */
 import { type OwnedTable, OwnerScopedRepository } from '@modules/auth';
 import { schema, type SyncSeqTable } from '@server/database';
 
 import { type DeltaRecord, type DeltaRow, type DeltaTombstone } from './sync.types';
 
-/**
- * Defining types
- */
-
 export type SyncableTable = OwnedTable & SyncSeqTable;
-
-/**
- * Declaring the constants
- */
 
 function toWireValue(value: unknown): unknown {
   if (typeof value === 'bigint') return String(value);

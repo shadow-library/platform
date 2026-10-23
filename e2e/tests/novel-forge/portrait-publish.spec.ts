@@ -1,18 +1,8 @@
-/**
- * Importing npm packages
- */
 import { type APIRequestContext } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { apiContext, mutate, runAll, subFor, webNovelDb } from '../../lib';
 import { buildBundle, expect, solidPng, test } from './forge-bundles';
 import { pollWebNovel, reconcileUntilConverged, uniqueSuffix } from './forge-helpers';
-
-/**
- * Defining types
- */
 
 interface ReaderWikiEntry {
   images: { imageUrl: string; caption?: string }[];

@@ -1,14 +1,8 @@
-/**
- * Importing npm packages
- */
 import { randomUUID } from 'node:crypto';
 
 import { type APIResponse } from '@playwright/test';
 import { type ReservedSql } from 'postgres';
 
-/**
- * Importing user defined packages
- */
 import { memoirDb, pollUntil } from '../../lib';
 import { expect, type MemoirPersona, test } from './fixtures';
 import {
@@ -27,10 +21,6 @@ import {
   todayLocal,
   waitersBlockedBy,
 } from './helpers';
-
-/**
- * Defining types
- */
 
 interface Mirrors {
   totalXp: string;

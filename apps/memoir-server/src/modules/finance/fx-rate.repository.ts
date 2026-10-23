@@ -1,22 +1,8 @@
-/**
- * Importing npm packages
- */
 import { and, eq } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { DatabaseService } from '@shadow-library/modules';
 
-/**
- * Importing user defined packages
- */
 import { type DatabaseTransaction, type FxRate, type PrimaryDatabase, schema } from '@server/database';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 /**
  * `fx_rates` carries no `account_id` (ARCHITECTURE §14.1: a shared, date-scoped cache, not user-owned

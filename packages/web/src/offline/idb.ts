@@ -1,12 +1,4 @@
 /**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
-
-/**
  * Defining types
  *
  * A dependency-free promise wrapper over the handful of IndexedDB operations the offline layer needs. Kept
@@ -19,9 +11,6 @@ export interface IdbConfig {
   version?: number;
 }
 
-/**
- * Declaring the constants
- */
 export function isIndexedDbAvailable(): boolean {
   return typeof indexedDB !== 'undefined';
 }

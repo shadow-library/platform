@@ -1,17 +1,7 @@
-/**
- * Importing npm packages
- */
 import { expect, request, test } from '@playwright/test';
 
-/**
- * Importing user defined packages
- */
 import { addIdentitySessionCookies, createIdentitySession, createIdentityUser, deleteIdentityUser, type IdentityUser, memoirDb, requireProductUrl } from '../../lib';
 import { getAccount } from './helpers';
-
-/**
- * Defining types
- */
 
 /**
  * Declaring the constants

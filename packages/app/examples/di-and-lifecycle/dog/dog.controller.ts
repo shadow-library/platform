@@ -1,21 +1,7 @@
-/**
- * Importing npm packages
- */
 import { Controller, Handler, OnApplicationReady, OnApplicationStop, OnModuleDestroy, OnModuleInit } from '@shadow-library/app';
 
-/**
- * Importing user defined packages
- */
 import { OutputService } from '../common/output.service';
 import { DogService } from './dog.service';
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 @Controller()
 export class DogController implements OnModuleInit, OnModuleDestroy, OnApplicationReady, OnApplicationStop {

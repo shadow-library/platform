@@ -1,17 +1,7 @@
-/**
- * Importing npm packages
- */
 import { ValidationError } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { type LocalDate, type MonthlyPattern, parseLocalDate, type ReasonTag, type RecurrenceEnd, type RecurrenceRule, type Weekday } from '@modules/rules';
 import { type Quest, type QuestLog } from '@server/database';
-
-/**
- * Defining types
- */
 
 /** The command-layer shape a `quest.create`/`quest.update` payload carries; validated by {@link parseQuestDraft}. */
 export interface QuestDraftInput {

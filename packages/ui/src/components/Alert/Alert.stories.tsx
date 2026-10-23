@@ -1,17 +1,7 @@
-/**
- * Importing npm packages
- */
-
 import { type Meta, type StoryObj } from '@storybook/react-vite';
 
-/**
- * Importing user defined packages
- */
 import { Alert } from './Alert';
 
-/**
- * Declaring the constants
- */
 const meta = {
   title: 'Components/Alert',
   component: Alert,

@@ -1,18 +1,9 @@
-/**
- * Importing npm packages
- */
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 
-/**
- * Importing user defined packages
- */
 import { RTEField, useRTEField } from './RTEField';
 
-/**
- * Declaring the constants
- */
 function Editable() {
   const { labelId, disabled, invalid } = useRTEField();
   // stand-in for an engine's contenteditable, which is role=textbox

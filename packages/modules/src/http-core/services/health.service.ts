@@ -1,25 +1,11 @@
-/**
- * Importing npm packages
- */
 import { createServer, Server } from 'node:http';
 
 import { Injectable, OnApplicationReady, OnApplicationStop } from '@shadow-library/app';
 import { Config, Logger } from '@shadow-library/common';
 
-/**
- * Importing user defined packages
- */
 import { DEFAULT_CONFIGS, LOGGER_NAMESPACE } from '../http-core.constants';
 
-/**
- * Defining types
- */
-
 type HealthServer = Server | Bun.Server<unknown> | null;
-
-/**
- * Declaring the constants
- */
 
 @Injectable()
 export class HealthService implements OnApplicationReady, OnApplicationStop {

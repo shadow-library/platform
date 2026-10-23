@@ -1,21 +1,8 @@
-/**
- * Importing npm packages
- */
 import { Field, Integer, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
 
-/**
- * Importing user defined packages
- */
 import { CommandEnvelopeDto } from '@modules/commands';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const MAX_BATCH_SIZE = 100;
 
 @Schema()

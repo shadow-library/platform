@@ -1,21 +1,7 @@
-/**
- * Importing npm packages
- */
-
-/**
- * Importing user defined packages
- */
 import { MaskOptions } from '@lib/interfaces';
 
 import { objectUtils } from './object';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 const MASK_CHAR = '*';
 
 class StringUtils {

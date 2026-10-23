@@ -1,19 +1,9 @@
-/**
- * Importing npm packages
- */
 import { type HandlerMetadata } from '@shadow-library/app';
 
-/**
- * Importing user defined packages
- */
 import { AuthErrorCode } from '../errors';
 import { type AuthAccessMode } from '../interfaces';
 import { AUTH_ROUTE_METADATA } from './constants';
 import { type AuthRouteAccess, type AuthRouteMetadata, type RequiredAuthRoute } from './decorators';
-
-/**
- * Defining types
- */
 
 type DeclaredAuthRoute = Partial<Omit<RequiredAuthRoute, 'access'>> & { access?: unknown };
 

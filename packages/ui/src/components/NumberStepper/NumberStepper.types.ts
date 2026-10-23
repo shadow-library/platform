@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type ReactNode } from 'react';
 
-/**
- * Defining types
- */
 export type NumberStepperSize = 'sm' | 'md' | 'lg';
 
 export interface NumberStepperProps {

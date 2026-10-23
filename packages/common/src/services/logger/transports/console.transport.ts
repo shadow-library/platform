@@ -1,19 +1,4 @@
-/**
- * Importing npm packages
- */
 import { format, Logform, transports } from 'winston';
-
-/**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
 
 /* istanbul ignore next */
 export class ConsoleTransport extends transports.Console {

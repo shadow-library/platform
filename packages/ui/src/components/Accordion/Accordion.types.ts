@@ -1,11 +1,5 @@
-/**
- * Importing npm packages
- */
 import { type ReactNode } from 'react';
 
-/**
- * Defining types
- */
 export interface AccordionProps {
   /** `single` scans one panel at a time; `multiple` keeps several open. */
   type: 'single' | 'multiple';
