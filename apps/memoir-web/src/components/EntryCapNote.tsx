@@ -9,9 +9,8 @@ export interface EntryCapNoteProps {
 }
 
 /**
- * One quiet line beneath a form or a save confirmation. It never renders a modal, a colour, or a blocked
- * state: PRD §4.13 makes the monthly allowance advisory, and `advisory.blocksSave` is typed `false` so this
- * component has nothing to branch on.
+ * One quiet line beneath a form or a save confirmation. The allowance is advisory — `advisory.blocksSave` is typed `false` — so there is no modal,
+ * colour or blocked state to branch to.
  */
 export function EntryCapNote({ advisory }: EntryCapNoteProps): ReactElement | null {
   if (!advisory || advisory.message === null) return null;

@@ -135,7 +135,7 @@ export interface ExpenseDetail extends Expense {
 }
 
 export interface ExpenseDraft {
-  /** Client-minted UUIDv7 (ARCHITECTURE §12.4) — an expense created offline already carries its permanent identity. Minted at dispatch when a caller leaves it out. */
+  /** Client-minted UUIDv7, so an expense created offline already carries its permanent identity. Minted at dispatch when a caller leaves it out. */
   id?: string;
   amountText: string;
   currency: CurrencyCode;
@@ -217,7 +217,6 @@ export interface FxRateSnapshot {
   from: CurrencyCode;
   to: CurrencyCode;
   rate: number;
-  /** The expense date the rate was captured for. */
   date: string;
 }
 
@@ -243,11 +242,13 @@ export interface RangeSpend {
   averageDayMinor: number;
   daysLogged: number;
   categories: CategorySlice[];
-  /** Rates the expenses in range were converted at. */
   fxRates: FxRateSnapshot[];
 }
 
-/** Active subscriptions whose monthly equivalent could not be converted to the home currency yet (no FX rate seen for their currency) — excluded from every total rather than counted as 0. */
+/**
+ * Active subscriptions whose monthly equivalent could not be converted to the home currency yet (no FX rate seen for their currency) — excluded from
+ * every total rather than counted as 0.
+ */
 export interface UnconvertedSubscriptions {
   count: number;
   currencies: CurrencyCode[];

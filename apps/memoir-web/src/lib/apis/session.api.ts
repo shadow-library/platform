@@ -12,10 +12,7 @@ export type { AuthPrincipal as SessionResponse } from '@shadow-library/web/auth'
 
 const authApi = createAuthApi(apiClient.auth);
 
-/**
- * `sessionQueryOptions` throws on 401 — that is what the route gate reads to bounce an unauthenticated
- * visitor.
- */
+/** `sessionQueryOptions` throws on 401, which is what the route gate reads to bounce an unauthenticated visitor. */
 export const { loginUrl, logout, sessionQueryOptions } = authApi;
 
 /**

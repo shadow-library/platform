@@ -37,7 +37,7 @@ function toSettlement(outcome: WireCommandOutcome): AckedCommand['settlement'] {
 /**
  * The persisted FIFO of commands waiting for the server. Nothing is ever reordered and nothing is ever
  * dropped except on an outcome, so a batch cut short simply resends from its first unacked entry under the
- * same ids — at-least-once on the wire, exactly-once in effect (ADR-0006).
+ * same ids — at-least-once on the wire, exactly-once in effect.
  */
 export class Outbox {
   private readonly now: () => Date;
@@ -53,7 +53,10 @@ export class Outbox {
     return uuidv7(this.now().getTime());
   }
 
-  /** Returns the minted envelope, or null when the command has no server handler and stays purely local. `commandId` lets a caller claim the outcome before the entry can be posted. */
+  /**
+   * Returns the minted envelope, or null when the command has no server handler and stays purely local. `commandId` lets a caller claim the outcome
+   * before the entry can be posted.
+   */
   async enqueue(command: SyncCommand, localDate: string, commandId: string = this.mintCommandId()): Promise<OutboxEntry | null> {
     if (!isServerBacked(command)) return null;
 

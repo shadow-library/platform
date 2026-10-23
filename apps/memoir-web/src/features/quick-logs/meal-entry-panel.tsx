@@ -19,10 +19,7 @@ export interface MealEntryPanelProps {
   onClose: () => void;
 }
 
-/**
- * Calories are typed. There is no commercial food database behind this field (D15), so zero is a legitimate
- * value — water and black coffee are meals a day can contain.
- */
+/** Calories are typed; no food database backs the field, so zero is a legitimate value — water and black coffee are meals a day can contain. */
 export function MealEntryPanel({ date, presets, presetsBusy, isLoggingPreset, confirmingPresetId, onLogPreset, onSaved, onClose }: MealEntryPanelProps): ReactElement {
   const command = useQuickLogCommand();
   const panelRef = useRef<HTMLDivElement>(null);

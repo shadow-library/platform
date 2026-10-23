@@ -11,10 +11,7 @@ export interface TitlesPanelProps {
   deck: HeroDeck;
 }
 
-/**
- * Titles are granted by sustained patterns and never chosen (PRD §4.8) — the only choice here is which of the
- * earned ones is displayed, so unearned rows carry no action at all rather than a disabled unlock.
- */
+/** Titles are granted by sustained patterns, never chosen: unearned rows carry no action at all rather than a disabled unlock. */
 export function TitlesPanel({ deck }: TitlesPanelProps): ReactElement {
   const command = useHeroCommand();
   const earned = deck.titles.filter(title => title.earnedOn !== null);

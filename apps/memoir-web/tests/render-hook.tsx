@@ -5,12 +5,7 @@ import { createRoot } from 'react-dom/client';
 
 export { act };
 
-/**
- * `createRoot`'s first call in a process pays a real, one-off setup cost (module-level React internals,
- * the reconciler's first pass) that otherwise lands inside whichever test happens to call `renderHook`
- * first, pushing it over the per-test budget for a reason that has nothing to do with that test. Paying
- * it here, at import time rather than inside a test body, keeps it off every file's first test.
- */
+/** `createRoot`'s first call pays a one-off setup cost; paying it at import time keeps it off whichever test would otherwise run first and blow its budget. */
 {
   const warmup = document.createElement('div');
   const root = createRoot(warmup);
@@ -29,13 +24,7 @@ export interface RenderHookResult<TResult, TProps> {
   unmount: () => void;
 }
 
-/**
- * A minimal stand-in for `@testing-library/react`'s `renderHook`, built on `react-dom/client` directly:
- * this app's test suite has no other dependency on the library, and pulling it in for one hook-shaped
- * corner would reintroduce the render-testing surface the migration removed. A hidden probe component
- * calls the hook on every render and records its return value; `wrapper` composes the same providers the
- * screens mount under.
- */
+/** A minimal `renderHook` built on `react-dom/client`, since the suite has no other need for `@testing-library/react`; `wrapper` composes the providers the screens mount under. */
 export function renderHook<TResult, TProps = void>(callback: (props: TProps) => TResult, options: RenderHookOptions<TProps> = {}): RenderHookResult<TResult, TProps> {
   const result = { current: undefined as unknown as TResult };
   let latestProps = options.initialProps as TProps;

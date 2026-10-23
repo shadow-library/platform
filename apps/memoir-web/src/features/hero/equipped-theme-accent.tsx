@@ -2,10 +2,7 @@ import { type ReactElement, useEffect } from 'react';
 
 import { useEquippedThemeAccentKey } from '@/lib/data';
 
-/**
- * Mounted once inside the authenticated shell, under `MemoirDataProvider`, so it unmounts (and clears the
- * attribute) on sign-out or account switch rather than surviving as a stale signal from a different account.
- */
+/** Mounted inside the authenticated shell so it unmounts, clearing the attribute, on sign-out or account switch instead of surviving as a stale signal. */
 export function EquippedThemeAccent(): ReactElement | null {
   const key = useEquippedThemeAccentKey();
 

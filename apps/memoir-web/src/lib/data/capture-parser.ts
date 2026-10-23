@@ -395,9 +395,8 @@ function expenseParse(text: string, found: AmountMatch, context: CaptureContext)
 }
 
 /**
- * Local-first heuristics only (PRODUCT.md §6.2) — the palette must never wait on a network or model call, so
- * an unrecognised line falls back to a journal draft rather than asking anything to interpret it. A typed
- * prefix (`done`, `j`, `sq`) is the owner saying what the line is, so it is read before any number in it.
+ * Local-first heuristics only: the palette must never wait on a network or model call, so an unrecognised line falls back to a journal draft.
+ * A typed prefix (`done`, `j`, `sq`) is the owner saying what the line is, so it is read before any number in it.
  */
 export function parseCapture(raw: string, context: CaptureContext): CaptureParse {
   const text = raw.trim();

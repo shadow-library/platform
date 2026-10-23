@@ -22,7 +22,7 @@ export function HistoryScreen(): ReactElement {
         </Button>
       }
     >
-      {/* No `query`: gating this on the filtered `history` query would remount it (and lose search focus) on every refetch the flash in follow-ups/P1-21 causes — P2-18 owns the real fix. */}
+      {/* No `query`: gating on the filtered `history` query would remount the content, losing search focus, on every refetch. */}
       <DataState skeleton={<HistorySkeleton />}>
         <HistoryContent />
       </DataState>

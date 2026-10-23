@@ -27,10 +27,8 @@ function occurrenceOf(command: Command): string | null {
 }
 
 /**
- * Reads render from the projected local world, never from the network; writes apply optimistically through
- * the same `MemoirEngine` the fixtures run and then enqueue a command. A rejected or superseded outcome is
- * corrected by the next delta pull rather than by unwinding the local apply — idempotency, not merge
- * (ADR-0006).
+ * Reads render from the projected local world, never the network; writes apply optimistically through the same `MemoirEngine` the fixtures run, then enqueue a command.
+ * A rejected or superseded outcome is corrected by the next delta pull rather than unwound — idempotency, not merge.
  */
 export class SyncedDataProvider implements DataProvider {
   private engine: MemoirEngine;

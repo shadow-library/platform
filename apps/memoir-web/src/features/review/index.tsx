@@ -29,7 +29,7 @@ const OUTCOME_LEGEND: { outcome: 'kept' | 'partial' | 'missed' | 'none'; label: 
 export function WeeklyReviewScreen(): ReactElement {
   return (
     <Screen title="Weekly Review" subtitle="A restrained look back at the week, in five short steps. Every prompt in it is optional.">
-      {/* No `query`: gating this on `review` would remount the wizard on the owner's own answer, per the flash in follow-ups/P1-21 — P2-18 owns the real fix. */}
+      {/* No `query`: gating on `review` would remount the wizard on the owner's own answer. */}
       <DataState skeleton={<Skeleton.Card />}>
         <ReviewWizard />
       </DataState>

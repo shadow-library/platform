@@ -14,14 +14,8 @@ export interface WireCommand {
 }
 
 /**
- * Every command type the server has a handler for that one of the web's four command unions also knows
- * how to build. A type absent from this set is applied locally and kept out of the outbox entirely:
- * `POST /sync/commands` fails the *whole batch* on an unknown type, so one command the server has not
- * shipped yet would strand every command behind it. `plan.setLock` is registered server-side
- * (`CompassionCommandsService`) and locks exactly the one calendar day its envelope carries, via the
- * `questIds` this module sends. Still absent server-side and therefore still local: `quest.setActive`,
- * `category.rename`, `journal.dismissPrompt`, `health.acceptOffer` (the owner's own `quest.complete` is
- * what completes the quest), and `intensity.set`. Reflect and account commands have no server module yet.
+ * Command types the server has a handler for. Anything else stays local and out of the outbox:
+ * `POST /sync/commands` fails the whole batch on an unknown type, which would strand every command behind it.
  */
 const SERVER_BACKED_TYPES = new Set<SyncCommand['type']>([
   'quest.complete',
@@ -102,11 +96,7 @@ export function isQuickLogCommand(command: SyncCommand): command is QuickLogComm
   return !isQuestCommand(command) && !isFinanceCommand(command) && !isHeroCommand(command);
 }
 
-/**
- * Mints the client-side identities the server expects a command to arrive with (ARCHITECTURE §12.4).
- * Called before the optimistic apply, never inside `toWireCommand`, so the row written locally and the
- * row the server writes carry the same id — and a replay of the queued command stays idempotent.
- */
+/** Minted before the optimistic apply, never inside `toWireCommand`, so the local row and the server's carry the same id and a replay stays idempotent. */
 export function mintCommandIds(command: SyncCommand): SyncCommand {
   switch (command.type) {
     case 'expense.create':
@@ -126,7 +116,6 @@ export function mintCommandIds(command: SyncCommand): SyncCommand {
 
 const WEEKDAY_WIRE: Record<Weekday, number> = { mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6, sun: 7 };
 
-/** The rules module's `RecurrenceRule` (numeric 1–7 weekdays, a monthly `pattern` discriminant) rather than the web's flatter `Recurrence` draft. */
 function toRecurrenceRule(recurrence: Recurrence): Record<string, unknown> {
   const base = { frequency: recurrence.frequency, interval: recurrence.interval, startDate: recurrence.startDate, end: recurrence.end, exceptions: recurrence.exceptions };
   if (recurrence.frequency === 'weekly') return { ...base, daysOfWeek: recurrence.daysOfWeek.map(day => WEEKDAY_WIRE[day]) };
@@ -181,20 +170,14 @@ function expenseWire(id: string, draft: ExpenseDraft): Record<string, unknown> {
 }
 
 /**
- * `subscriptions.category_id` is copied verbatim onto the expense `subscription.confirmCycle` writes, so
- * the wire carries the *expense* category key rather than the web's finer subscription grouping — the
- * ledger's category has to be a real one. `projection.ts` maps the key back, which is lossy only for the
- * subscription's own label.
+ * `subscriptions.category_id` is copied onto the expense `subscription.confirmCycle` writes, so the wire carries the expense category key;
+ * `projection.ts` maps it back, losing only the subscription's own label.
  */
 function subscriptionCategoryWire(categoryId: SubscriptionCategoryId): string {
   return SUBSCRIPTION_CATEGORIES[categoryId].expenseCategoryId;
 }
 
-/**
- * The only place a local command becomes a wire envelope body. A payload mismatch with any of the four
- * server modules is reconciled here and nowhere else — no call site outside this module knows the wire
- * shape of anything.
- */
+/** Payload mismatches with the server modules are reconciled here and nowhere else. */
 export function toWireCommand(command: SyncCommand): WireCommand {
   switch (command.type) {
     case 'quest.complete':

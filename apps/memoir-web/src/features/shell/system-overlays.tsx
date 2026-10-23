@@ -37,11 +37,7 @@ const INSTALL_OFFER_OFFLINE: Record<OfflineReadiness, string> = {
   ready: 'Everything works either way — the app already opens offline and syncs when you reconnect.',
 };
 
-/**
- * The shell-level overlays: everything the app needs to say about itself rather than about the day. They are
- * driven by a context rather than by each screen, so App and sync can raise the same update sheet the
- * service worker raises on its own.
- */
+/** Driven by a context rather than each screen, so App and sync can raise the same update sheet the service worker raises on its own. */
 export function SystemOverlayProvider({ children }: { children: ReactNode }): ReactElement {
   const [kind, setKind] = useState<SystemOverlayKind | null>(null);
   const install = useInstallOffer();

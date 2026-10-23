@@ -141,9 +141,8 @@ function HealthContent({ view, date }: { view: HealthView; date: string }): Reac
   const offers = view.metrics.flatMap(metric => (metric.offer?.met ? [{ definition: metric.definition, offer: metric.offer }] : []));
 
   /**
-   * Consent, never automation (PRD §2.6): the offer the server derives names the quest, and accepting it
-   * dispatches the owner's own `quest.complete`. Without a server-side threshold behind the offer there is
-   * no occurrence to address, so the local acknowledgement is all that is left to do.
+   * Consent, never automation: accepting the server-derived offer dispatches the owner's own `quest.complete`.
+   * Without a server-side threshold behind the offer there is no occurrence to address, so the local acknowledgement is all that is left.
    */
   const accept = async (offer: ThresholdOffer): Promise<void> => {
     if (offer.questId === null) {

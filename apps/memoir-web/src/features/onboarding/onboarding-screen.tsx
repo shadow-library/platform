@@ -111,10 +111,7 @@ function firstDay(days: Weekday[], today: string): Weekday | null {
   return ordered.find(weekday => days.includes(weekday)) ?? null;
 }
 
-/**
- * The first run, in five steps and under two minutes. Nothing is written until the last one, and the home
- * currency is the single decision that becomes read-only afterwards so historical totals stay comparable.
- */
+/** Five steps, and nothing is written until the last one. The home currency is the one decision that becomes read-only afterwards so historical totals stay comparable. */
 export function OnboardingScreen(): ReactElement {
   const navigate = useNavigate();
   const day = useDayPreferences();
@@ -212,11 +209,8 @@ export function OnboardingScreen(): ReactElement {
   });
 
   /**
-   * The quest is created after the account is onboarded, because the gate on `/` only lets go once
-   * `onboarding_completed_at` is set. `submittingRef` blocks a re-entrant call synchronously — before
-   * `isPending` has even re-rendered the button — so a double-click can never send a second request, and
-   * `onboardedRef` remembers a completed (or already-completed) account across a retry so a quest that
-   * failed to create is retried without re-submitting onboarding or creating a second quest.
+   * The quest is created after onboarding because the gate on `/` only lets go once `onboarding_completed_at` is set. `submittingRef` blocks a re-entrant call
+   * before `isPending` re-renders the button; `onboardedRef` remembers a completed account across a retry, so a failed quest creation never re-submits onboarding.
    */
   const finish = async (): Promise<void> => {
     if (problems.some(Boolean) || submittingRef.current) return;

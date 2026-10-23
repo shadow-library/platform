@@ -1,10 +1,6 @@
 const HEX = Array.from({ length: 256 }, (_, byte) => byte.toString(16).padStart(2, '0'));
 
-/**
- * UUIDv7 — a 48-bit millisecond timestamp followed by randomness, so a batch of outbox ids sorts into the
- * order the owner performed them even after a restart shuffles insertion order. The platform ships no
- * generator (`crypto.randomUUID` is v4, which is unordered), and ADR-0006 specifies v7 for command ids.
- */
+/** UUIDv7 so a batch of outbox ids sorts into the order the owner performed them; `crypto.randomUUID` is v4 and unordered. */
 export function uuidv7(now: number = Date.now()): string {
   const bytes = new Uint8Array(16);
   crypto.getRandomValues(bytes);

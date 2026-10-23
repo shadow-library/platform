@@ -8,9 +8,8 @@ export interface LinkageOfferNoteProps {
 }
 
 /**
- * PRD §2.6's consent step made visible: a saved entry that could satisfy a module-linked quest offers
- * the completion and never performs it. The entry's own reward was already withheld — completing the
- * quest is what grants the quest's, and only the owner can ask for it.
+ * A saved entry that could satisfy a module-linked quest offers the completion and never performs it; the entry's own reward is already withheld, and
+ * only the owner can claim the quest's.
  */
 export function LinkageOfferNote({ offer }: LinkageOfferNoteProps): ReactElement | null {
   const command = useCommand();

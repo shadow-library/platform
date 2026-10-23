@@ -30,7 +30,7 @@ export interface AccountProvider {
   dispatchCommand(command: AccountCommand): Promise<SettledCommandResult>;
 }
 
-/** Every category ships off. This is a safety requirement rather than a default anyone may tune (PRD §2.11). */
+/** Every category ships off: a safety requirement, not a default anyone may tune. */
 export const NOTIFICATION_SEEDS: Omit<NotificationPreference, 'email'>[] = [
   { id: 'weeklyDigest', label: 'Weekly review', help: 'One email when the week is ready to close. Never about a quest you missed.' },
   { id: 'aiReadiness', label: 'Coaching result ready', help: 'When a request or the nightly summary has finished.' },

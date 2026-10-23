@@ -96,9 +96,8 @@ function resolveGate(account: AccountStatus, pathname: string, setupSeen: boolea
 }
 
 /**
- * `onboarding_completed_at` null means the account has never chosen a currency or a wake window
- * (ARCHITECTURE §9.1), and every other screen would be reading defaults nobody agreed to — so nothing renders
- * until the account says which side of setup it is on, and each side is routed to where it belongs.
+ * `onboarding_completed_at` null means the account has never chosen a currency or a wake window, so every other screen would read defaults nobody agreed to:
+ * nothing renders until the account says which side of setup it is on, and each side is routed to where it belongs.
  */
 export function OnboardingGate({ children }: { children: ReactElement }): ReactElement {
   const onboarding = useOnboardingStatus();

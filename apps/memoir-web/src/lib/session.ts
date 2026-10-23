@@ -14,11 +14,7 @@ export function currentPage(): string {
   return `${window.location.pathname}${window.location.search}${window.location.hash}`;
 }
 
-/**
- * The auth gate for every route group — nothing in Memoir is public. An unauthenticated visitor (401) is
- * redirected to the `/login` shim with the intended destination preserved; a non-401 failure propagates to the
- * route error boundary.
- */
+/** The auth gate for every route group: a 401 redirects to the `/login` shim with the destination preserved; any other failure propagates to the route error boundary. */
 export function requireSession(queryClient: QueryClient, returnTo: string): Promise<SessionResponse> {
   return requireAuth(queryClient, sessionQueryOptions(), { loginTo: '/login', returnTo });
 }

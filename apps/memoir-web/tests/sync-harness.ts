@@ -24,14 +24,7 @@ export interface RecordedBatch {
   types: string[];
 }
 
-/**
- * Polls `predicate` until it is true, for assertions that settle after a promise-chain hop rather than
- * synchronously. Most callers settle within a handful of microtask turns (fake HTTP responses resolve
- * without real I/O), so this drains a few of those — free, no real timer — before falling back to a
- * bounded `setImmediate` loop (the task queue, cheaper than `setTimeout`'s timer overhead) for the rarer
- * case of a macrotask-scheduled continuation. Kept short: a condition that needs the task queue should
- * reach it quickly rather than spend the budget re-checking a microtask queue it will never settle on.
- */
+/** Polls `predicate`, draining a few microtask turns before falling back to a bounded `setImmediate` loop for macrotask-scheduled continuations. */
 export async function waitFor(predicate: () => boolean | Promise<boolean>, timeoutMs = 1_000): Promise<void> {
   for (let attempt = 0; attempt < 5; attempt++) {
     if (await predicate()) return;
@@ -44,11 +37,7 @@ export async function waitFor(predicate: () => boolean | Promise<boolean>, timeo
   }
 }
 
-/**
- * The same event-driven trade as {@link waitForState}, for a value that only changes through a React Query
- * cache write (a `useQuery` result observed via `renderHook`, not an engine snapshot): the cache's own
- * `subscribe` fires on every query-cache event, so this settles in one hop rather than a poll loop's budget.
- */
+/** Like {@link waitForState}, for a value that only changes through a React Query cache write; the cache's `subscribe` settles it in one hop. */
 export function waitForQuery(queryClient: QueryClient, predicate: () => boolean, timeoutMs = 1_000): Promise<void> {
   if (predicate()) return Promise.resolve();
   return new Promise((resolve, reject) => {
@@ -65,12 +54,7 @@ export function waitForQuery(queryClient: QueryClient, predicate: () => boolean,
   });
 }
 
-/**
- * Waits for an engine snapshot the same way a subscriber would, rather than polling for one: `engine.subscribe`
- * already notifies synchronously on every state change, so this settles in exactly one hop instead of
- * however many polling attempts it takes to next observe the queue — the difference that matters when the
- * process is under load and a poll loop's fixed attempt budget stops being "a few free microtask turns".
- */
+/** Waits for an engine snapshot via `engine.subscribe`, which notifies synchronously on every change, instead of polling. */
 export function waitForState(engine: SyncEngine, predicate: (snapshot: SyncSnapshot) => boolean, timeoutMs = 1_000): Promise<void> {
   if (predicate(engine.getSnapshot())) return Promise.resolve();
   return new Promise((resolve, reject) => {
@@ -291,7 +275,10 @@ export function createLiveTestEngine(options: Omit<TestEngineOptions, 'fetchImpl
   return subject;
 }
 
-/** The same composition `createSyncedMemoirData` builds in the app, over a test engine — for a screen that has to read and write through the sync layer rather than the fixtures. */
+/**
+ * The same composition `createSyncedMemoirData` builds in the app, over a test engine — for a screen that has to read and write through the sync layer
+ * rather than the fixtures.
+ */
 export function createSyncedTestData(engine: SyncEngine, principal?: () => Promise<string>): SyncedMemoirData {
   return composeSyncedMemoirData(engine, principal);
 }

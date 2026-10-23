@@ -8,18 +8,13 @@ import { defineConfig, type Plugin } from 'vite';
 import { buildManifest } from '@shadow-library/web/pwa';
 
 /**
- * The browser talks to memoir-server on the same origin (`/api/...`), so dev proxies `/api` to the
- * backend at `API_ORIGIN` (falling back to `SERVER_URL`, then localhost). Production fronts this server and
- * the API with an ingress that routes `/api` to memoir-server and everything else here.
+ * The browser talks to memoir-server on the same origin, so dev proxies `/api` to `API_ORIGIN` (then `SERVER_URL`, then localhost); in production the
+ * ingress routes `/api` to memoir-server.
  */
 const proxyTarget = process.env.API_ORIGIN || process.env.SERVER_URL || 'http://localhost:8080';
 const proxy = { '/api': { target: proxyTarget, changeOrigin: true, secure: false } };
 
-/**
- * Writes the installable manifest into `public/` at build time so Vite copies it into `dist/client` and
- * `serve()` delivers it as `application/manifest+json`. Shortcuts point at the two capture surfaces a
- * phone user reaches for from the launcher.
- */
+/** Writes the installable manifest into `public/` at build time so Vite copies it into `dist/client` and `serve()` delivers it as `application/manifest+json`. */
 function manifestPlugin(): Plugin {
   return {
     name: 'memoir-manifest',

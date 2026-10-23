@@ -57,9 +57,7 @@ describe('MemoirStore wipeAccount', () => {
 
     await acctA.wipeAccount();
 
-    // Reopening a store for acct-a here would re-claim and, via `deleteForeign`, delete acct-b's keys as
-    // "foreign" — a real device only ever runs one claimed store at a time, so the raw backing is what a
-    // second account's data actually depends on, not a second `MemoirStore` instance.
+    // Reopening a store for acct-a would re-claim and delete acct-b's keys as foreign, so the raw backing is read instead.
     const remaining = await backing.keys();
     expect(remaining.some(key => key.startsWith('acct:acct-a:domain:'))).toBe(false);
     expect(await acctB.readDomain('quests')).toEqual([{ id: 'q2' }]);

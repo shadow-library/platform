@@ -11,10 +11,7 @@ const DESTINATIONS = [
   { to: '/log/sidequests', label: 'Side quests', exact: false },
 ] as const;
 
-/**
- * The capture hub. Each surface underneath is a separate route so a launcher shortcut, a deep link or the
- * back button all land where the owner expects — the strip is navigation, not a tab widget holding state.
- */
+/** Each surface is a separate route so a launcher shortcut, deep link or back button lands where the owner expects — the strip is navigation, not a tab widget holding state. */
 export function QuickLogScreen(): ReactElement {
   const { pathname } = useLocation();
   const navRef = useRef<HTMLElement>(null);

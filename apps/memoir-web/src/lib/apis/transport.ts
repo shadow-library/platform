@@ -1,13 +1,8 @@
 import { createApiClient } from '@shadow-library/web';
 
 /**
- * The whole of Memoir's transport configuration. `@shadow-library/web` owns the request builder, the
- * browser/server split, the CSRF double-submit and the error contract; what is left is the two base paths
- * this app talks to and how to reach memoir-server during the server render.
- *
- * The browser hits the same-origin `/api/*` — vite proxies it in dev, the ingress routes it in prod — so
- * cookies and the CSRF double-submit work natively and the service worker can apply a strategy to a real
- * GET. Paths are surface-relative: `/quests`, not `/api/quests`.
+ * The browser hits the same-origin `/api/*` — vite proxies it in dev, the ingress routes it in prod — so cookies and the CSRF double-submit
+ * work natively and the service worker can apply a strategy to a real GET. Paths are surface-relative: `/quests`, not `/api/quests`.
  */
 export const apiClient = createApiClient({
   surfaces: { api: '/api', auth: '/api/auth' },

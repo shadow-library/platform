@@ -145,9 +145,7 @@ describe('Account settings over the wire', () => {
       },
     });
 
-    // `patchDay` fires its confirming re-sync as `void this.sync.sync({ fresh: true })` — spying on it
-    // from before the dispatch, rather than polling the projection afterwards, lets the test await that
-    // exact pass instead of guessing how many ticks its background start takes to land.
+    // Spy before the dispatch so the test awaits the exact fire-and-forget confirming re-sync instead of guessing how many ticks it takes to land.
     const sync = spyOn(live.engine, 'sync');
     const result = await new SyncedAccountProvider(live.engine).dispatchCommand({ type: 'day.set', patch: { monthlyBudgetMinor: 160000 } });
     await release();
@@ -607,8 +605,6 @@ describe('Devices over the wire', () => {
       },
     });
 
-    // Same confirming-resync shape as the monthly-budget pass above: spy on the fire-and-forget
-    // `sync.sync({ fresh: true })` and await exactly that call instead of polling for its effect.
     const sync = spyOn(live.engine, 'sync');
     const result = await subject.dispatchCommand({ type: 'device.remove', deviceId: 'device-b' });
     await release();

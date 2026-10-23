@@ -2,10 +2,7 @@ import { type NavConfig, type NavLeaf } from '@shadow-library/ui/router';
 
 import { AiIcon, HeroIcon, HistoryIcon, InsightsIcon, LogIcon, MoneyIcon, PlanIcon, QuestIcon, ReviewIcon, SettingsIcon, TodayIcon } from '@/components/icons';
 
-/**
- * The five destinations the phone's bottom bar carries — capture and completion, in the order a day is
- * lived. Anything reached less than daily belongs in the sidebar, not here.
- */
+/** The phone's bottom bar: capture and completion, in the order a day is lived. Anything reached less than daily belongs in the sidebar. */
 export const PHONE_NAV: NavLeaf[] = [
   { to: '/', label: 'Today', icon: <TodayIcon size={16} />, exact: true },
   { to: '/plan', label: 'Plan', icon: <PlanIcon size={16} /> },
@@ -14,10 +11,7 @@ export const PHONE_NAV: NavLeaf[] = [
   { to: '/hero', label: 'Hero', icon: <HeroIcon size={16} /> },
 ];
 
-/**
- * The desktop sidebar, grouped by what the surface is for: the day, capture, and the reflection half of the
- * loop that a phone screen could never carry.
- */
+/** The desktop sidebar, grouped by what the surface is for: the day, capture, and the reflection half of the loop. */
 export const DESKTOP_NAV: NavConfig = {
   variant: 'sections',
   sections: [

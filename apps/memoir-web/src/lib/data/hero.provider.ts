@@ -79,7 +79,7 @@ export interface AchievementSeed {
   reward: string;
 }
 
-/** The Phase 1 catalogue of seventeen, in the order PRD §4.7 lists them. */
+/** The achievement catalogue of seventeen. */
 export const ACHIEVEMENTS: AchievementSeed[] = [
   { id: 'first_quest_completed', name: 'First Promise', crest: '◈', teaser: 'Something about beginning', description: 'The first quest you completed.', reward: '+50 XP' },
   { id: 'first_level_up', name: 'Second Level', crest: '▲', teaser: 'Something about the first climb', description: 'The first level you reached.', reward: '+50 XP · 10 coins' },
@@ -170,7 +170,7 @@ export const ACHIEVEMENTS: AchievementSeed[] = [
   },
 ];
 
-/** The Phase 1 title catalogue (PRD §4.8). Titles are earned, never chosen — only which one is displayed is a choice. */
+/** Titles are earned, never chosen — only which one is displayed is a choice. */
 export const TITLES: { id: string; name: string; earnedFrom: string }[] = [
   { id: 'steady_builder', name: 'Steady Builder', earnedFrom: 'Discipline at sixty' },
   { id: 'body_tempered', name: 'Body Tempered', earnedFrom: 'Body at sixty' },
@@ -408,10 +408,7 @@ function applied(message: string): SettledCommandResult {
   return { status: 'applied', message, xpAwarded: 0, coinsAwarded: 0 };
 }
 
-/**
- * The fixture hero. Purchases spend the same coin balance the deck reads, so an unaffordable cosmetic
- * refuses in the provider rather than only being greyed out in the screen.
- */
+/** Purchases spend the same coin balance the deck reads, so an unaffordable cosmetic refuses in the provider rather than only being greyed out. */
 export function createHeroProvider({ persona = 'active', hero }: HeroFixtureOptions): HeroProvider {
   const titles = titlesFor(persona);
   const state: HeroFixtureState = {

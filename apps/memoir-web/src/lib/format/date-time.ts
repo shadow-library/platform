@@ -1,9 +1,8 @@
 import { addDays, DEFAULT_LOCALE, parseISODate, toISODate } from '@shadow-library/ui';
 
 /**
- * "Local" here means the browser's own time zone, for rendering a date or an instant; tests pin it with
- * `process.env.TZ`. Which calendar day is *today* is a different question, answered in the account's
- * zone by {@link accountDay}, because the server closes days there (docs/memoir.md).
+ * "Local" means the browser's own time zone, for rendering a date or an instant; tests pin it with `process.env.TZ`.
+ * Which day is *today* is answered in the account's zone by {@link accountDay}, because the server closes days there.
  */
 function toLocalDate(value: string): Date | null {
   const dateOnly = parseISODate(value);
@@ -21,11 +20,7 @@ export interface LocalDateOptions {
   year?: boolean;
 }
 
-/**
- * "3 Sep 2026" by default, day-month-year order. The month name is a fixed table rather than
- * `toLocaleDateString`, because `Intl`'s own short-month form for September varies by locale ("Sep" in
- * `en-US`, "Sept" in `en-GB`) and the app needs one literal spelling everywhere.
- */
+/** "3 Sep 2026" by default, day-month-year order, using {@link SHORT_MONTHS} rather than `toLocaleDateString`. */
 export function formatLocalDate(value: string | null | undefined, options: LocalDateOptions = {}): string {
   if (!value) return '';
   const date = toLocalDate(value);
@@ -39,7 +34,7 @@ export interface LocalTimeOptions {
   locale?: string;
 }
 
-/** Always 24-hour ("11:12"), matching P1-03's `hour12={false}` TimePicker, regardless of the locale's own convention. */
+/** Always 24-hour ("11:12"), matching the TimePicker's `hour12={false}`, regardless of the locale's own convention. */
 export function formatLocalTime(value: string | null | undefined, options: LocalTimeOptions = {}): string {
   if (!value) return '';
   const date = new Date(value);
@@ -68,7 +63,7 @@ export interface TimeZoneOption {
   label: string;
 }
 
-/** A-04a: every IANA zone the runtime knows, always including the browser's own and (if given) the account's saved and pending zones, so none of them ever goes missing from the list. */
+/** Every IANA zone the runtime knows, always including the browser's own and (if given) the account's saved and pending zones, so none ever goes missing from the list. */
 export function timeZoneOptions(currentZone?: string | null, pendingZone?: string | null): TimeZoneOption[] {
   const supported = typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : [];
   const zones = new Set(supported);

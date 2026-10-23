@@ -37,10 +37,8 @@ function SignOutIcon(): ReactElement {
 }
 
 /**
- * The two-surface chrome. One composition serves both: `AppShell` collapses its sidebar into a drawer below
- * 768px on its own, and this adds what the phone needs on top of that — the bottom bar for the five daily
- * destinations and a promoted capture action within thumb reach. On desktop the same capture action is the
- * command palette, so the FAB and the palette trigger are mutually exclusive rather than duplicated.
+ * `AppShell` collapses its sidebar into a drawer below 768px on its own; this adds the phone's bottom bar for the five daily destinations and a capture action
+ * within thumb reach. On desktop the capture action is the command palette, so the FAB and the palette trigger are mutually exclusive.
  */
 function ShellChrome({ children }: AppShellProps): ReactElement {
   const { theme, toggleTheme } = useTheme();

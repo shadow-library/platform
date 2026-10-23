@@ -411,7 +411,7 @@ export class FixtureQuickLogProvider implements QuickLogProvider {
 }
 
 export interface QuickLogApplyContext {
-  /** The module-linked quest this entry could satisfy. Present means the entry's own reward is suppressed — the quest's reward is the owner's to claim (PRD §2.6). */
+  /** The module-linked quest this entry could satisfy. Present means the entry's own reward is suppressed — the quest's reward is the owner's to claim. */
   linkage?: QuestLinkageOffer | null;
 }
 

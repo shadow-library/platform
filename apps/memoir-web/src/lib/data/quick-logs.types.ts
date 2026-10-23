@@ -206,10 +206,7 @@ export interface HealthMetricEntry {
   source: 'manual' | 'health';
 }
 
-/**
- * The consent step the PRD requires: a met threshold produces an offer the owner accepts, never a quest
- * the app completes on their behalf.
- */
+/** A met threshold produces an offer the owner accepts, never a quest the app completes on their behalf. */
 export interface ThresholdOffer {
   metricKey: HealthMetricKey;
   /** The day whose logged value crossed the threshold — an offer belongs to that day's occurrence, never to the same value logged on another day. */
@@ -257,10 +254,7 @@ export interface QuickLogReward {
   reason: string;
 }
 
-/**
- * The consent step PRD §2.6 requires around module-linked quests: a saved entry that could satisfy a
- * quest scheduled for the same day reports the quest, and the owner completes it — the log never does.
- */
+/** A saved entry that could satisfy a module-linked quest scheduled for the same day reports the quest; the owner completes it, the log never does. */
 export interface QuestLinkageOffer {
   status: 'offered' | 'already-completed';
   questId: string;

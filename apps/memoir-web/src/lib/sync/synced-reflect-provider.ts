@@ -119,14 +119,8 @@ interface StoredReview extends ReviewLocalState {
 }
 
 /**
- * The coaching surface, live. Tasks, results and consents are written over HTTP and read back through the
- * delta mirror, so a submitted request appears on the next pull rather than being invented locally — the
- * worker owns everything after the submission and nothing here can honestly guess its outcome.
- *
- * History, insights and the weekly review are derivations over the same mirror: the server has no read model
- * for any of the three, so they are computed locally from the rows the delta pull already landed. The
- * review's own answers stay local for the same reason — there is no server model to write them to, so they
- * live in the store's metadata beside the mirror.
+ * Tasks, results and consents are written over HTTP and read back through the delta mirror, so a submitted request appears on the next pull rather than being invented locally.
+ * History, insights and the weekly review are computed from the mirror; the review's own answers stay in store metadata because the server has no model for them.
  */
 export class SyncedReflectProvider implements ReflectProvider {
   private readonly narrative: ReflectProvider;

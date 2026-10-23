@@ -28,7 +28,10 @@ export const HEALTH_METRICS: HealthMetricDefinition[] = [
   { key: 'water', name: 'Water', unit: 'l', step: 0.1, precision: 1, threshold: { value: 2000, questTitle: 'Drink 2 litres', xp: 20 } },
 ];
 
-/** Every {@link HealthMetricEntry.value} and {@link HealthMetricDefinition.threshold} is stored the way the server stores it (water in millilitres); this converts to the unit shown. */
+/**
+ * Every {@link HealthMetricEntry.value} and {@link HealthMetricDefinition.threshold} is stored the way the server stores it (water in millilitres); this
+ * converts to the unit shown.
+ */
 const DISPLAY_CONVERT: Partial<Record<HealthMetricKey, (raw: number) => number>> = { water: convertMlToLitres };
 
 /** The inverse of {@link DISPLAY_CONVERT} — every write path converts what the owner typed back to storage units before it lands in state. */
@@ -155,10 +158,7 @@ export function applyMarkdownTool(text: string, selectionStart: number, selectio
   return { text: next, selectionStart: selectionStart + prefix.length, selectionEnd: selectionEnd + prefix.length };
 }
 
-/**
- * The meal keeps a copy of the preset's numbers, not a pointer to them: PRD §3.9 requires a later edit of
- * the preset to leave every already-logged meal untouched.
- */
+/** The meal keeps a copy of the preset's numbers, not a pointer: a later edit of the preset must leave every already-logged meal untouched. */
 export function snapshotPresetToMeal(preset: MealPreset, context: { id: string; date: string; loggedAt: string; rewarded: boolean }): Meal {
   return {
     id: context.id,

@@ -329,9 +329,8 @@ export class SyncedQuickLogProvider implements QuickLogProvider {
   }
 
   /**
-   * PRD §2.6's consent step, mirrored locally so the optimistic result matches the server's: an entry
-   * that could satisfy a module-linked quest scheduled for the same day suppresses its own reward and
-   * reports the quest. Completing it stays the owner's own `quest.complete`.
+   * Mirrors the server's consent step so the optimistic result matches: an entry that could satisfy a module-linked quest scheduled for the same day
+   * suppresses its own reward and reports the quest. Completing it stays the owner's own `quest.complete`.
    */
   private async linkageFor(module: ModuleLink, date: string): Promise<QuestLinkageOffer | null> {
     const linked = this.world.quests.filter(quest => quest.active && quest.moduleLink === module);

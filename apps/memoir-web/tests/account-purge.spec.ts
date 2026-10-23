@@ -151,9 +151,6 @@ describe('account-change isolation', () => {
     const a = await accountA(backing, marker);
     const b = engineFor('usr_B', backing, marker);
 
-    // The original exercised this switch through `<SyncEngineProvider>`'s effect (mount on A's data,
-    // rerender onto B's), which cleans up A (`engine.stop()`) then starts B — exactly what it does
-    // directly, and the purge invariant lives in the engine/store, not the provider's effect wiring.
     a.engine.stop();
     await b.engine.start();
 

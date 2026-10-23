@@ -12,10 +12,8 @@ import {
 import { apiClient, APIRequest } from './transport';
 
 /**
- * The account surfaces are online-first (ARCHITECTURE §9.1): settings, export, deletion and billing are
- * ordinary request/response calls, not offline commands, so they go out through the app's transport rather
- * than the outbox. Only the device registry overlaps with sync, and it is the same PUT the engine already
- * uses to register this browser.
+ * Settings, export, deletion and billing are ordinary request/response calls, not offline commands, so they bypass the outbox.
+ * Only the device registry overlaps with sync, and it is the same PUT the engine uses to register this browser.
  */
 export const accountApi = {
   get: (): Promise<AccountResponseDto> => APIRequest.get('/v1/account').execute<AccountResponseDto>(),

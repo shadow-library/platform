@@ -34,11 +34,8 @@ function page(overrides: Partial<DeltaPage>): DeltaPage {
 }
 
 /**
- * IndexedDB resolves on the task queue, not the microtask queue. A backing that resolves immediately hides
- * every ordering bug between a reprojection and the refetch a world listener triggers, which is why the
- * browser failed where the suite passed. `setImmediate` schedules on that same task queue — unlike
- * `setTimeout`, which carries per-call timer overhead that a store boot's ~90 sequential reads/writes turns
- * into real wall-clock seconds — so it reproduces the ordering hazard without the cost.
+ * IndexedDB resolves on the task queue, not the microtask queue; a backing that resolves immediately hides ordering bugs between a reprojection and the refetch
+ * a world listener triggers. `setImmediate` shares that queue without `setTimeout`'s per-call overhead.
  */
 function slowBacking(): KeyValueBacking {
   const inner = sharedBacking();

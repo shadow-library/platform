@@ -146,7 +146,7 @@ function toNthWeekday(pattern: Record<string, unknown>): NthWeekday | undefined 
   return weekday && ordinal !== undefined ? { weekday, ordinal } : undefined;
 }
 
-/** The server persists the rules module's `RecurrenceRule` (numeric 1–7 weekdays, a monthly `pattern` discriminant); this reverses `toRecurrenceRule` in `command-wire.ts` back to the web's flatter `Recurrence` draft shape. */
+/** Reverses `toRecurrenceRule` in `command-wire.ts`: the server persists the rules module's `RecurrenceRule`, the web keeps the flatter `Recurrence` draft. */
 function toRecurrence(value: unknown): Recurrence {
   const rule = (value ?? {}) as Record<string, unknown>;
   const daysOfWeek = Array.isArray(rule['daysOfWeek']) ? (rule['daysOfWeek'] as number[]).map(day => WEEKDAY_LOCAL[day] ?? 'mon') : [];
@@ -281,11 +281,7 @@ function isActiveLock(row: DeltaRow): boolean {
   return row['committedAt'] !== null && row['committedAt'] !== undefined && (row['lockBrokenAt'] === null || row['lockBrokenAt'] === undefined);
 }
 
-/**
- * Rebuilds the engine's world from the rows the delta pull has left in IndexedDB. It is deliberately total:
- * a domain the server has not yet populated projects to an empty set rather than to a hole, so each domain
- * flips from fixture-backed to live on its own without the projection learning about the others.
- */
+/** Total by design: a domain the server has not yet populated projects to an empty set, so each domain flips from fixture-backed to live on its own. */
 export function projectWorldState(rows: Partial<DomainRows>, today: string): MemoirWorldState {
   const metricIds = healthMetricIds(rows.metrics ?? []);
   const keyOf = metricKeyResolver(metricIds);
@@ -473,7 +469,10 @@ function toExpenseCategory(row: DeltaRow): ExpenseCategory {
 
 const REMINDER_LEAD_LOCAL: Record<string, ReminderLead> = { on_day: 'on-day', '1_day': '1-day', '2_day': '2-day', '3_day': '3-day', '1_week': '1-week' };
 
-/** The inverse of `command-wire.ts`'s `subscriptionCategoryWire`, and lossy by construction: three subscription groupings share the `subs` expense key, so the whole class projects back as `tools`. */
+/**
+ * The inverse of `command-wire.ts`'s `subscriptionCategoryWire`, and lossy by construction: three subscription groupings share the `subs` expense key,
+ * so the whole class projects back as `tools`.
+ */
 const SUBSCRIPTION_CATEGORY_LOCAL: Record<string, SubscriptionCategoryId> = { subs: 'tools', health: 'health', shopping: 'books' };
 
 function toSubscription(row: DeltaRow): Subscription {
@@ -526,7 +525,7 @@ function toJournalEntry(row: DeltaRow): JournalEntry {
   };
 }
 
-/** The server keeps calories and no macros (ARCHITECTURE §10.3), so a projected meal carries zeroes rather than invented grams. */
+/** The server keeps calories and no macros, so a projected meal carries zeroes rather than invented grams. */
 function toMeal(row: DeltaRow): Meal {
   const presetId = nullableText(row, 'presetId');
   return {
@@ -805,11 +804,7 @@ function toReflectQuestLog(row: DeltaRow, questNames: Map<string, string>): Refl
   };
 }
 
-/**
- * The reflection world, assembled from the same mirrored rows every other screen reads. Nothing here calls
- * the server: History, Insights and the Weekly Review are derivations over what the delta pull already left
- * in IndexedDB, because the server exposes no read model for any of the three.
- */
+/** History, Insights and the Weekly Review are derived from the mirrored rows because the server exposes no read model for any of them. */
 export function projectReflectSource(rows: Partial<DomainRows>, today: string, queuedIds: string[] = []): ReflectSource {
   const account = rows.account?.[0];
   const questNames = new Map((rows.quests ?? []).map(row => [String(row['id']), text(row, 'name') ?? 'Quest']));
@@ -958,7 +953,7 @@ function toHeroEvent(row: DeltaRow, questNames: Map<string, string>): HeroEventR
   };
 }
 
-/** `hero_events` rows migrated before P1-17 received their `syncSeq` in physical order, so the cursor order is not the order they happened in. */
+/** Older `hero_events` rows received their `syncSeq` in physical order, so cursor order is not the order they happened in. */
 function newestFirst(left: HeroEventRecord, right: HeroEventRecord): number {
   return right.createdAt.localeCompare(left.createdAt) || Number(right.id) - Number(left.id);
 }

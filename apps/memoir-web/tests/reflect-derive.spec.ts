@@ -272,8 +272,6 @@ describe('deriveHistory', () => {
   });
 
   it('should format a large record count with digit grouping', () => {
-    // Journal entries carry no per-row currency formatting, unlike `expense()`, so a count past the
-    // grouping threshold stays cheap to build — this test is about `formatCount`'s wiring, not volume.
     const large = source({
       journal: Array.from({ length: 1234 }, (_, index) => ({ ...journalEntry(`2026-08-${String(1 + (index % 28)).padStart(2, '0')}`, `entry ${index}`), id: `j-${index}` })),
     });

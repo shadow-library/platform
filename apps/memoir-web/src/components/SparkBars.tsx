@@ -38,10 +38,7 @@ function dayNumber(date: string): number {
   return Math.round(Date.parse(`${date}T00:00:00.000Z`) / DAY_MS);
 }
 
-/**
- * A blank day is a gap, never a zero — PRD §2.6. A null value renders as an empty slot so a missed day
- * cannot read as a day with nothing in it.
- */
+/** A blank day is a gap, never a zero: a null value renders as an empty slot so a missed day cannot read as a day with nothing in it. */
 export function SparkBars({ values, label, height = 40, highlightLast = false, domain = 'zero', dates, scale, axis, className }: SparkBarsProps): ReactElement {
   const present = values.filter((value): value is number => value !== null);
   const { low, high } = boundsOf(present, domain);

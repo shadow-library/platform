@@ -35,7 +35,6 @@ export interface SyncEngineOptions {
   /** Pins the day; otherwise it is the account's own day, read from the mirrored account row on every call, so it follows the clock past midnight. */
   today?: string;
   deviceId?: string;
-  /** Bounds a `hasMore` drain so a pathological server can never spin the client forever. */
   maxPages?: number;
   /** The session's current subject, asked at the start of every pass and before each later batch: the cookie can change hands under a running tab. */
   principal?: () => Promise<string>;
@@ -149,19 +148,13 @@ function retryAfterMsOf(error: unknown): number | null {
   return isApiError(error) && error.retryAfterSeconds !== undefined ? error.retryAfterSeconds * 1_000 : null;
 }
 
-/** The wire envelope, without the fields that exist only to order and settle the local queue. */
 function toEnvelope(entry: OutboxEntry): CommandEnvelope {
   return { commandId: entry.commandId, type: entry.type, payload: entry.payload, performedAt: entry.performedAt, localDate: entry.localDate, deviceId: entry.deviceId };
 }
 
-/**
- * The whole of the client's half of ADR-0006: a persisted outbox posted in strict order, a delta pull
- * that upserts by primary key, and one net state derived from both. It owns no view logic — the projected
- * world it publishes is what `SyncedDataProvider` reads through.
- */
+/** Persisted outbox posted in strict order, a delta pull that upserts by primary key, and one net state derived from both. Owns no view logic. */
 export class SyncEngine {
   readonly outbox: Outbox;
-  /** The local mirror, for the providers that persist their own bookkeeping beside it — the export job id, so far. */
   readonly store: MemoirStore;
 
   private readonly client: SyncClient;
@@ -239,13 +232,12 @@ export class SyncEngine {
     return projectWorldState(this.rows, this.today);
   }
 
-  /** The mirrored rows themselves, for the domain providers that project their own shapes rather than the quest world. */
   domains(): Partial<DomainRows> {
     return this.rows;
   }
 
   /**
-   * The server closes days in the account's timezone (docs/memoir.md), so a browser a zone ahead would otherwise stamp tomorrow's occurrence and be refused.
+   * The server closes days in the account's timezone, so a browser a zone ahead would otherwise stamp tomorrow's occurrence and be refused.
    * After a backward timezone change the server's open day (`lastHpDate`) stays ahead of the zone's date until the zone catches up, and that day is today.
    */
   get today(): string {
@@ -258,10 +250,8 @@ export class SyncEngine {
   }
 
   /**
-   * Hydrates the projected world from IndexedDB, then attempts one sync pass. A cold offline launch stops
-   * after the hydrate. A hydrate that throws — a browser that refuses storage, a mirror the projection
-   * cannot read — is recorded rather than left as a rejected promise, so the shell can say what happened
-   * instead of rendering an empty day forever.
+   * Hydrates the projected world from IndexedDB, then attempts one sync pass; a cold offline launch stops after the hydrate.
+   * A hydrate failure is recorded rather than rejected, so the shell can report it instead of rendering an empty day forever.
    */
   async start(): Promise<void> {
     this.store.open();
@@ -450,7 +440,7 @@ export class SyncEngine {
   }
 
   /**
-   * §4.3: a dead session leaves IndexedDB and the outbox exactly as they are. The owner keeps working
+   * A dead session leaves IndexedDB and the outbox exactly as they are. The owner keeps working
    * against local data and the same command ids replay once the same account signs back in. A different
    * account never inherits them: its data is built over a fresh store that empties itself on open.
    */
@@ -465,7 +455,10 @@ export class SyncEngine {
     if (isRetryable(error)) this.scheduleRetry(retryAfterMsOf(error));
   }
 
-  /** One timer at most, and a bounded number of attempts between successes, so a failing server is never answered with a storm; a server's `Retry-After` only ever lengthens the wait. */
+  /**
+   * One timer at most, and a bounded number of attempts between successes, so a failing server is never answered with a storm; a server's `Retry-After`
+   * only ever lengthens the wait.
+   */
   private scheduleRetry(retryAfterMs: number | null = null): void {
     const backoff = this.retryDelaysMs[this.retriesSpent];
     if (backoff === undefined || this.retryTimer) return;

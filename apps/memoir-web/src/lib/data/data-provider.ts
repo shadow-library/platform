@@ -13,8 +13,8 @@ export interface PlanRange {
 }
 
 /**
- * The seam every day-group screen reads through. Reads are plain queries; every write is a command, so the
- * sync/offline provider that replaces the fixtures can queue, retry and replay them without a new interface.
+ * The seam every day-group screen reads through. Reads are plain queries; every write is a command, so a sync provider can queue, retry and replay them
+ * without a new interface.
  */
 export interface DataProvider {
   getDay(date: string): Promise<DayView>;

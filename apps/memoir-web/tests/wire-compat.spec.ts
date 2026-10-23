@@ -30,12 +30,8 @@ interface Scenario {
 }
 
 /**
- * Pins `toWireCommand`'s output for every server-backed command in all four unions against `tests/fixtures/wire-commands.json`, a byte-identical copy of
- * which lives at `apps/memoir-server/tests/sync/fixtures/wire-commands.json` and is driven through
- * the real command endpoint by `wire-compat.spec.ts` there. Neither workspace can import the other's `src`
- * (the server's `tsconfig.json` has no path alias into the web app, and `command-wire.ts` pulls in the
- * whole `@/lib/data` barrel), so the JSON fixture is what keeps the two sides honest about the wire shape
- * instead of a shared import.
+ * Pins `toWireCommand`'s output for every server-backed command in all four unions against `tests/fixtures/wire-commands.json`, so a wire-shape change
+ * is a deliberate fixture edit.
  */
 describe('command-wire fixtures (FE-4)', () => {
   for (const entry of fixtures as unknown as Scenario[]) {

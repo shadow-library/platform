@@ -37,11 +37,8 @@ describe('toSyncFailureReason', () => {
 });
 
 /**
- * A dead session and a refused request look alike on the wire and are nothing alike to the owner: one is
- * worth a modal, the other is worth a retry. Getting that wrong put a sheet over the onboarding wizard —
- * which the owner cannot leave — on a transient failure. `sync-readiness.spec.ts` already covers 401
- * (signed-out) and offline-without-a-connection over a booting engine; this covers the retry-worthy HTTP
- * statuses `classify()` also has to route to `'server'`, which only a live `SyncEngine` boot exercises.
+ * A dead session and a refused request look alike on the wire but not to the owner: one is worth a modal, the other a retry.
+ * Pins the retry-worthy HTTP statuses `classify()` routes to `'server'`, which only a live `SyncEngine` boot exercises.
  */
 describe('sync failure classification (via SyncEngine)', () => {
   it.each([403, 429, 503])('should stay in the retry state on a %d', async (status: number) => {

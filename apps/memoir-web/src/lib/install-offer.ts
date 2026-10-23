@@ -43,11 +43,7 @@ function getServerEligible(): boolean {
   return false;
 }
 
-/**
- * The install offer, gated on that first value and spent exactly once. A person who said no is never asked
- * again — repeating the ask is the nagging the product's notification rules forbid on every other channel,
- * and there is no reason this one should be the exception.
- */
+/** Gated on that first value and spent exactly once: a person who said no is never asked again. */
 export function useInstallOffer(): InstallOffer {
   const { canInstall, promptInstall } = usePwaInstall();
   // localStorage is an external store whose server snapshot is `false`, so the server render and the

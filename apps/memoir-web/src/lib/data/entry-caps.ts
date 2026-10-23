@@ -9,7 +9,7 @@ export interface EntryCapAdvisory {
   ratio: number;
   level: EntryCapLevel;
   message: string | null;
-  /** Structural, not incidental: PRD §4.13 makes the cap advisory, so no caller can read a blocking value here. */
+  /** Structural, not incidental: the cap is advisory, so no caller can read a blocking value here. */
   blocksSave: false;
 }
 

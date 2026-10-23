@@ -3,7 +3,7 @@ import { type HeroState } from './view.types';
 
 export type HeroIntensityMode = 'gentle' | 'standard' | 'demanding';
 
-/** Locked achievements carry a teaser and nothing countable — a progress number turns the catalogue into a chore (PRD §2.9). */
+/** Locked achievements carry a teaser and nothing countable — a progress number turns the catalogue into a chore. */
 export interface Achievement {
   id: string;
   name: string;
@@ -25,7 +25,7 @@ export type CosmeticKind = 'badge' | 'hero_accent' | 'theme_accent';
 
 export type AccentKey = 'ember' | 'frost' | 'aurora' | 'sunrise' | 'midnight' | 'returner';
 
-/** `achievement` is never purchasable (PRD §2.9); `starter` is owned by every account but never server-granted, so it carries no action until that lands. */
+/** `achievement` is never purchasable; `starter` is owned by every account but never server-granted, so it carries no action until that lands. */
 type CosmeticState = 'equipped' | 'owned' | 'affordable' | 'short' | 'achievement' | 'starter';
 
 export interface Cosmetic {

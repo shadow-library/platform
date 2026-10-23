@@ -95,7 +95,7 @@ export interface ReflectFixtureOptions {
   persona?: Persona;
 }
 
-/** Free carries two requests a month; the third must meet the paywall before a task is ever written (PRD §6.8). */
+/** Free carries two requests a month; the third must meet the paywall before a task is ever written. */
 const FREE_MONTHLY_REQUESTS = 2;
 
 function applied(message: string): SettledCommandResult {

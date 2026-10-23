@@ -42,9 +42,8 @@ function toState(rows: FinanceRows, today: string): FinanceState {
 }
 
 /**
- * The finance domain read from the local mirror and written through the outbox. Reads never touch the
- * network; a write applies through the same `applyFinanceCommand` the fixtures run, then queues. A
- * rejected or superseded outcome is corrected by the next delta pull rather than unwound (ADR-0006).
+ * Reads never touch the network; a write applies through the same `applyFinanceCommand` the fixtures run, then queues.
+ * A rejected or superseded outcome is corrected by the next delta pull rather than unwound.
  */
 export class SyncedFinanceProvider implements FinanceProvider {
   private state: FinanceState;

@@ -23,10 +23,7 @@ const META_PREFIX = 'meta:';
 const OUTBOX_PREFIX = 'outbox:';
 const DEAD_LETTER_PREFIX = 'dead-letter:';
 
-/**
- * Primary key per delta domain, as the server's row projection names it. Upserting by this key is what
- * makes the cursor's deliberate overlap re-delivery (ARCHITECTURE §12.2) harmless.
- */
+/** Primary key per delta domain, as the server's row projection names it. Upserting by it makes the cursor's deliberate overlap re-delivery harmless. */
 const DOMAIN_KEYS: Record<SyncDomain, (row: DeltaRow) => string> = {
   quests: row => String(row['id']),
   quest_logs: row => String(row['id']),
@@ -152,11 +149,7 @@ const ACCOUNT_PREFIX = 'acct:';
 const UNLOAD_PREFIX = 'memoir:unload:';
 
 /**
- * The local mirror: one namespaced record per delta row, the sync metadata (cursor, epoch, device id),
- * and the outbox. Domains are namespaced by key prefix rather than by object store because
- * `@shadow-library/web/offline` exposes a keyed store, not a schema — the seam is here, so moving to real
- * per-domain object stores later is a change to this file alone.
- *
+ * The local mirror: one namespaced record per delta row, the sync metadata (cursor, epoch, device id), and the outbox.
  * The database is shared by every tab, so a bound store never reads or writes outside its account's namespace: a late write from a stale tab cannot reach another account.
  */
 export class MemoirStore {
@@ -183,7 +176,6 @@ export class MemoirStore {
     this.markOpened();
   }
 
-  /** Release the IndexedDB handle; anything still running against the store stops at its next read or write. */
   close(): void {
     this.closed = true;
     this.backing.close?.();

@@ -666,10 +666,7 @@ function createSubscription(state: FinanceState, draft: SubscriptionDraft): Fina
   return { id: created.id, message: 'Subscription added. It will prepare an expense for you to confirm when it comes due.' };
 }
 
-/**
- * Confirm-on-fire, idempotent per cycle: a second confirmation of the same billing date finds the
- * expense already written and reports it rather than logging the charge twice.
- */
+/** Confirm-on-fire, idempotent per cycle: a second confirmation of the same billing date reports the existing expense instead of logging the charge twice. */
 function confirmCycle(state: FinanceState, id: string, billingDate: string, syncState: ExpenseDetail['syncState']): FinanceCommandResult {
   const target = state.subscriptions.find(item => item.id === id);
   if (!target) return { id, message: 'That subscription is no longer here.' };

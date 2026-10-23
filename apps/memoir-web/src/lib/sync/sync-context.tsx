@@ -68,11 +68,7 @@ export function useSyncEngine(): SyncEngine | null {
   return useContext(SyncEngineContext);
 }
 
-/**
- * The shell's net strip, the settings queue and any screen that needs to say "queued" all read this one
- * snapshot. It returns the offline default when no engine is mounted, so a fixture-backed test or a story
- * renders the same components without a sync layer behind them.
- */
+/** The one snapshot the net strip, settings queue and any "queued" badge read; the offline default when no engine is mounted. */
 export function useSyncStatus(): SyncSnapshot {
   const engine = useSyncEngine();
   return useSyncExternalStore(
@@ -95,10 +91,8 @@ export interface SyncedMemoirOptions {
 }
 
 /**
- * The synced counterpart of `createMemoirData`. Quests, finance, quick logs and the hero deck read through
- * IndexedDB and write through the outbox; account and coaching read and write over HTTP, because neither is
- * something an offline owner can be told succeeded. What is left on a fixture provider is history, insights
- * and the weekly review — the server exposes no read model for any of the three.
+ * The synced counterpart of `createMemoirData`. Quests, finance, quick logs and the hero deck write through the outbox;
+ * account reads and writes go over HTTP, because an offline owner cannot be told they succeeded.
  */
 export function createSyncedMemoirData(options: SyncedMemoirOptions): SyncedMemoirData {
   const store = new MemoirStore(undefined, { accountId: options.accountId, marker: LAST_ACCOUNT_MARKER, unload: LOCAL_UNLOAD_BACKING });
@@ -106,7 +100,10 @@ export function createSyncedMemoirData(options: SyncedMemoirOptions): SyncedMemo
   return composeSyncedMemoirData(engine, options.principal);
 }
 
-/** Everything but the store and the engine, so a test composes the same providers over its own engine. Installing the module-level finance, quick-log and day sources is part of it. */
+/**
+ * Everything but the store and the engine, so a test composes the same providers over its own engine. Installing the module-level finance, quick-log and
+ * day sources is part of it.
+ */
 export function composeSyncedMemoirData(engine: SyncEngine, principal?: () => Promise<string>): SyncedMemoirData {
   const account = new SyncedAccountProvider(engine, principal);
   const finance = new SyncedFinanceProvider(engine);
@@ -136,12 +133,7 @@ export interface SyncProviderProps {
   children: ReactNode;
 }
 
-/**
- * Starts the engine on mount and runs a pass whenever the browser's connectivity changes: regaining it
- * flushes, losing it marks the engine offline so the strip can say so with the queued count. Both are
- * idempotent: `sync()` serializes overlapping passes. Unmounting — or being handed another account's data —
- * stops the engine before the next one opens the store.
- */
+/** Syncs on mount and on every connectivity change; unmounting, or being handed another account's data, stops the engine before the next one opens the store. */
 export function SyncEngineProvider({ data, children }: SyncProviderProps): ReactElement {
   const { engine, queryClient } = data;
 

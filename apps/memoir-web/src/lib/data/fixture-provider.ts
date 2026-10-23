@@ -88,11 +88,7 @@ export interface LogRecord {
   progress: number | null;
 }
 
-/**
- * Everything the day, plan and quest screens are derived from. The fixtures seed one; the sync layer
- * projects one out of the delta rows it has in IndexedDB. `MemoirEngine` never learns which it was given,
- * which is what lets an offline write and a fixture write run through the same code.
- */
+/** Everything the day, plan and quest screens derive from: fixtures seed one, the sync layer projects one from the delta rows, and `MemoirEngine` never learns which. */
 export interface MemoirWorldState {
   today: string;
   persona: DayMode;
@@ -221,11 +217,7 @@ function seedWorldState(options: FixtureProviderOptions = {}): MemoirWorldState 
   return state;
 }
 
-/**
- * The pure day-group engine: every read is derived from `MemoirWorldState` and every command mutates it.
- * It is the whole of the fixture provider, and the whole of the synced provider's optimistic local apply —
- * one implementation, so an offline completion and a fixture completion cannot disagree about the effect.
- */
+/** Pure day-group engine behind both the fixture provider and the synced provider's optimistic apply, so an offline completion and a fixture completion cannot disagree. */
 export class MemoirEngine implements DataProvider {
   constructor(
     private readonly state: MemoirWorldState,

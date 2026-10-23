@@ -93,12 +93,9 @@ function lastSeen(value: unknown): string {
 }
 
 /**
- * The account surfaces, online-first (ARCHITECTURE §9.1). Settings, export, deletion and billing are
- * request/response rather than outbox commands: none of them is something an offline owner can be told
- * succeeded. What the delta mirror is used for is the parts the endpoints do not answer — the registered
- * devices, the entitlement, and the record counts the export and deletion screens describe.
- *
- * Local-only by construction: the changes this device's outbox dead-lettered.
+ * The account surfaces are request/response rather than outbox commands: none is something an offline owner can be told succeeded.
+ * The delta mirror supplies only what the endpoints do not answer — registered devices, the entitlement and the record counts.
+ * The changes this device's outbox dead-lettered are local-only.
  */
 export class SyncedAccountProvider implements AccountProvider {
   private readonly deletion: SyncedDeletion;

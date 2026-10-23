@@ -5,7 +5,7 @@ export type StatAffinity = 'discipline' | 'body' | 'wealth' | 'mind';
 
 export type Strictness = 'anchor' | 'routine' | 'goal' | 'recovery' | 'optional';
 
-/** `upcoming` is display-only — it is never a persisted quest-log state (PRD §3.3). */
+/** `upcoming` is display-only — it is never a persisted quest-log state. */
 export type QuestLogState = 'completed' | 'partial' | 'skipped' | 'missed' | 'late' | 'postponed' | 'rescheduled' | 'recovery';
 
 export type OccurrenceState = QuestLogState | 'upcoming';

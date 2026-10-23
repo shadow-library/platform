@@ -132,9 +132,9 @@ export interface ReviewView {
 }
 
 export interface AiConsentGrants {
-  /** Reflection text and the reasons attached to a miss (PRD §6.7). */
+  /** Reflection text and the reasons attached to a miss. */
   journal: boolean;
-  /** Weight, sleep, steps, water and meals — a separate decision, revocable on its own (PRD §3.10). */
+  /** Weight, sleep, steps, water and meals — a separate decision, revocable on its own. */
   health: boolean;
 }
 

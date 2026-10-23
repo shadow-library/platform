@@ -22,7 +22,10 @@ export interface CommandError {
   kind: CommandErrorKind;
 }
 
-/** Kept on the device with nothing sending: `offline` (no connection), `held` (signed out or a retryable failure), `deletion` (the account is being deleted). `slow` is still being sent. */
+/**
+ * Kept on the device with nothing sending: `offline` (no connection), `held` (signed out or a retryable failure), `deletion` (the account is being
+ * deleted). `slow` is still being sent.
+ */
 export type UnconfirmedReason = 'offline' | 'held' | 'deletion' | 'slow';
 
 export type ServerSettlement =
@@ -60,10 +63,7 @@ export interface CommandOutcome {
   delivery?: CommandDelivery;
 }
 
-/**
- * A reschedule past the rolling-7-day cap is never blocked — it reclassifies as a postpone once the owner
- * confirms, so the same command re-dispatched with `acceptBeyondCap` carries the decision (PRD §2.2).
- */
+/** A reschedule past the rolling-7-day cap is never blocked: it reclassifies as a postpone once the owner confirms, by re-dispatching the command with `acceptBeyondCap`. */
 export interface CommandConfirmation {
   status: 'needs-confirmation';
   kind: 'reschedule-cap';
