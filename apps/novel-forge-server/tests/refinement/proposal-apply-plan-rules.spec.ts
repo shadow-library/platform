@@ -3,6 +3,7 @@ import { describe, expect, it, mock } from 'bun:test';
 import { loadArtifactStates } from '@modules/refinement/artifact-state';
 import { type ChangeOp, changeSetRefs } from '@modules/refinement/change-set';
 import { ProposalApplyService } from '@modules/refinement/proposal-apply.service';
+import { ProposalRevertService } from '@modules/refinement/proposal-revert.service';
 import { schema } from '@server/database';
 
 import { type PlanSeed, planTables } from '../knowledge/plan-tables';
@@ -17,6 +18,7 @@ function engine(seed: PlanSeed) {
   const tables = planTables(seed);
   let nextProposal = 300n;
   const service = new ProposalApplyService({ getPostgresClient: () => tables.db } as never, { has: () => true, get: mock(() => undefined) } as never);
+  const reverter = new ProposalRevertService({ getPostgresClient: () => tables.db } as never);
   const propose = async (changeSet: ChangeOp[]): Promise<bigint> => {
     const id = nextProposal++;
     const baseline = await loadArtifactStates(tables.db as never, 7n, changeSetRefs(changeSet));
@@ -24,7 +26,7 @@ function engine(seed: PlanSeed) {
     return id;
   };
   const proposal = (id: bigint): Row | undefined => tables.rows(schema.refinementProposals).find(row => row['id'] === id);
-  return { ...tables, service, propose, proposal };
+  return { ...tables, service, reverter, propose, proposal };
 }
 
 describe('ProposalApplyService — reveal rule on brief.update', () => {
@@ -80,7 +82,7 @@ describe('ProposalApplyService — reveal rule on brief.update', () => {
     await project.service.apply(7n, dropClaim);
     expect(project.milestone('lamp_rank_4')).toMatchObject({ state: 'open' });
 
-    await expect(project.service.revert(7n, dropReveal)).rejects.toMatchObject({ code: 'PLN_001' });
+    await expect(project.reverter.revert(7n, dropReveal)).rejects.toMatchObject({ code: 'PLN_001' });
     expect(project.proposal(dropReveal)?.['status']).toBe('applied');
   });
 
@@ -129,7 +131,7 @@ describe('ProposalApplyService — milestone ops', () => {
     await project.service.apply(7n, id);
     expect(project.milestone('lamp_rank_4')).toBeUndefined();
 
-    await project.service.revert(7n, id);
+    await project.reverter.revert(7n, id);
     expect(project.milestone('lamp_rank_4')).toMatchObject({ label: 'Mira reaches the fourth rank', kind: 'rank', state: 'planned', plannedChapter: 4 });
     expect(project.brief(4)?.['claimedMilestones']).toEqual(['lamp_rank_4']);
   });
@@ -149,7 +151,7 @@ describe('ProposalApplyService — milestone ops', () => {
     await project.service.apply(7n, id);
     expect(project.milestone('lamp_rank_4')).toMatchObject({ label: 'The fourth rung', subjectEntityKey: null, kind: 'rank', state: 'open' });
 
-    await project.service.revert(7n, id);
+    await project.reverter.revert(7n, id);
     expect(project.milestone('lamp_rank_4')).toMatchObject({ label: 'Mira reaches the fourth rank', subjectEntityKey: 'mira' });
   });
 

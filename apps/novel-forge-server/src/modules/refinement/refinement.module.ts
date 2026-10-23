@@ -17,6 +17,7 @@ import { ChatService } from './chat.service';
 import { IdeaRejectionService } from './idea-rejection.service';
 import { ProposalApplyService } from './proposal-apply.service';
 import { ProposalOpUndoService } from './proposal-op-undo.service';
+import { ProposalRevertService } from './proposal-revert.service';
 import { ProposalController } from './proposal.controller';
 import { ProposalService } from './proposal.service';
 import { RefineController } from './refine.controller';
@@ -36,6 +37,7 @@ import { WriterPreviewService } from './writer-preview.service';
   providers: [
     ProposalService,
     ProposalApplyService,
+    ProposalRevertService,
     ProposalOpUndoService,
     ChatCompactionService,
     ChatSessionService,

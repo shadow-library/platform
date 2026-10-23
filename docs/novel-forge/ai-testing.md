@@ -967,7 +967,7 @@ rejected: `applyBriefReveals` logs `brief reveals reference unknown keys — ski
   `pov` is a 400 here, not a silent no-op (`ai/schemas/knowledge-contract.schema.ts:17`).
 - **Fails when:** `DRF_001` if the upsert returns nothing. **Gap:** `PUT /briefs/:n` cannot set `writeMode` —
   the only ways to get `write_mode='external'` are the insert endpoint or a `brief.update` proposal op
-  (`chapter-insert.service.ts:183`, `proposal-apply.service.ts:834`).
+  (`chapter-insert.service.ts:183`, `refinement/apply/brief.handler.ts`).
 
 #### Chapter generation (happy path)
 
@@ -1575,7 +1575,7 @@ Ordinary hub turns run `chat-refine@2.13.0`, role `chat` (planning-group model),
   - The same door guards `action.generate_chapter` (400 `DRF_014` on a blanket apply, declined in an auto turn); applied deliberately, it still refuses a chapter that already has a draft with `DRF_015`.
   - UI: a guarded op is unchecked by default with "Applies only when you select it deliberately." The UI always sends explicit `opIndexes`.
 - **Fails when:**
-  - 500 `RFN_008`: it means "no executor registered for this action" (`proposal-apply.service.ts:246`), not an action failure, despite its message. Per-action failures are in `opResults`.
+  - 500 `RFN_008`: it means "no executor registered for this action" (`proposal-apply.service.ts:147`), not an action failure, despite its message. Per-action failures are in `opResults`.
   - An action runs during a blanket apply of a proposal that contains finalize (guard broken).
 
 #### 1.6 Auto mode
@@ -1891,7 +1891,7 @@ its $0.04 list price to the owner's $50 budget although nothing is billed.
 3. **Every recorded cost counts as the real charge.** `model_calls.cost_source` says where a figure came from (`provider`, `gateway`, or `estimate`; null on older rows), and `GET /cost` breaks spend down by it, but the totals add every source alike (`ai/quota.ts` `classifySynapseCostSource`).
 4. **Illustration runs have no linked context pack.** `/runs/:id/context` returns 404 `CTX_001`; the pack is only in `context_packs`. `chat-title`/`chat-compact` are also not listed in `GET /runs`.
 5. **Dead plugin API surface.** Manifest `actions` and the hooks `invoke`, `onEvent`, `registerPrompts` and `contributeWritingKnobs` are declared but never called (`plugin-policy.service.ts` hard-codes `knobs: {}`).
-6. **Unused error codes.** `CHT_004` and `CHT_005` are never thrown anywhere in the server (`AI_003` is: a resolution Synapse refuses, `SYN_ALIAS_UNAVAILABLE`, `SYN_NO_ELIGIBLE_MODEL` or `SYN_POLICY_DENIED`, maps to it in `ai/synapse-failure.ts`). Lookup-budget exhaustion is silent. `RFN_008`'s message ("Action execution failed — see the per-op results on the proposal") does not match its use (`proposal-apply.service.ts:246`: no executor registered).
+6. **Unused error codes.** `CHT_004` and `CHT_005` are never thrown anywhere in the server (`AI_003` is: a resolution Synapse refuses, `SYN_ALIAS_UNAVAILABLE`, `SYN_NO_ELIGIBLE_MODEL` or `SYN_POLICY_DENIED`, maps to it in `ai/synapse-failure.ts`). Lookup-budget exhaustion is silent. `RFN_008`'s message ("Action execution failed — see the per-op results on the proposal") does not match its use (`proposal-apply.service.ts:147`: no executor registered).
 7. **Proposal hand-edit skips the scope allowlist.** `proposal.service.ts:184` `updateChangeSet` calls `validateOps(kind, changeSet)` with no `allowedOps`, so a hub proposal can be hand-edited to carry any op in the global list. (Plugin proposals keep their own allowlist.)
 8. **`GET /context/preview` persists a pack for every purpose except `generation`.** Only the `generation` branch passes `dryRun` (`refine.service.ts`); `outline`, `chat`, `premise` and `audit` all insert a `context_packs` row (deduplicated by hash).
 9. **Product doc.** `novel-forge.md` matches the code on hub, proposals, plugins and quota. One gap: the doc says every call logs `promptKey@promptVersion`, true for `model_calls`, but no API returns the full prompt (0.3).

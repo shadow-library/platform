@@ -2,7 +2,8 @@ import { describe, expect, it, mock } from 'bun:test';
 import { textDigest } from '@shadow-library/sdk';
 
 import { CatalogService } from '@modules/ai/context/catalog.service';
-import { ContextAssembler, FULL_CAST_MAX, LATER_PLANS_LEAD, OUTLINE_TIMELINE_CAP, PREV_ENDING_TAIL } from '@modules/ai/context/context-assembler.service';
+import { ContextAssembler, FULL_CAST_MAX, LATER_PLANS_LEAD, OUTLINE_TIMELINE_CAP } from '@modules/ai/context/context-assembler.service';
+import { PREV_ENDING_TAIL } from '@modules/ai/context/pack-render';
 import { NO_APPROVED_BRIDGE } from '@modules/ai/isolation-read-policy';
 import { applyBudget, countTokens, truncateAtParagraph, truncateAtParagraphTail } from '@modules/ai/context/token-budget';
 import { DEFAULT_WRITING_INSTRUCTIONS } from '@modules/ai/prompts/authoring-preamble';
@@ -1673,5 +1674,37 @@ describe('ContextAssembler.forIllustration', () => {
     expect(pack.rendered).toContain('Chapter 3: The Ridge');
     expect(pack.rendered).toContain('## CAST APPEARANCE');
     expect(pack.rendered).toContain('Evan Vale (character): silver hair');
+  });
+});
+
+describe('ContextAssembler.forPremise and forAudit', () => {
+  const project = { id: 1n, premise: 'A ferry hand finds a drowned archive.', brief: null, themes: ['memory', 'debt'], instructions: null };
+  const docs = [
+    { section: 'project', slug: 'premise', body: 'Line one.\nLine two.\nLine three.\nLine four.\nLine five.\nLine six.' },
+    { section: 'world', slug: 'river', body: null },
+  ];
+
+  function premiseAssembler() {
+    return makeAssembler({ query: { projects: { findFirst: mock(async () => project) }, bibleDocuments: { findMany: mock(async () => docs) } } });
+  }
+
+  it('should render the premise and a one-line document inventory for premise enhancement', async () => {
+    const pack = await premiseAssembler().forPremise(1n);
+
+    expect(pack.purpose).toBe('premise');
+    expect(pack.budgetTokens).toBe(8_000);
+    expect(pack.rendered).toBe(
+      '## PREMISE\n\nA ferry hand finds a drowned archive.\n\nThemes: memory, debt\n\n---\n\n## BIBLE DOCUMENT INVENTORY\n\nproject/premise:\nLine one.\n\nworld/river:\n',
+    );
+  });
+
+  it('should render five lines of each document for the audit', async () => {
+    const pack = await premiseAssembler().forAudit(1n);
+
+    expect(pack.purpose).toBe('audit');
+    expect(pack.budgetTokens).toBe(12_000);
+    expect(pack.rendered).toBe(
+      '## PREMISE\n\nA ferry hand finds a drowned archive.\n\nThemes: memory, debt\n\n---\n\n## BIBLE DOCUMENT INVENTORY\n\nproject/premise:\nLine one.\nLine two.\nLine three.\nLine four.\nLine five.\n\nworld/river:\n',
+    );
   });
 });

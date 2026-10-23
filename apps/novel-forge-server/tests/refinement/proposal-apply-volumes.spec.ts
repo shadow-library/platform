@@ -4,6 +4,7 @@ import { type SQL } from 'drizzle-orm';
 import { loadArtifactStates } from '@modules/refinement/artifact-state';
 import { type ChangeOp } from '@modules/refinement/change-set';
 import { ProposalApplyService } from '@modules/refinement/proposal-apply.service';
+import { ProposalRevertService } from '@modules/refinement/proposal-revert.service';
 import { schema } from '@server/database';
 
 import { matchesWhere, queryRows } from '../sql-filter';
@@ -64,12 +65,13 @@ async function fakeProject(changeSet: ChangeOp[], seed: { briefs?: Row[]; volume
   const executors = { has: () => true, get: mock(() => undefined) };
   const db = { transaction: async (run: (handle: unknown) => Promise<unknown>) => run(tx) };
   const service = new ProposalApplyService({ getPostgresClient: () => db } as never, executors as never);
-  return { service, rows, proposal, executors };
+  const reverter = new ProposalRevertService({ getPostgresClient: () => db } as never);
+  return { service, reverter, rows, proposal, executors };
 }
 
 describe('ProposalApplyService — volumes and briefs', () => {
   it('should revert a proposal that made a volume and moved a brief into it, taking the brief back out first', async () => {
-    const { service, rows } = await fakeProject(
+    const { service, reverter, rows } = await fakeProject(
       [
         { op: 'volume.upsert', volumeKey: 'volume_2', ordinal: 2, objective: 'Steal the slip back.' },
         { op: 'brief.update', chapter: 3, volumeKey: 'volume_2' },
@@ -80,14 +82,14 @@ describe('ProposalApplyService — volumes and briefs', () => {
     await service.apply(7n, 300n);
     expect(rows(schema.briefs)[0]).toMatchObject({ volumeKey: 'volume_2' });
 
-    await service.revert(7n, 300n);
+    await reverter.revert(7n, 300n);
 
     expect(rows(schema.briefs)[0]).toMatchObject({ volumeKey: null });
     expect(rows(schema.volumes)).toEqual([]);
   });
 
   it('should revert a proposal that listed the brief before the new volume it moved into', async () => {
-    const { service, rows } = await fakeProject(
+    const { service, reverter, rows } = await fakeProject(
       [
         { op: 'brief.update', chapter: 3, volumeKey: 'volume_2' },
         { op: 'volume.upsert', volumeKey: 'volume_2', ordinal: 2, objective: 'Steal the slip back.' },
@@ -96,27 +98,27 @@ describe('ProposalApplyService — volumes and briefs', () => {
     );
 
     await service.apply(7n, 300n);
-    await service.revert(7n, 300n);
+    await reverter.revert(7n, 300n);
 
     expect(rows(schema.briefs)[0]).toMatchObject({ volumeKey: null });
     expect(rows(schema.volumes)).toEqual([]);
   });
 
   it('should revert a proposal that created a brief in a new volume listed after it', async () => {
-    const { service, rows } = await fakeProject([
+    const { service, reverter, rows } = await fakeProject([
       { op: 'brief.update', chapter: 1, body: 'Ada meets the clerk.', volumeKey: 'volume_1' },
       { op: 'volume.upsert', volumeKey: 'volume_1', ordinal: 1, objective: 'Get into the ledger house.' },
     ]);
 
     await service.apply(7n, 300n);
-    await service.revert(7n, 300n);
+    await reverter.revert(7n, 300n);
 
     expect(rows(schema.briefs)).toEqual([]);
     expect(rows(schema.volumes)).toEqual([]);
   });
 
   it('should apply a volume removal listed before the move of its last brief, and revert it', async () => {
-    const { service, rows } = await fakeProject(
+    const { service, reverter, rows } = await fakeProject(
       [
         { op: 'volume.remove', volumeKey: 'volume_1' },
         { op: 'brief.update', chapter: 3, volumeKey: 'volume_2' },
@@ -131,7 +133,7 @@ describe('ProposalApplyService — volumes and briefs', () => {
     expect(rows(schema.volumes)).toEqual([]);
     expect(rows(schema.briefs)[0]).toMatchObject({ volumeKey: 'volume_2' });
 
-    await service.revert(7n, 300n);
+    await reverter.revert(7n, 300n);
     expect(rows(schema.volumes)).toEqual([expect.objectContaining({ volumeKey: 'volume_1', objective: 'Get in.' })]);
     expect(rows(schema.briefs)[0]).toMatchObject({ volumeKey: 'volume_1' });
   });

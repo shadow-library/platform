@@ -4,7 +4,7 @@ import { type CallUsageTotals } from '../ai/usage/call-usage';
 import { type NotesOffer, notesOffer } from '../notes/notes-message';
 import { type ChatMessageResponse, type ChatPassageContextResponse, type ChatTurnResponse } from './chat.dto';
 import { type ChatTurnResult } from './chat.service';
-import { type OpResult } from './proposal-apply.service';
+import { type OpResult } from './apply';
 import { type AppliedActionJobItem, type ProposalResponse } from './refinement.dto';
 
 /**

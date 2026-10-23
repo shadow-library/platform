@@ -7,8 +7,9 @@ import { PROJECTS_READ_PERMISSION, PROJECTS_WRITE_PERMISSION } from '@server/con
 import { LedgerEntryResponse } from '../ledger/ledger.dto';
 import { ledgerEntryStatus } from '../ledger/ledger.service';
 import { IdeaRejectionService } from './idea-rejection.service';
-import { type OpToggleResult, ProposalApplyService } from './proposal-apply.service';
+import { ProposalApplyService } from './proposal-apply.service';
 import { ProposalOpUndoService } from './proposal-op-undo.service';
+import { type OpToggleResult, ProposalRevertService } from './proposal-revert.service';
 import { ProposalService } from './proposal.service';
 import {
   AdoptProposalBody,
@@ -41,6 +42,7 @@ export class ProposalController {
   constructor(
     private readonly proposalService: ProposalService,
     private readonly proposalApplyService: ProposalApplyService,
+    private readonly proposalRevertService: ProposalRevertService,
     private readonly writerPreviewService: WriterPreviewService,
     private readonly ideaRejectionService: IdeaRejectionService,
     private readonly proposalOpUndoService: ProposalOpUndoService,
@@ -93,7 +95,7 @@ export class ProposalController {
   @RespondFor(200, RevertProposalResponse)
   @RespondFor(400, RevealRuleErrorResponse)
   revertProposal(@Params() params: ProposalIdParams): Promise<RevertProposalResponse> {
-    return this.proposalApplyService.revert(params.projectId, params.proposalId).then(r => ({ ...r, proposal: serialiseProposal(r.proposal) }));
+    return this.proposalRevertService.revert(params.projectId, params.proposalId).then(r => ({ ...r, proposal: serialiseProposal(r.proposal) }));
   }
 
   @BotPermission(PROJECTS_WRITE_PERMISSION)

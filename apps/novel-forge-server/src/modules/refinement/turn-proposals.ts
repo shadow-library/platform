@@ -8,7 +8,8 @@ import { type ActionOp, type ChangeOp, changeSetRefs } from './change-set';
 import { dropRejectedIdeas, filterableIdeaIds } from './idea-filter';
 import { ORGANISE_NOTES_OP } from './later-plans-guard';
 import { PLANNER_ONLY_WARNING } from './planner-only-guard';
-import { type ApplyResult, type OpResult } from './proposal-apply.service';
+import { type OpResult } from './apply';
+import { type ApplyResult } from './proposal-apply.service';
 import { type ChangeSetSplit, type OpSource, splitChangeSet, type WriteHold } from './write-policy';
 
 export const HELD_FOR_REVIEW_NOTE = 'Not applied automatically: review the warnings on these suggestions first.';

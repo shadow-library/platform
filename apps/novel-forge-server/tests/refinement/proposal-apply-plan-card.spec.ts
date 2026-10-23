@@ -5,6 +5,7 @@ import { schema } from '@server/database';
 import { loadArtifactStates } from '@modules/refinement/artifact-state';
 import { type BriefUpdateOp, type ChangeOp, changeSetRefs } from '@modules/refinement/change-set';
 import { ProposalApplyService } from '@modules/refinement/proposal-apply.service';
+import { ProposalRevertService } from '@modules/refinement/proposal-revert.service';
 
 import { type PlanSeed, planTables } from '../knowledge/plan-tables';
 
@@ -24,6 +25,7 @@ function engine(seed: PlanSeed) {
   const tables = planTables({ drafts: [{ chapter: 1 }, { chapter: 2 }], ...seed });
   let nextProposal = 400n;
   const service = new ProposalApplyService({ getPostgresClient: () => tables.db } as never, { has: () => true, get: mock(() => undefined) } as never);
+  const reverter = new ProposalRevertService({ getPostgresClient: () => tables.db } as never);
   const propose = async (changeSet: ChangeOp[], kind = 'chapter_plan'): Promise<bigint> => {
     const id = nextProposal++;
     const baseline = await loadArtifactStates(tables.db as never, 7n, changeSetRefs(changeSet));
@@ -31,7 +33,7 @@ function engine(seed: PlanSeed) {
     return id;
   };
   const proposal = (id: bigint): Row | undefined => tables.rows(schema.refinementProposals).find(row => row['id'] === id);
-  return { ...tables, service, propose, proposal };
+  return { ...tables, service, reverter, propose, proposal };
 }
 
 describe('ProposalApplyService — a plan pass card', () => {
@@ -84,7 +86,7 @@ describe('ProposalApplyService — a plan pass card', () => {
     await project.service.apply(7n, id);
     expect(project.brief(3)).toMatchObject({ pov: null, repetitionRisks: null, densityRisk: 'Thin material' });
 
-    await project.service.revert(7n, id);
+    await project.reverter.revert(7n, id);
     expect(project.brief(3)).toMatchObject({ pov: 'mara', repetitionRisks: ['old'], densityRisk: 'old risk' });
   });
 });

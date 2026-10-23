@@ -2,8 +2,8 @@ import { describe, expect, it, mock } from 'bun:test';
 
 import { type Ledger } from '@server/database';
 
-import { type OpToggleHook, type OpToggleResult } from '@modules/refinement/proposal-apply.service';
 import { ProposalOpUndoService } from '@modules/refinement/proposal-op-undo.service';
+import { type OpToggleHook, type OpToggleResult } from '@modules/refinement/proposal-revert.service';
 import { type OpSource } from '@modules/refinement/write-policy';
 
 const OP = { op: 'entity.upsert', entityKey: 'mara', type: 'character', name: 'Mara' } as const;
@@ -16,12 +16,12 @@ function fakeService(source: OpSource, changed = true) {
     const base = { proposal: { id: 300n } as never, artifacts: [], staleMarked: [], changed, op: OP, source };
     return changed && hook ? { ...base, followUp: await hook(TX as never, { op: OP, source }) } : base;
   };
-  const apply = {
+  const reverter = {
     undoOp: mock((_projectId: bigint, _proposalId: bigint, _opIndex: number, hook?: OpToggleHook<unknown>) => toggle(hook)),
     redoOp: mock((_projectId: bigint, _proposalId: bigint, _opIndex: number, hook?: OpToggleHook<unknown>) => toggle(hook)),
   };
   const ideas = { reject: mock(async () => ENTRY), withdrawRejection: mock(async () => ENTRY) };
-  return { service: new ProposalOpUndoService(apply as never, ideas as never), apply, ideas };
+  return { service: new ProposalOpUndoService(reverter as never, ideas as never), reverter, ideas };
 }
 
 describe('ProposalOpUndoService', () => {
@@ -73,8 +73,8 @@ describe('ProposalOpUndoService', () => {
   });
 
   it('should record nothing when the engine refuses the undo', async () => {
-    const { service, apply, ideas } = fakeService('idea');
-    apply.undoOp.mockImplementation(() => Promise.reject(Object.assign(new Error('refused'), { code: 'RFN_015' })));
+    const { service, reverter, ideas } = fakeService('idea');
+    reverter.undoOp.mockImplementation(() => Promise.reject(Object.assign(new Error('refused'), { code: 'RFN_015' })));
 
     await expect(service.undo(7n, 300n, 0)).rejects.toMatchObject({ code: 'RFN_015' });
     expect(ideas.reject).not.toHaveBeenCalled();

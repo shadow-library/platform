@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'bun:test';
-import { FakeDatabaseService } from '@shadow-library/modules/testing';
 
-import { type FactUpsertOp, ProposalApplyService } from '@modules/refinement';
+import { FACT_HANDLERS, type FactUpsertOp } from '@modules/refinement';
 
 interface FakeFactRow {
   id: bigint;
@@ -11,10 +10,6 @@ interface FakeFactRow {
   writerNote: string | null;
   terms: string[] | null;
   revealChapter: number | null;
-}
-
-function createService(): ProposalApplyService {
-  return new ProposalApplyService(new FakeDatabaseService(), {} as never);
 }
 
 function fakeCtx(existing: FakeFactRow | undefined, captured: { set?: Record<string, unknown> }) {
@@ -34,12 +29,12 @@ function fakeCtx(existing: FakeFactRow | undefined, captured: { set?: Record<str
 const dated: FakeFactRow = { id: 1n, text: 'the vault is empty', subjects: null, constraintNote: null, writerNote: null, terms: null, revealChapter: 12 };
 const undated: FakeFactRow = { ...dated, revealChapter: null };
 
-describe('ProposalApplyService applyFactUpsert reveal merge', () => {
+describe('fact.upsert apply — reveal merge', () => {
   it('should keep the existing reveal date when the op omits revealChapter', async () => {
     const captured: { set?: Record<string, unknown> } = {};
     const op: FactUpsertOp = { op: 'fact.upsert', factKey: 'f1', body: 'edited' };
 
-    await createService()['applyFactUpsert'](fakeCtx(dated, captured), op);
+    await FACT_HANDLERS['fact.upsert'].apply(fakeCtx(dated, captured), op);
 
     expect(captured.set?.['revealChapter']).toBe(12);
   });
@@ -48,17 +43,17 @@ describe('ProposalApplyService applyFactUpsert reveal merge', () => {
     const captured: { set?: Record<string, unknown> } = {};
     const op: FactUpsertOp = { op: 'fact.upsert', factKey: 'f1', revealChapter: 30 };
 
-    await createService()['applyFactUpsert'](fakeCtx(undated, captured), op);
+    await FACT_HANDLERS['fact.upsert'].apply(fakeCtx(undated, captured), op);
 
     expect(captured.set?.['revealChapter']).toBe(30);
   });
 });
 
-describe('ProposalApplyService inverseFact reveal capture', () => {
+describe('fact.upsert inverse — reveal capture', () => {
   it('should restore null, explicitly rather than omitted, as the inverse of dating a previously undated fact', async () => {
     const op: FactUpsertOp = { op: 'fact.upsert', factKey: 'f1', revealChapter: 30 };
 
-    const inverse = (await createService()['inverseFact'](fakeCtx(undated, {}), op)) as FactUpsertOp;
+    const inverse = (await FACT_HANDLERS['fact.upsert'].inverse(fakeCtx(undated, {}), op)) as FactUpsertOp;
 
     expect(JSON.parse(JSON.stringify(inverse))).toHaveProperty('revealChapter', null);
   });

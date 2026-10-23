@@ -3,7 +3,7 @@ import { Injectable } from '@shadow-library/app';
 import { type Ledger } from '@server/database';
 
 import { type IdeaRejectionInput, IdeaRejectionService } from './idea-rejection.service';
-import { type OpToggleResult, ProposalApplyService } from './proposal-apply.service';
+import { type OpToggleResult, ProposalRevertService } from './proposal-revert.service';
 
 export interface OpUndoResult extends OpToggleResult<Ledger.Entry | null> {
   rejection: Ledger.Entry | null;
@@ -19,20 +19,20 @@ const REDONE_REASON = 'The author brought the change back after undoing it.';
 @Injectable()
 export class ProposalOpUndoService {
   constructor(
-    private readonly proposalApplyService: ProposalApplyService,
+    private readonly proposalRevertService: ProposalRevertService,
     private readonly ideaRejectionService: IdeaRejectionService,
   ) {}
 
   async undo(projectId: bigint, proposalId: bigint, opIndex: number, input: Partial<IdeaRejectionInput> = {}): Promise<OpUndoResult> {
     const scope = { scope: input.scope ?? 'not_now', why: input.why };
-    const result = await this.proposalApplyService.undoOp(projectId, proposalId, opIndex, (tx, change) =>
+    const result = await this.proposalRevertService.undoOp(projectId, proposalId, opIndex, (tx, change) =>
       change.source === 'idea' ? this.ideaRejectionService.reject(projectId, proposalId, opIndex, scope, tx) : Promise.resolve(null),
     );
     return { ...result, rejection: result.followUp ?? null };
   }
 
   redo(projectId: bigint, proposalId: bigint, opIndex: number): Promise<OpToggleResult<Ledger.Entry | null>> {
-    return this.proposalApplyService.redoOp(projectId, proposalId, opIndex, (tx, change) =>
+    return this.proposalRevertService.redoOp(projectId, proposalId, opIndex, (tx, change) =>
       change.source === 'idea' ? this.ideaRejectionService.withdrawRejection(projectId, change.op, REDONE_REASON, tx) : Promise.resolve(null),
     );
   }

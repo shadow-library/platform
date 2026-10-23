@@ -4,6 +4,7 @@ import { type SQL } from 'drizzle-orm';
 import { loadArtifactStates } from '@modules/refinement/artifact-state';
 import { type ChangeOp, changeSetRefs } from '@modules/refinement/change-set';
 import { ProposalApplyService } from '@modules/refinement/proposal-apply.service';
+import { ProposalRevertService } from '@modules/refinement/proposal-revert.service';
 import { schema } from '@server/database';
 
 import { matchesWhere, queryRows } from '../sql-filter';
@@ -65,8 +66,9 @@ async function fakeProject(changeSet: ChangeOp[], seed: { briefs?: Row[]; volume
   proposal.baseline = await loadArtifactStates(tx as never, 7n, changeSetRefs(changeSet));
   const db = { transaction: async (run: (handle: unknown) => Promise<unknown>) => run(tx) };
   const service = new ProposalApplyService({ getPostgresClient: () => db } as never, { has: () => true, get: mock(() => undefined) } as never);
+  const reverter = new ProposalRevertService({ getPostgresClient: () => db } as never);
   const inverse = () => JSON.parse(JSON.stringify(proposal.inverseOps, (_, value: unknown) => (typeof value === 'bigint' ? String(value) : value))) as Row[];
-  return { service, rows, inverse };
+  return { service, reverter, rows, inverse };
 }
 
 const PLAIN_BRIEF: Row = {
@@ -99,7 +101,7 @@ function planFields(row: Row | undefined): Row {
 
 describe('ProposalApplyService — chapter plan fields', () => {
   it('should set every plan field on a brief and restore the unset values on revert', async () => {
-    const { service, rows, inverse } = await fakeProject(
+    const { service, reverter, rows, inverse } = await fakeProject(
       [
         {
           op: 'brief.update',
@@ -128,7 +130,7 @@ describe('ProposalApplyService — chapter plan fields', () => {
     });
     expect(inverse()[0]).toMatchObject({ direction: null, contentMode: null, scenes: null, claimedMilestones: null, isEnding: false });
 
-    await service.revert(7n, 300n);
+    await reverter.revert(7n, 300n);
 
     expect(planFields(rows(schema.briefs)[0])).toEqual(planFields(PLAIN_BRIEF));
   });
@@ -142,14 +144,17 @@ describe('ProposalApplyService — chapter plan fields', () => {
   });
 
   it('should clear the plan fields an op sets to null, and put them back on revert', async () => {
-    const { service, rows } = await fakeProject([{ op: 'brief.update', chapter: 3, direction: null, contentMode: null, scenes: null, claimedMilestones: null, isEnding: false }], {
-      briefs: [PLANNED_BRIEF],
-    });
+    const { service, reverter, rows } = await fakeProject(
+      [{ op: 'brief.update', chapter: 3, direction: null, contentMode: null, scenes: null, claimedMilestones: null, isEnding: false }],
+      {
+        briefs: [PLANNED_BRIEF],
+      },
+    );
 
     await service.apply(7n, 300n);
     expect(planFields(rows(schema.briefs)[0])).toEqual(planFields(PLAIN_BRIEF));
 
-    await service.revert(7n, 300n);
+    await reverter.revert(7n, 300n);
     expect(planFields(rows(schema.briefs)[0])).toEqual(planFields(PLANNED_BRIEF));
   });
 });
@@ -159,14 +164,14 @@ describe('ProposalApplyService — volume state', () => {
 
   it('should never change an existing volume’s state from an upsert, even one carrying a state — that moves only through goal met — start next', async () => {
     const legacyOp = { op: 'volume.upsert', volumeKey: 'volume_1', state: 'active', objective: 'Get further in.' } as unknown as ChangeOp;
-    const { service, rows, inverse } = await fakeProject([legacyOp], { volumes: [{ ...volume, state: 'active' }] });
+    const { service, reverter, rows, inverse } = await fakeProject([legacyOp], { volumes: [{ ...volume, state: 'active' }] });
 
     await service.apply(7n, 300n);
     expect(rows(schema.volumes)[0]).toMatchObject({ state: 'active', objective: 'Get further in.' });
     expect(inverse()[0]).toMatchObject({ op: 'volume.upsert', objective: 'Get in.' });
     expect(inverse()[0]).not.toHaveProperty('state');
 
-    await service.revert(7n, 300n);
+    await reverter.revert(7n, 300n);
     expect(rows(schema.volumes)[0]).toMatchObject({ state: 'active', objective: 'Get in.' });
   });
 
@@ -209,13 +214,15 @@ describe('ProposalApplyService — fact unlock and allowed clues', () => {
   const unlock = { all: [{ milestone: 'ada_reads_ledger' }, { chapter: 12 }] };
 
   it('should set an unlock condition and clues on a fact and restore them as explicit nulls on revert', async () => {
-    const { service, rows, inverse } = await fakeProject([{ op: 'fact.upsert', factKey: 'f1', unlock, allowedClues: ['the ledger smells of seawater'] }], { facts: [fact] });
+    const { service, reverter, rows, inverse } = await fakeProject([{ op: 'fact.upsert', factKey: 'f1', unlock, allowedClues: ['the ledger smells of seawater'] }], {
+      facts: [fact],
+    });
 
     await service.apply(7n, 300n);
     expect(rows(schema.canonFacts)[0]).toMatchObject({ unlock, allowedClues: ['the ledger smells of seawater'] });
     expect(inverse()[0]).toMatchObject({ unlock: null, allowedClues: null });
 
-    await service.revert(7n, 300n);
+    await reverter.revert(7n, 300n);
     expect(rows(schema.canonFacts)[0]).toMatchObject({ unlock: null, allowedClues: null });
   });
 
@@ -256,23 +263,23 @@ describe('ProposalApplyService — fact unlock and allowed clues', () => {
   });
 
   it('should clear an unlock condition and clues set to null, and put them back on revert', async () => {
-    const { service, rows } = await fakeProject([{ op: 'fact.upsert', factKey: 'f1', unlock: null, allowedClues: null }], {
+    const { service, reverter, rows } = await fakeProject([{ op: 'fact.upsert', factKey: 'f1', unlock: null, allowedClues: null }], {
       facts: [{ ...fact, unlock, allowedClues: ['a cold draught'] }],
     });
 
     await service.apply(7n, 300n);
     expect(rows(schema.canonFacts)[0]).toMatchObject({ unlock: null, allowedClues: null });
 
-    await service.revert(7n, 300n);
+    await reverter.revert(7n, 300n);
     expect(rows(schema.canonFacts)[0]).toMatchObject({ unlock, allowedClues: ['a cold draught'] });
   });
 
   it('should treat a changed unlock condition as a change to the fact when guarding a revert', async () => {
-    const { service, rows } = await fakeProject([{ op: 'fact.upsert', factKey: 'f1', allowedClues: ['a cold draught'] }], { facts: [fact] });
+    const { service, reverter, rows } = await fakeProject([{ op: 'fact.upsert', factKey: 'f1', allowedClues: ['a cold draught'] }], { facts: [fact] });
 
     await service.apply(7n, 300n);
     Object.assign(rows(schema.canonFacts)[0] as Row, { unlock });
 
-    await expect(service.revert(7n, 300n)).rejects.toMatchObject({ code: 'RFN_006' });
+    await expect(reverter.revert(7n, 300n)).rejects.toMatchObject({ code: 'RFN_006' });
   });
 });

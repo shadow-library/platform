@@ -3,7 +3,7 @@ import { Body, Get, HttpController, Params, Post, Query, RespondFor } from '@sha
 
 import { PROJECTS_READ_PERMISSION, PROJECTS_WRITE_PERMISSION } from '@server/constants';
 
-import { ProposalApplyService, type RollbackResult } from './proposal-apply.service';
+import { ProposalRevertService, type RollbackResult } from './proposal-revert.service';
 import { ProposalService } from './proposal.service';
 import { ListChangesQuery, ListChangesResponse, ProposalProjectParams, RollbackBody, RollbackResponse } from './refinement.dto';
 
@@ -13,7 +13,7 @@ import { ListChangesQuery, ListChangesResponse, ProposalProjectParams, RollbackB
 export class ChangeHistoryController {
   constructor(
     private readonly proposalService: ProposalService,
-    private readonly proposalApplyService: ProposalApplyService,
+    private readonly proposalRevertService: ProposalRevertService,
   ) {}
 
   @Get()
@@ -26,7 +26,7 @@ export class ChangeHistoryController {
   @Post('/rollback')
   @RespondFor(200, RollbackResponse)
   rollbackChanges(@Params() params: ProposalProjectParams, @Body() body: RollbackBody): Promise<RollbackResponse> {
-    return this.proposalApplyService.rollbackAfter(params.projectId, body.afterProposalId).then(serialiseRollback);
+    return this.proposalRevertService.rollbackAfter(params.projectId, body.afterProposalId).then(serialiseRollback);
   }
 }
 

@@ -14,6 +14,7 @@ import { GenerationService } from '@modules/generation/generation.service';
 import { loadArtifactStates } from '@modules/refinement/artifact-state';
 import { type ChangeOp, changeSetRefs } from '@modules/refinement/change-set';
 import { ProposalApplyService } from '@modules/refinement/proposal-apply.service';
+import { ProposalRevertService } from '@modules/refinement/proposal-revert.service';
 import { hashReviewedBody } from '@modules/review/review-findings';
 import { findPlanRevealViolations, loadPlanState, milestonePlanStates, nextWritableChapter, sanitizeMarkdown } from '@server/common';
 import { type FinalizeReview, schema } from '@server/database';
@@ -159,6 +160,7 @@ export class IntegrityWorld {
   readonly versions: DraftVersionService;
   readonly amends: ChapterAmendService;
   readonly proposals: ProposalApplyService;
+  readonly reverter: ProposalRevertService;
   private readonly flights: Flight[] = [];
   /** Bodies the author approved, by `draftId:revision`: a finalized or still-approved revision must hold exactly these. */
   private readonly approvedBodies = new Map<string, string>();
@@ -205,6 +207,7 @@ export class IntegrityWorld {
     this.versions = new DraftVersionService(database);
     this.amends = new ChapterAmendService(database, indexing as never);
     this.proposals = new ProposalApplyService(database, { has: () => false, get: () => undefined } as never);
+    this.reverter = new ProposalRevertService(database);
   }
 
   private get project(): Row {
@@ -876,7 +879,7 @@ export class IntegrityWorld {
     if (applied.length === 0) return 'no proposal to undo';
     const proposal = this.copy(this.rng.pick(applied)) as Row;
     const before = this.store.writes();
-    const outcome = await this.attempt('chat undo', this.proposals.revert(P, proposal['id'] as bigint), CHAT_REFUSALS);
+    const outcome = await this.attempt('chat undo', this.reverter.revert(P, proposal['id'] as bigint), CHAT_REFUSALS);
     if (!outcome.ok) {
       this.expectUnchanged(before, 'chat undo');
       return `undo refused ${outcome.code}`;

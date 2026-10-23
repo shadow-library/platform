@@ -6,7 +6,9 @@ import { schema } from '@server/database';
 
 import { loadArtifactStates } from '@modules/refinement/artifact-state';
 import { type ChangeOp, changeSetRefs, validateChangeSet } from '@modules/refinement/change-set';
-import { type OpResult, ProposalApplyService } from '@modules/refinement/proposal-apply.service';
+import { type OpResult } from '@modules/refinement/apply';
+import { ProposalApplyService } from '@modules/refinement/proposal-apply.service';
+import { ProposalRevertService } from '@modules/refinement/proposal-revert.service';
 import { serialiseProposal } from '@modules/refinement/serialise';
 import { type OpSource } from '@modules/refinement/write-policy';
 
@@ -80,9 +82,10 @@ async function fakeTurn(options: { kind?: string; projectId?: bigint } = {}) {
   proposal['baseline'] = await loadArtifactStates(tx as never, 7n, changeSetRefs(TURN));
   const db = { transaction: async (run: (handle: unknown) => Promise<unknown>) => run(tx) };
   const service = new ProposalApplyService({ getPostgresClient: () => db } as never, { has: () => true, get: mock(() => undefined) } as never);
+  const reverter = new ProposalRevertService({ getPostgresClient: () => db } as never);
   const entity = (key: string) => rows(schema.entities).find(row => row['entityKey'] === key);
   const statusOf = (index: number) => (proposal['opResults'] as OpResult[]).find(result => result.index === index)?.status;
-  return { service, rows, proposal, entity, statusOf, applyTurn: () => service.apply(7n, 300n, { autoApplied: true, opSources: SOURCES }) };
+  return { service, reverter, rows, proposal, entity, statusOf, applyTurn: () => service.apply(7n, 300n, { autoApplied: true, opSources: SOURCES }) };
 }
 
 describe('ProposalApplyService — per-change undo', () => {
@@ -100,10 +103,10 @@ describe('ProposalApplyService — per-change undo', () => {
   });
 
   it('should undo one change and leave the rest of the turn applied', async () => {
-    const { applyTurn, service, entity, rows, statusOf, proposal } = await fakeTurn();
+    const { applyTurn, entity, rows, statusOf, proposal, reverter } = await fakeTurn();
     await applyTurn();
 
-    const result = await service.undoOp(7n, 300n, 2);
+    const result = await reverter.undoOp(7n, 300n, 2);
 
     expect(result).toMatchObject({ changed: true, source: 'quoted' });
     expect(entity('ada')).toMatchObject({ notes: 'Ada hides the slip.', motivation: null });
@@ -115,11 +118,11 @@ describe('ProposalApplyService — per-change undo', () => {
   });
 
   it('should redo an undone change', async () => {
-    const { applyTurn, service, entity, statusOf } = await fakeTurn();
+    const { applyTurn, entity, statusOf, reverter } = await fakeTurn();
     await applyTurn();
-    await service.undoOp(7n, 300n, 2);
+    await reverter.undoOp(7n, 300n, 2);
 
-    const result = await service.redoOp(7n, 300n, 2);
+    const result = await reverter.redoOp(7n, 300n, 2);
 
     expect(result.changed).toBe(true);
     expect(entity('ada')).toMatchObject({ notes: 'Ada keeps the slip in her boot.' });
@@ -127,10 +130,10 @@ describe('ProposalApplyService — per-change undo', () => {
   });
 
   it('should refuse to undo a change another applied change relies on, listing it, and write nothing', async () => {
-    const { applyTurn, service, entity, statusOf } = await fakeTurn();
+    const { applyTurn, entity, statusOf, reverter } = await fakeTurn();
     await applyTurn();
 
-    const refusal = await service.undoOp(7n, 300n, 0).catch((err: unknown) => err);
+    const refusal = await reverter.undoOp(7n, 300n, 0).catch((err: unknown) => err);
 
     expect(refusal).toBeInstanceOf(OpDependencyError);
     expect(refusal).toMatchObject({ code: 'RFN_015', opIndexes: [1] });
@@ -139,53 +142,53 @@ describe('ProposalApplyService — per-change undo', () => {
   });
 
   it('should undo a dependent first and then what it relied on, and redo them only in the opposite order', async () => {
-    const { applyTurn, service, entity, rows } = await fakeTurn();
+    const { applyTurn, entity, rows, reverter } = await fakeTurn();
     await applyTurn();
 
-    await service.undoOp(7n, 300n, 1);
-    await service.undoOp(7n, 300n, 0);
+    await reverter.undoOp(7n, 300n, 1);
+    await reverter.undoOp(7n, 300n, 0);
     expect(entity('mara')).toBeUndefined();
     expect(rows(schema.milestones)).toEqual([]);
 
-    await expect(service.redoOp(7n, 300n, 1)).rejects.toMatchObject({ code: 'RFN_016', opIndexes: [0] });
-    await service.redoOp(7n, 300n, 0);
-    await service.redoOp(7n, 300n, 1);
+    await expect(reverter.redoOp(7n, 300n, 1)).rejects.toMatchObject({ code: 'RFN_016', opIndexes: [0] });
+    await reverter.redoOp(7n, 300n, 0);
+    await reverter.redoOp(7n, 300n, 1);
     expect(rows(schema.milestones)).toEqual([expect.objectContaining({ milestoneKey: 'mara-escapes', subjectEntityKey: 'mara' })]);
   });
 
   it('should treat a repeated undo or redo as done, writing nothing', async () => {
-    const { applyTurn, service, rows } = await fakeTurn();
+    const { applyTurn, rows, reverter } = await fakeTurn();
     await applyTurn();
-    await service.undoOp(7n, 300n, 2);
+    await reverter.undoOp(7n, 300n, 2);
     const feedback = rows(schema.userFeedback).length;
 
-    expect(await service.undoOp(7n, 300n, 2)).toMatchObject({ changed: false, artifacts: [] });
-    await service.redoOp(7n, 300n, 2);
-    expect(await service.redoOp(7n, 300n, 2)).toMatchObject({ changed: false, artifacts: [] });
+    expect(await reverter.undoOp(7n, 300n, 2)).toMatchObject({ changed: false, artifacts: [] });
+    await reverter.redoOp(7n, 300n, 2);
+    expect(await reverter.redoOp(7n, 300n, 2)).toMatchObject({ changed: false, artifacts: [] });
     expect(rows(schema.userFeedback)).toHaveLength(feedback + 1);
   });
 
   it('should revert the rest of the turn as a whole after one change was undone on its own', async () => {
-    const { applyTurn, service, entity, rows, proposal } = await fakeTurn();
+    const { applyTurn, entity, rows, proposal, reverter } = await fakeTurn();
     await applyTurn();
-    await service.undoOp(7n, 300n, 2);
+    await reverter.undoOp(7n, 300n, 2);
 
-    await service.revert(7n, 300n);
+    await reverter.revert(7n, 300n);
 
     expect(proposal['status']).toBe('reverted');
     expect(entity('mara')).toBeUndefined();
     expect(rows(schema.milestones)).toEqual([]);
     expect(entity('ada')).toMatchObject({ notes: 'Ada hides the slip.' });
-    expect(await service.undoOp(7n, 300n, 0)).toMatchObject({ changed: false });
-    await expect(service.redoOp(7n, 300n, 2)).rejects.toMatchObject({ code: 'RFN_017' });
+    expect(await reverter.undoOp(7n, 300n, 0)).toMatchObject({ changed: false });
+    await expect(reverter.redoOp(7n, 300n, 2)).rejects.toMatchObject({ code: 'RFN_017' });
   });
 
   it('should empty a field the turn filled when the whole turn is reverted', async () => {
-    const { applyTurn, service, entity } = await fakeTurn();
+    const { applyTurn, entity, reverter } = await fakeTurn();
     await applyTurn();
     expect(entity('ada')).toMatchObject({ motivation: 'She wants the ledger back.' });
 
-    await service.revert(7n, 300n);
+    await reverter.revert(7n, 300n);
 
     expect(entity('ada')).toMatchObject({ notes: 'Ada hides the slip.', motivation: null });
   });
@@ -203,79 +206,79 @@ describe('ProposalApplyService — per-change undo', () => {
   });
 
   it('should refuse an undo that cannot put the records back exactly as the apply found them', async () => {
-    const { applyTurn, service, proposal } = await fakeTurn();
+    const { applyTurn, proposal, reverter } = await fakeTurn();
     await applyTurn();
     const record = (proposal['opUndo'] as { beforeState: Record<string, { contentHash: string | null }> }[])[2] as { beforeState: Record<string, { contentHash: string | null }> };
     Object.assign(record.beforeState['entity:ada'] as object, { contentHash: 'not what the undo leaves' });
 
-    await expect(service.undoOp(7n, 300n, 2)).rejects.toMatchObject({ code: 'RFN_018' });
+    await expect(reverter.undoOp(7n, 300n, 2)).rejects.toMatchObject({ code: 'RFN_018' });
   });
 
   it('should run the caller’s follow-up inside the undo only when the change moved', async () => {
-    const { applyTurn, service } = await fakeTurn();
+    const { applyTurn, reverter } = await fakeTurn();
     await applyTurn();
     const followUp = mock(async (_tx: unknown, change: { source?: OpSource }) => change.source);
 
-    expect(await service.undoOp(7n, 300n, 1, followUp)).toMatchObject({ changed: true, followUp: 'idea' });
-    const repeated = await service.undoOp(7n, 300n, 1, followUp);
+    expect(await reverter.undoOp(7n, 300n, 1, followUp)).toMatchObject({ changed: true, followUp: 'idea' });
+    const repeated = await reverter.undoOp(7n, 300n, 1, followUp);
     expect([repeated.changed, repeated.followUp]).toEqual([false, undefined]);
     expect(followUp).toHaveBeenCalledTimes(1);
   });
 
   it('should treat an undo after the whole turn was reverted as done, running no follow-up', async () => {
-    const { applyTurn, service } = await fakeTurn();
+    const { applyTurn, reverter } = await fakeTurn();
     await applyTurn();
-    await service.revert(7n, 300n);
+    await reverter.revert(7n, 300n);
     const followUp = mock(async () => 'rejected');
 
-    expect(await service.undoOp(7n, 300n, 0, followUp)).toMatchObject({ changed: false, source: 'idea' });
+    expect(await reverter.undoOp(7n, 300n, 0, followUp)).toMatchObject({ changed: false, source: 'idea' });
     expect(followUp).not.toHaveBeenCalled();
   });
 
   it('should refuse to redo a change whose record moved on since it was undone', async () => {
-    const { applyTurn, service, entity } = await fakeTurn();
+    const { applyTurn, entity, reverter } = await fakeTurn();
     await applyTurn();
-    await service.undoOp(7n, 300n, 2);
+    await reverter.undoOp(7n, 300n, 2);
     Object.assign(entity('ada') as Row, { notes: 'The author rewrote this by hand.' });
 
-    await expect(service.redoOp(7n, 300n, 2)).rejects.toMatchObject({ code: 'RFN_003' });
+    await expect(reverter.redoOp(7n, 300n, 2)).rejects.toMatchObject({ code: 'RFN_003' });
     expect(entity('ada')).toMatchObject({ notes: 'The author rewrote this by hand.', motivation: null });
   });
 
   it('should refuse to undo a change whose record moved on since the turn applied it', async () => {
-    const { applyTurn, service, entity } = await fakeTurn();
+    const { applyTurn, entity, reverter } = await fakeTurn();
     await applyTurn();
     Object.assign(entity('ada') as Row, { notes: 'The author rewrote this by hand.' });
 
-    await expect(service.undoOp(7n, 300n, 2)).rejects.toMatchObject({ code: 'RFN_006' });
+    await expect(reverter.undoOp(7n, 300n, 2)).rejects.toMatchObject({ code: 'RFN_006' });
     expect(entity('ada')).toMatchObject({ notes: 'The author rewrote this by hand.' });
   });
 
   it('should refuse a per-change undo of a proposal the author applied from a card', async () => {
-    const { service } = await fakeTurn();
+    const { service, reverter } = await fakeTurn();
     await service.apply(7n, 300n);
 
-    await expect(service.undoOp(7n, 300n, 2)).rejects.toMatchObject({ code: 'RFN_014' });
+    await expect(reverter.undoOp(7n, 300n, 2)).rejects.toMatchObject({ code: 'RFN_014' });
   });
 
   it('should refuse a per-change undo of an automatic apply that is not a chat turn', async () => {
-    const { service } = await fakeTurn({ kind: 'chapter_extract' });
+    const { service, reverter } = await fakeTurn({ kind: 'chapter_extract' });
     await service.apply(7n, 300n, { autoApplied: true });
 
-    await expect(service.undoOp(7n, 300n, 2)).rejects.toMatchObject({ code: 'RFN_014' });
+    await expect(reverter.undoOp(7n, 300n, 2)).rejects.toMatchObject({ code: 'RFN_014' });
   });
 
   it('should not find a turn that belongs to another project', async () => {
-    const { service } = await fakeTurn({ projectId: 8n });
+    const { reverter } = await fakeTurn({ projectId: 8n });
 
-    await expect(service.undoOp(7n, 300n, 2)).rejects.toMatchObject({ code: 'RFN_001' });
-    await expect(service.redoOp(7n, 300n, 2)).rejects.toMatchObject({ code: 'RFN_001' });
+    await expect(reverter.undoOp(7n, 300n, 2)).rejects.toMatchObject({ code: 'RFN_001' });
+    await expect(reverter.redoOp(7n, 300n, 2)).rejects.toMatchObject({ code: 'RFN_001' });
   });
 
   it('should refuse an op index outside the change-set', async () => {
-    const { applyTurn, service } = await fakeTurn();
+    const { applyTurn, reverter } = await fakeTurn();
     await applyTurn();
 
-    await expect(service.undoOp(7n, 300n, 3)).rejects.toMatchObject({ code: 'RFN_011' });
+    await expect(reverter.undoOp(7n, 300n, 3)).rejects.toMatchObject({ code: 'RFN_011' });
   });
 });

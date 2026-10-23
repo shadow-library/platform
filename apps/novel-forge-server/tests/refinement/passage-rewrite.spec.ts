@@ -10,6 +10,7 @@ import {
   type DraftRewritePassageOp,
   droppedRewritesNote,
   ProposalApplyService,
+  ProposalRevertService,
   ProposalService,
   rewrittenBody,
   stampPassageAnchors,
@@ -389,7 +390,8 @@ describe('ProposalApplyService passage rewrites', () => {
     const tables = workspace(chapter3);
     const { row, id } = await stage(tables, ops);
     const applier = new ProposalApplyService({ getPostgresClient: () => tables.db } as never, new ActionExecutorRegistry());
-    return { tables, row, id, applier };
+    const reverter = new ProposalRevertService({ getPostgresClient: () => tables.db } as never);
+    return { tables, row, id, applier, reverter };
   }
   const bothRewrites = [rewrite(WRIST, WRIST_REWRITE, { label: 'the wrist injury' }), rewrite(FEAR, FEAR_REWRITE, { label: 'show the fear' })];
   const rewritten = BODY.replace(WRIST, WRIST_REWRITE).replace(FEAR, FEAR_REWRITE);
@@ -490,27 +492,27 @@ describe('ProposalApplyService passage rewrites', () => {
   });
 
   it('should put the prior body back when the applied card is reverted', async () => {
-    const { tables, id, applier } = await staged(bothRewrites);
+    const { tables, id, applier, reverter } = await staged(bothRewrites);
     await applier.apply(7n, id, { opIndexes: [0, 1] });
 
-    await applier.revert(7n, id);
+    await reverter.revert(7n, id);
 
     expect(tables.draft(3)).toMatchObject({ body: BODY, revision: 3 });
     expect(tables.revisionsOf(3).at(-1)).toMatchObject({ revision: 3, source: 'chat_edited', body: BODY });
   });
 
   it('should put back the body as it stood before a relocated apply, the edit elsewhere included', async () => {
-    const { tables, id, applier } = await staged(bothRewrites);
+    const { tables, id, applier, reverter } = await staged(bothRewrites);
     Object.assign(tables.draft(3) as Row, { body: `Dawn.\n\n${BODY}`, revision: 2, saveSeq: 1 });
     await applier.apply(7n, id, { opIndexes: [0, 1] });
 
-    await applier.revert(7n, id);
+    await reverter.revert(7n, id);
 
     expect(tables.draft(3)?.['body']).toBe(`Dawn.\n\n${BODY}`);
   });
 
   it('should keep an autosave that committed just before the apply locked the draft when the card is reverted', async () => {
-    const { tables, id, applier } = await staged(bothRewrites);
+    const { tables, id, applier, reverter } = await staged(bothRewrites);
     const autosaved = `Dawn.\n\n${BODY}`;
     const select = tables.db.select;
     let autosaveLanded = false;
@@ -535,18 +537,18 @@ describe('ProposalApplyService passage rewrites', () => {
     await applier.apply(7n, id, { opIndexes: [0, 1] });
     expect(tables.draft(3)?.['body']).toBe(`Dawn.\n\n${rewritten}`);
 
-    await applier.revert(7n, id);
+    await reverter.revert(7n, id);
 
     expect(autosaveLanded).toBe(true);
     expect(tables.draft(3)?.['body']).toBe(autosaved);
   });
 
   it('should refuse the revert once the chapter was edited after the rewrite', async () => {
-    const { tables, id, applier } = await staged(bothRewrites);
+    const { tables, id, applier, reverter } = await staged(bothRewrites);
     await applier.apply(7n, id, { opIndexes: [0, 1] });
     Object.assign(tables.draft(3) as Row, { body: `${rewritten}\n\nDawn.` });
 
-    await expect(applier.revert(7n, id)).rejects.toMatchObject({ code: 'RFN_006' });
+    await expect(reverter.revert(7n, id)).rejects.toMatchObject({ code: 'RFN_006' });
     expect(tables.draft(3)?.['body']).toBe(`${rewritten}\n\nDawn.`);
   });
 });

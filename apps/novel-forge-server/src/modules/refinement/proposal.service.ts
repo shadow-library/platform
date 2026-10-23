@@ -24,7 +24,7 @@ import { planCardDiagnostics, proposalDiagnostics } from './plan-diagnostics';
 import { stampIdeaIds } from './idea-id';
 import { type OpUndoRecord } from './op-undo';
 import { rewriteDrafts, rewritesApart, stampPassageAnchors } from './passage-rewrite';
-import { type OpResult } from './proposal-apply.service';
+import { type OpResult } from './apply';
 import { findNegationEchoWarnings, findRevealClearWarnings } from './proposal-warnings';
 import { type ListChangesQuery, type ListProposalsQuery } from './refinement.dto';
 import { loadImpactRows, type UndoImpact, undoImpact, undoneChange } from './undo-impact';

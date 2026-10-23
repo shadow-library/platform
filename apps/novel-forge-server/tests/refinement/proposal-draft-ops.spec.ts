@@ -3,7 +3,7 @@ import { type SQL } from 'drizzle-orm';
 import { FakeDatabaseService } from '@shadow-library/modules/testing';
 
 import { HubActionRegistrar } from '@modules/hub/hub-action.registrar';
-import { ActionExecutorRegistry, type ActionOp, bindApprovalRevision, type ChangeOp, type DraftUpdateOp, ProposalApplyService, ProposalService } from '@modules/refinement';
+import { ActionExecutorRegistry, type ActionOp, bindApprovalRevision, type ChangeOp, DRAFT_HANDLERS, type DraftUpdateOp, ProposalService } from '@modules/refinement';
 import { AppErrorCode } from '@server/classes';
 import { REVEAL_STALE_PREFIX } from '@server/common';
 import { schema } from '@server/database';
@@ -13,20 +13,19 @@ import { type DraftRow, draftRow, fakeGenerationDb, render } from '../generation
 function applyDraftOp(reads: (DraftRow | undefined)[], written: unknown[] = []) {
   const fake = fakeGenerationDb({ draftReads: reads, draftWriteResult: written });
   const ctx = { tx: fake.db as never, projectId: 1n, applied: [] as { artifactRef: string; newRevision: number | null }[], staleMarked: [] as string[] };
-  const service = new ProposalApplyService(new FakeDatabaseService(), {} as never);
   return {
     fake,
     ctx,
-    update: (op: DraftUpdateOp & { isolated?: boolean; generator?: 'unrestricted' }) => service['applyDraftUpdate'](ctx, op),
-    remove: (chapter: number) => service['applyDraftRemove'](ctx, { op: 'draft.remove', chapter }),
-    inverse: (op: ChangeOp) => service['inverseDraft'](ctx, op as DraftUpdateOp),
+    update: (op: DraftUpdateOp & { isolated?: boolean; generator?: 'unrestricted' }) => DRAFT_HANDLERS['draft.update'].apply(ctx, op),
+    remove: (chapter: number) => DRAFT_HANDLERS['draft.remove'].apply(ctx, { op: 'draft.remove', chapter }),
+    inverse: (op: ChangeOp) => DRAFT_HANDLERS['draft.update'].inverse(ctx, op as DraftUpdateOp),
     staleMarks: () => fake.writesTo(schema.drafts, 'update').filter(write => typeof write.values?.['staleReason'] === 'string'),
   };
 }
 
 const REVOKE_CHAPTER_4 = '("character_knowledge"."project_id" = $1 and "character_knowledge"."source" = $2 and "character_knowledge"."learned_in_chapter" = $3)';
 
-describe('ProposalApplyService applyDraftUpdate', () => {
+describe('draft.update apply', () => {
   it('should bind the write to the revision it read, bump it in SQL and revoke the reveals the old prose earned', async () => {
     const run = applyDraftOp([draftRow()], [{ id: 11n, revision: 3, saveSeq: 1 }]);
 
@@ -170,7 +169,7 @@ describe('ProposalApplyService draft containment on revert', () => {
   });
 });
 
-describe('ProposalApplyService applyDraftRemove', () => {
+describe('draft.remove apply', () => {
   it('should refuse a draft that turned final and revoke reveals only after a removal', async () => {
     const refused = applyDraftOp([draftRow(), draftRow({ status: 'final' })]);
     await expect(refused.remove(4)).rejects.toMatchObject({ code: 'DRF_002' });

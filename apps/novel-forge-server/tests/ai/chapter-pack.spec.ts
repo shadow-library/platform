@@ -1,7 +1,9 @@
 import { beforeAll, describe, expect, it, mock, spyOn } from 'bun:test';
 
 import { type CatalogService } from '@modules/ai/context/catalog.service';
-import { ContextAssembler, ENTITY_CARD_BUDGET, FULL_CAST_MAX, WRITING_STYLE_BUDGET } from '@modules/ai/context/context-assembler.service';
+import { ContextAssembler, FULL_CAST_MAX } from '@modules/ai/context/context-assembler.service';
+import { ENTITY_CARD_BUDGET } from '@modules/ai/context/context-ref-resolver';
+import { WRITING_STYLE_BUDGET } from '@modules/ai/context/pack-render';
 import { countTokens } from '@modules/ai/context/token-budget';
 import { DEFAULT_WRITING_INSTRUCTIONS } from '@modules/ai/prompts/authoring-preamble';
 
