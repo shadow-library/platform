@@ -37,8 +37,8 @@ Notification service and operations console. Other apps send a message by templa
 ## Hard rules
 
 - NEVER edit content in place: edits go to the single DRAFT; only PUBLISHED serves live sends.
-- MUST keep exactly one PUBLISHED version per template/layout/partial. Only the transactional publish/rollback code and the baseline seed's supersede (archive-then-insert
-  in one transaction) enforce it (no DB index); never write statuses elsewhere.
+- MUST keep at most one PUBLISHED and one DRAFT version per template/layout/partial; partial unique indexes enforce it. Draft, content and publish/rollback writes take
+  the parent row's `FOR NO KEY UPDATE` lock first, so they serialise per item; the baseline seed's supersede archives before it inserts. Never write statuses elsewhere.
 - Template and layout publish MUST be render-gated on sample data; partial publish is NOT. The baseline seed is gated too: a layout or template it writes must render
   against the live design system, and a partial only while the whole fixture catalogue renders; a failure withholds the write with a warning. Rollback creates a NEW published copy (history never deleted), templates only.
 - A job MUST pin `templateVersionId`; NEVER resolve "latest" at delivery. Layout/partial publishes still hit every template at once, including retries of pinned jobs.

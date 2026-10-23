@@ -5,6 +5,12 @@ import { AppErrorCode } from '@server/classes';
 export const constraintErrorMap: Record<string, AppError> = {
   templates_template_key_unique: AppErrorCode.TPL_002.create(),
   template_versions_template_id_version_unique: AppErrorCode.TPL_VER_002.create(),
+  template_versions_template_id_draft_unique: AppErrorCode.TPL_PUB_004.create(),
+  template_versions_template_id_published_unique: AppErrorCode.TPL_PUB_005.create(),
+  layout_versions_layout_id_draft_unique: AppErrorCode.TPL_PUB_004.create(),
+  layout_versions_layout_id_published_unique: AppErrorCode.TPL_PUB_005.create(),
+  partial_versions_partial_id_draft_unique: AppErrorCode.TPL_PUB_004.create(),
+  partial_versions_partial_id_published_unique: AppErrorCode.TPL_PUB_005.create(),
   template_contents_version_channel_locale_unique: AppErrorCode.TPL_CNT_002.create(),
   layouts_layout_key_unique: AppErrorCode.TPL_LYT_002.create(),
   partials_partial_key_unique: AppErrorCode.TPL_PRT_002.create(),

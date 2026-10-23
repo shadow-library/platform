@@ -7,9 +7,10 @@ import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
-import { PrimaryDatabase, schema, Template } from '@server/database';
+import { PrimaryDatabase, type PrimaryTransaction, schema, Template } from '@server/database';
 
 import { TemplateResolverService } from './template-resolver.service';
+import { lockVersionedParent, rethrowTransactionError } from './version-transaction.util';
 
 export type CreatePartial = Omit<InferInsertModel<typeof schema.partials>, 'id' | 'createdAt' | 'updatedAt'>;
 export type UpdatePartial = Partial<Pick<CreatePartial, 'name' | 'description' | 'isActive'>>;
@@ -77,63 +78,69 @@ export class PartialService {
   }
 
   getDraft(partialId: bigint): Promise<Template.PartialVersion | undefined> {
-    return this.db.query.partialVersions.findFirst({
-      where: and(eq(schema.partialVersions.partialId, partialId), eq(schema.partialVersions.status, 'DRAFT')),
-      orderBy: desc(schema.partialVersions.version),
-    });
+    return this.findVersion(this.db, partialId, 'DRAFT');
   }
 
   async saveDraft(partialId: bigint, data: SavePartialDraftData, editedBy?: string): Promise<Template.PartialVersion> {
-    await this.getPartialOrThrow(partialId);
-    const existing = await this.getDraft(partialId);
-    if (existing) {
-      const [row] = await this.db
-        .update(schema.partialVersions)
-        .set({ body: data.body, notes: data.notes, editedBy, updatedAt: new Date() })
-        .where(eq(schema.partialVersions.id, existing.id))
-        .returning();
-      assert(row, 'Failed to update partial draft');
-      return row;
-    }
-
-    const version = await this.db
+    return this.db
       .transaction(async tx => {
+        await this.lockPartial(tx, partialId);
+        const existing = await this.findVersion(tx, partialId, 'DRAFT');
+        if (existing) {
+          const [row] = await tx
+            .update(schema.partialVersions)
+            .set({ body: data.body, notes: data.notes, editedBy, updatedAt: new Date() })
+            .where(eq(schema.partialVersions.id, existing.id))
+            .returning();
+          assert(row, 'Failed to update partial draft');
+          return row;
+        }
         const [maxRow] = await tx
           .select({ value: max(schema.partialVersions.version) })
           .from(schema.partialVersions)
           .where(eq(schema.partialVersions.partialId, partialId));
-        const nextVersion = (maxRow?.value ?? 0) + 1;
         const [row] = await tx
           .insert(schema.partialVersions)
-          .values({ partialId, version: nextVersion, status: 'DRAFT', body: data.body, notes: data.notes, editedBy })
+          .values({ partialId, version: (maxRow?.value ?? 0) + 1, status: 'DRAFT', body: data.body, notes: data.notes, editedBy })
           .returning();
+        assert(row, 'Failed to open partial draft');
         return row;
       })
-      .catch(err => this.databaseService.translateError(err));
-    assert(version, 'Failed to open partial draft');
-    return version;
+      .catch(err => rethrowTransactionError(this.databaseService, err));
   }
 
   async publishPartial(partialId: bigint, options: PartialPublishOptions = {}): Promise<Template.PartialVersion> {
-    await this.getPartialOrThrow(partialId);
-    const draft = await this.getDraft(partialId);
-    if (!draft) throw AppErrorCode.TPL_PUB_001.create();
-
-    const published = await this.db.transaction(async tx => {
-      await tx
-        .update(schema.partialVersions)
-        .set({ status: 'ARCHIVED', updatedAt: new Date() })
-        .where(and(eq(schema.partialVersions.partialId, partialId), eq(schema.partialVersions.status, 'PUBLISHED')));
-      const [row] = await tx
-        .update(schema.partialVersions)
-        .set({ status: 'PUBLISHED', publishedAt: new Date(), notes: options.notes ?? draft.notes, editedBy: options.editedBy ?? draft.editedBy, updatedAt: new Date() })
-        .where(eq(schema.partialVersions.id, draft.id))
-        .returning();
-      return row;
-    });
-    assert(published, 'Failed to publish partial');
+    const published = await this.db
+      .transaction(async tx => {
+        await this.lockPartial(tx, partialId);
+        const draft = await this.findVersion(tx, partialId, 'DRAFT');
+        if (!draft) throw AppErrorCode.TPL_PUB_001.create();
+        await tx
+          .update(schema.partialVersions)
+          .set({ status: 'ARCHIVED', updatedAt: new Date() })
+          .where(and(eq(schema.partialVersions.partialId, partialId), eq(schema.partialVersions.status, 'PUBLISHED')));
+        const [row] = await tx
+          .update(schema.partialVersions)
+          .set({ status: 'PUBLISHED', publishedAt: new Date(), notes: options.notes ?? draft.notes, editedBy: options.editedBy ?? draft.editedBy, updatedAt: new Date() })
+          .where(eq(schema.partialVersions.id, draft.id))
+          .returning();
+        assert(row, 'Failed to publish partial');
+        return row;
+      })
+      .catch(err => rethrowTransactionError(this.databaseService, err));
     this.resolver.invalidatePartials();
     this.logger.info(`Published partial ${partialId} as v${published.version}`);
     return published;
+  }
+
+  private async lockPartial(tx: PrimaryTransaction, partialId: bigint): Promise<void> {
+    if (!(await lockVersionedParent(tx, schema.partials, partialId))) throw AppErrorCode.TPL_PRT_001.create();
+  }
+
+  private findVersion(executor: PrimaryDatabase | PrimaryTransaction, partialId: bigint, status: 'DRAFT' | 'PUBLISHED'): Promise<Template.PartialVersion | undefined> {
+    return executor.query.partialVersions.findFirst({
+      where: and(eq(schema.partialVersions.partialId, partialId), eq(schema.partialVersions.status, status)),
+      orderBy: desc(schema.partialVersions.version),
+    });
   }
 }

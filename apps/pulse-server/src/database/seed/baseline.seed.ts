@@ -4,7 +4,7 @@ import { and, eq } from 'drizzle-orm';
 import { Config, Logger } from '@shadow-library/common';
 
 import { APP_NAME } from '@server/constants';
-import { type PrimaryDatabase, schema, type Template } from '@server/database';
+import { type PrimaryDatabase, type PrimaryTransaction, schema, type Template } from '@server/database';
 import { TemplateEngineService } from '@modules/template/rendering/template-engine.service';
 
 import { BASELINE_LAYOUTS, BASELINE_PARTIALS, BASELINE_SENDER_PROFILE, BASELINE_TEMPLATES, type LayoutFixture, type PartialFixture, type TemplateFixture } from './baseline.data';
@@ -30,12 +30,10 @@ const SEQUENCE_RESET = `
   END $$;
 `;
 
-type SeedTransaction = Parameters<Parameters<PrimaryDatabase['transaction']>[0]>[0];
-
 interface VersionWriter {
   renders(): Promise<boolean>;
-  insert(tx: SeedTransaction, version: number): Promise<unknown>;
-  archivePublished(tx: SeedTransaction): Promise<unknown>;
+  insert(tx: PrimaryTransaction, version: number): Promise<unknown>;
+  archivePublished(tx: PrimaryTransaction): Promise<unknown>;
   stamp(versionId: bigint): Promise<unknown>;
 }
 
@@ -43,7 +41,7 @@ export type BaselineGate = Pick<BaselineRenderGate, 'catalogueRenders' | 'layout
 
 const BASELINE_NOTES = 'Baseline';
 
-/** Superseding archives the old PUBLISHED version and inserts the new one in one transaction; a failed update is logged, not thrown, because the old copy keeps serving. */
+/** Superseding archives the old PUBLISHED version and inserts the new one in one transaction; a failed write is logged, not thrown, because a racing operator publish or the old copy keeps serving. */
 async function applyBaselineStep(db: PrimaryDatabase, subject: string, step: BaselineStep, writer: VersionWriter): Promise<void> {
   if (step.action === 'keep') {
     if (step.reason === 'draft-open' || step.reason === 'contract-changed') logger.warn('baseline update withheld', { subject, reason: step.reason });
@@ -51,16 +49,15 @@ async function applyBaselineStep(db: PrimaryDatabase, subject: string, step: Bas
   }
   if (step.action === 'adopt') return void (await writer.stamp(step.versionId));
   if (!(await writer.renders())) return logger.warn('baseline update withheld', { subject, reason: 'render-failed' });
-  if (step.action === 'create') return void (await db.transaction(tx => writer.insert(tx, step.version)));
 
   try {
     await db.transaction(async tx => {
-      await writer.archivePublished(tx);
+      if (step.action === 'supersede') await writer.archivePublished(tx);
       await writer.insert(tx, step.version);
     });
-    logger.info('published an updated baseline version', { subject, version: step.version, superseded: step.publishedId });
+    if (step.action === 'supersede') logger.info('published an updated baseline version', { subject, version: step.version, superseded: step.publishedId });
   } catch (error) {
-    logger.error('failed to publish an updated baseline version', { subject, version: step.version, error });
+    logger.error('failed to publish a baseline version', { subject, action: step.action, version: step.version, error });
   }
 }
 

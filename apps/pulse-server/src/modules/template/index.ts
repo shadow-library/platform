@@ -7,3 +7,4 @@ export * from './layout.service';
 export * from './partial.service';
 export * from './template-resolver.service';
 export * from './template.module';
+export * from './version-transaction.util';

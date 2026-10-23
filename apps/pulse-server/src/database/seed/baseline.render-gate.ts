@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 import { Logger } from '@shadow-library/common';
 
 import { APP_NAME } from '@server/constants';
@@ -33,15 +33,17 @@ export function fixtureDesignSystem(catalogue: BaselineCatalogue): DesignSystem 
 
 export async function loadPublishedDesignSystem(db: PrimaryDatabase): Promise<DesignSystem> {
   const layouts = await db
-    .select({ key: schema.layouts.layoutKey, body: schema.layoutVersions.body })
+    .selectDistinctOn([schema.layoutVersions.layoutId], { key: schema.layouts.layoutKey, body: schema.layoutVersions.body })
     .from(schema.layoutVersions)
     .innerJoin(schema.layouts, eq(schema.layouts.id, schema.layoutVersions.layoutId))
-    .where(eq(schema.layoutVersions.status, 'PUBLISHED'));
+    .where(eq(schema.layoutVersions.status, 'PUBLISHED'))
+    .orderBy(schema.layoutVersions.layoutId, desc(schema.layoutVersions.version));
   const partials = await db
-    .select({ key: schema.partials.partialKey, body: schema.partialVersions.body })
+    .selectDistinctOn([schema.partialVersions.partialId], { key: schema.partials.partialKey, body: schema.partialVersions.body })
     .from(schema.partialVersions)
     .innerJoin(schema.partials, eq(schema.partials.id, schema.partialVersions.partialId))
-    .where(eq(schema.partialVersions.status, 'PUBLISHED'));
+    .where(eq(schema.partialVersions.status, 'PUBLISHED'))
+    .orderBy(schema.partialVersions.partialId, desc(schema.partialVersions.version));
   return { layouts: Object.fromEntries(layouts.map(row => [row.key, row.body])), partials: Object.fromEntries(partials.map(row => [row.key, row.body])) };
 }
 

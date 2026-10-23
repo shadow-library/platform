@@ -49,7 +49,7 @@ export class TemplateResolverService {
       where: eq(schema.templates.templateKey, templateKey),
       with: {
         channelSettings: { where: eq(schema.templateChannelSettings.isEnabled, true), orderBy: asc(schema.templateChannelSettings.channel) },
-        versions: { where: eq(schema.templateVersions.status, 'PUBLISHED'), limit: 1 },
+        versions: { where: eq(schema.templateVersions.status, 'PUBLISHED'), orderBy: desc(schema.templateVersions.version), limit: 1 },
       },
     });
     if (!template) return this.notFound(templateKey);
@@ -84,7 +84,7 @@ export class TemplateResolverService {
 
     const layout = await this.db.query.layouts.findFirst({
       where: eq(schema.layouts.layoutKey, layoutKey),
-      with: { versions: { where: eq(schema.layoutVersions.status, 'PUBLISHED'), limit: 1 } },
+      with: { versions: { where: eq(schema.layoutVersions.status, 'PUBLISHED'), orderBy: desc(schema.layoutVersions.version), limit: 1 } },
     });
     const body = layout?.versions[0]?.body ?? null;
     this.layoutCache.set(layoutKey, body);
@@ -96,7 +96,7 @@ export class TemplateResolverService {
     if (cached) return cached;
 
     const rows = await this.db.query.partials.findMany({
-      with: { versions: { where: eq(schema.partialVersions.status, 'PUBLISHED'), limit: 1 } },
+      with: { versions: { where: eq(schema.partialVersions.status, 'PUBLISHED'), orderBy: desc(schema.partialVersions.version), limit: 1 } },
     });
     const map: Record<string, string> = {};
     for (const partial of rows) {

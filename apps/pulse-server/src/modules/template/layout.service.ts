@@ -7,12 +7,13 @@ import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
-import { PrimaryDatabase, schema, Template } from '@server/database';
+import { PrimaryDatabase, type PrimaryTransaction, schema, Template } from '@server/database';
 
 import { buildRenderGlobals } from './render-context';
 import { TemplateEngineService } from './rendering/template-engine.service';
 import { TemplateResolverService } from './template-resolver.service';
 import { buildSampleData, parseUndefinedVariable } from './variable-schema.util';
+import { lockVersionedParent, rethrowTransactionError } from './version-transaction.util';
 
 export type CreateLayout = Omit<InferInsertModel<typeof schema.layouts>, 'id' | 'createdAt' | 'updatedAt'>;
 export type UpdateLayout = Partial<Pick<CreateLayout, 'name' | 'description' | 'isActive'>>;
@@ -83,62 +84,76 @@ export class LayoutService {
   }
 
   getDraft(layoutId: bigint): Promise<Template.LayoutVersion | undefined> {
-    return this.db.query.layoutVersions.findFirst({
-      where: and(eq(schema.layoutVersions.layoutId, layoutId), eq(schema.layoutVersions.status, 'DRAFT')),
-      orderBy: desc(schema.layoutVersions.version),
-    });
+    return this.findVersion(this.db, layoutId, 'DRAFT');
   }
 
   async saveDraft(layoutId: bigint, data: SaveLayoutDraftData, editedBy?: string): Promise<Template.LayoutVersion> {
-    await this.getLayoutOrThrow(layoutId);
-    const existing = await this.getDraft(layoutId);
-    if (existing) {
-      const [row] = await this.db
-        .update(schema.layoutVersions)
-        .set({ body: data.body, notes: data.notes, editedBy, updatedAt: new Date() })
-        .where(eq(schema.layoutVersions.id, existing.id))
-        .returning();
-      assert(row, 'Failed to update layout draft');
-      return row;
-    }
-
-    const version = await this.db
+    return this.db
       .transaction(async tx => {
+        await this.lockLayout(tx, layoutId);
+        const existing = await this.findVersion(tx, layoutId, 'DRAFT');
+        if (existing) {
+          const [row] = await tx
+            .update(schema.layoutVersions)
+            .set({ body: data.body, notes: data.notes, editedBy, updatedAt: new Date() })
+            .where(eq(schema.layoutVersions.id, existing.id))
+            .returning();
+          assert(row, 'Failed to update layout draft');
+          return row;
+        }
         const [maxRow] = await tx
           .select({ value: max(schema.layoutVersions.version) })
           .from(schema.layoutVersions)
           .where(eq(schema.layoutVersions.layoutId, layoutId));
-        const nextVersion = (maxRow?.value ?? 0) + 1;
-        const [row] = await tx.insert(schema.layoutVersions).values({ layoutId, version: nextVersion, status: 'DRAFT', body: data.body, notes: data.notes, editedBy }).returning();
+        const [row] = await tx
+          .insert(schema.layoutVersions)
+          .values({ layoutId, version: (maxRow?.value ?? 0) + 1, status: 'DRAFT', body: data.body, notes: data.notes, editedBy })
+          .returning();
+        assert(row, 'Failed to open layout draft');
         return row;
       })
-      .catch(err => this.databaseService.translateError(err));
-    assert(version, 'Failed to open layout draft');
-    return version;
+      .catch(err => rethrowTransactionError(this.databaseService, err));
   }
 
   async publishLayout(layoutId: bigint, options: LayoutPublishOptions = {}): Promise<Template.LayoutVersion> {
     await this.getLayoutOrThrow(layoutId);
-    const draft = await this.getDraft(layoutId);
-    if (!draft) throw AppErrorCode.TPL_PUB_001.create();
-    await this.assertLayoutRenders(draft.body);
+    const gated = await this.getDraft(layoutId);
+    if (!gated) throw AppErrorCode.TPL_PUB_001.create();
+    await this.assertLayoutRenders(gated.body);
 
-    const published = await this.db.transaction(async tx => {
-      await tx
-        .update(schema.layoutVersions)
-        .set({ status: 'ARCHIVED', updatedAt: new Date() })
-        .where(and(eq(schema.layoutVersions.layoutId, layoutId), eq(schema.layoutVersions.status, 'PUBLISHED')));
-      const [row] = await tx
-        .update(schema.layoutVersions)
-        .set({ status: 'PUBLISHED', publishedAt: new Date(), notes: options.notes ?? draft.notes, editedBy: options.editedBy ?? draft.editedBy, updatedAt: new Date() })
-        .where(eq(schema.layoutVersions.id, draft.id))
-        .returning();
-      return row;
-    });
-    assert(published, 'Failed to publish layout');
+    const published = await this.db
+      .transaction(async tx => {
+        await this.lockLayout(tx, layoutId);
+        const draft = await this.findVersion(tx, layoutId, 'DRAFT');
+        if (!draft) throw AppErrorCode.TPL_PUB_001.create();
+        if (draft.id !== gated.id || draft.body !== gated.body) throw AppErrorCode.TPL_PUB_005.create();
+        await tx
+          .update(schema.layoutVersions)
+          .set({ status: 'ARCHIVED', updatedAt: new Date() })
+          .where(and(eq(schema.layoutVersions.layoutId, layoutId), eq(schema.layoutVersions.status, 'PUBLISHED')));
+        const [row] = await tx
+          .update(schema.layoutVersions)
+          .set({ status: 'PUBLISHED', publishedAt: new Date(), notes: options.notes ?? draft.notes, editedBy: options.editedBy ?? draft.editedBy, updatedAt: new Date() })
+          .where(eq(schema.layoutVersions.id, draft.id))
+          .returning();
+        assert(row, 'Failed to publish layout');
+        return row;
+      })
+      .catch(err => rethrowTransactionError(this.databaseService, err));
     this.resolver.invalidateLayouts();
     this.logger.info(`Published layout ${layoutId} as v${published.version}`);
     return published;
+  }
+
+  private async lockLayout(tx: PrimaryTransaction, layoutId: bigint): Promise<void> {
+    if (!(await lockVersionedParent(tx, schema.layouts, layoutId))) throw AppErrorCode.TPL_LYT_001.create();
+  }
+
+  private findVersion(executor: PrimaryDatabase | PrimaryTransaction, layoutId: bigint, status: 'DRAFT' | 'PUBLISHED'): Promise<Template.LayoutVersion | undefined> {
+    return executor.query.layoutVersions.findFirst({
+      where: and(eq(schema.layoutVersions.layoutId, layoutId), eq(schema.layoutVersions.status, status)),
+      orderBy: desc(schema.layoutVersions.version),
+    });
   }
 
   private async assertLayoutRenders(body: string): Promise<void> {

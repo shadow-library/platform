@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 import { BunSQLDatabase, drizzle } from 'drizzle-orm/bun-sql';
 import { Logger } from '@shadow-library/common';
 
@@ -25,7 +25,7 @@ async function bootstrapDemoMessages(db: Database): Promise<void> {
   for (const message of DEMO_MESSAGES) {
     const template = await db.query.templates.findFirst({
       where: eq(schema.templates.templateKey, message.templateKey),
-      with: { versions: { where: eq(schema.templateVersions.status, 'PUBLISHED'), limit: 1 } },
+      with: { versions: { where: eq(schema.templateVersions.status, 'PUBLISHED'), orderBy: desc(schema.templateVersions.version), limit: 1 } },
     });
     const version = template?.versions[0];
     if (!template || !version) continue;

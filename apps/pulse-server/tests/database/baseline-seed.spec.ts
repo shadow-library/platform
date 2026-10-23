@@ -132,6 +132,13 @@ describe('baseline seed', () => {
 
       expect(await bootstrapLayouts(db, PASSING_GATE)).toBeUndefined();
     });
+
+    it('should log a failed first publish and carry on rather than fail the migration', async () => {
+      const { db, calls } = scriptedPostgres([[], [LAYOUT], []], { failTransactions: true });
+
+      expect(await bootstrapLayouts(db, PASSING_GATE)).toBeUndefined();
+      expect(calls.filter(call => call.root === 'insert')).toHaveLength(1);
+    });
   });
 
   describe('bootstrapTemplates', () => {

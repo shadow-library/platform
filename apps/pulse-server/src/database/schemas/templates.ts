@@ -1,5 +1,5 @@
-import { InferEnum, InferSelectModel, relations } from 'drizzle-orm';
-import { bigint, bigserial, boolean, integer, pgEnum, pgTable, primaryKey, text, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
+import { InferEnum, InferSelectModel, relations, sql } from 'drizzle-orm';
+import { bigint, bigserial, boolean, integer, pgEnum, pgTable, primaryKey, text, timestamp, unique, uniqueIndex, varchar } from 'drizzle-orm/pg-core';
 
 import { jsonb } from './jsonb';
 import { notificationChannel, priority as priorityEnum } from './notification-jobs';
@@ -80,7 +80,15 @@ export const templateVersions = pgTable(
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },
-  t => [unique('template_versions_template_id_version_unique').on(t.templateId, t.version)],
+  t => [
+    unique('template_versions_template_id_version_unique').on(t.templateId, t.version),
+    uniqueIndex('template_versions_template_id_draft_unique')
+      .on(t.templateId)
+      .where(sql`${t.status} = 'DRAFT'`),
+    uniqueIndex('template_versions_template_id_published_unique')
+      .on(t.templateId)
+      .where(sql`${t.status} = 'PUBLISHED'`),
+  ],
 );
 
 export const templateContents = pgTable(
@@ -131,7 +139,15 @@ export const layoutVersions = pgTable(
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },
-  t => [unique('layout_versions_layout_id_version_unique').on(t.layoutId, t.version)],
+  t => [
+    unique('layout_versions_layout_id_version_unique').on(t.layoutId, t.version),
+    uniqueIndex('layout_versions_layout_id_draft_unique')
+      .on(t.layoutId)
+      .where(sql`${t.status} = 'DRAFT'`),
+    uniqueIndex('layout_versions_layout_id_published_unique')
+      .on(t.layoutId)
+      .where(sql`${t.status} = 'PUBLISHED'`),
+  ],
 );
 
 export const partials = pgTable('partials', {
@@ -162,7 +178,15 @@ export const partialVersions = pgTable(
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },
-  t => [unique('partial_versions_partial_id_version_unique').on(t.partialId, t.version)],
+  t => [
+    unique('partial_versions_partial_id_version_unique').on(t.partialId, t.version),
+    uniqueIndex('partial_versions_partial_id_draft_unique')
+      .on(t.partialId)
+      .where(sql`${t.status} = 'DRAFT'`),
+    uniqueIndex('partial_versions_partial_id_published_unique')
+      .on(t.partialId)
+      .where(sql`${t.status} = 'PUBLISHED'`),
+  ],
 );
 
 export const templateRelations = relations(templates, ({ many }) => ({

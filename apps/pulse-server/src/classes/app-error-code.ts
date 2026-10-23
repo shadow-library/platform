@@ -17,7 +17,8 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly TPL_PUB_001 = AppErrorCode.conflict('TPL_PUB_001', 'No draft version to publish');
   static readonly TPL_PUB_002 = AppErrorCode.conflict('TPL_PUB_002', 'Cannot publish a draft with no content');
   static readonly TPL_PUB_003 = AppErrorCode.validation('TPL_PUB_003', 'Draft content references variables not declared in the template schema');
-  static readonly TPL_PUB_004 = AppErrorCode.conflict('TPL_PUB_004', 'A draft version already exists for this template');
+  static readonly TPL_PUB_004 = AppErrorCode.conflict('TPL_PUB_004', 'A draft already exists; reload and edit it');
+  static readonly TPL_PUB_005 = AppErrorCode.conflict('TPL_PUB_005', 'The draft or published version changed concurrently; reload and retry');
 
   static readonly TPL_LYT_001 = AppErrorCode.notFound('TPL_LYT_001', 'Layout not found');
   static readonly TPL_LYT_002 = AppErrorCode.conflict('TPL_LYT_002', 'Layout with the given key already exists');
