@@ -34,12 +34,9 @@ interface UndoImpactResponse {
 }
 
 /**
- * Declaring the constants
- *
- * Refinement proposals: hand-edited (DB-inserted, then `PATCH`ed through the real API so the server validates, stamps idea ids and
- * re-baselines), applied, conflicted, reverted and rolled back. Every arranged change-set here is pure content ops or an unselected
- * `action.*` op that never runs — the one exception, `action.validate` on a project with no finalized chapters (zero model calls per
- * NF2-VAL-01), is quota-pinned as a belt-and-braces precaution since the route it reaches is generally model-capable.
+ * Refinement proposals: DB-inserted, `PATCH`ed through the real API (so the server validates, stamps idea ids and re-baselines), applied, conflicted, reverted and rolled back.
+ * Every arranged change-set is pure content ops or an unselected `action.*` op that never runs; the exception, `action.validate` on a project with no finalized chapters, makes
+ * zero model calls but is quota-pinned as a precaution.
  */
 
 async function readProjectPremise(projectId: string): Promise<string | null> {
@@ -161,8 +158,8 @@ test.describe('novel-forge proposal hand-edit and apply semantics', () => {
     const owner = await forge.actor({ label: 'prop-organise' });
     const projectId = await newProject(owner, 'prop-organise');
     const changeSet = [{ op: 'organise.rule', rule: 'Always keep chapter openings under three sentences.', optionId: 'r1' }];
-    // `{ legacy: true }` (`LEGACY_ORGANISE_RECORD`) is what a card staged before organise cards carried a reconciliation record
-    // reads as — apply treats it like any other card, rather than refusing with `NTS_009` for a card that carries no record at all.
+    // `{ legacy: true }` (`LEGACY_ORGANISE_RECORD`) is what a card staged before organise cards carried a reconciliation record reads as; apply treats it like any card instead
+    // of refusing with `NTS_009`.
     const proposalId = await insertPendingProposal({ projectId, scopeType: 'novel', kind: 'organise', changeSet, baseline: {}, organiseRecord: { legacy: true } });
 
     await expectCode(
@@ -278,8 +275,7 @@ test.describe('novel-forge proposal cherry-pick, one-way doors, revert and rollb
     const owner = await forge.actor({ label: 'prop-unregistered' });
     const projectId = await newProject(owner, 'prop-unregistered');
     const entityKey = `e2e-prop-unreg-${uniqueSuffix()}`;
-    // Raw-inserted and never `PATCH`ed: `validateChangeSet`'s "unknown op" check (which would normally catch an unrecognised op string)
-    // never runs, so this reaches `proposal-apply.service.ts:281-283`'s own action-registry check instead.
+    // Raw-inserted and never `PATCH`ed, so `validateChangeSet`'s "unknown op" check never runs and this reaches `proposal-apply.service.ts`'s own action-registry check.
     const proposalId = await insertPendingProposal({
       projectId,
       scopeType: 'novel',
@@ -344,9 +340,8 @@ test.describe('novel-forge proposal cherry-pick, one-way doors, revert and rollb
     await expectStatus(reverted, 200, 'reverting the volume removal');
     expect(await proposalStatus(proposalId)).toBe('reverted');
     const restored = await readVolumeRow(projectId, volumeKey);
-    // `state` is excluded from the byte-identical comparison on purpose: re-inserting the sole volume on revert runs through
-    // the same `applyVolumeUpsert` path a fresh create would, which calls `autoActivateVolume` (`volume-stats.ts:84-98`) —
-    // with no other volume active, it activates this one, `not_started` → `active`, exactly as creating it fresh would.
+    // `state` is excluded from the byte-identical comparison: re-inserting the sole volume on revert runs `applyVolumeUpsert`, whose `autoActivateVolume` activates it
+    // (`not_started` -> `active`) as a fresh create would.
     expect({ ...restored, state: undefined }, 'the volume row comes back byte-identical in every content field').toEqual({ ...original, state: undefined });
     expect(restored?.state, 'reinserting the project’s only volume auto-activates it, same as a fresh create would').toBe('active');
   });
@@ -399,8 +394,7 @@ test.describe('novel-forge proposal cherry-pick, one-way doors, revert and rollb
       'creating the entity a later card will depend on',
     );
 
-    // Proposal B stays pending, but re-baselining it names `entity:<key>` in its own baseline — exactly what `undo-impact` scans
-    // other pending cards for.
+    // Proposal B stays pending, but re-baselining it names `entity:<key>` in its baseline, which is what `undo-impact` scans other pending cards for.
     const changeSetB = [{ op: 'entity.upsert', entityKey, type: 'character', name: 'A rename proposed later' }];
     const proposalB = await insertPendingProposal({ projectId, scopeType: 'novel', kind: 'hub', changeSet: changeSetB, baseline: {} });
     await rebaselineProposal(owner.ctx, projectId, proposalB, changeSetB);
@@ -429,8 +423,8 @@ test.describe('novel-forge proposal cherry-pick, one-way doors, revert and rollb
     await expectStatus(await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/proposals/${proposalB}/apply`, { data: {} }), 200, 'applying the second rollback candidate');
     expect(await proposalStatus(proposalB)).toBe('applied');
 
-    // An action-only card (no content ops, so no inverse ops) applied last — `action.validate` on a project with no finalized chapters
-    // makes zero model calls (NF2-VAL-01), so the project's quota pin is never actually spent; it is guarded anyway per the spend rules.
+    // An action-only card (no content ops, so no inverse ops) applied last; `action.validate` with no finalized chapters makes zero model calls, so the quota pin is never spent
+    // but is applied anyway.
     const changeSetC = [{ op: 'action.validate', scope: 'novel' }];
     const proposalC = await insertPendingProposal({ projectId, scopeType: 'novel', kind: 'hub', changeSet: changeSetC, baseline: {} });
     await rebaselineProposal(owner.ctx, projectId, proposalC, changeSetC);
@@ -470,18 +464,11 @@ test.describe('novel-forge proposal cherry-pick, one-way doors, revert and rollb
 });
 
 /**
- * Coverage this batch leaves out of NF2-PROP-01/02, for the record: `RFN_005` (brief at/behind the story-cursor frontier — needs a
- * finalized chapter to move the cursor, pulling in Batch 5's finalize machinery); `RFN_010` via an actually-final draft specifically
- * (the isolated-chapter test above exercises the same `applyDraftUpdate` guard clause via `RFN_012` instead); the
- * `premise.update`-boilerplate-stores-only-the-additions behavior; `VOL_002` (volume removal while a plan still names it, via
- * `brief.update.volumeKey`); `RFN_004` triggered specifically on a malformed field value at PATCH time (only reached indirectly above,
- * via the organise/bible_audit-kind refusals); "`rationale` never reaches the applied artifact or `inverseOps`" (not independently
- * asserted); strict `GET /proposals` list-filter combinations beyond status/kind/chapter singly. The full "applies and reverts
- * byte-identically" op matrix covers entity, volume and premise; bible_doc/brief/draft/fact/milestone/promise are exercised as
- * individual refusal or apply-only cases rather than a full apply+revert round trip each, and fact revert including a restored
- * `writerNote` specifically is not separately checked. `RFN_007` on an action-only (never-content) applied proposal's own revert
- * attempt is not separately covered (only the never-applied and hand-edited-since paths are). A successful `writer-preview` response
- * (a pending `chapter_plan` card with a `brief.update` op) is not covered — every proposal in this file is `kind: 'hub'`.
+ * Not covered: `RFN_005` (needs a finalized chapter to move the story cursor); `RFN_010` via an actually-final draft (the isolated-chapter test exercises the same
+ * `applyDraftUpdate` guard via `RFN_012`);
+ * `VOL_002`; `RFN_004` at PATCH time; `RFN_007` on an action-only proposal's revert; a successful `writer-preview` (every proposal here is `kind: 'hub'`); and a full
+ * apply+revert round trip for
+ * bible_doc/brief/draft/fact/milestone/promise (entity, volume and premise have one).
  */
 test('should answer 200 with the applied proposal on a successful apply', async ({ forge }) => {
   const owner = await forge.actor({ label: 'prop-apply-status' });

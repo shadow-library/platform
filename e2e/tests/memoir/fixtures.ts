@@ -82,14 +82,10 @@ export interface MemoirHarness {
 }
 
 /**
- * Declaring the constants
- *
- * The memoir harness. Every persona is a fresh identity user built in the database (no registration budget spent) and
- * signed into memoir through the real OIDC hop, so a test can mutate its account freely while other lanes drive the
- * seeded personas. Everything a test arranges is removed afterwards even when an earlier teardown step throws.
- *
- * Memoir caches `sub → account id` in-process for `account.context-ttl` (60 s) and answers a cached id whose row is
- * gone with ACC_002. Removing a persona's account is still safe because identity never reissues a `sub`.
+ * Every persona is a fresh identity user built in the database (no registration budget spent) and signed into memoir through the real OIDC hop, so a test can mutate its account
+ * while other lanes use
+ * the seeded personas. Memoir caches `sub -> account id` in-process for `account.context-ttl` (60 s) and answers a cached id whose row is gone with ACC_002; removal is still
+ * safe because identity never reissues a `sub`.
  */
 
 export class MemoirPersonaError extends Error {
@@ -98,17 +94,13 @@ export class MemoirPersonaError extends Error {
 
 const SESSION_COOKIE = '__Host-shadow-session';
 
-/**
- * Removes every memoir account `identitySub` owns. Its domain rows cascade with it; `billing_events` only nulls its
- * reference, so those rows go first.
- */
+/** Removes every memoir account `identitySub` owns; domain rows cascade, but `billing_events` only nulls its reference, so those rows go first. */
 export async function deleteMemoirAccounts(identitySub: string): Promise<void> {
   const sql = memoirDb();
   await sql`DELETE FROM billing_events WHERE account_id IN (SELECT id FROM accounts WHERE identity_sub = ${identitySub})`;
   await sql`DELETE FROM accounts WHERE identity_sub = ${identitySub}`;
 }
 
-/** Identity's per-client token-endpoint counters (`rl:<bucket>:<clientId>` and `rl:<bucket>:<clientId>:<ip>`), which outlive the client. */
 export async function clearClientRateLimits(clientId: string): Promise<void> {
   const keys = [...(await redisScan(`rl:*:${clientId}`)), ...(await redisScan(`rl:*:${clientId}:*`))];
   if (keys.length > 0) await redisDel(...keys);
@@ -122,7 +114,6 @@ export function deleteMemoirPersona(persona: MemoirPersona): Promise<void> {
   return removeMemoirPersona(persona);
 }
 
-/** Follows one hop of the login chain without following the redirect it answers with. */
 async function hop(ctx: APIRequestContext, url: string): Promise<string> {
   const response = await ctx.get(url, { maxRedirects: 0 });
   const location = response.headers().location;
@@ -131,8 +122,8 @@ async function hop(ctx: APIRequestContext, url: string): Promise<string> {
 }
 
 /**
- * Walks login → identity authorize → memoir callback one redirect at a time and stops there. Following the callback's own
- * redirect would load memoir-web, whose server render may read the account and provision it before the caller asked.
+ * Walks login -> identity authorize -> memoir callback one redirect at a time and stops: following the callback's redirect would load memoir-web, whose server render may
+ * provision the account before the caller asked.
  */
 async function signInToMemoir(ctx: APIRequestContext, user: IdentityUser): Promise<void> {
   const authorize = await hop(ctx, '/api/auth/login?return_to=/');
@@ -149,8 +140,8 @@ async function signInToMemoir(ctx: APIRequestContext, user: IdentityUser): Promi
 }
 
 /**
- * A fresh identity user with a live memoir session. Memoir provisions the account on the first account-scoped request, so
- * unless `onboard` is set none exists yet when this returns. A failure anywhere after the user exists takes it back down.
+ * A fresh identity user with a live memoir session. Memoir provisions the account on the first account-scoped request, so none exists yet unless `onboard` is set. A failure
+ * after the user exists takes it back down.
  */
 export async function createMemoirPersona(options: MemoirPersonaOptions = {}): Promise<MemoirPersona> {
   const memoirUrl = requireProductUrl('memoir');
@@ -176,7 +167,6 @@ export async function createMemoirPersona(options: MemoirPersonaOptions = {}): P
   }
 }
 
-/** Inserts an `accounts` row with the same placeholders memoir's first-contact provisioning writes. */
 export async function createDisposableAccount(label = 'account'): Promise<DisposableAccount> {
   const identitySub = `e2e-${label}-${Date.now().toString(36)}${randomBytes(4).toString('hex')}`;
   const [row] = await memoirDb()<{ id: string }[]>`

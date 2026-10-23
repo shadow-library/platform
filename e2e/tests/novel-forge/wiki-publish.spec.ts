@@ -28,35 +28,29 @@ interface WikiEntry {
 }
 
 /**
- * Declaring the constants
+ * The forge->reader wiki round-trip, AI-free. The import bundle carries no wiki content, so the wiki is authored through the forge bible API after import: entities (`POST
+ * /projects/:id/entities`) plus canon facts
+ * (`PUT /projects/:id/facts/:key` + `POST .../reveal`). The reader wiki is a pure projection of that bible: `WikiPublishingService.computeProjections` derives one spoiler-gated
+ * payload per visible entity from
+ * entities, revealed facts and the published chapter->ordinal map, and `PublishRunner.converge` pushes it (`PUT /internal/novels/:slug/wiki/:entryKey`) in the same pass as
+ * chapters, on every publish-job converge
+ * and every `POST /publications/reconcile`.
  *
- * The forge→reader wiki round-trip, AI-free. The novel-import bundle format carries NO wiki/entity content
- * (the bundle is metadata + volumes/chapters + a cover asset only), so the wiki is authored
- * through the forge bible API after import: entities (`POST /projects/:id/entities`) plus canon facts
- * (`PUT /projects/:id/facts/:key` + `POST .../reveal`). The reader wiki is a pure PROJECTION of that bible —
- * `WikiPublishingService.computeProjections` derives one spoiler-gated payload per visible entity from
- * entities + revealed canon facts + the PUBLISHED chapter→ordinal map, and `PublishRunner.converge` pushes it
- * (`PUT /internal/novels/:slug/wiki/:entryKey`) in the SAME pass that pushes chapters. So the wiki push is not
- * a separate step: it rides every publish-job converge and every `POST /publications/reconcile`.
+ * Convergence is driven through `reconcile` (synchronous), not the auto-push jobs: publishing a chapter while a converge job is in flight is silently deduped onto it, so those
+ * chapters would only settle on the janitor sweep
+ * (see `reconcileUntilConverged`).
  *
- * Convergence is driven here through `reconcile` (synchronous converge), NOT the auto-push jobs: publishing a
- * chapter while a converge job is already in flight is silently "deduped onto active job", so those chapters
- * would only settle on the janitor sweep — see `reconcileUntilConverged`.
- *
- * Gating design used here (both derived from published ordinals, no `firstSeenChapter` needed — the create DTO
- * does not even expose it):
- *   - `e2e-hero`  — has a `body`, so it projects a `profile` facet at ordinal 0 (its `firstSeenChapter` is
- *                   null → pre-story). Visible to a viewer (gate 0).
- *   - `e2e-order` — has NO body/motivation/aliases, so it projects ONLY a fact facet. Its single canon fact is
- *                   revealed in chapter 2, so the facet — and thus the whole entry — is gated to ordinal 2.
- *                   Hidden from a viewer (gate 0); visible once a reader's furthestOrdinal reaches 2.
+ * Gating, derived from published ordinals:
+ *   - `e2e-hero`  has a `body`, so it projects a `profile` facet at ordinal 0 (pre-story): visible to a viewer (gate 0).
+ *   - `e2e-order` has no body/motivation/aliases, so it projects only a fact facet; its canon fact is revealed in chapter 2, gating the entry to ordinal 2: hidden at gate 0,
+ * visible once furthestOrdinal reaches 2.
  *
  * Serial: every step builds on the previous project's state.
  *
- * The second half reads web-novel's wiki ingest outcomes from its own tables, one project per test. A reader revision newer than the
- * forge's is written straight into the reader; the push that meets it is real. The ingest audit row names no entry key, so each step reads
- * the trail of one entry at a time. Out of reach this way: a wiki push for an unknown novel or under an end-user token, and a repeated
- * delete reaching the reader (the forge deletes only what the reader's wiki manifest still lists).
+ * The second half reads web-novel's wiki ingest outcomes from its tables, one project per test. A reader revision newer than the forge's is written straight into the reader and
+ * the push that meets it is real. The ingest audit
+ * row names no entry key, so each step reads one entry's trail at a time. Out of reach: a wiki push for an unknown novel or under an end-user token, and a repeated delete
+ * reaching the reader.
  */
 
 const RED_PIXEL = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGM4oaEBAALUARkFUI+kAAAAAElFTkSuQmCC';
@@ -73,7 +67,6 @@ async function revealFact(publication: ForgePublication, factKey: string, text: 
   expect(reveal.status(), await reveal.text()).toBe(200);
 }
 
-/** Adds a gallery image of the keeper dated before the story, and answers its id. */
 async function addGalleryImage(publication: ForgePublication, image: string, caption: string): Promise<string> {
   const { ctx, projectId } = publication;
   const added = await mutate(ctx, 'post', `/api/v1/projects/${projectId}/entities/${KEEPER.entityKey}/images`, { data: { mime: 'image/png', image, caption, depictsChapter: 0 } });
@@ -121,7 +114,6 @@ test.describe('novel-forge wiki publish → reader', () => {
   });
 
   test('should author wiki content: a visible entity and a chapter-2-gated entity via a canon fact', async () => {
-    // Visible entity — a `body` gives it a `profile` facet at ordinal 0 (pre-story), so a viewer can read it.
     const hero = await mutate(forgeCtx, 'post', `/api/v1/projects/${projectId}/entities`, {
       data: {
         entityKey: VISIBLE_KEY,
@@ -133,19 +125,16 @@ test.describe('novel-forge wiki publish → reader', () => {
     });
     expect(hero.status(), await hero.text()).toBe(201);
 
-    // Gated entity — deliberately NO body/motivation/aliases, so it projects ONLY the fact facet below.
     const order = await mutate(forgeCtx, 'post', `/api/v1/projects/${projectId}/entities`, {
       data: { entityKey: GATED_KEY, type: 'faction', name: 'The Tidewatch Order' },
     });
     expect(order.status(), await order.text()).toBe(201);
 
-    // A canon fact whose SUBJECT is the gated entity — the projector attaches it as a facet on `e2e-order`.
     const fact = await mutate(forgeCtx, 'put', `/api/v1/projects/${projectId}/facts/${FACT_KEY}`, {
       data: { text: 'The Tidewatch Order has quietly kept the flame lit for three hundred years.', subjects: [GATED_KEY] },
     });
     expect(fact.status(), await fact.text()).toBe(200);
 
-    // Reveal the fact in chapter 2 (learner = the hero) → the facet is stamped at chapter 2's published ordinal.
     const reveal = await mutate(forgeCtx, 'post', `/api/v1/projects/${projectId}/facts/${FACT_KEY}/reveal`, {
       data: { entityKey: VISIBLE_KEY, chapter: 2 },
     });
@@ -208,16 +197,12 @@ test.describe('novel-forge wiki publish → reader', () => {
   });
 
   test('should reveal the gated entry once a reader progresses past its gate (furthestOrdinal >= 2)', async () => {
-    // Before progress: user1 has never opened this novel, so gate = 0 and the gated entry is hidden.
     const before = await webUser1Ctx.get(`/api/novels/${slug}/wiki`);
     expect(before.status()).toBe(200);
     expect(((await before.json()) as WikiIndex).items.map(i => i.entryKey)).not.toContain(GATED_KEY);
 
-    // Advance reading progress to ordinal 2 → gate = 2. Written straight to the reader DB rather than through
-    // `PUT /api/novels/:slug/progress`: the shared `mutate` helper's CSRF read grabs the first `csrf-token`
-    // cookie in a multi-app jar (novel-forge's, here), so the web-novel server rejects the double-submit with
-    // 403 S010 — a known harness quirk the web-novel suite works around with a domain-scoped helper in its own
-    // directory. `furthest_ordinal` is what the wiki gate reads, so seeding it directly exercises the gate itself.
+    // Written straight to the reader DB: the shared `mutate` helper grabs the first `csrf-token` in a multi-app jar (novel-forge's), so web-novel rejects the double-submit with
+    // 403 S010. `furthest_ordinal` is what the wiki gate reads.
     const sql = webNovelDb();
     const sub = subFor('user1');
     await sql`
@@ -239,9 +224,8 @@ test.describe('novel-forge wiki publish → reader', () => {
     expect(del.status()).toBe(204);
     projectId = '';
 
-    // The reader is a downstream projection with its own lifecycle: deleting the forge project does not
-    // retract the published novel (there is no delete-novel push). It remains readable — an orphan the author
-    // would retire explicitly. Observed, not asserted as desired behaviour.
+    // Deleting the forge project does not retract the published novel (there is no delete-novel push): the reader keeps an orphan the author would retire explicitly. Observed,
+    // not asserted as desired behaviour.
     const stillThere = await webViewerCtx.get(`/api/novels/${slug}`);
     test.info().annotations.push({ type: 'reader after forge delete', description: `GET /api/novels/${slug} → ${stillThere.status()} (200 = orphaned, not cascaded)` });
   });

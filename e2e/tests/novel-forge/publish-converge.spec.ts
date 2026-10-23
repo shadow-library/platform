@@ -21,12 +21,9 @@ import { buildBundle, expect, ladderSlugs, type PublishingLane, reassignServedPu
 import { createEntity, type EntitySeed, reconcileUntilConverged, uniqueSuffix } from './forge-helpers';
 
 /**
- * Declaring the constants
- *
- * The converge that carries the forge's ledger to the reader, read from both sides: what the reader stores after a push, and what the forge
- * ledgers about it. Reader states the forge never produces — a novel another publisher serves, a slug whose owner rotated, a wiped reader —
- * are written straight into web-novel's tables, and the push that meets them is real. The janitor sweeps once a minute (publication.janitor.ts:21);
- * a sweep is proven to have run by a chapter it released, never by waiting out the clock.
+ * The converge that carries the forge's ledger to the reader, read from both sides. Reader states the forge never produces (another publisher's novel, a rotated slug owner, a
+ * wiped reader) are written straight into web-novel's tables and the push that meets them is real. The janitor sweeps once a minute (`publication.janitor.ts`), so a sweep is
+ * proven by a chapter it released, never by waiting out the clock.
  */
 
 const KEEPER: EntitySeed = { entityKey: 'e2e-keeper', type: 'character', name: 'Mira the Keeper', body: 'The keeper of the coast light for eleven winters.' };
@@ -44,7 +41,6 @@ async function ledgerRow(projectId: string, chapter: number): Promise<ForgeChapt
   return (await readForgeLedger(projectId)).find(row => row.chapter === chapter);
 }
 
-/** Waits for the janitor to release `chapter`, which only a sweep does for a row scheduled into the future. */
 async function awaitSweptRelease(projectId: string, chapter: number): Promise<ForgeChapterLedgerRow | undefined> {
   return pollUntil(
     () => ledgerRow(projectId, chapter),

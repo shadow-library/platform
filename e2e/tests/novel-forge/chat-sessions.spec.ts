@@ -26,13 +26,8 @@ interface ChatTurnStatus {
 }
 
 /**
- * Declaring the constants
- *
- * Chat sessions without a model: creation/CRUD, model pin validation, archive/unarchive/delete, and the turn
- * status a client polls (`pendingTurn`/`failedTurn`), derived from `workflow_runs` rows seeded directly so the
- * deterministic halves need no live turn. The two genuinely model-capable routes here (`turn/stream`,
- * `premise/enhance`) are exercised only on their pre-dispatch refusals, every project quota-pinned first even
- * though each refusal fires before routing, per the spend rules.
+ * Chat sessions without a model: CRUD, model pin validation, archive/unarchive/delete, and the turn status a client polls (`pendingTurn`/`failedTurn`) derived from seeded
+ * `workflow_runs` rows. The model-capable routes (`turn/stream`, `premise/enhance`) are exercised only on pre-dispatch refusals, with every project quota-pinned first.
  */
 
 async function turnStatus(ctx: APIRequestContext, projectId: string, sessionId: string): Promise<ChatTurnStatus> {
@@ -126,8 +121,7 @@ test.describe('novel-forge chat sessions', () => {
     expect(running.pendingTurn?.runId).toBe(runningId);
     expect(running.failedTurn, 'a run still reads as pending, not failed').toBeNull();
 
-    // Settle the still-`running` row before moving on — `insertWorkflowRun` leaves a `running` run open forever
-    // (no `endedAgoMs`), and `turnStatus`'s pendingTurn query would keep finding it as the newest running run.
+    // Settle the `running` row first: `insertWorkflowRun` leaves a run without `endedAgoMs` open forever and `turnStatus` would keep finding it as the newest.
     await settleWorkflowRun(runningId, 'completed');
     await insertWorkflowRun({ projectId, graph: 'chat-turn', target: `session:${sessionId}`, status: 'completed', startedAgoMs: 2_000, endedAgoMs: 1_000 });
 

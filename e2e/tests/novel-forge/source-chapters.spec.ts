@@ -24,11 +24,8 @@ interface ChapterRow {
 }
 
 /**
- * Declaring the constants
- *
- * Source chapters — the finalized `chapters` table rows an import (or an amend) leaves behind — as the pre-finalize manuscript-editing
- * routes see them: sanitized on write, immutable once locked, and listable by status, volume and point of view. Rows an import produces
- * are seeded straight into the database, since there is no hand-authoring route for them at this stage.
+ * The finalized `chapters` rows an import (or amend) leaves, as the pre-finalize manuscript-editing routes see them: sanitized on write, immutable once locked, listable by
+ * status, volume and point of view. Import rows are seeded straight into the database, as there is no hand-authoring route for them.
  */
 
 function sourcePath(projectId: string, suffix = ''): string {
@@ -57,15 +54,14 @@ test.describe('novel-forge source chapters', () => {
     const projectId = await createGuardedProject(forge, owner, 'source-sanitize');
     await insertSourceChapter(projectId, { number: 1, locked: false });
 
-    // The dangerous markup sits mid-paragraph, not at the start of the line: a line that OPENS with <script> is an HTML
-    // block under GFM (closed by the matching </script> on the same line) and swallows the whole line as one raw token,
-    // which would escape the bold/code markers too instead of leaving them to their own inline tokens.
+    // The dangerous markup sits mid-paragraph: a line that opens with <script> is a GFM HTML block that swallows the whole line as one raw token, escaping the bold/code markers
+    // too instead of leaving them to their own inline tokens.
     const dangerous = 'Before it: <script>alert(1)</script> **bold text** an `<a href="x">` sample, plus <img src=x onerror="alert(2)">.';
     const updated = await mutate(owner.ctx, 'patch', sourcePath(projectId, '/1'), { data: { title: '<script>bad</script>Title', content: dangerous } });
     expect(updated.status(), await updated.text()).toBe(200);
     const body = (await updated.json()) as SourceChapter;
-    // sanitizeMarkdown escapes raw HTML tokens' angle brackets rather than deleting their text — a script or an onerror
-    // attribute can never again parse as a live tag, but the escaped words stay visible as inert text (`&lt;script&gt;`).
+    // sanitizeMarkdown escapes raw HTML tokens' angle brackets rather than deleting their text, so a script or onerror attribute never parses as a live tag but the words stay
+    // visible as inert text (`&lt;script&gt;`).
     expect(body.content).not.toMatch(/<script[^>]*>/);
     expect(body.content).not.toMatch(/<img\b[^>]*onerror/i);
     expect(body.content, 'the stripped tags survive only escaped').toMatch(/&lt;script&gt;/);
@@ -98,8 +94,7 @@ test.describe('novel-forge source chapters', () => {
   test('should filter the chapter list by status, volume and point of view, and jump to a chapter with goto', async ({ forge }) => {
     const owner = await forge.actor({ label: 'source-filters' });
     const projectId = await createGuardedProject(forge, owner, 'source-filters');
-    // Briefs are written first: PUT /briefs/:n refuses a chapter at or behind the plan frontier (PLN_005), and a `done`
-    // chapters row (below) puts its own number at or behind that frontier.
+    // Briefs first: PUT /briefs/:n refuses a chapter at or behind the plan frontier (PLN_005), and a `done` chapters row puts its own number there.
     await writeBrief(owner.ctx, projectId, 1, { body: 'Mira opens the ledger.', pov: 'mira' });
     await writeBrief(owner.ctx, projectId, 3, { body: 'Odo delivers the writ.', pov: 'odo' });
     await insertSourceChapter(projectId, { number: 1, status: 'done', volumeKey: 'v1' });
@@ -135,8 +130,7 @@ test.describe('novel-forge chapter rows overview', () => {
   test('should list written and planned rows together and filter to a point of view', async ({ forge }) => {
     const owner = await forge.actor({ label: 'chapter-rows' });
     const projectId = await createGuardedProject(forge, owner, 'chapter-rows');
-    // "written" rows come from the `drafts` table (chapter-rows.service.ts), not from a finalized `chapters` row —
-    // a hand-written draft is the model-free way to get one.
+    // "written" rows come from the `drafts` table (`chapter-rows.service.ts`), not a finalized `chapters` row; a hand-written draft is the model-free way to get one.
     await writeBrief(owner.ctx, projectId, 1, { body: 'Mira opens the ledger.', pov: 'mira' });
     await writeChapterByHand(owner.ctx, projectId, { title: 'One', body: 'Mira opens the ledger at dawn.' });
     await writeBrief(owner.ctx, projectId, 2, { body: 'A plan with no draft yet.', pov: 'odo' });

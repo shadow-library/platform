@@ -41,16 +41,7 @@ export interface SeedManifest {
   };
 }
 
-/**
- * Declaring the constants
- *
- * The seed and the specs share one source of truth for who the test users are and what they can sign in with.
- * The password satisfies identity's policy (≥12 chars, upper + lower + number) so a seeded hash is accepted by a
- * real login exactly as a registered one would be. `.test`-domain emails keep these accounts unmistakably
- * synthetic and outside any real address space.
- */
-
-/** Shared password for the five seeded `.test` personas — meets identity's ≥12-char upper/lower/number policy. */
+/** Shared password for the five seeded `.test` personas; meets identity's ≥12-char upper/lower/number policy so a seeded hash is accepted like a registered one. */
 const E2E_PERSONA_PASSWORD = 'E2eSeed#Passw0rd!';
 
 /** Password the seed forces onto the bootstrap admin (id 1) so the suite has a working admin despite the unknown boot secret. */

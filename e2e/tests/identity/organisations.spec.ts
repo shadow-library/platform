@@ -81,13 +81,9 @@ interface StatusNotice {
 }
 
 /**
- * Declaring the constants
- *
- * Team organisations as their members drive them: creation, roles and ownership, member holds, invitations, domain ownership
- * challenges and the per-organisation policies that shorten a token's life. Organisations and memberships come from the factory,
- * every role-changing call goes through the API under test, and the states no API reaches — a lapsed suspension, an expired
- * invitation, a VERIFIED domain — are written straight to the database. Each test runs on its own client address and builds
- * its own organisations, so nothing it does is visible to another.
+ * Team organisations as members drive them: creation, roles and ownership, member holds, invitations, domain ownership challenges and the per-organisation policies that shorten
+ * a token's life. Organisations and memberships come from the factory, role-changing calls go through the API, and states no API reaches (a lapsed suspension, an expired
+ * invitation, a VERIFIED domain) are written to the database. Each test uses its own client address and organisations.
  */
 
 const ACCESS_TOKEN_TTL = 'auth.access_token.ttl';
@@ -202,8 +198,7 @@ async function tokenLifetime(ctx: APIRequestContext, tokenCtx: APIRequestContext
 }
 
 /**
- * Waits for `count` membership-status notices to `email` to have gone the whole way: every outbox row identity wrote SENT to pulse
- * (a missing pulse template once failed them as NOT_FOUND), and pulse's DEV provider holding the rendered message of each SENT job.
+ * Waits for `count` membership-status notices to `email` to go the whole way: every outbox row SENT to pulse, and pulse's DEV provider holding each SENT job's rendered message.
  */
 async function deliveredStatusNotices(email: string, count: number): Promise<StatusNotice[]> {
   return waitUntil(

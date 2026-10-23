@@ -7,10 +7,8 @@ import { expect, test } from './fixtures';
 import { countOutboxRows, expectErrorCode, expectNoSessionCookie, expectSessionCookie, flowChallenges, flowStepOf, pollOtp } from './helpers';
 
 /**
- * Declaring the constants
- *
- * Password recovery: an emailed code, the TOTP when the account has one, then a new password that ends every other session.
- * `recover/init` is limited to five per hour per client address, so every test runs on its own address and spends at most two.
+ * Password recovery: an emailed code, the TOTP when the account has one, then a new password that ends every other session. `recover/init` is limited to five per hour per client
+ * address, so every test uses its own address and spends at most two.
  */
 
 const RECOVERY_OTP_TEMPLATE = 'auth.recovery.otp';

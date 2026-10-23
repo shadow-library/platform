@@ -28,12 +28,9 @@ interface Volume {
 }
 
 /**
- * Declaring the constants
- *
- * The story model's authored records and what is derived from them: a milestone's state follows the plans that claim it (and only
- * finalize reaches it — see facts.spec.ts), a promise's standing is computed on read from its payoff and never carries a mystery's truth,
- * and a volume's goal is met only by the author's click on the active volume. Threads, mysteries and volumes have no hand-authoring
- * route, so they are arranged in the database.
+ * The story model's authored records and what derives from them: a milestone's state follows the plans that claim it (only finalize reaches it, see `facts.spec.ts`), a promise's
+ * standing is computed on read from its payoff and never carries a mystery's truth, and a volume's goal is met only by the author's click on the active volume. Threads,
+ * mysteries and volumes have no hand-authoring route, so they are arranged in the database.
  */
 
 function milestonePath(projectId: string, suffix = ''): string {

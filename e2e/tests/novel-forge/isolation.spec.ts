@@ -27,12 +27,9 @@ interface SnapshotView {
 }
 
 /**
- * Declaring the constants
- *
- * An isolated chapter's prose is walled off from every standard reader: the next chapter's writer pack, prose search, and the Writer's view
- * of any attempt on it. Only the author's own routes read it as written. Each chapter carries random markers in its prose and summary, and
- * a twin novel with the same chapter left standard shows each read does carry a neighbouring chapter when no wall stands in the way. An
- * isolated chapter routes unrestricted, and the quota pin every novel carries holds there too; nothing here reaches a model anyway.
+ * An isolated chapter's prose is walled off from every standard reader (the next chapter's writer pack, prose search, the Writer's view of any attempt); only the author's own
+ * routes read it. Each chapter carries random markers, and a twin novel with the chapter left standard shows each read does carry a neighbouring chapter when no wall stands in
+ * the way. Nothing here reaches a model; the quota pin holds on the unrestricted route anyway.
  */
 
 const WALLED_OFF = 'Prose: walled off. This is an unrestricted chapter, so the messages it sent are not available here.';

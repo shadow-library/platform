@@ -39,11 +39,8 @@ interface LauncherEntry {
 }
 
 /**
- * Declaring the constants
- *
- * The consent surface behind identity's authorize endpoint: the prompt a third-party client triggers, the user's decisions, how
- * a recorded consent gates later authorizations, the first-party policy that skips the prompt, and withdrawal. Each test registers
- * its own application and clients and signs its users in through the database.
+ * The consent surface behind authorize: the prompt a third-party client triggers, the user's decisions, how a recorded consent gates later authorizations, the first-party policy
+ * that skips the prompt, and withdrawal. Each test registers its own application and clients and signs users in through the database.
  */
 
 const ISSUER = new URL(requireProductUrl('identity')).origin;

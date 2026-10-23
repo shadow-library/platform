@@ -29,11 +29,8 @@ interface JobEnqueueResponse {
 }
 
 /**
- * Declaring the constants
- *
- * Hand saves, imports and deletes as the draft-save path enforces them (`draft-save.ts`), approval binding to the exact revision the
- * author read, and the generation gates that refuse `/generate`, `/chapters/:n/regenerate` and `/chapters/:n/generate-unrestricted`
- * before any model is reached. Every project is quota-pinned, since approving always stages a model job.
+ * Hand saves, imports and deletes as `draft-save.ts` enforces them, approval binding to the exact revision the author read, and the generation gates that refuse `/generate`,
+ * `/chapters/:n/regenerate` and `/chapters/:n/generate-unrestricted` before any model is reached. Every project is quota-pinned, since approving always stages a model job.
  */
 
 function draftsPath(projectId: string, chapter: number, suffix = ''): string {
@@ -44,7 +41,6 @@ async function setReviewStatus(projectId: string, chapter: number, reviewStatus:
   await novelForgeDb()`UPDATE drafts SET review_status = ${reviewStatus}::draft_review_status WHERE project_id = ${projectId} AND chapter = ${chapter}`;
 }
 
-/** Approving always stages a finalize-review model job, so every call is guarded right before it, like {@link approveAsRead}. */
 async function approveWith(ctx: APIRequestContext, projectId: string, chapter: number, data: Record<string, unknown>): Promise<APIResponse> {
   await assertSpendGuarded(projectId);
   const response = await mutate(ctx, 'post', draftsPath(projectId, chapter, '/approve'), { data });

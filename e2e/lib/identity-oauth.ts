@@ -246,12 +246,9 @@ export interface AppSessionApi {
 }
 
 /**
- * Declaring the constants
- *
- * The OAuth kit: an elevated admin caller minted in the database, throwaway PUBLIC applications with the clients, resources and
- * scope grants a scenario needs, and the authorize, token, introspection and revocation calls a relying party makes. Every client
- * redirects to a URI that is never followed, so authorize is read with `maxRedirects: 0`. Token-endpoint calls are form-encoded
- * and should go out on a cookie-less context, as a client's back end would send them.
+ * The OAuth kit: an elevated admin minted in the database, throwaway PUBLIC applications with their clients, resources and scope grants, and the relying-party calls.
+ * Every client redirects to a URI that is never followed, so authorize is read with `maxRedirects: 0`.
+ * Token-endpoint calls are form-encoded and should go out on a cookie-less context, as a client's back end would send them.
  */
 
 export const OAUTH_REDIRECT_URI = 'https://app.example.test/cb';

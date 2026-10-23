@@ -132,12 +132,9 @@ export interface FinalizeReviewItemSeed {
 }
 
 /**
- * Declaring the constants
- *
- * The story model as the chapter writer, the planner and the chat read it: canon facts, plans, entities, pages and volumes are written
- * through the API wherever a route exists, and only the rows no model-free route writes — a plan's cited refs, volumes, threads and
- * mysteries, finalized chapters, world facts — are arranged in the database. Every project here has its owner quota-pinned,
- * even where the route only assembles context, and each context read asserts the guard right before it goes out.
+ * The story model as the chapter writer, planner and chat read it: written through the API wherever a route exists, with only rows no model-free route writes (a plan's cited
+ * refs, volumes, threads, mysteries, finalized chapters, world facts) arranged in the database. Every project has its owner quota-pinned, and each context read asserts the guard
+ * right before it goes out.
  */
 
 export const WITHHELD = '[withheld]';
@@ -149,7 +146,6 @@ function ago(ms: number | undefined): string {
   return `${Math.max(0, Math.round(ms ?? 0))} milliseconds`;
 }
 
-/** A standard project owned by `owner`, with its owner stood at the AI call ceiling. */
 export async function createGuardedProject(forge: ForgeHarness, owner: ForgeActor, label: string, data: Record<string, unknown> = {}): Promise<string> {
   const created = await mutate(owner.ctx, 'post', '/api/v1/projects', {
     data: { name: `e2e-forge-${label}-${uniqueSuffix()}`, kind: 'new_novel', contentMode: 'standard', ...data },
@@ -183,7 +179,6 @@ export async function writeBibleDoc(ctx: APIRequestContext, projectId: string, s
   expect(response.status(), `writing page ${section}/${slug} — body ${await response.text()}`).toBe(200);
 }
 
-/** The refs a planner would have cited for the chapter; no hand-edit route writes them. */
 export async function setBriefRefs(projectId: string, chapter: number, refs: readonly string[]): Promise<void> {
   const sql = novelForgeDb();
   const updated = await sql`UPDATE briefs SET context_refs = ${sql.json([...refs] as never)} WHERE project_id = ${projectId} AND chapter = ${chapter}`;
@@ -195,7 +190,6 @@ export async function setBriefVolume(projectId: string, chapter: number, volumeK
   expect(updated.count, `a plan for chapter ${chapter} to place in ${volumeKey}`).toBe(1);
 }
 
-/** The plan's contracts as stored, which `GET /briefs/:n` does not return the knowledge contract of. */
 export async function readBriefContracts(projectId: string, chapter: number): Promise<{ knowledgeContract: unknown; endingContract: unknown } | undefined> {
   const [row] = await novelForgeDb()<{ knowledgeContract: unknown; endingContract: unknown }[]>`
     SELECT knowledge_contract AS "knowledgeContract", ending_contract AS "endingContract" FROM briefs WHERE project_id = ${projectId} AND chapter = ${chapter}
@@ -208,7 +202,6 @@ export async function readBriefStale(projectId: string, chapter: number): Promis
   return row?.staleReason;
 }
 
-/** The context pack a model call would read. Only `generation` is a dry run; the other purposes persist a `context_packs` row, keyed by content. */
 export async function previewContext(ctx: APIRequestContext, projectId: string, purpose: PreviewPurpose, query: Record<string, string | number> = {}): Promise<ContextPreview> {
   const response = await readPreview(ctx, projectId, purpose, query);
   expect(response.status(), `previewing the ${purpose} pack — body ${await response.text()}`).toBe(200);
@@ -232,7 +225,6 @@ export async function writerPrompt(ctx: APIRequestContext, projectId: string, ch
   return ((await response.json()) as { markdown: string }).markdown;
 }
 
-/** Approves the revision read and confirms it from the draft. */
 export async function approveAsRead(ctx: APIRequestContext, projectId: string, draft: Draft): Promise<Draft> {
   await assertSpendGuarded(projectId);
   await expectStatus(await approveChapter(ctx, projectId, draft), 200, `approving chapter ${draft.chapter}`);
@@ -242,9 +234,8 @@ export async function approveAsRead(ctx: APIRequestContext, projectId: string, d
 }
 
 /**
- * Finalizes a chapter with no model call: approves the read revision, waits for its finalize-review job to fail under the quota pin, marks the
- * review ready with no items, and finalizes through it. Real application logic throughout — only the model's finalize-review read is stood in
- * for by {@link readyFinalizeReview}. Callers only need "this chapter is final"; the finalize-review mechanics belong to batch 5.
+ * Finalizes a chapter with no model call: approves the read revision, waits for its finalize-review job to fail under the quota pin, marks the review ready with no items, and
+ * finalizes through it. Only the model's finalize-review read is stood in for by {@link readyFinalizeReview}.
  */
 export async function finalizeChapterNoReview(ctx: APIRequestContext, projectId: string, draft: Draft): Promise<Draft> {
   const approved = await approveAsRead(ctx, projectId, draft);
@@ -256,9 +247,8 @@ export async function finalizeChapterNoReview(ctx: APIRequestContext, projectId:
 }
 
 /**
- * A `drafts` row at `status: 'final'` alongside its matching finalized `chapters` row, for tests that need "this chapter is already final" as a
- * precondition without paying for a real finalize (used repeatedly across the chapter-lifecycle specs). Bypasses the app entirely — it arranges
- * a state the finalize pipeline would leave, it does not assert that the pipeline produces it.
+ * A `drafts` row at `status: 'final'` with its matching finalized `chapters` row, for tests needing "already final" as a precondition. Bypasses the app: it arranges a state the
+ * finalize pipeline would leave, without asserting the pipeline produces it.
  */
 export async function insertFinalDraft(projectId: string, chapter: number, body = `Chapter ${chapter}, finalized by arrangement.`): Promise<void> {
   await insertFinalChapters(projectId, [{ number: chapter, content: body, summary: 'Finalized by arrangement.' }]);
@@ -268,7 +258,6 @@ export async function insertFinalDraft(projectId: string, chapter: number, body 
   `;
 }
 
-/** A pending `continuity_proposals` row for a chapter, for tests that only need one to exist (no route creates one directly). */
 export async function insertContinuityProposal(projectId: string, chapter: number): Promise<void> {
   const sql = novelForgeDb();
   await sql`
@@ -295,7 +284,6 @@ export async function insertEntities(projectId: string, seeds: readonly EntitySe
   await sql`INSERT INTO entities ${sql(rows)}`;
 }
 
-/** Chapters as a finished import leaves them: done and locked, which also moves the plan frontier past them. */
 export async function insertFinalChapters(projectId: string, seeds: readonly ChapterSeed[]): Promise<void> {
   if (seeds.length === 0) return;
   const sql = novelForgeDb();
@@ -394,8 +382,8 @@ export async function readFinalizeReviewStatus(projectId: string, chapter: numbe
 }
 
 /**
- * Stands in for the model's finalize-review read: waits for the approval's review job to fail under the spend guard (a review still
- * preparing would overwrite a ready one), then marks the review ready for exactly the approved prose, carrying `items` already decided.
+ * Stands in for the model's finalize-review read: waits for the approval's review job to fail under the spend guard (a review still preparing would overwrite a ready one), then
+ * marks the review ready for exactly the approved prose with `items` already decided.
  */
 export async function readyFinalizeReview(projectId: string, draft: Pick<Draft, 'chapter' | 'revision' | 'body'>, items: readonly FinalizeReviewItemSeed[] = []): Promise<void> {
   const settled = await pollUntil(
@@ -435,7 +423,6 @@ export async function readyFinalizeReview(projectId: string, draft: Pick<Draft, 
   `;
 }
 
-/** How many `approved` `user_feedback` rows a chapter's draft has recorded — the row an approval writes exactly one of per call. */
 export async function countApprovals(projectId: string, chapter: number): Promise<number> {
   const [row] = await novelForgeDb()<{ count: number }[]>`
     SELECT count(*)::int AS count FROM user_feedback WHERE project_id = ${projectId} AND artifact_type = 'draft' AND artifact_ref = ${String(chapter)} AND disposition = 'approved'
@@ -450,7 +437,6 @@ export async function restoreVersionAsRead(ctx: APIRequestContext, projectId: st
   return readDraft(ctx, projectId, chapter);
 }
 
-/** `Draft` (`forge-helpers.ts`) omits `staleReason`, which the API does return — read through this instead of an ad hoc cast. */
 export interface StaleDraft extends Draft {
   readonly staleReason: string | null;
 }

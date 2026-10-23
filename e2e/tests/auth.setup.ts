@@ -16,24 +16,15 @@ import {
 } from '../lib';
 
 /**
- * Declaring the constants
+ * Produces one `storageState` file per login persona so real specs never drive the login UI. The identity session is minted in the database
+ * (`createIdentitySession`) rather than through `login/init` -> `challenge/verify`, which spends the 20/hour per-IP `login/init` budget and cannot finish for an
+ * account with a passkey enrolled (the dev bootstrap admin has one). A headless `GET <app>/api/auth/login` per app then rides that session through the OIDC hop.
+ * Interactive login is covered by `identity/login.spec.ts`.
  *
- * A Playwright `setup` project (the `chromium` project depends on it) that produces one `storageState` file per
- * login persona, so the real specs never drive the login UI. The identity session is minted in the database
- * (`createIdentitySession`) rather than through `login/init` → `challenge/verify`: that flow spends the 20/hour
- * per-IP `login/init` budget and cannot finish for an account with a passkey enrolled (the dev bootstrap admin has
- * one). A headless `GET <app>/api/auth/login` per app then rides that central session through the OIDC hop and
- * mints each app's `__Host-shadow-session` cookie. Interactive login itself is covered by `identity/login.spec.ts`.
+ * Resumable: a saved state that still answers `GET /api/auth/session` with 200 for every app the persona needs is kept, so re-runs do not pile up sessions.
  *
- * It is resumable: a saved storage state that still answers `GET /api/auth/session` with 200 for every app the
- * persona needs is kept untouched, so a re-run does not pile up sessions.
- *
- * Which apps each persona needs a session on: the two ordinary users get the consumer apps (Novel Forge, Web
- * Novel, and Memoir); the viewer is a Web Novel reader with no data of its own, standing in for "a signed-in reader
- * with no grant" now that no Web Novel request is anonymous. Web Novel is INTERNAL, so every persona that gets a
- * session there is seeded into the platform organisation. Only the admin drives Pulse, so only the admin is minted
- * a Pulse session; no other persona is. The admin's identity session is the `__Host-sid` the login flow already
- * established, so Pulse is the only app session it needs minted.
+ * Per persona: the two ordinary users get Novel Forge, Web Novel and Memoir; the viewer is a Web Novel reader with no data and no grant. Web Novel is INTERNAL,
+ * so every persona with a session there is seeded into the platform organisation. Only the admin drives Pulse, so only it is minted a Pulse session.
  */
 const PERSONA_APPS: Record<LoginPersona, ProductKey[]> = {
   user1: ['novelForge', 'webNovel', 'memoir'],
@@ -42,7 +33,6 @@ const PERSONA_APPS: Record<LoginPersona, ProductKey[]> = {
   admin: ['pulse'],
 };
 
-/** The apps a persona needs that are actually configured this run (an opted-out product is dropped, not failed). */
 function configuredApps(persona: LoginPersona): { product: ProductKey; url: string }[] {
   return PERSONA_APPS[persona].flatMap(product => {
     const url = getProductUrl(product);
@@ -50,7 +40,6 @@ function configuredApps(persona: LoginPersona): { product: ProductKey; url: stri
   });
 }
 
-/** True when the saved storage state still authenticates every required app — lets a re-run skip a fresh login. */
 async function existingStateIsValid(persona: LoginPersona, apps: { url: string }[]): Promise<boolean> {
   const statePath = storageStateFor(persona);
   if (!existsSync(statePath)) return false;
@@ -68,17 +57,12 @@ async function existingStateIsValid(persona: LoginPersona, apps: { url: string }
 }
 
 /**
- * The assurance level a real sign-in would leave: the admin completes a passkey factor (AAL2), the users sign in with a password
- * alone (AAL1). No elevation window — a reused storage state is long past the ten minutes a fresh MFA login grants.
+ * The assurance level a real sign-in leaves: the admin completes a passkey (AAL2), users sign in with a password alone (AAL1). No elevation window, as a reused state is long
+ * past ten minutes.
  */
 const PERSONA_AAL: Record<LoginPersona, SessionAal> = { user1: 'AAL1', user2: 'AAL1', viewer: 'AAL1', admin: 'AAL2' };
 
-/**
- * Establishes every app session `persona` needs and saves the storage state, unless a valid one already exists.
- * The identity central session is minted over `page.request` (which shares the browser context's cookies), then
- * each app's session is minted by navigating its login route — identity's `__Host-sid` short-circuits the prompt,
- * so the browser lands back on the app carrying `__Host-shadow-session`.
- */
+/** Mints every app session `persona` needs and saves the storage state unless a valid one exists; identity's `__Host-sid` short-circuits each app's login prompt. */
 async function authenticate(page: Page, persona: LoginPersona): Promise<void> {
   const account = PERSONAS[persona];
   const apps = configuredApps(persona);

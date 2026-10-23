@@ -3,15 +3,9 @@ import { expect, test } from '@playwright/test';
 import { readSeedManifest, requireProductUrl, storageStateFor } from '../../lib';
 
 /**
- * Declaring the constants
- *
- * The reading path end to end for a signed-in reader with no grants: home → detail → reader, plus the catalog/search surface and
- * the two 404 boundaries (unknown slug, and a real-but-unreadable slug — which must present identically, per
- * `NovelAccessService`'s no-existence-oracle contract exercised at the API level in `visibility.spec.ts`). Every test here runs as the
- * `viewer` persona, because Web Novel is private and an anonymous visitor never gets past the login redirect
- * (`private-access.spec.ts`). Opening a chapter records reading progress for the viewer, so no spec may assume the viewer has
- * none; the seed clears its progress on every run. Selectors favor structural facts (an `<a href="/novels/$slug">` card link,
- * landmark roles) over display copy, matching the rest of this suite (`reader-home.spec.ts`, `ssr-hydration.spec.ts`).
+ * The reading path for a signed-in reader with no grants (as `viewer`; anonymous never gets past the login redirect): home -> detail -> reader, catalog/search, and the two 404
+ * boundaries (unknown slug, real-but-unreadable slug), which must present identically (`NovelAccessService`'s no-existence-oracle contract, see `visibility.spec.ts`).
+ * Opening a chapter records progress for the viewer, so no spec may assume it has none; the seed clears it every run. Selectors favor structural facts over display copy.
  */
 test.describe('viewer reading', () => {
   test.use({ storageState: storageStateFor('viewer') });
@@ -30,17 +24,12 @@ test.describe('viewer reading', () => {
 
     await expect(page.getByRole('heading', { name: 'The E2E Public Chronicle' })).toBeVisible();
 
-    // The tab trigger is real (SSR-rendered) markup before React hydrates, so a click that lands before
-    // hydration finishes is observed to focus the "Chapters" tab without ever firing its `onValueChange` —
-    // the tabpanel stays on "Overview" even though the tab itself shows focused/active. Waiting for
-    // `networkidle` (the point the client has fetched its hydration bundle and settled) before interacting
-    // avoids that race; `ssr-hydration.spec.ts` in this suite uses the same signal for the same reason.
+    // The tab trigger is SSR markup before hydration: a click before it finishes focuses "Chapters" without firing `onValueChange`, leaving the tabpanel on "Overview".
+    // `networkidle` avoids the race.
     await page.waitForLoadState('networkidle');
 
-    // The chapter list lives in the "Chapters" panel of the `Tabs.List aria-label="Novel sections"` widget
-    // (`novel-screen.tsx:246-249`) — it isn't in the DOM until that tab is selected, unlike Overview which is
-    // the default panel. (There's also an always-present "Start reading" CTA whose href happens to match
-    // chapter 1's, so this checks each exact ordinal href rather than counting prefix matches.)
+    // The chapter list is not in the DOM until the "Chapters" tab is selected. An always-present "Start reading" CTA matches chapter 1's href, so each exact ordinal href is
+    // checked, not prefix matches.
     await page.getByRole('tab', { name: 'Chapters' }).click();
     for (const ordinal of [1, 2, 3]) await expect(page.locator(`a[href="/read/${webNovel.publicSlug}/${ordinal}"]`).first()).toBeVisible();
   });
@@ -49,14 +38,11 @@ test.describe('viewer reading', () => {
     const url = requireProductUrl('webNovel');
     await page.goto(`${url}/read/${webNovel.publicSlug}/1`, { waitUntil: 'domcontentloaded' });
 
-    // Chapter content is seeded distinctly per ordinal (`seed.ts`'s `upsertChapter`) — the numeral is enough to
-    // prove chapter 1's own body rendered, without depending on its full sentence. Waiting on it first also
-    // ensures the reader's bottom chrome (which only renders once `chapter.data` resolves — `reader-screen.tsx:359`)
-    // has mounted before the next click.
+    // Chapter content is seeded distinctly per ordinal, so the numeral proves the body rendered; waiting on it also ensures the bottom chrome (rendered once `chapter.data`
+    // resolves) has mounted.
     await expect(page.getByText('Chapter 1 of the seeded novel', { exact: false })).toBeVisible();
 
-    // "Next chapter" is a `<button>` (`reader-screen.tsx:373-381`), not a link — it drives client-side
-    // navigation via `goTo`, not an anchor `href`.
+    // "Next chapter" is a `<button>` driving client-side navigation via `goTo`, not an anchor.
     await page.getByRole('button', { name: 'Next chapter' }).click();
     await expect(page).toHaveURL(new RegExp(`/read/${webNovel.publicSlug}/2$`));
     await expect(page.getByText('Chapter 2 of the seeded novel', { exact: false })).toBeVisible();
@@ -68,9 +54,7 @@ test.describe('viewer reading', () => {
     await page.goto(`${url}/browse`, { waitUntil: 'domcontentloaded' });
     await expect(page.locator(`a[href="/novels/${webNovel.publicSlug}"]`).first()).toBeVisible();
 
-    // Driving search through the URL (the same `search` query param `GET /api/novels` accepts) is a structural
-    // assertion — it proves the catalog's search filter actually narrows results, without coupling to whichever
-    // element the search box happens to be this release.
+    // Driving search through the `search` query param is structural: it proves the filter narrows results without coupling to the search box element.
     await page.goto(`${url}/browse?search=${encodeURIComponent('E2E Public Chronicle')}`, { waitUntil: 'domcontentloaded' });
     await expect(page.locator(`a[href="/novels/${webNovel.publicSlug}"]`).first()).toBeVisible();
   });
@@ -85,10 +69,7 @@ test.describe('viewer reading', () => {
     await expect(page.locator(`a[href="/novels/${webNovel.restrictedSlug}"]`)).toHaveCount(0);
   });
 
-  /**
-   * A novel the reader may not see is answered exactly like one that does not exist: the route's own 404 boundary with a
-   * 404 status, never an error page that would tell the two apart.
-   */
+  /** A novel the reader may not see is answered exactly like a missing one: the route's own 404 boundary, never an error page that tells them apart. */
   for (const [label, slug] of [
     ['the restricted novel', webNovel.restrictedSlug],
     ['an unknown slug', 'e2e-does-not-exist'],

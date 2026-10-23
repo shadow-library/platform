@@ -6,7 +6,6 @@ import { redisDel } from './redis';
 
 export type BuiltInAuthMode = 'PASSWORD' | 'WEBAUTHN' | 'EMAIL_OTP' | 'SMS_OTP';
 
-/** Every method `GET /api/v1/admin/auth-modes` lists, in the order it lists them. */
 export const AUTH_MODES = ['PASSWORD', 'WEBAUTHN', 'EMAIL_OTP', 'SMS_OTP', 'GOOGLE', 'MICROSOFT', 'APPLE'] as const;
 
 export type AuthModeName = (typeof AUTH_MODES)[number];
@@ -17,13 +16,7 @@ export interface AuthModeSnapshot {
   readonly row?: { isEnabled: boolean; updatedBy: string | null; updatedAt: Date };
 }
 
-/**
- * Declaring the constants
- *
- * Auth modes are global: one `auth_mode_settings` row per overridden method, cached by identity in Redis under `auth_modes` for
- * five minutes. A spec that flips one snapshots the row first and puts it back exactly, dropping the cache so the restored state is
- * what identity reads next.
- */
+/** Auth modes are global (one `auth_mode_settings` row per override, cached in Redis for five minutes): a spec that flips one restores the row exactly and drops the cache. */
 
 const AUTH_MODES_CACHE_KEY = 'auth_modes';
 
@@ -52,12 +45,10 @@ export async function restoreAuthMode(snapshot: AuthModeSnapshot): Promise<void>
   await redisDel(AUTH_MODES_CACHE_KEY);
 }
 
-/** `PUT /api/v1/admin/auth-modes/:method` on an elevated admin context. */
 export function putAuthMode(admin: APIRequestContext, method: string, enabled: boolean): Promise<APIResponse> {
   return identityMutate(admin, 'put', `/api/v1/admin/auth-modes/${method}`, { enabled });
 }
 
-/** `putAuthMode`, throwing unless identity answers 200. */
 export async function setAuthMode(admin: APIRequestContext, method: AuthModeName, enabled: boolean): Promise<void> {
   const response = await putAuthMode(admin, method, enabled);
   if (response.status() !== 200) throw new AuthModeError(`set ${method}=${enabled} answered ${response.status()}: ${await response.text()}`);

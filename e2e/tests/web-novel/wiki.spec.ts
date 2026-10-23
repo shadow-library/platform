@@ -3,15 +3,11 @@ import { expect, test } from './fixtures';
 import { arrangeNovel, arrangeWikiEntry, deleteNovels, fakeImageRef, grantNovel, readAccessMode, setFurthestOrdinal, uniqueNovelSlug, UNKNOWN_SLUG } from './helpers';
 
 /**
- * Declaring the constants
- *
- * The wiki spoiler gate on `e2e-public-novel`: `the-protagonist` is visible from ordinal 0 (pre-reading), and
- * `the-ancient-order` unlocks at ordinal 2 with a facet (`secret-origin`) that stays hidden until ordinal 3 even
- * once the entry itself is visible (`hiddenFacetCount`). A fresh reader has no reading progress, so its gate is 0 and only the pre-reading entry is
- * ever visible to it (the shared `viewer` persona is not used: opening a chapter records progress);
- * `user1`'s seeded `furthestOrdinal` is 2 (read, never mutated, by this spec — see
- * `reader.spec.ts`'s note on why progress mutations run against `user2` instead), which is exactly the unlock
- * ordinal for the locked entry, so this doubles as a boundary check (`>=`, not `>`).
+ * The wiki spoiler gate on `e2e-public-novel`: `the-protagonist` is visible from ordinal 0, `the-ancient-order` unlocks at ordinal 2 with a facet (`secret-origin`) hidden until
+ * ordinal 3
+ * even once the entry is visible (`hiddenFacetCount`). A fresh reader (gate 0) sees only the pre-reading entry; the shared `viewer` is not used since opening a chapter records
+ * progress.
+ * `user1`'s seeded `furthestOrdinal` is 2 (read, never mutated; see `reader.spec.ts`), exactly the unlock ordinal, so this doubles as a `>=` not `>` boundary check.
  */
 test.describe('wiki gating', () => {
   const { webNovel } = readSeedManifest();
@@ -47,8 +43,7 @@ test.describe('wiki gating', () => {
     const entry = await ctx.get(`/api/novels/${webNovel.publicSlug}/wiki/${lockedKey}`);
     expect(entry.status()).toBe(200);
     const entryBody = (await entry.json()) as { hiddenFacetCount: number };
-    // The `secret-origin` facet unlocks at ordinal 3, one past user1's furthest of 2 — the entry itself is
-    // visible, but that facet must stay counted as hidden rather than leak through.
+    // `secret-origin` unlocks at ordinal 3, one past user1's furthest of 2: the entry is visible but the facet stays counted as hidden.
     expect(entryBody.hiddenFacetCount).toBeGreaterThanOrEqual(1);
   });
 
@@ -68,9 +63,8 @@ test.describe('wiki gating', () => {
 });
 
 /**
- * Progressive reveal beyond the single before/after gate above: the visible-entry set widening and `lockedCount`
- * shrinking across three ordinals, on a throwaway reader and a novel this spec owns outright, so nothing here
- * touches `user1`'s seeded gate that the block above depends on.
+ * Progressive reveal beyond the single gate above: visible entries widen and `lockedCount` shrinks across three ordinals, on a throwaway reader and a novel this spec owns, so
+ * `user1`'s seeded gate is untouched.
  */
 test.describe('wiki progressive reveal', () => {
   const slugs: string[] = [];
@@ -117,13 +111,10 @@ test.describe('wiki progressive reveal', () => {
   });
 
   /**
-   * Facet- and image-level gating *within* one already-visible entry, tracked independently of the entry's own
-   * `firstVisibleOrdinal` and of each other — plus 2469d4ea's headline-portrait gate (`gatedImageRef` /
-   * `imageVisibleFromOrdinal`), which the wiki-read plan predates: the entry's headline can itself be gated to a
-   * later chapter than the entry, the list falls back to the latest reached gallery image while it's locked, and
-   * the entry page never does (`WikiService.getEntry` calls `visibleHeadlineRef`, never `listThumbnailRef`).
-   * Each gated element is asserted locked, then unlocked once the reader's own gate reaches it — the positive
-   * control the brief requires for every spoiler gate here.
+   * Facet- and image-level gating within one visible entry, tracked independently of the entry's `firstVisibleOrdinal` and of each other, plus the headline-portrait gate
+   * (`gatedImageRef` / `imageVisibleFromOrdinal`): the headline can be gated to a later chapter than the entry, the list falls back to the latest reached gallery image while it is
+   * locked, and the entry page never does (`WikiService.getEntry` calls `visibleHeadlineRef`, never `listThumbnailRef`). Each gated element is asserted locked, then unlocked
+   * once the gate reaches it.
    */
   test('should gate a facet and a chapter-depicting headline portrait independently within one visible entry, revealing both once the gate reaches them', async ({ webNovel }) => {
     const slug = uniqueNovelSlug('wiki-gate');
@@ -187,11 +178,10 @@ test.describe('wiki progressive reveal', () => {
 });
 
 /**
- * The wiki's own caching contract, independent of the novel/chapter routes': CDN-cacheable with a revalidating
- * ETag for an anonymous read of a public novel — which only exists while the app is in public mode, since private mode refuses an
- * anonymous read outright — and `private, no-store` + `Vary` the moment the read becomes reader-specific:
- * `WikiController.applyCachePolicy`'s `personalized` branch fires even for a PUBLIC novel, since a signed-in reader's gate makes the
- * response a function of who's asking.
+ * The wiki's caching contract: CDN-cacheable with a revalidating ETag for an anonymous read of a public novel (only possible in public mode), and `private, no-store` + `Vary`
+ * once the
+ * read is reader-specific: `WikiController.applyCachePolicy`'s `personalized` branch fires even for a PUBLIC novel because a signed-in reader's gate makes the response a
+ * function of the caller.
  */
 test.describe('wiki caching contract', () => {
   const slugs: string[] = [];
@@ -237,10 +227,8 @@ test.describe('wiki caching contract', () => {
 });
 
 /**
- * The wiki route runs its own access check rather than trusting an upstream one: a RESTRICTED novel's wiki (list
- * and per-entry) must 404 with the same `WBN_001` the novel/chapter routes give, for both a seeded ungranted viewer and a
- * fresh ungranted reader, and a grant must unlock it — proving `WikiService.listEntries`/`getEntry` call
- * `catalogService.getReadableNovel` themselves.
+ * The wiki route runs its own access check: a RESTRICTED novel's wiki (list and per-entry) must 404 with the same `WBN_001` as the novel routes for ungranted readers, and a
+ * grant unlocks it, proving `WikiService` calls `catalogService.getReadableNovel` itself.
  */
 test.describe('wiki restricted-novel gate', () => {
   const slugs: string[] = [];
@@ -263,7 +251,7 @@ test.describe('wiki restricted-novel gate', () => {
     expect(viewerEntry.status()).toBe(404);
     expect(((await viewerEntry.json()) as { code?: string }).code).toBe('WBN_001');
 
-    // Enumeration safety: a real novel the viewer can't read must be byte-identical to one that doesn't exist at all, on both wiki routes — not just same-code.
+    // Enumeration safety: on both wiki routes a real unreadable novel must be byte-identical to a missing one, not just same-code.
     const [restrictedList, unknownList] = await Promise.all([viewer.get(`/api/novels/${slug}/wiki`), viewer.get(`/api/novels/${UNKNOWN_SLUG}/wiki`)]);
     expect(restrictedList.status()).toBe(404);
     expect(unknownList.status()).toBe(404);
@@ -284,7 +272,6 @@ test.describe('wiki restricted-novel gate', () => {
     expect(probeEntry.status()).toBe(404);
     expect(((await probeEntry.json()) as { code?: string }).code).toBe('WBN_001');
 
-    // Positive control: granting access unlocks both the wiki list and the entry.
     const granted = await webNovel.reader('wiki-restricted-granted');
     await grantNovel(novel, granted.user.userId);
     const { ctx: grantedCtx } = await webNovel.signIn(granted);

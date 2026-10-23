@@ -17,9 +17,8 @@ test.describe('memoir settings', () => {
     await page.goto(`${url}/settings/notifications`);
     const toggle = page.getByLabel('Billing reminders by email');
     await expect(toggle).toBeVisible();
-    // The switch is controlled from the account query, not toggled optimistically — it only flips once the
-    // `notification.set` command's PATCH round-trip refetches. `setChecked` only clicks once and checks
-    // immediately after, which races that round-trip, so click and then wait for the attribute directly.
+    // The switch is controlled from the account query and flips only after the `notification.set` PATCH round-trip refetches; `setChecked` checks immediately and races it, so
+    // click then wait for the attribute.
     await toggle.click();
     await expect(toggle).toHaveAttribute('aria-checked', String(nextBillingReminders));
 
@@ -27,7 +26,7 @@ test.describe('memoir settings', () => {
       .poll(async () => (await getAccount(ctx)).notificationPrefs?.billingReminders, { message: 'expected the toggle to persist to the account' })
       .toBe(nextBillingReminders);
 
-    // Revert so this spec is idempotent across reruns against the same persistent user1 account.
+    // Revert so the spec is idempotent against the persistent user1 account.
     await memoirMutate(ctx, 'patch', '/api/v1/account', { data: { notificationPrefs: { billingReminders: before.notificationPrefs?.billingReminders ?? false } } });
   });
 
@@ -40,8 +39,7 @@ test.describe('memoir settings', () => {
     await expect(page.getByRole('button', { name: 'Prepare the export' })).toBeVisible();
 
     const response = await memoirMutate(ctx, 'post', '/api/v1/account/export');
-    // 201 = accepted this run; 409 (EXP_002) = the once-a-day limit already spent by an earlier run today —
-    // both are proof the request was understood and accounted for, which is what this spec is checking.
+    // 201 = accepted this run; 409 (EXP_002) = the once-a-day limit already spent by an earlier run today: either proves the request was understood and accounted for.
     expect([201, 409]).toContain(response.status());
 
     if (response.status() === 201) {

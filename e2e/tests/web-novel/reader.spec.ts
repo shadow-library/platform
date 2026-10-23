@@ -3,15 +3,10 @@ import { expect, test } from './fixtures';
 import { listShelf, webNovelMutate } from './helpers';
 
 /**
- * Declaring the constants
- *
- * Reader-state coverage: progress (per-novel `ordinal`/`position`/monotonic `furthestOrdinal`) and library
- * (add/remove). Progress mutations deliberately run against `user2`, never `user1` — `user1`'s seeded progress on
- * `e2e-public-novel` (`ordinal=2, furthest=2`) is the fixture `wiki.spec.ts` reads to prove the spoiler gate opens
- * at the reader's furthest chapter, and these specs run in parallel workers, so mutating it here would race that
- * assertion. Library mutations use `user2` for the same reason — `user1`'s seeded library row is read (not
- * written) elsewhere. Nothing here needs restoring: `user2` carries no seeded progress/library state to begin
- * with, and the suite reseeds `user1`'s fixtures on every run regardless.
+ * Reader state: progress (`ordinal`/`position`/monotonic `furthestOrdinal`) and library. Mutations run against `user2`, never `user1`: `user1`'s seeded progress on
+ * `e2e-public-novel`
+ * (`ordinal=2, furthest=2`) is what `wiki.spec.ts` reads to prove the spoiler gate, and parallel workers would race it; `user1`'s library row is likewise read elsewhere.
+ * `user2` carries no seeded state, so nothing needs restoring.
  */
 test.describe('reader features', () => {
   const { webNovel } = readSeedManifest();
@@ -31,7 +26,7 @@ test.describe('reader features', () => {
     expect(advance.status()).toBe(200);
     expect(((await advance.json()) as { furthestOrdinal: number }).furthestOrdinal).toBe(3);
 
-    // Reading back to an earlier chapter must not roll furthestOrdinal backwards — it's a high-water mark.
+    // furthestOrdinal is a high-water mark: reading an earlier chapter must not roll it back.
     const regress = await webNovelMutate(ctx, 'put', `/api/novels/${webNovel.publicSlug}/progress`, { data: { ordinal: 1, position: 0.5 } });
     expect(regress.status()).toBe(200);
     const regressBody = (await regress.json()) as { ordinal: number; furthestOrdinal: number };
@@ -39,11 +34,7 @@ test.describe('reader features', () => {
     expect(regressBody.furthestOrdinal, 'furthestOrdinal must not regress below its high-water mark').toBe(3);
   });
 
-  /**
-   * `user1` has a grant on the restricted novel (so the read is authorized) but no seeded `reading_progress` row
-   * for it specifically — the seed only writes progress for the public novel — so this is a genuine "never opened"
-   * case rather than an access-denied one, isolating WBN_006 from WBN_001.
-   */
+  /** `user1` has a grant on the restricted novel but no seeded `reading_progress` row for it, so this is a genuine "never opened" case, isolating WBN_006 from WBN_001. */
   test('should 404 WBN_006 for progress on a novel the reader has never opened', async () => {
     const ctx = await apiContext('webNovel', 'user1');
     const response = await ctx.get(`/api/novels/${webNovel.restrictedSlug}/progress`);
@@ -52,14 +43,7 @@ test.describe('reader features', () => {
     expect(body.code).toBe('WBN_006');
   });
 
-  /**
-   * The web-novel report anticipated `WBN_004` for an unauthenticated call, but `WBN_004` is dead code: it's
-   * declared (`apps/web-novel-server/src/classes/app-error-code.ts:44`) but never thrown anywhere in
-   * `web-novel-server`'s source. The class-level `@Authenticated()` guard on the reader controller throws the
-   * shared platform code instead — confirmed live via `curl`: `401 {"code":"IAM_001","message":"Authentication
-   * required"}`. The status (401, unauthenticated) is correct; only the code differs from the report, so this
-   * asserts the real code rather than `test.fixme()`-ing a working auth gate.
-   */
+  /** `WBN_004` is declared but never thrown; the class-level `@Authenticated()` guard on the reader controller throws the shared `IAM_001` (401), so the real code is asserted. */
   test('should 401 IAM_001 for an unauthenticated progress PUT', async () => {
     const ctx = await apiContext('webNovel');
     const response = await webNovelMutate(ctx, 'put', `/api/novels/${webNovel.publicSlug}/progress`, { data: { ordinal: 1, position: 0 } });
@@ -91,8 +75,7 @@ test.describe('reader features', () => {
     const removed = await webNovelMutate(ctx, 'delete', `/api/library/${webNovel.publicSlug}`);
     expect(removed.status()).toBe(204);
 
-    // DELETE has no existence check server-side (per the report) — a second call against an already-absent row
-    // must still succeed rather than 404, which is what "idempotent" means for this endpoint.
+    // No server-side existence check on DELETE: a second call on an already-absent row must succeed rather than 404, which is what idempotent means here.
     const removedAgain = await webNovelMutate(ctx, 'delete', `/api/library/${webNovel.publicSlug}`);
     expect(removedAgain.status()).toBe(204);
   });
@@ -107,8 +90,8 @@ test.describe('reader features', () => {
 });
 
 /**
- * Per-reader scoping on fresh factory readers, so neither persona's shelf is touched: the seeded public novel is the one shared row both
- * readers point at, which is exactly the case where a query missing its user filter would leak or delete across readers.
+ * Per-reader scoping on fresh factory readers: the seeded public novel is the one row both point at, the case where a query missing its user filter would leak or delete across
+ * readers.
  */
 test.describe('reader data scoping', () => {
   const { webNovel: seeded } = readSeedManifest();

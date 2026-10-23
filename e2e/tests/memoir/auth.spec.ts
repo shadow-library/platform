@@ -3,13 +3,7 @@ import { expect, test } from '@playwright/test';
 import { apiContext, requireProductUrl, storageStateFor } from '../../lib';
 import { ensureOnboarded } from './helpers';
 
-/**
- * Declaring the constants
- *
- * `user1` is left onboarded by `ensureOnboarded` regardless of whether an earlier spec/run already did it — the
- * account persists in the dev cluster across runs, so this makes the landing → Today assertion deterministic
- * whether this is the very first run or the hundredth.
- */
+/** `user1` is left onboarded by `ensureOnboarded` whether or not an earlier run did it (the account persists across runs), so the landing -> Today assertion is deterministic. */
 test.describe('memoir auth', () => {
   test.use({ storageState: storageStateFor('user1') });
 

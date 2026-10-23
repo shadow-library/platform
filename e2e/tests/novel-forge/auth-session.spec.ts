@@ -12,10 +12,8 @@ interface SessionBody {
 }
 
 /**
- * Declaring the constants
- *
- * How a caller becomes someone to Novel Forge, and stops being one: the `/access` admin probe, the bearer and cookie paths the auth guard
- * accepts, the login and callback legs of the OIDC hop, logout, and what happens to an app session once identity ends the central one.
+ * The `/access` admin probe, the bearer and cookie paths the auth guard accepts, the login and callback legs of the OIDC hop, logout, and what happens to an app session once
+ * identity ends the central one.
  */
 
 const SESSION_COOKIE = '__Host-shadow-session';

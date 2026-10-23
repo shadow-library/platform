@@ -19,15 +19,11 @@ interface ProjectList {
 }
 
 /**
- * Declaring the constants
- *
- * Who reaches a project besides its owner. A bot's project may be shared with the bot's organisation, which opens it to that
- * organisation's curators (people holding `novel-forge:curate` there, acting in it) and to nobody else; everything else answers
- * 404 PRJ_001, indistinguishable from a project that does not exist. Ownership is the (kind, id) pair, never the id alone.
- * Also here: the surfaces the product retired, which must be gone rather than guarded.
+ * Who reaches a project besides its owner: a bot's project shared with the bot's organisation opens to that organisation's curators (`novel-forge:curate`, acting in it) and
+ * nobody else; everything else answers 404 PRJ_001, as for a missing project. Ownership is the (kind, id) pair, never the id alone. Also: surfaces the product retired must be
+ * gone, not guarded.
  */
 
-/** A bot id no identity bot carries; ownership never resolves it against identity. */
 function strayBotId(): string {
   return String(randomInt(900_000_000, 999_999_999));
 }

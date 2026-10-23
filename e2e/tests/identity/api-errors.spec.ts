@@ -3,15 +3,11 @@ import { expect, test } from './fixtures';
 import { expectErrorCode } from './helpers';
 
 /**
- * Declaring the constants
- *
- * Request-level assertions on identity's error contract — driven through raw `APIRequestContext`s (no browser)
- * so the exact status and machine `code` are observable. These exercise the boundaries a UI can't easily reach:
- * an expired flow, the OAuth token endpoint's content-type and client-auth rules, an unauthenticated userinfo
- * call, and the CSRF double-submit guard.
+ * Raw `APIRequestContext` assertions on identity's error contract (exact status and machine `code`) at boundaries a UI can't reach: an expired flow, the token endpoint's
+ * content-type and client-auth rules, unauthenticated userinfo and the CSRF double-submit guard.
  */
 
-/** A well-formed but non-existent flow id — the server must treat it as an expired/unknown flow, not a validation error. */
+/** A well-formed but nonexistent flow id: the server must treat it as an expired/unknown flow, not a validation error. */
 const UNKNOWN_FLOW_ID = 'flow_auth_00000000-0000-0000-0000-000000000000';
 
 test.describe('identity API error contract', () => {
@@ -23,7 +19,6 @@ test.describe('identity API error contract', () => {
   });
 
   test('should reject a JSON body on the OAuth token endpoint with 400 invalid_request', async ({ identity }) => {
-    // The token endpoint is form-encoded only (RFC 6749); a JSON body is a malformed request, not a client-auth failure.
     const anonymous = await identity.anonymous();
     const response = await anonymous.post('/oauth2/token', { data: { grant_type: 'client_credentials' } });
     expect(response.status()).toBe(400);
@@ -31,7 +26,6 @@ test.describe('identity API error contract', () => {
   });
 
   test('should reject bogus client credentials on the OAuth token endpoint with 401 invalid_client', async ({ identity }) => {
-    // Correct form encoding, unknown client — client authentication fails before any grant is considered.
     const anonymous = await identity.anonymous();
     const response = await anonymous.post('/oauth2/token', { form: { grant_type: 'client_credentials', client_id: 'no-such-client', client_secret: 'wrong' } });
     expect(response.status()).toBe(401);

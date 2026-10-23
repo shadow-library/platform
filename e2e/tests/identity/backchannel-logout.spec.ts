@@ -45,18 +45,14 @@ interface SignedInUser {
 }
 
 /**
- * Declaring the constants
- *
- * OIDC back-channel logout: ending a session makes identity POST a signed logout token to every client that holds a refresh
- * token for it. Identity runs every logout URI through the webhook SSRF guard, at registration and again before delivery, so
- * a receiver on this host — plain http, on a private or `.internal` address — is refused unless the deployment sets
- * `WEBHOOKS_ALLOW_INSECURE_TARGETS` for both identity-server (registration) and identity-worker (delivery). Where the guard is
- * strict, which is how dev runs, only the refusal and the https registration beside it are testable; the delivery tests run
- * only in an environment of their own with the flag set. There, which name reaches the host from inside the cluster varies by
- * container runtime, so the first test that needs one queues a delivery per candidate and keeps whichever one actually arrives.
- *
- * The retry ladder is minutes long by design, so the dead-letter walk fast-forwards `next_attempt_at` in the database between
- * the worker's five-second ticks rather than waiting it out.
+ * OIDC back-channel logout: ending a session makes identity POST a signed logout token to every client holding a refresh token for it. Identity runs every logout URI through the
+ * webhook SSRF guard at registration and again before delivery,
+ * so a plain-http receiver on a private or `.internal` host is refused unless `WEBHOOKS_ALLOW_INSECURE_TARGETS` is set for both identity-server (registration) and
+ * identity-worker (delivery). Where the guard is strict (dev), only the refusal and
+ * the https registration beside it are testable; the delivery tests run only in an environment with the flag set. There, which name reaches the host from inside the cluster
+ * varies by container runtime, so the first test needing one queues a
+ * delivery per candidate and keeps whichever arrives.
+ * The retry ladder is minutes long, so the dead-letter walk fast-forwards `next_attempt_at` between the worker's five-second ticks.
  */
 
 const INSECURE_TARGETS_KEY = 'WEBHOOKS_ALLOW_INSECURE_TARGETS';
@@ -152,10 +148,7 @@ async function relyingParty(identity: IdentityHarness, application: OAuthApplica
   return registerOAuthClient(admin, application, { suffix, ...(backchannelLogoutUri ? { backchannelLogoutUri } : {}) });
 }
 
-/**
- * Queues one delivery per candidate host from a single signout and keeps the host the worker actually reached. Memoised per
- * worker; a failure is not cached, so a later test retries rather than inheriting a stale verdict.
- */
+/** Queues one delivery per candidate host from a single signout and keeps the host the worker reached. Memoised per worker; a failure is not cached, so a later test retries. */
 async function resolveClusterHost(identity: IdentityHarness): Promise<string> {
   const admin = (await identity.admin()).ctx;
   const application = await identity.createOAuthApp('bcl-probe');

@@ -23,13 +23,11 @@ export interface BundleCover {
 
 export interface BundleOptions {
   title: string;
-  /** Default: one titled volume of three chapters. */
   volumes?: readonly BundleVolume[];
   genre?: string;
   tags?: string[];
   cover?: BundleCover;
   instructions?: string;
-  /** Prose of the global chapter `n`; default a short numbered paragraph. */
   chapterText?: (chapter: number) => string;
   chapterTitle?: (chapter: number) => string;
 }
@@ -78,11 +76,9 @@ export interface IllustrationRow {
 }
 
 export interface PublishingLane {
-  /** Quota-pins the project's owner. */
   guard(projectId: string): Promise<void>;
   /** A guarded `new_novel` the lane removes, with everything the reader holds for it, after the test. */
   project(owner: ForgeActor, label: string, body?: Record<string, unknown>): Promise<string>;
-  /** Imports `bundle` as a new guarded novel and waits for its chapters to land. */
   imported(owner: ForgeActor, bundle: ImportBundle): Promise<ImportAccepted>;
   /** Tracks a project another route created, so the lane removes it and its reader rows. */
   track(projectId: string): void;
@@ -93,13 +89,12 @@ export interface PublishingLane {
 }
 
 /**
- * Declaring the constants
- *
- * Arrangers for Novel Forge's import, export, illustration and publishing specs. Bundles are authored by hand (the import runs through the
- * job executor and calls no model), images are tiny fixed PNGs so the content-addressed store deduplicates them across runs, and the `.novel`
- * export is read with a central-directory zip reader over `node:zlib`. The lane fixture owns every project a test publishes: teardown settles
- * the push in flight, requires that nothing reached a model, deletes the project, then removes every reader novel under its ref or any slug
- * the test reserved or arranged.
+ * Arrangers for import, export, illustration and publishing specs. Bundles are authored by hand (the import runs through the job executor and calls no model), images are tiny
+ * fixed PNGs
+ * so the content-addressed store deduplicates them across runs, and the `.novel` export is read with a central-directory zip reader over `node:zlib`. The lane fixture owns every
+ * project a test
+ * publishes: teardown settles the push in flight, requires that nothing reached a model, deletes the project, then removes every reader novel under its ref or any slug the test
+ * reserved or arranged.
  */
 
 export const SLUG_LADDER = 5;
@@ -140,7 +135,7 @@ const FINAL_CHAPTERS: readonly { title: string; content: string }[] = [
   },
 ];
 
-/** A publish-ready novel: one volume of three hand-written chapters, titled and tagged, landed final — three, so a publish can skip one (PUB_003). */
+/** A publish-ready novel: one volume of three hand-written final chapters, titled and tagged; three, so a publish can skip one (PUB_003). */
 export const FINAL_BUNDLE = {
   genre: 'fantasy',
   tags: ['fantasy', 'slow-burn'],
@@ -167,7 +162,6 @@ function pngChunk(type: string, data: Buffer): Buffer {
   return Buffer.concat([length, body, crc]);
 }
 
-/** A valid 1×1 PNG of one colour; equal colours give equal bytes, so the store keeps one object per colour however often a run uploads it. */
 export function solidPng(red: number, green: number, blue: number): Buffer {
   const header = Buffer.alloc(13);
   header.writeUInt32BE(1, 0);
@@ -178,7 +172,6 @@ export function solidPng(red: number, green: number, blue: number): Buffer {
   return Buffer.concat([PNG_SIGNATURE, pngChunk('IHDR', header), pngChunk('IDAT', pixels), pngChunk('IEND', Buffer.alloc(0))]);
 }
 
-/** The ref the content-addressed store files `bytes` under. */
 export function storageRef(bytes: Buffer, ext = 'png'): string {
   return `${createHash('sha256').update(bytes).digest('hex')}.${ext}`;
 }
@@ -218,8 +211,8 @@ export function buildBundle(options: BundleOptions): ImportBundle {
 }
 
 /**
- * `POST /api/v1/import` with any body, valid or not; `timeoutMs` covers a bundle of many megabytes. A replica admits two imports at once and
- * refuses a third with 429 and a `Retry-After`, which this waits out as a client would, so a spec holding both permits cannot fail another.
+ * `POST /api/v1/import` with any body, valid or not; `timeoutMs` covers a bundle of many megabytes. A replica admits two imports at once and refuses a third with 429 and
+ * `Retry-After`, which this waits out as a client would, so a spec holding both permits cannot fail another.
  */
 export async function postImport(ctx: APIRequestContext, body: unknown, timeoutMs = 30_000): Promise<APIResponse> {
   const deadline = Date.now() + IMPORT_ADMISSION_WAIT_MS;
@@ -230,7 +223,6 @@ export async function postImport(ctx: APIRequestContext, body: unknown, timeoutM
   }
 }
 
-/** Starts importing {@link FINAL_BUNDLE} as a new project; the import job writes rows only and calls no model. */
 export async function startFinalImport(ctx: APIRequestContext, title: string): Promise<ImportAccepted> {
   const response = await postImport(ctx, { bundle: buildBundle({ ...FINAL_BUNDLE, title }) });
   expect(response.status(), await response.text()).toBe(202);
@@ -243,8 +235,8 @@ export async function expectImportLanded(jobId: string): Promise<void> {
 }
 
 /**
- * Reads a zip's entries through its central directory, which is where the sizes live whether or not the writer streamed them. Stored and
- * deflated entries only — the two methods a `.novel` package uses.
+ * Reads a zip's entries through its central directory, where sizes live whether or not the writer streamed them. Stored and deflated entries only, the two methods a `.novel`
+ * package uses.
  */
 export function readZip(archive: Buffer): Map<string, Buffer> {
   let end = archive.length - 22;
@@ -307,7 +299,6 @@ export async function readIllustrationRows(projectId: string): Promise<Illustrat
   `;
 }
 
-/** An illustration mid-flight — generated, nothing selected yet — the state a generation leaves and no model-free route reaches. */
 export async function insertUnselectedIllustration(projectId: string, subjectType: 'cover' | 'entity', subjectKey: string | null = null): Promise<string> {
   const sql = novelForgeDb();
   const spec = { basePrompt: 'Arranged by the e2e suite.', subjectFraming: '', styleNotes: '', instructions: [], promptKey: 'e2e-arranged', promptVersion: '1.0.0' };
@@ -326,13 +317,11 @@ export async function setIllustrationStatus(illustrationId: string, status: 'act
   if (updated.count !== 1) throw new ForgeBundleError(`no illustration ${illustrationId}`);
 }
 
-/** A bare publication row holding `slug`, on a bare project of `owner` — how a rung of the slug ladder is occupied without a reader push. */
 export async function holdForgeSlug(owner: ForgeActor, slug: string): Promise<void> {
   const projectId = await insertProject({ owner: owner.owner, name: `e2e-forge-slug-holder-${uniqueSuffix()}` });
   await novelForgeDb()`INSERT INTO publications (project_id, novel_slug, title, status) VALUES (${projectId}, ${slug}, 'Held by the e2e suite', 'live')`;
 }
 
-/** Writes publication vocabulary behind the DTO's back, as a row stored before the vocabulary tightened would hold it. */
 export async function writePublicationVocabulary(projectId: string, genres: string[], tags: string[]): Promise<void> {
   const sql = novelForgeDb();
   const updated = await sql`
@@ -346,13 +335,11 @@ export async function setPublicationAuthor(projectId: string, originalAuthor: st
   if (updated.count !== 1) throw new ForgeBundleError(`no publication for project ${projectId}`);
 }
 
-/** Wipes the reader's copy of a novel — chapters, wiki and grants cascade with it — as a reader restored from empty would stand. */
 export async function wipeServedNovel(slug: string): Promise<void> {
   const deleted = await webNovelDb()`DELETE FROM novels WHERE slug = ${slug}`;
   if (deleted.count !== 1) throw new ForgeBundleError(`no served novel ${slug} to wipe`);
 }
 
-/** Hands a served novel to another publisher, as a rotated forge client id would leave it: the forge's ref no longer finds it. */
 export async function reassignServedPublisher(slug: string, sourceClientId: string): Promise<void> {
   const updated = await webNovelDb()`UPDATE novels SET source_client_id = ${sourceClientId} WHERE slug = ${slug}`;
   if (updated.count !== 1) throw new ForgeBundleError(`no served novel ${slug} to reassign`);

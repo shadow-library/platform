@@ -24,12 +24,9 @@ interface ShiftColumn {
 }
 
 /**
- * Declaring the constants
- *
- * A hand-authored chapter insert: every chapter-numbered column above the insert point moves up by one inside one transaction, the briefs
- * it moves are re-rendered against the new numbering, and a verbatim brief lands in the freed slot. The planner mode drafts that brief with
- * a model and stays out of scope. Rows no model-free route writes — plans with cited refs, threads, context packs, model calls — are
- * arranged in the database at chapters below, at and above the insert point.
+ * A hand-authored chapter insert: every chapter-numbered column above the insert point moves up by one in one transaction, moved briefs are re-rendered against the new
+ * numbering, and a verbatim brief lands in the freed slot. The planner mode (a model drafts the brief) is out of scope; rows no model-free route writes are arranged in the
+ * database below, at and above the insert point.
  */
 
 const HAND_BRIEF = 'Tamsin measures the gap the wall left behind.';
@@ -41,8 +38,8 @@ const MOVED_BRIEF = ['Picks up from chapter 2 and sets up chapter 4.', 'Recall c
 );
 
 /**
- * `chapter-insert.service.ts` SHIFT_TARGETS as columns, less the three asserted on their own: `briefs.chapter` (it gains the inserted plan) and
- * the two a plan write re-derives at the end of the insert, `canon_facts.planned_chapter` and `milestones.planned_chapter`.
+ * `SHIFT_TARGETS` (`chapter-insert.service.ts`) as columns, less `briefs.chapter` (gains the inserted plan) and the two a plan write re-derives at the end
+ * (`canon_facts.planned_chapter`, `milestones.planned_chapter`).
  */
 const SHIFTED_COLUMNS: readonly ShiftColumn[] = [
   { table: 'drafts', column: 'chapter' },
@@ -88,7 +85,6 @@ async function readBriefs(projectId: string): Promise<BriefRow[]> {
   `;
 }
 
-/** Every value of every shifted column on the project, nulls first then ascending, so a before/after pair compares as multisets. */
 async function readShiftedValues(projectId: string): Promise<Record<string, (number | null)[]>> {
   const sql = novelForgeDb();
   const values: Record<string, (number | null)[]> = {};

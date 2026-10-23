@@ -25,16 +25,12 @@ export interface HostReceiver {
 }
 
 /**
- * Declaring the constants
+ * An HTTP server on the host that pods can POST to: identity's back-channel logout delivery is an unguarded `fetch`, so a plain-http loopback target works
+ * where the SSRF-guarded webhook sender would refuse one. Binds every interface on an ephemeral port so parallel workers never collide.
  *
- * An HTTP server on the host that pods can POST to — identity's back-channel logout delivery is an unguarded `fetch`, so a
- * plain-http loopback target is reachable where the SSRF-guarded webhook sender would refuse one. It binds every interface on
- * an ephemeral port, so parallel workers never collide, and records what arrives instead of answering anything meaningful.
- *
- * Which name reaches the host from inside the cluster is environment-specific: k3d writes `host.k3d.internal` into CoreDNS
- * pointing at the container network's gateway, which is the host under a Linux/Docker-Desktop bridge but only the virtual
- * machine under OrbStack, where `host.docker.internal` is the host instead. Rather than assume, a spec tries the candidates
- * below and keeps the one a delivery actually arrives on; `E2E_CLUSTER_HOST` overrides the list.
+ * Which name reaches the host from inside the cluster is environment-specific: k3d's `host.k3d.internal` is the container network's gateway, which is the host
+ * under a Linux/Docker-Desktop bridge but only the VM under OrbStack, where `host.docker.internal` is the host. A spec tries the candidates below and keeps
+ * the one a delivery arrives on; `E2E_CLUSTER_HOST` overrides the list.
  */
 
 const DEFAULT_CLUSTER_HOSTS = ['host.k3d.internal', 'host.docker.internal'];

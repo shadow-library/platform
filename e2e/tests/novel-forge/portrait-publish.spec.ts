@@ -9,12 +9,9 @@ interface ReaderWikiEntry {
 }
 
 /**
- * Declaring the constants
- *
- * A portrait dated "as of chapter N" reaches readers only from chapter N on, AI-free. Two gallery images of one entity are dated to
- * before the story and to chapter 3; the reader wiki shows the first to everyone and the second only to a reader who has reached
- * chapter 3. The novel belongs to a fresh actor; user1 only reads it. Progress is written straight to the reader DB, as in the wiki
- * spec, because the shared CSRF helper cannot mint a web-novel token from a multi-app jar; the rows cascade with the novel.
+ * AI-free: a portrait dated "as of chapter N" reaches readers only from chapter N on. Two gallery images of one entity are dated before the story and to chapter 3; the reader
+ * wiki shows the first to everyone and the second only past chapter 3. Progress is written straight to the reader DB because the shared CSRF helper cannot mint a web-novel token
+ * from a multi-app jar.
  */
 
 const ENTITY_KEY = 'e2e-portrait-keeper';

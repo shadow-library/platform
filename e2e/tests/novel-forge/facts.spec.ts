@@ -45,12 +45,9 @@ interface Milestone {
 }
 
 /**
- * Declaring the constants
- *
- * Canon facts — the book's secrets — and the reveal ledger that says who in the story knows each one. A fact is written by hand and
- * merges what a write omits; the ledger is written by hand, by an approval (provisionally, bound to the approved revision) and by
- * finalize (committed). A fact change that breaks a plan's reveal never rewrites the plan: it marks the plan and its draft stale. Every
- * approval queues a finalize-review model call, so each project is quota-pinned and the call fails without spending.
+ * Canon facts (the book's secrets) and the reveal ledger of who knows each one. A fact is written by hand and merges what a write omits; the ledger is written by hand, by an
+ * approval (provisionally, bound to the approved revision) and by finalize (committed). A fact change that breaks a plan's reveal marks the plan and its draft stale, never
+ * rewrites them. Each approval queues a finalize-review model call, so projects are quota-pinned.
  */
 
 const ORACLE = 'oracle_truth';
@@ -152,8 +149,7 @@ test.describe('novel-forge canon facts', () => {
     await expectCode(await mutate(owner.ctx, 'delete', factPath(projectId, '/no_such_fact/knowledge/mira')), 404, 'FCT_001', 'retracting from an unknown fact');
     expect((await readFact(owner.ctx, projectId, ORACLE)).knowledge, 'refusals leave the ledger alone').toHaveLength(1);
 
-    // apps/novel-forge-web/src/routes/novels/$novelId/story-bible.tsx:732 warns this removes "everything recorded about who learns it"; FCT_003
-    // guards only the revertible change-set op.
+    // The story-bible screen warns this removes "everything recorded about who learns it"; FCT_003 guards only the revertible change-set op.
     const deleted = await mutate(owner.ctx, 'delete', factPath(projectId, `/${ORACLE}`));
     expect(deleted.status(), await deleted.text()).toBe(204);
     expect(await countKnowledge(projectId), 'the ledger went with the fact').toBe(0);

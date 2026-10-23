@@ -12,12 +12,10 @@ interface OcrQuotaView {
 }
 
 /**
- * Declaring the constants
- *
- * `POST /ocr/parse` and `GET /ocr/quota` (ARCHITECTURE §14.3). Structuring goes through Synapse (task `memoir.receipt-structuring`),
- * which the test environment routes to local Ollama. A parse therefore either succeeds or, when Synapse or the model is unavailable,
- * surfaces `503 OCR_002` — never a fabricated result. The quota guard runs *before* the structuring call (ARCHITECTURE §14.3), so
- * either outcome costs an attempt; the assertions below hold for both.
+ * `POST /ocr/parse` and `GET /ocr/quota`. Structuring goes through Synapse (task `memoir.receipt-structuring`), routed to local Ollama in the test environment, so a parse either
+ * succeeds
+ * or surfaces `503 OCR_002` when Synapse or the model is unavailable, never a fabricated result. The quota guard runs before the structuring call, so either outcome costs an
+ * attempt.
  */
 
 async function getOcrQuota(ctx: APIRequestContext): Promise<OcrQuotaView> {
@@ -36,7 +34,6 @@ async function expectParseOutcome(response: APIResponse): Promise<void> {
   await expectRefusal(response, 503, 'OCR_002');
 }
 
-/** Today (and offsets from it) in UTC — every persona here onboards with `timezone: 'UTC'`, so this matches the account's own local day exactly. */
 function utcDateString(offsetDays = 0): string {
   const date = new Date();
   date.setUTCDate(date.getUTCDate() + offsetDays);

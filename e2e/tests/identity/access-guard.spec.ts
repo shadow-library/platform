@@ -16,14 +16,10 @@ import { expect, test } from './fixtures';
 import { expectErrorCode } from './helpers';
 
 /**
- * Declaring the constants
- *
- * The central access guard, one mode at a time: a session route, an `elevated` route, a `permission` route, an
- * `orgRole` route, the `bot` mode and a `service` route. Each case is a real route that declares exactly the mode
- * under test, and every refusal group ends by showing the same route answering the caller it was built for.
+ * The central access guard, one mode at a time (session, `elevated`, `permission`, `orgRole`, `bot`, `service`), each on a real route declaring exactly that mode; every refusal
+ * group ends with the same route answering the caller it was built for.
  */
 
-/** `POST /api/v1/me/mfa/totp/enroll` — the `elevated` route the step-up cases are judged on. */
 const ELEVATED_ROUTE = '/api/v1/me/mfa/totp/enroll';
 
 /** Bots created here outlive their organisation's cascade: the OAuth client behind one is `ON DELETE restrict`. */

@@ -18,21 +18,20 @@ import {
   todayLocal,
 } from './helpers';
 
-/** level.ts: level 2 costs `round(100 * 1^1.5)` = 100 XP; level 3 costs a further `round(100 * 2^1.5)` = 283 XP (ruleset.ts v1's curve, `xpToAdvance`). */
+/** Level 2 costs `round(100 * 1^1.5)` = 100 XP; level 3 a further `round(100 * 2^1.5)` = 283 XP (ruleset v1's `xpToAdvance`). */
 const LEVEL_TWO_XP = 100;
 const LEVEL_THREE_XP = 283;
 
-/** ruleset.ts v1: `level.maxLevel`. */
 const MAX_LEVEL = 999;
 
-/** Mirrors level.ts's `xpToAdvance`/`levelThresholds` cumulative sum exactly, to get the real lifetime XP MAX_LEVEL is reached at without hand-computing a 998-term sum. */
+/** Mirrors `xpToAdvance`/`levelThresholds` cumulative sum to get the lifetime XP at which MAX_LEVEL is reached without hand-computing a 998-term sum. */
 function xpThresholdForMaxLevel(): number {
   let cumulative = 0;
   for (let level = 1; level < MAX_LEVEL; level++) cumulative += Math.round(100 * level ** 1.5);
   return cumulative;
 }
 
-/** Every domain currently registered on `DeltaSourceRegistry`; asserted as a subset below, never exact equality, so a legitimately added domain never breaks this. */
+/** Domains currently registered on `DeltaSourceRegistry`; asserted as a subset so a legitimately added domain never breaks this. */
 const REGISTERED_DOMAINS = [
   'account',
   'entitlement',
@@ -104,7 +103,7 @@ test.describe('mixed-type command batches (memoir-sync-1)', () => {
     expect(deltaResponse.headers()['x-sync-epoch'], 'the delta response must carry x-sync-epoch too').toMatch(/^\d+$/);
 
     const expenseRow = rowsOf(delta, 'expenses').find(row => row['id'] === expenseId);
-    // amountMinor is a bigint column: serializeDeltaRow (sync/delta.repository.ts) sends every bigint over the wire as its decimal string.
+    // `amountMinor` is a bigint column: `serializeDeltaRow` sends every bigint as its decimal string.
     expect(expenseRow, "the update's read of the same-batch create must have seen it committed").toMatchObject({ amountMinor: '2500', amountText: '25.00' });
     expect(rowsOf(delta, 'expense_categories').find(row => row['key'] === 'food')).toMatchObject({ archivedAt: expect.any(String) });
     expect(rowsOf(delta, 'journal_entries').some(row => row['text'] === 'E2E sync-1 mixed batch')).toBe(true);
@@ -217,7 +216,7 @@ test.describe('cursor semantics (memoir-sync-5)', () => {
       const { page } = await pullDeltaWith(persona.ctx, { since, domains: 'quests', limit: 1 });
       const cursor = BigInt(page.cursor);
       const rows = page.domains['quests'] ?? [];
-      // The final, empty, hasMore:false page may repeat the previous cursor rather than advance it (§12.2's overlap only lags a drained cursor).
+      // The final empty `hasMore:false` page may repeat the previous cursor: the overlap only lags a drained cursor.
       if (lastCursor !== null) {
         expect(cursor >= lastCursor, 'the cursor must never move backwards between pages').toBe(true);
         if (rows.length > 0) expect(cursor > lastCursor, 'a page that returns a row must advance the cursor past it').toBe(true);
@@ -330,10 +329,8 @@ test.describe('progression snapshot (memoir-sync-9)', () => {
 
 test.describe('wire-shape compatibility (memoir-sync-12)', () => {
   /**
-   * The pinned command set `apps/memoir-web/src/lib/sync/command-wire.ts`'s `SERVER_BACKED_TYPES` actually sends,
-   * and the exact wire shape `toWireCommand` builds for each — reproduced here rather than imported, since this
-   * spec runs from `e2e/`, outside memoir-web's own module graph. `devices` is excluded: no `SyncCommand` maps to
-   * it (covered instead by memoir-sync-8). AI commands are excluded too: none of them is in `SERVER_BACKED_TYPES`.
+   * The command set `apps/memoir-web/src/lib/sync/command-wire.ts` (`SERVER_BACKED_TYPES`) sends and the wire shape `toWireCommand` builds, reproduced here since this spec
+   * cannot import memoir-web's module graph. `devices` and AI commands are excluded: no `SyncCommand` maps to the first and none of the second is in `SERVER_BACKED_TYPES`.
    */
   test('should apply every pinned wire-shaped command end to end, and every domain those commands touch must carry every camelCase field apps/memoir-web/src/lib/sync/projection.ts reads', async ({
     memoir,
@@ -353,7 +350,6 @@ test.describe('wire-shape compatibility (memoir-sync-12)', () => {
     const questCompleted = await createQuest(`E2E sync-12 complete ${randomUUID()}`);
     await applied('quest.complete', { occurrenceId: `${questCompleted}:${today}` });
     await applied('quest.update', { questId: questCompleted, patch: { name: `E2E sync-12 renamed ${randomUUID()}` } });
-    // plan.setLock has a test of its own below.
 
     const questPartial = await createQuest(`E2E sync-12 partial ${randomUUID()}`);
     await applied('quest.partial', { occurrenceId: `${questPartial}:${today}`, progress: 50, reasonTag: 'forgot', note: null });
@@ -367,7 +363,6 @@ test.describe('wire-shape compatibility (memoir-sync-12)', () => {
     const questReschedule = await createQuest(`E2E sync-12 reschedule ${randomUUID()}`);
     await applied('quest.reschedule', { occurrenceId: `${questReschedule}:${today}`, toMin: 600, acceptBeyondCap: false });
 
-    // quest.deleteLog (exercised on its own quest so the completed log above stays intact for field checks)
     const questDeleteLog = await createQuest(`E2E sync-12 deleteLog ${randomUUID()}`);
     await applied('quest.skip', { occurrenceId: `${questDeleteLog}:${today}`, reasonTag: 'other', note: null });
     await applied('quest.deleteLog', { occurrenceId: `${questDeleteLog}:${today}` });
@@ -408,7 +403,6 @@ test.describe('wire-shape compatibility (memoir-sync-12)', () => {
         })
       )['id'],
     );
-    // subscription.setActive's wire type is subscription.update.
     await applied('subscription.update', { id: subscriptionId, active: true });
     await applied('subscription.confirmCycle', { id: subscriptionId, billingDate: today });
 
@@ -427,8 +421,6 @@ test.describe('wire-shape compatibility (memoir-sync-12)', () => {
 
     const sideQuestId = randomUUID();
     await applied('sidequest.log', { id: sideQuestId, draft: { date: today, name: 'E2E sync-12 side quest', statAffinity: 'discipline' } });
-
-    // health.save (wire type metric.register) has its own test below.
 
     // title.display — titles are only ever chosen among already-earned ones, so one is seeded directly.
     await memoirDb()`INSERT INTO titles_earned (account_id, title_id) VALUES (${accountId}, 'steady_builder') ON CONFLICT DO NOTHING`;

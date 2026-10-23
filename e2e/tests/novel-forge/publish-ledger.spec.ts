@@ -29,12 +29,9 @@ interface LedgerView {
 }
 
 /**
- * Declaring the constants
- *
- * The forge side of publishing: the publication record (catalog vocabulary, revision bumps, slugs), the curate-gated attribution, and the
- * chapter ledger (gates, ordinals, content hashes). Every assertion reads the forge's own rows; each save also enqueues the real reader push,
- * whose outcome the converge specs own. Refusals are proven by the row staying exactly as it was, and each group ends on the legitimate
- * save still landing.
+ * The forge side of publishing: the publication record (catalog vocabulary, revision bumps, slugs), curate-gated attribution, and the chapter ledger (gates, ordinals, content
+ * hashes). Each save also enqueues the real reader push, whose outcome the converge specs own. Refusals are proven by the row staying exactly as it was, and each group ends on
+ * the legitimate save still landing.
  */
 
 const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;

@@ -58,12 +58,9 @@ interface ThreadRow {
 }
 
 /**
- * Declaring the constants
- *
- * Finalize as `finalize-refusals.ts` gates it and as the review path commits it, with no model call anywhere: every project is quota-pinned,
- * each approval's finalize-review job fails under that guard, and the reading it would have produced is arranged as rows
- * (`forge-review.ts`). The direct continuity path — a chapter with no review — does reach for the continuity model, which the quota pin
- * refuses before any dispatch, so it half-finalizes exactly as a failed extraction would.
+ * Finalize as `finalize-refusals.ts` gates it and the review path commits it, with no model call: projects are quota-pinned, each approval's finalize-review job fails under that
+ * guard, and the reading it would have produced is arranged as rows (`forge-review.ts`). The direct continuity path (a chapter with no review) does reach for the continuity
+ * model, which the pin refuses before dispatch, so it half-finalizes as a failed extraction would.
  */
 
 const REFUSAL_STATUS: Record<string, number> = {
@@ -207,7 +204,7 @@ test.describe('novel-forge finalize refusals', () => {
     await readyReviewWithItems(projectId, approved, []);
     await expectRefusedInOrder(owner, projectId, 3, ['FIN_001', 'FIN_002', 'FIN_003']);
 
-    // Nothing model-free clears the flag: only a validation window a model call covered successfully does (novel-validation.graph.ts:224-235).
+    // Only a validation window a model call covered successfully clears the flag; nothing model-free does (`novel-validation.graph.ts`).
     await setNeedsRevalidation(projectId, 1, false);
     await expectRefusedInOrder(owner, projectId, 3, ['FIN_001', 'FIN_003']);
     await finalizeChapterNoReview(owner.ctx, projectId, await readDraft(owner.ctx, projectId, 2));

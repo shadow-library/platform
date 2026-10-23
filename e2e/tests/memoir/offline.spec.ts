@@ -2,14 +2,7 @@ import { findSetCookie, requireProductUrl } from '../../lib';
 import { expect, test } from './fixtures';
 import { createDailyQuest, hasQuestLogFor, memoirCsrfHeaders, pullDelta } from './helpers';
 
-/**
- * Declaring the constants
- *
- * No prior offline-mode Playwright precedent exists in this monorepo (checked `apps/web-novel-web` and the
- * rest of `e2e/tests/` — nothing uses `context.setOffline`), so this is the first. It drives Playwright's own
- * network emulation (`BrowserContext.setOffline`) rather than the OS network, which is what the client's own
- * `navigator.onLine`-driven `NetStrip` reacts to.
- */
+/** Uses Playwright's `BrowserContext.setOffline` rather than the OS network, which is what drives the client's `navigator.onLine`-based `NetStrip`. */
 test.describe('memoir offline outbox', () => {
   test('should queue a quest completion while offline and flush it once back online', async ({ page, context, memoir }) => {
     const url = requireProductUrl('memoir');

@@ -3,13 +3,10 @@ import { expect, test } from '@playwright/test';
 import { apiContext, readSeedManifest } from '../../lib';
 
 /**
- * Declaring the constants
- *
- * The security-critical contract of `NovelAccessService`: a RESTRICTED novel must be indistinguishable from a
- * novel that doesn't exist to any reader without a grant — same status code, same error code, same *bytes* — so an
- * attacker probing slugs can never learn "this exists but I can't read it" from "this doesn't exist" (an
- * enumeration/existence-oracle defense). `e2e-restricted-novel` is granted to `user1` only (seeded), so `user2` and `viewer`
- * are the negative cases: signed-in readers without a grant. An anonymous caller never reaches this layer — private mode refuses it first.
+ * `NovelAccessService`'s security contract: a RESTRICTED novel is indistinguishable from a missing one to any reader without a grant (same status, error code and bytes), so slug
+ * probing
+ * yields no existence oracle. `e2e-restricted-novel` is granted to `user1` only, so `user2` and `viewer` are the negative cases; anonymous callers are refused earlier by private
+ * mode.
  */
 test.describe('visibility security', () => {
   const { webNovel } = readSeedManifest();
@@ -30,11 +27,7 @@ test.describe('visibility security', () => {
     expect(body.code).toBe('WBN_001');
   });
 
-  /**
-   * The enumeration-safety property itself: the ungranted-but-real slug and a genuinely nonexistent slug must
-   * produce byte-identical response bodies. This is asserted for two ungranted signed-in readers, since either is a plausible
-   * attacker vantage point.
-   */
+  /** The ungranted-but-real slug and a nonexistent slug must produce byte-identical bodies, for two ungranted readers (either is a plausible attacker vantage). */
   for (const persona of ['viewer', 'user2'] as const) {
     test(`should return a body identical to the unknown-slug 404 for ${persona}`, async () => {
       const ctx = await apiContext('webNovel', persona);

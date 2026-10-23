@@ -35,12 +35,9 @@ interface FactView {
 }
 
 /**
- * Declaring the constants
- *
- * What each reader of the story model is handed, observed through the packs the server assembles without a model: the chapter writer's
- * pack (`/context/preview?purpose=generation`, a dry run, and `/drafts/:n/prompt`), the planner's outline pack, the chat pack, and the
- * packs a refused model call leaves behind. Every withholding is checked on the exact rendered text, beside a control where the same
- * text is allowed through, so an assertion never passes because the text was simply never there.
+ * What each reader of the story model is handed, observed through packs the server assembles without a model: the chapter writer's pack (`/context/preview?purpose=generation`, a
+ * dry run, and `/drafts/:n/prompt`), the planner's outline pack, the chat pack, and the packs a refused model call leaves behind. Every withholding is checked on the exact
+ * rendered text beside a control where the same text is allowed through, so an assertion never passes because the text was never there.
  */
 
 const HEIR_KEY = 'heir_secret';

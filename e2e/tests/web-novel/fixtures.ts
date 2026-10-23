@@ -21,7 +21,6 @@ import { deleteReaderData, followRedirect, WEB_NOVEL_SESSION_COOKIE, WebNovelSes
 
 export interface WebNovelReader {
   readonly user: IdentityUser;
-  /** The central identity session every OIDC hop for this reader rides on. */
   readonly session: IdentitySession;
 }
 
@@ -37,7 +36,6 @@ export interface SignedInReader {
 }
 
 export interface WebNovelHarness {
-  /** This test's own client address; the identity side of every OIDC hop is charged to it. */
   readonly clientIp: string;
   /** A factory identity user with a live central session and no web-novel session yet; a platform member unless `platformMember` is false. */
   reader(label?: string, options?: ReaderOptions): Promise<WebNovelReader>;
@@ -49,14 +47,11 @@ export interface WebNovelHarness {
 }
 
 /**
- * Declaring the constants
- *
- * Readers are built per test rather than taken from the saved personas: logging out revokes the handle a persona's
- * storage state carries, which every other web-novel spec reads. Each reader's central session is written straight into
- * identity, so a test spends no `login/init` budget, and the chain is walked hop by hop so it never renders the SSR page
- * the callback lands on. Web Novel is an INTERNAL identity application, so a factory reader is added to the
- * platform organisation, the only membership identity admits to it. Deleting the user cascades that membership and its central and app
- * sessions; web-novel keys its shelves and progress by the bare subject, so those are removed by hand.
+ * Readers are built per test rather than taken from the saved personas: logging out revokes the handle a persona's storage state carries, which every other web-novel spec reads.
+ * Each reader's central session is written straight into identity (no `login/init` budget) and the chain is walked hop by hop so it never renders the SSR page the callback lands
+ * on.
+ * Web Novel is INTERNAL, so a factory reader joins the platform organisation, the only membership identity admits. Deleting the user cascades that membership and its sessions;
+ * web-novel keys shelves and progress by the bare subject, so those are removed by hand.
  */
 
 export const test = base.extend<{ webNovel: WebNovelHarness }>({

@@ -40,31 +40,25 @@ interface NovelManifest {
 }
 
 /**
- * Declaring the constants
- *
- * A novel import is one transaction that creates the project, its volumes and placeholder bible, and enqueues an `import` job, which the job
- * executor runs without any model: it lands the chapters and stores the cover. Only the final progress is asserted — each batch overwrites the
- * row's progress in place, and job events are recorded only for chat-started jobs (job.service.ts:339-341). Each malformed bundle is refused
- * before any project exists. The `.novel` export reads the same project back as a zip. What an import job keeps of the bundle is read from its
- * stored row, which is where the property lives.
+ * An import is one transaction creating the project, volumes and placeholder bible and enqueueing an `import` job that the executor runs without a model (lands chapters, stores
+ * the cover). Only the final progress is asserted: each batch overwrites the row's progress in place and job events are recorded only for chat-started jobs. Each malformed
+ * bundle is refused before any project exists.
  */
 
 const COVER: BundleCover = { name: 'cover-art', mimeType: 'image/png', bytes: solidPng(180, 40, 60) };
 
 /**
- * Thirteen one-megabyte chapters sit past the app-wide 12 MB body limit. Kept near that limit rather than at the
- * backlog's 20 MB: a 20 MB import OOM-killed the 1 GiB dev pod (exit 137) under the suite's concurrent load.
+ * Thirteen one-megabyte chapters sit past the app-wide 12 MB body limit. Kept near it rather than 20 MB, which OOM-killed the 1 GiB dev pod (exit 137) under the suite's
+ * concurrent load.
  */
 const OVERSIZED_CHAPTERS = 13;
 
 const MEGABYTE_CHAPTER = `${'The tide came in and the keeper counted the waves again. '.repeat(20_000).slice(0, 1024 * 1024 - 1)}.`;
 
-/** The import route's own body limit. */
 const IMPORT_BODY_LIMIT_BYTES = 16 * 1024 * 1024;
 
 const IMPORT_PERMITS = 2;
 
-/** A permit an upload holds is returned when the client drops it, or at the latest by the server's 60-second receive deadline. */
 const PERMIT_RETURN_MS = 75_000;
 
 function uniqueTitle(label: string): string {
@@ -79,10 +73,7 @@ async function readImportedProject(projectId: string, jobId: string): Promise<Im
   return row;
 }
 
-/**
- * Opens a POST declaring `declaredBytes` of JSON body on its own connection, with the actor's cookies and CSRF token, and sends none of it
- * yet; an `APIRequestContext` only sends whole bodies. The server sees the request before any body arrives.
- */
+/** Opens a POST declaring `declaredBytes` of JSON body on its own connection and sends none of it yet, as an `APIRequestContext` only sends whole bodies. */
 async function openUpload(ctx: APIRequestContext, path: string, declaredBytes: number): Promise<ClientRequest> {
   const url = new URL(path, requireProductUrl('novelForge'));
   const cookies = (await ctx.storageState()).cookies.filter(cookie => url.hostname.endsWith(cookie.domain.replace(/^\./, '')));
@@ -101,7 +92,6 @@ async function openUpload(ctx: APIRequestContext, path: string, declaredBytes: n
   return upload;
 }
 
-/** An import whose body never finishes arriving, so it holds one of the replica's import permits until it is destroyed. */
 async function holdImportUpload(ctx: APIRequestContext): Promise<ClientRequest> {
   const upload = await openUpload(ctx, '/api/v1/import', 1024 * 1024);
   upload.write('{"bundle":');
@@ -109,8 +99,8 @@ async function holdImportUpload(ctx: APIRequestContext): Promise<ClientRequest> 
 }
 
 /**
- * Streams `bytes` of body and returns the status the server answers, stopping the upload as soon as it answers. Posting a whole oversized
- * body races the refusal: the server answers and closes while the client is still writing, which the client sees as a hung-up socket.
+ * Streams `bytes` of body and returns the status the server answers, stopping as soon as it answers: posting a whole oversized body races the refusal, which the client sees as a
+ * hung-up socket.
  */
 async function statusForOversizedBody(ctx: APIRequestContext, path: string, bytes: number): Promise<number> {
   const upload = await openUpload(ctx, path, bytes);
@@ -139,7 +129,6 @@ async function statusForOversizedBody(ctx: APIRequestContext, path: string, byte
   }
 }
 
-/** An import the server refuses as malformed once admitted, so a probe never creates a project. */
 async function probeAdmission(ctx: APIRequestContext): Promise<APIResponse> {
   return ctx.post('/api/v1/import', { headers: await csrfHeaders(ctx), data: { bundle: { format: 'not-a-bundle', novel: {} } } });
 }

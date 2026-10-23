@@ -4,13 +4,8 @@ import { apiContext, mutate, requireProductUrl } from '../../lib';
 import { createTemplate, deleteTemplates, openDraft, publishDraft, putDraftContent, uniqueKey } from './helpers';
 
 /**
- * Declaring the constants
- *
- * Request-level coverage of the template CMS's draft → publish lifecycle
- * (`apps/pulse-server/src/modules/template/template-version.service.ts`), driven as `admin` (PulseAdmin holds
- * `pulse:templates:write` + the elevated `pulse:templates:publish`). Every template this file creates carries a
- * `uniqueKey('tpl')` key and is removed in the database in an `afterEach` (`TemplateController` has no `DELETE`
- * route), so nothing here touches the baseline `auth.*` catalog.
+ * Driven as `admin` (`pulse:templates:write` + elevated `pulse:templates:publish`). `TemplateController` has no `DELETE`, so each `uniqueKey('tpl')` template is removed in the
+ * database in `afterEach`; the baseline `auth.*` catalog is never touched.
  */
 test.describe('template lifecycle', () => {
   test.beforeEach(() => requireProductUrl('pulse'));
@@ -44,8 +39,7 @@ test.describe('template lifecycle', () => {
     const first = await openDraft(ctx, created.id);
     expect(first.status()).toBe(201);
 
-    // A second open while a draft is already outstanding is a conflict, not a silent no-op — opening a draft
-    // is the "start editing" action, and swallowing the second call would hide a concurrent editor.
+    // A second open while a draft is outstanding conflicts rather than silently no-ops, which would hide a concurrent editor.
     const second = await openDraft(ctx, created.id);
     expect(second.status()).toBe(409);
     const body = (await second.json()) as { code?: string };
@@ -77,7 +71,6 @@ test.describe('template lifecycle', () => {
     const previewBody = (await preview.json()) as { subject?: string | null; body: string };
     expect(previewBody.body).toContain('World');
 
-    // Roll back to the same (only) published version — a no-op content-wise, but exercises the endpoint's success path.
     const rollback = await mutate(ctx, 'post', `/api/v1/templates/${created.id}/versions/${publishedBody.version}/rollback`, { data: { notes: 'e2e rollback' } });
     expect(rollback.status()).toBe(200);
     const rollbackBody = (await rollback.json()) as { status: string; version: number };
@@ -140,10 +133,7 @@ test.describe('template lifecycle', () => {
     expect(await channelOf('SMS'), 'the toggle is an update of the same setting, not a second row').toMatchObject({ isEnabled: false });
   });
 
-  /**
-   * `assertContentsRender` strict-renders every draft content block through LiquidJS; a body referencing a
-   * variable the template's `variableSchema` never declared fails that render and maps to `TPL_PUB_003` (422).
-   */
+  /** `assertContentsRender` strict-renders every draft content block through LiquidJS; a variable the `variableSchema` never declared fails and maps to `TPL_PUB_003` (422). */
   test('should reject publishing content that references an undeclared variable with TPL_PUB_003', async () => {
     const ctx = await apiContext('pulse', 'admin');
     const created = await createTemplate(ctx, {

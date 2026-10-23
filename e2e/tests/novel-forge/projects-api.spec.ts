@@ -27,11 +27,8 @@ interface ProjectColumns {
 }
 
 /**
- * Declaring the constants
- *
- * The project resource itself, AI-free: identity of a new project, the fields a PATCH trims or clears, the chapter-writing instructions stored
- * as additions to the built-in style, the word-count band, cloning, listing order, the cover, stage resets and the status counters. Every
- * stored value is read back from the forge's own table as well as through the API.
+ * AI-free: identity of a new project, the fields a PATCH trims or clears, chapter-writing instructions stored as additions to the built-in style, the word-count band, cloning,
+ * listing order, the cover, stage resets and status counters. Every stored value is read back from the forge's table as well as the API.
  */
 
 const TARGET = { min: 1200, max: 2400 };

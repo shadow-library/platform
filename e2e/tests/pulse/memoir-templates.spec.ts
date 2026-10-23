@@ -7,21 +7,15 @@ interface MemoirTemplateCase {
   data: Record<string, unknown>;
   expectedSubject: string;
   /**
-   * Substrings anchored on the substituted value's own boundary (its text plus the tag that immediately follows
-   * or precedes it), never on a fixed opening tag — publishing composes the content into the baseline layout and
-   * `juice` then inlines that layout's `<style>` rules onto matching elements (`.email-strong`, `.email-meta td`),
-   * rewriting opening-tag attributes. Anchoring past the opening tag keeps the assertion immune to that rewrite.
+   * Anchored on the substituted value's own boundary, never a fixed opening tag: publishing composes into the baseline layout and `juice` inlines its `<style>` rules, rewriting
+   * opening-tag attributes.
    */
   expectedBodySubstrings: string[];
 }
 
 /**
- * Declaring the constants
- *
- * The three memoir EMAIL templates in the baseline catalog (`apps/pulse-server/src/database/seed/baseline.data.ts`'s
- * `BASELINE_TEMPLATES`), rendered through the studio preview API (`POST /versions/preview`) rather than a real send.
- * Preview needs no draft, no publish and no cleanup — it reads the already-PUBLISHED baseline version and renders it
- * against caller-supplied data, so this is read-only against seeded state; `send-delivery.spec.ts` covers the send itself.
+ * The three memoir EMAIL baseline templates rendered through the studio preview API (`POST /versions/preview`), which reads the PUBLISHED version and needs no draft, publish or
+ * cleanup. `send-delivery.spec.ts` covers the send.
  */
 const CASES: MemoirTemplateCase[] = [
   {

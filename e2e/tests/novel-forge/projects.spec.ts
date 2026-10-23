@@ -4,12 +4,7 @@ import { buildBundle, expect, readZip, test } from './forge-bundles';
 import { readProjectRow, UNREGISTERED_MODEL } from './forge-db';
 import { createNovel, errorCode } from './forge-helpers';
 
-/**
- * Declaring the constants
- *
- * Project CRUD, settings and export, AI-free, each on a project a fresh actor owns. Assertions are contract-level — status codes, error
- * codes, persisted shapes — rather than copy text.
- */
+/** AI-free CRUD, settings and export, each on a project a fresh actor owns; assertions are contract-level (status and error codes, persisted shapes) rather than copy text. */
 
 test.describe('novel-forge project CRUD and settings (API)', () => {
   test('should create a project, list it, and answer its status and cost endpoints', async ({ forge, lane }) => {
@@ -99,8 +94,8 @@ test.describe('novel-forge project settings (UI)', () => {
       const nextBrief = `Edited via the settings General tab ${Date.now().toString(36)}.`;
       await page.goto(`${requireProductUrl('novelForge')}/novels/${projectId}/settings`);
 
-      // A plain fill() appends on this controlled field, so it is cleared with the keyboard first. The workspace keeps a live connection
-      // open, so the page never reaches `networkidle`; the pre-filled value marks it ready instead.
+      // `fill()` appends on this controlled field, so clear it with the keyboard first. The workspace holds a live connection, so the page never reaches `networkidle`; the
+      // pre-filled value marks it ready.
       const field = page.getByLabel('Premise / brief');
       await expect(field).toHaveValue(/seed brief/);
       await field.click();

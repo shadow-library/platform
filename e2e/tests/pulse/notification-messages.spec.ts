@@ -5,19 +5,13 @@ import { expect, test } from './fixtures';
 import { createPublishedTemplate, insertNotificationJob, insertNotificationMessage } from './helpers';
 
 /**
- * Declaring the constants
- *
- * `GET /api/v1/notifications/messages` is the dev-only message log (`@EnableIf(app.stage === 'dev')` plus
- * `pulse:messages:read`). Its rows are arranged by writing the `notification_jobs` + `notification_messages` pair
- * `DevNotificationProvider` writes, because every send route into pulse is gated on the service-only
- * `notifications:send` scope no host-side caller can hold (see `security.spec.ts`).
- *
- * `pulse:messages:read` is declared by pulse but missing from identity's dev catalogue — identity's
- * `EcosystemSeedService.reconcileApplication` never adds a permission declared after its application exists — so
- * `createPulseStaff` creates the catalogue row with the test's role and removes it again afterwards.
+ * `GET /api/v1/notifications/messages` is the dev-only message log (`@EnableIf(app.stage === 'dev')` plus `pulse:messages:read`). Rows are arranged by writing the
+ * `notification_jobs` + `notification_messages` pair `DevNotificationProvider` writes, as every send route needs the service-only `notifications:send` scope (see
+ * `security.spec.ts`).
+ * An older dev catalogue can lack `pulse:messages:read` (identity's `reconcileApplication` never adds a permission declared after its application exists), so
+ * `createPulseStaff` creates the catalogue row with the test's role and removes it afterwards.
  */
 
-/** Every field `NotificationService.listMessages` projects; anything else on an item would be a leak. */
 const MESSAGE_FIELDS = ['id', 'createdAt', 'recipient', 'channel', 'locale', 'templateKey', 'messageType'];
 
 interface MessageItem {
@@ -27,7 +21,6 @@ interface MessageItem {
   templateKey: string;
 }
 
-/** `utils.string.mask`'s default shape: the first and last character survive, everything between is starred. */
 function masked(recipient: string): string {
   return `${recipient[0]}${'*'.repeat(recipient.length - 2)}${recipient.at(-1)}`;
 }
@@ -57,8 +50,7 @@ test.describe('notification message log', () => {
     const recipient = `e2e.msglog.${randomBytes(6).toString('hex')}@shadow-apps.test`;
     const renderedBody = `E2E rendered body ${randomBytes(8).toString('hex')}`;
     const renderedSubject = `E2E rendered subject ${randomBytes(4).toString('hex')}`;
-    // Dated outside the dashboard's seven-day trend window, so this row cannot move the counts `dashboard.spec.ts`
-    // asserts a delta on while the two run side by side. The message log itself is not date-filtered.
+    // Dated outside the dashboard's seven-day trend window, so it cannot move the counts `dashboard.spec.ts` asserts a delta on. The message log is not date-filtered.
     const queuedAt = new Date(Date.now() - 30 * 86_400_000);
     const jobId = await insertNotificationJob({ templateId: template.id, templateVersionId: template.versionId, channel: 'EMAIL', recipient, status: 'SENT', createdAt: queuedAt });
     pulse.trackJobs(jobId);

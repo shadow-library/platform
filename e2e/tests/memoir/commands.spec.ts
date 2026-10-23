@@ -60,33 +60,25 @@ interface HeldLock<T> {
 }
 
 /**
- * Declaring the constants
- *
- * The command bus and the hero ledger, driven through `POST /api/v1/sync/commands` on fresh personas. Where a property is about
- * what happens *while* a command is inside its transaction, a reserved `memoirDb()` connection holds a lock the command needs, so
- * the test can observe it mid-flight (`pg_locks`) instead of hoping the timing lines up.
+ * The command bus and hero ledger via `POST /api/v1/sync/commands` on fresh personas. For properties about a command mid-transaction, a reserved `memoirDb()` connection holds a
+ * lock the command needs, so the test observes it via `pg_locks` instead of timing.
  */
 
-/** `CURRENT_RULESET_VERSION` in apps/memoir-server/src/modules/rules/ruleset.ts. */
 const ACTIVE_RULESET_VERSION = 1;
 
-/** level.ts: level 2 costs `round(curveCoefficient * 1^curveExponent)` = 100 XP under ruleset v1's curve (ruleset.ts `level`). */
+/** Level 2 costs `round(curveCoefficient * 1^curveExponent)` = 100 XP under ruleset v1. */
 const LEVEL_TWO_XP = 100;
 
-/** A routine on-time completion earns 10 XP (ruleset.ts `baseXp.routine.on_time`), so 12 cross level 2 with two to spare after it. */
+/** A routine on-time completion earns 10 XP (`ruleset.ts` `baseXp.routine.on_time`), so 12 cross level 2 with two to spare. */
 const LEVEL_UP_COMPLETIONS = 12;
 
 /**
- * Memoir-server's pool is 10 connections and every request queued on the advisory lock pins one inside its open transaction. Two
- * copies of this test (two workers) at five waiters each exhausted it outright, starving the other account's command; three each
- * (two racing resends and one distinct command) leave room for that command and for other concurrent memoir traffic.
+ * Memoir-server's pool is 10 connections and each request queued on the advisory lock pins one. Two workers at five waiters each exhausted it; three each leave room for the
+ * other account's command.
  */
 const SERIALIZED_BURST = 3;
 
-/**
- * A blocker still holding its lock at the 30 s test timeout would outlive the abandoned test body and stall the fixture's account
- * delete behind it, so every hold is released well before then.
- */
+/** A blocker still holding its lock at the 30 s test timeout would stall the fixture's account delete behind it, so every hold is released well before then. */
 const HOLD_DEADLINE_MS = 15_000;
 
 class LockHoldTimeoutError extends Error {
@@ -103,7 +95,6 @@ async function mirrorsOf(accountId: string): Promise<AccountMirrors> {
   return row;
 }
 
-/** What the account's `hero_events` add up to — the authoritative source every mirror must equal. */
 async function ledgerTotalsOf(accountId: string): Promise<Mirrors> {
   const [row] = await memoirDb()<Mirrors[]>`
     SELECT
@@ -155,7 +146,6 @@ async function countsOf(accountId: string): Promise<{ commands: number; events: 
   return row;
 }
 
-/** The single backend queued behind `blockerPid`, which by construction is the command the test fired. */
 async function soleWaiterOf(blockerPid: number): Promise<number> {
   const waiters = await memoirDb()<{ pid: number }[]>`SELECT pid FROM pg_stat_activity WHERE ${blockerPid}::int = ANY(pg_blocking_pids(pid))`;
   expect(waiters, 'exactly the fired command must be queued behind the blocker').toHaveLength(1);
@@ -164,7 +154,6 @@ async function soleWaiterOf(blockerPid: number): Promise<number> {
   return waiter.pid;
 }
 
-/** The tables `pid` has written in its still-open transaction: a `RowExclusiveLock` is taken by INSERT/UPDATE/DELETE and held to commit. */
 async function tablesWrittenBy(pid: number): Promise<string[]> {
   const rows = await memoirDb()<{ relation: string }[]>`
     SELECT relation::regclass::text AS relation FROM pg_locks WHERE pid = ${pid} AND locktype = 'relation' AND mode = 'RowExclusiveLock' AND granted
@@ -173,8 +162,8 @@ async function tablesWrittenBy(pid: number): Promise<string[]> {
 }
 
 /**
- * The per-account advisory lock as `pg_locks` reports it. A one-bigint key is split into `classid` (high 32 bits) and `objid` (low 32
- * bits) with `objsubid = 1`, so reassembling them and comparing to the account id checks the key derivation, not just "some lock".
+ * The per-account advisory lock as `pg_locks` reports it: the one-bigint key is split into `classid` (high 32 bits) and `objid` (low 32) with `objsubid = 1`; reassembling them
+ * checks the key derivation.
  */
 async function accountLockHolders(accountId: string): Promise<{ pid: number; granted: boolean }[]> {
   return memoirDb()<{ pid: number; granted: boolean }[]>`
@@ -196,7 +185,6 @@ async function commandLogXmin(accountId: string, commandId: string): Promise<str
   return row.xmin;
 }
 
-/** Rejects when `work` outlives the hold deadline; the work itself keeps running, but nothing waits on it any more. */
 async function withinHoldDeadline(work: Promise<void>): Promise<void> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const deadline = new Promise<never>((_, reject) => {
@@ -211,9 +199,8 @@ async function withinHoldDeadline(work: Promise<void>): Promise<void> {
 }
 
 /**
- * Holds a lock on a reserved connection, fires work that must queue behind it, runs `whileHeld`, then rolls the blocker back and
- * returns the fired work's result. The rollback and the drain run even when an assertion inside fails or `whileHeld` stalls past
- * the hold deadline, so nothing stays locked into the fixture's teardown.
+ * Holds a lock on a reserved connection, fires work that must queue behind it, runs `whileHeld`, then rolls back and drains, even if an assertion fails or `whileHeld` stalls
+ * past the hold deadline.
  */
 async function underHeldLock<T>({ take, fire, whileHeld }: HeldLock<T>): Promise<T> {
   const blocker = await memoirDb().reserve();
@@ -269,7 +256,6 @@ async function soleOutcome(response: APIResponse): Promise<CommandOutcome> {
   return outcome;
 }
 
-/** The index of the completion whose award first brings the running XP total to `threshold`, or -1 if none does. */
 function crossingIndexOf(outcomes: CommandOutcome[], threshold: number): number {
   let cumulative = 0;
   for (const [index, outcome] of outcomes.entries()) {
@@ -327,9 +313,8 @@ test.describe('memoir command replay', () => {
 
 test.describe('memoir per-account command serialization', () => {
   /**
-   * The account's advisory lock is taken first from a reserved connection, so every request's transaction queues on it and the race is
-   * certain rather than timing-dependent. Released, the queue drains one transaction at a time: the first K to commit claims the id and
-   * every later K reads that claim back.
+   * The advisory lock is taken first from a reserved connection so the race is certain, not timing-dependent; released, the queue drains one transaction at a time: the first K
+   * to commit claims the id and every later K reads that claim back.
    */
   test('should serialize racing resends and a distinct command for one account behind its advisory lock while another account proceeds', async ({ memoir }) => {
     const [alice, bob] = await Promise.all([memoir.persona({ label: 'cmd-serial-a', onboard: true }), memoir.persona({ label: 'cmd-serial-b', onboard: true })]);
@@ -391,14 +376,13 @@ test.describe('memoir command rollback', () => {
   test('should leave no command-log claim or ledger effect when a handler refuses, and commit a fresh command afterwards', async ({ memoir }) => {
     const persona = await memoir.persona({ label: 'cmd-refused', onboard: true });
     const accountId = accountIdOf(persona);
-    // The day-opening rollover writes the account row before the claim, and the blocker would stall it there; a pull opens the day first.
     await pullDelta(persona.ctx);
     const mirrorsBefore = await mirrorsOf(accountId);
     const countsBefore = await countsOf(accountId);
     const purchase = commandEnvelope('cosmetic.purchase', { cosmeticId: 'badge_silver' });
 
-    // The grant reads the account FOR UPDATE after the bus has claimed the id, so holding that row pauses the command between the two.
-    // NO KEY UPDATE, because the claim's foreign-key check takes KEY SHARE on the same row and must not be the thing that waits.
+    // The grant reads the account FOR UPDATE after the bus claims the id, so holding that row pauses the command between the two. NO KEY UPDATE, because the claim's foreign-key
+    // check takes KEY SHARE on the same row.
     const response = await underHeldLock({
       take: blocker => blocker`SELECT id FROM accounts WHERE id = ${accountId} FOR NO KEY UPDATE`,
       fire: () => postCommands(persona.ctx, [purchase]),
@@ -426,8 +410,8 @@ test.describe('memoir command rollback', () => {
   });
 
   /**
-   * `progress_counters` is first touched after the completion's grant, so holding its row pauses the command with the event row and
-   * the mirror update written but uncommitted. Cancelling that statement aborts the transaction the grant ran in.
+   * `progress_counters` is first touched after the completion's grant, so holding its row pauses the command with the event row and mirror update written but uncommitted;
+   * cancelling that statement aborts the grant's transaction.
    */
   test('should roll back an applied grant with its enclosing transaction, leaving no event row and unmoved mirrors', async ({ memoir }) => {
     const persona = await memoir.persona({ label: 'cmd-rollback', onboard: true });
@@ -575,7 +559,6 @@ test.describe('memoir hero ledger', () => {
     expect(await xminOf('hero_events', levelUp.id), 'in the same transaction as that grant').toBe(await xminOf('hero_events', crossingEvent?.id ?? '0'));
     expect((await mirrorsOf(accountId)).level).toBe(2);
 
-    // Rewinding only the level mirror makes the next grant re-derive the crossing to level 2, whose event is already recorded.
     await memoirDb()`UPDATE accounts SET level = 1 WHERE id = ${accountId}`;
     const [rederived] = await submitCommands(persona.ctx, [completion(replayQuest)]);
     expect(rederived).toMatchObject({ status: 'applied', result: { levelAfter: 2 } });

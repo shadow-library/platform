@@ -54,15 +54,11 @@ interface AuditRow {
 }
 
 /**
- * Declaring the constants
- *
- * Identity's admin console API: who may reach it, and what the user, application and release endpoints do. Every
- * application, client, organisation and account here is the test's own — the platform application and the seeded
- * ecosystem clients are only ever read, or used as the subject of a refusal that changes nothing. The bootstrap
- * admin is the acting administrator throughout, on a database-minted session at the assurance level each case needs.
+ * The admin console API: who may reach it and what the user, application and release endpoints do. Every application, client, organisation and account is the test's own; the
+ * platform application and seeded ecosystem clients are only read or used as the subject of a refusal that changes nothing. The bootstrap admin acts throughout, on a
+ * database-minted session at the assurance level each case needs.
  */
 
-/** Every permission `GET /api/v1/admin/context` may report, which is identity's whole admin taxonomy. */
 const ADMIN_PERMISSIONS = [
   'iam:users:read',
   'iam:users:manage',
@@ -519,7 +515,6 @@ test.describe('identity admin application release', () => {
     const application = await identity.createOAuthApp('release');
     const team = await identity.createTeam({ label: 'release' });
 
-    // The application factory sets the visibility it was asked for, so the baseline is not empty.
     const before = (await auditRowsFor('application.visibility.changed', String(application.applicationId))).length;
     const restricted = await identityMutate(admin.ctx, 'patch', `/api/v1/admin/applications/${application.applicationId}`, { visibility: 'RESTRICTED' });
     expect(restricted.status(), await restricted.text()).toBe(200);

@@ -2,12 +2,6 @@ import { expect, test } from '@playwright/test';
 
 import { apiContext, requireProductUrl } from '../../lib';
 
-/**
- * Declaring the constants
- *
- * The internal health contract (`/health/live`, `/health/ready`) is asserted for every configured product,
- * memoir included, by `tests/health-not-exposed.spec.ts` — nothing memoir-specific belongs here for that.
- */
 test.describe('memoir smoke', () => {
   test.beforeEach(() => requireProductUrl('memoir'));
 

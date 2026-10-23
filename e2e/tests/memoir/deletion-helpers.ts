@@ -14,17 +14,14 @@ export interface ElevatedTokenOptions {
 }
 
 /**
- * Issues memoir-audience tokens for a persona through a throwaway first-party application that holds `memoir:account` and
- * `memoir:destructive` on `api://memoir`. The elevated path is identity's real step-up: the persona re-authenticates for this
- * client and resource, the app session claims that step-up, and identity mints an `AAL2` token from the claimed grant.
+ * Issues memoir-audience tokens through a throwaway first-party application holding `memoir:account` and `memoir:destructive` on `api://memoir`; the elevated path is identity's
+ * real step-up (re-authenticate, claim in the app session, mint `AAL2`).
  */
 export interface MemoirTokenIssuer {
   readonly client: OAuthTestClient;
-  /** The throwaway application's own audience — somewhere other than memoir a token can be minted for. */
   readonly audience: string;
-  /** A plain authorization-code token: no `aal` claim, and no sensitive scope such as `memoir:destructive`, which identity withholds without a step-up. */
+  /** A plain authorization-code token: no `aal` claim and no `memoir:destructive`, which identity withholds without a step-up. */
   unelevated(persona: MemoirPersona, scope?: string): Promise<string>;
-  /** Opens an app session, steps the persona up for `resource`, claims it, and mints an `AAL2` token for `resource`. */
   elevated(persona: MemoirPersona, options?: ElevatedTokenOptions): Promise<string>;
 }
 
@@ -35,7 +32,6 @@ export interface DeletionRow {
 
 export interface StoredReceipt {
   readonly ref: string;
-  /** A presigned `GET` for the stored object, valid for 15 minutes. */
   readonly downloadUrl: string;
 }
 
@@ -49,7 +45,6 @@ export const ACCOUNT_SCOPE = 'memoir:account';
 export const DESTRUCTIVE_SCOPE = 'memoir:destructive';
 export const DELETION_PATH = '/api/v1/account/deletion';
 
-/** A 1×1 PNG, small enough for any receipt limit and a content type the confirm step's HEAD check accepts. */
 export const RECEIPT_PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64');
 
 export class MemoirDeletionError extends Error {
@@ -101,7 +96,6 @@ export async function deletionRowOf(accountId: string): Promise<DeletionRow | un
   return row;
 }
 
-/** Polls the account row until it reaches `state` (or disappears, which reads as `undefined`), returning the last row read. */
 export function waitForDeletionState(accountId: string, state: DeletionState, timeoutMs = 20_000): Promise<DeletionRow | undefined> {
   return pollUntil(
     () => deletionRowOf(accountId),
@@ -116,7 +110,6 @@ export async function databaseNow(): Promise<Date> {
   return row.now;
 }
 
-/** Every table carrying an `account_id` — the set the relational purge must empty, read from the live schema rather than restated. */
 export async function accountOwnedTables(): Promise<string[]> {
   const rows = await memoirDb()<{ table: string }[]>`
     SELECT table_name AS table FROM information_schema.columns
@@ -126,7 +119,6 @@ export async function accountOwnedTables(): Promise<string[]> {
   return rows.map(row => row.table);
 }
 
-/** Row counts per table for `accountId`, one statement across every table. Table names come from `information_schema`, never from input. */
 export async function ownedRowCounts(accountId: string, tables: readonly string[]): Promise<Record<string, number>> {
   const union = tables.map(table => `SELECT '${table}' AS table, count(*)::int AS rows FROM "${table}" WHERE account_id = $1`).join(' UNION ALL ');
   const rows = await memoirDb().unsafe<{ table: string; rows: number }[]>(union, [accountId]);
@@ -142,7 +134,6 @@ async function withStorage<T>(use: (storage: APIRequestContext) => Promise<T>): 
   }
 }
 
-/** Uploads {@link RECEIPT_PNG} through memoir's presigned-URL flow and confirms it, so a real object sits under the account's `r/<id>/` prefix. */
 export async function storeReceipt(ctx: APIRequestContext): Promise<StoredReceipt> {
   const created = await memoirMutate(ctx, 'post', '/api/v1/receipts', { data: { contentType: 'image/png', sizeBytes: RECEIPT_PNG.length } });
   if (created.status() !== 201) throw new MemoirDeletionError(`receipt create answered ${created.status()}: ${await created.text()}`);
@@ -167,8 +158,8 @@ export function fetchObject(url: string): Promise<ObjectFetch> {
 }
 
 /**
- * Leaves rows across the quest, progression, device, command, finance and receipt tables: a completed daily quest, a registered
- * device, and an expense carrying a stored receipt (which also writes two `expense_audits` rows and seeds the categories).
+ * Leaves rows across the quest, progression, device, command, finance and receipt tables: a completed daily quest, a device, and an expense with a stored receipt (two
+ * `expense_audits` rows, seeded categories).
  */
 export async function seedAccountActivity(persona: MemoirPersona, label: string): Promise<StoredReceipt> {
   const { occurrenceId } = await createDailyQuest(persona.ctx, `E2E deletion ${label} ${randomUUID()}`);
@@ -193,9 +184,8 @@ export async function seedAccountActivity(persona: MemoirPersona, label: string)
 }
 
 /**
- * Drives `persona`'s own deletion to `data_deleted`, whose step 3 removes everything under the account's `r/<id>/` and
- * `exports/<id>/` prefixes — the one cleanup that reaches an object a half-finished setup uploaded, since the receipt orphan sweep
- * only walks the prefixes of accounts that still exist. An account whose deletion has already started is left as it is.
+ * Drives `persona`'s deletion to `data_deleted`, whose step 3 removes everything under `r/<id>/` and `exports/<id>/`: the one cleanup that reaches an object a half-finished
+ * setup uploaded, since the orphan sweep only walks prefixes of existing accounts. A deletion already started is left alone.
  */
 export async function wipeAccount(issuer: MemoirTokenIssuer, guest: APIRequestContext, persona: MemoirPersona, accountId: string): Promise<void> {
   if ((await deletionRowOf(accountId))?.state !== 'none') return;

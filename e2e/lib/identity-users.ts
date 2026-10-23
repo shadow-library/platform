@@ -55,14 +55,10 @@ export interface FederatedLink {
 }
 
 /**
- * Declaring the constants
- *
- * Creates identity users straight in the database, writing the same rows password registration does (user, profile, primary
- * email, PASSWORD identity + argon2id hash + its `password_history` row, personal organisation with an OWNER membership). Registration itself spends the
- * 5/hour `register-init` budget and needs an OTP round-trip; this costs a few inserts. Specs run under node, which has no argon2,
- * so the hash is copied from a seeded persona — every factory user therefore signs in with that persona's password. The source is
- * the `locked` persona because no spec ever changes its password: `account.spec.ts` changes `user1`'s mid-run, and a hash copied
- * inside that window would sign nobody in.
+ * Creates identity users straight in the database, writing the rows password registration does (user, profile, primary email, PASSWORD identity + argon2id hash +
+ * `password_history`, personal organisation with an OWNER membership) without spending the 5/hour `register-init` budget or an OTP round-trip.
+ * Specs run under node, which has no argon2, so the hash is copied from a seeded persona and every factory user signs in with that persona's password.
+ * The source is `locked` because no spec changes its password: `account.spec.ts` rotates `user1`'s mid-run, and a hash copied in that window would sign nobody in.
  */
 
 const HASH_SOURCE = PERSONAS.locked;
@@ -90,7 +86,6 @@ function copiedPasswordHash(): Promise<string> {
   return passwordHash;
 }
 
-/** A unique, unmistakably synthetic `.test` address. */
 export function uniqueEmail(label = 'user'): string {
   return `e2e.${label}.${Date.now().toString(36)}${randomBytes(3).toString('hex')}@shadow-apps.test`;
 }
@@ -148,11 +143,9 @@ export async function createIdentityUser(options: IdentityUserOptions = {}): Pro
 }
 
 /**
- * Removes a factory or API-registered user: the user row (its sessions, credentials, emails, memberships and the rest cascade), the
- * sign-in events and verification challenges that outlive it, the notifications identity queued and pulse delivered to any address it
- * held, its unfinished auth flows, its personal organisation, identity's Redis set of its session hashes and its per-identifier OTP
- * counters. Idempotent, so it is safe in a teardown that may run after a failed create or a spec that already deleted the user
- * through the API.
+ * Removes a factory or API-registered user: the user row (sessions, credentials, emails, memberships cascade), the sign-in events and verification challenges that
+ * outlive it, notifications queued or delivered to its addresses, unfinished auth flows, its personal organisation, its Redis session-hash set and OTP counters.
+ * Idempotent, so safe in a teardown after a failed create or a spec that already deleted the user.
  */
 export async function deleteIdentityUser(user: IdentityUserRef): Promise<void> {
   const sql = identityDb();
@@ -202,9 +195,8 @@ export async function findIdentityUserByEmail(email: string): Promise<IdentityUs
 }
 
 /**
- * Links `user` to an upstream subject on an OIDC provider owned by the user's personal organisation, the state a federated
- * sign-in leaves behind. The provider never routes or signs anyone in, and it goes with the personal organisation. It is
- * inactive unless `isActive` says otherwise — an active one is what identity requires before it will start a federated step-up.
+ * Links `user` to an upstream subject on an OIDC provider owned by the user's personal organisation (it goes with that organisation), the state a federated sign-in leaves.
+ * Inactive unless `isActive` says otherwise; identity requires an active one before it starts a federated step-up.
  */
 export async function linkFederatedIdentity(user: Pick<IdentityUser, 'userId' | 'personalOrgId'>, options: FederatedLinkOptions = {}): Promise<FederatedLink> {
   const sql = identityDb();

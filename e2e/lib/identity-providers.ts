@@ -39,8 +39,6 @@ export interface GlobalProviderSnapshot {
 }
 
 /**
- * Declaring the constants
- *
  * The platform-wide social identity providers (`identity_providers` with no organisation), which are global
  * mutable state: one row per kind, and a social auth mode is enabled exactly when its provider row is active.
  * Creating one runs real OIDC discovery against the issuer, so the upstream must be reachable from the cluster.

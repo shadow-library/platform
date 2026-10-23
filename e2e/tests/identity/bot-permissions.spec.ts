@@ -57,18 +57,12 @@ interface GrantItem {
 }
 
 /**
- * Declaring the constants
- *
- * What an organisation may hand a bot, and what the server re-checks when it does. The grantable roles come from the
- * real catalog sync — a manifest pushed to a throwaway application by its own client — because bot grantability,
- * sensitivity and the resource/level slot a grant is named by are all columns only that sync writes. Identity's own
- * `identity:org:*` roles are the exception: they are held by organisation rank, so an ADMIN may grant them without
- * holding any role assignment, and the platform application's grantable set is asserted against them rather than
- * pushed to.
- *
- * Every refusal here is followed by the grant that must still succeed, and every grant is read back from both the
- * API and the `role_assignments` row behind it, since the provenance marker that separates a grant made here from a
- * platform-staff assignment lives only in that row.
+ * What an organisation may hand a bot and what the server re-checks. Grantable roles come from a real catalog sync (a manifest pushed to a throwaway application by its own
+ * client) because bot grantability, sensitivity and the resource/level slot are columns only that sync writes.
+ * Identity's `identity:org:*` roles are the exception: held by organisation rank, so an ADMIN may grant them with no role assignment, and the platform application's grantable
+ * set is asserted against them.
+ * Every refusal is followed by the grant that must still succeed, and every grant is read back from the API and the `role_assignments` row, as the provenance marker separating
+ * it from a platform-staff assignment lives only there.
  */
 
 const READ = 'widgets:read';

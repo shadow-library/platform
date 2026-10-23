@@ -35,11 +35,8 @@ interface MfaSummary {
 }
 
 /**
- * Declaring the constants
- *
- * Passkeys end to end, driven by the software authenticator in `lib/webauthn.ts`: registration behind a self-service
- * elevation, the passkey as the second factor after a password, usernameless sign-in, step-up and removal. Users come from
- * the database factory so only the logins under test spend `login/init`, on the test's own client address.
+ * Passkeys end to end via the software authenticator in `lib/webauthn.ts`: registration behind a self-service elevation, the passkey as second factor, usernameless sign-in,
+ * step-up and removal. Users come from the factory so only the logins under test spend `login/init`.
  */
 
 const WEBAUTHN_PATH = '/api/v1/me/webauthn';
@@ -138,8 +135,7 @@ test.describe('identity WebAuthn — registration', () => {
     await expectRefused(await identityMutate(unelevated, 'post', `${WEBAUTHN_PATH}/register/options`), 403, 'AUTH_006');
     expect(await credentialRows(user.userId), 'a refused options call must provision nothing').toEqual([]);
 
-    // The elevation guard runs before the challenge is consumed, so the very attestation an un-elevated session was refused
-    // still registers on an elevated one.
+    // The elevation guard runs before the challenge is consumed, so the attestation an un-elevated session was refused still registers on an elevated one.
     const attestation = first.attest(await registrationOptions(ctx), { label: 'first key' });
     await expectRefused(await identityMutate(unelevated, 'post', `${WEBAUTHN_PATH}/register/verify`, attestation), 403, 'AUTH_006');
     expect(await credentialRows(user.userId), 'a refused verify must store no credential').toEqual([]);
@@ -337,8 +333,8 @@ test.describe('identity WebAuthn — account UI', () => {
     await addIdentitySessionCookies(context, session);
     await useClientIp(context, identity.clientIp);
 
-    // Chrome's own authenticator, driven over CDP: the browser runs the real `navigator.credentials.create` ceremony the
-    // node authenticator has to imitate. Resident keys and a pre-verified user, so the page never waits on a gesture.
+    // Chrome's own authenticator over CDP runs the real `navigator.credentials.create` ceremony the node authenticator imitates; resident keys and a pre-verified user avoid
+    // waiting on a gesture.
     const cdp = await context.newCDPSession(page);
     await cdp.send('WebAuthn.enable');
     await cdp.send('WebAuthn.addVirtualAuthenticator', {
@@ -348,9 +344,8 @@ test.describe('identity WebAuthn — account UI', () => {
     await page.goto(`${requireProductUrl('identity')}/account/security`);
     await expect(page.getByText(/No passkeys yet/i)).toBeVisible();
 
-    // The page is server-rendered, so a click that lands before hydration attaches the handler does nothing at all;
-    // retry until the ceremony actually starts. The credential count below is what proves it started exactly once.
-    // The first factor an account gains hands back its recovery codes, so the page shows those instead of the passkey list.
+    // The page is server-rendered, so a click before hydration attaches the handler does nothing: retry until the ceremony starts (the credential count proves exactly once). A
+    // first factor hands back recovery codes, so the page shows those instead of the passkey list.
     await expect(async () => {
       await page.getByRole('button', { name: 'Add a passkey' }).click();
       await expect(page.getByRole('heading', { name: /Save your recovery codes/i })).toBeVisible({ timeout: 8_000 });

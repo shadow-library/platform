@@ -5,11 +5,7 @@ import { insertChatMessage } from './forge-bible';
 import { NOVEL_NOTES, uniqueSuffix } from './forge-helpers';
 
 /**
- * Declaring the constants
- *
- * NF2-NEW-01 — new novel, notes and progress. Every route here is model-free (title/notes/progress are plain CRUD), so no project
- * needs a spend guard. The happy path (verbatim notes, an auto-mode chat) lives in `new-novel.spec.ts`; this file covers the caps,
- * refusals and ownership checks.
+ * Every route here is model-free CRUD, so no project needs a spend guard. The happy path lives in `new-novel.spec.ts`; this file covers the caps, refusals and ownership checks.
  */
 
 const TEN_THOUSAND_AND_ONE_WORDS = Array.from({ length: 10_001 }, (_, index) => `word${index}`).join(' ');

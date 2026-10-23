@@ -7,11 +7,8 @@ import { expect, test } from './fixtures';
 import { countOutboxRows, expectErrorCode, expectSessionCookie, flowChallenges, flowStepOf, pollSmsOtp } from './helpers';
 
 /**
- * Declaring the constants
- *
- * The `SMS_OTP` auth mode is a global switch, so this file runs in the `identity-serial` project (one worker, no in-file
- * parallelism — see `playwright.config.ts`) and puts the switch back exactly as it found it. Only a phone identifier reacts to
- * it, and no other spec signs in by phone, so flipping it cannot disturb the rest of the suite.
+ * `SMS_OTP` is a global switch, so this file runs in the `identity-serial` project and restores it exactly. Only a phone identifier reacts to it and no other spec signs in by
+ * phone.
  */
 
 const LOGIN_OTP_TEMPLATE = 'auth.login.otp';

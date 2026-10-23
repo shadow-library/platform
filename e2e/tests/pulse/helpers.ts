@@ -67,19 +67,13 @@ export interface NotificationJobRow {
 }
 
 /**
- * Declaring the constants
- *
- * Shared setup/teardown for the pulse spec suite. Every helper here creates or cleans up an
- * `e2e-`-prefixed resource the calling spec owns outright — nothing touches the seeded `e2e-dev` sender
- * profile/endpoints/routing rule or the baseline `auth.*` template catalog. `mutate` (from `../../lib`)
- * already handles the CSRF double-submit dance for the admin-authenticated `APIRequestContext` every spec
- * builds via `apiContext('pulse', 'admin')`.
+ * Every helper creates or cleans up an `e2e-`-prefixed resource the calling spec owns; nothing touches the seeded `e2e-dev` sender profile/endpoints/routing rule or the baseline
+ * `auth.*` catalog.
  */
 
 /**
- * A `notifications:send` bearer for pulse, minted as memoir's service client. Memoir is the one first-party client holding the
- * scope whose credential a host-side process can present: identity binds it to the `memoir/memoir-server` workload, and
- * `kubectl create token` issues that service account's projected token without touching the cluster.
+ * A `notifications:send` bearer for pulse, minted as memoir's service client: memoir is the one first-party client holding the scope whose credential a host-side process
+ * can present, since identity binds it to the `memoir/memoir-server` workload and `kubectl create token` issues that service account's projected token.
  */
 export async function memoirSendToken(identity: APIRequestContext): Promise<string> {
   const assertion = await mintServiceAccountToken('memoir', 'memoir-server', { audiences: [new URL(requireProductUrl('identity')).origin] });
@@ -105,9 +99,8 @@ export async function createTemplate(ctx: APIRequestContext, overrides: Template
 }
 
 /**
- * Templates have no DELETE route, and a deactivated one stays in the catalogue for good, so a test's templates are removed in
- * the database: their jobs and messages first (`notification_jobs` restricts the delete), then the template, whose versions,
- * contents and channel settings cascade.
+ * Templates have no DELETE route and a deactivated one stays in the catalogue, so they are removed in the database: jobs and messages first (`notification_jobs` restricts the
+ * delete), then the template, whose children cascade.
  */
 export async function deleteTemplates(templateIds: readonly string[]): Promise<void> {
   if (templateIds.length === 0) return;
@@ -159,7 +152,7 @@ export async function publishLayout(ctx: APIRequestContext, layoutId: string, no
   return mutate(ctx, 'post', `/api/v1/layouts/${layoutId}/publish`, { data: notes ? { notes } : {} });
 }
 
-/** Removes layout rows created for a test; `layout_versions` cascades off `layouts`. No DELETE route exists to do this via the API. */
+/** Removes layout rows created for a test (no DELETE route); `layout_versions` cascades. */
 export async function deleteLayouts(layoutIds: readonly string[]): Promise<void> {
   if (layoutIds.length === 0) return;
   const sql = pulseDb();
@@ -183,7 +176,7 @@ export async function publishPartial(ctx: APIRequestContext, partialId: string, 
   return mutate(ctx, 'post', `/api/v1/partials/${partialId}/publish`, { data: notes ? { notes } : {} });
 }
 
-/** Removes partial rows created for a test; `partial_versions` cascades off `partials`. No DELETE route exists to do this via the API. */
+/** Removes partial rows created for a test (no DELETE route); `partial_versions` cascades. */
 export async function deletePartials(partialIds: readonly string[]): Promise<void> {
   if (partialIds.length === 0) return;
   const sql = pulseDb();
@@ -233,10 +226,7 @@ export async function deleteRoutingRule(ctx: APIRequestContext, routingRuleId: s
   return mutate(ctx, 'delete', `/api/v1/sender-routing-rules/${routingRuleId}`);
 }
 
-/**
- * A template of the caller's own with one published `en-ZZ` EMAIL body, and the row id of that published version —
- * everything a `notification_jobs` row needs to point at, with no dependency on the baseline catalogue.
- */
+/** A template of the caller's own with one published `en-ZZ` EMAIL body, and its published version's row id, independent of the baseline catalogue. */
 export async function createPublishedTemplate(ctx: APIRequestContext, concern: string): Promise<{ id: string; templateKey: string; versionId: string }> {
   const created = await createTemplate(ctx, { templateKey: uniqueKey(concern), messageType: 'TRANSACTIONAL' });
   await mutate(ctx, 'put', `/api/v1/templates/${created.id}/channels/EMAIL`, { data: { isEnabled: true } });
@@ -247,10 +237,7 @@ export async function createPublishedTemplate(ctx: APIRequestContext, concern: s
   return { ...created, versionId: await findPublishedVersionId(created.id) };
 }
 
-/**
- * The id of `templateId`'s currently `PUBLISHED` version — `notification_jobs.template_version_id` is NOT NULL and
- * no API surfaces a version's row id (`VersionResponse` carries the version *number*).
- */
+/** The id of `templateId`'s `PUBLISHED` version: `notification_jobs.template_version_id` is NOT NULL and no API surfaces a version's row id. */
 export async function findPublishedVersionId(templateId: string): Promise<string> {
   const rows = await pulseDb()<{ id: string }[]>`
     SELECT id::text FROM template_versions WHERE template_id = ${templateId} AND status = 'PUBLISHED' ORDER BY version DESC LIMIT 1
@@ -261,10 +248,8 @@ export async function findPublishedVersionId(templateId: string): Promise<string
 }
 
 /**
- * Writes the `notification_jobs` row a queued delivery produces and returns its id.
- *
- * Every send path into pulse is `@RequireScope('notifications:send')`, a service-only scope no host-side caller can
- * hold (see `security.spec.ts`), so a delivery state is arranged by writing the row the queue would have written.
+ * Writes the `notification_jobs` row a queued delivery produces. Every send path is gated on the service-only `notifications:send` scope, so a delivery state is arranged by
+ * writing the row the queue would have written.
  */
 export async function insertNotificationJob(row: NotificationJobRow): Promise<string> {
   // `created_at` is a naive UTC `timestamp`: the client would parse a zone-less literal bound to it as host-local time, so the instant

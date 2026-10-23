@@ -60,11 +60,8 @@ export interface WebhookDeliveryRow {
 }
 
 /**
- * Declaring the constants
- *
- * Admin-side webhook management, plus the delivery reads and the `next_attempt_at` fast-forward a retry-ladder spec needs
- * between the worker's five-second ticks. Delivery targets stay inside identity's SSRF guard: nothing a spec registers is
- * ever fetched, so no receiver has to exist.
+ * Admin-side webhook management, plus delivery reads and a `next_attempt_at` fast-forward for retry-ladder specs between the worker's five-second ticks.
+ * Targets stay inside identity's SSRF guard, so nothing a spec registers is fetched and no receiver is needed.
  */
 
 const ADMIN_PATH = '/api/v1/admin/webhooks';
@@ -135,10 +132,7 @@ export async function readWebhookDeliveries(webhookId: string): Promise<WebhookD
   `;
 }
 
-/**
- * Puts a delivery `attemptCount` failures into the ladder and makes it due now, so the next worker tick runs the attempt
- * after it instead of the test waiting out a backoff measured in minutes.
- */
+/** Puts a delivery `attemptCount` failures into the ladder and makes it due now, so the test need not wait out a backoff measured in minutes. */
 export async function setWebhookDeliveryAttempts(deliveryId: string, attemptCount: number): Promise<void> {
   await identityDb()`UPDATE webhook_deliveries SET attempt_count = ${attemptCount}, next_attempt_at = now() WHERE id = ${deliveryId}`;
 }

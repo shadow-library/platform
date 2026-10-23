@@ -19,19 +19,14 @@ interface DashboardStats {
 }
 
 /**
- * Declaring the constants
- *
- * `GET /api/v1/dashboard/stats` aggregates `notification_jobs` across the whole deployment — no organisation or
- * service scoping — so the bucketing is asserted as the *delta* between a read before and a read after this test's
- * own rows land, and this file runs in the single-worker `pulse-serial` project so no copy of it overlaps another.
- * The jobs are written straight to `notification_jobs` because every send route is gated on the service-only
- * `notifications:send` scope (see `security.spec.ts`).
+ * `GET /api/v1/dashboard/stats` aggregates `notification_jobs` across the whole deployment, so bucketing is asserted as the delta around this test's own rows, and the
+ * file runs in the single-worker `pulse-serial` project. Jobs are written straight to `notification_jobs` because every send route needs the service-only `notifications:send`
+ * scope.
  */
 const TREND_DAYS = 7;
 
 const DAY_MS = 86_400_000;
 
-/** One job per bucket: `SENT` is succeeded, `FAILED` is the retryable state and counts as pending, `PERMANENTLY_FAILED` is failed. */
 const ONE_PER_BUCKET: NotificationJobStatus[] = ['SENT', 'FAILED', 'PERMANENTLY_FAILED'];
 
 const ONE_PER_BUCKET_DELTA: DeliveryStats = { total: 3, succeeded: 1, failed: 1, pending: 1 };
@@ -56,7 +51,6 @@ function trendTotal(stats: DashboardStats): number {
   return stats.trend.stats.reduce((sum, day) => sum + day.total, 0);
 }
 
-/** `YYYY-MM-DD` for `offset` days before `date`, in UTC — the calendar the service buckets in. */
 function shiftDay(date: string, offset: number): string {
   return new Date(Date.parse(`${date}T00:00:00Z`) + offset * DAY_MS).toISOString().slice(0, 10);
 }
@@ -93,8 +87,7 @@ test.describe('dashboard stats', () => {
       pulse.trackJobs(await insertNotificationJob({ templateId: template.id, templateVersionId: template.versionId, channel, recipient, status, createdAt }));
     };
 
-    // Today's rows go on PUSH: nothing in this deployment has ever queued a push job, so that bucket moves only by
-    // what this test queued even if an unrelated email or SMS delivery lands between the two reads.
+    // Today's rows go on PUSH, which nothing else queues, so that bucket moves only by this test's rows even if an unrelated email or SMS delivery lands between the reads.
     for (const status of ONE_PER_BUCKET) await queue('PUSH', status, new Date());
     await queue('EMAIL', 'SENT', new Date(Date.parse(`${inWindow}T12:00:00Z`)));
     await queue('SMS', 'FAILED', new Date(Date.parse(`${inWindow}T12:00:00Z`)));

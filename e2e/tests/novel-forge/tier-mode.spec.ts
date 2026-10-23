@@ -15,10 +15,8 @@ interface ChatSession {
 }
 
 /**
- * Declaring the constants
- *
- * Model type (Standard / Unrestricted) and cost tier (Economy / Balanced / Performant), AI-free: the project default, a chat's own
- * setting, and a single turn's override are each stored and resolved without any model being called.
+ * AI-free: model type (Standard / Unrestricted) and cost tier (Economy / Balanced / Performant): the project default, a chat's own setting and a single turn's override are each
+ * stored and resolved without a model call.
  */
 
 const TIERS: readonly CostTier[] = ['economy', 'balanced', 'performant'];

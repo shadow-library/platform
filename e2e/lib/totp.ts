@@ -2,12 +2,6 @@ import { createHmac } from 'node:crypto';
 
 import { sleep } from './wait';
 
-/**
- * Declaring the constants
- *
- * RFC 6238 TOTP with identity's parameters (SHA-1, 6 digits, 30 s step), for answering a TOTP challenge from a spec.
- */
-
 const BASE32_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 const STEP_SECONDS = 30;
 const STEP_MS = STEP_SECONDS * 1000;

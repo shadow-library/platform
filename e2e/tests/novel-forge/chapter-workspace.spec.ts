@@ -25,11 +25,8 @@ interface ChapterReview {
 }
 
 /**
- * Declaring the constants
- *
- * The hand-writing path, AI-free: a chapter is started in order, written and saved against the revision the author read, checked by
- * the deterministic reviews, and approved. An approval queues the finalize-review read, a model call, so every novel here belongs to an
- * owner the test created and quota-pinned, and the read fails AI_008 before any dispatch.
+ * The AI-free hand-writing path: a chapter is started in order, saved against the revision the author read, checked by deterministic reviews, and approved. Approval queues a
+ * model call (the finalize-review read), so every novel belongs to a quota-pinned owner the test created and the read fails AI_008 before dispatch.
  */
 
 async function guardedNovel(forge: ForgeHarness, owner: ForgeActor, title: string): Promise<CreatedNovel> {

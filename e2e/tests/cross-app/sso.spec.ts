@@ -4,27 +4,18 @@ import { PERSONAS, requireProductUrl } from '../../lib';
 import { loginIdentity, scopedMutate } from './helpers';
 
 /**
- * Declaring the constants
+ * Single sign-on in one fresh browser context: one credential prompt at identity, then every consumer app signs in silently off identity's `__Host-sid` (the OIDC hop
+ * auto-completes). It is one `test` because it spends one of identity's 20/hour `login/init`.
  *
- * The platform's single-sign-on contract, exercised end to end in one fresh browser context with no saved state:
- * a single credential prompt at identity, then every consumer app signs the user in silently off identity's
- * central `__Host-sid` session (the OIDC hop auto-completes — `/oauth2/authorize` sees the session and never
- * shows a prompt). One login is spent here against identity's 20/hour `login/init` limit, so this whole flow is a
- * single `test` rather than several, and it does not run in the parallel persona pool the other specs reuse.
- *
- * The second half asserts the platform's real *logout* semantics. Identity-side signout clears the central
- * `__Host-sid`, so identity's own portal must bounce to login again. Each consumer app's session is a separate
- * opaque handle in that app's own store (`__Host-shadow-session`), with no back-channel logout wired to identity
- * signout (identity's `terminateAllForUser` only touches its own session table + Redis) — so those app sessions
- * survive an identity signout, but not indefinitely: Novel Forge's lasts only until its cached identity access token
- * needs refreshing (~59 min after login), when the refresh fails against the ended central session. The assertions
- * below run seconds after signout, well inside that window.
+ * Logout semantics: identity signout clears `__Host-sid`, so identity's portal bounces to login. Each consumer app's session is an independent opaque handle in its own store
+ * (`__Host-shadow-session`) with no back-channel logout from signout, so it survives until its cached identity access token needs refreshing (~59 min for Novel Forge).
+ * The assertions run seconds after signout, well inside that window.
  */
 const IDENTITY_LOGIN_PATTERN = /identity\.shadow-apps\.test\/login/i;
 
 test.describe('single sign-on across apps', () => {
   test('should sign in once at identity and ride that session silently into every consumer app', async ({ browser }) => {
-    // One login + two multi-hop OIDC navigations + a signout dance comfortably exceed the 30s default.
+    // One login, two multi-hop OIDC navigations and a signout exceed the 30s default.
     test.setTimeout(120_000);
 
     const identityUrl = requireProductUrl('identity');
@@ -36,14 +27,10 @@ test.describe('single sign-on across apps', () => {
     try {
       const page = await context.newPage();
 
-      // The single credential prompt. `page.request` shares the browser context's cookie jar, so `__Host-sid`
-      // lands where the subsequent navigations will read it.
       await loginIdentity(page.request, identityUrl, user2.email, user2.password);
 
-      // Novel Forge: hitting a gated route with no app session kicks off the OIDC hop, which finds `__Host-sid`
-      // and completes without a prompt — the browser is expected to settle back on Novel Forge's own origin. The web
-      // app starts that hop client-side after `goto` has already resolved on its own origin (`routes/login.tsx`), so
-      // only the callback's response proves the hop ran; asserting the URL alone passed before it had begun.
+      // The web app starts the hop client-side after `goto` resolves (`routes/login.tsx`), so only the callback's response proves it ran; asserting the URL alone passed before
+      // it began.
       const forgeCallback = page.waitForResponse(response => response.url().startsWith(`${novelForgeUrl}/api/auth/callback`), { timeout: 30_000 });
       await page.goto(`${novelForgeUrl}/`);
       expect((await forgeCallback).status(), 'the Novel Forge OIDC callback should establish the app session and redirect').toBe(302);
@@ -54,26 +41,20 @@ test.describe('single sign-on across apps', () => {
       const forgeSession = await page.request.get(`${novelForgeUrl}/api/auth/session`);
       expect(forgeSession.status(), 'Novel Forge should now report an authenticated session').toBe(200);
 
-      // Web Novel: entering the OIDC login route must complete silently off `__Host-sid` (no credential prompt at
-      // identity) and land on the gated `/library` — the reader's only session-gated route. Web Novel's own `/login`
-      // is a client-side shim, so this exercises the SSO hop directly, the way `auth.setup` does.
       await page.goto(`${webNovelUrl}/api/auth/login?return_to=/library`);
       await expect(page, 'SSO should complete silently and open /library, never stall on an identity credential prompt').toHaveURL(/\/library/i, { timeout: 30_000 });
       await expect(page, 'the silent SSO hop must not have shown identity a credential prompt').not.toHaveURL(IDENTITY_LOGIN_PATTERN);
       const webNovelSession = await page.request.get(`${webNovelUrl}/api/auth/session`);
       expect(webNovelSession.status(), 'Web Novel should now report an authenticated session').toBe(200);
 
-      // Identity-side signout: clears the central `__Host-sid`. Mutating + cookie present ⇒ CSRF double-submit,
-      // scoped to identity's own origin so a sibling app's token is never sent by mistake.
+      // CSRF double-submit scoped to identity's own origin, so a sibling app's token is never sent.
       const signout = await scopedMutate(page.request, identityUrl, 'post', '/api/v1/auth/signout', { seedPath: '/api/v1/me' });
       expect(signout.status(), 'identity signout should succeed (204 No Content)').toBe(204);
 
-      // Identity's portal must now demand a fresh login — the central session is gone.
       await page.goto(`${identityUrl}/`);
       await expect(page, 'after signout identity must bounce back to its login').toHaveURL(/\/login/i, { timeout: 30_000 });
 
-      // Observed logout semantics: the consumer app sessions are independent opaque handles with no back-channel
-      // logout from identity signout, so they survive it — until their cached access token next needs a refresh.
+      // Consumer app sessions survive identity signout until their cached access token next needs a refresh.
       const webNovelAfter = await page.request.get(`${webNovelUrl}/api/auth/session`);
       expect(webNovelAfter.status(), "identity signout must NOT revoke Web Novel's independent app session").toBe(200);
       const forgeAfter = await page.request.get(`${novelForgeUrl}/api/auth/session`);

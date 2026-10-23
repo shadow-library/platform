@@ -19,12 +19,9 @@ import {
 import { accessAuditSince, auditWatermark, readServedAccess, reverseServedGrantOrder, setServedAccessRevision, uniqueNovelSlug, UNKNOWN_SLUG } from './helpers';
 
 /**
- * Declaring the constants
- *
- * web-novel's `PUT /internal/novels/:slug/access`, reached the only way it can be: user1 authors a novel-forge publication and changes its
- * share list, and forge's converge makes the real call. Outcomes are read from web-novel's own tables — the served grants and one
- * `publish_audit_log` row per access push. Forge never sends an organisation it did not take from the session, a push without a
- * visibility, or an access push for a novel it has not created, so WBN_007, WBN_008, the 422 and the unknown-novel 404 are out of reach.
+ * web-novel's `PUT /internal/novels/:slug/access`, reached the only way it can be: user1 changes a novel-forge publication's share list and forge's converge makes the call.
+ * Outcomes are read from web-novel's tables (served grants, one `publish_audit_log` row per access push). Forge never sends an organisation it did not take from the session,
+ * a push without a visibility, or an access push for a novel it has not created, so WBN_007, WBN_008, the 422 and the unknown-novel 404 are out of reach.
  */
 
 const test = base.extend<{ publication: ForgePublication }>({
@@ -55,7 +52,7 @@ function subjects(...readers: WebNovelReader[]): string[] {
   return readers.map(reader => reader.user.userId).sort();
 }
 
-/** Forge pushes resolved grants in the order it loads them, by email (`publication-access.service.ts:111`). */
+/** Forge pushes resolved grants in the order it loads them, by email. */
 function pushedOrder(...readers: WebNovelReader[]): string[] {
   return [...readers].sort((a, b) => a.user.email.toLowerCase().localeCompare(b.user.email.toLowerCase())).map(reader => reader.user.userId);
 }
@@ -109,8 +106,7 @@ test.describe('web-novel access push (forge-fronted)', () => {
 
   test('should answer a no-op for an unchanged or reordered share list and leave the served grants as they were', async ({ publication, webNovel }) => {
     const { slug } = publication;
-    // Created in this order, the later reader sorts first by email but second by subject, so neither a heap nor an index read of the
-    // reversed rows can come back in the order forge pushes them.
+    // Created in this order, the later reader sorts first by email but second by subject, so neither a heap nor an index read of the reversed rows can return forge's push order.
     const second = await webNovel.reader('noop-b');
     const first = await webNovel.reader('noop-a');
     const { accessRevision } = await setForgeAccess(publication, 'RESTRICTED', [first.user.email, second.user.email]);

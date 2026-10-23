@@ -39,13 +39,9 @@ interface EntityView {
 }
 
 /**
- * Declaring the constants
- *
- * Everything the Illustrations tab does before an image model is involved: the uploaded-cover row a cover upload opens, the reference
- * options it lists, and the reference validation that runs from storage heads alone. Starting or refining an illustration would call the
- * image model and is out of scope; the lane fixture fails a test whose project records any model call. The image model accepts one
- * reference, and an uploaded cover's own image is always sent as the edit source, so a newly attached reference that resolves is refused
- * for capacity — the refusals below each fire before that check.
+ * The Illustrations tab before an image model is involved: the uploaded-cover row, the reference options, and reference validation from storage heads alone. Starting or refining
+ * an illustration would call the image model and is out of scope (the lane fixture fails a test whose project records any model call). The model accepts one reference and an
+ * uploaded cover's own image is always the edit source, so a newly attached reference that resolves is refused for capacity; the refusals below fire before that check.
  */
 
 const RED = solidPng(200, 30, 30);
@@ -88,7 +84,6 @@ async function referenceOptions(owner: ForgeActor, projectId: string, query: Rec
   return owner.ctx.get(`/api/v1/projects/${projectId}/illustrations/reference-options?${new URLSearchParams(query)}`);
 }
 
-/** The uploaded-cover row: `id` when given, else the newest active cover row. */
 async function uploadedCoverRow(owner: ForgeActor, projectId: string, id?: string): Promise<IllustrationView> {
   const listed = await owner.ctx.get(`/api/v1/projects/${projectId}/illustrations?subjectType=cover`);
   expect(listed.status(), await listed.text()).toBe(200);

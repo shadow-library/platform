@@ -23,11 +23,8 @@ export interface ForgeLane {
 }
 
 /**
- * Declaring the constants
- *
- * Web-novel's `/internal/novels/*` ingest is reached the one legitimate way: an author's novel-forge project, whose converge makes the
- * real in-cluster call. Each test gets its own projects and slugs; teardown settles any push still running, deletes the projects, and
- * removes every reader row and audit row under any slug the test used, even when setup failed half way.
+ * Web-novel's `/internal/novels/*` ingest is reached the one legitimate way: an author's novel-forge project, whose converge makes the in-cluster call. Teardown settles any
+ * running push, deletes the projects and removes every reader and audit row under any slug the test used, even when setup failed halfway.
  */
 
 export const test = base.extend<{ forge: ForgeLane }>({

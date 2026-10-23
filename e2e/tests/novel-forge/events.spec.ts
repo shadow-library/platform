@@ -25,11 +25,8 @@ interface ChatEvent {
 }
 
 /**
- * Declaring the constants
- *
- * A project's event stream tells a client what to refetch. Every event here comes from model-free work: a full-novel validation over a
- * novel with no finished chapters plans no windows, a reindex of a novel with no finished prose embeds nothing, and a chat turn on a
- * quota-pinned novel stores the author's message and then fails AI_008 before any dispatch. Every project is quota-pinned all the same.
+ * A project's event stream tells a client what to refetch. Every event comes from model-free work (a validation with no finished chapters, a reindex with no finished prose, a
+ * chat turn on a quota-pinned novel that fails AI_008 before dispatch), and every project is quota-pinned all the same.
  */
 
 async function openEvents(sse: SseClient, owner: ForgeActor, projectId: string): Promise<SseStream> {

@@ -21,14 +21,9 @@ interface ClientRow {
 }
 
 /**
- * Declaring the constants
- *
- * The ecosystem the identity bootstrap leaves behind on a deployed environment: the platform application and
- * organisation, the bootstrap administrator, and the five seeded applications with their clients, resources, scope
- * grants, service-access rules and derived redirect URIs. Everything here is read-only — the deployment is shared with
- * every other spec — so each query excludes the `e2e-` applications and clients the suite creates and the
- * organisation-owned applications it registers, leaving exactly the seeded state. Re-running the bootstrap is not
- * covered: it needs an identity-server restart, which this suite never performs.
+ * The ecosystem the bootstrap leaves on a deployed environment: platform application and organisation, bootstrap administrator, and the five seeded applications with clients,
+ * resources, scope grants, service-access rules and derived redirect URIs. Read-only (the deployment is shared), so every query excludes the `e2e-` applications and clients and
+ * organisation-owned applications the suite creates. Re-running the bootstrap is not covered: it needs an identity-server restart.
  */
 
 const SEEDED_APPLICATIONS = ['memoir', 'novel-forge', 'pulse', 'shadow-identity', 'web-novel'];
@@ -39,7 +34,6 @@ const ECOSYSTEM_CLIENTS = ['memoir', 'novel-forge', 'pulse', 'web-novel'];
 
 const ECOSYSTEM_GRANT_TYPES = ['authorization_code', 'client_credentials', 'urn:ietf:params:oauth:grant-type:token-exchange'];
 
-/** `<name>.<root>` for every deployed application, taken from the identity host the suite targets. */
 const DEPLOYMENT_ROOT = new URL(requireProductUrl('identity')).hostname.split('.').slice(1).join('.');
 
 const OAUTH_CALLBACK_PATH = '/api/auth/callback';

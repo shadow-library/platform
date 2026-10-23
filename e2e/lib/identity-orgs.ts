@@ -78,14 +78,10 @@ export interface ScimGroup {
 }
 
 /**
- * Declaring the constants
- *
- * Team organisations and their application access. Organisations and memberships are written straight to the database, like
- * the user factory, because every state a scenario needs (a suspended membership, a suspended organisation, a SCIM-managed
- * account) is otherwise reachable only through flows this suite does not drive. Identity caches each organisation's grant set
- * in Redis under a version key; membership, organisation-status and SCIM rows are read live, and the helpers that change what
- * the cached set is computed from bump that key, as identity's own mutation paths do. Application assignment and org-owned
- * OAuth apps go through the API, which needs an org admin whose session is self-service elevated.
+ * Team organisations and application access, written straight to the database because states like a suspended membership or a SCIM-managed account are
+ * otherwise unreachable. Identity caches each organisation's grant set in Redis under a version key (membership, status and SCIM rows are read live),
+ * so helpers that change what the set is computed from bump that key, as identity's own mutation paths do.
+ * Application assignment and org-owned OAuth apps go through the API, which needs an org admin with a self-service-elevated session.
  */
 
 export const PLATFORM_ORGANISATION_NAME = 'Shadow Platform';

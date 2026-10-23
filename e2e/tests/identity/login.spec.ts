@@ -28,12 +28,9 @@ interface ErrorBody {
 }
 
 /**
- * Declaring the constants
- *
- * The UI tests drive identity's hosted multi-step `/login` page; the API tests pin the flow contract behind it. Every test runs
- * under its own client address, so per-IP budgets, failure tallies and IP blocks never leak between tests or into the rest of
- * the suite. Anything that fails a credential does so on a factory user: five failures in fifteen minutes lock an account to
- * OTP-only, which would break every spec that signs in as a persona.
+ * The UI tests drive the hosted multi-step `/login` page; the API tests pin the flow contract behind it. Every test runs under its own client address so per-IP budgets, failure
+ * tallies and IP blocks never leak. Credential failures happen on a factory user: five failures in fifteen minutes lock an account to OTP-only, which would break every spec
+ * signing in as a persona.
  */
 
 const HAPPY = PERSONAS.user2;

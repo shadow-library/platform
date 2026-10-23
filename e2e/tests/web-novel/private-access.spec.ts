@@ -5,12 +5,8 @@ import { expect, test } from './fixtures';
 import { followRedirect, readAccessMode, WEB_NOVEL_SESSION_COOKIE } from './helpers';
 
 /**
- * Declaring the constants
- *
- * Web Novel's pre-launch posture is two independent layers: identity admits only platform-organisation members (the application is
- * INTERNAL) and `AUTH_ACCESS_MODE=private` makes every route require a session. This spec pins both ends and is skipped when the
- * deployment has been opened up — a public Web Novel is covered by the rest of the suite's mode-aware assertions. The access
- * endpoint is the SDK's own, so it answers anonymously in either mode.
+ * Two independent layers: identity admits only platform-organisation members (INTERNAL application) and `AUTH_ACCESS_MODE=private` makes every route require a session.
+ * Skipped when the deployment has been opened up; the SDK's access endpoint answers anonymously in either mode.
  */
 const WEB_NOVEL_APPLICATION = 'web-novel';
 

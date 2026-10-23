@@ -98,10 +98,8 @@ export interface ForgeSession {
 }
 
 /**
- * Declaring the constants
- *
- * Novel-forge is the only caller web-novel admits to `/internal/novels/*`, and only from inside its pod, so these drive the reader's
- * access surface the one legitimate way: the author's own forge API, whose auto-push converge makes the real in-cluster call.
+ * Novel-forge is the only caller web-novel admits to `/internal/novels/*`, and only from inside its pod, so these drive the reader's access surface through the author's forge
+ * API, whose auto-push converge makes the call.
  */
 
 export const FORGE_CLIENT_ID = 'novel-forge';
@@ -121,8 +119,8 @@ async function expectStatus(response: APIResponse, status: number, action: strin
 }
 
 /**
- * Waits for the project's one `publish` job to leave pending/in-progress. A forge mutation made while that job is active dedups onto it
- * and can miss the pass that job already started, so every access change settles the push it caused before anything else happens.
+ * Waits for the project's one `publish` job to leave pending/in-progress. A forge mutation made while it is active dedups onto it and can miss the pass it already started, so
+ * every access change settles its push first.
  */
 export async function settlePublishJob(projectId: string): Promise<PublishJob | undefined> {
   const job = await pollUntil(
@@ -174,8 +172,8 @@ export async function setForgeAccess(publication: ForgePublication, visibility: 
 }
 
 /**
- * Stands the project's settled `publish` job in for a converge that is still running and has already read the share list. Nothing
- * picks it up: dispatch skips a job that is not pending, and only a boot resets an in-progress one.
+ * Stands the settled `publish` job in for a converge still running that has already read the share list; nothing picks it up (dispatch skips a non-pending job, only a boot
+ * resets an in-progress one).
  */
 export async function holdPublishJob(projectId: string): Promise<void> {
   const held = await novelForgeDb()`UPDATE jobs SET status = 'in_progress', updated_at = now() WHERE project_id = ${projectId} AND kind = 'publish' AND status = 'done'`;
@@ -197,9 +195,8 @@ export async function removeServedNovelsOf(projectId: string): Promise<void> {
 }
 
 /**
- * Settles any push still in flight first, or it could recreate the reader's row after it is deleted; every step still runs if an earlier
- * one fails. The reader's row is found by the forge's own `sourceRef` as well as the slug, since a converge that met a slug conflict would
- * have moved it.
+ * Settles any push in flight first, or it could recreate the reader's row after deletion; every step runs even if an earlier one fails. The row is found by the forge's
+ * `sourceRef` as well as the slug, since a slug conflict moves it.
  */
 export async function removeForgePublication(ctx: APIRequestContext, projectId: string, slug: string): Promise<void> {
   const forgeSteps = projectId
@@ -312,9 +309,8 @@ export async function setForgeWikiVisibility(projectId: string, entityKey: strin
 }
 
 /**
- * A novel-forge session for the bootstrap admin, the one persona holding `novel-forge:curate` — granted in the platform organisation, not
- * the admin's personal one, so the session is switched into it. The setup project signs the admin into Pulse only, so this opens the
- * forge session through the same OIDC hop a browser takes, on a central session minted for the purpose.
+ * A novel-forge session for the bootstrap admin, the one persona holding `novel-forge:curate`, granted in the platform organisation: opened through the same OIDC hop a browser
+ * takes, then switched into it.
  */
 export async function openCuratorSession(clientIp: string): Promise<ForgeSession> {
   const session = await createIdentitySession(readSeedManifest().users.admin.userId, { aal: 'AAL2' });

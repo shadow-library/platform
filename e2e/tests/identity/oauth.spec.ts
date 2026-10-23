@@ -47,12 +47,9 @@ interface TokenRow {
 }
 
 /**
- * Declaring the constants
- *
- * Identity as an OAuth 2 / OIDC provider: authorize validation, discovery and signing keys, the code flow with PKCE, refresh
- * rotation and reuse detection, introspection and revocation, and client-credentials audience binding. Every test registers its
- * own applications, clients, resources and scopes (scope names carry a per-test tag, because identity resolves scopes by name
- * across resources), signs its users in through the database, and sends token-endpoint calls cookie-less.
+ * Identity as an OAuth 2 / OIDC provider: authorize validation, discovery and signing keys, the code flow with PKCE, refresh rotation and reuse detection, introspection and
+ * revocation, and client-credentials audience binding. Every test registers its own applications, clients, resources and scopes (scope names carry a per-test tag, as identity
+ * resolves scopes by name across resources), signs users in through the database and sends token-endpoint calls cookie-less.
  */
 
 const ISSUER = new URL(requireProductUrl('identity')).origin;

@@ -9,12 +9,7 @@ interface ChatSession {
   status: string;
 }
 
-/**
- * Declaring the constants
- *
- * Starting a novel, AI-free. The Start dialog queues an opening message that the chat sends on arrival; the UI test intercepts that
- * turn so it proves the hand-off without spending a model call.
- */
+/** AI-free. The Start dialog queues an opening message the chat sends on arrival; the UI test intercepts that turn so it proves the hand-off without spending a model call. */
 
 const TURN_STREAM = '**/api/v1/projects/*/chats/*/turn/stream';
 

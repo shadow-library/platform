@@ -30,11 +30,8 @@ interface ForeignApp {
 }
 
 /**
- * Declaring the constants
- *
- * Memoir's cross-cutting isolation guarantees: who a credential may speak for, that a mid-deletion account is locked out of
- * every surface, and that no account ever reads or writes another's rows. Every test that mutates state does so on fresh
- * personas (see `fixtures.ts`); `user1` appears only as the read-only owner of the foreign session handles.
+ * Cross-cutting isolation: who a credential may speak for, that a mid-deletion account is locked out of every surface, and that no account reads or writes another's rows.
+ * State-mutating tests use fresh personas; `user1` is only the read-only owner of the foreign session handles.
  */
 
 const MEMOIR_AUDIENCE = 'api://memoir';
@@ -46,7 +43,6 @@ const FOREIGN_APPS: readonly ForeignApp[] = [
 ];
 const LOCKED_STATES: readonly Exclude<DeletionState, 'none'>[] = ['pending', 'blobs_deleted', 'data_deleted', 'identity_closed', 'done'];
 
-/** Delta domains backed by a table whose primary key is a synthetic `id`, so the same id in two accounts' pulls is the same row. */
 const GLOBAL_ID_DOMAINS: ReadonlySet<string> = new Set([
   'ai_results',
   'ai_tasks',
@@ -68,16 +64,16 @@ const GLOBAL_ID_DOMAINS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Memoir-server's pool (Bun SQL, default 10 connections, not overridden in dev) is shared with every other concurrent memoir test, and
- * each blocked first-contact insert pins one connection until the blocker rolls back. Two copies of this test run at once under two
- * workers, so three waiters each prove the path while leaving room for everything else.
+ * Memoir-server's pool (Bun SQL, default 10 connections) is shared with every concurrent memoir test and each blocked first-contact insert pins one until the blocker rolls back;
+ * with two workers running this test, three waiters each leave room for the rest.
  */
 const FIRST_CONTACT_BURST = 3;
 
-/** Identity's admin API floors `accessTokenTtl` at 60s (admin-client.dto.ts:48) and the `auth.access_token.ttl` policy clamps to
- *  the same floor no matter how low a client's own value goes (policy.service.ts's `clamp`), so 60s is the shortest TTL reachable
- *  through the API. Memoir accepts an unexpired token up to a further 60s of clock skew (auth-client.ts:74), so the token is only
- *  provably expired once `TOKEN_TTL_SECONDS + CLOCK_SKEW_SECONDS` has passed — the wait below adds a margin on top of that. */
+/**
+ * Identity's admin API floors `accessTokenTtl` at 60s (admin-client.dto.ts) and the `auth.access_token.ttl` policy clamps to the same floor, so 60s is the shortest reachable TTL.
+ * Memoir accepts an unexpired token up to a further 60s of clock skew (auth-client.ts), so the token is provably expired only once `TOKEN_TTL_SECONDS + CLOCK_SKEW_SECONDS` has
+ * passed; the wait adds a margin.
+ */
 const TOKEN_TTL_SECONDS = 60;
 const CLOCK_SKEW_SECONDS = 60;
 const EXPIRY_MARGIN_SECONDS = 20;
@@ -118,7 +114,6 @@ async function accountSequenceValue(): Promise<bigint> {
   return BigInt(row.value);
 }
 
-/** A context presenting `handle` as the app-session cookie of `product`'s origin, and nothing else. */
 function handleContext(product: ProductKey, handle: string): Promise<APIRequestContext> {
   return request.newContext({
     baseURL: requireProductUrl(product),
@@ -178,7 +173,6 @@ test.describe('memoir credentials', () => {
     expect(await introspect(tokenCtx, client, foreign)).toMatchObject({ active: true, sub: persona.sub, aud: application.audience });
     expect(await introspect(tokenCtx, client, own)).toMatchObject({ active: true, sub: persona.sub, aud: MEMOIR_AUDIENCE });
 
-    // A token memoir accepted but found short of `memoir:account` would be a 403; a 401 is the credential itself refused.
     const guest = await memoir.guest();
     await expectRefusal(await guest.get('/api/v1/account', bearer(foreign)), 401, 'IAM_001');
     expect(await accountIdsFor(persona.sub), 'a refused credential must not provision an account').toEqual([]);
@@ -212,9 +206,8 @@ test.describe('memoir credentials', () => {
 
 test.describe('memoir account provisioning', () => {
   /**
-   * The race is forced rather than hoped for: an uncommitted row for the sub, held on a reserved connection, makes every request's
-   * lookup miss and its insert wait on the unique key. Once all of them are waiting the row is rolled back, so one insert commits
-   * and the rest take `ON CONFLICT DO NOTHING` and re-select. Each insert draws its id before it waits, which the sequence shows.
+   * The race is forced: an uncommitted row for the sub, held on a reserved connection, makes every lookup miss and every insert wait on the unique key; once all wait it is
+   * rolled back, so one insert commits and the rest take `ON CONFLICT DO NOTHING` and re-select.
    */
   test('should converge concurrent first-contact requests for one sub on exactly one account', async ({ memoir }) => {
     const persona = await memoir.persona({ label: 'jit-race' });
@@ -438,7 +431,6 @@ test.describe('memoir credential expiry', () => {
       const afterExpiry = await guest.get('/api/v1/account', bearer(token));
       await expectRefusal(afterExpiry, 401, 'IAM_001');
 
-      // Same client, same audience, same scope — only time moved, so a fresh token proves the refusal above was expiry, not audience/scope.
       const renewed = await guest.get('/api/v1/account', bearer(await mint()));
       expect(renewed.status(), `a fresh token from the same client must still be admitted — ${await renewed.text()}`).toBe(200);
     } finally {

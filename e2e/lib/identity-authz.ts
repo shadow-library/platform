@@ -95,14 +95,9 @@ export interface AuthzApi extends AuthzCaller {
 }
 
 /**
- * Declaring the constants
- *
- * Identity's policy decision point as an application's back end reaches it: a client-credentials token on the
- * application's own provisioned client, and the `check`, `catalog` and `service-access` calls that token opens.
- * Every decision is scoped to the application the calling client is bound to, so a scenario about cross-application
- * isolation needs two throwaway applications rather than two clients. Roles and permissions here are created through
- * the catalog API itself — the surface under test — while the database factories arrange only the assignments and
- * memberships a sync never writes.
+ * Identity's policy decision point as an application's back end reaches it: a client-credentials token on the application's own client, and the `check`,
+ * `catalog` and `service-access` calls it opens. Decisions are scoped to the calling client's application, so cross-application isolation needs two throwaway
+ * applications. Roles and permissions come from the catalog API under test; the database factories arrange only the assignments and memberships a sync never writes.
  */
 
 export const AUTHZ_SCOPES: readonly AuthzScope[] = ['authz:check', 'authz:roles:sync'];

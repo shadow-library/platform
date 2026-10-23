@@ -22,7 +22,6 @@ export interface EntitySeed {
 
 export type ContentMode = 'standard' | 'unrestricted';
 
-/** What an API answer and a page's network answer share, so either can be judged by the same helpers. */
 export type HttpAnswer = Pick<APIResponse, 'status' | 'text'>;
 
 export type CostTier = 'economy' | 'balanced' | 'performant';
@@ -108,13 +107,9 @@ export interface FinalizeReview {
 }
 
 /**
- * Declaring the constants
- *
- * Shared building blocks for the Novel Forge specs. The suite splits in two:
- *   - deterministic specs, which drive the product through hand-written chapters, imports and settings and never wait on a model;
- *   - model-backed specs, tagged `MODEL_TAG` and gated by `aiAvailable()`, which spend real calls on an Economy-tier project.
- * `bun run test:deterministic` skips the tag; `bun run test:model` runs only it. Model-backed assertions check structure (a job
- * finished, a draft has prose, a review settled), never wording.
+ * Shared building blocks for the Novel Forge specs, split in two: deterministic specs (hand-written chapters, imports, settings; never wait on a model) and model-backed specs,
+ * tagged `MODEL_TAG` and
+ * gated by `aiAvailable()`, which spend real calls on an Economy-tier project. `bun run test:deterministic` skips the tag; `bun run test:model` runs only it.
  */
 
 export const MODEL_TAG = '@model';
@@ -131,8 +126,8 @@ export const MODEL_FLOW_TIMEOUT_MS = 30 * 60_000;
 const MODEL_CALL_TIMEOUT_MS = 10 * 60_000;
 
 /**
- * A chat pin is a Synapse alias, sent as the `synapse` option from `GET /ai/models` with its key as the model. Haiku is offered to standard
- * chats only, so an unrestricted chat cannot pin it.
+ * A chat pin is a Synapse alias, sent as the `synapse` option from `GET /ai/models` with its key as the model. Haiku is offered to standard chats only, so an unrestricted chat
+ * cannot pin it.
  */
 export const HAIKU_ALIAS: ModelRef = { provider: 'synapse', model: 'haiku' };
 
@@ -163,12 +158,10 @@ export const CHAPTER_TWO: ChapterText = {
   summary: 'Odo Kessling brings a guild writ to stop the survey; Tamsin refuses and keeps working.',
 };
 
-/** A collision-proof suffix for project names and slugs — the seed wipes e2e-owned projects each run, but a run may create several. */
 export function uniqueSuffix(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-/** Parses a response body as JSON, tolerating an empty body (204) by returning `undefined`. */
 export async function jsonOrUndefined<T = Record<string, unknown>>(response: HttpAnswer): Promise<T | undefined> {
   const text = await response.text();
   return text ? (JSON.parse(text) as T) : undefined;
@@ -191,14 +184,12 @@ export async function createProject(
   return { id: parsed.id, response };
 }
 
-/** Starts a novel the way the Start screen does: a `new_novel` project, the author's notes kept verbatim, and an auto-mode chat. */
 export async function createNovel(ctx: APIRequestContext, body: { title: string; notes?: string; contentMode?: ContentMode }): Promise<CreatedNovel> {
   const response = await mutate(ctx, 'post', '/api/v1/projects/new-novel', { data: body });
   expect(response.status(), await response.text()).toBe(201);
   return (await response.json()) as CreatedNovel;
 }
 
-/** Puts `projectId` on the Economy tier, the cheapest models. Run it before anything that can reach a model, including an approval. */
 export async function useEconomyTier(ctx: APIRequestContext, projectId: string): Promise<APIResponse> {
   return mutate(ctx, 'patch', `/api/v1/projects/${projectId}`, { data: { costTier: 'economy' } });
 }
@@ -214,14 +205,12 @@ export async function readDraft(ctx: APIRequestContext, projectId: string, chapt
   return (await response.json()) as Draft;
 }
 
-/** Opens the one chapter the server allows next, as "Write it myself" does; the server picks the number. */
 export async function startNextChapter(ctx: APIRequestContext, projectId: string): Promise<Draft> {
   const response = await mutate(ctx, 'post', `/api/v1/projects/${projectId}/drafts/next`, { data: {} });
   expect(response.status(), await response.text()).toBe(201);
   return (await response.json()) as Draft;
 }
 
-/** A hand save against the draft the author read, as the workspace's autosave sends it. */
 export async function saveChapter(ctx: APIRequestContext, projectId: string, draft: Draft, text: ChapterText): Promise<Draft> {
   const response = await mutate(ctx, 'put', `/api/v1/projects/${projectId}/drafts/${draft.chapter}`, {
     data: { baseDraftId: draft.id, baseRevision: draft.revision, baseSaveSeq: draft.saveSeq, ...text },
@@ -234,7 +223,6 @@ export async function writeChapterByHand(ctx: APIRequestContext, projectId: stri
   return saveChapter(ctx, projectId, await startNextChapter(ctx, projectId), text);
 }
 
-/** Imports prose onto `base`, as "Import chapters" does; `isolated` firewalls it as an unrestricted chapter and is left to the server when omitted. */
 export async function importDraft(ctx: APIRequestContext, projectId: string, base: Draft, text: ChapterText, options: { isolated?: boolean } = {}): Promise<Draft> {
   const response = await mutate(ctx, 'post', `/api/v1/projects/${projectId}/drafts/${base.chapter}/import`, {
     data: {
@@ -251,7 +239,6 @@ export async function importDraft(ctx: APIRequestContext, projectId: string, bas
   return readDraft(ctx, projectId, base.chapter);
 }
 
-/** Pastes prose into the next chapter the server allows. */
 export async function pasteChapter(ctx: APIRequestContext, projectId: string, text: ChapterText, options: { isolated?: boolean } = {}): Promise<Draft> {
   return importDraft(ctx, projectId, await startNextChapter(ctx, projectId), text, { isolated: options.isolated ?? false });
 }
@@ -262,7 +249,6 @@ export async function approveChapter(ctx: APIRequestContext, projectId: string, 
   });
 }
 
-/** Waits for a job to settle, read from the forge's own table so a caller needs no context that can read the job. */
 export async function pollJobStatus(jobId: string, timeoutMs = JOB_SETTLE_TIMEOUT_MS): Promise<ForgeJob> {
   const job = await pollUntil(
     async () => (await novelForgeDb()<ForgeJob[]>`SELECT status, last_error AS "lastError" FROM jobs WHERE id = ${jobId}`)[0],
@@ -273,7 +259,6 @@ export async function pollJobStatus(jobId: string, timeoutMs = JOB_SETTLE_TIMEOU
   return job;
 }
 
-/** Adds a Story Bible entity; one with a `body` projects a reader wiki entry visible before the first chapter. */
 export async function createEntity(ctx: APIRequestContext, projectId: string, seed: EntitySeed): Promise<void> {
   const response = await mutate(ctx, 'post', `/api/v1/projects/${projectId}/entities`, {
     data: { entityKey: seed.entityKey, name: seed.name, type: seed.type ?? 'character', body: seed.body ?? undefined, significance: seed.significance ?? undefined },
@@ -281,7 +266,6 @@ export async function createEntity(ctx: APIRequestContext, projectId: string, se
   expect(response.status(), `creating entity ${seed.entityKey} — body ${await response.text()}`).toBe(201);
 }
 
-/** Polls a web-novel GET until it returns `wantStatus`, so an in-flight reader push has time to arrive. */
 export async function pollWebNovel(ctx: APIRequestContext, path: string, wantStatus: number, timeoutMs = 45_000): Promise<APIResponse> {
   return pollUntil(
     () => ctx.get(path),
@@ -291,9 +275,8 @@ export async function pollWebNovel(ctx: APIRequestContext, path: string, wantSta
 }
 
 /**
- * Calls the synchronous `reconcile` until every wanted chapter and wiki entry has settled (pushed, or skipped as already in sync) with no
- * failures. Reconcile is the deterministic converge trigger: the auto-push job dedups concurrent enqueues, so a chapter published during
- * an in-flight converge never gets its own push. One pass pushes the due chapters and then recomputes the wiki off those ordinals.
+ * Calls the synchronous `reconcile` until every wanted chapter and wiki entry has settled (pushed, or skipped as in sync) with no failures. The auto-push job dedups concurrent
+ * enqueues, so a chapter published during an in-flight converge never gets its own push; one pass pushes the due chapters, then recomputes the wiki off those ordinals.
  */
 export async function reconcileUntilConverged(ctx: APIRequestContext, projectId: string, wantChapters: number[], wantWiki: string[], timeoutMs = 90_000): Promise<ReconcileResult> {
   const empty: ReconcileResult = { novel: '', pushed: [], skipped: [], failed: [], wiki: { pushed: [], skipped: [], failed: [] } };
@@ -312,13 +295,11 @@ export async function reconcileUntilConverged(ctx: APIRequestContext, projectId:
   );
 }
 
-/** A CSRF-authenticated POST that waits as long as a synchronous model call can take. */
 export async function slowPost(ctx: APIRequestContext, url: string, data?: unknown): Promise<APIResponse> {
   const headers = await csrfHeaders(ctx);
   return ctx.post(url, { headers, timeout: MODEL_CALL_TIMEOUT_MS, ...(data === undefined ? {} : { data }) });
 }
 
-/** Starts a chat turn the way the composer does and waits for its reply to land; a failed or cancelled turn fails the test. */
 export async function chatTurn(
   ctx: APIRequestContext,
   novel: CreatedNovel,
@@ -338,7 +319,6 @@ export async function chatTurn(
   return transcript;
 }
 
-/** Waits for a job of `kind` that this chat started to settle, and returns it; the caller asserts on its status. */
 export async function settledChatJob(ctx: APIRequestContext, novel: CreatedNovel, kind: string): Promise<ChatJob | undefined> {
   const settled = (items: ChatJob[]): ChatJob | undefined => items.find(job => job.kind === kind && !['pending', 'in_progress'].includes(job.status));
   const items = await pollUntil(
@@ -353,7 +333,6 @@ export async function readFinalizeReview(ctx: APIRequestContext, projectId: stri
   return ctx.get(`/api/v1/projects/${projectId}/drafts/${chapter}/finalize-review`);
 }
 
-/** Waits out the finalize-review read an approval starts, then answers every item by keeping it and finalizes through the review. */
 export async function finalizeThroughReview(ctx: APIRequestContext, projectId: string, chapter: number): Promise<FinalizeReview> {
   const review = await pollUntil(
     async () => (await (await readFinalizeReview(ctx, projectId, chapter)).json()) as FinalizeReview,
@@ -377,10 +356,9 @@ export async function finalizeThroughReview(ctx: APIRequestContext, projectId: s
 }
 
 /**
- * Whether model-backed specs may run. Live calls are metered, so they are opt-in: without `E2E_LIVE_AI=1` this answers false without
- * touching the gateway. With it, a throwaway Economy-tier project fires the cheapest AI endpoint (`POST /premise/enhance`) and the
- * verdict is cached to `.auth/ai-probe.json` so every worker and spec in a run reuses one probe. Any non-2xx caches a negative result —
- * model specs then `test.skip` rather than fail.
+ * Whether model-backed specs may run. Live calls are metered, so without `E2E_LIVE_AI=1` this answers false untouched; with it, a throwaway Economy-tier project fires the
+ * cheapest endpoint (`POST /premise/enhance`) and the verdict is cached to `.auth/ai-probe.json` for every worker. Any non-2xx caches a negative result, so model specs
+ * `test.skip` rather than fail.
  */
 const AI_PROBE_CACHE = path.join(AUTH_DIR, 'ai-probe.json');
 const AI_PROBE_TTL_MS = 20 * 60 * 1000;

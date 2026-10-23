@@ -27,17 +27,10 @@ import { expect, test } from './fixtures';
 import { expectRefused } from './helpers';
 
 /**
- * Declaring the constants
- *
- * Admin webhooks with the SSRF guard left strict, which is how the deployment runs: identity refuses every private or
- * plain-http target at registration and re-resolves the hostname again right before delivery. No delivery in this spec is
- * ever meant to arrive — a webhook that really reaches a receiver needs a public https endpoint (or
- * `WEBHOOKS_ALLOW_INSECURE_TARGETS` in an environment of its own), so the signed-payload, redirect and dual-secret
- * bullets stay out of scope. The receiver started below exists to be refused: it is a real HTTP server on this host, and
- * the assertions show identity will not take its address and never contacts it.
- *
- * Subscriptions are global rows, so a subscription here matches events another copy of this spec writes too. Every
- * assertion therefore names the audit event it is about and never counts the delivery list.
+ * Admin webhooks with the SSRF guard strict, as deployed: identity refuses every private or plain-http target at registration and re-resolves the hostname before delivery. No
+ * delivery here is meant to arrive (a real one needs a public https endpoint, or `WEBHOOKS_ALLOW_INSECURE_TARGETS` in an environment of its own),
+ * so signed-payload, redirect and dual-secret cases are out of scope. The receiver below exists to be refused: identity must not take its address nor contact it.
+ * Subscriptions are global rows, so one here matches events another copy of this spec writes; every assertion names its audit event and never counts the delivery list.
  */
 
 const RETRY_LADDER_TIMEOUT_MS = 180_000;

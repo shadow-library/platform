@@ -7,9 +7,8 @@ test.describe('memoir quick capture', () => {
     await memoir.signInBrowser(context, await memoir.persona({ label: 'quick-expense', onboard: true }));
 
     await page.goto(url);
-    // The ⌘K listener is registered by a shell effect after hydration, and `page.goto` only waits for `load`, so an early
-    // shortcut can land before anything listens. The SSR markup is no hydration signal, so re-send the shortcut until the
-    // palette opens — and only while it is still closed, since a second press would toggle it shut.
+    // The ⌘K listener is registered by a shell effect after hydration and `page.goto` only waits for `load`, so re-send the shortcut until the palette opens, and only while
+    // closed (a second press toggles it shut).
     const captureInput = page.getByLabel('Log something, or jump to a screen');
     await expect(async () => {
       if (!(await captureInput.isVisible())) await page.keyboard.press('ControlOrMeta+KeyK');
@@ -36,8 +35,7 @@ test.describe('memoir quick capture', () => {
     await page.getByPlaceholder('Write as much or as little as you like. One line counts.').fill(entryText);
     await page.getByRole('button', { name: 'Save entry' }).click();
 
-    // The saved entry legitimately renders twice — the list row and a preview excerpt elsewhere on the
-    // page — so an unscoped text match is ambiguous under strict mode; `.first()` just needs any instance.
+    // The saved entry renders twice (list row and a preview excerpt), so an unscoped text match is ambiguous under strict mode; `.first()` needs any instance.
     await expect(page.getByText(entryText).first()).toBeVisible();
   });
 });

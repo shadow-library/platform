@@ -34,9 +34,8 @@ export interface PendingProposalSeed {
   baseline?: Record<string, unknown>;
   summary?: string | null;
   /**
-   * An `organise`-kind proposal without one refuses to apply (`NTS_009`, `organise-record.ts:32`) — pass `{ legacy: true }`
-   * (`LEGACY_ORGANISE_RECORD`) to arrange one that applies like any other card, bypassing the real organise pass's own
-   * reconciliation bookkeeping.
+   * An `organise`-kind proposal without one refuses to apply (`NTS_009`); pass `{ legacy: true }` (`LEGACY_ORGANISE_RECORD`) to arrange one that applies like any other card,
+   * bypassing the organise pass's reconciliation bookkeeping.
    */
   organiseRecord?: Record<string, unknown> | null;
 }
@@ -82,24 +81,18 @@ export interface BibleDocRow {
 export interface RawBibleDocSeed {
   frontmatter?: Record<string, unknown> | null;
   body?: string | null;
-  /** Overrides the stored hash — simulates a row written before title-derivation existed, whose hash predates the fold. */
+  /** Overrides the stored hash, simulating a row written before title derivation existed, whose hash predates the fold. */
   contentHash?: string;
   revision?: number;
 }
 
-/** Thrown when a test's own arrangement failed to produce what a later step needs — never for an app response. */
 export class ForgeArrangeError extends Error {
   override readonly name = 'ForgeArrangeError';
 }
 
 /**
- * Declaring the constants
- *
- * Batch-6 arrangers: Story Bible documents/tidy/builder, the proposal engine, bible audits and chat messages — kept beside, not inside,
- * `forge-db.ts`/`forge-rows.ts` so this batch and the other novel-forge lanes never edit the same file. `chapters` rows exist only for
- * finalized chapters, so a bible-doc-edit test that needs to observe `needsRevalidation` on one seeds a bare row directly rather than
- * running a whole hand-write-approve-finalize flow. A pending proposal is likewise seeded bare and then `PATCH`ed through the real API
- * so the server computes its baseline and stamps idea ids.
+ * Story Bible documents/tidy/builder, proposal engine, bible audits and chat messages. `chapters` rows exist only for finalized chapters, so a test observing `needsRevalidation`
+ * seeds a bare row directly; a pending proposal is seeded bare then `PATCH`ed through the API so the server computes its baseline and stamps idea ids.
  */
 
 export async function insertChapterRow(seed: ChapterRowSeed): Promise<string> {
@@ -180,12 +173,10 @@ export async function insertChatMessage(seed: ChatMessageSeed): Promise<string> 
   return row.id;
 }
 
-/** Marks a `running` workflow run settled, as its executor would on completion — `insertWorkflowRun` otherwise leaves it open forever. */
 export async function settleWorkflowRun(runId: string, status: 'completed' | 'failed' | 'cancelled' = 'completed'): Promise<void> {
   await novelForgeDb()`UPDATE workflow_runs SET status = ${status}::workflow_run_status, ended_at = now() WHERE id = ${runId}`;
 }
 
-/** A raw JSON hash of `{frontmatter, body}`, mirroring the server's `computeBibleDocHash` (not whitespace-tolerant). */
 export function computeBibleDocHash(frontmatter: unknown, body: unknown): string {
   return createHash('sha256')
     .update(JSON.stringify({ frontmatter: frontmatter ?? null, body: body ?? null }))
@@ -200,7 +191,7 @@ export async function readBibleDocRow(projectId: string, section: string, slug: 
   return row;
 }
 
-/** Writes a bible document row directly, pre-dating the API's title fold — for NF2-BIBDOC-01's "title fold alone is not a content change". */
+/** Writes a bible document row directly, pre-dating the API's title fold, so "title fold alone is not a content change" can be tested. */
 export async function insertRawBibleDoc(projectId: string, section: string, slug: string, seed: RawBibleDocSeed): Promise<void> {
   const sql = novelForgeDb();
   const frontmatter = seed.frontmatter ?? null;
@@ -212,7 +203,7 @@ export async function insertRawBibleDoc(projectId: string, section: string, slug
   `;
 }
 
-/** A DB-written chat session with a scope the create API never exposes (`chat_scope` allows more than `'project'`) — for CHT_003. */
+/** A DB-written chat session with a scope the create API never exposes (`chat_scope` allows more than `'project'`), for CHT_003. */
 export async function insertChatSession(
   projectId: string,
   scopeType: 'project' | 'novel' | 'bible_document' | 'volume' | 'brief',
@@ -225,13 +216,12 @@ export async function insertChatSession(
   return row.id;
 }
 
-/** Rebaselines a bare-inserted pending proposal through the real API — the server validates the ops, stamps idea ids, and recomputes `baseline`. */
 export async function rebaselineProposal(ctx: APIRequestContext, projectId: string, proposalId: string, changeSet: readonly Record<string, unknown>[]): Promise<void> {
   const response = await mutate(ctx, 'patch', `/api/v1/projects/${projectId}/proposals/${proposalId}`, { data: { changeSet } });
   expect(response.status(), `re-baselining a raw-inserted proposal — body ${await response.text()}`).toBe(200);
 }
 
-/** The baseline entry a brand-new artifact reads as (`ArtifactState.MISSING_ARTIFACT`, `artifact-state.ts:26`) — for a ref a change-set is about to create. */
+/** The baseline entry a brand-new artifact reads as (`ArtifactState.MISSING_ARTIFACT`), for a ref a change-set is about to create. */
 export function missingArtifactRef(): Record<string, unknown> {
   return { exists: false, revision: null, contentHash: null };
 }
@@ -241,7 +231,6 @@ export async function readEntityRow(projectId: string, entityKey: string): Promi
   return row;
 }
 
-/** A canon fact with a committed knowledge-ledger reveal, so a `fact.remove` op (proposal path or the direct route) meets FCT_003's guard. */
 export async function insertLedgeredFact(projectId: string, factKey: string, entityKey: string): Promise<void> {
   const sql = novelForgeDb();
   await sql.begin(async tx => {
@@ -258,7 +247,6 @@ export async function insertLedgeredFact(projectId: string, factKey: string, ent
   });
 }
 
-/** No route creates a volume directly — only an applied `volume.upsert` proposal, or (here) a direct insert. */
 export async function insertVolumeRow(projectId: string, volumeKey: string, title: string): Promise<void> {
   await novelForgeDb()`INSERT INTO volumes (project_id, volume_key, title) VALUES (${projectId}, ${volumeKey}, ${title})`;
 }
@@ -279,7 +267,10 @@ export async function readVolumeRow(projectId: string, volumeKey: string): Promi
   return row;
 }
 
-/** Records a finding decision directly, bypassing `BibleAuditService.decide` — the only way to reach a still-`pending` card with nothing kept (the service auto-discards a card the moment its last finding is skipped). */
+/**
+ * Records a finding decision bypassing `BibleAuditService.decide`, the only way to reach a still-`pending` card with nothing kept (the service auto-discards a card once its last
+ * finding is skipped).
+ */
 export async function insertAuditFindingDecision(reportId: string, findingId: string, decision: 'kept' | 'skipped'): Promise<void> {
   await novelForgeDb()`INSERT INTO validation_finding_decisions (report_id, finding_id, decision) VALUES (${reportId}, ${findingId}, ${decision}::validation_finding_decision)`;
 }

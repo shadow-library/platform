@@ -3,14 +3,8 @@ import { expect, test } from '@playwright/test';
 import { apiContext, mutate, requireProductUrl, storageStateFor } from '../../lib';
 
 /**
- * Declaring the constants
- *
- * Access-control coverage for pulse. `/api/v1/*` is default-deny (a route with no auth decorator 403s
- * `SEC_003`, per the report), so every real route carries an explicit `@RequirePermission`/`@RequireScope`;
- * these tests exercise the two ends of that: no credential at all (401 `IAM_001`), and a credential that
- * simply doesn't exist for this app (`user1`/`user2` never receive a pulse session — Pulse is an
- * `INTERNAL`-visibility app and identity denies the OIDC hop for a non-privileged account, which is identity's
- * own correct behaviour and is covered by the cross-app infra report, not re-asserted here).
+ * `/api/v1/*` is default-deny (a route with no auth decorator 403s `SEC_003`), so the two ends are exercised: no credential (401 `IAM_001`), and a credential that does not
+ * exist for this app (`user1`/`user2` never get a pulse session: Pulse is `INTERNAL` and identity denies the OIDC hop to a non-privileged account).
  */
 test.describe('security', () => {
   test.beforeEach(() => requireProductUrl('pulse'));
@@ -24,12 +18,8 @@ test.describe('security', () => {
   });
 
   /**
-   * `user1`'s saved storage state (`.auth/user1.json`) carries sessions for novel-forge and web-novel only —
-   * no `__Host-shadow-session` cookie is scoped to `pulse.shadow-apps.test`, because `auth.setup.ts` never mints `user1`
-   * a Pulse session. A pulse
-   * `APIRequestContext` built with the `user1` persona therefore carries no pulse credential at all, and this
-   * assertion is the API-level mirror of that: it 401s exactly like a guest, not a 403 for lacking a specific
-   * permission — there is no session to check a permission against.
+   * `user1`'s storage state has no `__Host-shadow-session` for pulse (`auth.setup.ts` never mints one), so it carries no pulse credential and 401s like a guest, not a 403: there
+   * is no session to check a permission against.
    */
   test('should 401 IAM_001 for user1 (the setup never mints this persona a pulse session) GET /api/v1/templates', async () => {
     const ctx = await apiContext('pulse', 'user1');
@@ -46,14 +36,9 @@ test.describe('security', () => {
   });
 
   /**
-   * `POST /api/v1/notifications` is `@RequireScope('notifications:send')`, and that scope is declared
-   * `principalType: 'SERVICE'` and granted solely to the `identity-server` service client
-   * (`apps/identity-server/src/.../ecosystem-seed.constants.ts:157-161,180,219`) — no pulse user role
-   * (`PulseViewer`/`PulseOperator`/`PulseAdmin`) is ever granted it, and `AuthGuard.authorize()`'s scope check
-   * (`packages/auth/src/module/auth-guard.ts:113`) is a plain membership test against `principal.scopes`
-   * regardless of whether the principal came from a bearer token or a session cookie. So even the bootstrap
-   * admin — who holds every `pulse:*` permission there is — can never satisfy this route. The console sends through its
-   * own permission-gated route instead, covered in `send-delivery.spec.ts`.
+   * `POST /api/v1/notifications` is `@RequireScope('notifications:send')`, declared `principalType: 'SERVICE'` and granted only to service clients, never a pulse user role.
+   * `AuthGuard.authorize()` tests the scope against `principal.scopes` whether the principal came from a bearer or a session, so even the bootstrap admin can never satisfy it.
+   * The console sends through its own permission-gated route (see `send-delivery.spec.ts`).
    */
   test('should 403 IAM_002 for admin (a user session can never hold the service-only notifications:send scope) POST /api/v1/notifications', async () => {
     const ctx = await apiContext('pulse', 'admin');
@@ -63,10 +48,7 @@ test.describe('security', () => {
     expect(body.code).toBe('IAM_002');
   });
 
-  /**
-   * `GET /api/v1/notifications/messages` is gated by `@EnableIf(() => Config.get('app.stage') === 'dev')` in
-   * addition to `pulse:messages:read`, which only `PulseAdmin` (admin's role) carries.
-   */
+  /** `GET /api/v1/notifications/messages` is gated by `@EnableIf(app.stage === 'dev')` as well as `pulse:messages:read`, which only `PulseAdmin` carries. */
   test('should allow admin GET /api/v1/notifications/messages in this (dev-stage) deployment', async () => {
     const ctx = await apiContext('pulse', 'admin');
     const response = await ctx.get('/api/v1/notifications/messages?limit=3');
@@ -81,9 +63,8 @@ test.describe('security', () => {
     test.use({ storageState: storageStateFor('admin') });
 
     /**
-     * `MessageLog.tsx` gates on `import.meta.env.DEV` — a **build-time** Vite flag baked into the bundle, not the server's
-     * runtime `APP_STAGE` — so the page is either the unavailable notice (a production build) or the live table (a dev build).
-     * Either way `/logs`, which the nav rail links to, has to reach the page.
+     * `MessageLog.tsx` gates on the build-time Vite flag `import.meta.env.DEV`, not the server's `APP_STAGE`, so the page is the unavailable notice (production build) or the
+     * live table (dev build); `/logs` must reach the page either way.
      */
     test('should reach the Message Log page at /logs, the path the nav rail links to', async ({ page }, testInfo) => {
       const url = requireProductUrl('pulse');

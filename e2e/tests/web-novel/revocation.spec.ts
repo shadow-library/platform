@@ -16,10 +16,8 @@ import {
 } from './helpers';
 
 /**
- * Declaring the constants
- *
- * A revoked RESTRICTED share must stop working on the reader's next request. Per-user grants are read from Postgres on every request
- * (only organisation membership is cached), so every assertion runs straight after the revoke instead of polling for it.
+ * A revoked RESTRICTED share must stop working on the next request. Per-user grants are read from Postgres every request (only organisation membership is cached), so assertions
+ * run straight after the revoke.
  */
 
 async function errorCode(response: { json(): Promise<unknown> }): Promise<string | undefined> {

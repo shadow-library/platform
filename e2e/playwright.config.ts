@@ -5,15 +5,8 @@ import { defineConfig, devices } from '@playwright/test';
 import { loadDotEnv } from './lib';
 
 /**
- * Declaring the constants
- *
- * This file is re-imported in every Playwright worker process, so loading `.env` here — rather than
- * relying on Bun's own startup-time auto-load, which does not reach forked workers (see `lib/load-env.ts`)
- * — reliably lands the vars before any spec reads them.
- *
- * Every product URL (`lib/env.ts`) defaults to the local k3d dev ingress and is resolved per spec, not
- * from a single `baseURL` — this workspace never starts a server itself: whether that's the local k3d
- * cluster or a deployed environment reached via an env override, it's already running.
+ * Re-imported in every Playwright worker, and Bun's startup-time `.env` auto-load does not reach forked workers (see `lib/load-env.ts`).
+ * No `baseURL`: every product URL (`lib/env.ts`) is resolved per spec, and this workspace never starts a server — the target is already running.
  */
 loadDotEnv(path.join(import.meta.dirname, '.env'));
 
@@ -33,20 +26,17 @@ const PULSE_SPECS = /tests[\\/]pulse[\\/].*\.spec\.ts$/;
 
 export default defineConfig({
   testDir: './tests',
-  // Seed the dev cluster's Postgres before anything runs, and drain DB clients after. `globalSetup` spawns the
-  // seed as a Bun subprocess (specs run under the node runner, which lacks Bun's argon2id hashing); it completes
-  // synchronously so the seed manifest exists before the auth-setup project logs anyone in.
+  // `globalSetup` spawns the seed as a Bun subprocess because specs run under the node runner, which lacks Bun's argon2id hashing.
   globalSetup: './seed/global-setup.ts',
   globalTeardown: './seed/global-teardown.ts',
   fullyParallel: true,
   forbidOnly: isCI,
-  // Unconditional retries would hide real local flake; CI still gets one to absorb network jitter.
+  // CI gets one retry to absorb network jitter; locally a retry would hide real flake.
   retries: isCI ? 1 : 0,
   workers: isCI ? 2 : undefined,
   timeout: 30_000,
   expect: { timeout: 10_000 },
 
-  // Both reporters write under `test-results/`, which the root `.gitignore` already excludes at any depth.
   reporter: [['list'], ['html', { outputFolder: 'test-results/html-report', open: 'never' }]],
   outputDir: 'test-results/artifacts',
 
@@ -54,30 +44,20 @@ export default defineConfig({
     trace: 'on-first-retry',
     actionTimeout: 15_000,
     navigationTimeout: 30_000,
-    // The k3d dev ingress presents a self-signed/local-CA cert on *.shadow-apps.test — not a production
-    // trust concern, since every target here is either that local cluster or an env-overridden URL the
-    // caller explicitly chose.
+    // The k3d dev ingress serves a local-CA cert on *.shadow-apps.test.
     ignoreHTTPSErrors: true,
   },
 
-  // The `setup` project produces the per-persona storage states (`tests/auth.setup.ts`); `chromium` depends on it
-  // so those files exist before an authenticated spec reads one. `chromium` carries no `storageState` of its own —
-  // the existing specs assert the unauthenticated experience, and authenticated specs opt in per-test (via
-  // `test.use({ storageState })` or `apiContext(product, persona)`).
+  // `chromium` depends on `setup` (per-persona storage states from `tests/auth.setup.ts`) but carries no `storageState`: authenticated specs opt in
+  // per test via `test.use({ storageState })` or `apiContext(product, persona)`.
   //
-  // `identity-serial` holds the specs that drive identity-wide state no other spec may observe mid-flight — a global
-  // auth mode, a per-IP rate-limit budget, the deployment-wide namespace of Kubernetes workload-subject bindings. One
-  // worker and no in-file parallelism means even `--repeat-each` copies of the same test run one after another, which
-  // `test.describe.configure({ mode: 'serial' })` alone does not guarantee. `pulse-serial` holds the one pulse spec
-  // with the same problem: `GET /api/v1/dashboard/stats` aggregates every notification job in the deployment, so a
-  // second copy queueing its own rows would move the counts the first one is asserting a delta on.
+  // The `*-serial` projects hold specs that drive deployment-wide state no other spec may observe mid-flight: one worker and no in-file parallelism,
+  // so even `--repeat-each` copies run one after another, which `test.describe.configure({ mode: 'serial' })` alone does not guarantee.
+  // identity: a global auth mode, a per-IP rate-limit budget, the namespace of Kubernetes workload-subject bindings.
+  // pulse: `GET /api/v1/dashboard/stats` aggregates every notification job, so a second copy would move the counts the first asserts deltas on.
   //
-  // The rest of pulse runs in its own `pulse` project at two workers. Everything pulse-server does for a signed-in
-  // caller — opening an app session, minting its token, every permission decision — is a back-channel call to
-  // identity, and all of them arrive from the one pod address, so what they spend is identity's per-IP general
-  // budget (`GENERAL_LIMIT`, 100 a minute, `security.constants.ts`) rather than the far roomier per-client M2M one.
-  // A handful of concurrent sessions exhausts it, and identity then answers 429 — which pulse surfaces as a 503
-  // login or, fail-closed, a 403 on a route the caller is entitled to.
+  // The rest of pulse runs at two workers: pulse-server's back-channel calls to identity (app session, token, every permission decision) all arrive from
+  // one pod address and spend identity's per-IP `GENERAL_LIMIT` (100/min). Exhausting it yields 429, surfaced as a 503 login or, fail-closed, a 403.
   projects: [
     { name: 'setup', testMatch: /.*\.setup\.ts/ },
     { name: 'chromium', use: { ...devices['Desktop Chrome'] }, dependencies: ['setup'], testIgnore: [/.*\.setup\.ts/, SERIAL_IDENTITY_SPECS, SERIAL_SYNAPSE_SPECS, PULSE_SPECS] },

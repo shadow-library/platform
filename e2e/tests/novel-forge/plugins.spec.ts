@@ -4,11 +4,8 @@ import { expectCode, guardedProject } from './forge-arrange';
 import { assertSpendGuarded } from './forge-db';
 
 /**
- * Declaring the constants
- *
- * The plugin surface on a deployment with no plugin directory, which is how dev runs: nothing is installed, so no plugin can be enabled or
- * asked to augment a novel, and the routes still guard the novel they address. Installed-plugin behaviour needs a fixture directory on the
- * server and is out of reach here.
+ * The plugin surface on a deployment with no plugin directory (as in dev): no plugin can be enabled or asked to augment a novel, and routes still guard the novel they address.
+ * Installed-plugin behaviour needs a fixture directory on the server.
  */
 
 const MISSING_PLUGIN = 'e2e-missing-plugin';

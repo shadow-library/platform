@@ -31,12 +31,9 @@ interface RunDetail {
 }
 
 /**
- * Declaring the constants
- *
- * Workflow-run inspection. The run list and each run's usage are the author's; a run's detail, its context pack and a model call's raw
- * output sit behind `novel-forge:admin`, evaluated in the organisation the caller acts in, and still behind the project ownership guard:
- * a personal project has no organisation, so an admin of their own personal organisation reading a stranger's runs would be cross-tenant.
- * Runs, calls and packs are seeded rows, so nothing here waits on a model.
+ * Workflow-run inspection. The run list and each run's usage are the author's; a run's detail, context pack and a model call's raw output sit behind `novel-forge:admin` in the
+ * caller's acting organisation, and still behind the project ownership guard: a personal project has no organisation, so an admin of their own personal organisation reading a
+ * stranger's runs would be cross-tenant. Runs, calls and packs are seeded rows.
  */
 
 const RAW_OUTPUT = 'e2e-raw-model-output-marker';

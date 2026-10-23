@@ -11,12 +11,7 @@ interface MeResponse {
   readonly elevated: boolean;
 }
 
-/**
- * Declaring the constants
- *
- * Self-checks for the shared identity fixtures in `e2e/lib`: that a factory user plus a DB-minted session is a caller identity
- * accepts, and that the Redis helper reaches the cache identity actually reads. None of them spends a rate-limited login.
- */
+/** Self-checks for the shared identity fixtures in `e2e/lib`; none spends a rate-limited login. */
 test.describe('e2e identity fixtures', () => {
   let user: IdentityUser | undefined;
 

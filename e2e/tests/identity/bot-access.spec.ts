@@ -69,17 +69,12 @@ interface BotRoles {
 }
 
 /**
- * Declaring the constants
- *
- * The two ways a bot key reaches identity: exchanged at `/oauth2/token` by a first-party service for a five-minute bot
- * access token, and sent straight to identity's own organisation routes as `Authorization: Bearer sl_bot_…`. Every bot
- * caller here is cookie-less — a session cookie puts identity's CSRF guard in front of the bot guard, so each refusal
- * would come back as a CSRF failure rather than the decision under test.
- *
- * Addresses matter twice: the allowlist is checked against the `client_ip` a first-party exchanger forwards (the
- * connection address when it forwards none), and the general per-address budget is charged to that same forwarded value.
- * Forwarded addresses are therefore minted per test and their counters dropped afterwards, as the harness does for the
- * test's own connection address.
+ * The two ways a bot key reaches identity: exchanged at `/oauth2/token` by a first-party service for a five-minute bot access token, and sent straight to identity's organisation
+ * routes as `Authorization: Bearer sl_bot_…`.
+ * Every bot caller is cookie-less: a session cookie puts the CSRF guard in front of the bot guard, so each refusal would come back as a CSRF failure.
+ * Addresses matter twice: the allowlist is checked against the `client_ip` a first-party exchanger forwards (the connection address when none), and the general per-address
+ * budget is charged to that same value, so forwarded addresses are minted
+ * per test and their counters dropped afterwards.
  */
 
 const RATE_WINDOW_SECONDS = 60;
@@ -164,7 +159,7 @@ test.describe('identity bot key exchange — the token a key buys', () => {
     expect(claims, 'a bot token carries no scope').not.toHaveProperty('scope');
     expect(claims, 'no delegation').not.toHaveProperty('act');
     expect(claims, 'and no session').not.toHaveProperty('sid');
-    // A failure here means the server's own BOT_ACCESS_TOKEN_TTL_SECONDS moved, or the lifetime became policy-driven like every other grant's.
+    // A failure here means the server's `BOT_ACCESS_TOKEN_TTL_SECONDS` moved, or the lifetime became policy-driven like every other grant's.
     expect(Number(claims.exp) - Number(claims.iat), 'the lifetime is the fixed bot constant').toBe(BOT_ACCESS_TOKEN_TTL_SECONDS);
   });
 
@@ -221,7 +216,7 @@ test.describe('identity bot key exchange — refusals', () => {
     await updateOrganisation(team.organisationId, { status: 'SUSPENDED' });
     await expectRefused(await exchange(key.key), 400, 'invalid_grant', 'a suspended organisation');
 
-    // Naming no key is a malformed request rather than a rejected grant; it is still a 400 and still never a 401.
+    // Naming no key is a malformed request, still a 400 and never a 401.
     await expectRefused(await exchangeBotKey(ctx, client, {}), 400, 'invalid_request', 'no subject token');
 
     await updateOrganisation(team.organisationId, { status: 'ACTIVE' });
@@ -325,8 +320,8 @@ test.describe('identity bot key exchange — the caller address and the budgets'
     const retryAfter = (response: APIResponse): number => Number(response.headers()['retry-after']);
 
     try {
-      // Pre-spending the window rather than sending sixty exchanges: `enforce` increments, so the next call is the sixty-first.
-      // A failure here means the server's own BOT_KEY_EXCHANGE_LIMIT_PER_MINUTE moved, or the quota stopped being per key.
+      // Pre-spend the window instead of sending sixty exchanges (`enforce` increments, so the next call is the sixty-first). A failure here means the server's
+      // `BOT_KEY_EXCHANGE_LIMIT_PER_MINUTE` moved, or the quota stopped being per key.
       await spendRateLimit(BOT_KEY_EXCHANGE_BUCKET, key.keyId, BOT_KEY_EXCHANGE_LIMIT_PER_MINUTE, RATE_WINDOW_SECONDS);
       const overKeyBudget = await exchange(fresh);
       await expectRefused(overKeyBudget, 429, 'RATE_LIMITED', 'the sixty-first exchange of one key inside a minute');

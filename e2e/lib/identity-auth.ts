@@ -59,8 +59,6 @@ export interface PasswordSignIn {
 }
 
 /**
- * Declaring the constants
- *
  * Drives identity's public auth-flow API (`/api/v1/auth/*`) from a spec. A context that completes a login holds `__Host-sid`
  * afterwards, and from then on identity enforces CSRF on its POSTs — so start each login on a fresh `identityApi` context.
  */

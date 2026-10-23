@@ -21,11 +21,8 @@ interface MeSession {
 }
 
 /**
- * Declaring the constants
- *
- * Identity's own session: the cookie a login sets, sign-out, absolute and idle expiry, and self-service session management.
- * Sessions are minted in the database where the login itself is not under test, so only the cookie and device tests spend
- * `login/init`, and each test runs under its own client address.
+ * Identity's own session: the login cookie, sign-out, absolute and idle expiry, and self-service session management. Sessions are minted in the database where login is not under
+ * test, so only the cookie and device tests spend `login/init`, each under its own client address.
  */
 
 const SESSION_COOKIE = '__Host-sid';

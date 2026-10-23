@@ -22,17 +22,12 @@ export interface AuditChainTip {
 }
 
 /**
- * Declaring the constants
- *
- * Identity writes `audit_events` inside the transaction that performs the audited action, so a row is readable the
- * moment its API call answers. Every row belongs to exactly one hash chain — the organisation named on it, or the
- * global chain of rows carrying no organisation — and `prev_hash` points at the previous row of that chain alone.
- * `chain_position` is write order within a chain; ids are UUIDv7, which is not monotonic inside one millisecond, so only
- * the rows written before positions existed (position null, chained in id order) are ordered by id. `detail` is stored as a JSON string inside jsonb (as the
- * notification outbox is), so it is unwrapped with `#>> '{}'` and re-parsed rather than read with `->`.
+ * `audit_events` rows are written in the audited action's transaction, so they are readable as soon as the API call answers. Each row belongs to one hash chain
+ * (its organisation, or the global chain when it carries none) and `prev_hash` points at the previous row of that chain alone.
+ * `chain_position` is write order; ids are UUIDv7, not monotonic within a millisecond, so only rows predating positions (null, chained in id order) sort by id.
+ * `detail` is a JSON string inside jsonb, so it is unwrapped with `#>> '{}'` and re-parsed rather than read with `->`.
  */
 
-/** Rows of one chain in write order — `organisationId` null is the global chain — optionally only those written after the row `afterId`. */
 export async function auditChain(organisationId: string | null, afterId?: string): Promise<AuditRow[]> {
   const after = afterId ?? null;
   return identityDb()<AuditRow[]>`
@@ -45,7 +40,6 @@ export async function auditChain(organisationId: string | null, afterId?: string
   `;
 }
 
-/** The newest row of a chain, or `undefined` when nothing has been written to it yet. */
 export async function auditChainTip(organisationId: string | null): Promise<AuditChainTip | undefined> {
   const [row] = await identityDb()<AuditChainTip[]>`
     SELECT id::text, hash, chain_position::text AS "chainPosition" FROM audit_events
@@ -55,7 +49,6 @@ export async function auditChainTip(organisationId: string | null): Promise<Audi
   return row;
 }
 
-/** How many rows start a chain (`prev_hash IS NULL`) — exactly one while the chain is intact. */
 export async function countAuditChainRoots(organisationId: string | null): Promise<number> {
   const [row] = await identityDb()<{ count: number }[]>`
     SELECT count(*)::int AS count FROM audit_events WHERE organisation_id IS NOT DISTINCT FROM ${organisationId} AND prev_hash IS NULL
@@ -71,7 +64,6 @@ export async function findAuditEvents(action: string, targetId: string): Promise
   `;
 }
 
-/** Rows of `action` recorded against `ipAddress` — the security events that name no target. */
 export async function findAuditEventsByIp(action: string, ipAddress: string): Promise<AuditRow[]> {
   return identityDb()<AuditRow[]>`
     SELECT id::text, action, outcome::text, actor_type::text AS "actorType", actor_id AS "actorId", organisation_id AS "organisationId",
@@ -80,7 +72,6 @@ export async function findAuditEventsByIp(action: string, ipAddress: string): Pr
   `;
 }
 
-/** Rows of `action` recorded for `actorId`, in write order. */
 export async function findAuditEventsByActor(action: string, actorId: string): Promise<AuditRow[]> {
   return identityDb()<AuditRow[]>`
     SELECT id::text, action, outcome::text, actor_type::text AS "actorType", actor_id AS "actorId", organisation_id AS "organisationId",

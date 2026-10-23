@@ -21,13 +21,7 @@ export interface Jwks {
   keys: PublicJwk[];
 }
 
-/**
- * Declaring the constants
- *
- * Decodes, verifies and tampers with the compact JWS tokens identity issues. Identity signs with Ed25519 (`alg: EdDSA`) and
- * publishes the public halves at `/.well-known/jwks.json`, so a spec checks a token the way a relying party would: by `kid`
- * against that document, never by trusting the payload it decoded.
- */
+/** Verifies identity's Ed25519 (`alg: EdDSA`) tokens the way a relying party would: by `kid` against `/.well-known/jwks.json`, never by trusting the decoded payload. */
 
 export class JwtError extends Error {
   override readonly name = 'JwtError';

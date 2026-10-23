@@ -36,11 +36,8 @@ export interface SseClient {
 }
 
 /**
- * Declaring the constants
- *
- * A server-sent event reader for Novel Forge's streams. `APIRequestContext` buffers a body until it ends, and a project's event stream never
- * ends on its own, so a stream is read over a raw HTTPS request instead, carrying the context's cookies. Frames are parsed as the SSE
- * spec dispatches them: a block without data (the opening `retry:`) and comment lines (heartbeats) produce no frame.
+ * A server-sent event reader: `APIRequestContext` buffers a body until it ends and a project's event stream never does, so streams are read over a raw HTTPS request with the
+ * context's cookies. A block without data (the opening `retry:`) and comment lines (heartbeats) produce no frame.
  */
 
 const DEFAULT_WAIT_MS = 15_000;
@@ -154,7 +151,6 @@ class LiveSseStream implements SseStream {
   }
 }
 
-/** Resolves once the response headers arrive; a refused open has read its whole body by then. */
 export async function openSse(ctx: APIRequestContext, path: string, options: SseOpenOptions = {}): Promise<SseStream> {
   const url = new URL(path, requireProductUrl('novelForge'));
   const headers: Record<string, string> = { accept: 'text/event-stream', ...(options.clientIp ? clientIpHeaders(options.clientIp) : {}), ...options.headers };
@@ -178,13 +174,11 @@ export async function openSse(ctx: APIRequestContext, path: string, options: Sse
   });
 }
 
-/** Asserts an open was refused before the stream started, with `code` in its JSON body. */
 export function expectRefusedStream(stream: SseStream, status: number, code: string, what: string): void {
   expect(stream.status, `${what} — body ${stream.body}`).toBe(status);
   expect((JSON.parse(stream.body || '{}') as { code?: string }).code, what).toBe(code);
 }
 
-/** The frames of one event, each parsed as JSON. */
 export function framesOf<T>(frames: readonly SseFrame[], event: string): T[] {
   return frames.filter(frame => frame.event === event).map(frame => JSON.parse(frame.data) as T);
 }

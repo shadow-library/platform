@@ -13,12 +13,7 @@ interface UsageTotals {
   byDay: unknown[];
 }
 
-/**
- * Declaring the constants
- *
- * The usage and charges screens, AI-free. A fresh novel has made no model call, so its screen is asserted on its empty states; the
- * account screen is asserted on structure only, since other specs spend concurrently.
- */
+/** AI-free: a fresh novel has made no model call, so its screen is asserted on empty states; the account screen on structure only, since other specs spend concurrently. */
 
 test.describe('novel-forge usage and charges', () => {
   test.use({ storageState: storageStateFor('user1') });

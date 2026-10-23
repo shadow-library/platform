@@ -38,11 +38,8 @@ interface SubscriptionRow {
 }
 
 /**
- * Declaring the constants
- *
- * Finance (ARCHITECTURE §14): the expense audit trail, the lazy 9-category seed and its archive toggle, FX
- * capture-at-entry, and subscription cycle confirmation. The "idempotent under a race" claims prove genuine
- * concurrent overlap via `concurrency-helpers.ts`'s `withAccountLockHeld`, not by hoping `Promise.all` races in time.
+ * Finance: the expense audit trail, the lazy 9-category seed and archive toggle, FX capture-at-entry, and subscription cycle confirmation. "Idempotent under a race" claims prove
+ * real overlap via `withAccountLockHeld`.
  */
 
 const BUILTIN_CATEGORY_KEYS = ['food', 'groceries', 'transport', 'bills', 'health', 'shopping', 'home', 'subs', 'uncat'].sort();
@@ -63,7 +60,7 @@ function subscriptionRowOf(delta: Awaited<ReturnType<typeof pullFullDelta>>, sub
   return (delta.domains['subscriptions'] as unknown as SubscriptionRow[]).find(row => row.id === subscriptionId);
 }
 
-/** `fx_rates` carries no `account_id` — it's a shared, date-scoped cache across every lane on this cluster, so a randomized far-past date keeps a seeded row from colliding with anyone else's real traffic. */
+/** `fx_rates` has no `account_id`: it is a date-scoped cache shared across every lane, so a randomized far-past date keeps a seeded row from colliding with real traffic. */
 function randomPastDate(): string {
   const start = Date.UTC(2015, 0, 1);
   const end = Date.UTC(2023, 11, 31);
@@ -398,7 +395,6 @@ test.describe('memoir finance', () => {
 
     const afterDuplicate = await getAccount(persona.ctx);
     expect(afterDuplicate.coins, 'confirming the same cycle twice must grant exactly one coin').toBe(before.coins + 1);
-    // The occurredOn edit is one legitimate 'updated' row; the duplicate confirm must not add another.
     expect(auditRowsFor(delta, expenseId).map(row => row.action)).toEqual(['created', 'updated']);
 
     const thirdConfirm = await submitCommand(persona.ctx, 'subscription.confirmCycle', { id: subscriptionId, billingDate: '2026-02-28' });

@@ -36,11 +36,9 @@ interface RevisionRow {
 }
 
 /**
- * Declaring the constants
- *
- * Amend is the one write past a finalized chapter's lock: it replaces prose, title and note in place, carries the new prose into the final
- * draft under an `amended` revision, re-indexes it, and reschedules the reader's copy only when the payload the reader sees has changed.
- * The republish half runs against a real publication of the actor's own imported novel, under its own slug, removed with its reader rows.
+ * Amend is the one write past a finalized chapter's lock: it replaces prose, title and note in place, carries the prose into the final draft under an `amended` revision,
+ * re-indexes it, and reschedules the reader's copy only when the payload the reader sees changed. The republish half runs against a real publication of the actor's own imported
+ * novel, removed with its reader rows.
  */
 
 const AMENDED = 'Tamsin set her chain across the cobbles at dawn and counted the links three times, because the numbers had lied twice.';

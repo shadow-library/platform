@@ -15,14 +15,10 @@ interface ProjectBody {
 type Method = 'get' | 'post' | 'put' | 'patch' | 'delete';
 
 /**
- * Declaring the constants
- *
- * What an organisation bot may do on Novel Forge. A route admits a bot only when it declares a bot permission, and the bot must hold
- * every one the route and its controller declare; the guard decides before the body is validated, so an empty body still proves the
- * decision. Anything that could reach a model runs on a quota-pinned project (429 AI_008 before routing).
+ * A route admits a bot only when it declares a bot permission, and the bot must hold every one the route and controller declare; the guard decides before body validation, so an
+ * empty body still proves the decision. Anything that could reach a model runs on a quota-pinned project (429 AI_008 before routing).
  */
 
-/** A well-formed chat session id no session carries. */
 const UNKNOWN_SESSION = '00000000-0000-4000-8000-000000000000';
 
 async function call(ctx: APIRequestContext, method: Method, path: string, data?: unknown): Promise<APIResponse> {
@@ -45,7 +41,6 @@ async function createOwnProject(bot: ForgeBot): Promise<ProjectBody> {
   return (await created.json()) as ProjectBody;
 }
 
-/** A project the bot owns, inserted directly for a bot that may not create one. */
 function seedOwnProject(bot: ForgeBot, team: ForgeTeam): Promise<string> {
   return insertProject({ owner: bot.owner, organisationId: team.organisationId });
 }
@@ -56,7 +51,6 @@ async function listedIds(ctx: APIRequestContext): Promise<string[]> {
   return ((await response.json()) as { items: ProjectBody[] }).items.map(item => item.id);
 }
 
-/** A project with one hand-written chapter, written by a bot that holds projects:write. */
 async function projectWithChapter(writer: ForgeBot): Promise<string> {
   const project = await createOwnProject(writer);
   await saveChapter(writer.ctx, project.id, await startNextChapter(writer.ctx, project.id), CHAPTER_ONE);

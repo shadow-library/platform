@@ -7,14 +7,8 @@ interface VersionSummary {
 }
 
 /**
- * Declaring the constants
- *
- * `seedBaseline` (`apps/pulse-server/src/database/seed/baseline.seed.ts`) runs unconditionally at every boot and
- * bootstraps the branded design system (1 layout, 2 partials) plus a 23-key template catalog
- * (`apps/pulse-server/src/database/seed/baseline.data.ts`'s `BASELINE_TEMPLATES`) — each item created only when
- * absent, so an operator's customisation is never clobbered. This asserts presence by the specific seeded keys the
- * source declares, never by a raw `templates`/`layouts`/`partials` count: this shared dev database accumulates
- * `e2e-*` residue from other specs and runs, so a total is not a stable signal.
+ * `seedBaseline` runs at every boot and creates the branded design system (1 layout, 2 partials) plus the `BASELINE_TEMPLATES` catalog, each item only when absent so
+ * operator customisation is never clobbered. Presence is asserted by the seeded keys, never a raw count: this shared dev database accumulates `e2e-*` residue.
  */
 const IDENTITY_CATALOGUE_KEYS = ['auth.register.otp', 'auth.login.otp', 'auth.password.changed', 'security.new-signin', 'user.email.verification'] as const;
 

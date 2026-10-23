@@ -19,11 +19,8 @@ interface OneRowPerKeyCase {
 }
 
 /**
- * Declaring the constants
- *
- * Schema-level invariants verified directly against `apps/memoir-server/generated/drizzle/0000_abandoned_malcolm_colcord.sql`
- * (plus 0004's `reschedule_events` migration) via raw SQL on `memoirDb()`, asserting on constraint NAMES and SQLSTATEs rather
- * than application error codes — these guarantees hold independent of any handler that happens to sit in front of them.
+ * Schema-level invariants via raw SQL on `memoirDb()`, asserting constraint NAMES and SQLSTATEs rather than application error codes, as these guarantees hold independent of any
+ * handler in front of them.
  */
 
 const CHECK_CASES: readonly CheckCase[] = [
@@ -83,7 +80,6 @@ const ONE_ROW_PER_KEY_CASES: readonly OneRowPerKeyCase[] = [
   },
 ];
 
-/** Turns a rejection into its resolved value, so a constraint violation can be asserted on rather than caught. */
 async function captureError(promise: Promise<unknown>): Promise<unknown> {
   return promise.then(
     () => undefined,
@@ -92,16 +88,13 @@ async function captureError(promise: Promise<unknown>): Promise<unknown> {
 }
 
 /**
- * Sets `column` to a CHECK-violating `value` on an already fixture-tracked account via a dynamic column name — the
- * column always comes from {@link CHECK_CASES}, never from input. Updating a tracked row rather than inserting a
- * fresh one means a loosened constraint can never leak an untracked `accounts` row: the account is deleted by the
- * `memoir` fixture's teardown regardless of whether this update is rejected.
+ * Sets `column` (always from {@link CHECK_CASES}, never input) to a CHECK-violating `value` on a fixture-tracked account, so a loosened constraint can never leak an untracked
+ * row: teardown deletes it either way.
  */
 async function violateAccountCheck(accountId: string, column: string, value: number): Promise<unknown> {
   return captureError(memoirDb().unsafe(`UPDATE accounts SET ${column} = $1 WHERE id = $2`, [value, accountId]));
 }
 
-/** A minimal `quests` row owned by `accountId`, for tests that need a real quest id to satisfy a foreign key. */
 async function insertQuest(accountId: string, name: string): Promise<string> {
   const sql = memoirDb();
   const [row] = await sql<{ id: string }[]>`
@@ -124,7 +117,6 @@ function rowsOf(delta: DeltaPage, domain: string): Record<string, unknown>[] {
   return delta.domains[domain] ?? [];
 }
 
-/** Every table's `sync_seq` `column_default`, keyed by table name — the literal default text reveals whether two tables share one sequence object. */
 async function syncSeqColumnDefaults(): Promise<Map<string, string | null>> {
   const rows = await memoirDb()<{ tableName: string; columnDefault: string | null }[]>`
     SELECT table_name AS "tableName", column_default AS "columnDefault"
@@ -239,9 +231,8 @@ test.describe('quest_logs duplicate occurrence (memoir-db-4)', () => {
 
 test.describe('daily_states concurrent insert (memoir-db-5)', () => {
   /**
-   * The overlap is proven, not assumed: the first insert is held open on a reserved connection until the racing
-   * insert is observably queued behind it (`pg_blocking_pids`), only then does the first commit — at which point
-   * the racer, having genuinely waited on the uncommitted row, resolves into a primary-key violation.
+   * The first insert is held open on a reserved connection until the racing insert is observably queued behind it (`pg_blocking_pids`); only then does the first commit, so the
+   * racer resolves into a primary-key violation.
    */
   test('should let exactly one of two overlapping raw inserts for the same (account, date) survive', async ({ memoir }) => {
     const account = await memoir.disposableAccount('daily-states-race');
@@ -362,12 +353,9 @@ test.describe('one-row-per-key uniqueness (memoir-db-7)', () => {
 
 test.describe('shared sync_seq sequence (memoir-db-8)', () => {
   /**
-   * Two proofs, not one: `information_schema.columns` first confirms `daily_states`, `quests`, `quest_logs`,
-   * `hero_events` and `deleted_records` all default `sync_seq` from the literal same sequence object
-   * (`nextval('sync_seq'::regclass)`) — that is the sharing itself. The API-driven ordering check below then shows
-   * that shared default is load-bearing at runtime: touching four different tables in a fixed order and observing
-   * their sync_seq values increase in that same cross-table order, which independent per-table counters could not
-   * guarantee even if each happened to be named the same.
+   * Two proofs: `information_schema.columns` confirms `daily_states`, `quests`, `quest_logs`, `hero_events` and `deleted_records` default `sync_seq` from the same sequence
+   * (`nextval('sync_seq'::regclass)`), and the API-driven ordering check shows it is load-bearing: independent per-table counters could not keep four tables' values increasing
+   * in cross-table order.
    */
   test("should draw every syncable domain's sync_seq, and deleted_records' tombstone sync_seq, from one shared increasing sequence", async ({ memoir }) => {
     const SYNC_SEQ_TABLES = ['daily_states', 'quests', 'quest_logs', 'hero_events', 'deleted_records'] as const;
@@ -416,7 +404,6 @@ test.describe('shared sync_seq sequence (memoir-db-8)', () => {
 });
 
 test.describe('accounts cascade delete (memoir-db-9)', () => {
-  /** The account under test uploads nothing (only a device + a command), so its raw removal cannot orphan a storage object. */
   test('should cascade-delete devices and command_log rows when the owning accounts row is removed', async ({ memoir }) => {
     const persona = await memoir.persona({ label: 'cascade', onboard: true });
     const account = await getAccount(persona.ctx);

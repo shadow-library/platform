@@ -6,12 +6,10 @@ import { memoirDb, pollUntil } from '../../lib';
 import { type CommandEnvelopeInput, type CommandOutcome, todayLocal } from './helpers';
 
 /**
- * `CommandBus.execute` serializes every command for an account behind `pg_advisory_xact_lock(accountId)`
- * (`command-log.repository.ts`'s `runSerialized`), so two commands submitted for one account never race at the
- * Postgres row level — the second's transaction blocks on the lock until the first's commits or rolls back.
- * `withAccountLockHeld` proves that queueing happens (mirroring `security-core.spec.ts`'s blocker-row +
- * `pg_blocking_pids` proof) instead of trusting two `Promise.all` calls to overlap in time; `submitCommandWithHeaders`
- * and `expectApplied` are the plumbing finance.spec.ts and metrics.spec.ts share to fire a burst under it.
+ * `CommandBus.execute` serializes commands per account behind `pg_advisory_xact_lock(accountId)` (`runSerialized`), so a second command blocks until the first commits or rolls
+ * back.
+ * `withAccountLockHeld` proves the queueing (blocker row + `pg_blocking_pids`) instead of trusting `Promise.all` to overlap; `submitCommandWithHeaders` and `expectApplied` are
+ * shared with finance.spec.ts and metrics.spec.ts.
  */
 
 async function waitersBlockedBy(pid: number): Promise<number> {
@@ -20,10 +18,8 @@ async function waitersBlockedBy(pid: number): Promise<number> {
 }
 
 /**
- * Holds `accountId`'s own advisory lock open, starts `fire()` (which is expected to submit `waiterCount` commands
- * for that account), waits until all of them are genuinely queued behind the held lock, then releases it and
- * returns `fire()`'s settled result. Throws if fewer than `waiterCount` callers ever queued — a flaky call is a
- * failed proof, not a passed one.
+ * Holds `accountId`'s advisory lock, starts `fire()` (expected to submit `waiterCount` commands), waits until all are queued behind the lock, then releases and returns
+ * `fire()`'s result. Throws if fewer ever queued: a flaky call is a failed proof.
  */
 export async function withAccountLockHeld<T>(accountId: string, waiterCount: number, fire: () => Promise<T>): Promise<T> {
   const blocker = await memoirDb().reserve();
@@ -52,9 +48,8 @@ export async function withAccountLockHeld<T>(accountId: string, waiterCount: num
 }
 
 /**
- * Submits one sync command reusing pre-fetched CSRF headers rather than `memoirMutate`'s per-call reseed, which
- * rotates the `csrf-token` cookie and fails an earlier in-flight POST of a concurrent burst with `403 S010`. Fetch
- * `headers` once via `csrfHeaders(ctx)` and share it across every call in the burst.
+ * Submits one sync command with pre-fetched CSRF headers: `memoirMutate`'s per-call reseed rotates the `csrf-token` cookie and fails an in-flight POST of a concurrent burst with
+ * `403 S010`. Fetch `headers` once via `csrfHeaders(ctx)` per burst.
  */
 export async function submitCommandWithHeaders(
   ctx: APIRequestContext,

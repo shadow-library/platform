@@ -25,14 +25,9 @@ export interface ApplicationRole {
 }
 
 /**
- * Declaring the constants
- *
- * Application roles, their permissions and the assignments that confer them, written straight to the database.
- * Identity creates roles only through the catalog-sync service API, which needs a service token and a manifest a
- * scenario about role administration does not otherwise want; the assignment API under `/api/v1/admin` is the
- * surface under test and cannot bootstrap the role it assigns. Roles, permissions, role-permission links and
- * assignments all cascade with their application, so a spec that puts them on a throwaway application needs no
- * teardown of its own. Identity re-reads assignments on every decision, so a written row is live at once.
+ * Application roles, permissions and assignments written straight to the database: identity creates roles only through the catalog-sync service API (needs a
+ * service token and a manifest), and the assignment API under test cannot bootstrap the role it assigns. Everything cascades with its application, so a
+ * throwaway application needs no teardown. Identity re-reads assignments on every decision, so a written row is live at once.
  */
 
 export const PLATFORM_APPLICATION_NAME = 'shadow-identity';

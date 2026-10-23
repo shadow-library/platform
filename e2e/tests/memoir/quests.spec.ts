@@ -46,14 +46,10 @@ interface QuestRow {
 }
 
 /**
- * Declaring the constants
- *
- * Quest commands (ARCHITECTURE §9.3, §11.2) and the compassion mechanics layered on them (PRD §2.4, §3.6, §4.3, §4.6), asserted
- * through command outcomes and the rows they write. Rewards come from ruleset v1 (`rules/ruleset.ts`): an untimed routine
- * completed the same day is always on time, 10 xp and 1 coin, so every reward below is exact regardless of the wall clock.
- *
- * `plan.setLock` stores `daily_states.locked_quest_ids` as `bigint[]`, which the delta serializer cannot encode
- * (apps/memoir-server/src/modules/sync/delta.repository.ts:29), so the lock test never pulls a delta for its account.
+ * Quest commands and the compassion mechanics layered on them, asserted through command outcomes and written rows. Rewards come from ruleset v1: an untimed routine completed the
+ * same
+ * day is always on time, 10 xp and 1 coin. `plan.setLock` stores `daily_states.locked_quest_ids` as `bigint[]`, which the delta serializer cannot encode, so the lock test never
+ * pulls a delta.
  */
 
 const QUEST_REWARD_TYPES = ['quest_complete', 'quest_late', 'quest_partial'];

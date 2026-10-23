@@ -52,17 +52,12 @@ interface RateLimitScratch {
 }
 
 /**
- * Declaring the constants
- *
- * Every budget, block and tally identity keeps is keyed on the caller's address, so this file runs in the `identity-serial`
- * project (one worker, no in-file parallelism — see `playwright.config.ts`) and gives each test addresses of its own out of
- * the benchmarking range. A limit is proven the cheap way where the count is large — pre-spend the window in Redis, then let
- * the next real request cross it — and the whole way where it is small: the `register/init` budget below is reached by six
- * real requests. Every test also proves the legitimate path still works — a fresh address, or another source, gets through —
- * so a pass can never mean "everything is refused".
- *
- * The numbers mirror the server's own (`security.constants.ts`, the `@RateLimit` decorators on `auth.controller.ts`, and
- * `SuspiciousLoginService`); a budget that moves there shows up here as a wrong count rather than a silent pass.
+ * Every budget, block and tally identity keeps is keyed on the caller's address, so this file runs in the `identity-serial` project and gives each test addresses of its own from
+ * the benchmarking range. Where the count is large a limit is proven by pre-spending
+ * the window in Redis and letting the next real request cross it; where small, the whole way (`register/init` takes six real requests). Every test also proves the legitimate
+ * path still works, so a pass never means "everything is refused".
+ * The numbers mirror the server's (`security.constants.ts`, the `@RateLimit` decorators on `auth.controller.ts`, `SuspiciousLoginService`); a budget that moves there shows up
+ * here as a wrong count rather than a silent pass.
  */
 
 const REGISTER_INIT: Budget = { bucket: 'register-init', limit: 5, windowSeconds: 3_600 };
@@ -162,8 +157,8 @@ test.describe.configure({ mode: 'serial' });
 test.describe('identity auth endpoint budgets', () => {
   test('should let five register/inits through per address, refuse the sixth and leave other addresses alone', async ({ identity, limits }) => {
     const user = await identity.createUser({ label: 'rl-register' });
-    // The twin masks to the same string as the user's address, so only its own local part varies between runs: purge its trail
-    // first and last, or a rerun that happens to derive the same twin would count the previous run's OTP.
+    // The twin masks to the same string as the user's address, so only its local part varies between runs: purge its trail first and last, or a rerun deriving the same twin
+    // would count the previous run's OTP.
     const twin = enumerationTwin(user.email);
     const probed = [twin];
     const probeAddress = (): string => {
@@ -207,7 +202,7 @@ test.describe('identity auth endpoint budgets', () => {
     const bystander = await limits.caller();
 
     try {
-      // Twenty real inits would prove nothing the one crossing request does not, so the window is pre-spent to the limit.
+      // Twenty real inits would prove nothing the one crossing request does not, so the window is pre-spent.
       await spendRateLimit(LOGIN_INIT.bucket, flooder.ip, LOGIN_INIT.limit, LOGIN_INIT.windowSeconds);
       const refused = await loginInit(flooder.ctx, user.email);
       await expectRefused(refused, 429, 'RATE_LIMITED', 'the twenty-first login/init from one address inside the window');
@@ -267,8 +262,8 @@ test.describe('identity address blocks', () => {
     const attacker = await limits.caller();
     const bystander = await limits.caller();
 
-    // Twenty-nine arranged failures, then one real one on another account: the block fires on the failure that makes the tally
-    // exactly the threshold, and a fresh address guarantees the tally starts at zero.
+    // Twenty-nine arranged failures, then one real one on another account: the block fires on the failure that makes the tally exactly the threshold; a fresh address starts the
+    // tally at zero.
     await spendRateLimit(IP_FAILURE.bucket, attacker.ip, IP_FAILURE.threshold - 1, IP_FAILURE.windowSeconds);
     const flowId = await startLogin(attacker.ctx, first.email);
     const failed = await verifyChallenge(attacker.ctx, { flowId, password: wrongPassword() });

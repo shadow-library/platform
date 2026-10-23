@@ -3,12 +3,8 @@ import { expect, test } from './fixtures';
 import { createDailyQuest, hasQuestLogFor, memoirMutate, pullDelta, submitCommand } from './helpers';
 
 /**
- * Declaring the constants
- *
- * Creates a fresh daily quest via `quest.create` (so completing it always has an XP/coin delta to observe,
- * unlike reusing a quest that may have already paid out today's reward), completes it from the real Today
- * screen, and checks the result both in the UI and by pulling the server's own delta — the round trip the
- * offline outbox exists to make invisible to the user.
+ * Creates a fresh daily quest (so completion always has an XP/coin delta, unlike one that paid out today), completes it from the Today screen, and checks the UI and the server's
+ * pulled delta: the round trip the offline outbox hides.
  */
 test.describe('memoir core loop', () => {
   test('should complete a quest from Today, update Hero state, and persist across reload', async ({ page, context, memoir }) => {
@@ -30,8 +26,7 @@ test.describe('memoir core loop', () => {
     await expect(page.getByRole('button', { name: `Completed: ${questName}` })).toBeVisible();
     await expect(page.getByRole('progressbar')).not.toHaveAttribute('aria-valuenow', xpBefore ?? '');
 
-    // Give the outbox its round trip, then confirm the server actually recorded the completion (not just an
-    // optimistic local flip) before reloading and asserting the state survived a fresh page load.
+    // Confirm the server recorded the completion (not just an optimistic local flip) before reloading.
     await expect
       .poll(async () => hasQuestLogFor(await pullDelta(ctx), occurrenceId), { message: 'expected the completed occurrence to appear in a quest_logs delta', timeout: 15_000 })
       .toBe(true);

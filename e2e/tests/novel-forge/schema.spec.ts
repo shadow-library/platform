@@ -9,18 +9,11 @@ class ThrowawayInsertError extends Error {
 }
 
 /**
- * Declaring the constants
- *
- * DB-level invariants (NF2-SCHEMA-01), asserted directly against Postgres rather than through the API: a unique or check
- * constraint violation, and a foreign key's cascade/set-null behaviour. Every arrangement is a throwaway `owner_kind:'user'`,
- * `owner_id:NULL` project (nullable in the schema, so no identity actor is needed) inside a transaction the test itself rolls
- * back — either because the constraint violation aborts it (`sql.begin()` rejects and rolls back automatically), or because
- * the read-then-rollback helper below throws a sentinel after reading back what it needs to assert. Either way nothing
- * survives the test.
- *
- * `character_states.entity_key` carries no foreign key to `entities` (only a shared `project_id`), so an entity's own delete
- * does not cascade its `character_states` row — only the project's delete does; that half of the invariant is the only one
- * this file does not assert, because it is not true.
+ * DB-level invariants asserted directly against Postgres: unique and check constraint violations, and foreign-key cascade/set-null. Every arrangement is a throwaway
+ * `owner_kind:'user'`, `owner_id:NULL` project
+ * (nullable, so no identity actor is needed) inside a transaction the test rolls back, either by the violation aborting it or by the read-then-rollback helper throwing a sentinel.
+ * `character_states.entity_key` has no foreign key to `entities` (only a shared `project_id`), so an entity's delete does not cascade its `character_states` row, only the
+ * project's does; that half is not asserted because it is not true.
  */
 
 async function insertThrowawayProject(tx: TransactionSql): Promise<string> {
@@ -32,9 +25,8 @@ async function insertThrowawayProject(tx: TransactionSql): Promise<string> {
 }
 
 /**
- * Runs `arrange` inside a transaction, always rolling it back: `arrange` reads back whatever state it needs to assert before
- * the rollback discards it, and returns that snapshot. One shared sentinel-and-catch dance instead of a bespoke `Rollback`
- * subclass per test.
+ * Runs `arrange` in a transaction that is always rolled back: `arrange` reads back what it needs before the rollback discards it and returns that snapshot. One shared
+ * sentinel-and-catch instead of a `Rollback` subclass per test.
  */
 async function readThenRollback<T>(arrange: (tx: TransactionSql) => Promise<T>): Promise<T> {
   class Snapshot extends Error {
@@ -107,7 +99,7 @@ test.describe('novel-forge database invariants', () => {
       await tx`DELETE FROM chat_sessions WHERE id = ${session.id}`;
       const [messages] = await tx<{ count: number }[]>`SELECT count(*)::int AS count FROM chat_messages WHERE session_id = ${session.id}`;
       const [after] = await tx<{ sessionId: string | null }[]>`SELECT session_id::text AS "sessionId" FROM refinement_proposals WHERE id = ${proposal.id}`;
-      // A missing row and a correctly-nulled `session_id` must read as different outcomes — `after` is checked for existing first.
+      // A missing row and a correctly-nulled `session_id` must read as different outcomes, so `after` is checked for existing first.
       const proposalSessionId = after ? after.sessionId : 'e2e-row-missing';
       return { messages: messages?.count ?? -1, proposalSessionId };
     });

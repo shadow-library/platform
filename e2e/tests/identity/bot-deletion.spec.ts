@@ -96,20 +96,14 @@ interface StalledDeletion {
 }
 
 /**
- * Declaring the constants
+ * Deleting an organisation bot is two halves. Immediately and locally: the handle is confirmed, the recipient checked, every key revoked, the backing client deactivated, the bot
+ * goes `DELETING` and one handover is queued per bot-aware application.
+ * Then the worker hands the bot's records over application by application and writes the `DELETED` tombstone only once every one has confirmed.
  *
- * Deleting an organisation bot is two halves. The first is immediate and local: the handle is confirmed, the recipient is
- * checked, every key is revoked, the backing client is deactivated, the bot goes `DELETING` and one handover is queued per
- * bot-aware application. The second belongs to the worker, which hands the bot's records over application by application
- * and writes the `DELETED` tombstone only once every one of them has confirmed.
- *
- * Novel Forge is the one bot-aware application here, and it is reachable, so both halves are asserted against real
- * delivery. The worker polls every five seconds, so a handover is claimed within a tick or two of being queued — which
- * means a bot's `DELETING` state is only stable while something is holding the deletion open. The tests that assert on
- * that state give the bot a second handover to an application that is no longer bot-aware, a row the worker can claim but
- * never deliver; the rest wait the drain out with `waitUntil` rather than reading a state the server may already have
- * left. An application holds its handovers by `ON DELETE restrict`, so every such row is removed before the harness takes
- * the application down.
+ * Novel Forge is the one reachable bot-aware application, so both halves are asserted against real delivery. The worker polls every five seconds, so `DELETING` is stable only
+ * while something holds the deletion open: tests asserting on it give the
+ * bot a second handover to an application no longer bot-aware (claimable but never deliverable); the rest wait the drain out with `waitUntil`. An application holds its handovers
+ * by `ON DELETE restrict`, so such rows are removed before the harness takes the application down.
  */
 
 /** Six worker ticks: enough for a handover to be claimed, delivered and finalised, and short enough to fail fast. */
@@ -150,9 +144,8 @@ function requestDeletion(ctx: APIRequestContext, bot: OrganisationBot, body: { t
 }
 
 /**
- * Every handover's outcome in one line. A timeout waiting on the worker has two very different causes — the worker is not
- * ticking, or it is ticking and Novel Forge is unreachable (which is what an unset `SERVICE_URL_NOVEL_FORGE_SERVER` looks
- * like) — and only the rows tell them apart.
+ * Every handover's outcome in one line: a timeout waiting on the worker is either the worker not ticking or Novel Forge being unreachable (an unset
+ * `SERVICE_URL_NOVEL_FORGE_SERVER`), and only the rows tell them apart.
  */
 function describeTransfers(rows: BotTransferRow[], novelForgeId: number): string {
   if (rows.length === 0) return 'no rows at all, so the request queued nothing';
@@ -168,9 +161,8 @@ function transferTo<T extends { applicationId: number }>(rows: T[], applicationI
 }
 
 /**
- * A bot holding a grantable role on a throwaway application, and that application's own policy-decision caller. Identity's
- * own bot roles cannot stand in: a decision is scoped to the application the calling client belongs to, and the platform
- * application's clients are the seeded ecosystem ones.
+ * A bot holding a grantable role on a throwaway application, and that application's own policy-decision caller: a decision is scoped to the calling client's application and the
+ * platform application's clients are the seeded ecosystem ones.
  */
 async function decidableBot(identity: IdentityHarness, team: IdentityTeam, label: string): Promise<{ bot: OrganisationBot; authz: AuthzApi }> {
   const application = await identity.createOAuthApp(label);
@@ -198,11 +190,9 @@ async function botProject(forge: APIRequestContext): Promise<ForgeProject> {
 }
 
 /**
- * Requests a deletion that cannot finish: a handover to an application that no longer exposes a bot ownership scope is
- * queued alongside the real one, so the worker claims it, fails it and leaves the bot `DELETING` for as long as the test
- * needs. The row is queued before the request because the enqueue is atomic with it, and `onConflictDoNothing` means the
- * request's own fan-out neither sees nor rewrites it. The row is removed again on any failure here: it holds the
- * application by `ON DELETE restrict`, which the harness takes down before the bot.
+ * Requests a deletion that cannot finish: a handover to an application with no bot ownership scope is queued beside the real one, so the worker claims and fails it and the bot
+ * stays `DELETING`. The row is queued before the request because the enqueue is atomic with it and `onConflictDoNothing` keeps the request's fan-out from rewriting it; it is
+ * removed again on failure here, as it holds the application by `ON DELETE restrict`.
  */
 async function stalledDeletion(identity: IdentityHarness, team: IdentityTeam, label: string, bot: OrganisationBot): Promise<StalledDeletion> {
   const stranded = await identity.createOAuthApp(label);

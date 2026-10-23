@@ -38,7 +38,7 @@ export interface PulseHarness {
   preLogin(staff: PulseStaff): Promise<APIRequestContext>;
   /** An identity context signed in as `staff`, for the OAuth calls that ride a session. */
   identityCaller(staff: PulseStaff): Promise<APIRequestContext>;
-  /** A cookie-less identity context — the token endpoint refuses a cookie-carrying caller with `S010` (CSRF). */
+  /** Cookie-less: the token endpoint refuses a cookie-carrying caller with `S010` (CSRF). */
   identityAnonymous(): Promise<APIRequestContext>;
   /** An identity admin caller, for the OAuth application a cross-audience token is minted from. */
   identityAdmin(): Promise<AdminApi>;
@@ -51,12 +51,8 @@ export interface PulseHarness {
 }
 
 /**
- * Declaring the constants
- *
- * The pulse harness. Every account, context and row a test arranges is tracked here and removed afterwards even
- * when an earlier teardown step throws, so a test that fails halfway leaves the deployment as it found it. The
- * personas are built fresh per test rather than shared: a pulse permission is resolved by identity's PDP and
- * cached per subject in the pulse pod, so a reused subject would carry a previous test's decision.
+ * Everything a test arranges is tracked and removed even when an earlier teardown step throws. Personas are built fresh per test because a pulse permission is
+ * resolved by identity's PDP and cached per subject in the pulse pod, so a reused subject would carry a previous test's decision.
  */
 
 export const test = base.extend<{ pulse: PulseHarness }>({

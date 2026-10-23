@@ -46,12 +46,7 @@ export interface WorkflowRunSummary {
   readonly status: string;
 }
 
-/**
- * Declaring the constants
- *
- * Arrange-and-assert rows for the stream, job and claim specs, beside `forge-db.ts` rather than in it so parallel lanes never edit one
- * file. Job events are what a chat's job stream replays, keyed by the session's `job_event_seq` cursor.
- */
+/** Arrange-and-assert rows for the stream, job and claim specs. Job events are what a chat's job stream replays, keyed by the session's `job_event_seq` cursor. */
 
 /** A held slot rolls itself back after this even if the test never releases it, and the database ends the transaction soon after. */
 const HELD_SLOT_MAX_MS = 20_000;
@@ -111,7 +106,6 @@ export async function readAuthoringClaim(projectId: string): Promise<AuthoringCl
   return row;
 }
 
-/** Backdates the claim's heartbeat, as a holder that stopped heartbeating would leave it. */
 export async function ageAuthoringClaim(projectId: string, heartbeatAgoMs: number): Promise<void> {
   await novelForgeDb()`
     UPDATE authoring_claims SET heartbeat_at = timezone('utc', now()) - ${`${Math.round(heartbeatAgoMs)} milliseconds`}::interval WHERE project_id = ${projectId}
@@ -137,8 +131,8 @@ export async function listWorkflowRuns(projectId: string, graph: string): Promis
 }
 
 /**
- * Holds the chat's next message slot in an open transaction, so a turn that has started and answered with its run id blocks on storing
- * the author's message until the returned release rolls the hold back. Without it a quota-refused turn settles before any client connects.
+ * Holds the chat's next message slot in an open transaction, so a started turn blocks on storing the author's message until the returned release rolls the hold back; without it
+ * a quota-refused turn settles before any client connects.
  */
 export async function holdNextChatMessage(projectId: string, sessionId: string): Promise<() => Promise<void>> {
   let release: () => void = () => undefined;
@@ -174,7 +168,6 @@ export async function holdNextChatMessage(projectId: string, sessionId: string):
   };
 }
 
-/** Marks a chapter's draft and every version of it isolated, as pasting it with `isolated: true` stores it. */
 export async function markDraftIsolated(projectId: string, chapter: number): Promise<void> {
   const sql = novelForgeDb();
   const [draft] = await sql<{ id: string }[]>`UPDATE drafts SET isolated = true WHERE project_id = ${projectId} AND chapter = ${chapter} RETURNING id::text`;

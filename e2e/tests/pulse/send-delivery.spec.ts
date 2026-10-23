@@ -26,17 +26,13 @@ interface SendBody {
 }
 
 /**
- * Declaring the constants
+ * `POST /api/v1/notifications` is `@RequireScope('notifications:send')`, a `principalType: 'SERVICE'` scope no session can hold. Two service clients do: identity's outbound
+ * client (self-signed token e2e cannot forge) and memoir's, authenticated by its bound `memoir/memoir-server` workload identity. The producer path is proven by a real identity
+ * action; the endpoint contract is driven as memoir.
  *
- * `POST /api/v1/notifications` is `@RequireScope('notifications:send')`, a scope declared `principalType: 'SERVICE'`
- * (`apps/identity-server/src/modules/bootstrap/ecosystem-seed.constants.ts:109-111`), so no session — the bootstrap admin's
- * included — can hold it. Two service clients do: identity's own outbound client, whose self-signed token e2e cannot
- * forge, and memoir's, which authenticates by its bound `memoir/memoir-server` workload identity. The producer path is
- * proven by a real identity action; the contract of the endpoint itself is driven as memoir.
- *
- * The console's manual send is its own route, `POST /api/v1/notifications/console`: a `pulse:notifications:send` permission on a
- * stepped-up session, refusing identity's and other security templates and limiting each actor to 20 sends in ten minutes, counted
- * per pulse replica (`console-send-limiter.service.ts`). Its callers are fresh staff accounts, so no test spends the seeded admin's budget.
+ * The console's manual send is `POST /api/v1/notifications/console`: a `pulse:notifications:send` permission on a stepped-up session, refusing identity's and other security
+ * templates and limiting each actor to 20 sends in ten minutes, counted per pulse replica (`console-send-limiter.service.ts`). Callers are fresh staff accounts so no test spends
+ * the seeded admin's budget.
  */
 
 const TEMPLATES_READ = 'pulse:templates:read';
@@ -48,7 +44,6 @@ const IDENTITY_PAYLOAD = { organisationName: 'Acme Corp', role: 'ADMIN', token: 
 const CONSOLE_SEND_LIMIT = 20;
 const CONSOLE_SEND_WINDOW_SECONDS = 600;
 
-/** True when `templateKey` has a published version with at least one enabled channel — the send precondition. */
 async function hasPublishedTemplate(templateKey: string): Promise<boolean> {
   const rows = await pulseDb()<{ count: number }[]>`
     SELECT count(*)::int AS count
@@ -79,7 +74,6 @@ function consoleSend(ctx: APIRequestContext, data: Record<string, unknown>): Pro
   return mutate(ctx, 'post', '/api/v1/notifications/console', { data });
 }
 
-/** A staff account holding the console send, stepped up through pulse's own step-up route. */
 async function elevatedSender(pulse: PulseHarness, label: string): Promise<PulseStaff> {
   const sender = await pulse.staff({ label, permissions: [TEMPLATES_READ, NOTIFICATIONS_SEND] });
   await stepUpThroughApp(sender, await pulse.identityCaller(sender), '/send');
@@ -95,10 +89,9 @@ test.describe('send + delivery', () => {
   test.beforeEach(() => requireProductUrl('pulse'));
 
   /**
-   * The end-to-end interconnect proof: registering a never-before-used email makes identity enqueue an OTP and post it to
-   * pulse with its own service credential; pulse must route it (the catch-all `e2e-dev` rule), render it (the code, not the
-   * raw `{{ code }}`) and deliver it through the `DEV` provider. The baseline seed runs after every pulse migration, so a
-   * missing `auth.register.otp` is a broken deployment, not a reason to skip.
+   * End-to-end interconnect proof: registering a never-before-used email makes identity enqueue an OTP and post it to pulse with its own service credential; pulse must route it
+   * (catch-all `e2e-dev` rule), render it (the code, not the raw `{{ code }}`) and deliver it through the `DEV` provider. The baseline seed runs after every pulse migration,
+   * so a missing `auth.register.otp` is a broken deployment, not a reason to skip.
    */
   test('should deliver a real registration OTP end-to-end through identity -> pulse -> DEV provider', async ({ pulse }) => {
     expect(await hasPublishedTemplate('auth.register.otp'), 'auth.register.otp has no published version — the baseline seed did not run on this deployment').toBe(true);
@@ -345,7 +338,6 @@ test.describe('send + delivery — console', () => {
   });
 });
 
-/** Polls identity's outbox for the OTP `fetchLatestOtp` returns, giving the worker a few seconds to catch up. */
 async function pollForOtp(email: string, templateKey: string, timeoutMs = 20_000): Promise<string | undefined> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -356,7 +348,6 @@ async function pollForOtp(email: string, templateKey: string, timeoutMs = 20_000
   }
 }
 
-/** Polls pulse for the delivered `notification_messages` row for `email`, once its job reaches `SENT`. */
 async function pollForDeliveredMessage(email: string, expected: string, timeoutMs = 60_000): Promise<{ renderedSubject: string | null; renderedBody: string }> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {

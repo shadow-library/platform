@@ -2,12 +2,8 @@ import { authorizeCode, exchangeCode, introspect, relyingPartyClient, requirePro
 import { expect, test } from './fixtures';
 
 /**
- * Declaring the constants
- *
- * `GET /api/v1/templates` is the permission-gated route these cases are argued on: it carries
- * `@RequirePermission('pulse:templates:read')` and nothing else, so what it answers is decided by the credential
- * alone. Each refusal is followed by the call that must still succeed, on the same route, so a refusal can never
- * be read as the route being broken.
+ * `GET /api/v1/templates` carries only `@RequirePermission('pulse:templates:read')`, so what it answers is decided by the credential alone.
+ * Each refusal is followed by a call that must still succeed on the same route, so a refusal is never the route being broken.
  */
 const MANAGEMENT_ROUTE = '/api/v1/templates';
 
@@ -33,9 +29,8 @@ test.describe('auth guard', () => {
   });
 
   /**
-   * The token is minted by identity's real authorization-code flow for a throwaway application's own
-   * `api://<name>` resource, and identity's introspection is asked to confirm it is live and audience-bound before
-   * pulse sees it — so the 401 is pulse refusing another audience's token, not pulse refusing a broken one.
+   * Minted by identity's real authorization-code flow for a throwaway application's own `api://<name>` resource and confirmed live and audience-bound by introspection, so the
+   * 401 is pulse refusing another audience's token, not a broken one.
    */
   test('should refuse a validly-signed bearer token minted for another audience with 401 IAM_001', async ({ pulse }) => {
     const staff = await pulse.staff({ label: 'guard-audience', permissions: ['pulse:templates:read'] });

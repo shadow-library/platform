@@ -34,15 +34,8 @@ interface SamlActor {
 }
 
 /**
- * Declaring the constants
- *
- * Identity's SAML 2.0 IdP, driven by the scripted service provider in `lib/saml-sp.ts`: it builds the `AuthnRequest`,
- * reads the auto-post form and verifies the assertion's signature against the certificate the IdP metadata publishes.
- * Identity never calls an ACS itself — it hands the browser a form — so every service provider here points at a
- * fictional `example.test` endpoint and nothing has to listen.
- *
- * Service providers are global rows keyed by `entity_id`, so each test registers its own and asserts on that one alone;
- * nothing here reads or changes another spec's provider.
+ * Identity's SAML 2.0 IdP, driven by the scripted service provider in `lib/saml-sp.ts`. Identity never calls an ACS itself (it hands the browser a form), so every service
+ * provider points at a fictional `example.test` endpoint. Providers are global rows keyed by `entity_id`, so each test registers its own and asserts on that one alone.
  */
 
 const ISSUER = new URL(requireProductUrl('identity')).origin;

@@ -64,13 +64,9 @@ interface ClientRow {
 }
 
 /**
- * Declaring the constants
- *
- * The two application surfaces an organisation administers: the platform applications it may add to its own allowlist, and
- * the OAuth applications it owns outright. Both are driven through the API as an organisation admin, whose session carries
- * the self-service step-up every mutation needs, and each group of refusals is followed by the legitimate call it must not
- * have closed. The ten-application allowance is filled with bare owned rows rather than ten registrations, and those rows
- * are removed before the harness takes the organisation down.
+ * The two application surfaces an organisation administers: platform applications it may add to its allowlist, and the OAuth applications it owns, driven as an organisation
+ * admin whose session carries the self-service step-up. Each refusal group is followed by the legitimate call it must not have closed. The ten-application allowance is filled
+ * with bare owned rows, removed before the harness takes the organisation down.
  */
 
 const APP_PATH = (organisationId: string): string => `/api/v1/organisations/${organisationId}/oauth-apps`;

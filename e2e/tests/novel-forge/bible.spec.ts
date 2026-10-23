@@ -59,12 +59,8 @@ async function putDoc(ctx: APIRequestContext, projectId: string, section: string
 }
 
 /**
- * Declaring the constants
- *
- * Story Bible documents, tidy-up and the bible builder's skip path (NF2-BIBDOC-01, NF2-TIDY-01, NF2-BIB-01) — NF2-AUD-01
- * lives in notebook.spec.ts. Every tidy proposal is a pure content-op card — not model-capable — so only the bible
- * builder run itself (a genuinely model-capable route, driven entirely through a pre-populated skip-everything run)
- * needs the spend guards.
+ * Story Bible documents, tidy-up and the bible builder's skip path (the audit lives in `notebook.spec.ts`). Tidy proposals are pure content-op cards, so only the bible builder
+ * run itself, a model-capable route driven through a pre-populated skip-everything run, needs the spend guards.
  */
 
 test.describe('novel-forge Story Bible documents', () => {
@@ -106,7 +102,6 @@ test.describe('novel-forge Story Bible documents', () => {
     expect(changed.status(), await changed.text()).toBe(200);
     expect((await readBibleDocRow(projectId, 'world', 'fresh-doc'))?.revision).toBe(2);
 
-    // An authored title is kept exactly, never replaced by the body's own heading.
     const authored = await putDoc(owner.ctx, projectId, 'world', 'authored-title', { frontmatter: { title: 'The Author Chose This' }, body: '# A Different Heading Entirely' });
     expect(authored.status(), await authored.text()).toBe(200);
     expect((await authored.json()) as BibleDocResponse).toMatchObject({ frontmatter: { title: 'The Author Chose This' } });
@@ -184,8 +179,7 @@ test.describe('novel-forge Story Bible tidy', () => {
     expect(firstPreview.status(), await firstPreview.text()).toBe(200);
     const firstItems = ((await firstPreview.json()) as { items: TidyItem[] }).items;
     const byKind = (kind: TidyItem['kind']): TidyItem[] => firstItems.filter(item => item.kind === kind);
-    // Every other bible section (project, power, plot, ai, lore) also starts with its own empty `default` placeholder doc,
-    // so `remove_empty` candidates exist project-wide; only `world/default` is the one this test wrote and cares about.
+    // Every other bible section also starts with an empty `default` placeholder doc, so `remove_empty` candidates exist project-wide; only `world/default` is this test's.
     const worldDefaultRemoval = byKind('remove_empty').find(item => item.section === 'world' && item.slug === 'default');
     expect(worldDefaultRemoval, 'the empty world/default doc this test wrote is offered for removal').toBeDefined();
     expect(byKind('retitle')).toHaveLength(1);
@@ -263,15 +257,13 @@ test.describe('novel-forge bible builder', () => {
     expect(new Set(body.skippedStages)).toEqual(allStages);
     expect(body.status).toBe('completed');
 
-    // Author-facing list also reports `skippedStages` on the run summary.
     const list = await owner.ctx.get(`/api/v1/projects/${projectId}/runs?graph=bible-builder`);
     expect(list.status(), await list.text()).toBe(200);
     const listedRun = ((await list.json()) as { items: { id: string; skippedStages: string[] }[] }).items.find(item => item.id === body.runId);
     expect(new Set(listedRun?.skippedStages)).toEqual(allStages);
 
-    // Run detail (novel-forge:admin only) carries the persisted node trace — live-verified as the bare stage name per
-    // skipped stage (e.g. `"foundation"`), not a `skipped:<stage>`-prefixed one; `skippedStages` above is the field that
-    // actually distinguishes a skip from a stage that ran.
+    // Run detail (novel-forge:admin only) carries the persisted node trace as the bare stage name per skipped stage (e.g. `"foundation"`), not `skipped:<stage>`; `skippedStages`
+    // above is what distinguishes a skip from a stage that ran.
     const detail = await owner.ctx.get(`/api/v1/projects/${projectId}/runs/${body.runId}`);
     expect(detail.status(), await detail.text()).toBe(200);
     const detailBody = (await detail.json()) as WorkflowRunDetail;

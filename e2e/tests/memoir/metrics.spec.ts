@@ -29,10 +29,8 @@ interface QuestLogRow {
 }
 
 /**
- * Declaring the constants
- *
- * Metrics (ARCHITECTURE §18): the lazy 4-built-in seed, `metric.delete`'s quest-consequence guard, per-source
- * entry uniqueness, and the health-threshold completion offer a `metric.register` surfaces.
+ * Metrics: the lazy 4-built-in seed, `metric.delete`'s quest-consequence guard, per-source entry uniqueness, and the health-threshold completion offer a `metric.register`
+ * surfaces.
  */
 
 const BUILTIN_METRIC_NAMES = ['Steps', 'Calories burned', 'Sleep duration', 'Water'].sort();
@@ -213,9 +211,8 @@ test.describe('memoir metrics', () => {
     expectApplied(quest);
     const questId = String(quest.result['id']);
 
-    // findThresholdOffers (metrics-commands.service.ts:159-161) runs for any health-metric source, so a
-    // quest_log-sourced register exercises the same offer logic as manual — each call needs its own log id
-    // since dedupe is keyed on (questLogId, metricId).
+    // `findThresholdOffers` runs for any health-metric source, so a quest_log-sourced register exercises the same offer logic; each call needs its own log id since dedupe is
+    // keyed on (questLogId, metricId).
     async function helperLogId(label: string): Promise<string> {
       const { questId: helperQuestId, occurrenceId } = await createDailyQuest(persona.ctx, `E2E met-4 helper ${label} ${randomUUID()}`);
       expectApplied(await submitCommand(persona.ctx, 'quest.complete', { occurrenceId }));

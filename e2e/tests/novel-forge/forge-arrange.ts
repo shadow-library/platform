@@ -10,14 +10,8 @@ export interface QuotaRefusedChat {
   readonly sessionId: string;
 }
 
-/**
- * Declaring the constants
- *
- * Request-side arrangers the stream, job, isolation and plugin specs share: owner-created projects and chats, and the spend guards each
- * novel starts with.
- */
+/** Request-side arrangers the stream, job, isolation and plugin specs share: owner-created projects and chats, and the spend guards each novel starts with. */
 
-/** Kept under the length at which a session's first message is sent to a model for a title. */
 export const SHORT_TURN = 'Hello';
 
 export async function expectCode(response: APIResponse, status: number, code: string, what: string): Promise<void> {
@@ -31,7 +25,6 @@ export async function newProject(owner: ForgeActor, label: string): Promise<stri
   return ((await response.json()) as { id: string }).id;
 }
 
-/** A standard novel whose owner stands at the call ceiling. */
 export async function guardedProject(forge: ForgeHarness, owner: ForgeActor, label: string): Promise<string> {
   const projectId = await newProject(owner, label);
   await forge.quotaPin(projectId);
@@ -44,10 +37,7 @@ export async function newChatSession(owner: ForgeActor, projectId: string): Prom
   return ((await response.json()) as { id: string }).id;
 }
 
-/**
- * A chat whose replies route to a real model while its owner stands at the call ceiling: a turn starts and answers with its run id, then
- * fails AI_008 before any dispatch.
- */
+/** A chat whose replies route to a real model while its owner stands at the call ceiling: a turn starts and answers with its run id, then fails AI_008 before any dispatch. */
 export async function quotaRefusedChat(forge: ForgeHarness, owner: ForgeActor, label: string): Promise<QuotaRefusedChat> {
   const projectId = await newProject(owner, label);
   await forge.quotaPin(projectId);

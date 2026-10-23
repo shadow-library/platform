@@ -36,23 +36,12 @@ interface SocialStart {
 }
 
 /**
- * Declaring the constants
- *
- * Federation configuration and the gates around it. The platform-wide social providers are a single global row per
- * kind, and a social auth mode is enabled exactly when its provider is active, so this file runs in the
- * `identity-serial` project (one worker, no in-file parallelism) and puts the provider set and the SMS_OTP override
- * back exactly as it found them.
- *
- * The SSRF guard's refusal is not separable from a failed fetch out here: the guard call and the discovery request
- * share one `try`, and every failure funnels into FED_001. So the guard cases assert what is observable — the
- * refusal and an untouched provider table — plus how fast it comes back, since a guard refusal is immediate and a
- * connect attempt to an unroutable address is not.
- *
- * Registering a provider runs real OIDC discovery against the issuer, so the tests that do it are gated on the
- * cluster being able to reach `accounts.google.com`, as the workload specs are gated on `kubectl`.
- *
- * What is NOT here: everything that needs a mock upstream IdP to answer a token or JWKS request. The strict target
- * guard refuses any private or plain-http upstream, so no receiver on this host is reachable from identity.
+ * Federation configuration and its gates. The platform-wide social providers are one global row per kind and a social auth mode is enabled exactly when its provider is active,
+ * so this file runs in the `identity-serial` project and puts the provider set and the SMS_OTP override back as found.
+ * The SSRF guard's refusal is not separable from a failed fetch here (guard call and discovery share one `try`, every failure funnels into FED_001), so the guard cases assert
+ * the refusal, an untouched provider table, and how fast it returns: a guard refusal is immediate, a connect attempt to an unroutable address is not.
+ * Registering a provider runs real OIDC discovery, so those tests are gated on the cluster reaching `accounts.google.com`, as the workload specs are gated on `kubectl`.
+ * Not covered: anything needing a mock upstream IdP, as the strict target guard refuses any private or plain-http upstream.
  */
 
 /** A public hostname that resolves to 127.0.0.1 — the rebinding shape the delivery-time guard exists to catch. */
@@ -243,7 +232,6 @@ test.describe('identity federation SSRF guard', () => {
     await restoreGlobalProviders(providers);
   });
 
-  // The positive control for this endpoint — a public issuer registering successfully — is the configuration test above.
   test('should refuse an issuer whose host is a link-local address and store nothing', async ({ identity }) => {
     const admin = await identity.admin();
 

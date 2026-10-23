@@ -35,13 +35,10 @@ interface ChapterReview {
 }
 
 /**
- * Declaring the constants
- *
- * The two authoring paths end to end against a live model, on Economy-tier projects:
- *   - a new novel: notes → chat opener → organise → plan chapter 1 → write it → approve → finalize review → final;
- *   - a hand-written chapter: write → an AI editorial review → approve → finalize review → final.
- * Assertions read structure only — a job settled `done`, a card was staged and applied, a draft has prose, a review settled — never
- * the model's wording. Opt-in (`E2E_LIVE_AI=1`) and tagged `@model`.
+ * The two authoring paths against a live model, on Economy-tier projects: a new novel (notes -> chat opener -> organise -> plan chapter 1 -> write -> approve -> finalize review
+ * -> final) and a
+ * hand-written chapter (write -> AI editorial review -> approve -> finalize review -> final). Assertions read structure only, never the model's wording. Opt-in (`E2E_LIVE_AI=1`)
+ * and tagged `@model`.
  */
 
 const OPENER = 'Organise my notes';

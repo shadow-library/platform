@@ -142,9 +142,8 @@ export interface JobSeed {
 
 export interface AuthoringClaimOptions {
   /**
-   * Reserves the claim for this arranged authoring job the way enqueueing does, with no holder token: the janitor leaves the job alone until
-   * the heartbeat goes stale, and cancelling the job releases the reservation. Without it the claim is a job-less holder's, as a synchronous
-   * action (finalize, insert) takes it.
+   * Reserves the claim for this authoring job as enqueueing does, with no holder token: the janitor leaves it alone until the heartbeat goes stale, and cancelling releases it.
+   * Without it the claim is a job-less holder's, as a synchronous action (finalize, insert) takes it.
    */
   jobId?: string | null;
   kind?: JobKind;
@@ -153,25 +152,18 @@ export interface AuthoringClaimOptions {
 }
 
 /**
- * Declaring the constants
+ * Arrange-and-assert access to Novel Forge's database for states no model-free call reaches: rows a model call or workflow run would have written, projects a bot owns, and the
+ * authoring claim
+ * a running job holds. Timestamps use the database clock (`timestamp without time zone`, UTC), which every server-side window compares against.
  *
- * Arrange-and-assert access to Novel Forge's database, for the states no model-free API call reaches: rows a model call or a
- * workflow run would have written, projects a bot owns, and the authoring claim a running job holds. Timestamps are written on the
- * database clock (`timestamp without time zone`, UTC), which is the clock every server-side window compares against.
- *
- * Keeping a model-capable request from spending: `budgetPin` stands the project's owner at the AI_008 call ceiling, so the request is
- * refused before any model is reached. Novel-forge enforces no quota of its own; spend limits are Synapse budgets, admitted before
- * dispatch. So the pin is in Synapse's database: the owner's `1h` budget counters for the current and the next hour stand at the most
- * calls a counter holds, whatever cap the catalog sets, and Synapse answers `SYN_BUDGET_CALLS`, which novel-forge reports as AI_008 and
- * records as a `refused` call that ran no model. It holds for every project of that owner until the next hour ends, and teardown deletes
- * the counters. The `local-only` catalog would make a dispatch free anyway, but a refusal keeps the deterministic specs off the model, and
- * its image deployments are the `mock` provider, whose images still count list cost.
- * A seeded persona cannot be quota-pinned — that would block it in every lane — and neither can a project without an owner, whose Synapse
- * subject every unowned project shares, so a spec that needs a model-capable request runs it as an owner it created. Call
- * `assertSpendGuarded` right before any model-capable request.
- *
- * There is no fail-pin any more: a chat pin is a Synapse alias the catalog must offer, so a pin that would refuse every turn cannot be stored
- * (`AI_022`).
+ * Keeping a model-capable request from spending: novel-forge enforces no quota of its own; spend limits are Synapse budgets admitted before dispatch. `budgetPin` stands the
+ * owner's `1h` budget
+ * counters in Synapse's database, for the current and next hour, at the most calls a counter holds whatever cap the catalog sets, so Synapse answers `SYN_BUDGET_CALLS`, which
+ * novel-forge reports
+ * as AI_008 and records as a `refused` call that ran no model. It holds for every project of that owner until the next hour ends, and teardown deletes the counters.
+ * A seeded persona cannot be pinned (it would block it in every lane), nor can a project without an owner (every unowned project shares one Synapse subject), so a spec needing a
+ * model-capable request
+ * runs it as an owner it created. Call `assertSpendGuarded` right before any model-capable request.
  */
 
 /** Not a model Synapse or the registry knows: seeded rows carry it, so a seeded call is never mistaken for a dispatched one. */
@@ -209,7 +201,6 @@ export class SpendGuardError extends Error {
   override readonly name = 'SpendGuardError';
 }
 
-/** The Synapse budget subject `budgetPin` stood at the cap, by the project it guards. */
 const budgetPins = new Map<string, string>();
 
 function ago(ms: number | undefined): string {
@@ -255,8 +246,8 @@ export async function updateProjectOwnership(projectId: string, patch: ProjectOw
 }
 
 /**
- * Removes the projects and everything that cascades with them, plus the tool calls, which hang off a run id with no foreign key. A server
- * transaction left open on one of their rows would otherwise block the delete forever, so it gives up after `TEARDOWN_LOCK_TIMEOUT` instead.
+ * Removes the projects and everything that cascades, plus tool calls (they hang off a run id with no foreign key). A server transaction left open on one of their rows would
+ * block the delete forever, so it gives up after `TEARDOWN_LOCK_TIMEOUT`.
  */
 export async function deleteForgeProjects(projectIds: readonly string[]): Promise<void> {
   if (projectIds.length === 0) return;
@@ -316,7 +307,6 @@ export async function insertModelCalls(seeds: readonly ModelCallSeed[]): Promise
   return ids;
 }
 
-/** `count` identical calls in one statement — what standing an owner at a quota ceiling takes. */
 export async function insertModelCallBatch(count: number, seed: ModelCallSeed): Promise<void> {
   if (count <= 0) return;
   await novelForgeDb()`
@@ -363,9 +353,8 @@ async function currentBudgetCalls(subjectId: string): Promise<number> {
 }
 
 /**
- * The Synapse quota pin: stands the owner's novel-forge budget counters for this hour and the next at `BUDGET_PIN_CALLS`, so Synapse refuses
- * every model-capable request of that owner with `SYN_BUDGET_CALLS` before dispatch. Only an owner in `owners` — one the caller created and
- * tears down — may be pinned: a pin on anyone else would block their AI in every lane.
+ * The Synapse quota pin: stands the owner's novel-forge budget counters for this hour and the next at `BUDGET_PIN_CALLS`. Only an owner in `owners` (one the caller created and
+ * tears down) may be pinned, as a pin on anyone else would block their AI in every lane.
  */
 export async function budgetPin(projectId: string, owners: readonly ForgeOwner[]): Promise<void> {
   const owner = await pinnableOwner(projectId, owners);
@@ -381,7 +370,6 @@ export async function budgetPin(projectId: string, owners: readonly ForgeOwner[]
   budgetPins.set(projectId, subjectId);
 }
 
-/** Deletes the Synapse counters `budgetPin` stood at the cap for these projects' owners, so a pin never outlives its test. */
 export async function releaseBudgetPins(projectIds: readonly string[]): Promise<void> {
   const subjectIds = new Set<string>();
   for (const projectId of projectIds) {
@@ -398,10 +386,7 @@ export async function releaseBudgetPins(projectIds: readonly string[]): Promise<
   `;
 }
 
-/**
- * Throws unless a model-capable request on the project would be refused before dispatch: its owner was budget-pinned and its counter for the
- * hour now running still stands at the cap.
- */
+/** Throws unless a model-capable request on the project would be refused before dispatch: its owner was budget-pinned and the current hour's counter still stands at the cap. */
 export async function assertSpendGuarded(projectId: string): Promise<void> {
   if (!(await readProjectRow(projectId))) throw new ForgeDbError(`no project ${projectId} to guard`);
   const subjectId = budgetPins.get(projectId);
@@ -479,9 +464,9 @@ async function writeAuthoringClaim(sql: Sql | TransactionSql, projectId: string,
 }
 
 /**
- * A job row. A pending authoring job is re-dispatched by the janitor within one claim TTL unless a reservation names it (`insertReservedJob`,
- * or `holdAuthoringClaim` with its id), and again once that reservation's heartbeat goes stale; pending non-authoring jobs run at the next
- * boot. So a live model-capable job is refused unless the project is quota-pinned.
+ * A job row. A pending authoring job is re-dispatched by the janitor within one claim TTL unless a reservation names it (`insertReservedJob`, or `holdAuthoringClaim` with its
+ * id), and again once that reservation's heartbeat goes stale; pending non-authoring jobs run at the next boot. So a live model-capable job is refused unless the project is
+ * quota-pinned.
  */
 export async function insertJob(seed: JobSeed): Promise<string> {
   if (MODEL_CAPABLE_JOB_KINDS.includes(seed.kind) && LIVE_JOB_STATUSES.includes(seed.status ?? 'pending')) await assertSpendGuarded(seed.projectId);

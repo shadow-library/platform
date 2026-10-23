@@ -9,12 +9,8 @@ export interface ServiceAccountTokenOptions {
 }
 
 /**
- * Declaring the constants
- *
- * Mints Kubernetes projected service-account tokens for the workload-identity grant, the only assertions identity's cluster
- * issuer will vouch for. The context is pinned because this kubeconfig also holds `k3d-shadow-apps-prod`, and only `create
- * token` on service accounts that already exist is ever issued — nothing here creates, mutates or deletes cluster objects.
- * The minted tokens are credentials: they are passed straight to the token endpoint and never logged or written to disk.
+ * Mints Kubernetes projected service-account tokens for the workload-identity grant. The context is pinned because this kubeconfig also holds `k3d-shadow-apps-prod`;
+ * only `create token` on existing service accounts is issued, nothing creates, mutates or deletes cluster objects. The tokens are credentials: never logged or written to disk.
  */
 
 export const KUBE_CONTEXT = process.env.E2E_KUBE_CONTEXT || 'k3d-shadow-apps-dev';

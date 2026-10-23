@@ -4,11 +4,8 @@ import { apiContext, mutate, requireProductUrl } from '../../lib';
 import { createProject, deleteProjectQuietly, jsonOrUndefined, uniqueSuffix } from './forge-helpers';
 
 /**
- * Declaring the constants
- *
- * Ownership is enforced by `ProjectOwnershipGuard`, which answers another user's project with 404 PRJ_001 — a
- * deliberate BOLA defence that never leaks existence via 403. These tests assert the *code*, not just the
- * status, so a future accidental 403 would fail here.
+ * `ProjectOwnershipGuard` answers another user's project with 404 PRJ_001, a deliberate BOLA defence that never leaks existence via 403. The code is asserted, not just the
+ * status, so an accidental 403 fails here.
  */
 
 test.describe('novel-forge ownership security', () => {
@@ -60,8 +57,7 @@ test.describe('novel-forge ownership security', () => {
 
   test('should send a guest visiting a workspace overview to a login surface', async ({ browser }) => {
     const base = requireProductUrl('novelForge');
-    // A brand-new context carries no session — the workspace route's guard must redirect before any ownership
-    // check runs, so a real (even nonexistent-to-the-guest) project id is a fine target.
+    // A fresh context carries no session, so the workspace route's guard redirects before any ownership check; any project id is a fine target.
     const guest = await browser.newContext();
     try {
       const page = await guest.newPage();

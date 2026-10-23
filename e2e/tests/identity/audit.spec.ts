@@ -18,15 +18,11 @@ import {
 import { expect, type IdentityHarness, type IdentityTeam, test } from './fixtures';
 
 /**
- * Declaring the constants
- *
- * The audit log's chain, read where it is observable: the rows themselves. Identity writes an event inside the
- * transaction that performs the audited action, under an advisory lock keyed by the chain the event belongs to — the
- * organisation named on it, or the global chain of events carrying none. A spec can therefore assert linkage, the
- * independence of the two kinds of chain, and that concurrency does not break either. It cannot assert verification:
- * `AuditService.verifyChain` has no HTTP surface, and re-deriving a row's hash here would only re-implement the
- * verifier under test. Each test drives its own organisation, so its chain starts empty and every row in it is one the
- * test caused; the global chain is shared with every other spec, so it is asserted over whole contiguous segments.
+ * The audit log's chain, read from the rows. Identity writes an event inside the audited action's transaction, under an advisory lock keyed by the chain (the event's
+ * organisation, or the global chain), so a spec can assert linkage,
+ * the independence of the two chain kinds, and that concurrency breaks neither. It cannot assert verification: `AuditService.verifyChain` has no HTTP surface and re-deriving a
+ * hash here would re-implement the verifier.
+ * Each test drives its own organisation so its chain starts empty; the global chain is shared with every spec, so it is asserted over whole contiguous segments.
  */
 
 function domainPath(organisationId: string): string {
@@ -37,7 +33,6 @@ function newDomain(): { domain: string } {
   return { domain: `e2e-${randomBytes(6).toString('hex')}.example.test` };
 }
 
-/** Registers a domain on the organisation — an org-scoped audited action with no DNS or worker behind it. */
 function registerDomain(orgAdmin: APIRequestContext, organisationId: string): Promise<APIResponse> {
   return identityMutate(orgAdmin, 'post', domainPath(organisationId), newDomain());
 }
@@ -56,7 +51,6 @@ async function auditedTeam(identity: IdentityHarness, label: string): Promise<Id
   return team;
 }
 
-/** Changing a platform application's visibility — an audited action identity records on the global chain. */
 async function globalAction(identity: IdentityHarness, application: OAuthApplication, visibility: ApplicationVisibility): Promise<void> {
   await updateApplication((await identity.admin()).ctx, application.applicationId, { visibility });
 }

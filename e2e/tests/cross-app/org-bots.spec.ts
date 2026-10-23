@@ -66,56 +66,39 @@ interface ProjectItem {
 }
 
 /**
- * Declaring the constants
+ * The organisation-bot story across identity and Novel Forge: an org admin creates a bot, grants it Novel Forge projects and issues one key; the bot authenticates with
+ * only `Authorization: Bearer sl_bot_…` and lands a bot-owned project shared with the organisation; a curator reaches it while a member without `novel-forge:curate` gets
+ * a 404; the bot is refused a route needing a grant it lacks; the key is revoked; the activity feed accounts for the key's life; the bot is deleted by handing its project to a
+ * member.
  *
- * The organisation-bot story, end to end across identity and Novel Forge: an org admin creates a bot, grants it
- * Novel Forge projects from the permission catalog and issues one key; the bot authenticates with nothing but
- * `Authorization: Bearer sl_bot_…` and lands a project that comes back bot-owned and shared with the
- * organisation; an organisation curator reaches that project while a member without `novel-forge:curate` cannot
- * tell it from one that does not exist; the bot is refused on a route needing a grant it never received; the key
- * is revoked and the bot stops; the activity feed accounts for the key's whole life; and the bot is finally
- * deleted by handing its project to a member.
+ * Serial, as each step builds on the one above. The organisation is created per run (timestamped slug) so the bot limit never accumulates.
  *
- * Serial, because every step is built by the one above it. The organisation is created per run (timestamped
- * slug) so nothing collides and the bot limit never accumulates, mirroring `org-access-and-visibility.spec.ts`.
- *
- * Two setup steps are deliberately not driven through their own product flows, which other specs already cover:
- * the member joins by an `organisation_members` row rather than the invitation round-trip, and the curator's
- * `novel-forge:curate` comes from identity's admin role-assignment API, which is the only surface that grants an
- * application role to a person. The seeded admin holds platform `iam:roles:manage`, so that assignment takes
- * `assertAssignable`'s `scope !== 'application'` early return and never exercises the entitlement or membership
- * checks — it proves the assignment landed, not that the organisation is entitled, which the catalog asserts.
+ * Two setup steps skip their own product flows (covered elsewhere): the member joins by an `organisation_members` row, and the curator's `novel-forge:curate` comes from
+ * identity's admin role-assignment API, the only surface granting an application role to a person. The seeded admin holds platform `iam:roles:manage`, so the assignment takes
+ * `assertAssignable`'s `scope !== 'application'` early return: it proves the assignment landed, not that the organisation is entitled (the catalog asserts that).
  */
 
-/** Identity's application name for Novel Forge — the key the bot permission catalog is indexed by. */
 const NOVEL_FORGE_APPLICATION = 'novel-forge';
 
-/** The catalog resource the Novel Forge projects roles are claimed under. */
 const PROJECTS_RESOURCE = 'projects';
 
-/** The Novel Forge role carrying `novel-forge:curate`; people only, so it is absent from the bot permission catalog. */
 const CURATOR_ROLE = 'NovelForgeCurator';
 
 /** A bot key is exchanged for a short-lived token the SDK caches for at most 60s, so a revocation lands within that window. */
 const REVOCATION_WINDOW_MS = 90_000;
 
-/** The ownership transfer is driven by identity's worker, so the new owner appears asynchronously. */
 const TRANSFER_TIMEOUT_MS = 90_000;
 
-/** The issued key outlives only this run: teardown revokes it, and an hour caps the damage if teardown itself fails. */
+/** Teardown revokes the key; the hour is the cap if teardown itself fails. */
 const KEY_LIFETIME_MS = 60 * 60 * 1000;
 
-/**
- * Elevates `ctx`'s identity session to AAL2, which every bot mutation is gated behind. The seeded personas
- * enrol no second factor, so identity accepts the account password as the step-up proof.
- */
+/** Elevates `ctx` to AAL2, which every bot mutation requires; the seeded personas enrol no second factor, so the account password is accepted as the step-up proof. */
 async function stepUp(ctx: APIRequestContext, identityUrl: string, password: string): Promise<void> {
   const response = await scopedMutate(ctx, identityUrl, 'post', '/api/v1/me/mfa/step-up', { data: { password }, seedPath: '/api/v1/me' });
   expect(response.status(), `step-up should succeed — body ${await response.text()}`).toBe(200);
   expect(((await response.json()) as { aal: string }).aal, 'a completed step-up leaves the session at AAL2').toBe('AAL2');
 }
 
-/** The project ids a list response carries. */
 async function projectIds(response: APIResponse): Promise<string[]> {
   expect(response.status(), `listing projects — body ${await response.text()}`).toBe(200);
   return ((await response.json()) as { items: ProjectItem[] }).items.map(item => item.id);
@@ -133,7 +116,6 @@ test.describe('organisation bots across identity and Novel Forge', () => {
   const botHandle = `e2e-release-notes-${stamp.toString(36)}`;
   const projectName = `e2e-bot-project-${stamp}`;
 
-  // Shared, built up across the serial steps.
   let ownerIdentity: APIRequestContext;
   let adminSession: IdentitySession;
   let adminIdentity: APIRequestContext;
@@ -148,24 +130,16 @@ test.describe('organisation bots across identity and Novel Forge', () => {
 
   test.beforeAll(async () => {
     ownerIdentity = await apiContext('identity', 'user1');
-    // An already-elevated admin session, arranged in the database: the dev bootstrap admin has a passkey enrolled, so identity
-    // refuses a password step-up for it (MFA_001), and step-up is not what this spec is about.
+    // Arranged in the database: the dev bootstrap admin has a passkey, so identity refuses it a password step-up (MFA_001).
     adminSession = await createIdentitySession(users.admin.userId, { aal: 'AAL2' });
     adminIdentity = await identitySessionContext(adminSession);
   });
 
   test.afterAll(async () => {
-    // Revoking is unconditional and goes through the database, not the API: serial mode skips the remaining tests
-    // when one fails but still runs this, and the API route is elevated — a failed step-up would be exactly the
-    // case that leaves a live `sl_bot_…` credential behind in a shared environment. The project is the only other
-    // row this spec leaves there, and it outlives the bot that made it: the seed's novel-forge sweep only reaches
-    // user-owned projects. The organisation, its membership, the keyless bot and the curator role assignment
-    // persist, as in `org-access-and-visibility.spec.ts` — identity offers no cheap delete, and every one of them
-    // is scoped to a slug unique to this run.
-    //
-    // Settled independently so that one failure — a database that went away mid-run, say — cannot strand the
-    // revoke or the disposals, and reported rather than swallowed, since a revoke that silently failed is the
-    // whole risk this teardown exists to close.
+    // Revoke unconditionally and through the database: serial mode skips remaining tests on failure but still runs this, and the elevated API route would fail in exactly
+    // the case that leaves a live `sl_bot_…` credential in a shared environment. The project outlives the bot (the seed's novel-forge sweep only reaches user-owned projects);
+    // the organisation, membership, keyless bot and curator assignment persist under a run-unique slug.
+    // Steps are settled independently and reported rather than swallowed, since a silently failed revoke is the risk this teardown closes.
     const settled = await Promise.allSettled([
       botId ? identityDb()`UPDATE bot_keys SET revoked_at = now() WHERE bot_id = ${botId} AND revoked_at IS NULL` : undefined,
       adminSession ? identityDb()`UPDATE user_sessions SET status = 'REVOKED', terminated_at = now() WHERE id = ${adminSession.sessionId}` : undefined,
@@ -224,8 +198,7 @@ test.describe('organisation bots across identity and Novel Forge', () => {
     const botGrantableRoleIds = novelForge!.resources.flatMap(resource => resource.levels.map(level => level.roleId));
     expect(botGrantableRoleIds, 'the curate role is never offered to a bot').not.toContain(curatorRoleId);
 
-    // `novel-forge:curate` is not part of the default authoring role, and no self-service surface grants an
-    // application role to a person — identity's platform admin is the only one who can make the owner a curator.
+    // `novel-forge:curate` is not in the default authoring role, and only identity's platform admin can grant an application role to a person.
     const assigned = await scopedMutate(adminIdentity, identityUrl, 'post', '/api/v1/admin/role-assignments', {
       data: { principalType: 'USER', principalId: users.user1.userId, roleId: curatorRoleId, organisationId },
       seedPath: '/api/v1/me',
@@ -248,7 +221,6 @@ test.describe('organisation bots across identity and Novel Forge', () => {
     expect(bot.clientId, 'the bot is backed by its own OAuth client').toMatch(/^bot_/);
     botId = bot.id;
 
-    // One entry per resource: the write level carries the read role's permissions, so this is projects read+write.
     const granted = await scopedMutate(ownerIdentity, identityUrl, 'put', `/api/v1/organisations/${organisationId}/bots/${botId}/permissions`, {
       data: { grants: [{ applicationId, resource: PROJECTS_RESOURCE, level: 'write' }] },
       seedPath: '/api/v1/me',
@@ -307,8 +279,7 @@ test.describe('organisation bots across identity and Novel Forge', () => {
   });
 
   test('should refuse the bot on a route needing a grant it was never given', async () => {
-    // Generation is the sensitive `novel-forge:generation:run` grant, which this bot does not hold; the guard
-    // answers before the body is ever validated, so an empty one still proves the permission decision.
+    // `novel-forge:generation:run` is a sensitive grant this bot lacks; the guard answers before body validation, so an empty body still proves the permission decision.
     const denied = await botContext.post(`/api/v1/projects/${projectId}/generate`, { data: {} });
     expect(denied.status(), `generation without the grant — body ${await denied.text()}`).toBe(403);
     expect(((await denied.json()) as { code?: string }).code, 'the refusal is an authorization denial, not a server error').toBe('IAM_002');
@@ -321,8 +292,7 @@ test.describe('organisation bots across identity and Novel Forge', () => {
     const revoked = await scopedMutate(ownerIdentity, identityUrl, 'delete', `/api/v1/organisations/${organisationId}/bots/${botId}/keys/${keyId}`, { seedPath: '/api/v1/me' });
     expect(revoked.status(), `revoke bot key — body ${await revoked.text()}`).toBe(200);
 
-    // Novel Forge holds the token it exchanged the key for until it expires, so the bot keeps working for up to
-    // 60s after the revocation. Poll rather than assert instantly: the contract is the window, not immediacy.
+    // Novel Forge keeps the exchanged token until it expires, so the bot works for up to 60s after revocation: poll, since the contract is the window.
     const status = await pollUntil(
       async () => (await botContext.get('/api/v1/projects?limit=1')).status(),
       value => value === 401,

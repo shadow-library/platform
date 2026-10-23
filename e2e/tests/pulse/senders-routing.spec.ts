@@ -4,13 +4,8 @@ import { apiContext, mutate, requireProductUrl } from '../../lib';
 import { createRoutingRule, createSenderEndpoint, createSenderProfile, deleteRoutingRule, deleteSenderProfile, findRoutingRuleId, uniqueKey } from './helpers';
 
 /**
- * Declaring the constants
- *
- * Request-level coverage of `apps/pulse-server/src/modules/configuration/*` (sender profiles, endpoints,
- * routing rules), driven as `admin` (PulseAdmin holds `pulse:senders:write`/`read`). Every profile/rule this
- * file creates carries a `uniqueKey('...')` key or a distinct `service` tag and is deleted at the end of the
- * test that created it — nothing here touches the seeded `e2e-dev` profile, its DEV endpoints, or the
- * all-NULL catch-all routing rule.
+ * Driven as `admin` (PulseAdmin holds `pulse:senders:write`/`read`). Every profile/rule carries a `uniqueKey(...)` or distinct `service` tag and is deleted by its test; the
+ * seeded `e2e-dev` profile, its endpoints and the catch-all rule are never touched.
  */
 test.describe('sender & routing CRUD', () => {
   test.beforeEach(() => requireProductUrl('pulse'));
@@ -36,7 +31,6 @@ test.describe('sender & routing CRUD', () => {
     const duplicateBody = (await duplicateEndpoint.json()) as { code?: string };
     expect(duplicateBody.code).toBe('SND_EP_002');
 
-    // Cleanup: the endpoint cascades off the profile delete (sender_endpoints FK is ON DELETE CASCADE per the DB report).
     const deleted = await deleteSenderProfile(ctx, profile.id);
     expect(deleted.status()).toBe(204);
   });
@@ -112,17 +106,15 @@ test.describe('sender & routing CRUD', () => {
     const blockedBody = (await blocked.json()) as { code?: string };
     expect(blockedBody.code).toBe('SND_PRF_003');
 
-    // Clean up in the order the API demands: rule first, profile second.
+    // Rule first, profile second: the API demands this order.
     const routingRuleId = await findRoutingRuleId(profile.id, service);
     await deleteRoutingRule(ctx, routingRuleId);
     const deletedProfile = await deleteSenderProfile(ctx, profile.id);
     expect(deletedProfile.status()).toBe(204);
   });
 
-  // Confirmed live: a non-numeric id fails the route param's `^[0-9]+$` pattern at the class-schema validation
-  // layer, which 422s `VALIDATION_ERROR` — not the 400 this suite was briefed to expect (that assumption traced
-  // to `S006`/Fastify's own default, which would apply to a raw Ajv failure; class-schema's own validator wins
-  // first here and always answers 422 on this stack, matching every other malformed-body case in this suite).
+  // A non-numeric id fails the route param's `^[0-9]+$` pattern in class-schema validation, which answers 422 `VALIDATION_ERROR` (as for every malformed body here), not
+  // Fastify's 400 `S006`.
   test('should 422 a non-numeric id in a sender-profile URL', async () => {
     const ctx = await apiContext('pulse', 'admin');
     const response = await ctx.get('/api/v1/sender-profiles/not-a-number');

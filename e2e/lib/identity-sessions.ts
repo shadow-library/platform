@@ -57,8 +57,6 @@ export interface IdentitySessionContextOptions {
 }
 
 /**
- * Declaring the constants
- *
  * Mints identity sessions directly in `user_sessions`, the same row a completed login writes, so a spec gets a signed-in
  * caller without spending `login/init` (20/hour per IP) or completing an MFA ceremony. A row that has never been used is not
  * in identity's 60 s Redis cache, so its expiry, idle time, AAL and status are judged from the database on first use.

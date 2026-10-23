@@ -5,12 +5,9 @@ import { expect, test } from './fixtures';
 import { countOutboxRows, expectErrorCode, expectSessionCookie, fillOtp, flowChallenges, flowStepOf, pollOtp, uniqueRegistrationEmail } from './helpers';
 
 /**
- * Declaring the constants
- *
- * The UI tests drive the real `/register` screen (email → email OTP → demographics → profile → password); the API tests pin the
- * step guards behind it. OTPs are read back from identity's `notification_outbox` (identity never sends mail in dev). Each test
- * runs on its own client address, so `register/init`'s five-per-hour budget is never shared, and every account a test registers
- * is removed after it.
+ * The UI tests drive the real `/register` screen (email, email OTP, demographics, profile, password); the API tests pin the step guards behind it. OTPs are read from
+ * `notification_outbox` (no mail in dev). Each test uses its own client address so `register/init`'s five-per-hour budget is never shared, and removes every account it
+ * registers.
  */
 
 /** A password that satisfies identity's policy: ≥12 chars, upper + lower, a number (a symbol too, though only recommended). */
@@ -34,26 +31,22 @@ test.describe('identity registration', () => {
 
     await page.goto(`${identityUrl}/register`);
 
-    // Step 1 — email.
     await page.getByLabel('Email address').fill(email);
     const initResponsePromise = page.waitForResponse(response => response.url().includes('/api/v1/auth/register/init'));
     await page.getByRole('button', { name: 'Continue' }).click();
     const initResponse = await initResponsePromise;
     expect(initResponse.status(), 'register/init should succeed for a fresh email').toBe(200);
 
-    // Step 2 — email OTP. The code is written to the outbox transactionally with init, so it is readable now.
     await expect(page.getByRole('heading', { name: 'Verify your email' })).toBeVisible();
     const code = await pollOtp(email, REGISTER_OTP_TEMPLATE);
     await fillOtp(page, code);
 
-    // Step 3 — profile. Both names are required; the flow will not advance without them.
     await expect(page.getByRole('heading', { name: 'Tell us about you' })).toBeVisible();
     await page.getByLabel('First name').fill('Regina');
     await page.getByLabel('Last name').fill('Tester');
     await page.getByRole('button', { name: 'Continue' }).click();
 
-    // Step 4 — password. First prove the policy bites: a weak password is refused by the server and surfaced
-    // inline, and the flow stays on this step (it never consumed the account or the failure budget).
+    // First prove the policy bites: a weak password is refused and surfaced inline, and the flow stays on this step (it never consumed the account or the failure budget).
     await expect(page.getByRole('heading', { name: 'Set a password' })).toBeVisible();
     const passwordField = page.getByLabel('Password', { exact: true });
     await passwordField.fill(WEAK_PASSWORD);
@@ -61,24 +54,20 @@ test.describe('identity registration', () => {
     await expect(page.getByText(/That didn.t work/i)).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Set a password' })).toBeVisible();
 
-    // Now a compliant password completes registration and mints a session.
     await passwordField.fill(STRONG_PASSWORD);
     await page.getByRole('button', { name: 'Create account' }).click();
 
-    // Completion — the success screen, then Continue lands on the signed-in account overview (no returnTo).
     await expect(page.getByRole('heading', { name: /You.re all set/i })).toBeVisible();
     await page.getByRole('button', { name: 'Continue' }).click();
     await expect(page).toHaveURL(/\/account\/?$/);
-    // The overview only renders for an authenticated session — reaching it is the end-to-end proof of sign-in.
     await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible();
     await expect(page.getByText(email)).toBeVisible();
   });
 
   test('should keep registration enumeration-safe for an email that already has an account', async ({ page, identity }) => {
     const identityUrl = requireProductUrl('identity');
-    // A seeded, definitely-existing account. Identity must not reveal that it exists: `register/init` answers
-    // with the same 200 → OTP step as a brand-new email, and issues no code. A submitted code therefore fails
-    // generically — the account's existence is never disclosed at any step.
+    // A seeded, existing account must not be revealed: `register/init` answers the same 200 -> OTP step as for a new email and issues no code, so a submitted code fails
+    // generically.
     const existingEmail = 'e2e.user2@shadow-apps.test';
 
     await page.goto(`${identityUrl}/register`);
@@ -88,18 +77,14 @@ test.describe('identity registration', () => {
     const initResponse = await initResponsePromise;
     identity.trackFlow(String(((await initResponse.json()) as { flowId?: string }).flowId));
 
-    // Enumeration-safety, part one: the response is a normal 200 that advances to the OTP step, identical to a
-    // new email — no 409/"already exists" leak at init.
+    // Enumeration safety, part one: a normal 200 to the OTP step, identical to a new email (no 409 "already exists" leak).
     expect(initResponse.status(), 'register/init must not distinguish an existing email').toBe(200);
     await expect(page.getByRole('heading', { name: 'Verify your email' })).toBeVisible();
-    // The generic, non-disclosing hint identity shows regardless of whether the email exists.
     await expect(page.getByText(/already has an account, we.ll help you sign in/i)).toBeVisible();
 
-    // Enumeration-safety, part two: since no OTP was issued, any code is rejected as an ordinary failed attempt
-    // rather than an account-exists disclosure. One wrong code yields the generic retry error (not a lock-out).
+    // Part two: with no OTP issued, any code is an ordinary failed attempt, not an account-exists disclosure; one wrong code yields the generic retry error, not a lock-out.
     await fillOtp(page, '000000');
     await expect(page.getByText(/didn.t work|couldn.t continue/i)).toBeVisible();
-    // The page must never surface that the address is already registered.
     await expect(page.getByText(/already (registered|exists|in use)/i)).toHaveCount(0);
   });
 });

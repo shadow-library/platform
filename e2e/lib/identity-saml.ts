@@ -49,13 +49,7 @@ export interface SamlSpPatch {
   isActive?: boolean;
 }
 
-/**
- * Declaring the constants
- *
- * Admin-side SAML service-provider management plus the two public `/saml2` calls a spec drives. Both public calls ask
- * for no content encoding: a compressed `/saml2` reply arrives with an empty body in this deployment (asserted by the
- * `test.fixme` in `tests/identity/saml.spec.ts`), so a spec that wants to read the document has to opt out of it.
- */
+/** Admin-side SAML service-provider management plus the two public `/saml2` calls. Both send `accept-encoding: identity`: a compressed reply arrives with an empty body here. */
 
 const ADMIN_PATH = '/api/v1/admin/saml/service-providers';
 

@@ -6,12 +6,9 @@ import { errorCodeOf, memoirMutate, submitCommand, todayLocal } from './helpers'
 import { fetchPresignedUrl, type MintedReceipt, mintReceipt, uploadAndConfirm } from './receipt-helpers';
 
 /**
- * Declaring the constants
- *
- * `POST /receipts`, `/:ref/confirm`, `/:ref/download` (ARCHITECTURE §19.2, ADR-0008) and the
- * `expense.delete` cascade that is the only route removing a stored object. `ReceiptSweepService`'s two
- * sweeps (60-min pending-upload / weekly orphan-object) stay out of scope — no manual-trigger route exists
- * (see the batch's plan doc) and a per-test timeout can't await either cadence.
+ * `POST /receipts`, `/:ref/confirm`, `/:ref/download` and the `expense.delete` cascade, the only route removing a stored object. `ReceiptSweepService`'s sweeps (60-min
+ * pending-upload,
+ * weekly orphan-object) are out of scope: no manual trigger exists and a test timeout cannot await either cadence.
  */
 
 async function expectRefusal(response: APIResponse, status: number, code: string): Promise<void> {
@@ -29,13 +26,10 @@ test.describe('memoir receipts', () => {
     await expectRefusal(unsupportedType, 400, 'RCP_002');
 
     /**
-     * `storage.max-receipt-bytes` defaults to 8_388_608, the same value the DTO's own `maximum` on
-     * `sizeBytes` enforces (`receipt.dto.ts:29`) — so a literal oversize declaration never reaches
-     * `ReceiptService`; class-schema's own DTO validation rejects it first, 422 VALIDATION_ERROR. RCP_003
-     * (400) is reachable only through the app's own guard in `createUpload` (`receipt.service.ts:71`):
-     * `sizeBytes` is a plain TS `number` field (JSON-schema `type: 'number'`, not the library's `Integer`
-     * marker), so a non-integer value within [1, 8_388_608] passes the DTO and falls through to that
-     * guard's `!Number.isInteger` branch, throwing the same RCP_003 a confirm-time oversize HEAD would.
+     * `storage.max-receipt-bytes` defaults to 8_388_608, the DTO's own `maximum` on `sizeBytes`, so a literal oversize declaration is rejected by class-schema first (422
+     * VALIDATION_ERROR).
+     * RCP_003 (400) is reachable only via `createUpload`'s guard: `sizeBytes` is a plain `number` (not `Integer`), so a non-integer within [1, 8_388_608] passes the DTO and hits
+     * its `!Number.isInteger` branch.
      */
     const oversizeDeclaration = await memoirMutate(persona.ctx, 'post', '/api/v1/receipts', { data: { contentType: 'image/jpeg', sizeBytes: 9_000_000 } });
     expect(oversizeDeclaration.status(), await oversizeDeclaration.text()).toBe(422);
@@ -72,7 +66,6 @@ test.describe('memoir receipts', () => {
     const expenseId = crypto.randomUUID();
     const expensePayload = { id: expenseId, currency: 'USD', occurredOn: todayLocal(), categoryId: 'uncat', amountText: '$12.34', amountMinor: 1234 };
 
-    /** Captured the instant `mintReceipt` resolves — the ref exists in the database from that point on, before any bytes are uploaded. */
     let receipt: MintedReceipt | undefined;
     let cleaned = false;
     try {
@@ -108,11 +101,8 @@ test.describe('memoir receipts', () => {
       expect(objectAfterDelete.status, `the storage object itself must be gone, not just memoir's own route: ${objectAfterDelete.body}`).toBe(404);
     } finally {
       /**
-       * `expense.delete`'s cascade is the only route that removes a stored object (§19.2 Lifecycle) — if
-       * anything above threw before `cleaned` was set, the upload may still be live in storage, in any
-       * status (`deleteForExpense`/`removeInTx` act regardless of `pending_upload` vs `stored`). Re-link it
-       * (an earlier `expense.create` above may or may not have landed) and delete, so cleanup always runs
-       * through that same API path rather than reaching for the storage client directly.
+       * `expense.delete`'s cascade is the only route removing a stored object, and the upload may be live in any status if an earlier step threw. Re-link it (an earlier
+       * `expense.create` may or may not have landed) and delete, so cleanup runs through that API path rather than the storage client.
        */
       if (receipt && !cleaned) {
         const orphanRisk = receipt.ref;

@@ -12,21 +12,13 @@ interface EntitlementRow {
 }
 
 /**
- * Declaring the constants
- *
- * `POST /billing/checkout`, `POST /billing/webhooks/{provider}` and the read-only entitlement surface (T-16,
- * ARCHITECTURE §16). `billing.webhook-secret` and `billing.checkout-url` are both unset in this cluster today:
- * `memoir-server-secrets` — the Secret the Deployment's `envFrom` names for them — does not exist at all, and
- * neither `BILLING_WEBHOOK_SECRET` nor `BILLING_CHECKOUT_URL` appears in any configmap/secret memoir loads.
- * `probeMemoirConfigKeys` (`../../lib/config-probe.ts`) does that read live, read-only, key NAMES only — never
- * a value — via `kubectl get configmap/secret -n memoir -o go-template=…`. The test that depends on that state
- * (`should reach application-ready...`) reads live cluster state itself before asserting: a `NotFound` reads as
- * "unconfigured" (today's actual shape), any other kubectl failure (off PATH, wrong context, RBAC) is a probe
- * failure that skips the test with its own reason rather than being misread as "unconfigured", and a future
- * environment that names a provider also skips it — never a false failure either way. The grace/lapse read
- * (`resolveEffectiveState`, `entitlement-lifecycle.ts`) is a pure function of stored columns and server time —
- * independent of the webhook secret and of the hourly `EntitlementLapseService` sweep — so the grace/lapse
- * test needs no such guard.
+ * `POST /billing/checkout`, `POST /billing/webhooks/{provider}` and the read-only entitlement surface. `billing.webhook-secret` and `billing.checkout-url` may be unset in a
+ * cluster; the test depending on that (`should reach application-ready...`) reads live cluster state itself via `probeMemoirConfigKeys` (`../../lib/config-probe.ts`, key NAMES
+ * only).
+ * A `NotFound` reads as "unconfigured", any other kubectl failure skips the test with its own reason, and an environment that names a provider also skips: never a false failure.
+ * The grace/lapse read (`resolveEffectiveState`, `entitlement-lifecycle.ts`) is a pure function of stored columns and server time, independent of the webhook secret and of the
+ * hourly
+ * `EntitlementLapseService` sweep, so that test needs no guard.
  */
 
 const CONFIGURED_PROVIDER = 'generic-hmac';

@@ -31,16 +31,12 @@ interface Bridge {
 }
 
 /**
- * Declaring the constants
- *
- * An isolated (unrestricted) chapter's prose never reaches a standard call; later chapters read only the bridge the author approved
- * in its finalize review. The deterministic half proves the wall is up before anything is approved; the model-backed half finalizes
- * the chapter through its review and reads the bridge that crossed.
+ * An isolated (unrestricted) chapter's prose never reaches a standard call; later chapters read only the bridge the author approved in its finalize review. The deterministic
+ * half proves the wall is up before anything is approved; the model-backed half finalizes through the review and reads the bridge that crossed.
  */
 
 const ISOLATED_CHAPTER = { ...CHAPTER_ONE, title: 'Behind the Locked Door' };
 
-/** A standard novel of `owner` whose owner stands at the call ceiling, which holds on the unrestricted route an isolated chapter takes. */
 async function bridgedNovel(forge: ForgeHarness, owner: ForgeActor): Promise<string> {
   const { projectId } = await createNovel(owner.ctx, { title: `E2E Bridge ${uniqueSuffix()}` });
   await forge.quotaPin(projectId);

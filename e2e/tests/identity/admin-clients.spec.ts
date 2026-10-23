@@ -38,12 +38,8 @@ interface RoleAssignmentItem {
 }
 
 /**
- * Declaring the constants
- *
- * The OAuth client registry and the role-assignment API of identity's admin console. Every client is registered on a
- * throwaway application, never on a seeded one, so the ten-client ceiling and the deletion cascade are exercised
- * without touching the ecosystem. Application roles are written straight to the database — identity creates them
- * only through catalog sync — and the API under test is what confers them.
+ * The OAuth client registry and role-assignment API of the admin console. Every client is registered on a throwaway application so the ten-client ceiling and deletion cascade
+ * run without touching the ecosystem. Roles are written straight to the database (identity creates them only through catalog sync); the API under test confers them.
  */
 
 /** A workload subject nobody else can be using: the namespace label is unique to this test. */
@@ -124,7 +120,7 @@ test.describe('identity admin OAuth client administration', () => {
     expect(reserved.status(), 'the platform client id is reserved').toBe(400);
     await expectErrorCode(reserved, 'ADM_006');
 
-    // `Bad_Id` never reaches the service: the client-id pattern is on the DTO, so the schema layer refuses it first.
+    // The client-id pattern is on the DTO, so the schema layer refuses `Bad_Id` before the service sees it.
     const malformed = await registerClient(admin.ctx, application, { clientId: 'Bad_Id' });
     expect(malformed.status()).toBe(422);
     expect(((await malformed.json()) as { fields: { field: string }[] }).fields.map(field => field.field)).toEqual(['body.clientId']);
@@ -156,7 +152,6 @@ test.describe('identity admin OAuth client administration', () => {
     expect(duplicate.status(), 'an exact subject belongs to one client').toBe(400);
     await expectErrorCode(duplicate, 'ADM_007');
 
-    // The application is provisioned with a client of its own, and the workload client above is the second.
     for (let index = 0; index < 8; index++) expect((await registerClient(admin.ctx, application, {})).status(), `client ${index + 3}`).toBe(201);
 
     const eleventh = await registerClient(admin.ctx, application, {});

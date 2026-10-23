@@ -12,9 +12,7 @@ export interface RolloverQuestSpec {
   strictness: Strictness;
   startDate: string;
   name?: string;
-  /** Required by an anchor; defaults to 08:00 for one. */
   startTimeMinutes?: number;
-  /** Replaces the open-ended daily rule `dailyQuestDraft` builds. */
   recurrence?: Record<string, unknown>;
 }
 
@@ -120,14 +118,10 @@ export interface MissedAnchorRig extends RolloverSubject {
 }
 
 /**
- * Declaring the constants
- *
- * The rollover seeding rig. Rollover runs in-request (`RolloverGate`, before every command batch and delta pull) and walks
- * from `accounts.last_hp_date + 1`: every elapsed day is closed in its own transaction, then today is prepared. A spec
- * arranges "elapsed days" by rewinding `last_hp_date` to a terminalized day and removing the `daily_states` rows after
- * it, so the next pull closes those days from scratch under whatever quests, logs and account settings the spec seeded.
- * Leaving `last_hp_date`'s own day closed keeps the arrangement valid whether the walk resumes after that day or first
- * closes it when still open.
+ * Rollover runs in-request (`RolloverGate`, before every command batch and delta pull) from `accounts.last_hp_date + 1`: each elapsed day closes in its own transaction, then
+ * today is prepared.
+ * A spec arranges elapsed days by rewinding `last_hp_date` to a terminalized day and removing the `daily_states` rows after it, so the next pull closes them from scratch.
+ * Leaving `last_hp_date`'s own day closed keeps the arrangement valid whether the walk resumes after that day or first closes it.
  */
 
 const MS_PER_DAY = 86_400_000;
@@ -137,7 +131,6 @@ export class RolloverRigError extends Error {
   override readonly name = 'RolloverRigError';
 }
 
-/** Today's calendar date in `timeZone`, the same `YYYY-MM-DD` rollover stamps on `daily_states.date`. */
 export function localToday(timeZone = 'UTC'): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 }
@@ -146,19 +139,16 @@ export function addDays(date: string, days: number): string {
   return new Date(Date.parse(`${date}T00:00:00Z`) + days * MS_PER_DAY).toISOString().slice(0, 10);
 }
 
-/** Every date from `from` to `to`, both inclusive. */
 export function dateRange(from: string, to: string): string[] {
   const dates: string[] = [];
   for (let date = from; date <= to; date = addDays(date, 1)) dates.push(date);
   return dates;
 }
 
-/** ISO weekday, Monday = 1 … Sunday = 7 — the numbering the ruleset's weekly Crown anchor uses. */
 export function isoWeekday(date: string): number {
   return ((new Date(`${date}T00:00:00Z`).getUTCDay() + 6) % 7) + 1;
 }
 
-/** The instant `date` begins in `timeZone`, found by walking the UTC hours around it — enough for every whole-hour or half-hour zone. */
 export function startOfLocalDay(date: string, timeZone: string): Date {
   const fromUtc = Date.parse(`${date}T00:00:00Z`);
   for (let minutes = -16 * 60; minutes <= 16 * 60; minutes += 15) {
@@ -176,7 +166,6 @@ function localDateOf(instant: Date, timeZone: string): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(instant);
 }
 
-/** A `quest.create` payload for `spec`, built on `dailyQuestDraft` so a spec only states what differs. */
 export function questDraft(spec: RolloverQuestSpec): Record<string, unknown> {
   const name = spec.name ?? `E2E rollover ${spec.strictness} ${crypto.randomUUID()}`;
   const draft: Record<string, unknown> = { ...dailyQuestDraft(name, spec.startDate), strictness: spec.strictness };
@@ -192,14 +181,12 @@ export async function createQuest(ctx: APIRequestContext, spec: RolloverQuestSpe
   return String(outcome.result['id']);
 }
 
-/** An onboarded persona (UTC) whose account row exists; today is not prepared until its first command or pull. */
 export async function rolloverSubject(memoir: MemoirHarness, label: string): Promise<RolloverSubject> {
   const persona = await memoir.persona({ label, onboard: true });
   if (!persona.account) throw new RolloverRigError(`persona ${label} came back without an onboarded account`);
   return { persona, ctx: persona.ctx, accountId: persona.account.id, timeZone: 'UTC' };
 }
 
-/** Writes account columns no command sets immediately — `PATCH /account` only stages timezone and intensity for the next rollover. */
 export async function setAccountSettings(accountId: string, settings: AccountSettings): Promise<void> {
   const sql = memoirDb();
   if (settings.timezone !== undefined) await sql`UPDATE accounts SET timezone = ${settings.timezone} WHERE id = ${accountId}::bigint`;
@@ -209,10 +196,8 @@ export async function setAccountSettings(accountId: string, settings: AccountSet
 }
 
 /**
- * Makes every day after `lastWalked` elapsed and unwalked: `last_hp_date` becomes `lastWalked`, that day is left
- * terminalized (an existing row keeps its values and closing time; a missing one is written closed at the mode's full
- * HP), and each `daily_states` row after it — today's prepared one included — is removed, so the next command or pull
- * closes those days afresh and then prepares today again. Earlier rows stay, which is how a spec seeds a closed day.
+ * Makes every day after `lastWalked` elapsed and unwalked: that day is left terminalized (an existing row keeps its values; a missing one is written closed at full HP) and every
+ * later `daily_states` row, today's included, is removed. Earlier rows stay, which is how a spec seeds a closed day.
  */
 export async function rewindRollover(accountId: string, lastWalked: string): Promise<void> {
   const sql = memoirDb();
@@ -227,17 +212,14 @@ export async function rewindRollover(accountId: string, lastWalked: string): Pro
   await sql`UPDATE accounts SET last_hp_date = ${lastWalked}::date WHERE id = ${accountId}::bigint`;
 }
 
-/**
- * Moves only `last_hp_date` back, leaving every `daily_states` row in place — the shape of a replayed walk, whose
- * already-terminalized days must be skipped rather than recomputed.
- */
+/** Moves only `last_hp_date` back, leaving every `daily_states` row: the shape of a replayed walk, whose terminalized days must be skipped rather than recomputed. */
 export async function rewindLastHpDate(accountId: string, lastWalked: string): Promise<void> {
   await memoirDb()`UPDATE accounts SET last_hp_date = ${lastWalked}::date WHERE id = ${accountId}::bigint`;
 }
 
 /**
- * Turns a freshly prepared account into one that was prepared `days` ago and has not been touched since: its open
- * `daily_states` row and `last_hp_date` move back together. Valid only while nothing else the account owns is dated today.
+ * Turns a freshly prepared account into one prepared `days` ago and untouched since: its open `daily_states` row and `last_hp_date` move back together. Valid only while nothing
+ * else the account owns is dated today.
  */
 export async function backdatePreparedDay(accountId: string, today: string, days: number): Promise<string> {
   const preparedOn = addDays(today, -days);
@@ -251,7 +233,6 @@ export async function backdatePreparedDay(accountId: string, today: string, days
   return preparedOn;
 }
 
-/** Inserts `quest_logs` rows with the snapshot columns a real log carries, copied from each quest. */
 export async function seedQuestLogs(accountId: string, questId: string, dates: string[], state: QuestLogState = 'completed'): Promise<void> {
   if (dates.length === 0) return;
   await memoirDb()`
@@ -271,7 +252,6 @@ export async function seedQuestStreak(accountId: string, questId: string, streak
   `;
 }
 
-/** A pending Recovery as `prepareToday` would have spawned it on `date`, expiring at the start of the next local day. */
 export async function seedPendingRecovery(accountId: string, date: string, timeZone: string, sourceQuestId: string | null = null): Promise<string> {
   const expiresAt = startOfLocalDay(addDays(date, 1), timeZone);
   const [row] = await memoirDb()<{ id: string }[]>`
@@ -283,15 +263,13 @@ export async function seedPendingRecovery(accountId: string, date: string, timeZ
   return row.id;
 }
 
-/** Walks the rollover through the lazy delta-pull entry point. */
 export async function catchUp(ctx: APIRequestContext): Promise<void> {
   await pullDelta(ctx);
 }
 
 /**
- * The Recovery/Comeback rig: an anchor quest scheduled since yesterday, yesterday elapsed and unwalked, then one pull —
- * so the walk records yesterday's anchor miss and today's preparation arms Comeback and spawns one pending Recovery.
- * `arrange` runs before the walk, for quests or logs that shape yesterday's outcome or today's momentum.
+ * The Recovery/Comeback rig: an anchor quest scheduled since yesterday, yesterday elapsed and unwalked, then one pull, so the walk records the anchor miss and today's
+ * preparation arms Comeback and spawns one pending Recovery. `arrange` runs before the walk.
  */
 export async function missedAnchorRig(memoir: MemoirHarness, label: string, arrange?: (rig: MissedAnchorRig) => Promise<void>): Promise<MissedAnchorRig> {
   const subject = await rolloverSubject(memoir, label);
@@ -311,10 +289,6 @@ export async function patchAccount(ctx: APIRequestContext, data: Record<string, 
   if (!response.ok()) throw new RolloverRigError(`PATCH /account failed: ${response.status()} ${await response.text()}`);
   return (await response.json()) as Record<string, unknown>;
 }
-
-/*!
- * Readers
- */
 
 /** The delta's `account` snapshot row — the only wire surface carrying the derived standing (`persona`, `comeback`, `shieldsAvailable`, `crown`). */
 export async function accountSnapshot(ctx: APIRequestContext): Promise<Record<string, unknown>> {
@@ -382,7 +356,6 @@ export async function heroEvents(accountId: string, types?: string[]): Promise<H
   `;
 }
 
-/** Hero-event counts by type, for asserting a walk wrote each kind exactly as often as the fixture says. */
 export async function heroEventCounts(accountId: string): Promise<Record<string, number>> {
   const rows = await memoirDb()<{ type: string; n: number }[]>`SELECT type, count(*)::int AS n FROM hero_events WHERE account_id = ${accountId}::bigint GROUP BY type`;
   return Object.fromEntries(rows.map(row => [row.type, row.n]));

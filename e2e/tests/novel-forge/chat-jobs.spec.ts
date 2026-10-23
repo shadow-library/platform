@@ -29,12 +29,9 @@ interface ArrangedChat {
 }
 
 /**
- * Declaring the constants
- *
- * The jobs a chat started, and the stream that follows them. A job belongs to a chat through the origin on its payload, and each transition
- * it makes is logged against that chat with the next `seq`, which is the stream's event id. Opened without a cursor the stream replays only
- * the running jobs' events and how each recently settled job ended; with `Last-Event-ID` (or `after`) it resumes after that seq. The
- * arranged jobs are reindex jobs, which only run when something dispatches them, so they sit still while the spec reads them.
+ * The jobs a chat started and the stream that follows them. A job belongs to a chat through the origin on its payload and each transition is logged against that chat with the
+ * next `seq`, the stream's event id. Opened without a cursor the stream replays only running jobs' events and how each recently settled job ended; `Last-Event-ID` (or `after`)
+ * resumes after that seq. The arranged reindex jobs only run when dispatched, so they sit still.
  */
 
 function chatPath(projectId: string, sessionId: string, suffix = ''): string {

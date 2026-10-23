@@ -57,14 +57,9 @@ interface RoleAssignmentBody {
 }
 
 /**
- * Declaring the constants
- *
- * Identity's policy decision point and the catalog behind it, driven as an application's back end drives them: a
- * client-credentials token on the application's own client, a declarative role manifest pushed through
- * `PUT /api/v1/authz/catalog`, and decisions read from `POST /api/v1/authz/check`. Every manifest targets a throwaway
- * application the test created — the seeded ecosystem applications are only ever read, and the claim that one
- * application's sync leaves another's catalog alone is made against identity's own seeded roles without pushing to
- * them. Roles and permissions come from the sync under test; the database factories arrange only the assignments,
+ * The policy decision point and its catalog, driven as an application's back end drives them: a client-credentials token on the application's own client, a role manifest pushed
+ * through `PUT /api/v1/authz/catalog`, decisions from `POST /api/v1/authz/check`. Every manifest targets a throwaway application; seeded ecosystem applications are only read
+ * (one application's sync leaving another's catalog alone is asserted against identity's seeded roles without pushing to them). Database factories arrange only the assignments,
  * memberships and directory rows no manifest carries.
  */
 

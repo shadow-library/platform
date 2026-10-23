@@ -33,22 +33,16 @@ interface ExportManifest {
 }
 
 /**
- * Declaring the constants
- *
- * Account export (ARCHITECTURE §20): request/status polling plus the assembler sweep that actually builds the
- * manifest. `export.assembler-interval-minutes` is 1 in dev, so a request here is awaited out rather than seeded
- * past.
- *
- * An assembled export writes a real object under `exports/<accountId>/<jobId>.json`, and a stored receipt writes
- * one under `r/<id>/`; memoir's orphan sweep only walks the prefixes of accounts that still exist, so deleting an
- * account row (the harness's ordinary persona teardown) would otherwise leak both. The one test here that uploads
- * a receipt and completes an export instead drives its own account to `data_deleted` first (`wipeAccount`, which
- * removes both prefixes) — in a `finally`, so a failed assertion still cleans up, after first giving the export job
- * a bounded wait to settle so the sweep never races the account's own deletion.
+ * Account export: request/status polling plus the assembler sweep that builds the manifest (`export.assembler-interval-minutes` is 1 in dev, so a request is awaited, not seeded
+ * past).
+ * An assembled export writes an object under `exports/<accountId>/<jobId>.json` and a stored receipt one under `r/<id>/`; the orphan sweep only walks prefixes of existing
+ * accounts, so deleting
+ * an account row would leak both. The test that uploads a receipt and completes an export instead drives its account to `data_deleted` (`wipeAccount`) in a `finally`, after
+ * giving the export job a
+ * bounded wait to settle so the sweep never races the deletion.
  */
 
 const EXPORT_PATH = '/api/v1/account/export';
-/** `export.assembler-interval-minutes` (1) plus assembly time, with headroom for a shared dev cluster under load. */
 const ASSEMBLE_TIMEOUT_MS = 120_000;
 
 function requestExport(ctx: APIRequestContext) {
@@ -164,8 +158,7 @@ test.describe('memoir export', () => {
       expect(manifest.sensitiveFields.length).toBeGreaterThan(0);
       expect(manifest.sensitiveFields).toContainEqual({ table: 'expense_audits', column: 'changes', classification: 'sensitive' });
       expect(manifest.sensitiveFields).toContainEqual({ table: 'journal_entries', column: 'text', classification: 'most-sensitive' });
-      // Sensitivity manifest columns are the raw DB names (log-redaction.ts's own toCamelCase() fallback confirms
-      // getSensitivityManifest() reports snake_case), not the JS-side camelCase field names.
+      // Sensitivity manifest columns are the raw snake_case DB names, not the JS-side camelCase field names.
       expect(manifest.sensitiveFields).toContainEqual({ table: 'quest_logs', column: 'reason_note', classification: 'most-sensitive' });
       expect(manifest.sensitiveFields).toContainEqual({ table: 'quest_logs', column: 'reflection_text', classification: 'most-sensitive' });
     } finally {

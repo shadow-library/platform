@@ -39,20 +39,18 @@ interface NovelDetail {
 }
 
 /**
- * Declaring the constants
+ * The fast, AI-free content path: hand-author a valid `final`-mode import bundle, land it in one call, publish metadata + chapters, exercise the forge-side gates
+ * (PUB_002/PUB_003) and access
+ * management, then verify the one-way push reached web-novel, including a RESTRICTED grant.
  *
- * The fast, AI-free content path: hand-author a valid `final`-mode novel-import bundle, land it in one call,
- * publish metadata + chapters, exercise the forge-side gates (PUB_002/PUB_003) and access management, then
- * verify the one-way push reached web-novel, including a RESTRICTED grant.
- *
- * The second half drives web-novel's `/internal/novels/*` ingest the only way it can be reached: novel-forge's converge, as the author's
- * project publishes. Outcomes are read from web-novel's own tables — the served rows and one `publish_audit_log` row per push. A state the
- * forge would never produce (a newer reader revision, a foreign publish token, a drifted row) is written straight into the reader, and
- * the push that meets it is real. Out of reach this way, since forge always sends its own `sourceRef`, managed token and a self-consistent
- * hash and never pushes for a novel it has not created: a second publisher, a tokenless push, a push with no `sourceRef`, a wrong content
- * hash, `authorNote` absent vs null (forge never sends null), an unknown novel, and a repeated unpublish reaching the reader (forge only
- * deletes an ordinal the reader's manifest still lists). Two first pushes fired together cannot be forced to overlap, so the reader's
- * insert-race retry is not proven here.
+ * The second half drives web-novel's `/internal/novels/*` ingest through novel-forge's converge, reading outcomes from web-novel's tables (served rows, one `publish_audit_log`
+ * row per push). A state the forge
+ * would never produce (a newer reader revision, a foreign publish token, a drifted row) is written straight into the reader and the push that meets it is real. Out of reach,
+ * since forge always sends its own
+ * `sourceRef`, managed token and a self-consistent hash and never pushes for a novel it has not created: a second publisher, a tokenless push, a push with no `sourceRef`, a
+ * wrong content hash, `authorNote` absent vs
+ * null, an unknown novel, and a repeated unpublish reaching the reader. Two first pushes fired together cannot be forced to overlap, so the reader's insert-race retry is not
+ * proven here.
  */
 
 const RATED = { violence: 'mild' };
@@ -89,8 +87,7 @@ test.describe('novel-forge import and publish pipeline', () => {
     expect(projectId).toMatch(/^[0-9]+$/);
     await expectImportLanded(jobId);
 
-    // The import writes into the `chapters` table (not finalized `drafts`), which the source-chapters listing
-    // reads back — three chapters, contiguous from 1, titled as authored.
+    // The import writes into `chapters` (not finalized `drafts`), which the source-chapters listing reads back: three chapters, contiguous from 1, titled as authored.
     const chapters = await forgeCtx.get(`/api/v1/projects/${projectId}/source/chapters`);
     expect(chapters.status()).toBe(200);
     const body = (await chapters.json()) as { items: { number: number; title: string }[] };
@@ -109,17 +106,15 @@ test.describe('novel-forge import and publish pipeline', () => {
   });
 
   test('should enforce contiguous chapter publishing (PUB_003) on the forge ledger', async () => {
-    // These are pure forge-side gates on the publication ledger — they hold regardless of whether the
-    // downstream reader push succeeds. Chapter 1 is accepted (202, enqueued)...
+    // Pure forge-side gates on the publication ledger: they hold whether or not the downstream reader push succeeds.
     const ch1 = await mutate(forgeCtx, 'post', `/api/v1/projects/${projectId}/chapters/1/publish`, { data: {} });
     expect(ch1.status(), await ch1.text()).toBe(202);
 
-    // ...then chapter 3 (skipping 2) must be refused — readers never see a hole.
+    // Skipping chapter 2 must be refused: readers never see a hole.
     const ch3 = await mutate(forgeCtx, 'post', `/api/v1/projects/${projectId}/chapters/3/publish`, { data: {} });
     expect(ch3.status()).toBe(400);
     expect((await jsonOrUndefined<{ code: string }>(ch3))?.code).toBe('PUB_003');
 
-    // Chapter 2 restores contiguity and is accepted.
     const ch2 = await mutate(forgeCtx, 'post', `/api/v1/projects/${projectId}/chapters/2/publish`, { data: {} });
     expect(ch2.status(), await ch2.text()).toBe(202);
   });
@@ -132,9 +127,8 @@ test.describe('novel-forge import and publish pipeline', () => {
   });
 
   test('should resolve a RESTRICTED share grant for user2 by email, then reopen to public', async () => {
-    // Forge-side access management, independent of the reader push. Proves the identity M2M path
-    // (resolveUsersByEmail) works: user2's address resolves to a subject, so the grant is `resolved`, not
-    // `pending`. The reader-side effect of a grant is asserted after reconcile below.
+    // Forge-side access management, independent of the reader push: user2's address resolves to a subject via the identity M2M path (`resolveUsersByEmail`), so the grant is
+    // `resolved`, not `pending`.
     const access = await mutate(forgeCtx, 'put', `/api/v1/projects/${projectId}/publications/access`, {
       data: { visibility: 'RESTRICTED', grants: [{ email: PERSONAS.user2.email }] },
     });
@@ -179,7 +173,7 @@ test.describe('novel-forge import and publish pipeline', () => {
   });
 
   test('should reject a garbage bundle with a 422 validation error', async () => {
-    // Missing envelope literals + no volumes is rejected by schema validation before any DB write.
+    // No envelope literals and no volumes is rejected by schema validation before any DB write.
     const response = await mutate(forgeCtx, 'post', '/api/v1/import', { data: { bundle: { format: 'not-a-bundle', novel: {} } } });
     expect(response.status()).toBe(422);
     expect((await jsonOrUndefined<{ code: string }>(response))?.code).toBe('VALIDATION_ERROR');

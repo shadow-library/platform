@@ -26,17 +26,12 @@ interface WorkloadClient {
 }
 
 /**
- * Declaring the constants
- *
- * Kubernetes workload identity: a pod authenticates at the token endpoint with its projected service-account token instead of
- * a client secret. Tokens are minted through `kubectl create token` against the dev cluster's own issuer, which is the only
- * signer identity trusts, so every scenario needs a real service account — each binding therefore uses a distinct one, never
- * a service account a shipped client already claims (identity binds `pulse-server`, `novel-forge-server`, `web-novel-server`
- * and `memoir-server`), because identity refuses to bind one exact subject to two clients. That binding namespace is shared
- * by the whole deployment, which is why this file runs in the single-worker `identity-serial` project.
- *
- * An assertion that identity cannot verify is refused identically however it is broken — the server never says which check
- * failed — so the forged cases assert the shared refusal and each group ends by proving the honest token still mints.
+ * Kubernetes workload identity: a pod authenticates at the token endpoint with its projected service-account token instead of a client secret. Tokens come from `kubectl create
+ * token` against the dev cluster's issuer, the only signer identity trusts, so each binding uses a distinct
+ * service account, never one a shipped client claims (`pulse-server`, `novel-forge-server`, `web-novel-server`, `memoir-server`), as identity refuses to bind one exact subject
+ * to two clients. That namespace is deployment-wide, hence the single-worker `identity-serial` project.
+ * An assertion identity cannot verify is refused identically however it is broken, so forged cases assert the shared refusal and each group ends by proving the honest token
+ * still mints.
  */
 
 const ISSUER = new URL(requireProductUrl('identity')).origin;

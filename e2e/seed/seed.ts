@@ -11,23 +11,13 @@ import { ADMIN_EMAIL, AUTH_DIR, type Persona, PERSONAS, SEED_MANIFEST_PATH, type
 type DatabaseKey = 'identity' | 'memoir' | 'pulse' | 'webNovel' | 'novelForge';
 
 /**
- * Declaring the constants
- *
- * A Bun script that idempotently seeds the dev cluster's Postgres so the e2e suite has known users, readable
- * novels, and a delivering notification pipeline. It is safe to re-run forever: every write is an upsert keyed by
- * a well-known identifier (email, slug, profile key), never a blind insert. Playwright's `globalSetup` spawns it
- * as a subprocess (`bun seed/seed.ts`) precisely because it needs Bun APIs — `Bun.password.hash` for argon2id —
- * that the specs' node runner does not have.
- *
- * Every connection string is overridable via `E2E_PG_URL_*`; a blank override means "skip this database", which
- * lets a run target a partial environment. The identity seed must run for the sub-dependent seeds (web-novel
- * grants/progress, novel-forge cleanup) to have the OIDC subs they key on.
+ * Idempotently seeds the dev cluster's Postgres: every write is an upsert keyed on a well-known identifier, never a blind insert.
+ * Runs as a Bun subprocess (`bun seed/seed.ts`) because argon2id needs `Bun.password.hash`.
+ * A blank `E2E_PG_URL_*` override skips that database. The identity seed must run for the sub-dependent seeds (web-novel, novel-forge) to have the OIDC subs they key on.
  */
 
-/** Physical database name per key, for the default local URL. */
 const DATABASE_NAMES: Record<DatabaseKey, string> = { identity: 'identity', memoir: 'memoir', pulse: 'pulse', webNovel: 'web_novel', novelForge: 'novel_forge' };
 
-/** The env var each database's connection string is read from. */
 const DATABASE_ENV_VARS: Record<DatabaseKey, string> = {
   identity: 'E2E_PG_URL_IDENTITY',
   memoir: 'E2E_PG_URL_MEMOIR',
@@ -56,7 +46,6 @@ function sha256(content: string): string {
   return crypto.createHash('sha256').update(content).digest('hex');
 }
 
-/** The first row of a result that must be non-empty (a `RETURNING`/guarded query) — narrows past `noUncheckedIndexedAccess`. */
 function first<T>(rows: T[]): T {
   const row = rows[0];
   if (row === undefined) throw new Error('expected a seed query to return at least one row');
@@ -74,17 +63,11 @@ function resolveUrl(key: DatabaseKey): string | null {
   return trimmed ? trimmed : null;
 }
 
-/** Opens a short-lived client for one seeding pass. */
 function connect(url: string): Sql {
   return postgres(url, { max: 1, onnotice: () => undefined });
 }
 
-/**
- * Upserts one persona into identity — mirroring every row real password registration writes: the user, its
- * profile, a verified primary email, a PASSWORD auth identity, an argon2id password, and a personal organisation
- * with an OWNER membership. Keyed on the verified email, so a re-run updates the existing user in place. Returns
- * the manifest entry (the user id doubles as the OIDC `sub`).
- */
+/** Upserts one persona into identity with every row password registration writes, keyed on the verified email. The user id doubles as the OIDC `sub`. */
 async function seedPersona(sql: Sql, persona: Persona): Promise<SeedManifestUser> {
   const account = PERSONAS[persona];
   const email = account.email.toLowerCase();
@@ -140,10 +123,7 @@ async function seedPersona(sql: Sql, persona: Persona): Promise<SeedManifestUser
   return { userId, sub: userId, email };
 }
 
-/**
- * Ensures the user owns a personal organisation, backfilling `personal_organisation_id` the way registration
- * does. Idempotent: a user that already has one only has its OWNER membership re-asserted.
- */
+/** Backfills `personal_organisation_id` the way registration does; a user that already has one only has its OWNER membership re-asserted. */
 async function ensurePersonalOrg(sql: Sql, userId: string, name: string): Promise<void> {
   const rows = await sql<{ personal_organisation_id: string | null }[]>`SELECT personal_organisation_id FROM users WHERE id = ${userId}`;
   const orgId = rows[0]?.personal_organisation_id;
@@ -176,7 +156,6 @@ async function ensurePlatformMembership(sql: Sql, userId: string): Promise<void>
   `;
 }
 
-/** Seeds all six personas (the bootstrap admin is one of them, so this also performs the admin password reset). */
 async function seedIdentity(url: string): Promise<Record<Persona, SeedManifestUser>> {
   const sql = connect(url);
   try {
@@ -190,7 +169,6 @@ async function seedIdentity(url: string): Promise<Record<Persona, SeedManifestUs
   }
 }
 
-/** Seeds the two readable novels, their chapters, a restricted grant for user1, wiki entries, and user1's library/progress. */
 async function seedWebNovel(url: string, user1Sub: string, viewerSub: string): Promise<void> {
   const sql = connect(url);
   try {
@@ -333,7 +311,6 @@ async function seedPulse(url: string): Promise<void> {
   }
 }
 
-/** Deletes every novel-forge project owned by an e2e persona (cascade), so repeated runs don't accumulate authoring state. */
 async function cleanNovelForge(url: string, subs: string[]): Promise<void> {
   const sql = connect(url);
   try {
@@ -344,7 +321,6 @@ async function cleanNovelForge(url: string, subs: string[]): Promise<void> {
   }
 }
 
-/** Writes the computed ids/subs to the gitignored manifest the specs read. */
 function writeManifest(users: Record<Persona, SeedManifestUser>): void {
   const manifest: SeedManifest = { generatedAt: new Date().toISOString(), users, webNovel: { publicSlug: PUBLIC_NOVEL_SLUG, restrictedSlug: RESTRICTED_NOVEL_SLUG } };
   mkdirSync(AUTH_DIR, { recursive: true });

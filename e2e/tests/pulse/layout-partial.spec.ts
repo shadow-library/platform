@@ -4,13 +4,8 @@ import { apiContext, mutate, requireProductUrl } from '../../lib';
 import { createLayout, createPartial, deleteLayouts, deletePartials, publishLayout, publishPartial, saveLayoutDraft, savePartialDraft, uniqueKey } from './helpers';
 
 /**
- * Declaring the constants
- *
- * Request-level coverage of the layout and partial CMS (`apps/pulse-server/src/modules/template/{layout,partial}.
- * {controller,service}.ts`), which structurally mirror the template CMS covered by `template-lifecycle.spec.ts` —
- * except a draft save (`PUT /:id/draft`) is a plain upsert (create-or-update), never a 409 on a second call the way
- * a template's `POST /draft` is. Every layout/partial this file creates carries a `uniqueKey(...)` key; neither
- * resource has a DELETE route, so cleanup removes the rows directly via `pulseDb()` in `afterEach`.
+ * The layout and partial CMS mirrors the template CMS except a draft save (`PUT /:id/draft`) is a plain upsert, never a 409 on a second call as a template's `POST /draft` is.
+ * Neither resource has a DELETE route, so `afterEach` removes the rows directly via `pulseDb()`.
  */
 test.describe('layout and partial CMS lifecycle', () => {
   test.beforeEach(() => requireProductUrl('pulse'));
@@ -59,8 +54,7 @@ test.describe('layout and partial CMS lifecycle', () => {
     expect(draft.status(), await draft.text()).toBe(200);
     expect((await draft.json()) as { version: number; status: string }).toMatchObject({ version: 1, status: 'DRAFT' });
 
-    // Unlike a template's draft (409 TPL_PUB_004 on a second open), a layout draft save is a plain upsert — a
-    // second call while one is outstanding updates the same row rather than conflicting.
+    // Unlike a template's draft (409 TPL_PUB_004 on a second open), a second layout draft save updates the same row.
     const redraft = await saveLayoutDraft(ctx, created.id, { body: '<html><body>updated {{ content | raw }}</body></html>' });
     expect(redraft.status()).toBe(200);
     expect((await redraft.json()) as { version: number }).toMatchObject({ version: 1 });

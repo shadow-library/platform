@@ -28,11 +28,8 @@ interface RecoveryCodeRow {
 }
 
 /**
- * Declaring the constants
- *
- * TOTP, recovery codes and step-up, driven through identity's API. Users come from the database factory and start on minted
- * sessions; only the logins under test spend `login/init`, on the test's own client address. Every failed factor lands on a
- * factory user, never a persona, because five failures in fifteen minutes lock an account.
+ * TOTP, recovery codes and step-up through the API. Users come from the factory on minted sessions; only the logins under test spend `login/init`, on the test's own client
+ * address. Failed factors land on a factory user, never a persona, as five failures in fifteen minutes lock an account.
  */
 
 const MFA_PATH = '/api/v1/me/mfa';

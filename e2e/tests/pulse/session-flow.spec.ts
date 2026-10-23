@@ -4,18 +4,13 @@ import { findSetCookie, mutate, requireProductUrl } from '../../lib';
 import { expect, test } from './fixtures';
 
 /**
- * Declaring the constants
- *
- * Pulse's browser-facing auth surface — the routes `@shadow-library/auth`'s `AuthController` contributes and every
- * pulse-web screen depends on. Driven against the real identity-server rather than a stub: the login redirect is
- * inspected without following it, then the authorize hop and the callback are followed one at a time so each
- * response's status, body and cookies can be asserted on their own.
+ * Pulse's browser-facing auth routes (`@shadow-library/auth`'s `AuthController`) against the real identity-server: the login redirect is inspected unfollowed, then the authorize
+ * hop and callback one at a time.
  */
 const SESSION_COOKIE = '__Host-shadow-session';
 
 const LOGIN_STATE_COOKIE = '__Host-shadow-session-login';
 
-/** Follows one hop of the login chain and hands back the `Location` it points at. */
 async function hop(ctx: APIRequestContext, url: string): Promise<URL> {
   const response = await ctx.get(url, { maxRedirects: 0 });
   const location = response.headers().location;
@@ -51,7 +46,7 @@ test.describe('first-party session flow', () => {
     expect(state?.attributes.has('httponly')).toBe(true);
     expect(state?.attributes.has('secure')).toBe(true);
     expect(state?.attributes.get('path')).toBe('/');
-    // The `__Host-` prefix is only honoured by a browser when the cookie names no domain.
+    // A browser honours the `__Host-` prefix only when the cookie names no domain.
     expect(state?.attributes.has('domain')).toBe(false);
   });
 
@@ -97,7 +92,6 @@ test.describe('first-party session flow', () => {
     expect((await stateless.json()) as { code?: string }).toMatchObject({ code: 'LOGIN_STATE_INVALID' });
     expect(await guest.get('/api/auth/session').then(response => response.status()), 'neither refusal may leave a session behind').toBe(401);
 
-    // The refused code was never redeemed, so the legitimate path is a fresh login on the same account.
     const admitted = await pulse.preLogin(staff);
     const freshAuthorize = await hop(admitted, '/api/auth/login?return_to=/');
     const redeemed = await admitted.get((await hop(admitted, freshAuthorize.href)).href, { maxRedirects: 0 });

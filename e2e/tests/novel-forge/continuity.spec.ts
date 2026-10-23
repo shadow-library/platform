@@ -56,10 +56,8 @@ interface MysteryRow {
 }
 
 /**
- * Declaring the constants
- *
- * The manual half of continuity: a proposal is only ever written by the continuity model, so each one here is a crafted delta inserted as
- * the model would have left it, then read, edited, applied and discarded through the API. Nothing in this file reaches a model.
+ * The manual half of continuity: a proposal is only written by the continuity model, so each one here is a crafted delta inserted as the model would have left it, then read,
+ * edited, applied and discarded through the API.
  */
 
 const EMPTY_DELTA = {

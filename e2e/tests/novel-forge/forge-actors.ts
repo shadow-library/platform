@@ -37,11 +37,9 @@ import { budgetPin, deleteAccountSettings, deleteForgeProjects, deleteForgeProje
 
 export type ForgeRole = 'NovelForgeCurator' | 'NovelForgeAdmin';
 
-/** One bot grant as the permission catalog offers it; `projects:write` carries `projects:read` with it. */
 export type ForgeBotGrant = 'projects:read' | 'projects:write' | 'generation' | 'illustrations';
 
 export interface ForgeActorOptions {
-  /** Readable tag embedded in the generated email. */
   label?: string;
   /** A team organisation to join; the actor's session is switched into it, so it acts and is authorised there. */
   organisation?: Pick<TeamOrganisation, 'organisationId'>;
@@ -98,16 +96,13 @@ export interface ForgeHarness {
 }
 
 /**
- * Declaring the constants
- *
- * Novel Forge callers that belong to one test and nothing else. The web-novel lane's seed deletes every project owned by a seeded
- * persona at the start of its runs, so a spec's projects must never be owned by one: an actor here is a fresh identity user whose
- * app session comes from the same OIDC hop a browser makes, driven over an `APIRequestContext` that starts out with nothing but a
- * database-minted identity session. A bot is created through identity's organisation API by the team's elevated owner, granted the
- * Novel Forge resources it is meant to hold, and calls with its `sl_bot_…` key alone.
- *
- * Novel Forge keeps nothing that cascades from identity, so teardown removes the owner's projects (by owner kind and id, which is
- * how the server scopes them), its saved settings and its role assignments before the identity account goes.
+ * Callers that belong to one test: the web-novel lane's seed deletes every project owned by a seeded persona at the start of its runs, so a spec's projects must never be owned
+ * by one.
+ * An actor is a fresh identity user whose app session comes from the browser's OIDC hop, driven over a context that starts with only a database-minted identity session. A bot is
+ * created through
+ * identity's organisation API by the team's elevated owner and calls with its `sl_bot_…` key alone.
+ * Novel Forge keeps nothing that cascades from identity, so teardown removes the owner's projects (by owner kind and id), saved settings and role assignments before the identity
+ * account goes.
  */
 
 const NOVEL_FORGE_APPLICATION = 'novel-forge';
@@ -122,10 +117,8 @@ const BOT_GRANTS: Record<ForgeBotGrant, { resource: string; level: 'read' | 'wri
 /** What Novel Forge answers when identity throttled the app-session call behind a login or an organisation switch. */
 const IDENTITY_THROTTLED = 503;
 
-/** Past one full rate-limit window, with room for the request that finally lands. */
 const THROTTLE_RETRY_MS = 75_000;
 
-/** Enough for a test to wait out a throttled window once, on top of its own work. */
 const HARNESS_TIMEOUT_MS = 180_000;
 
 export class ForgeActorError extends Error {
@@ -147,15 +140,13 @@ async function clearAccessTokenTtl(organisationId: string): Promise<void> {
 }
 
 /**
- * Novel Forge opens and switches app sessions through identity's `/api/v1/app-sessions` and exchanges bot keys at its token endpoint,
- * which identity charges to the one pod address every caller of Novel Forge shares, at 100 a minute. A 503 there is that budget running
- * out, not a verdict on the actor, so the step is retried into the next window. Once exchanged, a bot's token is cached for the test.
+ * Novel Forge opens and switches app sessions through identity's `/api/v1/app-sessions` and exchanges bot keys at its token endpoint, charged to the one pod address every caller
+ * shares, at 100 a minute. A 503 there is that budget running out, not a verdict on the actor, so the step is retried into the next window.
  */
 export async function untilIdentityAdmits<T extends { status(): number }>(step: () => Promise<T>): Promise<T> {
   return pollUntil(step, response => response.status() !== IDENTITY_THROTTLED, { timeoutMs: THROTTLE_RETRY_MS, intervalMs: 5_000 });
 }
 
-/** Rides the identity session through Novel Forge's login into an app session, optionally switched into another organisation. */
 async function signInToForge(session: IdentitySession, clientIp: string, switchTo?: string): Promise<APIRequestContext> {
   const ctx = await request.newContext({
     baseURL: requireProductUrl('novelForge'),

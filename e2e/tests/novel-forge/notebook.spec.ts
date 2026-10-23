@@ -28,12 +28,7 @@ interface LedgerEntryResponse {
   decidedBy: string;
 }
 
-/**
- * Declaring the constants
- *
- * The Notebook ledger (NF2-LDG-01): direct entries, supersede/withdraw lifecycle, reserved-topic refusals and idea
- * rejections written off a proposal's ops. Nothing here reaches a model, so no spend guard is needed.
- */
+/** The Notebook ledger: direct entries, supersede/withdraw lifecycle, reserved-topic refusals and idea rejections written off a proposal's ops. Nothing here reaches a model. */
 
 async function postLedger(owner: ForgeActor, projectId: string, body: Record<string, unknown>): Promise<APIResponse> {
   return mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/ledger`, { data: body });
@@ -129,9 +124,8 @@ test.describe('novel-forge notebook ledger', () => {
       await expectCode(await postLedger(owner, projectId, { kind: 'direction', topic, statement: 'x' }), 400, 'LDG_005', `writing directly to the reserved topic ${topic}`);
     }
 
-    // `LDG_004` ("not a key of lowercase words joined by dots, dashes or underscores") is dead code on this route: the DTO's own
-    // `pattern` constraint on `topic` rejects a malformed key at the schema layer before `LedgerService.append`'s own regex check ever
-    // runs, so the response is the generic schema-validation shape, not `LDG_004`.
+    // `LDG_004` is dead code on this route: the DTO's `pattern` on `topic` rejects a malformed key at the schema layer before `LedgerService.append`'s regex runs, so the
+    // response is the generic schema-validation shape.
     const malformed = await postLedger(owner, projectId, { kind: 'direction', topic: 'Not A Valid Topic!', statement: 'x' });
     expect(malformed.status(), await malformed.text()).toBe(422);
     expect(await malformed.json().then((body: { code?: string }) => body.code), 'the schema layer refuses it first — LDG_004 is unreachable through this route').toBe(
@@ -275,9 +269,8 @@ test.describe('novel-forge bible audit findings (arranged report)', () => {
       'deciding an unknown finding',
     );
 
-    // `AUD_007` only fires while the card is still `pending` — `updateChangeSet` (`proposal.service.ts`) checks `status !== 'pending'`
-    // (→ `RFN_002`) before it even looks at whether the card is audit-linked, so a settled card refuses a hand-edit with the more
-    // generic code instead. Checked here, before any finding is decided.
+    // `AUD_007` fires only while the card is `pending`: `updateChangeSet` checks `status !== 'pending'` (`RFN_002`) before whether the card is audit-linked, so a settled card
+    // refuses a hand-edit with the more generic code. Checked before any finding is decided.
     await expectCode(
       await mutate(owner.ctx, 'patch', `/api/v1/projects/${projectId}/proposals/${proposalId}`, {
         data: { changeSet: [{ op: 'entity.upsert', entityKey: keyA, type: 'character' }] },
@@ -355,8 +348,8 @@ test.describe('novel-forge bible audit findings (arranged report)', () => {
       findings: [{ id: 'skipped-finding', group: 'add', ref: `entity:${entityKeyB}`, text: 'Another minor character.', evidence: [], opIndexes: [0], withheld: null }],
       checked: CHECKED_STUB,
     });
-    // Arranged directly rather than through `decide`, which auto-discards the card the moment its last finding
-    // is skipped — the only way to observe `apply` reach a still-`pending` card with nothing left kept.
+    // Arranged directly, as `decide` auto-discards the card once its last finding is skipped; this is the only way to observe `apply` reach a `pending` card with nothing left
+    // kept.
     await insertAuditFindingDecision(nothingKeptReportId, 'skipped-finding', 'skipped');
 
     await expectCode(

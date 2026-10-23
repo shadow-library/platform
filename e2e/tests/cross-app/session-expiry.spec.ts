@@ -7,33 +7,18 @@ interface AppUnderTest {
   readonly product: 'novelForge' | 'pulse' | 'webNovel' | 'identity';
   readonly storage: 'user1' | 'admin';
   readonly authedPath: string;
-  /** A same-shell, client-side navigation (no reload) the user performs after the session dies. */
   readonly clickThrough: (page: Page) => Promise<void>;
-  /** The in-shell guard runs only while the app's access mode is private; the test skips on a public deployment. */
   readonly onlyWhenPrivate?: boolean;
 }
 
 /**
- * Declaring the constants
- *
- * Scenario: the app is loaded and hydrated, then the session ends server-side (idle/absolute TTL or a revoke).
- * The question is whether the next thing the user does lands them on a login screen rather than a shell that
- * keeps rendering with auth errors. We simulate the expiry by clearing every cookie on the context (the server
- * answers 401 to the next authenticated request); we clear identity's central `__Host-sid` too, so the OIDC hop
- * can't silently re-authenticate and hide the redirect.
- *
- * Two paths matter and they behave differently across the apps:
- *   - CLIENT-SIDE navigation (clicking a link inside the mounted shell, no document reload). Only an in-shell
- *     session guard re-validates here — the route-entry `beforeLoad` gate does not re-run for a reused layout
- *     match. Novel Forge, Pulse, the identity portal and, while private, Web Novel bind `@shadow-library/web`'s
- *     `useSessionGuard` on their authed shell, so they bounce. A public Web Novel does not run that guard, so a
- *     client-side hop keeps rendering (from warm cache / device-local data) instead of redirecting. See the note
- *     on the second block.
- *   - FULL reload / fresh route entry. Every app's `beforeLoad` gate runs and bounces to login. This is the
- *     safety net that guarantees no app is *stuck* — a reload always recovers to login.
+ * The app is loaded, then the session ends server-side; the next user action must land on a login screen, not a shell rendering auth errors. Expiry is simulated by clearing
+ * every cookie, including identity's `__Host-sid` so the OIDC hop cannot silently re-authenticate.
+ *  - Client-side navigation (no reload): only an in-shell `useSessionGuard` (`@shadow-library/web`) re-validates, since the route-entry `beforeLoad` gate does not re-run for a
+ *    reused layout. Novel Forge, Pulse, the identity portal and a private Web Novel bind it and bounce; a public Web Novel does not.
+ *  - Full reload: every app's `beforeLoad` gate bounces to login, so no app is ever stuck.
  */
 
-/** A login destination: a consumer app's own `/login` shim or identity's hosted login/authorize surface. */
 const LOGIN_URL = /\/login\b|identity\.shadow-apps\.test\/(login|oauth2\/authorize)/;
 
 const GUARDED_APPS: readonly AppUnderTest[] = [
@@ -52,8 +37,6 @@ const GUARDED_APPS: readonly AppUnderTest[] = [
     clickThrough: page => page.getByRole('link', { name: 'Templates' }).first().click(),
   },
   {
-    // The identity portal binds the same `useSessionGuard` (added alongside this suite), so a client-side hop
-    // between portal pages after expiry bounces to login instead of rendering the cached account page.
     label: 'Identity portal',
     product: 'identity',
     storage: 'user1',
@@ -71,10 +54,8 @@ const GUARDED_APPS: readonly AppUnderTest[] = [
 ];
 
 /**
- * Web Novel runs the in-shell guard only while private. A public Web Novel is an offline-first reader, so `/library`
- * and `/history` keep rendering device-local data when the session ends rather than force a login redirect mid-use.
- * The guarantee pinned in every mode is that a full reload re-runs the route gate and recovers to login, so the
- * reader is never trapped.
+ * Web Novel runs the in-shell guard only while private: a public Web Novel is an offline-first reader whose `/library` and `/history` keep rendering device-local data after the
+ * session ends.
  */
 const GATE_ONLY_APPS: readonly { label: string; product: AppUnderTest['product']; storage: AppUnderTest['storage']; authedPath: string }[] = [
   { label: 'Web Novel /library (any mode)', product: 'webNovel', storage: 'user1', authedPath: '/library' },
@@ -112,11 +93,8 @@ test.describe('session expiry — in-shell guard bounces on a mid-session client
 
 test.describe('session expiry — route-entry gate recovers to login on the next full load', () => {
   /**
-   * A public Web Novel does NOT run the in-shell guard (by design — it is offline-first), so a purely client-side hop
-   * after expiry keeps rendering device-local data rather than redirecting. That is not a stuck-on-error state —
-   * the server still rejects every real request — but it is not a proactive bounce either. What this block pins
-   * down is the guarantee that always holds: on a full reload / fresh route entry the `beforeLoad` gate
-   * re-validates and lands the user on login, so the reader is never trapped.
+   * A public Web Novel keeps rendering device-local data on a client-side hop after expiry (by design); what always holds is that a full reload re-runs the gate and lands on
+   * login.
    */
   for (const app of GATE_ONLY_APPS) {
     test(`should redirect to login on reload after the session expired — ${app.label}`, async ({ browser }) => {

@@ -11,12 +11,9 @@ import { holdNextChatMessage, listWorkflowRuns } from './forge-rows';
 import { expect, expectRefusedStream, framesOf, type SseClient, type SseFrame, type SseStream, test } from './forge-sse';
 
 /**
- * Declaring the constants
- *
- * The chat turn stream: the POST starts a turn and answers with its run id, and `GET /turns/:runId/stream` replays what the run has emitted
- * so far and follows it live until its terminal frame. A turn is refused before its run exists when it cannot even be routed, and fails on
- * the stream once it has one. Every turn here runs on a quota-pinned owner, so a routed turn fails AI_008 before dispatch and nothing is
- * spent; the buffer is dropped once a finished run's last stream closes.
+ * The POST starts a turn and answers with its run id; `GET /turns/:runId/stream` replays what the run emitted and follows it live until its terminal frame. A turn that cannot be
+ * routed is refused before its run exists and fails on the stream once it has one. Every turn runs on a quota-pinned owner, so a routed turn fails AI_008 before dispatch; the
+ * buffer is dropped once a finished run's last stream closes.
  */
 
 const TURN_FRAMES = ['ready', 'reset', 'user', 'error'];

@@ -3,12 +3,7 @@ import { type APIResponse } from '@playwright/test';
 import { expect, test } from './fixtures';
 import { type AccountView, errorCodeOf, getAccount, memoirMutate } from './helpers';
 
-/**
- * Declaring the constants
- *
- * `GET/PATCH /account` and `POST /account/onboarding` (T-17). Every test onboards or mutates its own fresh
- * persona (see `fixtures.ts`) — the accounts here are throwaway, never one of the five seeded personas.
- */
+/** `GET/PATCH /account` and `POST /account/onboarding`; every test onboards or mutates its own fresh persona, never a seeded one. */
 
 async function expectValidationError(response: APIResponse): Promise<void> {
   expect(response.status(), `${response.url()} answered ${await response.text()}`).toBe(422);

@@ -149,14 +149,10 @@ export interface RoleBotGrant {
 }
 
 /**
- * Declaring the constants
- *
- * Organisation bots as an org admin creates them: the bot, the permission grants it may hold and one key, plus a
- * caller that presents nothing but `Authorization: Bearer sl_bot_…`. Every mutation needs an elevated OWNER or
- * ADMIN session, and identity's own `identity:org:*` roles are held by organisation rank, so a team owner may
- * grant them without any role assignment of their own. A bot's OAuth client is `ON DELETE restrict`, and its
- * service-account role assignments hang off the client id rather than the bot, so neither goes with the
- * organisation — `deleteOrganisationBotRecord` removes all three.
+ * Organisation bots as an org admin creates them, plus a caller presenting only `Authorization: Bearer sl_bot_…`. Mutations need an elevated OWNER or ADMIN session;
+ * identity's `identity:org:*` roles are held by organisation rank, so a team owner may grant them without a role assignment.
+ * A bot's OAuth client is `ON DELETE restrict` and its service-account role assignments hang off the client id, so neither goes with the organisation:
+ * `deleteOrganisationBotRecord` removes all three.
  */
 
 const KEY_LIFETIME_MS = 60 * 60 * 1000;

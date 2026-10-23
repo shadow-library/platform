@@ -9,14 +9,8 @@ interface ProjectSummary {
 }
 
 /**
- * Declaring the constants
- *
- * Cross-user data isolation: one authenticated user must never see another's private state on any product. The
- * seed gives user1 a RESTRICTED novel accessible only through a per-user grant; user2 has no grant for it. The
- * Web Novel checks are anchored on that RESTRICTED novel rather than the PUBLIC one, because a PUBLIC novel is
- * legitimately readable (and trackable) by *anyone* — user2 reading it is not a leak. The RESTRICTED novel is the
- * genuinely private, grant-gated resource: user1 can reach it, user2 must not, anywhere. The Novel Forge check
- * covers its owner-scoped project list — each user creates a throwaway project and must see only their own.
+ * One authenticated user must never see another's private state. Web Novel checks anchor on the RESTRICTED novel (user1 holds a grant, user2 does not), because a
+ * PUBLIC novel is legitimately readable by anyone. The Novel Forge check covers its owner-scoped project list.
  */
 const FORGE_LIST_PATH = '/api/v1/projects';
 
@@ -24,8 +18,7 @@ test.describe('cross-user data isolation', () => {
   const { webNovel } = readSeedManifest();
 
   test("should keep user1's granted RESTRICTED novel out of user2's reader endpoints", async () => {
-    // user2 has no grant, so the restricted novel must never surface in either of user2's per-user reader lists,
-    // regardless of what user2 has legitimately read on public novels.
+    // Must not surface in either of user2's reader lists, whatever user2 read on public novels.
     const ctx = await apiContext('webNovel', 'user2');
 
     const progress = await ctx.get('/api/me/progress');
@@ -46,8 +39,7 @@ test.describe('cross-user data isolation', () => {
   });
 
   test('should let the granted user read the RESTRICTED novel while hiding it byte-identically from a non-granted user', async () => {
-    // The sharp edge of isolation: the exact same request is a 200 for the grant-holder and an indistinguishable
-    // 404 (WBN_001, the same code an unknown slug returns — no existence probe) for everyone else.
+    // The same request is a 200 for the grant-holder and an indistinguishable 404 (WBN_001, as for an unknown slug) for everyone else: no existence probe.
     const asUser1 = await apiContext('webNovel', 'user1');
     const granted = await asUser1.get(`/api/novels/${webNovel.restrictedSlug}`);
     expect(granted.status(), 'user1 holds the grant and must be able to read the restricted novel').toBe(200);
@@ -66,7 +58,6 @@ test.describe('cross-user data isolation', () => {
     const created: { ctx: typeof user1; id: string }[] = [];
 
     try {
-      // Each user creates a distinctly-named throwaway project.
       const stamp = Date.now();
       const name1 = `e2e-isolation-u1-${stamp}`;
       const name2 = `e2e-isolation-u2-${stamp}`;
@@ -80,7 +71,6 @@ test.describe('cross-user data isolation', () => {
       const id1 = await make(user1, name1);
       const id2 = await make(user2, name2);
 
-      // Each list contains the owner's project and never the other's.
       const listNames = async (ctx: typeof user1): Promise<{ ids: string[]; names: string[] }> => {
         const response = await ctx.get(FORGE_LIST_PATH);
         expect(response.status()).toBe(200);
@@ -97,7 +87,6 @@ test.describe('cross-user data isolation', () => {
       expect(u2List.ids, "user2 must NOT see user1's project").not.toContain(id1);
       expect(u2List.names, "user1's project name must not leak into user2's list").not.toContain(name1);
     } finally {
-      // Clean up both throwaway projects regardless of assertion outcome.
       for (const { ctx, id } of created) await scopedMutate(ctx, forgeUrl, 'delete', `${FORGE_LIST_PATH}/${id}`);
       await user1.dispose();
       await user2.dispose();

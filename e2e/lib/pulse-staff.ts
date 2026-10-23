@@ -35,17 +35,12 @@ export interface PulseStaff extends PulseStaffRemnants {
 }
 
 /**
- * Declaring the constants
+ * Pulse is an INTERNAL application: `ApplicationAccessService.computePlatformGrants` grants it only through the platform organisation, and `resolveActiveOrganisationId`
+ * narrows a pulse session to the organisation that granted it. So a staff account is a platform-organisation member with every permission assigned there;
+ * membership alone confers nothing, since identity's admin surface authorizes on a platform-organisation permission (`AdminAccessService.authorize`).
  *
- * Pulse is an INTERNAL application: `ApplicationAccessService.computePlatformGrants` grants an INTERNAL app only
- * through the platform organisation ("Shadow Platform"), and `resolveActiveOrganisationId` then narrows a pulse
- * session to the organisation that granted it — so a staff account is a platform-organisation member, and every
- * permission it holds is assigned in that organisation. Membership alone confers nothing else: identity's admin
- * surface authorizes on a platform-organisation *permission* (`AdminAccessService.authorize`), not on membership.
- *
- * Permissions come from a throwaway role on pulse's own application, because the route guard asks identity's PDP
- * for the exact permission name pulse declares. A name pulse declares that identity's catalogue is missing
- * (`pulse:messages:read` today) is created with the role and dropped again afterwards while nothing links it.
+ * Permissions come from a throwaway role on pulse's own application, because the route guard asks identity's PDP for the exact name pulse declares.
+ * A name pulse declares that identity's catalogue lacks is created with the role and dropped afterwards while nothing links it.
  */
 
 export class PulseStaffError extends Error {
@@ -55,12 +50,9 @@ export class PulseStaffError extends Error {
 const PULSE_APPLICATION_NAME = 'pulse';
 
 /**
- * Removes a staff account: the role's own permission links and assignments cascade with it, and the
- * platform-organisation membership and every session cascade with the user.
- *
- * A permission row is dropped only while no role links it, which is both what makes it safe to run for every
- * permission the account held — each name identity's own catalogue carries is linked by a pulse role and therefore
- * survives — and what lets concurrent tests share one created row: whoever tears down last removes it.
+ * Removes a staff account; the role's permission links and assignments cascade with it, and the membership and sessions with the user.
+ * A permission row is dropped only while no role links it, so running this for every permission held is safe (catalogue names stay linked by a pulse role)
+ * and concurrent tests can share one created row: whoever tears down last removes it.
  */
 async function removePulseStaff(staff: PulseStaffRemnants): Promise<void> {
   const sql = identityDb();
@@ -82,12 +74,9 @@ export function deletePulseStaff(staff: PulseStaff): Promise<void> {
 }
 
 /**
- * A staff account with a live pulse session, holding exactly `permissions`.
- *
- * The OIDC hop is driven over an `APIRequestContext` that starts out carrying only identity's session cookies:
- * following `GET /api/auth/login` through identity's authorize endpoint and back into pulse's callback leaves
- * pulse's own session cookie in the same jar, which every later call on `ctx` then presents. A failure anywhere
- * after the account exists takes the account back down, so a caller's teardown has nothing to inherit.
+ * A staff account with a live pulse session, holding exactly `permissions`. The OIDC hop runs over an `APIRequestContext` that starts with identity's session
+ * cookies only: `GET /api/auth/login` through authorize and back into pulse's callback leaves pulse's session cookie in the same jar.
+ * A failure after the account exists takes it back down.
  */
 export async function createPulseStaff(options: PulseStaffOptions = {}): Promise<PulseStaff> {
   const pulseUrl = requireProductUrl('pulse');

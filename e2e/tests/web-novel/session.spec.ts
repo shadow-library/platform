@@ -23,11 +23,8 @@ interface PendingLogin {
 }
 
 /**
- * Declaring the constants
- *
- * The reader's browser-session surface, which `@shadow-library/auth`'s `AuthController` contributes under `/api/auth`, driven
- * against the real identity-server. Each hop of login → authorize → callback is taken one at a time so every response's
- * status and cookies can be asserted on their own.
+ * The reader's browser-session surface (`@shadow-library/auth`'s `AuthController` under `/api/auth`) against the real identity-server, one login -> authorize -> callback hop at
+ * a time.
  */
 
 const WEB_NOVEL_AUDIENCE = 'api://web-novel';
@@ -86,7 +83,7 @@ test.describe('web-novel session: login', () => {
     expect(state?.attributes.has('httponly')).toBe(true);
     expect(state?.attributes.has('secure')).toBe(true);
     expect(state?.attributes.get('path')).toBe('/');
-    // The `__Host-` prefix is only honoured by a browser when the cookie names no domain.
+    // A browser honours the `__Host-` prefix only when the cookie names no domain.
     expect(state?.attributes.has('domain')).toBe(false);
     expect(state?.attributes.get('samesite')?.toLowerCase(), 'the state must survive identity redirecting the browser back').toBe('lax');
     expect(state?.attributes.get('max-age')).toBe('600');

@@ -45,20 +45,15 @@ interface ProjectBody {
 }
 
 /**
- * Declaring the constants
- *
- * Spend control and the figures behind it. The AI quota is a rolling window per owner over `model_calls`, reported by `GET /ai/quota` and
- * enforced by nothing in novel-forge: the spend limits are Synapse budgets, which the quota pin stands at their cap. A request is sent only
- * once the owner is pinned. Otherwise the quota's own report is what is asserted. Cost figures are asserted over seeded calls whose prices
- * this spec controls; the one list-price estimate comes from the historical list price of a pre-Synapse slug.
+ * The AI quota is a rolling window per owner over `model_calls`, reported by `GET /ai/quota` and enforced by nothing in novel-forge (spend limits are Synapse budgets, which the
+ * quota pin stands at their cap). A request is sent only once the owner is pinned; otherwise the quota's report is asserted. Cost figures use seeded calls with controlled
+ * prices; the one list-price estimate comes from the historical price of a pre-Synapse slug.
  */
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-/** A pre-Synapse slug the server still names and prices from `historical-models.ts`, so a row recording no cost is estimated from it. */
 const HISTORICAL_MODEL = { id: 'anthropic/claude-sonnet-5', label: 'Claude Sonnet 5', inputPricePerMToken: 2 };
 
-/** Not in the registry, so its calls are labelled by id and never estimated. */
 const UNKNOWN_MODEL = 'e2e/unknown-model';
 
 async function createProject(owner: ForgeActor, data: Record<string, unknown> = {}): Promise<ProjectBody> {

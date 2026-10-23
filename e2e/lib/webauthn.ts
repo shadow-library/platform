@@ -46,12 +46,8 @@ export interface AttestationOverrides extends CeremonyOverrides {
 }
 
 /**
- * Declaring the constants
- *
- * A software WebAuthn authenticator: an ES256 key pair, `none` attestation and discoverable-credential assertions, built by
- * hand because the node runner has no authenticator and this workspace carries no WebAuthn dependency. It speaks exactly what
- * `@simplewebauthn/server` verifies on the other side — CBOR attestation objects, a COSE public key, and DER ECDSA signatures
- * over `authenticatorData || sha256(clientDataJSON)` — and exposes the signature counter, which no real authenticator would.
+ * A software WebAuthn authenticator (ES256, `none` attestation, discoverable assertions) built by hand: the node runner has none and this workspace carries no WebAuthn
+ * dependency. It exposes the signature counter, which no real authenticator would.
  */
 
 const FLAG_USER_PRESENT = 0x01;

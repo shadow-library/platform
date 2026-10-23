@@ -21,12 +21,8 @@ import {
 } from './quest-helpers';
 
 /**
- * Declaring the constants
- *
- * Progression (PRD §2.9, §4.7, §4.8): achievements and titles are evaluated inside the command that moves their counters and
- * inserted against natural keys, so a grant lands once at its threshold and is never taken back; cosmetics are bought with
- * coins through the hero ledger and equipped one per kind. Catalogue numbers come from `rules/achievement.ts`,
- * `rules/title.ts` and `progression/cosmetic.catalogue.ts`.
+ * Achievements and titles are evaluated inside the command that moves their counters and inserted against natural keys, so a grant lands once at its threshold and is never taken
+ * back; cosmetics are bought with coins through the hero ledger and equipped one per kind.
  */
 
 function purchase(cosmeticId: string): CommandSpec {

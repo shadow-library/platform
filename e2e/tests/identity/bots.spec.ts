@@ -93,17 +93,12 @@ interface BotRoute {
 }
 
 /**
- * Declaring the constants
- *
- * The guard rails around the organisation-bot API, whose happy path `cross-app/org-bots.spec.ts` already walks: who may
- * reach it, what each status refuses, and what creation, keys and the activity feed record. Every mutation needs an
- * organisation admin on a self-service-elevated session, so the harness owner drives them and each refusal group ends
- * with the legitimate call it must not have closed. Requests are sent one at a time rather than in parallel: identity's
- * CSRF token is reissued by the GET that seeds it, so concurrent mutations would refuse each other on a stale token —
- * the two tests that genuinely need concurrency take the header once and reuse it.
- *
- * A bot's OAuth client is `ON DELETE restrict` and its service-account role assignments hang off that client rather
- * than the bot, so neither goes with the organisation; the harness removes all three for every bot it hands out.
+ * The guard rails around the organisation-bot API (the happy path is in `cross-app/org-bots.spec.ts`): who may reach it, what each status refuses, and what creation, keys and
+ * the activity feed record. Every mutation needs an organisation admin on a
+ * self-service-elevated session, and each refusal group ends with the legitimate call it must not have closed. Requests go one at a time because the CSRF token is reissued by
+ * the GET that seeds it, so concurrent mutations would refuse each other;
+ * the two tests needing concurrency take the header once and reuse it. A bot's OAuth client is `ON DELETE restrict` and its service-account role assignments hang off the client,
+ * so neither goes with the organisation: the harness removes all three.
  */
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -427,8 +422,7 @@ test.describe('identity organisation bots — creation, limits and listing', () 
     expect(await clientIds(`?applicationId=${platformApplicationId}`), "the platform application's client list hides its bot clients").not.toContain(bot.clientId);
     expect(await clientIds(''), 'nor does the unfiltered listing carry one').not.toContain(bot.clientId);
 
-    // Ten more bot clients put the platform application past the ten-client ceiling, so an eleventh registration
-    // succeeding is the proof that the ceiling never counted them.
+    // Ten more bot clients put the platform application past the ten-client ceiling, so an eleventh registration succeeding proves the ceiling never counted them.
     await identity.seedBots(team, 10, { label: 'bot-budget' });
     const clientId = `e2e-budget-${randomBytes(4).toString('hex')}`;
     const registered = await identityMutate(admin, 'post', '/api/v1/admin/clients', {

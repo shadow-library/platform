@@ -12,13 +12,10 @@ interface RedisTarget {
 type ParseResult = { value: RespValue; next: number } | undefined;
 
 /**
- * Declaring the constants
+ * A minimal RESP2 client for identity's Redis via the k3d Traefik raw-TCP entrypoint: `Bun.RedisClient` is unavailable under the node runner, and a hand-rolled
+ * client avoids a Redis dependency for a few commands. Each call opens its own short-lived socket.
  *
- * A minimal RESP2 client for identity's Redis, reached from the host on the k3d Traefik raw-TCP entrypoint. The specs run
- * under Playwright's node runner where `Bun.RedisClient` is unavailable, and a hand-rolled client keeps the workspace free of
- * a Redis dependency for the handful of commands arranging test state needs. Each call opens its own short-lived socket.
- *
- * Identity's key layout (verified against `apps/identity-server/src`):
+ * Identity's key layout:
  *  - `rl:<bucket>:<ip>` fixed-window counters, `rl:oauth-public-client:<clientId>:<ip>`, `rl:ipfail:<ip>`, `rl:ipblock:<ip>`
  *  - `auth_flow:<flowId>` JSON flow context
  *  - `session:<sha256(secret)>` 60 s session cache, `user_sessions:<userId>` set of session hashes

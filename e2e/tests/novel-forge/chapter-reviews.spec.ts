@@ -25,11 +25,8 @@ interface ChapterReview {
 }
 
 /**
- * Declaring the constants
- *
- * Chapter reviews as the mechanics/readability checks and the judge gate see them: the deterministic kinds answer synchronously and for
- * free, the judge kind is a model job that fails under the quota pin, and an open blocking judge finding holds the chapter as a
- * `contradiction` — which the author answers by dismissing, overriding or promising to fix it by hand — never by spending a model call.
+ * Mechanics/readability checks and the judge gate: deterministic kinds answer synchronously and free, the judge kind is a model job that fails under the quota pin, and an open
+ * blocking judge finding holds the chapter as a `contradiction`, which the author dismisses, overrides or promises to fix by hand, never by spending a model call.
  */
 
 function reviewsPath(projectId: string, chapter: number, suffix = ''): string {
@@ -40,7 +37,7 @@ function remedyPath(projectId: string, chapter: number, reviewId: string, findin
   return `${reviewsPath(projectId, chapter)}/${reviewId}/findings/${findingId}/remedy`;
 }
 
-/** DB-inserts a `judge` review with hand-crafted findings, bound to the chapter's current draft text — the model call NF2-REV-01 never spends. */
+/** DB-inserts a `judge` review with hand-crafted findings bound to the chapter's current draft text, standing in for the model call the suite never spends. */
 async function insertJudgeReview(projectId: string, chapter: number, revision: number, body: string, findings: { id: string; severity: string }[]): Promise<string> {
   const bodyHash = createHash('sha256').update(body).digest('hex');
   const rows = findings.map(finding => ({
@@ -120,7 +117,7 @@ test.describe('novel-forge judge gate and remedies', () => {
       { id: 'f2', severity: 'warning' },
     ]);
 
-    // fixing_myself is the author saying they will fix it by hand — review-findings.ts:330 keeps it open, so the gate stays shut.
+    // fixing_myself is the author promising a hand fix: `review-findings.ts` keeps the finding open, so the gate stays shut.
     const fixing = await mutate(owner.ctx, 'post', remedyPath(projectId, 1, reviewId, 'f1'), { data: { action: 'fixing_myself' } });
     expect(fixing.status(), await fixing.text()).toBe(200);
     const afterFixing = (await fixing.json()) as ChapterReview;
@@ -161,7 +158,6 @@ test.describe('novel-forge judge gate and remedies', () => {
     const liftedReadiness = (await (await owner.ctx.get(`/api/v1/projects/${projectId}/drafts/1/finalize-readiness`)).json()) as { blockers: { code: string }[] };
     expect(liftedReadiness.blockers.map(blocker => blocker.code)).not.toContain('FIN_004');
 
-    // Withdrawing the answer reopens f1, which is blocking again, so the gate shuts once more.
     const cleared = await mutate(owner.ctx, 'delete', remedyPath(projectId, 1, reviewId, 'f1'));
     expect(cleared.status(), await cleared.text()).toBe(200);
     expect((await cleared.json()) as ChapterReview).toMatchObject({ openFindings: 2, openBlocking: 1 });

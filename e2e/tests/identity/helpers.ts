@@ -20,12 +20,8 @@ export interface PasswordCredentialSnapshot {
 }
 
 /**
- * Declaring the constants
- *
- * Identity-only helpers that the shared `e2e/lib` deliberately does not carry: driving the `OtpInput`
- * widget, timestamped throwaway registration emails, polling the `notification_outbox` for a freshly
- * enqueued OTP or side-effect row, and recognising the server's rate-limit refusal so a spec can skip
- * (never fail) when the sticky `register/init` budget is exhausted for the hour.
+ * Identity-only helpers `e2e/lib` does not carry: driving the `OtpInput` widget, timestamped throwaway registration emails, polling `notification_outbox`, and recognising the
+ * rate-limit refusal so a spec skips (never fails) when the sticky `register/init` budget is exhausted for the hour.
  */
 
 /** Default poll budget for outbox reads — the rows are written transactionally, so they land fast; a few seconds covers replica/commit lag. */
@@ -46,9 +42,8 @@ export async function isRateLimited(response: APIResponse): Promise<boolean> {
 }
 
 /**
- * Types `code` into the shared `OtpInput` (a fieldset of single-character boxes). Each keystroke advances
- * focus internally, so we focus the first box and let `keyboard.type` follow the moving focus — driving the
- * boxes one at a time the way a human would, which also fires the widget's `onComplete` on the final digit.
+ * Types `code` into the shared `OtpInput` (a fieldset of single-character boxes): focus the first box and let `keyboard.type` follow the focus each keystroke advances, which
+ * also fires `onComplete` on the final digit.
  */
 export async function fillOtp(page: Page, code: string): Promise<void> {
   const firstBox = page.getByRole('textbox', { name: /character 1 of \d/i });
@@ -75,10 +70,8 @@ async function pollPayloadValue(field: OutboxRecipient, recipient: string, templ
 }
 
 /**
- * Polls the identity outbox until `email` has an OTP under `templateKey`, returning it — or throws when none
- * lands in time. Identity stores `recipients`/`payload` as double-encoded jsonb string scalars (the values come
- * back as JSON *text*, not objects — see the report), so we unwrap with `#>> '{}'` and re-parse rather than the
- * plain `->> 'email'` the shared `fetchLatestOtp` uses, which returns NULL against this shape.
+ * Polls the identity outbox until `email` has an OTP under `templateKey`, or throws. `recipients`/`payload` are double-encoded jsonb string scalars, so values are unwrapped with
+ * `#>> '{}'` and re-parsed rather than read with the plain `->> 'email'` of the shared `fetchLatestOtp`, which returns NULL against this shape.
  */
 export function pollOtp(email: string, templateKey: string, options: PollOptions = {}): Promise<string> {
   return pollPayloadValue('email', email, templateKey, 'code', options);
@@ -161,11 +154,9 @@ export async function expectRefused(response: APIResponse, status: number, code:
 }
 
 /**
- * Snapshots `userId`'s PASSWORD credential (and the password-history high-water mark) so a spec that exercises a
- * real password change can put the seeded credential back verbatim afterwards. A UI "change it back" cannot do
- * this idempotently: identity refuses to reuse any of the last five passwords (`PASSWORD_HISTORY_DEPTH`), so on
- * a rerun both the temporary password and the seeded one are already in history. Writing the original hash
- * directly — and pruning the history rows the test appended — keeps the account usable by `auth.setup` forever.
+ * Snapshots `userId`'s PASSWORD credential (and the password-history high-water mark) so a real password change can put the seeded credential back verbatim: a UI "change it
+ * back" is not idempotent, as identity refuses to reuse any of the last five passwords (`PASSWORD_HISTORY_DEPTH`). Writing the original hash and pruning the added history rows
+ * keeps the account usable by `auth.setup`.
  */
 export async function capturePasswordCredential(userId: string): Promise<PasswordCredentialSnapshot> {
   const rows = await identityDb()<{ hash: string; algorithm: string; version: number }[]>`

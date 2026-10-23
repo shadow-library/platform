@@ -47,12 +47,8 @@ export interface SamlResponse {
 }
 
 /**
- * Declaring the constants
- *
- * A service provider scripted end to end in the test process: it builds the `AuthnRequest` identity expects on the
- * HTTP-Redirect binding, reads the auto-post form identity answers with, and verifies the assertion's XML signature
- * against the certificate published in the IdP metadata. Nothing listens on the network — identity never contacts an
- * ACS itself, it only hands the browser a form pointed at one, so the registered ACS URL can stay fictional.
+ * A service provider scripted in the test process: builds the HTTP-Redirect `AuthnRequest`, reads identity's auto-post form and verifies the assertion signature against the IdP
+ * metadata certificate. Identity never contacts an ACS, so the registered ACS URL can be fictional.
  */
 
 const NS_PROTOCOL = 'urn:oasis:names:tc:SAML:2.0:protocol';

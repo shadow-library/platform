@@ -31,16 +31,11 @@ interface StaleSeed {
 }
 
 /**
- * Declaring the constants
- *
- * Account deletion (ARCHITECTURE §21): the step-up-gated start and status routes, the state machine the start drives in the
- * background, and the resume sweep that re-drives a stalled one. Every account here is a fresh persona or a disposable row; the
- * sweep runs in-process on the shared memoir pod for every account, so nothing is ever placed where it could reach another's.
+ * Account deletion: the step-up-gated start and status routes, the background state machine, and the resume sweep. The sweep runs in-process on the shared memoir pod for every
+ * account, so every account here is a fresh persona or disposable row that nothing can place where it reaches another's.
  */
 
-/** `deletion.resume-after-minutes`; dev keeps the default. */
 const RESUME_AFTER_MINUTES = 15;
-/** `deletion.sweep-interval-minutes` is 5 in dev; the budget covers one full cadence plus the sweeps sharing its tick. */
 const SWEEP_WAIT_MS = 7.5 * 60_000;
 const SEEDED_TABLES = ['command_log', 'devices', 'expense_audits', 'expense_categories', 'expenses', 'hero_events', 'quest_logs', 'quests', 'receipts'];
 
@@ -60,7 +55,6 @@ function scopesOf(token: string): string[] {
     .filter(Boolean);
 }
 
-/** A null start keeps the resume sweep, which only re-drives rows started before its threshold, off a hand-placed state. */
 async function placeDeletionState(accountId: string, state: DeletionState): Promise<void> {
   await memoirDb()`UPDATE accounts SET deletion_state = ${state}::deletion_state, deletion_started_at = NULL WHERE id = ${accountId}`;
 }
@@ -205,7 +199,7 @@ test.describe('memoir account deletion — data removal', () => {
       expect(await fetchObject(bystanderReceipt.downloadUrl)).toEqual({ status: 200, body: RECEIPT_PNG });
       expect((await getAccount(bystander.ctx)).id).toBe(bystanderId);
 
-      // Dev grants memoir no identity-close surface (`identity.close-path` unset), so §21.3 rests the machine here with the row intact.
+      // Dev grants memoir no identity-close surface (`identity.close-path` unset), so the machine rests here with the row intact.
       expect((await deletionRowOf(targetId))?.state).toBe('data_deleted');
       await expectDeletionState(await guest.get(DELETION_PATH, bearer(await issuer.elevated(target))), 200, 'data_deleted');
     } finally {
@@ -216,15 +210,14 @@ test.describe('memoir account deletion — data removal', () => {
 
 test.describe('memoir account deletion — resume sweep', () => {
   /**
-   * The states are placed in one transaction, so the sweep reads either none or all of them in a single pass: once the stale rows
-   * have moved, the same pass has also judged the fresh and never-started controls. Every row is a disposable account with a
-   * synthetic identity subject, so anything the sweep does to them touches only their own ids and prefixes.
+   * The states are placed in one transaction so the sweep reads none or all in a single pass: once the stale rows moved, the same pass has also judged the fresh and
+   * never-started controls. Every row is a disposable account with a synthetic subject.
    */
   test('should drive a stale deletion on from every state it stalls in, remove the row only from identity_closed, and leave fresh or never-started accounts alone', async ({
     memoir,
   }) => {
     test.setTimeout(SWEEP_WAIT_MS + 90_000);
-    // A killed run's rows would otherwise sit in the sweep's 50-row page for good; an hour is far past any live run of this test.
+    // A killed run's rows would otherwise sit in the sweep's 50-row page for good.
     await memoirDb()`DELETE FROM accounts WHERE identity_sub LIKE 'e2e-del-sweep-%' AND created_at < now() - interval '1 hour'`;
     const sweepAccount = (label: string): Promise<DisposableAccount> => memoir.disposableAccount(`del-sweep-${label}`);
     const [closed, pending, blobs, halted, fresh, never] = await Promise.all([

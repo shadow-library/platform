@@ -11,10 +11,8 @@ interface ProjectJob {
 }
 
 /**
- * Declaring the constants
- *
- * Continuing a manuscript, AI-free: the author imports the chapters already written as a `final` bundle, and the novel carries on from
- * the chapter after them. The upload goes through the Import screen; the job and the frontier are read from the API.
+ * AI-free: the author imports finished chapters as a `final` bundle through the Import screen and the novel carries on from the next chapter; the job and the frontier are read
+ * from the API.
  */
 
 const IMPORTED_CHAPTERS = 3;

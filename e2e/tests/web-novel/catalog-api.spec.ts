@@ -6,14 +6,10 @@ import { apiContext, readSeedManifest } from '../../lib';
 import { arrangeNovel, deleteNovels, readAccessMode, uniqueNovelSlug, updateServedChapter } from './helpers';
 
 /**
- * Declaring the constants
- *
- * Request-level coverage of `apps/web-novel-server`'s catalog/chapter API, as the `viewer` persona — a signed-in
- * reader with no grants, because Web Novel is private and an anonymous request is refused (`private-access.spec.ts`). The catalog
- * projection is PUBLIC-visibility-only unconditionally — the seeded
- * `e2e-restricted-novel` must never appear in it regardless of caller — and a handful of validation rules on
- * `GET /api/novels` are enforced server-side even though `apps/web-novel-web`'s own Browse screen never sends
- * the values that would trip them (see the web-novel report: several Browse filters are client-only).
+ * Request-level coverage of the catalog/chapter API as the `viewer` persona (signed in, no grants; anonymous is refused, see `private-access.spec.ts`). The catalog projection is
+ * PUBLIC-only unconditionally, so the seeded `e2e-restricted-novel` never appears, and several `GET /api/novels` validation rules are server-side only: the Browse screen never
+ * sends
+ * the values that trip them.
  */
 test.describe('catalog api', () => {
   const { webNovel } = readSeedManifest();
@@ -51,9 +47,8 @@ test.describe('catalog api', () => {
   });
 
   /**
-   * `NovelCatalogQuery` extends the shared `PaginationQuery`, whose `@Field` decorators bound `limit` to 1–100, `offset` to
-   * 0 and up, and `sortBy` to `NOVEL_SORT_FIELDS`. A value outside them is refused with the platform's 422 validation
-   * envelope naming the query field, never answered 200 with the default substituted.
+   * `NovelCatalogQuery` extends `PaginationQuery`: `limit` 1-100, `offset` >= 0, `sortBy` in `NOVEL_SORT_FIELDS`. Outside them is the platform's 422 envelope naming the field,
+   * never a 200 with a default substituted.
    */
   const invalidQueries: { name: string; query: string; field: string }[] = [
     { name: 'limit=0', query: '?limit=0', field: 'querystring.limit' },
@@ -78,7 +73,6 @@ test.describe('catalog api', () => {
     for (const query of ['?limit=1', '?limit=100&offset=0', '?sortBy=title']) expect((await ctx.get(`/api/novels${query}`)).status(), query).toBe(200);
   });
 
-  /** Path validation answers with the same 422 envelope as the query string. */
   test('should 422 with VALIDATION_ERROR on a slug containing characters outside the allowed pattern', async () => {
     const ctx = await apiContext('webNovel', 'viewer');
     const response = await ctx.get('/api/novels/BAD_SLUG!');
@@ -106,11 +100,7 @@ test.describe('catalog api', () => {
     expect(body.code).toBe('WBN_002');
   });
 
-  /**
-   * `ETag`/`If-None-Match` on a chapter GET is a real conditional-request contract, not decoration — a reader
-   * client is expected to skip re-downloading unchanged chapter text. Fetch once to capture the `ETag`, then
-   * echo it back and expect a bodyless `304`.
-   */
+  /** A reader client skips re-downloading unchanged chapter text: capture the `ETag`, echo it as `If-None-Match`, and expect a bodyless `304`. */
   test('should return a 304 when re-requesting a chapter with its own ETag', async () => {
     const ctx = await apiContext('webNovel', 'viewer');
     const first = await ctx.get(`/api/novels/${webNovel.publicSlug}/chapters/1`);
@@ -123,8 +113,8 @@ test.describe('catalog api', () => {
   });
 
   /**
-   * `cache-control: public` is reserved for a PUBLIC novel served while the app is in public mode; in private mode a shared cache must
-   * never hold a response only a signed-in reader may fetch, so the same read is `private, no-store`.
+   * `cache-control: public` is reserved for a PUBLIC novel in public mode; in private mode a shared cache must never hold what only a signed-in reader may fetch, so it is
+   * `private, no-store`.
    */
   test('should mark the public novel detail response cacheable only when the app is in public mode', async () => {
     const ctx = await apiContext('webNovel', 'viewer');
@@ -143,10 +133,8 @@ test.describe('catalog api', () => {
   });
 
   /**
-   * The contrast case: any authenticated, per-caller endpoint must never be marked shared-cacheable, however
-   * cacheable a public-mode catalog is. `GET /api/library` sets `cache-control: private, no-store` explicitly
-   * (`reader.controller.ts:106-109`) — a stray `public`/`max-age` here would risk one user's library leaking
-   * into a shared cache.
+   * An authenticated per-caller endpoint must never be shared-cacheable: `GET /api/library` sets `private, no-store`, and a stray `public`/`max-age` would leak one user's
+   * library into a shared cache.
    */
   test('should mark an authenticated per-caller response private, no-store', async () => {
     const ctx = await apiContext('webNovel', 'user1');
@@ -159,11 +147,9 @@ test.describe('catalog api', () => {
 });
 
 /**
- * `GET /api/novels` filter/search/pagination/serialization behavior, arranged straight into the catalog table
- * rather than through a publisher. The catalog is public and shared with every other lane and ~19 pre-existing
- * orphan e2e novels, so every query here is additionally scoped by `search=marker` — a token unique to this
- * describe's own four rows, embedded in an otherwise fixed-case substring of the title (also the vehicle for the
- * case-insensitive search assertion) — so a concurrent lane's rows can never leak into an assertion here.
+ * `GET /api/novels` filter/search/pagination/serialization on rows arranged straight into the catalog table. The catalog is shared with other lanes and pre-existing orphan e2e
+ * novels, so every query is also scoped by `search=marker`, a token unique to this describe's four rows (embedded in a fixed-case title substring, which also serves the
+ * case-insensitive check).
  */
 test.describe('catalog filters, search and serialization', () => {
   const marker = randomBytes(4).toString('hex');
@@ -176,9 +162,8 @@ test.describe('catalog filters, search and serialization', () => {
   };
 
   test.beforeAll(async () => {
-    // alpha: fully rated, one chapter with genre/tag matches. beta: rated but a different genre/tag, high violence.
-    // gamma: entirely unrated and retired — the "excluded under any ceiling, included with none" and status-filter control.
-    // delta: same genre as alpha but rated past any sane ceiling — the rank-vs-alphabetical differentiator alongside beta.
+    // alpha: fully rated, one chapter with genre/tag matches. beta: rated, different genre/tag, high violence.
+    // gamma: unrated and retired (excluded under any ceiling, included with none; status-filter control). delta: alpha's genre but rated past any sane ceiling.
     await arrangeNovel({
       slug: slugs.alpha,
       visibility: 'PUBLIC',
@@ -219,7 +204,7 @@ test.describe('catalog filters, search and serialization', () => {
 
   test('should case-insensitively match the title search', async () => {
     const ctx = await apiContext('webNovel', 'viewer');
-    // `search` is already the lowercase form of the "CATALOG-" the titles were seeded with — a case mismatch the ilike must tolerate.
+    // The titles were seeded with "CATALOG-"; the lowercase search is a case mismatch the ilike must tolerate.
     const response = await ctx.get(`/api/novels?search=${search}&limit=100`);
     expect(response.status()).toBe(200);
     const body = (await response.json()) as { items: { slug: string }[] };
@@ -251,10 +236,8 @@ test.describe('catalog filters, search and serialization', () => {
   });
 
   /**
-   * The differentiator between a rank-based ceiling and a naive alphabetical one: `violence` is stored as
-   * `['none','mild','graphic','extreme']` in rank order, but alphabetically `'extreme' < 'graphic' < 'mild'`, so
-   * a string comparison against a `mild` ceiling would wrongly admit both `beta` (`graphic`) and `delta`
-   * (`extreme`) — either leaking in here would mean the server compared level names as strings, not ranks.
+   * `violence` is stored as `['none','mild','graphic','extreme']` in rank order but sorts alphabetically `'extreme' < 'graphic' < 'mild'`: a string comparison against a `mild`
+   * ceiling would wrongly admit `beta` (`graphic`) and `delta` (`extreme`).
    */
   test('should apply the violence ceiling by rank, not alphabetically, and exclude the unrated row', async () => {
     const ctx = await apiContext('webNovel', 'viewer');
@@ -266,7 +249,7 @@ test.describe('catalog filters, search and serialization', () => {
 
   test('should exclude the unrated novel under any ceiling, however loose, while it stays included with no rating filter', async () => {
     const ctx = await apiContext('webNovel', 'viewer');
-    // gamma has no violence rating at all; even the loosest ceiling must exclude it rather than treat NULL as satisfying it.
+    // gamma has no violence rating; even the loosest ceiling must exclude it rather than treat NULL as satisfying it.
     const response = await ctx.get(`/api/novels?search=${search}&maxViolence=extreme&limit=100`);
     expect(response.status()).toBe(200);
     const body = (await response.json()) as { items: { slug: string }[] };
@@ -342,10 +325,7 @@ test.describe('catalog filters, search and serialization', () => {
   });
 });
 
-/**
- * Chapter ETag/cache correctness beyond a single round-trip 304, each in its own novel so a republish in one
- * test can never be observed by another.
- */
+/** Chapter ETag/cache correctness beyond one 304 round-trip, each in its own novel so one test's republish is never observed by another. */
 test.describe('chapter etag/cache correctness beyond a single 304', () => {
   const slugs: string[] = [];
 
@@ -400,7 +380,7 @@ test.describe('chapter etag/cache correctness beyond a single 304', () => {
     const originalBody = (await first.json()) as { content: string; revision: number };
 
     const newContent = 'A silently patched chapter body, same revision.';
-    // Revision is deliberately left unchanged — the cache key must still include the contentHash, or this GET would replay the cached body.
+    // Revision is left unchanged: the cache key must still include the contentHash, or this GET would replay the cached body.
     await updateServedChapter(novel.slug, 1, { content: newContent, contentHash: createHash('sha256').update(newContent).digest('hex') });
 
     const second = await ctx.get(`/api/novels/${novel.slug}/chapters/1`);
@@ -412,12 +392,9 @@ test.describe('chapter etag/cache correctness beyond a single 304', () => {
   });
 
   /**
-   * Positive control for the two tests above, which only prove the cache never serves *stale* content — neither would fail if
-   * `getChapterContent` had no cache at all. Force a state the real write path can never produce (content edited while revision
-   * AND contentHash are both left untouched, so the LRU key `slug:ordinal:revision:contentHash` does not change) and confirm the
-   * second GET still returns the *old* cached body — proof the LRU actually served from cache rather than re-reading the DB, which
-   * is what the other two tests rely on to mean anything. web-novel-server runs a single replica in dev (confirmed via `kubectl get
-   * deploy -n web-novel`), so this in-process LRU cannot be bypassed by the request landing on a different pod.
+   * Positive control for the two tests above, which only prove the cache never serves stale content and would pass with no cache at all. Edits content while revision AND
+   * contentHash stay untouched (a state the real write path cannot produce), so the LRU key `slug:ordinal:revision:contentHash` is unchanged, and the second GET must still
+   * return the old body. Assumes web-novel-server runs a single replica in dev, so the in-process LRU is not bypassed by another pod.
    */
   test('should serve the cached body when the cache key is unchanged, proving the LRU is actually live', async () => {
     const slug = uniqueNovelSlug('cat-etag-cache-hit');
@@ -438,7 +415,6 @@ test.describe('chapter etag/cache correctness beyond a single 304', () => {
     expect(secondBody.content, 'an unchanged cache key must serve the cached body — if this is the drifted content, there is no live cache').toBe(originalBody.content);
     expect(secondBody.content).not.toBe(driftedContent);
 
-    // Leave the row consistent again before cleanup.
     await updateServedChapter(novel.slug, 1, { contentHash: createHash('sha256').update(driftedContent).digest('hex') });
   });
 });

@@ -6,12 +6,9 @@ import { buildBundle, countEntities, expect, test } from './forge-bundles';
 import { createEntity, type EntitySeed, reconcileUntilConverged, uniqueSuffix } from './forge-helpers';
 
 /**
- * Declaring the constants
- *
- * The forge's wiki outbox (`wiki_publications`) as each converge reconciles it against the freshly projected bible: a fact is projected only
- * from the published ordinal of the chapter it was learned in, so it is absent — not gated — until that chapter goes live; a new entity is
- * ledgered at revision 1, an unchanged one is never touched, and one left with no facet is tombstoned and deleted from the reader. The row
- * is `pending` only inside the converge that writes it, so the ledger is read once each converge settles.
+ * The forge's wiki outbox (`wiki_publications`) as each converge reconciles it against the freshly projected bible: a fact is projected only from the published ordinal of the
+ * chapter it was learned in, so it is absent (not gated) until that chapter goes live; a new entity is ledgered at revision 1, an unchanged one is never touched, and one left
+ * with no facet is tombstoned and deleted from the reader. A row is `pending` only inside the converge that writes it, so the ledger is read once each converge settles.
  */
 
 const KEEPER: EntitySeed = { entityKey: 'e2e-keeper', type: 'character', name: 'Mira the Keeper', body: 'The keeper of the coast light for eleven winters.' };

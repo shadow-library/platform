@@ -3,18 +3,9 @@ import { expect, test } from '@playwright/test';
 import { requireProductUrl, storageStateFor } from '../lib';
 
 /**
- * Declaring the constants
- *
- * All four apps are TanStack Start SSR: a route `loader` prefetches through TanStack Query server-side, the
- * HTML shipped to the browser already contains the fetched data, and the client rehydrates from that
- * dehydrated state instead of refetching on mount. This spec checks that contract at both ends for Web
- * Novel, signed in as the `viewer` persona because the private reader renders nothing for an anonymous request, and
- * complements `auth-gate.spec.ts` with the raw redirect contract for one gated app.
- *
- * `/api/auth/session`, `/api/auth/userinfo` (Web Novel's own auth surface — `session.api.ts`'s `fetchSession`/
- * `fetchUserInfo`) and `/api/v1/me` (the console apps' profile query) are excluded throughout: the suite's own
- * framing already documents the session query as one that intentionally refetches, so it is not evidence of a
- * hydration bug.
+ * TanStack Start SSR contract for Web Novel (signed in as `viewer`, since the private reader renders nothing anonymously): a route `loader` prefetches through TanStack Query,
+ * the HTML already contains the data, and the client rehydrates instead of refetching. `/api/auth/session`, `/api/auth/userinfo` and `/api/v1/me` are excluded
+ * throughout because the session query intentionally refetches.
  */
 const EXCLUDED_API_PATHS = ['/api/auth/session', '/api/auth/userinfo', '/api/v1/me'];
 
@@ -23,14 +14,9 @@ test.describe('ssr hydration', () => {
     test.use({ storageState: storageStateFor('viewer') });
 
     /**
-     * `apps/web-novel-web/src/routes/_shell/index.tsx`'s loader prefetches the catalog (`catalogQueryOptions`,
-     * `apps/web-novel-web/src/lib/apis/novels.api.ts`, resolving to `GET /api/novels`); the shared `Shell`
-     * (`packages/ui/src/components/Shell/Shell.tsx`) always renders `<main id="sh-main-content">` regardless of
-     * content state, so that landmark alone (the one selector `reader-home.spec.ts` relies on) would not tell
-     * a real catalog apart from an empty one. The home screen has no skeleton fallback on this route (unlike
-     * Browse), so an empty catalog renders as an empty section, not a loading placeholder — a server-rendered
-     * `<Link to="/novels/$slug">` (`apps/web-novel-web/src/components/novel/novel-card.tsx`) in the raw,
-     * JS-free response is what actually distinguishes delivered data from an empty shell.
+     * The `_shell/index.tsx` loader prefetches the catalog (`GET /api/novels`) but `Shell` always renders `<main id="sh-main-content">`, so that landmark cannot tell a
+     * real catalog from an empty one, and this route has no skeleton fallback. A server-rendered `<Link to="/novels/$slug">` in the raw, JS-free response is what
+     * proves delivered data.
      */
     test('should deliver rendered catalog markup in the raw SSR response for Web Novel', async ({ request }) => {
       const url = requireProductUrl('webNovel');
@@ -46,11 +32,8 @@ test.describe('ssr hydration', () => {
     });
 
     /**
-     * A real browser this time, so the client actually hydrates. The catalog queries prefetched by the loader
-     * carry a `staleTime` long enough that a freshly hydrated client has no reason to refetch them on mount
-     * (`novels.api.ts`), so no browser-issued `GET /api/novels` should appear at all in the window from
-     * navigation through network-idle — and, more generally, no tracked `/api/*` GET should be seen twice for
-     * the identical URL, which would be true of any query that refetches instead of hydrating warm.
+     * A real browser, so the client hydrates. The prefetched catalog queries carry a `staleTime` long enough that no browser-issued `GET /api/novels` should appear
+     * between navigation and network-idle, and no tracked `/api/*` GET should be seen twice for the identical URL (what a query that refetches instead of hydrating does).
      */
     test('should not refetch SSR-hydrated queries after the client takes over on Web Novel', async ({ page }) => {
       const url = requireProductUrl('webNovel');
@@ -76,13 +59,8 @@ test.describe('ssr hydration', () => {
   });
 
   /**
-   * `auth-gate.spec.ts` already covers the browser-level view for every product — a real page settling on a
-   * URL containing `/login` after however many hops that takes. This probes the raw HTTP contract behind Novel
-   * Forge's hop specifically: `_app.tsx`'s `beforeLoad` gate (`requireSession` → `@shadow-library/web/router`'s
-   * `requireAuth`) is confirmed (per `auth-gate.spec.ts`'s own research) to redirect unauthenticated visitors
-   * server-side, before any markup ships — unlike Pulse, whose currently-deployed build may still be the
-   * pre-SSR-conversion SPA and would not answer this deterministically. A fresh `request` context starts with
-   * no cookies, so this is already an unauthenticated request without needing to clear any.
+   * The raw HTTP contract behind Novel Forge's hop, complementing the browser-level `auth-gate.spec.ts`: the `_app.tsx` `beforeLoad` gate redirects unauthenticated
+   * visitors server-side before any markup ships. A fresh `request` context carries no cookies, so it is already unauthenticated.
    */
   test('should redirect an unauthenticated SSR request toward login for Novel Forge', async ({ request }) => {
     const url = requireProductUrl('novelForge');

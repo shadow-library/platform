@@ -12,15 +12,10 @@ export interface MintedReceipt {
 export type StoredReceipt = MintedReceipt;
 
 /**
- * Declaring the constants
- *
- * The presigned-URL real-upload flow (ARCHITECTURE §19.2): `POST /receipts` mints the ref and a `PUT` URL
- * signed against `storage.s3.external-endpoint` — a public host reachable from outside the cluster, not
- * cluster-internal — then `POST /receipts/{ref}/confirm` HEAD-verifies the upload and flips the row to
- * `stored`. Content need not be a real image: the server only checks the declared/HEAD-observed size and
- * content type, never the bytes. `mintReceipt`/`uploadAndConfirm` are split rather than one call so a
- * caller can hold the ref the instant it exists in the database — before any bytes cross the wire — since
- * that ref is the only thing a partial-failure cleanup needs.
+ * The presigned-URL upload flow: `POST /receipts` mints the ref and a `PUT` URL signed against `storage.s3.external-endpoint` (a host reachable outside the cluster), then
+ * `POST /receipts/{ref}/confirm` HEAD-verifies the upload and flips the row to `stored`. Content need not be a real image: only size and content type are checked.
+ * `mintReceipt`/`uploadAndConfirm` are split so a caller holds the ref once it exists in the database, before any bytes cross the wire, which is all a partial-failure cleanup
+ * needs.
  */
 const RECEIPT_CONTENT_TYPE = 'image/jpeg';
 const RECEIPT_BYTES = Buffer.from('e2e-memoir-receipt-fixture'.repeat(8));

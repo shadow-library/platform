@@ -34,9 +34,7 @@ import { expectErrorCode } from './helpers';
 interface SessionApp {
   readonly application: OAuthApplication;
   readonly api: AppSessionApi;
-  /** A non-sensitive scope the application declares on its own audience. */
   readonly readScope: string;
-  /** A sensitive scope the application declares on its own audience, released only into stepped-up tokens. */
   readonly adminScope: string;
 }
 
@@ -48,13 +46,10 @@ interface ElevationState {
 }
 
 /**
- * Declaring the constants
- *
- * First-party app sessions: a first-party application's back end turns an authorization code into an opaque session handle and
- * mints short-lived tokens from it, claims step-up elevations performed for it, and switches the organisation it acts in. Every
- * test registers its own applications with a public origin (so the provisioned client redirects to `<origin>/api/auth/callback`
- * like a real app), grants their clients `app-session:manage`, and signs users in through the database. A step-up uses the
- * account password, which identity accepts for an account with no second factor.
+ * First-party app sessions: an application's back end turns an authorization code into an opaque session handle, mints short-lived tokens from it, claims step-up elevations
+ * performed for it, and switches the organisation it acts in. Every test registers its own applications with a public origin (so the provisioned client redirects to
+ * `<origin>/api/auth/callback`), grants their clients `app-session:manage`, and signs users in through the database. A step-up uses the account password, which identity accepts
+ * for an account with no second factor.
  */
 
 function tag(): string {

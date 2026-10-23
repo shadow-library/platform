@@ -74,11 +74,8 @@ export interface ValidationIssueSeed {
 }
 
 /**
- * Declaring the constants
- *
- * The finalize review as FX-13 arranges it: the approval's review job fails under the spend guard, and the model's reading of the approved
- * prose is stood in for by rows marked ready for exactly that text. Everything a model would have written — review items, judge findings,
- * a novel validation report — is a row here; every decision, finalize and revert goes through the API.
+ * The finalize review: the approval's review job fails under the spend guard and the model's reading is stood in for by rows marked ready for exactly the approved text.
+ * Everything a model would have written is a row here; every decision, finalize and revert goes through the API.
  */
 
 /** A judge finding that holds the chapter until it is answered; the model call that would have found it is never made. */
@@ -100,19 +97,16 @@ export async function readinessCodes(ctx: APIRequestContext, projectId: string, 
   return readiness.blockers.map(blocker => blocker.code);
 }
 
-/** Finalizes through the review route, which answers 200; a model-capable request, so the guard is asserted right before it. */
 export async function finalizeThroughReviewRoute(ctx: APIRequestContext, projectId: string, chapter: number): Promise<APIResponse> {
   await assertSpendGuarded(projectId);
   return mutate(ctx, 'post', reviewPath(projectId, chapter, '/finalize'), { data: {} });
 }
 
-/** `POST /finalize`, the route a chapter approved before reviews existed takes. */
 export async function finalizeRoute(ctx: APIRequestContext, projectId: string, chapter: number): Promise<APIResponse> {
   await assertSpendGuarded(projectId);
   return mutate(ctx, 'post', `/api/v1/projects/${projectId}/finalize`, { data: { chapter } });
 }
 
-/** A run `POST /finalize` started. */
 export async function expectFinalizeRun(response: APIResponse, what: string): Promise<FinalizeAnswer> {
   expect(response.status(), `${what} — body ${await response.text()}`).toBe(200);
   return (await response.json()) as FinalizeAnswer;

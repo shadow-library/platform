@@ -42,11 +42,8 @@ interface StoredPassword {
 }
 
 /**
- * Declaring the constants
- *
- * The self-service account API behind `/api/v1/me` — closure, password rotation, contact emails and phones — plus the
- * tenant-isolation and user-creation rules registration surfaces, and the service-only directory seam. Users come from the
- * database factory, so only the logins under test spend `login/init`, on the test's own client address.
+ * The self-service account API behind `/api/v1/me` (closure, password rotation, contact emails and phones), the tenant-isolation and user-creation rules, and the service-only
+ * directory seam. Users come from the database factory, so only the logins under test spend `login/init`, on the test's own client address.
  */
 
 const ME_PATH = '/api/v1/me';
@@ -67,7 +64,6 @@ function uniqueUsername(): string {
   return `e2e${randomBytes(6).toString('hex')}`;
 }
 
-/** An E.164 number in the +1 999 test range, shaped so `validator.isMobilePhone` accepts it. */
 function uniquePhone(): string {
   return `+1999${randomInt(2, 10)}${randomInt(100_000, 1_000_000)}`;
 }
@@ -396,7 +392,6 @@ test.describe('identity account API — tenants and user creation', () => {
     expect(completed.status(), await completed.text()).toBe(200);
     expect(await findIdentityUserByEmail(mixedCase.toLowerCase()), 'the address is stored lowercased').toBeDefined();
 
-    // A completed registration leaves `__Host-sid` on the context, and identity enforces CSRF on every later mutation it sends.
     const youngCtx = await identity.anonymous();
     const youngEmail = uniqueEmail('reg-underage');
     identity.trackUserByEmail(youngEmail);
@@ -417,8 +412,7 @@ test.describe('identity account API — tenants and user creation', () => {
     await ctx.post('/api/v1/auth/register/demographics', { data: { flowId } });
     await ctx.post('/api/v1/auth/register/profile', { data: { flowId, firstName, lastName: 'Tester' } });
 
-    // The address is claimed between the flow's verification and its completion — the one way in to the duplicate-email
-    // guard from outside, since `register/init` never discloses an address that already exists.
+    // The address is claimed between the flow's verification and completion: the only way to the duplicate-email guard, as `register/init` never discloses an existing address.
     const squatter = await identity.createUser({ label: 'reg-duplicate-squatter' });
     await identityDb()`UPDATE user_emails SET email_id = ${email} WHERE user_id = ${squatter.userId} AND is_primary`;
 

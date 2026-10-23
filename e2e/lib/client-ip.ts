@@ -5,15 +5,11 @@ import { type BrowserContext } from '@playwright/test';
 import { clearIpState } from './redis';
 
 /**
- * Declaring the constants
- *
- * Identity keys every rate limit, failure tally and IP block on `request.ip`, which it resolves from `X-Forwarded-For` past the
- * CIDRs in `APP_TRUST_PROXY`. In the local dev cluster the chain honours a client-supplied address: TLS ends at the host's
- * HAProxy, which hands off over loopback to Traefik's `web` entrypoint (forwarded headers kept), and identity trusts 127.0.0.1,
- * the pod CIDR and the k3d network. So a spec that sends its own address is charged in buckets of its own instead of the one
- * address the whole suite otherwise shares. An environment whose proxies drop or overwrite the header collapses back to that
- * shared address. Addresses come from 198.18.0.0/15 (RFC 2544 benchmarking): never routed, and outside every trusted proxy
- * range, where they would be skipped as a hop.
+ * Identity keys rate limits, failure tallies and IP blocks on `request.ip`, resolved from `X-Forwarded-For` past the CIDRs in `APP_TRUST_PROXY`.
+ * In the local dev cluster (HAProxy -> loopback -> Traefik `web`, forwarded headers kept; identity trusts 127.0.0.1, the pod CIDR and the k3d network)
+ * a client-supplied address is honoured, so a spec gets buckets of its own instead of the one address the suite shares. An environment whose proxies
+ * drop or overwrite the header collapses back to that shared address.
+ * Addresses come from 198.18.0.0/15 (RFC 2544 benchmarking): never routed, and outside every trusted proxy range, where they would be skipped as a hop.
  */
 
 export const FORWARDED_FOR_HEADER = 'x-forwarded-for';

@@ -10,15 +10,11 @@ import { CHAPTER_ONE, type Draft, writeChapterByHand } from './forge-helpers';
 import { ageAuthoringClaim, readAuthoringClaim, readJobRow, updateJobRow } from './forge-rows';
 
 /**
- * Declaring the constants
- *
- * Background jobs and the one authoring claim a novel has. Jobs are arranged as rows: reindex (`backfill`) jobs only run when something
- * dispatches them, so a queued or running one sits still, and `POST /backfill` is the one enqueue that never reaches a model. The authoring
- * claim is held by a job-less holder as a synchronous action would hold it, or reserved for a queued generation job as enqueueing does;
- * either way the novel is quota-pinned, so a refusal that failed to hold would still spend nothing.
+ * Background jobs and a novel's one authoring claim. Reindex (`backfill`) jobs only run when dispatched, so a queued or running one sits still, and `POST /backfill` is the one
+ * enqueue that never reaches a model. The claim is held by a job-less holder as a synchronous action would, or reserved for a queued generation job as enqueueing does; either
+ * way the novel is quota-pinned, so a refusal that failed to hold would still spend nothing.
  */
 
-/** `jobs.authoring-claim.ttl-ms`, which the dev deployment leaves at its default. */
 const CLAIM_TTL_MS = 120_000;
 
 const HAND_BRIEF = 'Tamsin measures the street at dawn and finds the wall has moved overnight.';

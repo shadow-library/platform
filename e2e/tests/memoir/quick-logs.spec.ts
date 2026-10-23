@@ -23,11 +23,8 @@ interface MealRow {
 }
 
 /**
- * Declaring the constants
- *
- * Quick logs (PRD §2.6, §4.12, §4.13): journal, meal and weight each reward once per local day through a `{module}_{date}`
- * ledger key, side quests reward their first three a day, a backdated or quest-linked entry never calls the ledger, and the
- * monthly entry cap only ever advises.
+ * Journal, meal and weight each reward once per local day through a `{module}_{date}` ledger key, side quests reward their first three a day, a backdated or quest-linked entry
+ * never calls the ledger, and the monthly entry cap only advises.
  */
 
 function journalSave(date: string): CommandSpec {

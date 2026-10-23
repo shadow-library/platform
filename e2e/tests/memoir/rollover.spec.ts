@@ -42,14 +42,9 @@ interface DstDay {
 }
 
 /**
- * Declaring the constants
- *
- * Rollover (ARCHITECTURE §13): the lazy, in-request day walk every command batch and delta pull runs first. Elapsed days
- * are arranged by rewinding `accounts.last_hp_date` (see `rollover-helpers.ts`) and asserted through the delta and the
- * rows the walk writes. The engine's HP/Crown/Comeback/Returner numbers come from ruleset v1 (`rules/ruleset.ts`).
- *
- * Preparing today stamps `last_hp_date = today` with the day still open, so the walk resumes at that day itself while its
- * row is open and at the day after once it is closed; the prepared-day tests below backdate an open prepared day to prove it.
+ * The lazy, in-request day walk every command batch and delta pull runs first. Elapsed days are arranged by rewinding `accounts.last_hp_date` (see `rollover-helpers.ts`).
+ * Preparing today stamps `last_hp_date = today` with the day still open, so the walk resumes at that day while its row is open and at the next once closed; the prepared-day
+ * tests backdate an open prepared day to prove it.
  */
 
 const CATCHUP_MAX_DAYS = 90;
@@ -57,7 +52,6 @@ const DST_CANDIDATE_ZONES = ['America/Santiago', 'America/New_York', 'Europe/Lon
 const DST_SEARCH_DAYS = 85;
 const RETURNER_OFF = 90;
 
-/** Days the walk closed after `lastWalked`, whose own row the rig leaves terminalized. */
 function closedDates(states: DailyStateRow[], lastWalked: string): string[] {
   return states.filter(state => state.date > lastWalked && state.rolloverAt !== null).map(state => state.date);
 }
@@ -79,7 +73,6 @@ function crownOf(
   return { crownXpGranted, crownXpRemaining, crownCoinsGranted, crownCoinsRemaining, crownBankedXp, crownBankedCoins };
 }
 
-/** The most recent local day, within the catch-up bound, on which some candidate zone changes its UTC offset. */
 function recentDstDay(): DstDay | undefined {
   const found: DstDay[] = [];
   for (const timeZone of DST_CANDIDATE_ZONES) {
@@ -100,7 +93,6 @@ async function syncSeqOf(table: 'daily_states' | 'quest_logs', accountId: string
   return BigInt(row.seq);
 }
 
-/** Last active `absentDays` ago with a completed anchor then, and every day since elapsed and unwalked. */
 async function returnAfter(subject: RolloverSubject, anchorQuestId: string, absentDays: number): Promise<string> {
   const lastActive = addDays(localToday(subject.timeZone), -absentDays);
   await seedQuestLogs(subject.accountId, anchorQuestId, [lastActive]);

@@ -45,13 +45,10 @@ interface AuditRow {
 }
 
 /**
- * Declaring the constants
- *
- * Which applications a user may sign into, as identity decides at `/oauth2/authorize`: a code (or, for a third-party client,
- * the consent prompt) when access is granted, `access_denied` when the application is visible but not granted, and the
- * unknown-client page when it is hidden. Grants come from the user's organisations — the personal workspace, team
- * organisations in either app-access mode, the platform organisation — and from releases, assignments and ownership. Each test
- * builds its own organisations and applications; states no API reaches (suspensions, SCIM management) are arranged in the database.
+ * Which applications a user may sign into, as decided at `/oauth2/authorize`: a code (or the consent prompt for a third-party client) when granted, `access_denied` when visible
+ * but not granted, the unknown-client page when hidden. Grants come from the user's organisations (personal workspace, team organisations in either app-access mode, the platform
+ * organisation), releases, assignments and ownership. Each test builds its own organisations and applications; states no API reaches (suspensions, SCIM management) are arranged
+ * in the database.
  */
 
 const ISSUER = new URL(requireProductUrl('identity')).origin;

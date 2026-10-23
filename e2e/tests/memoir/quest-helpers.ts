@@ -45,10 +45,8 @@ export interface EarnedRow {
 }
 
 /**
- * Declaring the constants
- *
- * Shared plumbing for the quest, quick-log and progression specs: occurrence ids, refusal assertions, a two-command race
- * proven through `withAccountLockHeld`, and the database readers for the rows the sync wire does not expose whole.
+ * Quest, quick-log and progression plumbing: occurrence ids, refusal assertions, a two-command race proven through `withAccountLockHeld`, and readers for rows the sync wire does
+ * not expose whole.
  */
 
 export class MemoirRowMissingError extends Error {

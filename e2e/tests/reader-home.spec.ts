@@ -3,13 +3,8 @@ import { expect, test } from '@playwright/test';
 import { requireProductUrl, storageStateFor } from '../lib';
 
 /**
- * Declaring the constants
- *
- * Web Novel is private, so its home route (`_shell/index.tsx`) renders only for a signed-in platform member; the anonymous
- * redirect is covered by `web-novel/private-access.spec.ts`. The page renders through the shared `Shell` component
- * (`packages/ui/src/components/Shell/Shell.tsx`), whose doc comment calls the `<main>` region mandatory: it always wraps the page
- * content, whether the catalog has rows or the empty state renders. That landmark is the one selector assumption this spec makes —
- * deliberately not asserting on specific catalog copy, which is free to change.
+ * Web Novel is private, so its home renders only for a signed-in platform member (the anonymous redirect is in `web-novel/private-access.spec.ts`). The shared `Shell`
+ * always wraps the page in `<main>`, with or without catalog rows; that landmark is the one selector assumed, so catalog copy stays free to change.
  */
 test.describe('reader home', () => {
   test.use({ storageState: storageStateFor('viewer') });

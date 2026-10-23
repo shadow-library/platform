@@ -21,18 +21,14 @@ interface AiConsentView {
 }
 
 /**
- * Declaring the constants
- *
- * `POST /ai/tasks`, `/tasks/{id}/cancel`, `/consents`, `/scheduled-query` and `/results/{id}/apply`
- * (ARCHITECTURE §15). `AiExecutorService.drain()` only ever fires from a sweep, which is always registered; inference goes through
- * Synapse (task `memoir.insight`), routed to local Ollama in the test environment. Submit, consent and apply paths are synchronous and
- * never reach inference. The cancel test races the sweep: `claimNext` (`ai-worker.repository.ts`) can claim any `pending` task on the
- * sweep's cadence (`ai.batch-poll-interval-minutes`, default 5 minutes), so a cancel answers either 200 (refunded) or 409 `AI_004`
+ * `POST /ai/tasks`, `/tasks/{id}/cancel`, `/consents`, `/scheduled-query` and `/results/{id}/apply`. `AiExecutorService.drain()` fires only from a sweep; inference goes through
+ * Synapse
+ * (task `memoir.insight`), routed to local Ollama in the test environment. Submit, consent and apply are synchronous and never reach inference. The cancel test races the sweep:
+ * `claimNext` (`ai-worker.repository.ts`) can claim any `pending` task on the sweep's cadence (`ai.batch-poll-interval-minutes`, default 5), so a cancel answers 200 (refunded)
+ * or 409 `AI_004`
  * (already claimed), and the test asserts the contract of whichever happened.
  *
- * The free- and paid-tier quota caps (`quotas.ai-free-monthly`/`quotas.ai-paid-daily`) are read live by
- * discovering them through real submissions rather than hardcoded, mirroring `ocr.spec.ts`'s live-cap read —
- * there is no `GET` route exposing either number, so discovery is the only live-reading option available.
+ * The free- and paid-tier caps (`quotas.ai-free-monthly`/`quotas.ai-paid-daily`) are discovered through real submissions, as no `GET` route exposes them (see `ocr.spec.ts`).
  */
 
 const QUOTA_DISCOVERY_CEILING = 60;
@@ -56,7 +52,7 @@ async function getConsents(ctx: APIRequestContext): Promise<AiConsentView[]> {
   return ((await response.json()) as { consents: AiConsentView[] }).consents;
 }
 
-/** Submits distinct-id tasks until one is refused `AI_001`/`AI_002`, returning how many were admitted first — the live cap, read by discovery since no route exposes it directly. */
+/** Submits distinct-id tasks until one is refused `AI_001`/`AI_002`, returning how many were admitted first: the live cap. */
 async function discoverQuotaCap(ctx: APIRequestContext, exhaustedCode: 'AI_001' | 'AI_002'): Promise<number> {
   for (let admitted = 0; admitted < QUOTA_DISCOVERY_CEILING; admitted++) {
     const response = await submitAiTask(ctx, `quota discovery probe ${admitted}`);
@@ -198,12 +194,7 @@ test.describe('memoir ai', () => {
     const scheduledQuery = await memoirMutate(persona.ctx, 'put', '/api/v1/ai/scheduled-query', { data: { queryText: 'summarize my week', active: true } });
     await expectRefusal(scheduledQuery, 402, 'AI_005');
 
-    /**
-     * There is no `GET /ai/results/{id}` route — `ai.controller.ts` exposes only `POST /results/:id/apply`,
-     * which is where `AI_006` (result not found) is actually thrown (`ai-result.service.ts:70`). The backlog's
-     * "GET /ai/results/{id} 404s AI_006" bullet does not match a route that exists; this proves the same
-     * not-found guarantee through the route that really carries it.
-     */
+    /** There is no `GET /ai/results/{id}`; `AI_006` (result not found) is thrown by `POST /results/:id/apply`, so the not-found guarantee is proven through that route. */
     const applyMissing = await memoirMutate(persona.ctx, 'post', '/api/v1/ai/results/999999999999/apply', { data: { suggestionIndex: 0 } });
     await expectRefusal(applyMissing, 404, 'AI_006');
   });

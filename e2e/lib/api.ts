@@ -30,21 +30,7 @@ export interface PollWindow {
   intervalMs?: number;
 }
 
-/**
- * Declaring the constants
- *
- * Helpers for driving the platform's JSON APIs directly from a spec, without a browser page. `apiContext` hands
- * back a Playwright `APIRequestContext` already pointed at a product and (optionally) carrying a persona's saved
- * session; `mutate` performs the double-submit CSRF dance every mutating request needs once a session cookie is
- * present; `pollUntil` waits out async work.
- */
-
-/**
- * An `APIRequestContext` for `product`, optionally authenticated as `persona`. The self-signed local CA is
- * tolerated the same way the browser projects tolerate it. When `persona` is given but its storage state has not
- * been produced yet (setup skipped), the context is created without it rather than throwing — the caller's own
- * auth assertion then fails meaningfully instead of a file-not-found surfacing here.
- */
+/** An `APIRequestContext` for `product`; without `persona`'s storage state (setup skipped) it is created unauthenticated, so the caller's own auth assertion fails. */
 export async function apiContext(product: ProductKey, persona?: LoginPersona, options: ApiContextOptions = {}): Promise<APIRequestContext> {
   const baseURL = requireProductUrl(product);
   const statePath = persona ? storageStateFor(persona) : undefined;
@@ -54,10 +40,8 @@ export async function apiContext(product: ProductKey, persona?: LoginPersona, op
 }
 
 /**
- * Reads the `csrf-token` cookie's token half for `host` out of `ctx`'s jar. The cookie value is `expiry(radix36):hex`; the
- * server compares the `x-csrf-token` header against the `hex` half alone (`CSRFTokenService.validateToken`), so that is what
- * we echo back. A persona's storage state holds one `csrf-token` per app, so the lookup must be scoped to the target host.
- * Returns `undefined` when no session cookie has caused a token to be issued yet.
+ * The `csrf-token` cookie's token half for `host`. The cookie value is `expiry(radix36):hex` and the server compares `x-csrf-token` against the `hex` half alone
+ * (`CSRFTokenService.validateToken`). A persona's storage state holds one `csrf-token` per app, so the lookup is scoped to the host.
  */
 async function readCsrfToken(ctx: APIRequestContext, host: string): Promise<string | undefined> {
   const { cookies } = await ctx.storageState();
@@ -66,11 +50,9 @@ async function readCsrfToken(ctx: APIRequestContext, host: string): Promise<stri
 }
 
 /**
- * The double-submit header for `ctx`'s `csrf-token` cookie, minting one by GETting `seedPath` first — the CSRF
- * middleware only issues (and only enforces) a token once the request already carries a session cookie, so this is a
- * no-op on an unauthenticated context, where CSRF is not enforced anyway. Take the header once and reuse it when
- * firing concurrent mutations: each seeding GET reissues the cookie, so a request racing another's reissue would echo
- * a token the jar no longer holds and be refused.
+ * The double-submit header for `ctx`, minting the token by GETting `seedPath` first. Take it once and reuse it for concurrent mutations: each seeding GET
+ * reissues the cookie, so a request racing another's reissue would echo a token the jar no longer holds and be refused.
+ * CSRF is only issued and enforced once the request carries a session cookie, so this is a no-op on an unauthenticated context.
  */
 export async function csrfHeaders(ctx: APIRequestContext, seedPath = '/api/auth/session'): Promise<Record<string, string>> {
   const seed = await ctx.get(seedPath);
@@ -78,16 +60,12 @@ export async function csrfHeaders(ctx: APIRequestContext, seedPath = '/api/auth/
   return token ? { 'x-csrf-token': token } : {};
 }
 
-/** Performs a mutating request with the double-submit CSRF token attached. */
 export async function mutate(ctx: APIRequestContext, method: MutationMethod, url: string, options: MutateOptions = {}): Promise<APIResponse> {
   const headers = { ...(await csrfHeaders(ctx, options.csrfSeedPath)), ...options.headers };
   return ctx[method](url, { headers, ...(options.data === undefined ? {} : { data: options.data }) });
 }
 
-/**
- * Polls `probe` until `done` accepts its result or the budget runs out, returning the last result either way —
- * so a caller asserts on the settled value and gets its own message on a timeout rather than a thrown one.
- */
+/** Returns the last result whether or not `done` accepted it, so a caller asserts on the settled value instead of getting a thrown timeout. */
 export async function pollUntil<T>(probe: () => Promise<T>, done: (value: T) => boolean, options: PollWindow = {}): Promise<T> {
   const intervalMs = options.intervalMs ?? 2_000;
   const deadline = Date.now() + (options.timeoutMs ?? 300_000);

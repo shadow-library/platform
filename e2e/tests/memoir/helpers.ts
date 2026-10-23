@@ -35,12 +35,8 @@ export interface DeltaPage {
 }
 
 /**
- * Declaring the constants
- *
- * A memoir-scoped replacement for `lib/api.ts`'s `mutate` — see `tests/web-novel/helpers.ts`'s `webNovelMutate`
- * for why this is necessary rather than reusing the shared one directly: the seeded personas carry a
- * `csrf-token` cookie per app they hold a session for (novel-forge, web-novel, and now memoir too), and the
- * shared helper's cookie lookup has no origin filter, so it nondeterministically echoes a foreign-origin token.
+ * A memoir-scoped replacement for `lib/api.ts`'s `mutate`: the shared helper's cookie lookup has no origin filter, so it can echo a foreign app's `csrf-token` (see
+ * `webNovelMutate`).
  */
 export async function memoirMutate(ctx: APIRequestContext, method: MutationMethod, url: string, options: MemoirMutateOptions = {}): Promise<APIResponse> {
   const headers = { ...(await memoirCsrfHeaders(ctx, options.csrfSeedPath)), ...options.headers };
@@ -48,8 +44,8 @@ export async function memoirMutate(ctx: APIRequestContext, method: MutationMetho
 }
 
 /**
- * Seeds memoir's CSRF cookie and returns the matching header. Each seed may rotate the token, so requests fired concurrently on one
- * context must share a single seed taken beforehand — seeding per request lets a later seed invalidate an earlier request's header (`S010`).
+ * Seeds memoir's CSRF cookie and returns the header. A seed may rotate the token, so concurrent requests on one context must share one seed taken beforehand, or a later seed
+ * invalidates an earlier header (`S010`).
  */
 export async function memoirCsrfHeaders(ctx: APIRequestContext, seedPath = '/api/auth/session'): Promise<Record<string, string>> {
   await ctx.get(seedPath);
@@ -61,7 +57,6 @@ export async function memoirCsrfHeaders(ctx: APIRequestContext, seedPath = '/api
   return token ? { 'x-csrf-token': token } : {};
 }
 
-/** Today's UTC date in `YYYY-MM-DD` — the account day of every harness persona, which `ensureOnboarded` puts on UTC. */
 export function todayLocal(): string {
   return new Date().toISOString().slice(0, 10);
 }
@@ -70,10 +65,7 @@ export function commandEnvelope(type: string, payload: Record<string, unknown>, 
   return { commandId: crypto.randomUUID(), type, payload, localDate: todayLocal(), ...overrides };
 }
 
-/**
- * Posts one sync batch and hands back the raw response, for callers asserting on a refusal or racing the request. Pass `csrfHeaders`
- * from {@link memoirCsrfHeaders} when firing several at once.
- */
+/** Posts one sync batch and returns the raw response, for refusals or racing; pass `csrfHeaders` from {@link memoirCsrfHeaders} when firing several at once. */
 export function postCommands(ctx: APIRequestContext, commands: CommandEnvelopeInput[], csrfHeaders?: Record<string, string>): Promise<APIResponse> {
   if (csrfHeaders) return ctx.post('/api/v1/sync/commands', { headers: csrfHeaders, data: { commands } });
   return memoirMutate(ctx, 'post', '/api/v1/sync/commands', { data: { commands } });
@@ -102,7 +94,6 @@ export async function submitCommand(
   return outcome;
 }
 
-/** How many memoir-database backends are currently waiting on a lock `pid` holds. */
 export async function waitersBlockedBy(pid: number): Promise<number> {
   const [row] = await memoirDb()<{ waiters: number }[]>`SELECT count(*)::int AS waiters FROM pg_stat_activity WHERE ${pid}::int = ANY(pg_blocking_pids(pid))`;
   return row?.waiters ?? 0;
@@ -122,7 +113,7 @@ export interface PullDeltaOptions {
   limit?: number;
 }
 
-/** Like {@link pullDelta}, but exposes `domains`/`limit` and the raw response — for cursor-paging and header assertions `pullDelta`/`pullFullDelta` have no room for. */
+/** Like {@link pullDelta} but exposes `domains`/`limit` and the raw response, for cursor-paging and header assertions. */
 export async function pullDeltaWith(ctx: APIRequestContext, options: PullDeltaOptions = {}): Promise<{ response: APIResponse; page: DeltaPage }> {
   const params = new URLSearchParams({ since: options.since ?? '0' });
   if (options.domains) params.set('domains', options.domains);
@@ -152,10 +143,7 @@ export async function errorCodeOf(response: APIResponse): Promise<string | undef
   return typeof body.code === 'string' ? body.code : undefined;
 }
 
-/**
- * `quest_logs` delta rows carry `questId` and `date` — there is no `occurrenceId` column — so an occurrence
- * is looked up by reassembling the id the client sends, never by a field the wire does not have.
- */
+/** `quest_logs` delta rows carry `questId` and `date` but no `occurrenceId`, so an occurrence is looked up by reassembling the id the client sends. */
 export function hasQuestLogFor(delta: DeltaPage, occurrenceId: string): boolean {
   const logs = delta.domains['quest_logs'] ?? [];
   return logs.some(log => `${String(log['questId'])}:${String(log['date'])}` === occurrenceId);
@@ -188,10 +176,7 @@ export async function getAccount(ctx: APIRequestContext): Promise<AccountView> {
   return (await response.json()) as AccountView;
 }
 
-/**
- * Completes onboarding for the caller if it has not already run — the account is provisioned lazily on first
- * touch, so a spec driving a persona needs this to guarantee an onboarded account without depending on run order.
- */
+/** Completes onboarding if it has not run (the account is provisioned lazily), so a spec does not depend on run order. */
 export async function ensureOnboarded(ctx: APIRequestContext): Promise<AccountView> {
   const account = await getAccount(ctx);
   if (account.onboardingCompletedAt) return account;

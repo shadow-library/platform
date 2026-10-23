@@ -46,13 +46,9 @@ interface ExchangeFixture {
 }
 
 /**
- * Declaring the constants
- *
- * RFC 8693 delegation: a first-party back end trades a user's access token for one addressed to another application, carrying
- * the same user but naming itself as the actor. Each test builds its own caller and target applications, declares the target's
- * scopes and grants them to the caller, and mints subject tokens through the authorization-code flow on a database-minted
- * session. Subject tokens are deliberately short-lived (60 s, the client TTL floor) so the exchanged lifetime can be checked
- * against the subject's remainder rather than against the caller's own hour-long ceiling.
+ * RFC 8693 delegation: a first-party back end trades a user's access token for one addressed to another application, naming itself as actor. Each test builds its own caller and
+ * target applications and mints subject tokens through the authorization-code flow on a database-minted session. Subject tokens are short-lived (60 s, the client TTL floor) so
+ * the exchanged lifetime is checked against the subject's remainder rather than the caller's hour-long ceiling.
  */
 
 const SUBJECT_TOKEN_TTL = 60;
