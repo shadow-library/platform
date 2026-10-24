@@ -111,7 +111,14 @@ export class CatalogAdminController {
     if (body.expectedFingerprint !== undefined && body.expectNoDraft) {
       throw AppErrorCode.SYN_INVALID_REQUEST.create({ param: 'expectNoDraft', reason: 'a save expects either an existing draft or none, not both' });
     }
-    const expected = { ...(body.expectedFingerprint !== undefined && { fingerprint: body.expectedFingerprint }), ...(body.expectNoDraft && { noDraft: true }) };
+    if (body.expectedActiveVersion !== undefined && !body.expectNoDraft) {
+      throw AppErrorCode.SYN_INVALID_REQUEST.create({ param: 'expectedActiveVersion', reason: 'pinning the active version requires expectNoDraft' });
+    }
+    const expected = {
+      ...(body.expectedFingerprint !== undefined && { fingerprint: body.expectedFingerprint }),
+      ...(body.expectNoDraft && { noDraft: true }),
+      ...(body.expectedActiveVersion !== undefined && { activeVersion: body.expectedActiveVersion }),
+    };
     const granted = await this.caller.permissions(user, DRAFT_PERMISSIONS, DRAFT_SENSITIVE_PERMISSIONS);
     return this.withIssues(response, async () => {
       const saved = await this.catalog.saveDraft(body.document, body.note, user.sub, draftAuthorizer(granted), expected);

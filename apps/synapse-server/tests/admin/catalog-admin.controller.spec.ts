@@ -141,6 +141,37 @@ describe('CatalogAdminController', () => {
       expect(repository.rows.filter(row => row.state === 'DRAFT')).toHaveLength(0);
     });
 
+    it('should pass the pinned active version through and refuse the save once another version is active', async () => {
+      repository.seed(catalogDocument(), 1);
+      const reply = new FakeReply().asResponse();
+      const saved = await asPrincipal(userWith('admin'), () =>
+        controller.saveDraft({ document: catalogDocument() as never, expectNoDraft: true, expectedActiveVersion: 1 }, reply),
+      );
+      expect(saved).toHaveProperty('fingerprint');
+      await asPrincipal(userWith('admin'), () => controller.discardDraft({ fingerprint: (saved as { fingerprint: string }).fingerprint }));
+      await asPrincipal(userWith('admin'), () => controller.publishBudgets({ budgets: catalogDocument().budgets as never, expectedVersion: 1 }, new FakeReply().asResponse()));
+
+      await expectFailure(
+        asPrincipal(userWith('admin'), () =>
+          controller.saveDraft({ document: catalogDocument() as never, expectNoDraft: true, expectedActiveVersion: 1 }, new FakeReply().asResponse()),
+        ),
+        AppErrorCode.SYN_CATALOG_CONFLICT,
+      );
+    });
+
+    it('should refuse a pinned active version without expectNoDraft', async () => {
+      await expectFailure(
+        asPrincipal(userWith('admin'), () => controller.saveDraft({ document: catalogDocument() as never, expectedActiveVersion: 1 }, new FakeReply().asResponse())),
+        AppErrorCode.SYN_INVALID_REQUEST,
+      );
+      await expectFailure(
+        asPrincipal(userWith('admin'), () =>
+          controller.saveDraft({ document: catalogDocument() as never, expectedFingerprint: 'x', expectedActiveVersion: 1 }, new FakeReply().asResponse()),
+        ),
+        AppErrorCode.SYN_INVALID_REQUEST,
+      );
+    });
+
     it('should save an invalid document and report its issues instead of failing', async () => {
       const reply = new FakeReply();
       const saved = (await save('operator', withUnknownModel, reply)) as { issues: { code: string; path: string }[] };

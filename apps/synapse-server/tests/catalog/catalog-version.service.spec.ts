@@ -178,6 +178,59 @@ describe('CatalogVersionService.saveDraft expectation', () => {
     await expectFailure(service.saveDraft(catalogDocument(withOpusMax), undefined, 'admin-2', allowAll, { noDraft: true }), AppErrorCode.SYN_CATALOG_CONFLICT);
   });
 
+  it('should save when the pinned active version is still active', async () => {
+    repository.seed(catalogDocument(), 1);
+
+    const saved = await service.saveDraft(catalogDocument(withOpusMax), undefined, 'admin-1', allowAll, { noDraft: true, activeVersion: 1 });
+
+    expect(saved.draft.state).toBe('DRAFT');
+  });
+
+  it('should refuse a pinned save after a budget-only publish created a newer version', async () => {
+    repository.seed(catalogDocument(), 1);
+    await service.publishBudgets(catalogDocument().budgets, 1, undefined, 'finance-1');
+
+    await expectFailure(service.saveDraft(catalogDocument(withOpusMax), undefined, 'admin-1', allowAll, { noDraft: true, activeVersion: 1 }), AppErrorCode.SYN_CATALOG_CONFLICT);
+
+    expect(states()).toEqual(['v1:ARCHIVED', 'v2:PUBLISHED']);
+  });
+
+  it('should refuse a pinned save after a publish or a rollback moved the active version', async () => {
+    repository.seed(catalogDocument(), 1);
+    await service.saveDraft(catalogDocument(withOpusMax), undefined, 'admin-1', allowAll);
+    await service.publish('admin-1', (await service.getDraft())!.fingerprint);
+    await expectFailure(service.saveDraft(catalogDocument(), undefined, 'admin-1', allowAll, { noDraft: true, activeVersion: 1 }), AppErrorCode.SYN_CATALOG_CONFLICT);
+
+    await service.rollback(1, 'admin-1');
+    await expectFailure(service.saveDraft(catalogDocument(), undefined, 'admin-1', allowAll, { noDraft: true, activeVersion: 2 }), AppErrorCode.SYN_CATALOG_CONFLICT);
+    await service.saveDraft(catalogDocument(), undefined, 'admin-1', allowAll, { noDraft: true, activeVersion: 3 });
+  });
+
+  it('should refuse a pinned save when there is no active version', async () => {
+    await expectFailure(service.saveDraft(catalogDocument(), undefined, 'admin-1', allowAll, { noDraft: true, activeVersion: 1 }), AppErrorCode.SYN_CATALOG_CONFLICT);
+
+    expect(repository.rows).toHaveLength(0);
+  });
+
+  it('should read the active version under the lock', async () => {
+    repository.seed(catalogDocument(), 1);
+    repository.beforeExclusive = () => {
+      repository.rows[0]!.state = 'ARCHIVED';
+      repository.seed(catalogDocument(), 2);
+    };
+
+    await expectFailure(service.saveDraft(catalogDocument(withOpusMax), undefined, 'admin-1', allowAll, { noDraft: true, activeVersion: 1 }), AppErrorCode.SYN_CATALOG_CONFLICT);
+  });
+
+  it('should ignore the active version when the saver pins none', async () => {
+    repository.seed(catalogDocument(), 1);
+    await service.publishBudgets(catalogDocument().budgets, 1, undefined, 'finance-1');
+
+    const saved = await service.saveDraft(catalogDocument(withOpusMax), undefined, 'admin-1', allowAll, { noDraft: true });
+
+    expect(saved.draft.state).toBe('DRAFT');
+  });
+
   it('should refuse a stale save before asking the authorizer', async () => {
     await service.saveDraft(catalogDocument(), undefined, 'admin-1', allowAll);
     let authorized = false;

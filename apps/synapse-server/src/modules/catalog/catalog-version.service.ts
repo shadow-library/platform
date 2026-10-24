@@ -25,10 +25,11 @@ export interface SavedDraft extends DraftView {
   issues: CatalogIssue[];
 }
 
-/** What the saver last saw: the draft's fingerprint, or that no draft existed. A save made against anything else is refused. */
+/** What the saver last saw: the draft's fingerprint, or that no draft existed and which version was active. A save made against anything else is refused. */
 export interface DraftExpectation {
   fingerprint?: string;
   noDraft?: boolean;
+  activeVersion?: number;
 }
 
 export interface DraftDiff extends CatalogDiff {
@@ -39,8 +40,9 @@ export interface DraftDiff extends CatalogDiff {
 /** Throws to refuse the save, e.g. when the caller lacks the permission a changed section needs */
 export type DraftAuthorizer = (changed: Set<CatalogSection>) => void | Promise<void>;
 
-function assertExpected(existing: Catalog.Version | undefined, expected: DraftExpectation): void {
+function assertExpected(existing: Catalog.Version | undefined, active: Catalog.Version | undefined, expected: DraftExpectation): void {
   if (expected.noDraft && existing) throw AppErrorCode.SYN_CATALOG_CONFLICT.create();
+  if (expected.activeVersion !== undefined && active?.version !== expected.activeVersion) throw AppErrorCode.SYN_CATALOG_CONFLICT.create();
   if (expected.fingerprint === undefined) return;
   if (!existing || catalogFingerprint(existing.document) !== expected.fingerprint) throw AppErrorCode.SYN_CATALOG_CONFLICT.create();
 }
@@ -99,8 +101,8 @@ export class CatalogVersionService {
     const values = { document, note: note ?? null, createdBy: actor };
     const saved = await this.repository.exclusive(async store => {
       const existing = await store.findDraft();
-      assertExpected(existing, expected);
       const activeRow = await store.findActive();
+      assertExpected(existing, activeRow, expected);
       await authorize(changedSections(document, existing?.document ?? activeRow?.document ?? null));
       const active = activeRow ? this.parseActive(activeRow) : null;
       const check = await checkPublishable(document, active, ids => store.findCredentials(ids));
