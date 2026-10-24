@@ -881,7 +881,7 @@ export const SEED_CATALOG_DATA = utils.object.deepFreeze<Omit<CatalogDocument, '
     },
     'novel-forge.image': {
       label: 'Illustrations and covers',
-      description: 'Generates images for covers and scenes from your descriptions.',
+      description: 'Generates book covers and illustrations of your characters, places and scenes from your descriptions.',
       kind: 'image',
       requires: ['image_output'],
       dataPolicy: 'any',
