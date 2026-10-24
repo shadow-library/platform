@@ -1,20 +1,23 @@
 import { type APIRequestContext, type APIResponse } from '@playwright/test';
 
 import {
+  addIdentitySessionCookies,
   enrollTotp,
   findSessionBySecret,
   identityDb,
   identityMutate,
   type IdentityUser,
   linkFederatedIdentity,
+  requireProductUrl,
   signInWithPassword,
   stepUp,
   TotpAuthenticator,
   totpCode,
+  useClientIp,
   verifyChallenge,
 } from '../../lib';
 import { expect, test } from './fixtures';
-import { expectErrorCode, expectNoSessionCookie, expectSealedEnvelope, expectSessionCookie, flowStepOf, maxOutboxId, pollOutboxRowAfter } from './helpers';
+import { expectErrorCode, expectNoSessionCookie, expectSealedEnvelope, expectSessionCookie, fillOtp, flowStepOf, maxOutboxId, pollOutboxRowAfter } from './helpers';
 
 interface MfaSummary {
   enrollments: { type: string; label: string }[];
@@ -149,6 +152,35 @@ test.describe('identity MFA — TOTP enrolment', () => {
     expect(await removed.json()).toEqual({ success: true });
     expect((await mfaSummary(ctx)).enrollments).toEqual([]);
     expect(await enrolmentRows(user.userId)).toEqual([]);
+  });
+});
+
+test.describe('identity MFA — account UI', () => {
+  test('should step a password-only session up before enrolling a first authenticator through the account UI', async ({ context, identity, page }) => {
+    const user = await identity.createUser({ label: 'totp-ui' });
+    const { session, ctx } = await identity.signIn(user);
+    await addIdentitySessionCookies(context, session);
+    await useClientIp(context, identity.clientIp);
+
+    await page.goto(`${requireProductUrl('identity')}/account/security`);
+    const stepUpDialog = page.getByRole('dialog').filter({ hasText: 'Confirm it’s you' });
+    // The page is server-rendered, so a click before hydration attaches the handler does nothing: retry until the step-up dialog opens.
+    await expect(async () => {
+      await page.getByRole('button', { name: 'Set up', exact: true }).click();
+      await expect(stepUpDialog).toBeVisible({ timeout: 8_000 });
+    }).toPass({ timeout: 40_000, intervals: [0] });
+    expect(await isElevated(session.sessionId), 'opening the dialog must not elevate on its own').toBe(false);
+
+    await stepUpDialog.getByLabel('Password', { exact: true }).fill(user.password);
+    await stepUpDialog.getByRole('button', { name: 'Confirm' }).click();
+
+    await expect(page.getByRole('heading', { name: 'Set up authenticator app' })).toBeVisible();
+    const secret = (await page.locator('code').textContent())?.trim() ?? '';
+    expect(secret).not.toBe('');
+    await fillOtp(page, totpCode(secret));
+
+    await expect(page.getByRole('heading', { name: /Save your recovery codes/i })).toBeVisible();
+    expect((await mfaSummary(ctx)).enrollments).toEqual([expect.objectContaining({ type: 'TOTP' })]);
   });
 });
 

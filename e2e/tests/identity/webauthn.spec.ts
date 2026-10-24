@@ -327,9 +327,9 @@ test.describe('identity WebAuthn — removal', () => {
 });
 
 test.describe('identity WebAuthn — account UI', () => {
-  test('should add a passkey through the account UI on a Chrome virtual authenticator', async ({ context, identity, page }) => {
+  test('should step a password-only session up and add a passkey through the account UI on a Chrome virtual authenticator', async ({ context, identity, page }) => {
     const user = await identity.createUser({ label: 'passkey-ui' });
-    const { session } = await identity.signIn(user, { aal: 'AAL2' });
+    const { session } = await identity.signIn(user);
     await addIdentitySessionCookies(context, session);
     await useClientIp(context, identity.clientIp);
 
@@ -344,12 +344,16 @@ test.describe('identity WebAuthn — account UI', () => {
     await page.goto(`${requireProductUrl('identity')}/account/security`);
     await expect(page.getByText(/No passkeys yet/i)).toBeVisible();
 
-    // The page is server-rendered, so a click before hydration attaches the handler does nothing: retry until the ceremony starts (the credential count proves exactly once). A
-    // first factor hands back recovery codes, so the page shows those instead of the passkey list.
+    // The page is server-rendered, so a click before hydration attaches the handler does nothing: retry until the step-up dialog opens. A first factor hands back recovery codes,
+    // so the page shows those instead of the passkey list.
+    const stepUpDialog = page.getByRole('dialog').filter({ hasText: 'Confirm it’s you' });
     await expect(async () => {
       await page.getByRole('button', { name: 'Add a passkey' }).click();
-      await expect(page.getByRole('heading', { name: /Save your recovery codes/i })).toBeVisible({ timeout: 8_000 });
+      await expect(stepUpDialog).toBeVisible({ timeout: 8_000 });
     }).toPass({ timeout: 40_000, intervals: [0] });
+    await stepUpDialog.getByLabel('Password', { exact: true }).fill(user.password);
+    await stepUpDialog.getByRole('button', { name: 'Confirm' }).click();
+    await expect(page.getByRole('heading', { name: /Save your recovery codes/i })).toBeVisible();
     expect(await credentialRows(user.userId), 'the browser ceremony registered exactly one credential').toHaveLength(1);
 
     await page.reload();

@@ -6,6 +6,7 @@ import { Button, Dialog, FormField, Input, OtpInput, Spinner, toast } from '@sha
 import { LockIcon } from '@/components/icons';
 import { assertPasskey } from '@/features/auth';
 import { meKeys, requestPasskeyStepUpOptions, type StepUpIntent, type StepUpMethod, useMeQuery, useStepUpMethodsQuery, useStepUpMutation, verifyPasskeyStepUp } from '@/lib/apis';
+import { isElevationLive } from '@/lib/elevation';
 
 import styles from './portal.module.css';
 
@@ -167,7 +168,7 @@ export function useStepUpGate(): { require: (action: () => void) => void; dialog
   const methods = useStepUpMethodsQuery(pending !== null);
 
   const require = (action: () => void): void => {
-    if (me.data?.elevated) action();
+    if (isElevationLive(me.data)) action();
     else setPending(() => action);
   };
 

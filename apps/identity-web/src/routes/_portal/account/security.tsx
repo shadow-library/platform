@@ -78,22 +78,23 @@ function SecurityPage(): React.JSX.Element {
     }
   };
 
-  const activateTotp = (value: string): void => {
-    totpActivate.mutate(value, {
-      onSuccess: result => {
-        setEnrollment(null);
-        setCode('');
-        if (result.recoveryCodes?.length) {
-          setSecretCodes(result.recoveryCodes);
-          setView('secret');
-        } else {
-          setView('default');
-          toast.success('Authenticator app added');
-        }
-      },
-      onError: error => toast.danger(error.message),
-    });
-  };
+  const activateTotp = (value: string): void =>
+    require(() =>
+      totpActivate.mutate(value, {
+        onSuccess: result => {
+          setEnrollment(null);
+          setCode('');
+          if (result.recoveryCodes?.length) {
+            setSecretCodes(result.recoveryCodes);
+            setView('secret');
+          } else {
+            setView('default');
+            toast.success('Authenticator app added');
+          }
+        },
+        onError: error => toast.danger(error.message),
+      }),
+    );
 
   const addPasskey = async (): Promise<void> => {
     try {
@@ -176,6 +177,7 @@ function SecurityPage(): React.JSX.Element {
             Activate authenticator
           </Button>
         </div>
+        {dialog}
       </div>
     );
 
@@ -213,7 +215,7 @@ function SecurityPage(): React.JSX.Element {
               Active
             </Badge>
           ) : (
-            <Button variant="secondary" size="sm" loading={totpEnroll.isPending} onClick={startTotp}>
+            <Button variant="secondary" size="sm" loading={totpEnroll.isPending} onClick={() => require(() => void startTotp())}>
               Set up
             </Button>
           )}
@@ -240,7 +242,7 @@ function SecurityPage(): React.JSX.Element {
             <div className={styles.cardTitle}>Passkeys</div>
             <div className={styles.cardSub}>Phishing-resistant sign-in with your device.</div>
           </div>
-          <Button variant="secondary" size="sm" loading={registerOptions.isPending || registerVerify.isPending} onClick={addPasskey}>
+          <Button variant="secondary" size="sm" loading={registerOptions.isPending || registerVerify.isPending} onClick={() => require(() => void addPasskey())}>
             Add a passkey
           </Button>
         </div>
