@@ -1,0 +1,169 @@
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.notice {
+  margin-bottom: 20px;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.search {
+  width: 280px;
+  max-width: 100%;
+}
+
+.problem {
+  margin: 0;
+  color: var(--sh-danger-text);
+}
+
+.disabledTrigger {
+  display: inline-flex;
+}
+
+.usageTrigger {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--sh-text-primary);
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.usageCard {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.usageHeading {
+  margin: 0 0 4px;
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-tertiary);
+}
+
+.usageList {
+  margin: 0;
+  padding-left: 18px;
+  font-size: var(--sh-text-body-sm);
+}
+
+.issues {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+.details {
+  margin-top: 8px;
+  font-size: var(--sh-text-body-sm);
+}
+
+.details summary {
+  cursor: pointer;
+}
+
+.compareLabel {
+  color: var(--sh-text-secondary);
+}
+
+.cheapest {
+  color: var(--sh-success-text);
+  font-weight: 600;
+}
+
+.cheapestNote {
+  font-weight: 400;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.formSection {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.formSectionTitle {
+  margin: 0;
+  font-size: var(--sh-text-h3);
+  line-height: var(--sh-text-h3--line-height);
+  font-weight: 600;
+}
+
+.formSectionHint {
+  margin: 4px 0 0;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-tertiary);
+}
+
+.formRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.formGrow {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+.deployments {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.deployment {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.deploymentPosition {
+  min-width: 20px;
+  line-height: var(--sh-control-height-md);
+  color: var(--sh-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.deploymentProvider {
+  flex: 1 1 160px;
+  min-width: 0;
+}
+
+.deploymentId {
+  flex: 2 1 200px;
+  min-width: 0;
+}
+
+.deploymentActions {
+  display: flex;
+  gap: 4px;
+  min-height: var(--sh-control-height-md);
+  align-items: center;
+}

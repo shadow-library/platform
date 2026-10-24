@@ -3,12 +3,12 @@ import { type ReactElement } from 'react';
 
 import { prefetchActiveCatalog } from '@/features/catalog';
 import { ModelsScreen } from '@/features/models';
-import { loadCapabilities } from '@/lib';
+import { draftQueryOptions, loadCapabilities } from '@/lib';
 
 export const Route = createFileRoute('/_app/models/')({
   loader: async ({ context: { queryClient } }) => {
     const capabilities = await loadCapabilities(queryClient);
-    if (capabilities.readCatalog) await prefetchActiveCatalog(queryClient);
+    if (capabilities.readCatalog) await Promise.all([queryClient.prefetchQuery(draftQueryOptions()), prefetchActiveCatalog(queryClient)]);
   },
   head: () => ({ meta: [{ title: 'Models · Shadow Synapse' }] }),
   component: ModelsRoute,
