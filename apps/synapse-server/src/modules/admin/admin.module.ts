@@ -8,6 +8,8 @@ import { CredentialsModule } from '@modules/credentials';
 
 import { AccessController } from './access.controller';
 import { AliasImpactService } from './alias-impact.service';
+import { BudgetStatusService } from './budget-status.service';
+import { BudgetsController } from './budgets.controller';
 import { CallerService } from './caller.service';
 import { CatalogAdminController } from './catalog-admin.controller';
 import { CatalogController } from './catalog.controller';
@@ -21,7 +23,7 @@ import { UsageService } from './usage.service';
 
 @Module({
   imports: [AuthModule, CatalogModule, CredentialsModule, DatabaseModule, FastifyModule],
-  controllers: [AccessController, CatalogController, CatalogAdminController, UsageController, ProvidersController, CredentialsController],
-  providers: [CallerService, CatalogViewService, LedgerReportRepository, AliasImpactService, UsageService, ProvidersViewService],
+  controllers: [AccessController, CatalogController, CatalogAdminController, UsageController, ProvidersController, CredentialsController, BudgetsController],
+  providers: [CallerService, CatalogViewService, LedgerReportRepository, AliasImpactService, UsageService, ProvidersViewService, BudgetStatusService],
 })
 export class AdminModule {}

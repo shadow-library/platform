@@ -3,6 +3,7 @@ import { describe, expect, it } from 'bun:test';
 import { AUTH_ROUTE_METADATA, type RequiredAuthRoute } from '@shadow-library/auth/module';
 
 import { AccessController } from '@modules/admin/access.controller';
+import { BudgetsController } from '@modules/admin/budgets.controller';
 import { CatalogAdminController } from '@modules/admin/catalog-admin.controller';
 import { CatalogController } from '@modules/admin/catalog.controller';
 import { CredentialsController } from '@modules/admin/credentials.controller';
@@ -14,7 +15,7 @@ interface DeclaredRoute {
   auth: RequiredAuthRoute | undefined;
 }
 
-const CONTROLLERS = [AccessController, CatalogController, CatalogAdminController, UsageController, ProvidersController, CredentialsController];
+const CONTROLLERS = [AccessController, CatalogController, CatalogAdminController, UsageController, ProvidersController, CredentialsController, BudgetsController];
 
 function basePath(controller: object): string {
   for (const key of Reflect.getMetadataKeys(controller)) {
@@ -53,6 +54,7 @@ const PERMISSIONS: Record<string, string> = {
   'GET /api/v1/admin/catalog/aliases/:key/impact': 'synapse:catalog:read',
   'GET /api/v1/admin/usage': 'synapse:usage:read',
   'GET /api/v1/admin/usage/series': 'synapse:usage:read',
+  'GET /api/v1/admin/budgets/status': 'synapse:usage:read',
   'GET /api/v1/admin/providers': 'synapse:catalog:read',
 };
 

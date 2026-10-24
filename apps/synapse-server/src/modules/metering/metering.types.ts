@@ -12,10 +12,13 @@ export interface BudgetCounterKey {
   windowStart: Date;
 }
 
-export interface BudgetAdmissionRequest {
-  key: BudgetCounterKey;
+export interface BudgetLimits {
   maxCalls?: number;
   maxListCostUsd?: number;
+}
+
+export interface BudgetAdmissionRequest extends BudgetLimits {
+  key: BudgetCounterKey;
 }
 
 export interface BudgetCounterReading {

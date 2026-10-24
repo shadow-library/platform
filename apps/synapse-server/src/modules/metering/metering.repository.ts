@@ -5,7 +5,15 @@ import { DatabaseService } from '@shadow-library/modules';
 import { type Ledger, type PrimaryDatabase, schema } from '@server/database';
 
 import { usdLiteral } from './cost.util';
-import { type BudgetAdmissionRequest, type BudgetCounterKey, type BudgetRefusal, type LedgerSweepCutoffs, type LedgerSweepResult, UNSETTLED_ERROR_CODE } from './metering.types';
+import {
+  type BudgetAdmissionRequest,
+  type BudgetCounterKey,
+  type BudgetLimits,
+  type BudgetRefusal,
+  type LedgerSweepCutoffs,
+  type LedgerSweepResult,
+  UNSETTLED_ERROR_CODE,
+} from './metering.types';
 
 export type LedgerSettlementValues = Omit<Partial<Ledger.NewEntry>, 'requestId' | 'app' | 'subjectType' | 'subjectId' | 'task' | 'createdAt'>;
 
@@ -15,7 +23,7 @@ const ledger = schema.ledger;
 /** Transaction-scoped, so a replica that dies mid-sweep never leaves the lock held */
 const RETENTION_LOCK = sql`select pg_try_advisory_xact_lock(hashtext('synapse:retention')) as locked`;
 
-function counterMatches(key: BudgetCounterKey): SQL | undefined {
+export function budgetCounterMatches(key: BudgetCounterKey): SQL | undefined {
   return and(
     eq(counters.app, key.app),
     eq(counters.subjectType, key.subjectType),
@@ -25,11 +33,12 @@ function counterMatches(key: BudgetCounterKey): SQL | undefined {
   );
 }
 
-function belowLimits(request: BudgetAdmissionRequest): SQL | undefined {
-  const limits: SQL[] = [];
-  if (request.maxCalls !== undefined) limits.push(sql`${counters.calls} < ${request.maxCalls}`);
-  if (request.maxListCostUsd !== undefined) limits.push(sql`${counters.listCostUsd} < ${usdLiteral(request.maxListCostUsd)}::numeric`);
-  return and(...limits);
+/** Admission's own test, so a report of counters at their limit matches what admission refuses; `undefined` when no limit is set */
+export function belowBudgetLimits(limits: BudgetLimits): SQL | undefined {
+  const conditions: SQL[] = [];
+  if (limits.maxCalls !== undefined) conditions.push(sql`${counters.calls} < ${limits.maxCalls}`);
+  if (limits.maxListCostUsd !== undefined) conditions.push(sql`${counters.listCostUsd} < ${usdLiteral(limits.maxListCostUsd)}::numeric`);
+  return and(...conditions);
 }
 
 @Injectable()
@@ -64,12 +73,12 @@ export class MeteringRepository {
             .onConflictDoUpdate({
               target: [counters.app, counters.subjectType, counters.subjectId, counters.window, counters.windowStart],
               set: { calls: sql`${counters.calls} + 1` },
-              setWhere: belowLimits(request),
+              setWhere: belowBudgetLimits(request),
             })
             .returning({ calls: counters.calls });
           if (admitted.length > 0) continue;
 
-          const [counter] = await tx.select({ calls: counters.calls, listCostUsd: counters.listCostUsd }).from(counters).where(counterMatches(request.key));
+          const [counter] = await tx.select({ calls: counters.calls, listCostUsd: counters.listCostUsd }).from(counters).where(budgetCounterMatches(request.key));
           refusal = { request, ...(counter ? { counter } : {}) };
           tx.rollback();
         }
@@ -94,7 +103,7 @@ export class MeteringRepository {
           await tx
             .update(counters)
             .set({ listCostUsd: sql`${counters.listCostUsd} + ${usdLiteral(listCostUsd)}::numeric` })
-            .where(counterMatches(key));
+            .where(budgetCounterMatches(key));
         }
       }),
     );

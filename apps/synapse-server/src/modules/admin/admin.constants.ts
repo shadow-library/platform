@@ -16,3 +16,4 @@ export const MAX_USAGE_RANGE_DAYS = 400;
 
 export const MAX_SELECTOR_PAIRS = 16;
 export const SELECTOR_TOKEN = /^[A-Za-z0-9_.-]{1,64}$/;
+export const BUDGET_TOP_SUBJECTS = 10;

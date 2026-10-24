@@ -5,19 +5,15 @@ import { type BudgetSpec } from '@modules/catalog';
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 
-import { windowStart } from './budget-window.util';
+import { appCounterKey, windowStart } from './budget-window.util';
 import { type LedgerSettlementValues, MeteringRepository } from './metering.repository';
 import { type BudgetAdmissionInput, type BudgetAdmissionRequest, type BudgetCounterKey, type BudgetRefusal, type LedgerClaim, type Settlement } from './metering.types';
 
 function admissionRequest(budget: BudgetSpec, input: BudgetAdmissionInput): BudgetAdmissionRequest {
-  const perApp = budget.per === 'app';
-  const key: BudgetCounterKey = {
-    app: input.app,
-    subjectType: perApp ? 'app' : input.subject.type,
-    subjectId: perApp ? input.app : input.subject.id,
-    window: budget.window,
-    windowStart: windowStart(budget.window, input.now),
-  };
+  const key: BudgetCounterKey =
+    budget.per === 'app'
+      ? appCounterKey(input.app, budget.window, input.now)
+      : { app: input.app, subjectType: input.subject.type, subjectId: input.subject.id, window: budget.window, windowStart: windowStart(budget.window, input.now) };
   return {
     key,
     ...(budget.maxCalls === undefined ? {} : { maxCalls: budget.maxCalls }),
