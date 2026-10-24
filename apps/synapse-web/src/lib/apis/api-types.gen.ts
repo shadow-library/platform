@@ -827,6 +827,8 @@ export interface components {
       expectedFingerprint?: string;
       /** @description The save starts a new draft; it is refused with 409 when a draft already exists */
       expectNoDraft?: boolean;
+      /** @description The active version the document was built from; requires expectNoDraft and cannot be combined with expectedFingerprint. The save is refused with 409 when the active version differs at save time, e.g. after a budget-only publish, so the draft cannot silently revert it */
+      expectedActiveVersion?: number;
     };
     SaveDraftResponse: {
       draft: components['schemas']['CatalogVersionDetailResponse'];
