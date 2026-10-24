@@ -8,7 +8,7 @@ const meta = {
   parameters: { layout: 'padded' },
   args: { value: 64, max: 100, label: 'Re-indexing' },
   argTypes: {
-    intent: { control: 'inline-radio', options: ['accent', 'success', 'danger'] },
+    intent: { control: 'inline-radio', options: ['accent', 'success', 'warning', 'danger'] },
     size: { control: 'inline-radio', options: ['sm', 'md'] },
     indeterminate: { control: 'boolean' },
   },
@@ -30,5 +30,7 @@ export const Labeled: Story = {};
 export const Bare: Story = { args: { label: undefined, value: 40 } };
 
 export const Complete: Story = { args: { value: 100, intent: 'success', label: 'Deployed' } };
+
+export const Warning: Story = { args: { value: 85, intent: 'warning', label: 'Quota used' } };
 
 export const Indeterminate: Story = { args: { indeterminate: true, label: 'Deploying…' } };

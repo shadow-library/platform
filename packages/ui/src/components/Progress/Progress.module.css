@@ -49,6 +49,9 @@
 .fill[data-intent='success'] {
   background: var(--sh-success-solid);
 }
+.fill[data-intent='warning'] {
+  background: var(--sh-warning-solid);
+}
 .fill[data-intent='danger'] {
   background: var(--sh-danger-solid);
 }

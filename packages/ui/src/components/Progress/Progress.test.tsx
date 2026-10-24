@@ -42,6 +42,11 @@ describe('Progress', () => {
     expect(screen.getByText('Experience')).toBeInTheDocument();
   });
 
+  it('should apply the warning intent to the fill', () => {
+    render(<Progress value={85} intent="warning" aria-label="Quota" />);
+    expect(screen.getByRole('progressbar').firstElementChild).toHaveAttribute('data-intent', 'warning');
+  });
+
   it('clamps the percentage to 0–100', () => {
     render(<Progress value={150} max={100} label="Full" />);
     expect(screen.getByText('100%')).toBeInTheDocument();

@@ -1,6 +1,6 @@
 import { type ComponentPropsWithoutRef, type ReactNode } from 'react';
 
-export type ProgressIntent = 'accent' | 'success' | 'danger';
+export type ProgressIntent = 'accent' | 'success' | 'warning' | 'danger';
 export type ProgressSize = 'sm' | 'md';
 
 export interface ProgressProps extends Omit<ComponentPropsWithoutRef<'div'>, 'children'> {
