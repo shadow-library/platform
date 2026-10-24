@@ -172,10 +172,17 @@ describe('buildSeedCatalog', () => {
     }
   });
 
+  it('should label and describe every seeded task', () => {
+    for (const task of Object.values(STANDARD_SEED.tasks)) {
+      expect(task.label?.trim()).toBeTruthy();
+      expect(task.description?.trim()).toBeTruthy();
+    }
+  });
+
   it('should preserve the embedding pin and route both memoir tasks to Llama', () => {
     expect(STANDARD_SEED.tasks['novel-forge.embedding']!.pinned).toBe(true);
     for (const task of ['memoir.insight', 'memoir.receipt-structuring']) {
-      expect(STANDARD_SEED.tasks[task]).toEqual({ kind: 'chat', requires: ['structured_output'], dataPolicy: 'any', routes: [{ model: 'llama3.1' }] });
+      expect(STANDARD_SEED.tasks[task]).toMatchObject({ kind: 'chat', requires: ['structured_output'], dataPolicy: 'any', routes: [{ model: 'llama3.1' }] });
     }
   });
 

@@ -159,6 +159,56 @@ describe('parseCatalogDocument', () => {
     ]);
   });
 
+  it('should accept a task label and description', () => {
+    const result = parseWith(document => {
+      document.tasks['novel-forge.chat'].label = 'Chat';
+      document.tasks['novel-forge.chat'].description = 'Talks through ideas with you.';
+    });
+    expect(issuesOf(result)).toEqual([]);
+    expect(result.ok && result.document.tasks['novel-forge.chat']).toMatchObject({ label: 'Chat', description: 'Talks through ideas with you.' });
+  });
+
+  it('should reject a task label or description of the wrong type', () => {
+    const result = parseWith(document => {
+      document.tasks['novel-forge.chat'].label = 7;
+      document.tasks['novel-forge.chat'].description = ['x'];
+    });
+    expect(issuesOf(result)).toEqual([
+      { path: 'tasks.novel-forge.chat.label', code: 'invalid_type' },
+      { path: 'tasks.novel-forge.chat.description', code: 'invalid_type' },
+    ]);
+  });
+
+  it('should reject a task label past 60 characters and a description past 280', () => {
+    const result = parseWith(document => {
+      document.tasks['novel-forge.chat'].label = 'a'.repeat(61);
+      document.tasks['novel-forge.chat'].description = 'a'.repeat(281);
+    });
+    expect(issuesOf(result)).toEqual([
+      { path: 'tasks.novel-forge.chat.label', code: 'invalid_value' },
+      { path: 'tasks.novel-forge.chat.description', code: 'invalid_value' },
+    ]);
+  });
+
+  it('should accept a task label of exactly 60 characters and a description of exactly 280', () => {
+    const result = parseWith(document => {
+      document.tasks['novel-forge.chat'].label = 'a'.repeat(60);
+      document.tasks['novel-forge.chat'].description = 'a'.repeat(280);
+    });
+    expect(issuesOf(result)).toEqual([]);
+  });
+
+  it('should reject an empty or whitespace-only task label or description', () => {
+    const result = parseWith(document => {
+      document.tasks['novel-forge.chat'].label = '';
+      document.tasks['novel-forge.chat'].description = '   ';
+    });
+    expect(issuesOf(result)).toEqual([
+      { path: 'tasks.novel-forge.chat.label', code: 'invalid_value' },
+      { path: 'tasks.novel-forge.chat.description', code: 'invalid_value' },
+    ]);
+  });
+
   it('should reject a task key without an app prefix', () => {
     const result = parseWith(document => {
       document.tasks.chat = document.tasks['novel-forge.chat'];

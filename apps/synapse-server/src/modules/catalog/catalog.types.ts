@@ -86,6 +86,8 @@ export interface TaskRoute {
 }
 
 export interface TaskSpec {
+  label?: string;
+  description?: string;
   kind: TaskKind;
   requires: Capability[];
   effort?: TaskEffort;

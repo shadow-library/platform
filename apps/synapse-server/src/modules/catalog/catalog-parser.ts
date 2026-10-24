@@ -38,6 +38,8 @@ interface NumberRule {
   min: number;
 }
 
+const TASK_LABEL_MAX = 60;
+const TASK_DESCRIPTION_MAX = 280;
 const KEY_PATTERN = /^[A-Za-z0-9][\w.:/@-]*$/;
 const TASK_KEY_PATTERN = /^[a-z0-9][a-z0-9-]*\.[a-z0-9][a-z0-9._-]*$/;
 const URL_PROTOCOLS = ['http:', 'https:'];
@@ -92,7 +94,17 @@ const EMBEDDING_FIELDS = keysOf<keyof NonNullable<ModelCapabilities['embedding']
 const PRICE_FIELDS = keysOf<keyof ModelPrice>({ input: true, cachedInput: true, output: true, perImage: true });
 const DEPLOYMENT_FIELDS = keysOf<keyof ModelDeployment>({ provider: true, id: true });
 const ALIAS_FIELDS = keysOf<keyof AliasSpec>({ label: true, description: true, model: true, showVersion: true, state: true, available: true });
-const TASK_FIELDS = keysOf<keyof TaskSpec>({ kind: true, requires: true, effort: true, dataPolicy: true, aliases: true, pinned: true, routes: true });
+const TASK_FIELDS = keysOf<keyof TaskSpec>({
+  label: true,
+  description: true,
+  kind: true,
+  requires: true,
+  effort: true,
+  dataPolicy: true,
+  aliases: true,
+  pinned: true,
+  routes: true,
+});
 const EFFORT_FIELDS = keysOf<keyof TaskEffort>({ default: true, min: true, max: true });
 const ROUTE_FIELDS = keysOf<keyof TaskRoute>({ when: true, model: true });
 const BUDGET_FIELDS = keysOf<keyof BudgetSpec>({ app: true, per: true, window: true, maxCalls: true, maxListCostUsd: true });
@@ -206,6 +218,8 @@ class CatalogParser {
 
   private readonly task: Reader<TaskSpec> = (value, path) =>
     this.object(value, path, TASK_FIELDS, fields => ({
+      label: fields.optional('label', this.boundedText(TASK_LABEL_MAX)),
+      description: fields.optional('description', this.boundedText(TASK_DESCRIPTION_MAX)),
       kind: fields.required('kind', this.literal(TASK_KINDS)),
       requires: fields.required('requires', this.array(this.literal(CAPABILITIES))),
       effort: fields.optional('effort', this.effort),
@@ -263,6 +277,14 @@ class CatalogParser {
       if (typeof value !== 'string') return this.mismatch(value, path, 'a string', allowed[0] as T);
       if (!allowed.includes(value as T)) this.report(path, 'invalid_value', `Expected one of ${allowed.join(', ')}`);
       return value as T;
+    };
+  }
+
+  private boundedText(max: number): Reader<string> {
+    return (value, path) => {
+      const text = this.text(value, path);
+      if (text.length > max) this.report(path, 'invalid_value', `Expected at most ${max} characters`);
+      return text;
     };
   }
 

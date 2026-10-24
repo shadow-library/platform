@@ -586,6 +586,8 @@ export const SEED_CATALOG_DATA = utils.object.deepFreeze<Omit<CatalogDocument, '
   },
   tasks: {
     'novel-forge.writing': {
+      label: 'Chapter writing',
+      description: "Writes and rewrites chapter prose in your story's voice.",
       kind: 'chat',
       requires: ['streaming'],
       dataPolicy: 'any',
@@ -643,6 +645,8 @@ export const SEED_CATALOG_DATA = utils.object.deepFreeze<Omit<CatalogDocument, '
       ],
     },
     'novel-forge.planning': {
+      label: 'Story planning',
+      description: 'Builds your premise, outline, chapter plan and story bible, and pulls characters and facts out of your text.',
       kind: 'chat',
       requires: ['structured_output'],
       dataPolicy: 'any',
@@ -700,6 +704,8 @@ export const SEED_CATALOG_DATA = utils.object.deepFreeze<Omit<CatalogDocument, '
       ],
     },
     'novel-forge.review': {
+      label: 'Manuscript review',
+      description: 'Checks chapters for quality, continuity and consistency with your story bible.',
       kind: 'chat',
       requires: ['structured_output'],
       dataPolicy: 'any',
@@ -757,6 +763,8 @@ export const SEED_CATALOG_DATA = utils.object.deepFreeze<Omit<CatalogDocument, '
       ],
     },
     'novel-forge.chat': {
+      label: 'Chat',
+      description: 'Talks through ideas with you as a writing coach.',
       kind: 'chat',
       requires: ['tools', 'streaming'],
       dataPolicy: 'any',
@@ -815,6 +823,8 @@ export const SEED_CATALOG_DATA = utils.object.deepFreeze<Omit<CatalogDocument, '
       ],
     },
     'novel-forge.helper': {
+      label: 'Quick helper',
+      description: 'Handles small background jobs such as chapter titles, condensing context, and composing image prompts.',
       kind: 'chat',
       requires: [],
       dataPolicy: 'any',
@@ -870,6 +880,8 @@ export const SEED_CATALOG_DATA = utils.object.deepFreeze<Omit<CatalogDocument, '
       ],
     },
     'novel-forge.image': {
+      label: 'Illustrations and covers',
+      description: 'Generates images for covers and scenes from your descriptions.',
       kind: 'image',
       requires: ['image_output'],
       dataPolicy: 'any',
@@ -922,6 +934,8 @@ export const SEED_CATALOG_DATA = utils.object.deepFreeze<Omit<CatalogDocument, '
       ],
     },
     'novel-forge.vision': {
+      label: 'Image understanding',
+      description: "Looks at a reference image you upload and writes down the subject's appearance.",
       kind: 'chat',
       requires: ['vision'],
       effort: { default: 'none' },
@@ -975,6 +989,8 @@ export const SEED_CATALOG_DATA = utils.object.deepFreeze<Omit<CatalogDocument, '
       ],
     },
     'novel-forge.embedding': {
+      label: 'Story search',
+      description: 'Indexes your story so related notes and passages can be found by meaning.',
       kind: 'embedding',
       requires: ['embedding'],
       dataPolicy: 'any',
@@ -1028,6 +1044,8 @@ export const SEED_CATALOG_DATA = utils.object.deepFreeze<Omit<CatalogDocument, '
       ],
     },
     'memoir.insight': {
+      label: 'Insight',
+      description: 'Answers your questions about your habits and quests, with patterns and suggested next steps.',
       kind: 'chat',
       requires: ['structured_output'],
       dataPolicy: 'any',
@@ -1038,6 +1056,8 @@ export const SEED_CATALOG_DATA = utils.object.deepFreeze<Omit<CatalogDocument, '
       ],
     },
     'memoir.receipt-structuring': {
+      label: 'Receipt structuring',
+      description: 'Reads scanned receipt text and fills in the total, merchant, category, date and line items.',
       kind: 'chat',
       requires: ['structured_output'],
       dataPolicy: 'any',
