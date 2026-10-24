@@ -1,10 +1,10 @@
-import { and, type AnyColumn, asc, desc, eq, gte, lt, ne, sql } from 'drizzle-orm';
+import { and, type AnyColumn, asc, desc, eq, gte, lt, ne, type SQL, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { type PrimaryDatabase, schema } from '@server/database';
 
-import { type UsageGroup } from './admin.constants';
+import { type SeriesGroup, type UsageGroup } from './admin.constants';
 import { type TokenTotals } from '@modules/catalog';
 
 export interface UsageRow extends TokenTotals {
@@ -13,6 +13,15 @@ export interface UsageRow extends TokenTotals {
   reasoningTokens: number;
   listCostUsd: number;
   billedCostUsd: number;
+}
+
+export interface UsageFilter {
+  app?: string;
+  task?: string;
+}
+
+export interface SeriesRow extends UsageRow {
+  day: string;
 }
 
 export interface AliasUsageRow extends TokenTotals {
@@ -43,6 +52,23 @@ const SETTLED = ne(ledger.status, 'pending');
 /** Sums are cast to float8 because the driver hands back bigint and numeric sums as strings. */
 const total = (column: AnyColumn): ReturnType<typeof sql<number>> => sql<number>`coalesce(sum(${column}), 0)::float8`;
 
+const USAGE_COLUMNS = {
+  calls: sql<number>`count(*)::int`,
+  inputTokens: total(ledger.inputTokens),
+  cachedInputTokens: total(ledger.cachedInputTokens),
+  outputTokens: total(ledger.outputTokens),
+  reasoningTokens: total(ledger.reasoningTokens),
+  listCostUsd: total(ledger.listCostUsd),
+  billedCostUsd: total(ledger.billedCostUsd),
+};
+
+function filterConditions(filter: UsageFilter): SQL[] {
+  const conditions: SQL[] = [];
+  if (filter.app !== undefined) conditions.push(eq(ledger.app, filter.app));
+  if (filter.task !== undefined) conditions.push(eq(ledger.task, filter.task));
+  return conditions;
+}
+
 @Injectable()
 export class LedgerReportRepository {
   private readonly db: PrimaryDatabase;
@@ -51,25 +77,34 @@ export class LedgerReportRepository {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
 
-  usage(group: UsageGroup, from: Date, to: Date): Promise<UsageRow[]> {
+  usage(group: UsageGroup, from: Date, to: Date, filter: UsageFilter = {}): Promise<UsageRow[]> {
     const key = GROUP_EXPRESSIONS[group];
     const order = group === 'day' ? [asc(sql`key`)] : [desc(total(ledger.listCostUsd)), asc(sql`key`)];
     return this.databaseService.run(() =>
       this.db
         .select({
           key: sql<string | null>`${key}`.as('key'),
-          calls: sql<number>`count(*)::int`,
-          inputTokens: total(ledger.inputTokens),
-          cachedInputTokens: total(ledger.cachedInputTokens),
-          outputTokens: total(ledger.outputTokens),
-          reasoningTokens: total(ledger.reasoningTokens),
-          listCostUsd: total(ledger.listCostUsd),
-          billedCostUsd: total(ledger.billedCostUsd),
+          ...USAGE_COLUMNS,
         })
         .from(ledger)
-        .where(and(gte(ledger.createdAt, from), lt(ledger.createdAt, to), SETTLED))
+        .where(and(gte(ledger.createdAt, from), lt(ledger.createdAt, to), SETTLED, ...filterConditions(filter)))
         .groupBy(sql`key`)
         .orderBy(...order),
+    );
+  }
+
+  usageSeries(group: SeriesGroup, from: Date, to: Date, filter: UsageFilter = {}): Promise<SeriesRow[]> {
+    return this.databaseService.run(() =>
+      this.db
+        .select({
+          key: sql<string | null>`${GROUP_EXPRESSIONS[group]}`.as('key'),
+          day: sql<string>`${GROUP_EXPRESSIONS.day}`.as('day'),
+          ...USAGE_COLUMNS,
+        })
+        .from(ledger)
+        .where(and(gte(ledger.createdAt, from), lt(ledger.createdAt, to), SETTLED, ...filterConditions(filter)))
+        .groupBy(sql`key`, sql`day`)
+        .orderBy(asc(sql`day`), asc(sql`key`)),
     );
   }
 

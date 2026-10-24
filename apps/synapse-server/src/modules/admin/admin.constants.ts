@@ -2,6 +2,10 @@ export const USAGE_GROUPS = ['app', 'task', 'alias', 'model', 'provider', 'day']
 
 export type UsageGroup = (typeof USAGE_GROUPS)[number];
 
+export const SERIES_GROUPS = ['app', 'task', 'alias', 'model', 'provider'] as const;
+
+export type SeriesGroup = (typeof SERIES_GROUPS)[number];
+
 export const DAY_MS = 86_400_000;
 export const HOUR_MS = 3_600_000;
 

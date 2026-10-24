@@ -94,5 +94,5 @@ export function fakeCache(document: CatalogDocument = catalogDocument(), version
 }
 
 export function fakeLedger(overrides: Partial<Record<keyof LedgerReportRepository, unknown>> = {}): LedgerReportRepository {
-  return { usage: async () => [], aliasUsage: async () => [], providerOutcomes: async () => [], ...overrides } as unknown as LedgerReportRepository;
+  return { usage: async () => [], usageSeries: async () => [], aliasUsage: async () => [], providerOutcomes: async () => [], ...overrides } as unknown as LedgerReportRepository;
 }

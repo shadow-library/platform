@@ -52,6 +52,7 @@ const PERMISSIONS: Record<string, string> = {
   'POST /api/v1/admin/catalog/versions/:version/rollback': 'synapse:catalog:publish',
   'GET /api/v1/admin/catalog/aliases/:key/impact': 'synapse:catalog:read',
   'GET /api/v1/admin/usage': 'synapse:usage:read',
+  'GET /api/v1/admin/usage/series': 'synapse:usage:read',
   'GET /api/v1/admin/providers': 'synapse:catalog:read',
 };
 
