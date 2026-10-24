@@ -238,6 +238,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/admin/usage/series': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Usage Series */
+    get: operations['get_api_v1_admin_usage_series'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/admin/providers': {
     parameters: {
       query?: never;
@@ -336,6 +353,23 @@ export interface paths {
     put?: never;
     /** Test Credential */
     post: operations['post_api_v1_admin_credentials_id_test'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/budgets/status': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Status */
+    get: operations['get_api_v1_admin_budgets_status'];
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -885,6 +919,34 @@ export interface components {
       /** @description Cost actually charged, in USD; zero for free providers */
       billedCostUsd: number;
     };
+    UsageSeriesResponse: {
+      /** Format: date-time */
+      from: string;
+      /** Format: date-time */
+      to: string;
+      groupBy: string;
+      /** @description Every UTC calendar day (YYYY-MM-DD) touched by the half-open range, in order */
+      days: string[];
+      /** @description Ordered by list cost, highest first, then key; the null key last */
+      series: components['schemas']['UsageSeriesEntryResponse'][];
+      totals: components['schemas']['UsageTotalsResponse'];
+    };
+    UsageSeriesEntryResponse: {
+      /** @description The group value; null for requests that never named an alias, model or provider */
+      key: string | null;
+      /** @description Exactly one point per entry of `days`, in the same order; days without requests are zero */
+      points: components['schemas']['UsageSeriesPointResponse'][];
+      totals: components['schemas']['UsageTotalsResponse'];
+    };
+    UsageSeriesPointResponse: {
+      /** @description The UTC calendar day, YYYY-MM-DD */
+      day: string;
+      calls: number;
+      /** @description Cost at catalog list prices, in USD */
+      listCostUsd: number;
+      /** @description Cost actually charged, in USD; zero for free providers */
+      billedCostUsd: number;
+    };
     ProvidersResponse: {
       /** @description Version of the active catalog the providers come from */
       catalogVersion: number;
@@ -992,6 +1054,69 @@ export interface components {
       message: string;
       /** @description Keys of the providers in the published catalog that still name the credential */
       referencedBy: string[];
+    };
+    BudgetStatusResponse: {
+      /** @description Version of the active catalog the budgets come from */
+      catalogVersion: number;
+      budgets: components['schemas']['BudgetStatusEntryResponse'][];
+    };
+    BudgetStatusEntryResponse: {
+      /** @description Position of the budget in the active catalog's budgets */
+      index: number;
+      app: string;
+      /** @enum {string} */
+      per: 'subject' | 'app';
+      /** @enum {string} */
+      window: '1h' | '1d' | '30d';
+      maxCalls?: number;
+      /** @description Limit on list-price cost in USD */
+      maxListCostUsd?: number;
+      /**
+       * Format: date-time
+       * @description Start of the current window. Windows are fixed UTC buckets counted from the epoch, so 30d is not a calendar month
+       */
+      windowStart: string;
+      /**
+       * Format: date-time
+       * @description When the current window ends and its counters start again from zero
+       */
+      windowEnd: string;
+      /** @description Usage in the current window, shaped by `kind`, which matches `per`. Budgets of one app, scope and window share their counters and each reports them against its own limits */
+      usage: components['schemas']['AppBudgetUsageResponse'] | components['schemas']['SubjectBudgetUsageResponse'];
+    };
+    AppBudgetUsageResponse: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      kind: 'app';
+      /** @description Calls admitted in the window, including any still in flight; zero when the app made none */
+      calls: number;
+      /** @description Cost at catalog list prices in USD, which budgets count: a free subscription call still adds to it */
+      listCostUsd: number;
+    };
+    SubjectBudgetUsageResponse: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      kind: 'subject';
+      /** @description Subjects with at least one call in the window */
+      activeSubjects: number;
+      /** @description Subjects whose next call this budget refuses: calls at maxCalls or cost at maxListCostUsd, whichever are set */
+      atLimit: number;
+      /** @description At most 10 subjects, by cost then calls, highest first */
+      top: components['schemas']['BudgetSubjectCounterResponse'][];
+    };
+    BudgetSubjectCounterResponse: {
+      /** @description owner, user or app */
+      subjectType: string;
+      /** @description The calling app's opaque id for the subject */
+      subjectId: string;
+      /** @description Calls admitted in the window, including any still in flight */
+      calls: number;
+      /** @description Cost at catalog list prices in USD, which budgets count: a free subscription call still adds to it */
+      listCostUsd: number;
     };
     AuthAccessResponse: {
       /**
@@ -1665,6 +1790,10 @@ export interface operations {
         from?: string;
         /** @description End of the range, exclusive, in the same formats. Defaults to now. The range cannot exceed 400 days */
         to?: string;
+        /** @description Only count requests from this app, matched exactly. Combines with every groupBy and with `task` */
+        app?: string;
+        /** @description Only count requests for this task id, matched exactly. Combines with every groupBy and with `app` */
+        task?: string;
         /** @description One of app, task, alias, model, provider, day. Defaults to app */
         groupBy?: string;
       };
@@ -1681,6 +1810,55 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['UsageResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_admin_usage_series: {
+    parameters: {
+      query?: {
+        /** @description Start of the range, inclusive: an ISO date (UTC midnight) or a date-time with an offset. Defaults to 30 days before `to` */
+        from?: string;
+        /** @description End of the range, exclusive, in the same formats. Defaults to now. The range cannot exceed 400 days */
+        to?: string;
+        /** @description Only count requests from this app, matched exactly. Combines with every groupBy and with `task` */
+        app?: string;
+        /** @description Only count requests for this task id, matched exactly. Combines with every groupBy and with `app` */
+        task?: string;
+        /** @description One of app, task, alias, model, provider. Defaults to app. Unlike the usage report, day is not a grouping: every series already has one point per day */
+        groupBy?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['UsageSeriesResponse'];
         };
       };
       /** @description Default Response */
@@ -2028,6 +2206,44 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['CredentialTestResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_admin_budgets_status: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BudgetStatusResponse'];
         };
       };
       /** @description Default Response */
@@ -2428,6 +2644,9 @@ export type AliasRetargetResponse = components['schemas']['AliasRetargetResponse
 export type UsageResponse = components['schemas']['UsageResponse'];
 export type UsageRowResponse = components['schemas']['UsageRowResponse'];
 export type UsageTotalsResponse = components['schemas']['UsageTotalsResponse'];
+export type UsageSeriesResponse = components['schemas']['UsageSeriesResponse'];
+export type UsageSeriesEntryResponse = components['schemas']['UsageSeriesEntryResponse'];
+export type UsageSeriesPointResponse = components['schemas']['UsageSeriesPointResponse'];
 export type ProvidersResponse = components['schemas']['ProvidersResponse'];
 export type ProviderResponse = components['schemas']['ProviderResponse'];
 export type CredentialListResponse = components['schemas']['CredentialListResponse'];
@@ -2438,6 +2657,11 @@ export type KeyringKeyResponse = components['schemas']['KeyringKeyResponse'];
 export type RotateCredentialBody = components['schemas']['RotateCredentialBody'];
 export type CredentialTestResponse = components['schemas']['CredentialTestResponse'];
 export type CredentialInUseResponse = components['schemas']['CredentialInUseResponse'];
+export type BudgetStatusResponse = components['schemas']['BudgetStatusResponse'];
+export type BudgetStatusEntryResponse = components['schemas']['BudgetStatusEntryResponse'];
+export type AppBudgetUsageResponse = components['schemas']['AppBudgetUsageResponse'];
+export type SubjectBudgetUsageResponse = components['schemas']['SubjectBudgetUsageResponse'];
+export type BudgetSubjectCounterResponse = components['schemas']['BudgetSubjectCounterResponse'];
 export type AuthAccessResponse = components['schemas']['AuthAccessResponse'];
 export type AuthLogoutResponse = components['schemas']['AuthLogoutResponse'];
 export type AuthSessionResponse = components['schemas']['AuthSessionResponse'];
@@ -2451,6 +2675,7 @@ export type GetVersionPathParams = Exclude<paths['/api/v1/admin/catalog/versions
 export type AliasImpactQueryParams = Exclude<paths['/api/v1/admin/catalog/aliases/{key}/impact']['get']['parameters']['query'], undefined>;
 export type AliasImpactPathParams = Exclude<paths['/api/v1/admin/catalog/aliases/{key}/impact']['get']['parameters']['path'], undefined>;
 export type GetUsageQueryParams = Exclude<paths['/api/v1/admin/usage']['get']['parameters']['query'], undefined>;
+export type GetUsageSeriesQueryParams = Exclude<paths['/api/v1/admin/usage/series']['get']['parameters']['query'], undefined>;
 export type GetCredentialPathParams = Exclude<paths['/api/v1/admin/credentials/{id}']['get']['parameters']['path'], undefined>;
 export type LoginQueryParams = Exclude<paths['/api/auth/login']['get']['parameters']['query'], undefined>;
 export type CallbackQueryParams = Exclude<paths['/api/auth/callback']['get']['parameters']['query'], undefined>;
