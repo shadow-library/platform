@@ -16,12 +16,14 @@ export interface ChartSeries {
   label: string;
   /** `neutral` paints an "Other" bucket in `--sh-chart-neutral` and takes no palette slot. */
   tone?: ChartSeriesTone;
+  /** Palette slot to pin this series' colour; defaults to its position */
+  slot?: number;
 }
 
 export interface ChartProps extends Omit<ComponentPropsWithoutRef<'div'>, 'children' | 'aria-label'> {
   type: ChartType;
   data: ChartDatum[];
-  /** Palette slots go to non-neutral series in order, so a series keeps its colour only at a stable index. Eight coloured series at most: fold the rest into a neutral one. */
+  /** Unpinned series take the lowest free palette slots in order; pin `slot` to keep a colour when the set changes. Eight coloured series at most: fold the rest into a neutral one. */
   series: ChartSeries[];
   /** Stacks bars and areas from the first series up; lines never stack. @default false */
   stacked?: boolean;

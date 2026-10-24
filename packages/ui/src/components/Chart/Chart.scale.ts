@@ -32,6 +32,7 @@ const LABEL_BUDGET_CHARS = 64;
 const LABEL_GAP_CHARS = 3;
 const MIN_LABELS = 2;
 const MAX_LABELS = 12;
+const PALETTE_SIZE = 8;
 
 export function niceTicks(max: number, intervals: number): ChartTicks {
   const ceiling = Number.isFinite(max) && max > 0 ? max : 1;
@@ -103,4 +104,19 @@ export function linePath(levels: readonly number[]): string {
 export function areaPath(upper: readonly number[], lower: readonly number[]): string {
   const back = lower.map((level, i) => ({ level, i })).reverse();
   return `${linePath(upper)}${back.map(({ level, i }) => `L${i + 0.5} ${100 - level}`).join('')}Z`;
+}
+
+const wrapSlot = (slot: number): number => ((((Math.round(slot) - 1) % PALETTE_SIZE) + PALETTE_SIZE) % PALETTE_SIZE) + 1;
+
+export function resolveSlots(series: readonly ChartSeries[]): string[] {
+  const coloured = series.filter(entry => entry.tone !== 'neutral');
+  const pinned = new Set(coloured.flatMap(entry => (entry.slot !== undefined && Number.isFinite(entry.slot) ? [wrapSlot(entry.slot)] : [])));
+  const free = Array.from({ length: PALETTE_SIZE }, (_, i) => i + 1).filter(slot => !pinned.has(slot));
+  const pool = free.length > 0 ? free : Array.from({ length: PALETTE_SIZE }, (_, i) => i + 1);
+  let next = 0;
+  return series.map(entry => {
+    if (entry.tone === 'neutral') return 'neutral';
+    if (entry.slot !== undefined && Number.isFinite(entry.slot)) return String(wrapSlot(entry.slot));
+    return String(pool[next++ % pool.length]);
+  });
 }

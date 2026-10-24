@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 
 import { Chart } from './Chart';
-import { columnTotal, domainMax, labelBox, niceTicks, planLabels, stackColumn } from './Chart.scale';
+import { columnTotal, domainMax, labelBox, niceTicks, planLabels, resolveSlots, stackColumn } from './Chart.scale';
 import { type ChartDatum, type ChartSeries } from './Chart.types';
 
 const SERIES: ChartSeries[] = [
@@ -84,6 +84,47 @@ describe('planLabels', () => {
   });
 });
 
+describe('resolveSlots', () => {
+  const plain = (...keys: string[]): ChartSeries[] => keys.map(key => ({ key, label: key }));
+
+  it('should number unpinned series by position and leave neutral out of the count', () => {
+    expect(resolveSlots([...plain('a'), { key: 'o', label: 'Other', tone: 'neutral' }, ...plain('b')])).toEqual(['1', 'neutral', '2']);
+  });
+
+  it('should honour a pinned slot and give the rest the lowest unpinned slots in order', () => {
+    const series = [{ key: 'a', label: 'a', slot: 1 }, ...plain('b', 'c'), { key: 'd', label: 'd', slot: 3 }];
+    expect(resolveSlots(series)).toEqual(['1', '2', '4', '3']);
+  });
+
+  it('should keep a pinned colour when the surrounding series change', () => {
+    const pinned = { key: 'x', label: 'x', slot: 5 };
+    expect(resolveSlots([...plain('a', 'b'), pinned])[2]).toBe('5');
+    expect(resolveSlots([pinned])[0]).toBe('5');
+  });
+
+  it('should wrap out-of-range and fractional slots modulo the palette', () => {
+    const slots = [9, 16, 0, -1, 2.4].map(slot => ({ key: String(slot), label: 'x', slot }));
+    expect(resolveSlots(slots)).toEqual(['1', '8', '8', '7', '2']);
+  });
+
+  it('should ignore a non-finite slot', () => {
+    expect(resolveSlots([{ key: 'a', label: 'a', slot: Number.NaN }])).toEqual(['1']);
+  });
+
+  it('should ignore the slot of a neutral series', () => {
+    expect(resolveSlots([{ key: 'o', label: 'o', tone: 'neutral', slot: 3 }, ...plain('a')])).toEqual(['neutral', '1']);
+  });
+
+  it('should cycle every slot when all eight are pinned and an unpinned series remains', () => {
+    const pinned = Array.from({ length: 8 }, (_, i) => ({ key: `p${i}`, label: 'p', slot: i + 1 }));
+    expect(resolveSlots([...pinned, ...plain('a')]).at(-1)).toBe('1');
+  });
+
+  it('should reuse the free slots once more than eight series are unpinned', () => {
+    expect(resolveSlots(plain(...'abcdefghi'.split(''))).at(-1)).toBe('1');
+  });
+});
+
 describe('Chart', () => {
   it('should render the empty state when there is no data', () => {
     render(<Chart type="bar" data={[]} series={SERIES} aria-label="Daily cost" />);
@@ -160,5 +201,11 @@ describe('Chart', () => {
     ).toEqual(['6', '1.5', '0', '7.5']);
     await user.keyboard('{Escape}');
     expect(document.querySelector('[data-side]')).toBeNull();
+  });
+
+  it('should paint a pinned series with its slot whatever its position', () => {
+    const { container } = render(<Chart type="bar" data={DATA} series={[{ key: 'memoir', label: 'Memoir', slot: 4 }]} aria-label="Daily cost" />);
+    expect(container.querySelector('[data-slot="4"]')).not.toBeNull();
+    expect(container.querySelector('[data-slot="1"]')).toBeNull();
   });
 });

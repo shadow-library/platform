@@ -5,10 +5,9 @@ import { cn, DEFAULT_LOCALE } from '@/lib';
 import { EmptyState } from '../EmptyState';
 import { Popover } from '../Popover';
 import styles from './Chart.module.css';
-import { areaPath, columnTotal, domainMax, labelBox, linePath, niceTicks, planLabels, readValue, stackColumn } from './Chart.scale';
+import { areaPath, columnTotal, domainMax, labelBox, linePath, niceTicks, planLabels, readValue, resolveSlots, stackColumn } from './Chart.scale';
 import { type ChartDatum, type ChartProps, type ChartSeries, type ChartType } from './Chart.types';
 
-const PALETTE_SIZE = 8;
 const DEFAULT_HEIGHT = 240;
 const PX_PER_TICK_INTERVAL = 60;
 const BAND_AIR = 0.15;
@@ -19,18 +18,13 @@ const formatDefaultValue = (value: number): string => VALUE_FORMAT.format(value)
 const formatDefaultTick = (value: number): string => TICK_FORMAT.format(value);
 const formatIdentity = (x: string): string => x;
 
-interface PlottedSeries extends ChartSeries {
+interface PlottedSeries extends Omit<ChartSeries, 'slot'> {
   slot: string;
 }
 
 function assignSlots(series: readonly ChartSeries[]): PlottedSeries[] {
-  let next = 0;
-  return series.map(entry => {
-    if (entry.tone === 'neutral') return { ...entry, slot: 'neutral' };
-    const slot = String((next % PALETTE_SIZE) + 1);
-    next++;
-    return { ...entry, slot };
-  });
+  const slots = resolveSlots(series);
+  return series.map((entry, i) => ({ ...entry, slot: slots[i] ?? 'neutral' }));
 }
 
 function bandStyle(index: number, count: number): CSSProperties {

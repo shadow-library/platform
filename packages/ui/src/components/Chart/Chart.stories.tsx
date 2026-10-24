@@ -67,6 +67,12 @@ export const SingleSeriesLine: Story = {
   args: { type: 'line', stacked: false, data: dailyCost(30), series: APPS.slice(0, 1), 'aria-label': 'Novel Forge daily cost' },
 };
 
+const PINNED_SLOTS: Record<string, number> = { 'novel-forge': 4, memoir: 2 };
+
+export const PinnedSlots: Story = {
+  args: { series: APPS.map(entry => ({ ...entry, slot: PINNED_SLOTS[entry.key] })), 'aria-label': 'Daily cost with pinned colours' },
+};
+
 export const StackedArea: Story = {
   args: { type: 'area', data: dailyCost(30) },
 };
