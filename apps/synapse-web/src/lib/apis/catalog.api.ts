@@ -27,6 +27,7 @@ export const catalogKeys = {
   version: (version: number) => [...catalogKeys.versions(), version],
   draft: () => [...catalogKeys.all, 'draft'],
   diff: () => [...catalogKeys.draft(), 'diff'],
+  validation: (fingerprint: string) => [...catalogKeys.draft(), 'validation', fingerprint],
   impact: (alias: string, model?: string) => [...catalogKeys.all, 'aliases', alias, 'impact', model ?? null],
 } as const;
 
@@ -102,6 +103,14 @@ export function useSaveDraftMutation(): UseMutationResult<CatalogWriteOutcome<Sa
   });
 }
 
+/** Validates whatever draft the server holds, so the result is keyed by the fingerprint the caller saw and re-run when it changes. */
+export const draftValidationQueryOptions = (fingerprint: string): UseQueryOptions<ValidateDraftResponse, ApiError> =>
+  queryOptions<ValidateDraftResponse, ApiError>({
+    queryKey: catalogKeys.validation(fingerprint),
+    queryFn: () => APIRequest.post('/admin/catalog/draft/validate').execute(),
+    staleTime: 0,
+  });
+
 export function useValidateDraftMutation(): UseMutationResult<ValidateDraftResponse, ApiError, undefined> {
   return useMutation<ValidateDraftResponse, ApiError, undefined>({ mutationFn: () => APIRequest.post('/admin/catalog/draft/validate').execute() });
 }
@@ -126,6 +135,13 @@ function useCatalogWrite<TVariables>(
 
 export function usePublishDraftMutation(): UseMutationResult<VersionOutcome, ApiError, string> {
   return useCatalogWrite<string>(fingerprint => APIRequest.post('/admin/catalog/draft/publish').body({ fingerprint }).modeled(UNPROCESSABLE).execute());
+}
+
+export const discardDraft = (fingerprint: string): Promise<undefined> => APIRequest.delete('/admin/catalog/draft').query({ fingerprint }).execute();
+
+export function useDiscardDraftMutation(): UseMutationResult<undefined, ApiError, string> {
+  const queryClient = useQueryClient();
+  return useMutation<undefined, ApiError, string>({ mutationFn: discardDraft, onSettled: () => queryClient.invalidateQueries({ queryKey: catalogKeys.all }) });
 }
 
 export function useRollbackMutation(): UseMutationResult<VersionOutcome, ApiError, number> {

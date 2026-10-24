@@ -1,0 +1,114 @@
+.notice {
+  margin-bottom: 20px;
+}
+
+.origin {
+  margin: 0;
+  color: var(--sh-text-secondary);
+}
+
+.note {
+  margin: 6px 0 0;
+  color: var(--sh-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.area {
+  margin-top: 28px;
+}
+
+.entities {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.lines {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-wrap: anywhere;
+}
+
+.before {
+  color: var(--sh-text-tertiary);
+  text-decoration: line-through;
+}
+
+.arrow {
+  margin: 0 6px;
+  color: var(--sh-text-tertiary);
+}
+
+.after {
+  color: var(--sh-text-primary);
+  font-weight: 600;
+}
+
+.issues {
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.issue {
+  padding: 10px 12px;
+  border: 1px solid var(--sh-border-subtle);
+  border-left: 3px solid var(--sh-danger-solid);
+  border-radius: var(--sh-radius-md);
+  background: var(--sh-surface-card);
+  overflow-wrap: anywhere;
+}
+
+.issueText {
+  color: var(--sh-danger-text);
+}
+
+.technical {
+  margin-top: 6px;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-tertiary);
+}
+
+.technical summary {
+  cursor: pointer;
+}
+
+.technicalBody {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-top: 4px;
+}
+
+.fix {
+  margin: 10px 0 0;
+  font-size: var(--sh-text-body-sm);
+}
+
+.problemLinks {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+.publishForm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.noteField {
+  flex: 1 1 320px;
+  max-width: 520px;
+}
+
+.stale {
+  margin-top: 14px;
+}
