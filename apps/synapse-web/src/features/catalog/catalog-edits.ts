@@ -47,11 +47,18 @@ function routeValue(route: TaskRoute): Entry {
   return when ? { when: { ...when }, model: route.model } : { model: route.model };
 }
 
+const PINNED_ROUTES = 'A pinned feature keeps its models: stored embeddings depend on them';
+
 /** The server refuses any change to a pinned task's routes, since stored vectors depend on their models, so this refuses it first. */
 export function withTaskRoutes(document: CatalogDocument, taskKey: string, routes: readonly TaskRoute[]): DocumentEdit {
-  return editEntry(document, 'tasks', taskKey, task =>
-    task.pinned === true ? 'A pinned feature keeps its models: stored embeddings depend on them' : withField(task, 'routes', routes.map(routeValue)),
-  );
+  return editEntry(document, 'tasks', taskKey, task => (task.pinned === true ? PINNED_ROUTES : withField(task, 'routes', routes.map(routeValue))));
+}
+
+export type RawTaskField = 'routes' | 'effort';
+
+/** Writes the value as given, so fields inside routes or effort that this console does not model survive a save; `undefined` removes the field. */
+export function withTaskFieldValue(document: CatalogDocument, taskKey: string, field: RawTaskField, value: unknown): DocumentEdit {
+  return editEntry(document, 'tasks', taskKey, task => (field === 'routes' && task.pinned === true ? PINNED_ROUTES : withField(task, field, value)));
 }
 
 export function withTaskEffort(document: CatalogDocument, taskKey: string, effort: TaskEffort | null): DocumentEdit {

@@ -2,6 +2,8 @@ export * from './cells';
 export * from './CostLabel';
 export * from './format';
 export * from './icons';
+export * from './model-options';
+export * from './ModelPicker';
 export * from './naming';
 export * from './notice.types';
 export * from './PageHeader';
