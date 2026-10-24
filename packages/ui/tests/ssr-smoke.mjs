@@ -47,6 +47,7 @@ const cases = [
   ['Spinner', h(UI.Spinner, null)],
   ['Kbd', h(UI.Kbd, { keys: 'mod+k' })],
   ['Statistic', h(UI.Statistic, { label: 'Revenue', value: 1234567 })],
+  ['Chart', h(UI.Chart, { type: 'line', data: [{ x: 'Mon', values: { a: 1 } }], series: [{ key: 'a', label: 'A' }], 'aria-label': 'Trend' })],
   ['Pagination', h(UI.Pagination, { page: 1, pageSize: 10, total: 1234, onPageChange() {} })],
   ['Calendar', h(UI.Calendar, null)],
   ['DatePicker', h(UI.DatePicker, null)],

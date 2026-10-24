@@ -166,6 +166,18 @@
   --sh-info-text: var(--sh-indigo-600);
   --sh-info-border: var(--sh-indigo-200);
 
+  /* ── Semantic · Chart categorical palette (light) ─────────── */
+  /* Slot order is the colour-blind safety mechanism (adjacent slots validated for CVD separation and 3:1 on card and app): append, never reorder. */
+  --sh-chart-1: #2a78d6;
+  --sh-chart-2: #e2602c;
+  --sh-chart-3: #199e70;
+  --sh-chart-4: #b97a00;
+  --sh-chart-5: #d55181;
+  --sh-chart-6: #008300;
+  --sh-chart-7: #6250d6;
+  --sh-chart-8: #e34948;
+  --sh-chart-neutral: var(--sh-neutral-500);
+
   /* ── Semantic · Focus (light) ─────────────────────────────── */
   --sh-focus-ring: var(--sh-indigo-500);
   --sh-focus-ring-width: 2px;
@@ -381,6 +393,16 @@
   --sh-info-text-on-subtle: var(--sh-indigo-300);
   --sh-info-text: var(--sh-indigo-400);
   --sh-info-border: rgb(91 92 235 / 0.3);
+
+  --sh-chart-1: #3987e5;
+  --sh-chart-2: #d95926;
+  --sh-chart-3: #199e70;
+  --sh-chart-4: #c98500;
+  --sh-chart-5: #d55181;
+  --sh-chart-6: #008300;
+  --sh-chart-7: #9085e9;
+  --sh-chart-8: #e66767;
+  --sh-chart-neutral: var(--sh-neutral-450);
 
   --sh-focus-ring: var(--sh-indigo-400);
   --sh-focus-field-ring: rgb(130 131 240 / 0.2);

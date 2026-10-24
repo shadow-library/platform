@@ -1,0 +1,339 @@
+/*
+ * Chart — every mark is placed in percentages of the plot box, so nothing is measured and SSR markup matches the client.
+ * Series colour flows through --series-color from the data-slot palette token; text always wears text tokens.
+ */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  color: var(--sh-text-tertiary);
+  font-size: var(--sh-text-caption);
+  line-height: var(--sh-text-caption--line-height);
+}
+
+.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.frame {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 8px;
+  row-gap: 8px;
+  padding-top: 8px;
+}
+
+.series[data-slot='1'] {
+  --series-color: var(--sh-chart-1);
+}
+.series[data-slot='2'] {
+  --series-color: var(--sh-chart-2);
+}
+.series[data-slot='3'] {
+  --series-color: var(--sh-chart-3);
+}
+.series[data-slot='4'] {
+  --series-color: var(--sh-chart-4);
+}
+.series[data-slot='5'] {
+  --series-color: var(--sh-chart-5);
+}
+.series[data-slot='6'] {
+  --series-color: var(--sh-chart-6);
+}
+.series[data-slot='7'] {
+  --series-color: var(--sh-chart-7);
+}
+.series[data-slot='8'] {
+  --series-color: var(--sh-chart-8);
+}
+.series[data-slot='neutral'] {
+  --series-color: var(--sh-chart-neutral);
+}
+
+.yAxis {
+  position: relative;
+  grid-row: 1;
+  grid-column: 1;
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
+.yTick {
+  position: absolute;
+  right: 0;
+  transform: translateY(50%);
+  white-space: nowrap;
+}
+
+/* In-flow but zero-height copies of the tick labels size the gutter to the widest one without measuring. */
+.ySizer {
+  display: block;
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  white-space: nowrap;
+}
+
+.canvas {
+  position: relative;
+  grid-row: 1;
+  grid-column: 2;
+}
+
+.marks {
+  position: absolute;
+  inset: 0;
+  forced-color-adjust: none;
+}
+
+.gridline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: var(--sh-border-width) solid var(--sh-border-default);
+}
+.gridline[data-baseline] {
+  border-top-color: var(--sh-border-strong);
+}
+
+.wash {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: var(--sh-radius-sm);
+  background: var(--sh-bg-hover);
+}
+
+.band {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 2px;
+  box-sizing: border-box;
+}
+
+.bar,
+.stack {
+  flex: 0 1 24px;
+  min-width: 0;
+}
+
+.bar {
+  border-radius: var(--sh-radius-sm) var(--sh-radius-sm) 0 0;
+  background: var(--series-color);
+}
+
+.stack {
+  display: flex;
+  flex-direction: column-reverse;
+}
+
+.segment {
+  flex: none;
+  box-sizing: border-box;
+  background: var(--series-color);
+  background-clip: padding-box;
+}
+.segment:not(:last-child) {
+  border-top: 2px solid transparent;
+}
+.segment:last-child {
+  border-radius: var(--sh-radius-sm) var(--sh-radius-sm) 0 0;
+}
+
+.svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.line {
+  fill: none;
+  stroke: var(--series-color);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.area {
+  fill: var(--series-color);
+  fill-opacity: 0.1;
+  stroke: none;
+}
+.area[data-stacked] {
+  fill-opacity: 0.24;
+}
+
+.crosshair {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: var(--sh-border-width) solid var(--sh-border-strong);
+}
+
+.dot {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--sh-radius-full);
+  background: var(--series-color);
+  box-shadow: 0 0 0 2px var(--sh-surface-card);
+  transform: translate(-50%, 50%);
+}
+
+.anchor {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  pointer-events: none;
+}
+
+.columns {
+  position: absolute;
+  inset: 0;
+}
+
+.column {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: var(--sh-radius-sm);
+  outline: none;
+}
+.column:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: calc(-1 * var(--sh-focus-ring-width));
+}
+
+.xAxis {
+  position: relative;
+  grid-row: 2;
+  grid-column: 2;
+  height: var(--sh-text-caption--line-height);
+}
+
+.xTick {
+  position: absolute;
+  top: 0;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.xTick[data-align='start'] {
+  text-align: start;
+}
+.xTick[data-align='end'] {
+  text-align: end;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--sh-text-secondary);
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.key {
+  flex: none;
+  background: var(--series-color);
+}
+.key[data-shape='rect'] {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+.key[data-shape='line'] {
+  width: 12px;
+  height: 2px;
+  border-radius: var(--sh-radius-full);
+}
+
+/* Radix positions the content inside a wrapper it owns; both must let the pointer through to the columns beneath. */
+:global([data-radix-popper-content-wrapper]):has(> .tooltip) {
+  pointer-events: none;
+}
+
+.tooltip[data-side] {
+  min-width: 0;
+  max-width: min(280px, var(--radix-popover-content-available-width));
+  padding: 8px 12px;
+  pointer-events: none;
+  font-size: var(--sh-text-caption);
+  line-height: var(--sh-text-caption--line-height);
+}
+
+.tooltipTitle {
+  margin-bottom: 6px;
+  font-weight: 600;
+  color: var(--sh-text-primary);
+}
+
+.tooltipRows {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+}
+
+.tooltipRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.tooltipRow[data-total] {
+  margin-top: 2px;
+  padding-top: 6px;
+  border-top: var(--sh-border-width) solid var(--sh-border-default);
+}
+
+.tooltipLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--sh-text-secondary);
+}
+.tooltipLabel .key[data-shape='rect'] {
+  width: 12px;
+  height: 2px;
+  border-radius: var(--sh-radius-full);
+}
+
+.tooltipValue {
+  margin: 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--sh-text-primary);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}

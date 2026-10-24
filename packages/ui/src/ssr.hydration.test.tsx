@@ -5,6 +5,7 @@ import { renderToString } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
 import { Calendar } from '@/components/Calendar';
+import { Chart } from '@/components/Chart';
 import { Kbd } from '@/components/Kbd';
 import { NotificationList } from '@/components/NotificationCenter';
 import { Statistic } from '@/components/Statistic';
@@ -46,6 +47,17 @@ describe('SSR hydration', () => {
 
   it('hydrates Statistic without a locale-driven mismatch', async () => {
     await expectHydrationClean(<Statistic label="Revenue" value={1234567} delta={0.12} positiveIs="up" comparison="vs last week" format={{ notation: 'compact' }} />);
+  });
+
+  it('should hydrate a stacked Chart without a measurement-driven mismatch', async () => {
+    const data = Array.from({ length: 30 }, (_, i) => ({ x: `Oct ${i + 1}`, values: { forge: (i * 37) % 11, memoir: (i * 13) % 7, other: 1.25 } }));
+    const series = [
+      { key: 'forge', label: 'Novel Forge' },
+      { key: 'memoir', label: 'Memoir' },
+      { key: 'other', label: 'Other', tone: 'neutral' as const },
+    ];
+    await expectHydrationClean(<Chart type="bar" stacked data={data} series={series} aria-label="Daily cost" />);
+    await expectHydrationClean(<Chart type="area" stacked data={data} series={series} aria-label="Daily cost" />);
   });
 
   it('hydrates an unselected Calendar without a today-driven mismatch', async () => {

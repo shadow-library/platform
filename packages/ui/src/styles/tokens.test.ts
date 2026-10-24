@@ -145,3 +145,21 @@ describe('dark theme contrast tokens', () => {
     expect(rootBlock!.vars.get('sh-text-tertiary')).toBe('var(--sh-neutral-500)');
   });
 });
+
+describe('chart palette tokens', () => {
+  const chartTokens = [...Array.from({ length: 8 }, (_, i) => `sh-chart-${i + 1}`), 'sh-chart-neutral'];
+  const themes = [
+    ['light', rootBlock],
+    ['dark', darkBlock],
+  ] as const;
+
+  it.each(themes)('should keep every %s chart colour at least 3:1 on card and app surfaces', (_, theme) => {
+    for (const surface of ['sh-surface-card', 'sh-surface-app']) {
+      for (const token of chartTokens) expect(contrastRatio(resolve(token, theme), resolve(surface, theme)), `${token} on ${surface}`).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  it.each(themes)('should give the %s theme eight distinct categorical slots plus a neutral', (_, theme) => {
+    expect(new Set(chartTokens.map(token => resolve(token, theme))).size).toBe(chartTokens.length);
+  });
+});
