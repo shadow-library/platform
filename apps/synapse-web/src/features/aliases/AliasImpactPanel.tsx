@@ -1,27 +1,28 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, useNavigate } from '@tanstack/react-router';
+import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from '@tanstack/react-router';
 import { type ReactElement, useState } from 'react';
-import { Alert, Button, Card, FormField, Select, Statistic, Table, type TableColumn } from '@shadow-library/ui';
+import { Alert, Button, Card, FormField, Statistic, Table, type TableColumn } from '@shadow-library/ui';
 
-import { type AliasEntry, type CatalogDocument, draftExpectation, type ModelEntry, withAliasModel } from '@/features/catalog';
-import { formatNumber, formatSignedUsd, Mono, SectionHeader, signedUsdFormat, usdFormat } from '@/features/shared';
+import { type CatalogDocument, readAliases, readModels, readTasks, useDraftEdit } from '@/features/catalog';
+import { formatNumber, formatSignedUsd, modelDisplayName, modelEligibility, ModelPicker, Mono, SectionHeader, signedUsdFormat, usdFormat } from '@/features/shared';
 import controls from '@/features/shared/controls.module.css';
-import { aliasImpactQueryOptions, type AliasImpactRowResponse, type Capabilities, draftQueryOptions, isApiError, isCatalogConflict, useSaveDraftMutation } from '@/lib';
+import { aliasImpactQueryOptions, type AliasImpactRowResponse, type Capabilities } from '@/lib';
 
 import { relativeChange } from './alias-impact';
+import { retargetAliasEdit } from './alias-form';
+import { aliasModelNeeds, aliasOutcomeNotice, type AliasRow, defaultAliasNote, featureNames, type AliasFeedback as Notice } from './alias-view';
+import { AliasNotice } from './AliasNotice';
 import styles from './Aliases.module.css';
 
 interface AliasImpactPanelProps {
-  alias: AliasEntry;
-  models: ModelEntry[];
+  /** The name as the working document has it: the draft's when there is one */
+  alias: AliasRow;
+  /** The document a save applies to: the draft when there is one, else the active version */
+  workingDocument: CatalogDocument;
+  activeDocument: CatalogDocument | null;
   candidate?: string;
-  activeDocument: CatalogDocument;
   capabilities: Capabilities;
 }
-
-type RetargetState = { status: 'idle' } | { status: 'saved'; model: string; issues: number } | { status: 'failed'; title: string; message: string };
-
-const RETARGET_FAILED = "Couldn't retarget the alias in the draft";
 
 function deltaClass(delta: number): string | undefined {
   if (delta < 0) return styles.cheaper;
@@ -29,56 +30,74 @@ function deltaClass(delta: number): string | undefined {
   return undefined;
 }
 
-export function AliasImpactPanel({ alias, models, candidate, activeDocument, capabilities }: AliasImpactPanelProps): ReactElement {
+export function AliasImpactPanel({ alias, workingDocument, activeDocument, candidate, capabilities }: AliasImpactPanelProps): ReactElement {
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const impact = useQuery(aliasImpactQueryOptions(alias.key, candidate));
-  const save = useSaveDraftMutation();
-  const [retarget, setRetarget] = useState<RetargetState>({ status: 'idle' });
-  const [preparing, setPreparing] = useState(false);
-  const candidates = models.filter(model => model.key !== alias.model);
+  const draftEdit = useDraftEdit();
+  const [notice, setNotice] = useState<Notice | null>(null);
+  const published = activeDocument ? readAliases(activeDocument).find(entry => entry.key === alias.key) : undefined;
+  const impact = useQuery({ ...aliasImpactQueryOptions(alias.key, candidate), enabled: published !== undefined });
+
+  const close = (
+    <Button variant="ghost" size="sm" onClick={() => void navigate({ to: '/aliases', search: {} })}>
+      Close
+    </Button>
+  );
+
+  if (!activeDocument || !published)
+    return (
+      <section className={styles.panel} aria-label={`Impact of changing ${alias.name}`}>
+        <SectionHeader title={`Impact: ${alias.name}`} action={close} />
+        <Alert intent="info" title={`${alias.name} isn't published yet`}>
+          No calls have used it, so there is nothing to compare. Point it at a model with Edit.
+        </Alert>
+      </section>
+    );
+
+  const models = readModels(activeDocument);
+  const modelByKey = new Map(models.map(model => [model.key, model]));
+  const tasks = new Map(readTasks(activeDocument).map(task => [task.key, task]));
+  const nameOf = (key: string): string => {
+    const model = modelByKey.get(key);
+    return model ? modelDisplayName(model) : key;
+  };
+  const needs = aliasModelNeeds(workingDocument, alias.key);
+  const candidateModel = candidate ? (readModels(workingDocument).find(model => model.key === candidate) ?? modelByKey.get(candidate)) : undefined;
+  const eligibility = candidateModel ? modelEligibility(candidateModel, needs) : undefined;
+  const draftMoved = alias.target.key !== published.model;
 
   const chooseCandidate = (model?: string): void => {
-    setRetarget({ status: 'idle' });
+    setNotice(null);
     void navigate({ to: '/aliases', search: { alias: alias.key, ...(model && { model }) } });
   };
 
-  /** Applied to the draft as it stands right now, so the save keeps every other edit already in it. */
-  const handleRetarget = async (model: string): Promise<void> => {
-    setRetarget({ status: 'idle' });
-    setPreparing(true);
-    const draft = await queryClient.fetchQuery({ ...draftQueryOptions(), staleTime: 0 }).catch((error: unknown) => {
-      setRetarget({ status: 'failed', title: RETARGET_FAILED, message: isApiError(error) ? error.message : "Couldn't read the current draft" });
-      return undefined;
-    });
-    setPreparing(false);
-    if (draft === undefined) return;
-    const next = withAliasModel(draft?.draft.document ?? activeDocument, alias.key, model);
-    if (!next.ok) return setRetarget({ status: 'failed', title: RETARGET_FAILED, message: next.reason });
-    const note = draft?.draft.note ?? `Retarget alias ${alias.key} to ${model}`;
-    save.mutate(
-      { document: next.document, note, ...draftExpectation(draft?.fingerprint ?? null) },
-      {
-        onSuccess: outcome =>
-          setRetarget(
-            outcome.kind === 'done'
-              ? { status: 'saved', model, issues: outcome.value.issues.length }
-              : { status: 'failed', title: RETARGET_FAILED, message: outcome.issues.map(issue => `${issue.path}: ${issue.message}`).join('; ') },
-          ),
-        onError: error =>
-          setRetarget(
-            isCatalogConflict(error)
-              ? { status: 'failed', title: 'The draft changed while this was being saved', message: 'Nothing was saved. Try again to apply the retarget to the current draft.' }
-              : { status: 'failed', title: RETARGET_FAILED, message: error.message },
-          ),
-      },
+  const retarget = async (model: string): Promise<void> => {
+    setNotice(null);
+    const target = nameOf(model);
+    const outcome = await draftEdit.apply(retargetAliasEdit(alias.key, alias.target.key, model), defaultAliasNote(alias.name, 'retargeted', target));
+    setNotice(
+      outcome.kind === 'unchanged'
+        ? { intent: 'info', title: 'Nothing to save', body: `The draft already points ${alias.name} to ${target}.` }
+        : aliasOutcomeNotice(outcome, alias.name, 'retargeted'),
     );
   };
 
   const data = impact.data;
   const columns: TableColumn<AliasImpactRowResponse>[] = [
-    { id: 'app', header: 'App', cell: row => <Mono>{row.app}</Mono> },
-    { id: 'task', header: 'Task', cell: row => <Mono>{row.task}</Mono> },
+    {
+      id: 'feature',
+      header: 'Feature',
+      cell: row => {
+        const names = featureNames(row.app, row.task, tasks);
+        return (
+          <span className={styles.stack}>
+            <span>
+              {names.app} · {names.feature}
+            </span>
+            <Mono>{row.task}</Mono>
+          </span>
+        );
+      },
+    },
     { id: 'calls', header: 'Calls', align: 'end', cell: row => <span className={controls.tabular}>{formatNumber(row.calls)}</span> },
     { id: 'inputTokens', header: 'Input tokens', align: 'end', cell: row => <span className={controls.tabular}>{formatNumber(row.inputTokens)}</span> },
     { id: 'cachedInputTokens', header: 'Cached input', align: 'end', cell: row => <span className={controls.tabular}>{formatNumber(row.cachedInputTokens)}</span> },
@@ -87,7 +106,7 @@ export function AliasImpactPanel({ alias, models, candidate, activeDocument, cap
       ? [
           {
             id: 'deltaUsd',
-            header: 'List-price delta',
+            header: 'API-price change',
             align: 'end' as const,
             cell: (row: AliasImpactRowResponse) => (row.deltaUsd == null ? '—' : <span className={deltaClass(row.deltaUsd)}>{formatSignedUsd(row.deltaUsd)}</span>),
           },
@@ -96,25 +115,28 @@ export function AliasImpactPanel({ alias, models, candidate, activeDocument, cap
   ];
 
   return (
-    <section className={styles.panel} aria-label={`Impact of retargeting ${alias.label}`}>
+    <section className={styles.panel} aria-label={`Impact of changing ${alias.name}`}>
       <SectionHeader
-        title={`Impact: ${alias.label}`}
-        subtitle={data ? `Calls made through this alias in the last ${data.windowDays} days, priced at the active catalog's list prices.` : undefined}
-        action={
-          <Button variant="ghost" size="sm" onClick={() => void navigate({ to: '/aliases', search: {} })}>
-            Close
-          </Button>
-        }
+        title={`Impact: ${alias.name}`}
+        subtitle={data ? `Calls made with this name in the last ${data.windowDays} days, priced at the published catalog's list prices.` : undefined}
+        action={close}
       />
+      {draftMoved ? (
+        <p className={controls.hint}>
+          The draft already points {alias.name} to {alias.target.name ?? alias.target.key}; this comparison starts from the published model, {nameOf(published.model)}.
+        </p>
+      ) : null}
       <div className={styles.controls}>
-        <FormField label="Candidate target model" className={styles.candidate}>
-          <Select value={candidate ?? ''} onValueChange={value => chooseCandidate(value)} placeholder="Choose a model to compare">
-            {candidates.map(model => (
-              <Select.Item key={model.key} value={model.key} description={model.key}>
-                {model.label}
-              </Select.Item>
-            ))}
-          </Select>
+        <FormField label="Compare with" className={styles.candidate}>
+          <ModelPicker
+            {...needs}
+            models={models}
+            value={candidate ?? null}
+            onValueChange={model => chooseCandidate(model)}
+            disableIneligible={false}
+            placeholder="Choose a model to compare"
+            aria-label="Model to compare with"
+          />
         </FormField>
         {candidate ? (
           <Button variant="ghost" onClick={() => chooseCandidate(undefined)}>
@@ -122,31 +144,23 @@ export function AliasImpactPanel({ alias, models, candidate, activeDocument, cap
           </Button>
         ) : null}
         {candidate && capabilities.writeDraft ? (
-          <Button variant="secondary" onClick={() => void handleRetarget(candidate)} loading={preparing || save.isPending}>
-            Set as the alias target in the draft
+          <Button variant="secondary" onClick={() => void retarget(candidate)} loading={draftEdit.pending} disabled={candidate === alias.target.key}>
+            Point {alias.name} to this model in the draft
           </Button>
         ) : null}
       </div>
-      {candidates.length === 0 ? <p className={controls.hint}>The catalog has no other model to retarget this alias to.</p> : null}
-
-      {retarget.status === 'saved' ? (
-        <Alert intent={retarget.issues === 0 ? 'success' : 'warning'} title={`The draft now targets ${retarget.model}`} className={styles.result}>
-          {retarget.issues === 0 ? 'The draft passes validation.' : `The draft has ${retarget.issues} issue(s) to fix before it can be published.`} Nothing changes for apps until
-          it is published:{' '}
-          <Link to="/catalog" search={{ tab: 'publish' }}>
-            review the diff and publish
-          </Link>
-          .
-        </Alert>
+      {models.length < 2 ? <p className={controls.hint}>The published catalog has no other model to compare with.</p> : null}
+      {candidate && candidate === alias.target.key ? <p className={controls.hint}>The draft already points {alias.name} to this model.</p> : null}
+      {eligibility && !eligibility.eligible ? (
+        <p className={controls.hint}>
+          Features offering {alias.name} may not be able to use it: {eligibility.reasons.join('; ')}. Publishing checks this.
+        </p>
       ) : null}
-      {retarget.status === 'failed' ? (
-        <Alert intent="danger" title={retarget.title} className={styles.result}>
-          {retarget.message}
-        </Alert>
-      ) : null}
+      {candidate && !capabilities.writeDraft ? <p className={controls.hint}>Changing the target needs permission to change the catalog.</p> : null}
+      {notice ? <AliasNotice notice={notice} onDismiss={() => setNotice(null)} className={styles.result} /> : null}
 
       {impact.error ? (
-        <Alert intent="danger" title="Couldn't load the impact">
+        <Alert intent="danger" title="Couldn't load the impact" className={styles.result}>
           {impact.error.message}
         </Alert>
       ) : (
@@ -156,29 +170,29 @@ export function AliasImpactPanel({ alias, models, candidate, activeDocument, cap
               <Statistic label="Calls" value={data?.totalCalls ?? 0} loading={impact.isLoading} />
               {data?.retarget ? (
                 <>
-                  <Statistic label={`At ${data.retarget.fromModel}`} value={data.retarget.currentUsd} format={usdFormat(data.retarget.currentUsd)} />
-                  <Statistic label={`At ${data.retarget.toModel}`} value={data.retarget.proposedUsd} format={usdFormat(data.retarget.proposedUsd)} />
+                  <Statistic label={`At ${nameOf(data.retarget.fromModel)}`} value={data.retarget.currentUsd} format={usdFormat(data.retarget.currentUsd)} />
+                  <Statistic label={`At ${nameOf(data.retarget.toModel)}`} value={data.retarget.proposedUsd} format={usdFormat(data.retarget.proposedUsd)} />
                   <Statistic
-                    label="List-price delta"
+                    label="API-price change"
                     value={data.retarget.deltaUsd}
                     format={signedUsdFormat(data.retarget.deltaUsd)}
                     delta={relativeChange(data.retarget.deltaUsd, data.retarget.currentUsd)}
                     positiveIs="down"
-                    comparison={`vs ${data.retarget.fromModel}`}
+                    comparison={`vs ${nameOf(data.retarget.fromModel)}`}
                   />
                 </>
               ) : null}
             </div>
             {data && !data.retarget ? (
-              <p className={controls.hint}>Choose a candidate model to see what the same traffic would cost at its list prices. Current target: {data.model}.</p>
+              <p className={controls.hint}>Choose a model to see what the same traffic would cost at its list prices. It now goes to {nameOf(data.model)}.</p>
             ) : null}
             <Table
               data={data?.rows ?? []}
               columns={columns}
               rowKey={row => `${row.app}/${row.task}`}
               loading={impact.isLoading}
-              aria-label={`Calls through ${alias.label} by app and task`}
-              emptyState="No calls went through this alias in the window."
+              aria-label={`Calls made with ${alias.name} by feature`}
+              emptyState="No calls used this name in the window."
             />
             {data?.retarget ? <p className={controls.hint}>Image output is not priced.</p> : null}
           </Card.Body>

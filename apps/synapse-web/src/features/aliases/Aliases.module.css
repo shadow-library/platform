@@ -1,7 +1,31 @@
-.aliasCell {
+.stack {
   display: flex;
   flex-direction: column;
   gap: 2px;
+}
+
+.name {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  color: var(--sh-text-primary);
+  font-weight: 560;
+}
+
+.users {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.problem {
+  margin: 0;
+  color: var(--sh-danger-text);
+}
+
+.notice {
+  margin-bottom: 20px;
 }
 
 .panel {
@@ -38,6 +62,89 @@
 
 .dearer {
   color: var(--sh-danger-text);
+}
+
+.issues {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+.details {
+  margin-top: 8px;
+  font-size: var(--sh-text-body-sm);
+}
+
+.details summary {
+  cursor: pointer;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.formSection {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.formSectionTitle {
+  margin: 0;
+  font-size: var(--sh-text-h3);
+  line-height: var(--sh-text-h3--line-height);
+  font-weight: 600;
+}
+
+.formSectionHint {
+  margin: 4px 0 0;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-tertiary);
+}
+
+.formRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.formGrow {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+.rule {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: var(--sh-border-width) solid var(--sh-border-subtle);
+  border-radius: var(--sh-radius-md);
+}
+
+.ruleHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ruleTitle {
+  margin: 0;
+  font-size: var(--sh-text-body);
+  font-weight: 600;
+}
+
+.suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.suggestions .formSectionHint {
+  margin: 0;
 }
 
 @media (max-width: 1023px) {
