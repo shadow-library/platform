@@ -1,33 +1,118 @@
-.cards {
+.kpis {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
-  margin-bottom: 28px;
+  margin-bottom: 20px;
 }
 
-.totals {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+.kpiBody {
+  display: flex;
+  flex-direction: column;
   gap: 12px;
 }
 
-.cardLink {
-  margin-top: 12px;
-  font-size: 0.8125rem;
+.kpiNote {
+  margin: 0;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-tertiary);
 }
 
-.features {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
+.notice {
+  margin-bottom: 20px;
 }
 
 .section {
   margin-bottom: 28px;
 }
 
+.stale {
+  opacity: var(--sh-disabled-opacity);
+}
+
+.chartControls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.share {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.bar {
+  width: 72px;
+  height: 6px;
+  border-radius: var(--sh-radius-full);
+  background: var(--sh-surface-well);
+  overflow: hidden;
+}
+
+.barFill {
+  display: block;
+  height: 100%;
+  background: var(--sh-accent);
+}
+
+.footerLink {
+  margin-top: 12px;
+  font-size: var(--sh-text-body-sm);
+}
+
+.attention {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.attentionItem {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.attentionTitle {
+  margin: 0;
+  color: var(--sh-text-primary);
+}
+
+.attentionDetail {
+  margin: 0;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+}
+
 @media (max-width: 1023px) {
-  .cards {
-    grid-template-columns: 1fr;
+  .kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 599px) {
+  .kpis {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
