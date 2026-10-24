@@ -1,0 +1,131 @@
+.notice {
+  margin-bottom: 20px;
+}
+
+.windows {
+  margin: 0 0 20px;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-tertiary);
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.cardBody {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 0;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+}
+
+.meters {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.meter {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.meterRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+  font-size: var(--sh-text-body-sm);
+}
+
+.summary {
+  margin: 0;
+  color: var(--sh-text-primary);
+}
+
+.note {
+  margin: 0;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-tertiary);
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.share {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.miniBar {
+  width: 72px;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.issues {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.technical {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-family: var(--sh-font-mono);
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-tertiary);
+}
+
+.confirmBody {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.confirmLine {
+  display: block;
+}
+
+.confirmWarning {
+  display: block;
+  color: var(--sh-warning-text-on-subtle);
+}
+
+.footerNote {
+  margin-right: auto;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-tertiary);
+}
+
+@media (max-width: 1023px) {
+  .cards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
