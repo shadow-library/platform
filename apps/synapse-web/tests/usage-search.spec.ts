@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'bun:test';
 
+import { type TaskEntry } from '../src/features/catalog/catalog-spec.types';
 import {
   addUtcDays,
+  filterApps,
+  filterTasks,
   isReportableRange,
   lastIncludedInstant,
   MAX_USAGE_RANGE_DAYS,
@@ -11,6 +14,9 @@ import {
   usageParams,
   usageRangePresets,
   utcToday,
+  withApp,
+  withRange,
+  withTask,
 } from '../src/features/usage/usage-search';
 
 describe('parseUsageSearch', () => {
@@ -34,8 +40,34 @@ describe('parseUsageSearch', () => {
   });
 
   it('should drop an empty or inverted range whole', () => {
-    expect(parseUsageSearch({ from: '2026-10-01', to: '2026-10-01', groupBy: 'day' }, now)).toEqual({ groupBy: 'day' });
-    expect(parseUsageSearch({ from: '2026-10-02', to: '2026-10-01', groupBy: 'day' }, now)).toEqual({ groupBy: 'day' });
+    expect(parseUsageSearch({ from: '2026-10-01', to: '2026-10-01', groupBy: 'task' }, now)).toEqual({ groupBy: 'task' });
+    expect(parseUsageSearch({ from: '2026-10-02', to: '2026-10-01', groupBy: 'task' }, now)).toEqual({ groupBy: 'task' });
+  });
+
+  it('should read an old day grouping as grouping by app', () => {
+    expect(parseUsageSearch({ from: '2026-09-01', to: '2026-10-01', groupBy: 'day' }, now)).toEqual({ from: '2026-09-01', to: '2026-10-01', groupBy: 'app' });
+  });
+
+  it('should keep the app and feature filters the server accepts', () => {
+    expect(parseUsageSearch({ app: 'novel-forge', task: 'novel-forge.chat', groupBy: 'model' }, now)).toEqual({ app: 'novel-forge', task: 'novel-forge.chat', groupBy: 'model' });
+  });
+
+  it('should keep a feature link that names no app', () => {
+    expect(parseUsageSearch({ groupBy: 'task', task: 'memoir.reflect' }, now)).toEqual({ task: 'memoir.reflect', groupBy: 'task' });
+  });
+
+  it('should drop filters the server would refuse', () => {
+    expect(parseUsageSearch({ app: 'novel forge', task: 'x'.repeat(65) }, now)).toEqual({ groupBy: 'app' });
+    expect(parseUsageSearch({ app: ['memoir'], task: 42 }, now)).toEqual({ groupBy: 'app' });
+    expect(parseUsageSearch({ app: '' }, now)).toEqual({ groupBy: 'app' });
+  });
+
+  it('should drop an app that contradicts the feature, keeping the feature', () => {
+    expect(parseUsageSearch({ app: 'memoir', task: 'novel-forge.chat' }, now)).toEqual({ task: 'novel-forge.chat', groupBy: 'app' });
+  });
+
+  it('should keep the filters when it drops an invalid range', () => {
+    expect(parseUsageSearch({ from: '2026-10-02', to: '2026-10-01', app: 'memoir' }, now)).toEqual({ app: 'memoir', groupBy: 'app' });
   });
 
   it('should drop malformed dates and an unknown grouping', () => {
@@ -43,11 +75,11 @@ describe('parseUsageSearch', () => {
   });
 
   it('should keep an open-ended range that starts today', () => {
-    expect(parseUsageSearch({ from: '2026-10-18', groupBy: 'day' }, now)).toEqual({ from: '2026-10-18', groupBy: 'day' });
+    expect(parseUsageSearch({ from: '2026-10-18', groupBy: 'provider' }, now)).toEqual({ from: '2026-10-18', groupBy: 'provider' });
   });
 
   it('should drop an open-ended range that starts after now', () => {
-    expect(parseUsageSearch({ from: '2026-10-19', groupBy: 'day' }, now)).toEqual({ groupBy: 'day' });
+    expect(parseUsageSearch({ from: '2026-10-19', groupBy: 'provider' }, now)).toEqual({ groupBy: 'provider' });
   });
 
   it('should drop an open-ended range that starts exactly at now, since it would be empty', () => {
@@ -69,7 +101,7 @@ describe('parseUsageSearch', () => {
   });
 
   it('should drop an open-ended range that reaches back further than the cap to now', () => {
-    expect(parseUsageSearch({ from: addUtcDays('2026-10-18', -MAX_USAGE_RANGE_DAYS), groupBy: 'day' }, now)).toEqual({ groupBy: 'day' });
+    expect(parseUsageSearch({ from: addUtcDays('2026-10-18', -MAX_USAGE_RANGE_DAYS), groupBy: 'alias' }, now)).toEqual({ groupBy: 'alias' });
   });
 
   it('should keep an open-ended range that spans exactly the cap at midnight', () => {
@@ -111,8 +143,72 @@ describe('isReportableRange', () => {
 });
 
 describe('usageParams', () => {
-  it('should send only the bounds that are set', () => {
-    expect(usageParams({ groupBy: 'day', from: '2026-09-01' })).toEqual({ groupBy: 'day', from: '2026-09-01' });
+  it('should send only the bounds and filters that are set', () => {
+    expect(usageParams({ groupBy: 'task', from: '2026-09-01' })).toEqual({ groupBy: 'task', from: '2026-09-01' });
+    expect(usageParams({ groupBy: 'model', app: 'memoir', task: 'memoir.reflect' })).toEqual({ groupBy: 'model', app: 'memoir', task: 'memoir.reflect' });
+  });
+});
+
+describe('withApp', () => {
+  it('should keep a feature of the chosen app', () => {
+    expect(withApp({ groupBy: 'task', task: 'memoir.reflect' }, 'memoir')).toEqual({ groupBy: 'task', app: 'memoir', task: 'memoir.reflect' });
+  });
+
+  it('should clear a feature of another app', () => {
+    expect(withApp({ groupBy: 'task', from: '2026-09-01', task: 'memoir.reflect' }, 'novel-forge')).toEqual({ groupBy: 'task', from: '2026-09-01', app: 'novel-forge' });
+  });
+
+  it('should keep the feature when the app filter is cleared', () => {
+    expect(withApp({ groupBy: 'app', app: 'memoir', task: 'memoir.reflect' }, undefined)).toEqual({ groupBy: 'app', task: 'memoir.reflect' });
+  });
+});
+
+describe('withTask', () => {
+  it('should set and clear the feature, leaving the rest', () => {
+    expect(withTask({ groupBy: 'app', app: 'memoir' }, 'memoir.reflect')).toEqual({ groupBy: 'app', app: 'memoir', task: 'memoir.reflect' });
+    expect(withTask({ groupBy: 'app', app: 'memoir', task: 'memoir.reflect' }, undefined)).toEqual({ groupBy: 'app', app: 'memoir' });
+  });
+});
+
+describe('withRange', () => {
+  it('should replace the range and keep the filters', () => {
+    expect(withRange({ groupBy: 'model', from: '2026-09-01', to: '2026-10-01', app: 'memoir' }, { from: '2026-10-01' })).toEqual({
+      groupBy: 'model',
+      app: 'memoir',
+      from: '2026-10-01',
+    });
+    expect(withRange({ groupBy: 'model', from: '2026-09-01', to: '2026-10-01' }, {})).toEqual({ groupBy: 'model' });
+  });
+});
+
+describe('filter options', () => {
+  const task = (key: string, label?: string): TaskEntry => {
+    const [app = '', name = ''] = key.split('.');
+    return { key, app, name, ...(label && { label }), kind: 'chat', requires: [], dataPolicy: 'any', aliases: [], pinned: false, routes: [] };
+  };
+  const tasks = [task('novel-forge.chat'), task('memoir.reflect', 'Daily reflection'), task('novel-forge.outline')];
+
+  it('should list each app once, sorted', () => {
+    expect(filterApps(tasks, undefined)).toEqual(['memoir', 'novel-forge']);
+  });
+
+  it('should still list a chosen app the catalog no longer has', () => {
+    expect(filterApps(tasks, 'pulse')).toEqual(['memoir', 'novel-forge', 'pulse']);
+  });
+
+  it('should narrow features to the chosen app, sorted by readable name', () => {
+    expect(filterTasks(tasks, 'novel-forge', undefined)).toEqual([
+      { key: 'novel-forge.chat', title: 'Novel Forge · Chat' },
+      { key: 'novel-forge.outline', title: 'Novel Forge · Outline' },
+    ]);
+  });
+
+  it('should list every feature when no app is chosen', () => {
+    expect(filterTasks(tasks, undefined, undefined).map(option => option.key)).toEqual(['memoir.reflect', 'novel-forge.chat', 'novel-forge.outline']);
+  });
+
+  it('should still list a chosen feature the catalog no longer has', () => {
+    expect(filterTasks(tasks, 'novel-forge', 'novel-forge.retired-thing')).toContainEqual({ key: 'novel-forge.retired-thing', title: 'Novel Forge · Retired thing' });
   });
 });
 
@@ -163,12 +259,28 @@ describe('searchRangeOf', () => {
 });
 
 describe('usageRangePresets', () => {
-  it('should count today as the last day of every preset', () => {
+  it('should offer rolling windows ending today and the UTC calendar months', () => {
     expect(usageRangePresets('2026-10-17')).toEqual([
       { label: 'Last 7 days', range: { start: '2026-10-11', end: '2026-10-17' } },
       { label: 'Last 30 days', range: { start: '2026-09-18', end: '2026-10-17' } },
       { label: 'Last 90 days', range: { start: '2026-07-20', end: '2026-10-17' } },
+      { label: 'This month', range: { start: '2026-10-01', end: '2026-10-17' } },
+      { label: 'Last month', range: { start: '2026-09-01', end: '2026-09-30' } },
     ]);
+  });
+
+  it('should make this month a single day on the first', () => {
+    expect(usageRangePresets('2026-10-01').find(preset => preset.label === 'This month')?.range).toEqual({ start: '2026-10-01', end: '2026-10-01' });
+  });
+
+  it('should reach back into the previous year in January and end on a leap day', () => {
+    expect(usageRangePresets('2027-01-15').find(preset => preset.label === 'Last month')?.range).toEqual({ start: '2026-12-01', end: '2026-12-31' });
+    expect(usageRangePresets('2028-03-05').find(preset => preset.label === 'Last month')?.range).toEqual({ start: '2028-02-01', end: '2028-02-29' });
+  });
+
+  it('should store last month as a range the server accepts', () => {
+    const range = usageRangePresets('2026-10-17').find(preset => preset.label === 'Last month')?.range;
+    expect(range && searchRangeOf(range)).toEqual({ from: '2026-09-01', to: '2026-10-01' });
   });
 });
 

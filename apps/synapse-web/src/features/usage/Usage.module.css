@@ -8,6 +8,12 @@
 
 .field {
   width: 190px;
+  max-width: 100%;
+}
+
+.feature {
+  width: 260px;
+  max-width: 100%;
 }
 
 .range {
@@ -15,11 +21,36 @@
   max-width: 100%;
 }
 
+.segments {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
 .totals {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
   margin-bottom: 24px;
+}
+
+.total {
+  position: relative;
+}
+
+.totalInfo {
+  position: absolute;
+  top: 0;
+  right: 0;
+}
+
+.section {
+  margin-bottom: 24px;
+}
+
+.name {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .share {
@@ -43,8 +74,22 @@
   background: var(--sh-accent);
 }
 
+.cheaper {
+  color: var(--sh-success-text);
+}
+
+.dearer {
+  color: var(--sh-danger-text);
+}
+
 @media (max-width: 1023px) {
   .totals {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 479px) {
+  .totals {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
