@@ -347,6 +347,192 @@ describe('CatalogVersionService.rollback', () => {
   });
 });
 
+const APP_BUDGET: CatalogDocument['budgets'][number] = { app: 'novel-forge', per: 'app', window: '1d', maxCalls: 5 };
+
+function draftRow() {
+  return repository.rows.find(row => row.state === 'DRAFT');
+}
+
+describe('CatalogVersionService.publishBudgets', () => {
+  const budgets = [...catalogDocument().budgets, APP_BUDGET];
+
+  it('should publish the active document with only its budgets replaced, as the next version', async () => {
+    repository.seed(catalogDocument(withOpusMax), 1);
+
+    const published = await service.publishBudgets(budgets, 1, undefined, 'finance-1');
+
+    expect({ version: published.version, document: published.document, note: published.note, createdBy: published.createdBy }).toEqual({
+      version: 2,
+      document: { ...catalogDocument(withOpusMax), budgets },
+      note: 'Budgets updated',
+      createdBy: 'finance-1',
+    });
+    expect(states()).toEqual(['v1:ARCHIVED', 'v2:PUBLISHED']);
+    expect(refreshes).toBe(1);
+  });
+
+  it('should store the note the caller gave', async () => {
+    repository.seed(catalogDocument(), 1);
+
+    expect((await service.publishBudgets(budgets, 1, 'Raise novel-forge limits', 'finance-1')).note).toBe('Raise novel-forge limits');
+  });
+
+  it('should refuse a stale expected version and leave the catalog untouched', async () => {
+    repository.seed(catalogDocument(), 1, 'ARCHIVED');
+    repository.seed(catalogDocument(), 2);
+
+    await expectFailure(service.publishBudgets(budgets, 1, undefined, 'finance-1'), AppErrorCode.SYN_CATALOG_CONFLICT);
+
+    expect(states()).toEqual(['v1:ARCHIVED', 'v2:PUBLISHED']);
+    expect(refreshes).toBe(0);
+  });
+
+  it('should refuse when nothing has been published yet', async () => {
+    await expectFailure(service.publishBudgets(budgets, 1, undefined, 'finance-1'), AppErrorCode.SYN_CATALOG_CONFLICT);
+
+    expect(repository.rows).toHaveLength(0);
+  });
+
+  it('should let exactly one of two publishers against the same version succeed', async () => {
+    repository.seed(catalogDocument(), 1);
+
+    const results = await Promise.allSettled([service.publishBudgets(budgets, 1, undefined, 'finance-1'), service.publishBudgets([], 1, undefined, 'finance-2')]);
+
+    const outcomes = results.map(result => (result.status === 'fulfilled' ? `v${result.value.version}` : AppError.is(result.reason) ? result.reason.code : 'unknown'));
+    expect(outcomes).toEqual(['v2', AppErrorCode.SYN_CATALOG_CONFLICT.code]);
+  });
+
+  it('should refuse invalid budgets with their issues and leave the catalog and draft untouched', async () => {
+    repository.seed(catalogDocument(), 1);
+    repository.seed(catalogDocument(withOpusMax), DRAFT_VERSION, 'DRAFT');
+
+    const error = await expectFailure(service.publishBudgets([{ app: 'ghost', per: 'app', window: '1d' }], 1, undefined, 'finance-1'), AppErrorCode.SYN_CATALOG_INVALID);
+
+    expect(catalogIssuesOf(error)?.map(issue => `${issue.path}:${issue.code}`)).toEqual(['budgets[0]:budget_without_limit', 'budgets[0].app:unknown_app']);
+    expect(states()).toEqual(['v0:DRAFT', 'v1:PUBLISHED']);
+    expect(draftRow()?.document).toEqual(catalogDocument(withOpusMax));
+  });
+
+  it('should refuse budgets that are not a list', async () => {
+    repository.seed(catalogDocument(), 1);
+
+    const error = await expectFailure(service.publishBudgets({ app: 'novel-forge' }, 1, undefined, 'finance-1'), AppErrorCode.SYN_CATALOG_INVALID);
+
+    expect(catalogIssuesOf(error)?.map(issue => issue.path)).toEqual(['budgets']);
+  });
+
+  it('should check the whole document against the active one, credentials included', async () => {
+    const credential = '00000000-0000-4000-8000-000000000001';
+    const withCredential = (document: CatalogDocument): void => {
+      delete document.providers.openrouter!.apiKeyConfig;
+      document.providers.openrouter!.credential = credential;
+    };
+    repository.seed(catalogDocument(withCredential), 1);
+    repository.credentials = [{ id: credential, allowedOrigin: 'https://openrouter.ai', revoked: true }];
+
+    const error = await expectFailure(service.publishBudgets(budgets, 1, undefined, 'finance-1'), AppErrorCode.SYN_CATALOG_INVALID);
+
+    expect(catalogIssuesOf(error)?.map(issue => issue.code)).toEqual(['credential_revoked']);
+  });
+
+  it('should rewrite the draft budgets in place and keep the rest of the draft, its note and author', async () => {
+    repository.seed(catalogDocument(), 1);
+    const saved = await service.saveDraft(catalogDocument(withOpusMax), 'alias work', 'operator-1', allowAll);
+
+    await service.publishBudgets(budgets, 1, undefined, 'finance-1');
+
+    const draft = draftRow();
+    expect({ id: draft?.id, note: draft?.note, createdBy: draft?.createdBy, document: draft?.document }).toEqual({
+      id: saved.draft.id,
+      note: 'alias work',
+      createdBy: 'operator-1',
+      document: { ...catalogDocument(withOpusMax), budgets },
+    });
+  });
+
+  it('should make the open draft fingerprint stale, so a later publish of what the editor saw is refused', async () => {
+    repository.seed(catalogDocument(), 1);
+    const saved = await service.saveDraft(catalogDocument(withOpusMax), undefined, 'operator-1', allowAll);
+
+    await service.publishBudgets(budgets, 1, undefined, 'finance-1');
+
+    await expectFailure(service.publish('admin-1', saved.fingerprint), AppErrorCode.SYN_CATALOG_CONFLICT);
+    const fresh = await service.getDraft();
+    const published = await service.publish('admin-1', fresh!.fingerprint);
+    expect((published.document as CatalogDocument).budgets).toEqual(budgets);
+  });
+
+  it('should leave no draft behind when there was none', async () => {
+    repository.seed(catalogDocument(), 1);
+
+    await service.publishBudgets(budgets, 1, undefined, 'finance-1');
+
+    expect(draftRow()).toBeUndefined();
+  });
+
+  it('should publish budgets identical to the active ones as a new version, as publish does', async () => {
+    repository.seed(catalogDocument(), 1);
+
+    expect((await service.publishBudgets(catalogDocument().budgets, 1, undefined, 'finance-1')).version).toBe(2);
+  });
+});
+
+describe('CatalogVersionService.discardDraft', () => {
+  it('should delete the draft whose fingerprint the caller presents and keep the published versions', async () => {
+    repository.seed(catalogDocument(), 1);
+    const saved = await service.saveDraft(catalogDocument(withOpusMax), undefined, 'operator-1', allowAll);
+
+    await service.discardDraft(saved.fingerprint, 'operator-1', allowAll);
+
+    expect(states()).toEqual(['v1:PUBLISHED']);
+    expect(refreshes).toBe(0);
+  });
+
+  it('should refuse a stale fingerprint and keep the draft', async () => {
+    const seen = await service.saveDraft(catalogDocument(), undefined, 'operator-1', allowAll);
+    await service.saveDraft(catalogDocument(withOpusMax), undefined, 'operator-2', allowAll);
+
+    await expectFailure(service.discardDraft(seen.fingerprint, 'operator-1', allowAll), AppErrorCode.SYN_CATALOG_CONFLICT);
+
+    expect(draftRow()?.document).toEqual(catalogDocument(withOpusMax));
+  });
+
+  it('should answer not found when there is no draft', async () => {
+    repository.seed(catalogDocument(), 1);
+
+    await expectFailure(service.discardDraft(catalogFingerprint(catalogDocument()), 'operator-1', allowAll), AppErrorCode.S009);
+  });
+
+  it('should authorise the sections the discard reverts to the active document', async () => {
+    repository.seed(catalogDocument(), 1);
+    const saved = await service.saveDraft(
+      catalogDocument(document => (document.budgets[0]!.maxCalls = 10)),
+      undefined,
+      'admin-1',
+      allowAll,
+    );
+    const seen: Set<CatalogSection>[] = [];
+
+    await service.discardDraft(saved.fingerprint, 'operator-1', changed => void seen.push(changed));
+
+    expect(seen).toEqual([new Set<CatalogSection>(['budgets'])]);
+  });
+
+  it('should keep the draft when authorisation throws', async () => {
+    const saved = await service.saveDraft(catalogDocument(), undefined, 'admin-1', allowAll);
+    const refusal = AppErrorCode.SEC_003.create();
+
+    const error = await failure(
+      service.discardDraft(saved.fingerprint, 'viewer-1', () => {
+        throw refusal;
+      }),
+    );
+
+    expect(error).toBe(refusal);
+    expect(draftRow()).toBeDefined();
+  });
+});
+
 describe('catalogIssuesOf', () => {
   it('should read nothing from an error other than SYN_CATALOG_INVALID', () => {
     expect(catalogIssuesOf(AppErrorCode.SYN_CATALOG_CONFLICT.create())).toBeUndefined();

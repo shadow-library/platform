@@ -22,7 +22,7 @@ export function draftAuthorizer(granted: ReadonlySet<string>): DraftAuthorizer {
     const required = [SYNAPSE_PERMISSIONS.catalogWrite, ...[...changed].flatMap(section => SECTION_PERMISSIONS[section] ?? [])];
     const missing = required.filter(permission => !granted.has(permission));
     if (missing.length === 0) return;
-    logger.warn('Refused a catalog draft save that changes sections the caller may not write', { missing, changed: [...changed] });
+    logger.warn('Refused a catalog draft change to sections the caller may not write', { missing, changed: [...changed] });
     throw AuthGuardErrorCode.IAM_002.create({ missing });
   };
 }

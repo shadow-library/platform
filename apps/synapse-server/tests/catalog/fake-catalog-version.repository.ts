@@ -44,6 +44,12 @@ class InMemoryCatalogStore implements CatalogVersionStore {
     return row;
   }
 
+  async deleteDraft(id: bigint): Promise<boolean> {
+    const before = this.repository.rows.length;
+    this.repository.rows = this.repository.rows.filter(row => !(row.id === id && row.state === 'DRAFT'));
+    return this.repository.rows.length < before;
+  }
+
   async archivePublished(): Promise<void> {
     for (const row of this.repository.rows) if (row.state === 'PUBLISHED') row.state = 'ARCHIVED';
   }

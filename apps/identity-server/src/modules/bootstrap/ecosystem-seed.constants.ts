@@ -85,6 +85,7 @@ const PULSE_ADMIN_PERMISSIONS = [...PULSE_OPERATOR_PERMISSIONS, 'pulse:senders:w
 /** Mirrors `apps/synapse-server/src/modules/auth/rbac.constants.ts`. */
 const SYNAPSE_VIEWER_PERMISSIONS = ['synapse:catalog:read', 'synapse:usage:read'] as const;
 const SYNAPSE_OPERATOR_PERMISSIONS = [...SYNAPSE_VIEWER_PERMISSIONS, 'synapse:catalog:write'] as const;
+const SYNAPSE_FINANCE_PERMISSIONS = [...SYNAPSE_VIEWER_PERMISSIONS, 'synapse:budgets:write'] as const;
 const SYNAPSE_ADMIN_PERMISSIONS = [...SYNAPSE_OPERATOR_PERMISSIONS, 'synapse:catalog:publish', 'synapse:providers:write', 'synapse:budgets:write'] as const;
 const SYNAPSE_CREDENTIALS_ADMIN_PERMISSIONS = ['synapse:credentials:manage'] as const;
 
@@ -156,6 +157,7 @@ export const ECOSYSTEM_SEED: EcosystemSeed = {
       roles: [
         { name: 'SynapseViewer', description: 'Read-only access to the synapse catalog and usage', permissions: SYNAPSE_VIEWER_PERMISSIONS },
         { name: 'SynapseOperator', description: 'Day-to-day operator: reads everything and edits catalog drafts', permissions: SYNAPSE_OPERATOR_PERMISSIONS },
+        { name: 'SynapseFinance', description: 'Reads usage and the catalog, and sets budgets', permissions: SYNAPSE_FINANCE_PERMISSIONS },
         { name: 'SynapseAdmin', description: 'Full control over the synapse catalog, providers and budgets', permissions: SYNAPSE_ADMIN_PERMISSIONS, grantToBootstrapAdmin: true },
         {
           name: 'SynapseCredentialsAdmin',

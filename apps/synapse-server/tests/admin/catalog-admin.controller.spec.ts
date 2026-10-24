@@ -44,6 +44,8 @@ describe('CatalogAdminController', () => {
         getVersion: () => controller.getVersion({ version: 1 }),
         getDraft: () => controller.getDraft(),
         saveDraft: () => controller.saveDraft({ document: {} }, reply),
+        discardDraft: () => controller.discardDraft({ fingerprint: 'x' }),
+        publishBudgets: () => controller.publishBudgets({ budgets: [], expectedVersion: 1 }, reply),
         validateDraft: () => controller.validateDraft(),
         diffDraft: () => controller.diffDraft(),
         publish: () => controller.publish({ fingerprint: 'x' }, reply),
@@ -196,6 +198,82 @@ describe('CatalogAdminController', () => {
         asPrincipal(userWith('admin'), () => controller.publish({ fingerprint: 'abc' }, new FakeReply().asResponse())),
         ServerErrorCode.S009,
       );
+    });
+  });
+
+  describe('discardDraft', () => {
+    it('should discard the draft for an operator when it reverts only sections catalog write covers', async () => {
+      const saved = (await save('operator', withLabel)) as { fingerprint: string };
+
+      await asPrincipal(userWith('operator'), () => controller.discardDraft({ fingerprint: saved.fingerprint }));
+
+      expect(repository.rows.filter(row => row.state === 'DRAFT')).toHaveLength(0);
+    });
+
+    it('should refuse an operator discarding a draft that changes budgets, as a save reverting them is refused', async () => {
+      const saved = (await save('admin', withBudgets)) as { fingerprint: string };
+
+      await expectFailure(
+        asPrincipal(userWith('operator'), () => controller.discardDraft({ fingerprint: saved.fingerprint })),
+        AuthGuardErrorCode.IAM_002,
+      );
+      expect(repository.rows.filter(row => row.state === 'DRAFT')).toHaveLength(1);
+    });
+
+    it('should let an admin discard a draft that changes budgets and providers', async () => {
+      const saved = (await save('admin', document => (withBudgets(document), withProviderUrl(document)))) as { fingerprint: string };
+
+      await asPrincipal(userWith('admin'), () => controller.discardDraft({ fingerprint: saved.fingerprint }));
+
+      expect(repository.rows.filter(row => row.state === 'DRAFT')).toHaveLength(0);
+    });
+
+    it('should map a stale fingerprint to SYN_CATALOG_CONFLICT and a missing draft to not found', async () => {
+      const first = (await save('operator', withLabel)) as { fingerprint: string };
+      await save('operator', withUnknownModel);
+
+      const error = await expectFailure(
+        asPrincipal(userWith('operator'), () => controller.discardDraft({ fingerprint: first.fingerprint })),
+        AppErrorCode.SYN_CATALOG_CONFLICT,
+      );
+      expect(error.status).toBe(409);
+
+      repository.rows = repository.rows.filter(row => row.state !== 'DRAFT');
+      await expectFailure(
+        asPrincipal(userWith('operator'), () => controller.discardDraft({ fingerprint: first.fingerprint })),
+        ServerErrorCode.S009,
+      );
+    });
+  });
+
+  describe('publishBudgets', () => {
+    const budgets = catalogDocument(withBudgets).budgets as unknown as Record<string, unknown>[];
+
+    it('should publish the budgets as a new version with the caller as its author', async () => {
+      const published = await asPrincipal(userWith('finance'), () => controller.publishBudgets({ budgets, expectedVersion: 1 }, new FakeReply().asResponse()));
+
+      expect(published).toMatchObject({ version: 2, state: 'PUBLISHED', note: 'Budgets updated', createdBy: 'user-finance' });
+      expect(repository.published()[0]?.document).toEqual(catalogDocument(withBudgets));
+    });
+
+    it('should map a stale expected version to SYN_CATALOG_CONFLICT', async () => {
+      const error = await expectFailure(
+        asPrincipal(userWith('finance'), () => controller.publishBudgets({ budgets, expectedVersion: 7 }, new FakeReply().asResponse())),
+        AppErrorCode.SYN_CATALOG_CONFLICT,
+      );
+      expect(error.status).toBe(409);
+    });
+
+    it('should render the issues of invalid budgets in the 422 body', async () => {
+      const reply = new FakeReply();
+
+      await asPrincipal(userWith('finance'), () =>
+        controller.publishBudgets({ budgets: [{ app: 'ghost', per: 'app', window: '1d', maxCalls: 1 }], expectedVersion: 1 }, reply.asResponse()),
+      );
+
+      expect(reply.statusCode).toBe(422);
+      expect(reply.body).toMatchObject({ code: AppErrorCode.SYN_CATALOG_INVALID.code, issues: [expect.objectContaining({ path: 'budgets[0].app', code: 'unknown_app' })] });
+      expect(repository.published().map(row => row.version)).toEqual([1]);
     });
   });
 

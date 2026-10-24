@@ -158,5 +158,26 @@ describe('EcosystemSeedService', () => {
       expect(seed.assignRole).toHaveBeenCalledTimes(1);
       expect(seed.assignRole).toHaveBeenCalledWith({ type: 'USER', id: '1' }, created?.id, '1');
     });
+
+    it('should add the finance role to an existing synapse application with its permissions and assign it to no one', async () => {
+      const seed = seedOver({
+        synapse: [
+          { id: 1, roleName: 'SynapseViewer' },
+          { id: 2, roleName: 'SynapseOperator' },
+          { id: 3, roleName: 'SynapseAdmin' },
+          { id: 4, roleName: 'SynapseCredentialsAdmin' },
+        ],
+      });
+      const synapseId = seed.applications.get('synapse')?.id ?? 0;
+
+      await seed.service.seed(OPERATOR);
+
+      expect(seed.addRole).toHaveBeenCalledTimes(1);
+      expect(seed.addRole).toHaveBeenCalledWith('synapse', expect.objectContaining({ roleName: 'SynapseFinance' }));
+      const created = seed.applications.get('synapse')?.roles.find(role => role.roleName === 'SynapseFinance');
+      const granted = seed.grantPermissionToRole.mock.calls.filter(([roleId]) => roleId === created?.id).map(([, permission]) => permission);
+      expect(granted.sort()).toEqual(['synapse:budgets:write', 'synapse:catalog:read', 'synapse:usage:read'].map(name => permissionId(synapseId, name)));
+      expect(seed.assignRole).not.toHaveBeenCalled();
+    });
   });
 });

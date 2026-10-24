@@ -36,8 +36,12 @@ describe('ECOSYSTEM_SEED synapse', () => {
     expect(synapse?.roles?.filter(role => role.grantToBootstrapAdmin).map(role => role.name)).toEqual(['SynapseAdmin', 'SynapseCredentialsAdmin']);
   });
 
+  it('should give the finance role the viewer permissions plus budget writes and nothing that edits drafts or publishes them', () => {
+    expect([...permissionsOf('SynapseFinance')].sort()).toEqual(['synapse:budgets:write', 'synapse:catalog:read', 'synapse:usage:read']);
+  });
+
   it('should keep credential management out of every catalog role and in its own role', () => {
-    for (const role of ['SynapseViewer', 'SynapseOperator']) expect(permissionsOf(role)).not.toContain('synapse:credentials:manage');
+    for (const role of ['SynapseViewer', 'SynapseOperator', 'SynapseFinance']) expect(permissionsOf(role)).not.toContain('synapse:credentials:manage');
     expect(permissionsOf('SynapseCredentialsAdmin')).toEqual(['synapse:credentials:manage']);
   });
 

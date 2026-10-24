@@ -12,7 +12,7 @@ export type CatalogVersionSummary = Omit<Catalog.Version, 'document'>;
 export interface DraftValues {
   document: unknown;
   note: string | null;
-  createdBy: string;
+  createdBy: string | null;
 }
 
 export interface PublishedValues {
@@ -22,7 +22,7 @@ export interface PublishedValues {
   createdBy: string;
 }
 
-/** The writes publish, rollback and draft saves make, available only inside `CatalogVersionRepository.exclusive`. */
+/** The writes publish, budget publish, rollback and draft saves and discards make, available only inside `CatalogVersionRepository.exclusive`. */
 export interface CatalogVersionStore {
   findDraft(): Promise<Catalog.Version | undefined>;
   findActive(): Promise<Catalog.Version | undefined>;
@@ -30,6 +30,8 @@ export interface CatalogVersionStore {
   maxVersion(): Promise<number>;
   insertDraft(values: DraftValues): Promise<Catalog.Version>;
   updateDraft(id: bigint, values: DraftValues): Promise<Catalog.Version | undefined>;
+  /** Resolves `false` when the row is no longer a draft */
+  deleteDraft(id: bigint): Promise<boolean>;
   archivePublished(): Promise<void>;
   /** Resolves `undefined` when the row is no longer a draft */
   promoteDraft(id: bigint, version: number, createdBy: string): Promise<Catalog.Version | undefined>;
@@ -103,6 +105,14 @@ class DrizzleCatalogVersionStore implements CatalogVersionStore {
       .where(and(eq(versions.id, id), eq(versions.state, 'DRAFT')))
       .returning();
     return row;
+  }
+
+  async deleteDraft(id: bigint): Promise<boolean> {
+    const rows = await this.executor
+      .delete(versions)
+      .where(and(eq(versions.id, id), eq(versions.state, 'DRAFT')))
+      .returning({ id: versions.id });
+    return rows.length > 0;
   }
 
   async archivePublished(): Promise<void> {

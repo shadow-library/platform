@@ -47,10 +47,12 @@ const PERMISSIONS: Record<string, string> = {
   'GET /api/v1/admin/catalog/versions/:version': 'synapse:catalog:read',
   'GET /api/v1/admin/catalog/draft': 'synapse:catalog:read',
   'PUT /api/v1/admin/catalog/draft': 'synapse:catalog:write',
+  'DELETE /api/v1/admin/catalog/draft': 'synapse:catalog:write',
   'POST /api/v1/admin/catalog/draft/validate': 'synapse:catalog:write',
   'GET /api/v1/admin/catalog/draft/diff': 'synapse:catalog:read',
   'POST /api/v1/admin/catalog/draft/publish': 'synapse:catalog:publish',
   'POST /api/v1/admin/catalog/versions/:version/rollback': 'synapse:catalog:publish',
+  'PUT /api/v1/admin/catalog/budgets': 'synapse:budgets:write',
   'GET /api/v1/admin/catalog/aliases/:key/impact': 'synapse:catalog:read',
   'GET /api/v1/admin/usage': 'synapse:usage:read',
   'GET /api/v1/admin/usage/series': 'synapse:usage:read',
@@ -88,6 +90,12 @@ describe('admin route auth metadata', () => {
       const declared = routes.find(candidate => candidate.route === route);
       expect({ route, auth: declared?.auth }).toMatchObject({ route, auth: { access: 'required', permission: 'synapse:credentials:manage', highRisk: true } });
     }
+  });
+
+  it('should check budget publishing against the short high-risk cache, as a draft save changing budgets is', () => {
+    const declared = routes.find(candidate => candidate.route === 'PUT /api/v1/admin/catalog/budgets');
+
+    expect(declared?.auth).toMatchObject({ access: 'required', permission: 'synapse:budgets:write', highRisk: true });
   });
 
   it('should require the catalog read scope, and no permission, on the service catalog route', () => {

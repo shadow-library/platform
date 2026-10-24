@@ -6,7 +6,7 @@ import { assignApplicationRole, deleteRoleAssignmentsFor, findApplicationRoleId 
 import { createIdentitySession, type IdentitySession, identityStorageState, type SessionAal } from './identity-sessions';
 import { createIdentityUser, deleteIdentityUser, type IdentityUser } from './identity-users';
 
-export type SynapseRole = 'SynapseViewer' | 'SynapseOperator' | 'SynapseAdmin' | 'SynapseCredentialsAdmin';
+export type SynapseRole = 'SynapseViewer' | 'SynapseOperator' | 'SynapseFinance' | 'SynapseAdmin' | 'SynapseCredentialsAdmin';
 
 export interface SynapseStaffOptions {
   label?: string;

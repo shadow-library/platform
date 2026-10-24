@@ -1,6 +1,21 @@
 import { RequirePermission } from '@shadow-library/auth/module';
 import { AppError } from '@shadow-library/common';
-import { Body, ErrorResponseDto, Get, HttpController, type HttpResponse, Params, Post, Put, Query, Res, RespondFor, ServerErrorCode } from '@shadow-library/fastify';
+import {
+  Body,
+  Delete,
+  ErrorResponseDto,
+  Get,
+  HttpController,
+  type HttpResponse,
+  HttpStatus,
+  Params,
+  Post,
+  Put,
+  Query,
+  Res,
+  RespondFor,
+  ServerErrorCode,
+} from '@shadow-library/fastify';
 
 import { AppErrorCode } from '@server/classes';
 import { type Catalog } from '@server/database';
@@ -17,9 +32,11 @@ import {
   CatalogVersionDetailResponse,
   CatalogVersionListResponse,
   CatalogVersionSummaryResponse,
+  DiscardDraftQuery,
   DraftDiffResponse,
   DraftResponse,
   PublishBody,
+  PublishBudgetsBody,
   SaveDraftBody,
   SaveDraftResponse,
   ValidateDraftResponse,
@@ -30,6 +47,8 @@ import { DRAFT_PERMISSIONS, DRAFT_SENSITIVE_PERMISSIONS, draftAuthorizer } from 
 
 const UNPROCESSABLE = 422;
 const CONFLICT = 409;
+/** The draft path checks budget writes against the short PDP cache too, so revoking the permission takes effect within a minute on both */
+const HIGH_RISK = { highRisk: true };
 
 function summaryOf(row: CatalogVersionSummary): CatalogVersionSummaryResponse {
   return {
@@ -100,6 +119,16 @@ export class CatalogAdminController {
     });
   }
 
+  @Delete('/draft')
+  @RequirePermission(SYNAPSE_PERMISSIONS.catalogWrite)
+  @HttpStatus(204)
+  @RespondFor(CONFLICT, ErrorResponseDto)
+  async discardDraft(@Query() query: DiscardDraftQuery): Promise<void> {
+    const user = this.caller.user();
+    const granted = await this.caller.permissions(user, DRAFT_PERMISSIONS, DRAFT_SENSITIVE_PERMISSIONS);
+    await this.catalog.discardDraft(query.fingerprint, user.sub, draftAuthorizer(granted));
+  }
+
   @Post('/draft/validate')
   @RequirePermission(SYNAPSE_PERMISSIONS.catalogWrite)
   @RespondFor(200, ValidateDraftResponse)
@@ -127,6 +156,16 @@ export class CatalogAdminController {
     const fingerprint = body.fingerprint;
     if (!fingerprint) throw AppErrorCode.SYN_INVALID_REQUEST.create({ param: 'fingerprint', reason: 'the fingerprint of the draft being published is required' });
     return this.withIssues(response, async () => summaryOf(await this.catalog.publish(user.sub, fingerprint)));
+  }
+
+  @Put('/budgets')
+  @RequirePermission(SYNAPSE_PERMISSIONS.budgetsWrite, HIGH_RISK)
+  @RespondFor(200, CatalogVersionSummaryResponse)
+  @RespondFor(CONFLICT, ErrorResponseDto)
+  @RespondFor(UNPROCESSABLE, CatalogInvalidResponse)
+  async publishBudgets(@Body() body: PublishBudgetsBody, @Res() response: HttpResponse): Promise<CatalogVersionSummaryResponse | HttpResponse> {
+    const user = this.caller.user();
+    return this.withIssues(response, async () => summaryOf(await this.catalog.publishBudgets(body.budgets, body.expectedVersion, body.note, user.sub)));
   }
 
   @Post('/versions/:version/rollback')

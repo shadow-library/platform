@@ -138,6 +138,29 @@ export class PublishBody {
 }
 
 @Schema()
+export class DiscardDraftQuery {
+  @Field({ minLength: 1, description: 'Fingerprint of the draft being discarded; the discard is refused with 409 when the draft has changed since' })
+  fingerprint: string;
+}
+
+@Schema()
+export class PublishBudgetsBody {
+  @Field(() => [Object], {
+    description: 'The complete budget list that replaces the active one. Validated with the whole catalog, so an invalid entry is refused with 422 and its issues',
+  })
+  budgets: Record<string, unknown>[];
+
+  @Field(() => Integer, {
+    minimum: 1,
+    description: 'Version of the active catalog the budgets were edited against; refused with 409 when another version has been published since',
+  })
+  expectedVersion: number;
+
+  @Field({ optional: true, maxLength: 500, description: 'Free-text note stored with the new version; defaults to "Budgets updated"' })
+  note?: string;
+}
+
+@Schema()
 export class AliasImpactRowResponse {
   @Field()
   app: string;
