@@ -10,7 +10,7 @@ describe('capabilitiesOf', () => {
       publish: false,
       writeProviders: false,
       manageCredentials: false,
-      writeBudgets: false,
+      setBudgets: false,
       readUsage: true,
     });
   });
@@ -24,6 +24,12 @@ describe('capabilitiesOf', () => {
   it('should grant credential management on its own permission, not on the provider write permission', () => {
     expect(capabilitiesOf([SYNAPSE_PERMISSIONS.providersWrite]).manageCredentials).toBe(false);
     expect(capabilitiesOf([SYNAPSE_PERMISSIONS.credentialsManage]).manageCredentials).toBe(true);
+  });
+
+  it('should let a holder of the budget permission set budgets without editing the rest of the draft', () => {
+    const capabilities = capabilitiesOf([SYNAPSE_PERMISSIONS.catalogRead, SYNAPSE_PERMISSIONS.budgetsWrite]);
+    expect(capabilities.setBudgets).toBe(true);
+    expect(capabilities.writeDraft).toBe(false);
   });
 
   it('should grant nothing for permissions of another application', () => {

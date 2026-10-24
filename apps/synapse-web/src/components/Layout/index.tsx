@@ -2,30 +2,60 @@ import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { type PropsWithChildren, type ReactElement } from 'react';
 import { Alert, IconButton, OrganisationSwitcher, useTheme } from '@shadow-library/ui';
-import { AppShell, type NavConfig } from '@shadow-library/ui/router';
+import { AppShell, type NavConfig, type NavLeaf, type NavSection } from '@shadow-library/ui/router';
 import { userDisplayName } from '@shadow-library/web';
 import { useOrganisationSwitch } from '@shadow-library/web/router';
 
-import { AliasIcon, CatalogIcon, KeyIcon, MoonIcon, OverviewIcon, SunIcon, SynapseMark, UsageIcon } from '@/features/shared';
+import {
+  AliasIcon,
+  BudgetIcon,
+  CatalogIcon,
+  FeaturesIcon,
+  HistoryIcon,
+  KeyIcon,
+  ModelIcon,
+  MoonIcon,
+  OverviewIcon,
+  ProviderIcon,
+  PublishIcon,
+  SunIcon,
+  SynapseMark,
+  UsageIcon,
+} from '@/features/shared';
 import { type Capabilities, logout, meQuery, organisationsQueryOptions, switchOrganisation, useAccessCheck, useCapabilities } from '@/lib';
 
+import { ChangesBar } from './ChangesBar';
 import styles from './Layout.module.css';
 
+function section(label: string, items: NavLeaf[]): NavSection {
+  return { label, items, hidden: items.every(item => item.hidden) };
+}
+
 function navFor(capabilities: Capabilities): NavConfig {
+  const catalogHidden = !capabilities.readCatalog;
+  const usageHidden = !capabilities.readUsage;
   return {
     variant: 'sections',
     sections: [
-      { label: 'Overview', items: [{ to: '/', label: 'Overview', icon: <OverviewIcon />, exact: true, hidden: !capabilities.readCatalog }] },
-      {
-        label: 'Catalog',
-        hidden: !capabilities.readCatalog,
-        items: [
-          { to: '/catalog', label: 'Catalog editor', icon: <CatalogIcon /> },
-          { to: '/aliases', label: 'Aliases', icon: <AliasIcon /> },
-        ],
-      },
-      { label: 'Metering', hidden: !capabilities.readUsage, items: [{ to: '/usage', label: 'Usage', icon: <UsageIcon /> }] },
-      { label: 'Security', hidden: !capabilities.manageCredentials, items: [{ to: '/credentials', label: 'Credentials', icon: <KeyIcon /> }] },
+      section('Spend', [
+        { to: '/', label: 'Overview', icon: <OverviewIcon />, exact: true, hidden: usageHidden },
+        { to: '/usage', label: 'Usage', icon: <UsageIcon />, hidden: usageHidden },
+        { to: '/budgets', label: 'Budgets', icon: <BudgetIcon />, hidden: usageHidden },
+      ]),
+      section('AI features', [
+        { to: '/features', label: 'Features', icon: <FeaturesIcon />, hidden: catalogHidden },
+        { to: '/aliases', label: 'Model names', icon: <AliasIcon />, hidden: catalogHidden },
+        { to: '/models', label: 'Models', icon: <ModelIcon />, hidden: catalogHidden },
+      ]),
+      section('Changes', [
+        { to: '/changes', label: 'Review & publish', icon: <PublishIcon />, hidden: catalogHidden },
+        { to: '/history', label: 'History', icon: <HistoryIcon />, hidden: catalogHidden },
+      ]),
+      section('Infrastructure', [
+        { to: '/providers', label: 'Providers', icon: <ProviderIcon />, hidden: catalogHidden },
+        { to: '/credentials', label: 'Credentials', icon: <KeyIcon />, hidden: !capabilities.manageCredentials },
+        { to: '/advanced', label: 'Advanced editor', icon: <CatalogIcon />, hidden: catalogHidden },
+      ]),
     ],
   };
 }
@@ -79,6 +109,7 @@ export function Layout({ children }: PropsWithChildren): ReactElement {
           Controls are hidden until they can be. The server still decides what you may do.
         </Alert>
       ) : null}
+      <ChangesBar />
       {children}
     </AppShell>
   );

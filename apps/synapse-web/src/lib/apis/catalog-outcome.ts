@@ -1,10 +1,16 @@
-import { ApiError, type ErrorResponse } from '@shadow-library/web';
+import { ApiError, type ErrorResponse, isApiError } from '@shadow-library/web';
 
 import { type CatalogInvalidResponse } from './api-types.gen';
 
 export const UNPROCESSABLE = 422;
 
+const CONFLICT = 409;
+
 const CATALOG_INVALID = 'SYN_CATALOG_INVALID';
+
+export function isCatalogConflict(error: unknown): boolean {
+  return isApiError(error) && error.status === CONFLICT;
+}
 
 export type CatalogWriteOutcome<T> = { kind: 'done'; value: T } | { kind: 'invalid'; issues: CatalogInvalidResponse['issues'] };
 

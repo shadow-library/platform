@@ -1,28 +1,17 @@
-import { createFileRoute } from '@tanstack/react-router';
-import { type ReactElement } from 'react';
+import { createFileRoute, redirect } from '@tanstack/react-router';
 
-import { activeVersionOf, type CatalogTab, CatalogWorkspace, parseCatalogTab } from '@/features/catalog';
-import { draftQueryOptions, loadCapabilities, versionQueryOptions, versionsQueryOptions } from '@/lib';
+import { type CatalogTab, parseCatalogTab } from '@/features/catalog';
 
 interface CatalogSearch {
   tab: CatalogTab;
 }
 
-/** The editor's buffer starts from the draft, or from the active version when there is none, so both are loaded before it mounts. */
+const TAB_DESTINATIONS = { draft: '/advanced', publish: '/changes', versions: '/history' } as const satisfies Record<CatalogTab, string>;
+
+/** The old single catalog screen, kept as a redirect so bookmarked `?tab=` links land on the screen that replaced each tab. */
 export const Route = createFileRoute('/_app/catalog/')({
   validateSearch: (search: Record<string, unknown>): CatalogSearch => ({ tab: parseCatalogTab(search.tab) }),
-  loader: async ({ context: { queryClient } }) => {
-    const capabilities = await loadCapabilities(queryClient);
-    if (!capabilities.readCatalog) return;
-    const [versions] = await Promise.all([queryClient.ensureQueryData(versionsQueryOptions()), queryClient.ensureQueryData(draftQueryOptions())]);
-    const active = activeVersionOf(versions.items);
-    if (active) await queryClient.ensureQueryData(versionQueryOptions(active.version));
+  beforeLoad: ({ search }) => {
+    throw redirect({ to: TAB_DESTINATIONS[search.tab] });
   },
-  head: () => ({ meta: [{ title: 'Catalog · Shadow Synapse' }] }),
-  component: CatalogRoute,
 });
-
-function CatalogRoute(): ReactElement {
-  const { tab } = Route.useSearch();
-  return <CatalogWorkspace tab={tab} />;
-}

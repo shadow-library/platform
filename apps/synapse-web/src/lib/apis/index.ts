@@ -1,5 +1,6 @@
 export * from './access.api';
 export * from './api-types.gen';
+export * from './budgets.api';
 export * from './catalog.api';
 export * from './catalog-outcome';
 export * from './credential-outcome';

@@ -69,7 +69,7 @@ function CatalogScreen({ tab, capabilities }: { tab: CatalogTab; capabilities: C
           key={generation}
           tab={tab}
           capabilities={capabilities}
-          initial={editorSourceOf(draft, activeDocument)}
+          initial={editorSourceOf(draft, activeDetail.data ?? null)}
           activeVersion={active?.version}
           onNotice={setNotice}
           onReload={reload}
@@ -131,7 +131,7 @@ function CatalogEditor({ tab, capabilities, initial, activeVersion, onNotice, on
     });
   };
 
-  const changeTab = (value: string): void => void navigate({ to: '/catalog', search: { tab: value as CatalogTab } });
+  const changeTab = (value: string): void => void navigate({ to: '/advanced', search: { tab: value as CatalogTab } });
 
   /** A publish or rollback replaces what the editor was loaded from; unsaved edits are kept rather than thrown away with it. */
   const afterCatalogChange = async (notice: Notice): Promise<void> => {

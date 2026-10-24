@@ -1,4 +1,4 @@
-import { queryOptions, useMutation, type UseMutationResult, useQueryClient, type UseQueryOptions } from '@tanstack/react-query';
+import { type QueryClient, queryOptions, useMutation, type UseMutationResult, useQueryClient, type UseQueryOptions } from '@tanstack/react-query';
 import { type ApiResult } from '@shadow-library/web';
 
 import {
@@ -13,13 +13,13 @@ import {
   type SaveDraftResponse,
   type ValidateDraftResponse,
 } from './api-types.gen';
-import { catalogWriteOutcome, type CatalogWriteOutcome, UNPROCESSABLE } from './catalog-outcome';
+import { budgetKeys } from './budgets.api';
+import { catalogWriteOutcome, type CatalogWriteOutcome, isCatalogConflict, UNPROCESSABLE } from './catalog-outcome';
 import { credentialKeys } from './credentials.api';
 import { providerKeys } from './providers.api';
-import { ApiError, APIRequest, isApiError } from './transport';
+import { ApiError, APIRequest } from './transport';
 
 const NOT_FOUND = 404;
-const CONFLICT = 409;
 
 export const catalogKeys = {
   all: ['catalog'],
@@ -29,10 +29,6 @@ export const catalogKeys = {
   diff: () => [...catalogKeys.draft(), 'diff'],
   impact: (alias: string, model?: string) => [...catalogKeys.all, 'aliases', alias, 'impact', model ?? null],
 } as const;
-
-export function isCatalogConflict(error: unknown): boolean {
-  return isApiError(error) && error.status === CONFLICT;
-}
 
 interface ResultRequest {
   result<T>(): Promise<ApiResult<T>>;
@@ -82,15 +78,22 @@ export const aliasImpactQueryOptions = (alias: string, model?: string): UseQuery
         .execute(),
   });
 
+export async function saveDraft(body: SaveDraftBody): Promise<CatalogWriteOutcome<SaveDraftResponse>> {
+  return catalogWriteOutcome(await APIRequest.put('/admin/catalog/draft').body(body).modeled(UNPROCESSABLE).execute<SaveDraftResponse | CatalogInvalidResponse>());
+}
+
+export function cacheSavedDraft(queryClient: QueryClient, saved: SaveDraftResponse): void {
+  const draft: DraftResponse = { draft: saved.draft, fingerprint: saved.fingerprint };
+  queryClient.setQueryData(draftQueryOptions().queryKey, draft);
+}
+
 export function useSaveDraftMutation(): UseMutationResult<CatalogWriteOutcome<SaveDraftResponse>, ApiError, SaveDraftBody> {
   const queryClient = useQueryClient();
   return useMutation<CatalogWriteOutcome<SaveDraftResponse>, ApiError, SaveDraftBody>({
-    mutationFn: async body =>
-      catalogWriteOutcome(await APIRequest.put('/admin/catalog/draft').body(body).modeled(UNPROCESSABLE).execute<SaveDraftResponse | CatalogInvalidResponse>()),
+    mutationFn: saveDraft,
     onSuccess: outcome => {
       if (outcome.kind !== 'done') return;
-      const draft: DraftResponse = { draft: outcome.value.draft, fingerprint: outcome.value.fingerprint };
-      queryClient.setQueryData(draftQueryOptions().queryKey, draft);
+      cacheSavedDraft(queryClient, outcome.value);
       return queryClient.invalidateQueries({ queryKey: catalogKeys.diff() });
     },
     onError: async error => {
@@ -116,6 +119,7 @@ function useCatalogWrite<TVariables>(
         queryClient.invalidateQueries({ queryKey: catalogKeys.all }),
         queryClient.invalidateQueries({ queryKey: providerKeys.all }),
         queryClient.invalidateQueries({ queryKey: credentialKeys.all }),
+        queryClient.invalidateQueries({ queryKey: budgetKeys.all }),
       ]),
   });
 }

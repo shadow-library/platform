@@ -30,7 +30,7 @@ export interface Capabilities {
   publish: boolean;
   writeProviders: boolean;
   manageCredentials: boolean;
-  writeBudgets: boolean;
+  setBudgets: boolean;
   readUsage: boolean;
 }
 
@@ -42,7 +42,7 @@ export function capabilitiesOf(permissions: readonly string[]): Capabilities {
     publish: held.has(SYNAPSE_PERMISSIONS.catalogPublish),
     writeProviders: held.has(SYNAPSE_PERMISSIONS.providersWrite),
     manageCredentials: held.has(SYNAPSE_PERMISSIONS.credentialsManage),
-    writeBudgets: held.has(SYNAPSE_PERMISSIONS.budgetsWrite),
+    setBudgets: held.has(SYNAPSE_PERMISSIONS.budgetsWrite),
     readUsage: held.has(SYNAPSE_PERMISSIONS.usageRead),
   };
 }

@@ -6,6 +6,7 @@ import { draftQueryOptions, loadCapabilities, providersQueryOptions, usageQueryO
 export const Route = createFileRoute('/_app/')({
   beforeLoad: async ({ context: { queryClient } }) => {
     const capabilities = await loadCapabilities(queryClient);
+    if (!capabilities.readUsage && capabilities.readCatalog) throw redirect({ to: '/features' });
     if (!capabilities.readCatalog && capabilities.readUsage) throw redirect({ to: '/usage', search: { groupBy: 'app' } });
   },
   loader: async ({ context: { queryClient } }) => {

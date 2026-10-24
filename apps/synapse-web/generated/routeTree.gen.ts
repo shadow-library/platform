@@ -13,9 +13,17 @@ import { Route as LoginRouteImport } from './../src/routes/login'
 import { Route as AppRouteImport } from './../src/routes/_app'
 import { Route as AppIndexRouteImport } from './../src/routes/_app/index'
 import { Route as AppUsageIndexRouteImport } from './../src/routes/_app/usage/index'
+import { Route as AppProvidersIndexRouteImport } from './../src/routes/_app/providers/index'
+import { Route as AppModelsIndexRouteImport } from './../src/routes/_app/models/index'
+import { Route as AppHistoryIndexRouteImport } from './../src/routes/_app/history/index'
+import { Route as AppFeaturesIndexRouteImport } from './../src/routes/_app/features/index'
 import { Route as AppCredentialsIndexRouteImport } from './../src/routes/_app/credentials/index'
+import { Route as AppChangesIndexRouteImport } from './../src/routes/_app/changes/index'
 import { Route as AppCatalogIndexRouteImport } from './../src/routes/_app/catalog/index'
+import { Route as AppBudgetsIndexRouteImport } from './../src/routes/_app/budgets/index'
 import { Route as AppAliasesIndexRouteImport } from './../src/routes/_app/aliases/index'
+import { Route as AppAdvancedIndexRouteImport } from './../src/routes/_app/advanced/index'
+import { Route as AppFeaturesTaskRouteImport } from './../src/routes/_app/features/$task'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -36,9 +44,34 @@ const AppUsageIndexRoute = AppUsageIndexRouteImport.update({
   path: '/usage/',
   getParentRoute: () => AppRoute,
 } as any)
+const AppProvidersIndexRoute = AppProvidersIndexRouteImport.update({
+  id: '/providers/',
+  path: '/providers/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppModelsIndexRoute = AppModelsIndexRouteImport.update({
+  id: '/models/',
+  path: '/models/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppHistoryIndexRoute = AppHistoryIndexRouteImport.update({
+  id: '/history/',
+  path: '/history/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppFeaturesIndexRoute = AppFeaturesIndexRouteImport.update({
+  id: '/features/',
+  path: '/features/',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppCredentialsIndexRoute = AppCredentialsIndexRouteImport.update({
   id: '/credentials/',
   path: '/credentials/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppChangesIndexRoute = AppChangesIndexRouteImport.update({
+  id: '/changes/',
+  path: '/changes/',
   getParentRoute: () => AppRoute,
 } as any)
 const AppCatalogIndexRoute = AppCatalogIndexRouteImport.update({
@@ -46,26 +79,57 @@ const AppCatalogIndexRoute = AppCatalogIndexRouteImport.update({
   path: '/catalog/',
   getParentRoute: () => AppRoute,
 } as any)
+const AppBudgetsIndexRoute = AppBudgetsIndexRouteImport.update({
+  id: '/budgets/',
+  path: '/budgets/',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppAliasesIndexRoute = AppAliasesIndexRouteImport.update({
   id: '/aliases/',
   path: '/aliases/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAdvancedIndexRoute = AppAdvancedIndexRouteImport.update({
+  id: '/advanced/',
+  path: '/advanced/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppFeaturesTaskRoute = AppFeaturesTaskRouteImport.update({
+  id: '/features/$task',
+  path: '/features/$task',
   getParentRoute: () => AppRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/login': typeof LoginRoute
+  '/features/$task': typeof AppFeaturesTaskRoute
+  '/advanced/': typeof AppAdvancedIndexRoute
   '/aliases/': typeof AppAliasesIndexRoute
+  '/budgets/': typeof AppBudgetsIndexRoute
   '/catalog/': typeof AppCatalogIndexRoute
+  '/changes/': typeof AppChangesIndexRoute
   '/credentials/': typeof AppCredentialsIndexRoute
+  '/features/': typeof AppFeaturesIndexRoute
+  '/history/': typeof AppHistoryIndexRoute
+  '/models/': typeof AppModelsIndexRoute
+  '/providers/': typeof AppProvidersIndexRoute
   '/usage/': typeof AppUsageIndexRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/': typeof AppIndexRoute
+  '/features/$task': typeof AppFeaturesTaskRoute
+  '/advanced': typeof AppAdvancedIndexRoute
   '/aliases': typeof AppAliasesIndexRoute
+  '/budgets': typeof AppBudgetsIndexRoute
   '/catalog': typeof AppCatalogIndexRoute
+  '/changes': typeof AppChangesIndexRoute
   '/credentials': typeof AppCredentialsIndexRoute
+  '/features': typeof AppFeaturesIndexRoute
+  '/history': typeof AppHistoryIndexRoute
+  '/models': typeof AppModelsIndexRoute
+  '/providers': typeof AppProvidersIndexRoute
   '/usage': typeof AppUsageIndexRoute
 }
 export interface FileRoutesById {
@@ -73,25 +137,68 @@ export interface FileRoutesById {
   '/_app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
   '/_app/': typeof AppIndexRoute
+  '/_app/features/$task': typeof AppFeaturesTaskRoute
+  '/_app/advanced/': typeof AppAdvancedIndexRoute
   '/_app/aliases/': typeof AppAliasesIndexRoute
+  '/_app/budgets/': typeof AppBudgetsIndexRoute
   '/_app/catalog/': typeof AppCatalogIndexRoute
+  '/_app/changes/': typeof AppChangesIndexRoute
   '/_app/credentials/': typeof AppCredentialsIndexRoute
+  '/_app/features/': typeof AppFeaturesIndexRoute
+  '/_app/history/': typeof AppHistoryIndexRoute
+  '/_app/models/': typeof AppModelsIndexRoute
+  '/_app/providers/': typeof AppProvidersIndexRoute
   '/_app/usage/': typeof AppUsageIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/login' | '/aliases/' | '/catalog/' | '/credentials/' | '/usage/'
+    | '/'
+    | '/login'
+    | '/features/$task'
+    | '/advanced/'
+    | '/aliases/'
+    | '/budgets/'
+    | '/catalog/'
+    | '/changes/'
+    | '/credentials/'
+    | '/features/'
+    | '/history/'
+    | '/models/'
+    | '/providers/'
+    | '/usage/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/login' | '/' | '/aliases' | '/catalog' | '/credentials' | '/usage'
+  to:
+    | '/login'
+    | '/'
+    | '/features/$task'
+    | '/advanced'
+    | '/aliases'
+    | '/budgets'
+    | '/catalog'
+    | '/changes'
+    | '/credentials'
+    | '/features'
+    | '/history'
+    | '/models'
+    | '/providers'
+    | '/usage'
   id:
     | '__root__'
     | '/_app'
     | '/login'
     | '/_app/'
+    | '/_app/features/$task'
+    | '/_app/advanced/'
     | '/_app/aliases/'
+    | '/_app/budgets/'
     | '/_app/catalog/'
+    | '/_app/changes/'
     | '/_app/credentials/'
+    | '/_app/features/'
+    | '/_app/history/'
+    | '/_app/models/'
+    | '/_app/providers/'
     | '/_app/usage/'
   fileRoutesById: FileRoutesById
 }
@@ -130,11 +237,46 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppUsageIndexRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/providers/': {
+      id: '/_app/providers/'
+      path: '/providers'
+      fullPath: '/providers/'
+      preLoaderRoute: typeof AppProvidersIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/models/': {
+      id: '/_app/models/'
+      path: '/models'
+      fullPath: '/models/'
+      preLoaderRoute: typeof AppModelsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/history/': {
+      id: '/_app/history/'
+      path: '/history'
+      fullPath: '/history/'
+      preLoaderRoute: typeof AppHistoryIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/features/': {
+      id: '/_app/features/'
+      path: '/features'
+      fullPath: '/features/'
+      preLoaderRoute: typeof AppFeaturesIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/credentials/': {
       id: '/_app/credentials/'
       path: '/credentials'
       fullPath: '/credentials/'
       preLoaderRoute: typeof AppCredentialsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/changes/': {
+      id: '/_app/changes/'
+      path: '/changes'
+      fullPath: '/changes/'
+      preLoaderRoute: typeof AppChangesIndexRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/catalog/': {
@@ -144,6 +286,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppCatalogIndexRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/budgets/': {
+      id: '/_app/budgets/'
+      path: '/budgets'
+      fullPath: '/budgets/'
+      preLoaderRoute: typeof AppBudgetsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/aliases/': {
       id: '/_app/aliases/'
       path: '/aliases'
@@ -151,22 +300,52 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAliasesIndexRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/advanced/': {
+      id: '/_app/advanced/'
+      path: '/advanced'
+      fullPath: '/advanced/'
+      preLoaderRoute: typeof AppAdvancedIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/features/$task': {
+      id: '/_app/features/$task'
+      path: '/features/$task'
+      fullPath: '/features/$task'
+      preLoaderRoute: typeof AppFeaturesTaskRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
 interface AppRouteChildren {
   AppIndexRoute: typeof AppIndexRoute
+  AppFeaturesTaskRoute: typeof AppFeaturesTaskRoute
+  AppAdvancedIndexRoute: typeof AppAdvancedIndexRoute
   AppAliasesIndexRoute: typeof AppAliasesIndexRoute
+  AppBudgetsIndexRoute: typeof AppBudgetsIndexRoute
   AppCatalogIndexRoute: typeof AppCatalogIndexRoute
+  AppChangesIndexRoute: typeof AppChangesIndexRoute
   AppCredentialsIndexRoute: typeof AppCredentialsIndexRoute
+  AppFeaturesIndexRoute: typeof AppFeaturesIndexRoute
+  AppHistoryIndexRoute: typeof AppHistoryIndexRoute
+  AppModelsIndexRoute: typeof AppModelsIndexRoute
+  AppProvidersIndexRoute: typeof AppProvidersIndexRoute
   AppUsageIndexRoute: typeof AppUsageIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppIndexRoute: AppIndexRoute,
+  AppFeaturesTaskRoute: AppFeaturesTaskRoute,
+  AppAdvancedIndexRoute: AppAdvancedIndexRoute,
   AppAliasesIndexRoute: AppAliasesIndexRoute,
+  AppBudgetsIndexRoute: AppBudgetsIndexRoute,
   AppCatalogIndexRoute: AppCatalogIndexRoute,
+  AppChangesIndexRoute: AppChangesIndexRoute,
   AppCredentialsIndexRoute: AppCredentialsIndexRoute,
+  AppFeaturesIndexRoute: AppFeaturesIndexRoute,
+  AppHistoryIndexRoute: AppHistoryIndexRoute,
+  AppModelsIndexRoute: AppModelsIndexRoute,
+  AppProvidersIndexRoute: AppProvidersIndexRoute,
   AppUsageIndexRoute: AppUsageIndexRoute,
 }
 

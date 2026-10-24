@@ -32,6 +32,34 @@ export function KeyIcon(): ReactElement {
   return <StrokeIcon paths={['M21 2l-2 2', 'M15.5 7.5l3 3L22 7l-3-3', 'M11.4 11.6a5.5 5.5 0 1 1-7.8 7.8 5.5 5.5 0 0 1 7.8-7.8z', 'M15.5 7.5l-4.1 4.1']} />;
 }
 
+export function BudgetIcon(): ReactElement {
+  return <StrokeIcon paths={['M3 7a2 2 0 0 1 2-2h13v4', 'M3 7v11a2 2 0 0 0 2 2h15V9H5a2 2 0 0 1-2-2z', 'M16 14.5h.01']} />;
+}
+
+export function FeaturesIcon(): ReactElement {
+  return <StrokeIcon paths={['M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z', 'M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z']} />;
+}
+
+export function ModelIcon(): ReactElement {
+  return <StrokeIcon paths={['M7 7h10v10H7z', 'M9 3v4', 'M15 3v4', 'M9 17v4', 'M15 17v4', 'M3 9h4', 'M3 15h4', 'M17 9h4', 'M17 15h4']} />;
+}
+
+export function PublishIcon(): ReactElement {
+  return <StrokeIcon paths={['M12 15V3', 'M7 8l5-5 5 5', 'M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4']} />;
+}
+
+export function HistoryIcon(): ReactElement {
+  return <StrokeIcon paths={['M3 12a9 9 0 1 0 3-6.7', 'M3 4v4h4', 'M12 7v5l3 2']} />;
+}
+
+export function ProviderIcon(): ReactElement {
+  return <StrokeIcon paths={['M4 4h16v6H4z', 'M4 14h16v6H4z', 'M8 7h.01', 'M8 17h.01']} />;
+}
+
+export function InfoIcon(): ReactElement {
+  return <StrokeIcon paths={['M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z', 'M12 16v-4', 'M12 8h.01']} size={14} />;
+}
+
 export function MoonIcon(): ReactElement {
   return <StrokeIcon paths={['M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z']} size={16} />;
 }

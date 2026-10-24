@@ -13,5 +13,5 @@ export async function fetchEditorSource(queryClient: QueryClient): Promise<Edito
   await queryClient.invalidateQueries({ queryKey: catalogKeys.diff() });
   const active = activeVersionOf(versions.items);
   const detail = active ? await queryClient.fetchQuery(versionQueryOptions(active.version)) : null;
-  return editorSourceOf(draft, detail?.document ?? null);
+  return editorSourceOf(draft, detail);
 }

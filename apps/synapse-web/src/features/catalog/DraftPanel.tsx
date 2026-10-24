@@ -34,7 +34,7 @@ function errorNotice(title: string, error: unknown): Notice {
 }
 
 function sectionHint(capabilities: Capabilities): string | null {
-  const locked = [!capabilities.writeProviders && '`providers`', !capabilities.writeBudgets && '`budgets`'].filter(Boolean);
+  const locked = [!capabilities.writeProviders && '`providers`', !capabilities.setBudgets && '`budgets`'].filter(Boolean);
   if (locked.length === 0) return null;
   return `Your role cannot change ${locked.join(' or ')}: a save that changes them is refused.`;
 }
@@ -67,7 +67,7 @@ export function DraftPanel({
     const trimmed = note.trim();
     onNotice(null);
     save.mutate(
-      { document: parsed.document, ...(trimmed && { note: trimmed }), ...draftExpectation(source.fingerprint) },
+      { document: parsed.document, ...(trimmed && { note: trimmed }), ...draftExpectation(source.fingerprint, source.activeVersion) },
       {
         onSuccess: outcome => {
           if (outcome.kind === 'invalid') {

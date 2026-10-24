@@ -9,16 +9,10 @@ import cells from '@/features/shared/cells.module.css';
 import controls from '@/features/shared/controls.module.css';
 import { type Capabilities, type CatalogIssueResponse, type CredentialResponse, credentialsQueryOptions } from '@/lib';
 
-import {
-  type CatalogDocument,
-  credentialIssuesByProvider,
-  type DocumentEdit,
-  type ParsedCatalog,
-  type ProviderEntry,
-  readProviders,
-  withoutProviderCredential,
-  withProviderCredential,
-} from './catalog-document';
+import { type CatalogDocument, credentialIssuesByProvider, type DocumentEdit, type ParsedCatalog } from './catalog-document';
+import { withoutProviderCredential, withProviderCredential } from './catalog-edits';
+import { readProviders } from './catalog-readers';
+import { type ProviderEntry } from './catalog-spec.types';
 import styles from './Catalog.module.css';
 
 interface ProviderCredentialsPanelProps {
