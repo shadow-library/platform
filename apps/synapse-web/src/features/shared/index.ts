@@ -1,4 +1,5 @@
 export * from './cells';
+export * from './chart-slots';
 export * from './CostLabel';
 export * from './format';
 export * from './icons';

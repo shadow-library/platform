@@ -110,10 +110,21 @@ describe('dailySpendOf', () => {
   it('should order series by key so colours stay with their app', () => {
     const spend = dailySpendOf(seriesResponse([entry('web-novel', [[9, 1]]), entry('memoir', [[1, 1]]), entry(null, [[5, 0]])]), 'list');
     expect(spend.series).toEqual([
-      { key: 'memoir', label: 'Memoir' },
-      { key: 'web-novel', label: 'Web Novel' },
-      { key: UNKNOWN_SERIES_KEY, label: 'Unknown app' },
+      { key: 'memoir', label: 'Memoir', slot: 1 },
+      { key: 'web-novel', label: 'Web Novel', slot: 2 },
+      { key: UNKNOWN_SERIES_KEY, label: 'Unknown app', slot: 3 },
     ]);
+  });
+
+  it('should keep an app on its slot when another app is folded away', () => {
+    const apps = ['aa', 'bb', 'cc', 'dd', 'ee', 'ff', 'gg', 'hh', 'ii'];
+    const full = dailySpendOf(seriesResponse(apps.map((key, position) => entry(key, [[100 - position, 1]]))), 'list');
+    const slotOf = (spend: typeof full, key: string): number | undefined => spend.series.find(item => item.key === key)?.slot;
+    expect(slotOf(full, 'aa')).toBe(1);
+    expect(slotOf(full, 'gg')).toBe(7);
+    expect(full.series.find(item => item.key === OTHER_SERIES_KEY)?.slot).toBeUndefined();
+    const fewer = dailySpendOf(seriesResponse(apps.slice(0, 3).map(key => entry(key, [[1, 1]]))), 'list');
+    expect(slotOf(fewer, 'cc')).toBe(3);
   });
 
   it('should chart the chosen cost per day, one datum for every day', () => {

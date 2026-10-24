@@ -16,6 +16,7 @@ import {
   usageKeyName,
   usageNamesOf,
   usageRows,
+  usageSlotKeys,
 } from '../src/features/usage/usage-report';
 import { type UsageRowResponse, type UsageSeriesEntryResponse, type UsageTotalsResponse } from '../src/lib/apis/api-types.gen';
 
@@ -62,6 +63,19 @@ describe('usageChart', () => {
     expect(after.series.map(item => item.key)).toEqual(['alpha', 'zeta']);
   });
 
+  it('should keep a series on its slot when a cost basis drops a series or a key falls out of the kept set', () => {
+    const series = [entry('a', [9, 0]), { ...entry('b', [0, 0]) }, entry('c', [1, 0])];
+    const slotsOf = (chart: ReturnType<typeof usageChart>): Record<string, number | undefined> => Object.fromEntries(chart.series.map(item => [item.key, item.slot]));
+    expect(slotsOf(usageChart({ days: DAYS, series }, 'list', nameOf))).toEqual({ a: 1, c: 3 });
+    expect(slotsOf(usageChart({ days: DAYS, series }, 'list', nameOf, 1))).toEqual({ a: 1, [OTHER_SERIES_KEY]: undefined });
+    expect(slotsOf(usageChart({ days: DAYS, series: [series[2]!] }, 'list', nameOf, 7, ['a', 'b', 'c']))).toEqual({ c: 3 });
+  });
+
+  it('should leave the neutral Other without a slot', () => {
+    const series = [entry('a', [9, 0]), entry('b', [1, 0])];
+    expect(usageChart({ days: DAYS, series }, 'list', nameOf, 1).series.at(-1)?.slot).toBeUndefined();
+  });
+
   it('should rank by the chosen cost basis', () => {
     const billedOnly = { ...entry('paid', [1, 0]), totals: totals(1, 5) };
     const free = entry('free', [9, 0]);
@@ -76,8 +90,8 @@ describe('usageChart', () => {
   it('should give the unrecorded series a sentinel key, sorted last, named in words', () => {
     const chart = usageChart({ days: DAYS, series: [entry(null, [5, 5]), entry('b', [1, 1])] }, 'list', nameOf);
     expect(chart.series).toEqual([
-      { key: 'b', label: 'b' },
-      { key: UNRECORDED_SERIES_KEY, label: NOT_RECORDED },
+      { key: 'b', label: 'b', slot: 1 },
+      { key: UNRECORDED_SERIES_KEY, label: NOT_RECORDED, slot: 2 },
     ]);
     expect(chart.data[0]?.values[UNRECORDED_SERIES_KEY]).toBe(5);
   });
@@ -273,5 +287,29 @@ describe('usageCsvFilename', () => {
   it('should name the covered days and the grouping', () => {
     expect(usageCsvFilename('2026-10-01', '2026-10-31', 'task')).toBe('synapse-usage-2026-10-01_2026-10-31-by-feature.csv');
     expect(usageCsvFilename('2026-10-01', '2026-10-31', 'alias')).toBe('synapse-usage-2026-10-01_2026-10-31-by-model-name.csv');
+  });
+});
+
+describe('usageSlotKeys', () => {
+  const names = usageNamesOf({
+    tasks: {
+      'novel-forge.chat': { kind: 'chat', dataPolicy: 'any', routes: [{ model: 'opus' }] },
+      'novel-forge.outline': { kind: 'chat', dataPolicy: 'any', routes: [{ model: 'opus' }] },
+      'memoir.recap': { kind: 'chat', dataPolicy: 'any', routes: [{ model: 'opus' }] },
+    },
+    aliases: { opus: { label: 'Opus', model: 'opus-5', state: 'active' } },
+    models: { 'opus-5': { label: 'Opus 5.5', capabilities: {}, deployments: [], pricePerMTok: { input: 1, output: 2 } } },
+  });
+
+  it('should list each app once, and the catalog keys for every other grouping', () => {
+    expect(usageSlotKeys('app', names).sort()).toEqual(['memoir', 'novel-forge']);
+    expect(usageSlotKeys('task', names)).toHaveLength(3);
+    expect(usageSlotKeys('alias', names)).toEqual(['opus']);
+    expect(usageSlotKeys('model', names)).toEqual(['opus-5']);
+    expect(usageSlotKeys('provider', names)).toEqual([]);
+  });
+
+  it('should be empty without a catalog', () => {
+    expect(usageSlotKeys('task', EMPTY_NAMES)).toEqual([]);
   });
 });

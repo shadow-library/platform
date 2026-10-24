@@ -6,7 +6,7 @@ import { formatUsd, SectionHeader } from '@/features/shared';
 import controls from '@/features/shared/controls.module.css';
 import { type ApiError, type UsageSeriesResponse } from '@/lib';
 
-import { BASIS_NOUNS, type CostBasis, formatShortDay, formatUsdTick, usageChart, usageKeyName, type UsageNames } from './usage-report';
+import { BASIS_NOUNS, type CostBasis, formatShortDay, formatUsdTick, usageChart, usageKeyName, type UsageNames, usageSlotKeys } from './usage-report';
 import styles from './Usage.module.css';
 import { USAGE_GROUP_LABELS, type UsageGroup } from './usage-search';
 
@@ -35,7 +35,7 @@ export function UsageChartPanel({ query, group, basis, names, subtitle }: UsageC
           <Spinner label="Loading the daily chart" />
         </div>
       );
-    const chart = usageChart(query.data, basis, key => usageKeyName(group, key, names));
+    const chart = usageChart(query.data, basis, key => usageKeyName(group, key, names), undefined, usageSlotKeys(group, names));
     return (
       <Chart
         type="bar"

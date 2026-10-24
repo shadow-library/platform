@@ -1,5 +1,6 @@
 import { type ChartDatum, type ChartSeries } from '@shadow-library/ui';
 
+import { cyclicChartSlots } from '@/features/shared/chart-slots';
 import { appName } from '@/features/shared/naming';
 import { type UsageSeriesEntryResponse, type UsageSeriesResponse } from '@/lib/apis/api-types.gen';
 
@@ -30,7 +31,7 @@ function byListCost(left: UsageSeriesEntryResponse, right: UsageSeriesEntryRespo
   return right.totals.listCostUsd - left.totals.listCostUsd || seriesKeyOf(left).localeCompare(seriesKeyOf(right));
 }
 
-/** Palette slots follow series order, so ordering by key keeps an app's colour when another app's spend overtakes it; the unknown bucket sorts last. */
+/** Stacks keep a stable order as spend ranks shift; the unknown bucket sorts last. */
 function byKey(left: UsageSeriesEntryResponse, right: UsageSeriesEntryResponse): number {
   if (left.key === null || right.key === null) return Number(left.key === null) - Number(right.key === null);
   return left.key.localeCompare(right.key);
@@ -42,6 +43,7 @@ function pointValues(entry: UsageSeriesEntryResponse, measure: SpendMeasure): Ma
 }
 
 export function dailySpendOf(response: UsageSeriesResponse, measure: SpendMeasure): DailySpend {
+  const slots = cyclicChartSlots(response.series.map(entry => entry.key));
   const ranked = [...response.series].sort(byListCost);
   const folds = ranked.length > MAX_CHART_SERIES;
   const shown = (folds ? ranked.slice(0, MAX_CHART_SERIES - 1) : ranked).sort(byKey);
@@ -56,7 +58,7 @@ export function dailySpendOf(response: UsageSeriesResponse, measure: SpendMeasur
     return { x: day, values };
   });
   const series: ChartSeries[] = [
-    ...shown.map(entry => ({ key: seriesKeyOf(entry), label: entry.key === null ? 'Unknown app' : appName(entry.key) })),
+    ...shown.map(entry => ({ key: seriesKeyOf(entry), label: entry.key === null ? 'Unknown app' : appName(entry.key), slot: slots.get(entry.key) })),
     ...(folds ? [{ key: OTHER_SERIES_KEY, label: `${folded.length} other apps`, tone: 'neutral' as const }] : []),
   ];
   return { data, series, total: response.totals[MEASURE_FIELDS[measure]] };

@@ -1,8 +1,9 @@
 import { type ChartDatum, type ChartSeries } from '@shadow-library/ui';
 
 import { type CatalogDocument } from '@/features/catalog/catalog-document';
-import { readAliases, readModels, readTasks, splitTaskKey } from '@/features/catalog/catalog-readers';
-import { type AliasEntry, type ModelEntry, type TaskEntry } from '@/features/catalog/catalog-spec.types';
+import { readAliases, readModels, readProviders, readTasks, splitTaskKey } from '@/features/catalog/catalog-readers';
+import { type AliasEntry, type ModelEntry, type ProviderEntry, type TaskEntry } from '@/features/catalog/catalog-spec.types';
+import { cyclicChartSlots } from '@/features/shared/chart-slots';
 import { formatUsd, usdFormat } from '@/features/shared/format';
 import { aliasName, appName, modelName, providerName, taskTitle } from '@/features/shared/naming';
 import { type UsageRowResponse, type UsageSeriesResponse, type UsageTotalsResponse } from '@/lib/apis/api-types.gen';
@@ -44,6 +45,7 @@ export interface UsageNames {
   tasks: ReadonlyMap<string, TaskEntry>;
   aliases: ReadonlyMap<string, AliasEntry>;
   models: ReadonlyMap<string, ModelEntry>;
+  providers: ReadonlyMap<string, ProviderEntry>;
 }
 
 export interface UsageTotalsDeltas {
@@ -80,7 +82,7 @@ export function costOf(costs: Costs, basis: CostBasis): number {
   return basis === 'billed' ? costs.billedCostUsd : costs.listCostUsd;
 }
 
-export const EMPTY_NAMES: UsageNames = { tasks: new Map(), aliases: new Map(), models: new Map() };
+export const EMPTY_NAMES: UsageNames = { tasks: new Map(), aliases: new Map(), models: new Map(), providers: new Map() };
 
 export function usageNamesOf(document: CatalogDocument | undefined): UsageNames {
   if (!document) return EMPTY_NAMES;
@@ -88,6 +90,7 @@ export function usageNamesOf(document: CatalogDocument | undefined): UsageNames 
     tasks: new Map(readTasks(document).map(task => [task.key, task])),
     aliases: new Map(readAliases(document).map(alias => [alias.key, alias])),
     models: new Map(readModels(document).map(model => [model.key, model])),
+    providers: new Map(readProviders(document).map(provider => [provider.key, provider])),
   };
 }
 
@@ -191,13 +194,30 @@ export function usageRows(
     }));
 }
 
-/** Kept series are ordered by key, not rank: the chart hands out colours by position, so a series keeps its colour as its rank moves. */
+export function usageSlotKeys(group: UsageGroup, names: UsageNames): string[] {
+  switch (group) {
+    case 'app':
+      return [...new Set([...names.tasks.values()].map(task => task.app))];
+    case 'task':
+      return [...names.tasks.keys()];
+    case 'alias':
+      return [...names.aliases.keys()];
+    case 'model':
+      return [...names.models.keys()];
+    case 'provider':
+      return [...names.providers.keys()];
+  }
+}
+
+/** Colours are pinned from every key the catalog and the unfiltered response know, so a series keeps its colour as the kept set changes; kept series stack in key order. */
 export function usageChart(
   response: Pick<UsageSeriesResponse, 'days' | 'series'>,
   basis: CostBasis,
   nameOf: (key: string | null) => string,
   limit = CHART_SERIES_LIMIT,
+  slotKeys: Iterable<string> = [],
 ): UsageChartView {
+  const slots = cyclicChartSlots([...slotKeys, ...response.series.map(entry => entry.key)]);
   const ranked = response.series
     .map(entry => ({ entry, total: costOf(entry.totals, basis) }))
     .filter(ranking => ranking.total > 0)
@@ -218,7 +238,7 @@ export function usageChart(
     if (folded.length > 0) values[OTHER_SERIES_KEY] = folded.reduce((sum, entry) => sum + valueOn(entry, day), 0);
     return { x: day, values };
   });
-  const series: ChartSeries[] = plotted.map(({ key, entry }) => ({ key, label: nameOf(entry.key) }));
+  const series: ChartSeries[] = plotted.map(({ key, entry }) => ({ key, label: nameOf(entry.key), slot: slots.get(entry.key) }));
   if (folded.length > 0) series.push({ key: OTHER_SERIES_KEY, label: `Other (${folded.length})`, tone: 'neutral' });
   return { series, data };
 }
