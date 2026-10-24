@@ -130,7 +130,8 @@ export interface paths {
     /** Save Draft */
     put: operations['put_api_v1_admin_catalog_draft'];
     post?: never;
-    delete?: never;
+    /** Discard Draft */
+    delete: operations['delete_api_v1_admin_catalog_draft'];
     options?: never;
     head?: never;
     patch?: never;
@@ -181,6 +182,23 @@ export interface paths {
     put?: never;
     /** Publish */
     post: operations['post_api_v1_admin_catalog_draft_publish'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/catalog/budgets': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Publish Budgets */
+    put: operations['put_api_v1_admin_catalog_budgets'];
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -852,6 +870,14 @@ export interface components {
     PublishBody: {
       /** @description Fingerprint of the draft being published, as returned when it was read or saved */
       fingerprint: string;
+    };
+    PublishBudgetsBody: {
+      /** @description The complete budget list that replaces the active one. Validated with the whole catalog, so an invalid entry is refused with 422 and its issues */
+      budgets: Record<string, never>[];
+      /** @description Version of the active catalog the budgets were edited against; refused with 409 when another version has been published since */
+      expectedVersion: number;
+      /** @description Free-text note stored with the new version; defaults to "Budgets updated" */
+      note?: string;
     };
     AliasImpactResponse: {
       alias: string;
@@ -1555,6 +1581,47 @@ export interface operations {
       };
     };
   };
+  delete_api_v1_admin_catalog_draft: {
+    parameters: {
+      query: {
+        /** @description Fingerprint of the draft being discarded; the discard is refused with 409 when the draft has changed since */
+        fingerprint: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   post_api_v1_admin_catalog_draft_validate: {
     parameters: {
       query?: never;
@@ -1641,6 +1708,66 @@ export interface operations {
     requestBody: {
       content: {
         'application/json': components['schemas']['PublishBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CatalogVersionSummaryResponse'];
+        };
+      };
+      /** @description Default Response */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CatalogInvalidResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  put_api_v1_admin_catalog_budgets: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['PublishBudgetsBody'];
       };
     };
     responses: {
@@ -2638,6 +2765,7 @@ export type CatalogInvalidResponse = components['schemas']['CatalogInvalidRespon
 export type ValidateDraftResponse = components['schemas']['ValidateDraftResponse'];
 export type DraftDiffResponse = components['schemas']['DraftDiffResponse'];
 export type PublishBody = components['schemas']['PublishBody'];
+export type PublishBudgetsBody = components['schemas']['PublishBudgetsBody'];
 export type AliasImpactResponse = components['schemas']['AliasImpactResponse'];
 export type AliasImpactRowResponse = components['schemas']['AliasImpactRowResponse'];
 export type AliasRetargetResponse = components['schemas']['AliasRetargetResponse'];
