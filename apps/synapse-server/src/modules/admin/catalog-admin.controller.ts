@@ -1,4 +1,5 @@
 import { RequirePermission } from '@shadow-library/auth/module';
+import { type JSONSchema } from '@shadow-library/class-schema';
 import { AppError } from '@shadow-library/common';
 import {
   Body,
@@ -44,13 +45,19 @@ import {
 } from './catalog-admin.dto';
 import { CallerService } from './caller.service';
 import { DRAFT_PERMISSIONS, DRAFT_SENSITIVE_PERMISSIONS, draftAuthorizer } from './draft-authorizer';
+import { IdentityDirectoryService } from './identity-directory.service';
 
+type VersionSummary = Omit<CatalogVersionSummaryResponse, 'createdByName'>;
+type VersionDetail = Omit<CatalogVersionDetailResponse, 'createdByName'>;
+
+const NO_CONTENT = 204;
 const UNPROCESSABLE = 422;
 const CONFLICT = 409;
+const NO_DRAFT: JSONSchema = { $id: 'NoDraftResponse', type: 'null', description: 'No draft exists' };
 /** The draft path checks budget writes against the short PDP cache too, so revoking the permission takes effect within a minute on both */
 const HIGH_RISK = { highRisk: true };
 
-function summaryOf(row: CatalogVersionSummary): CatalogVersionSummaryResponse {
+function summaryOf(row: CatalogVersionSummary): VersionSummary {
   return {
     version: row.version,
     state: row.state,
@@ -61,7 +68,7 @@ function summaryOf(row: CatalogVersionSummary): CatalogVersionSummaryResponse {
   };
 }
 
-function detailOf(row: Catalog.Version): CatalogVersionDetailResponse {
+function detailOf(row: Catalog.Version): VersionDetail {
   return { ...summaryOf(row), document: row.document as Record<string, unknown> };
 }
 
@@ -71,6 +78,7 @@ export class CatalogAdminController {
     private readonly caller: CallerService,
     private readonly catalog: CatalogVersionService,
     private readonly impact: AliasImpactService,
+    private readonly directory: IdentityDirectoryService,
   ) {}
 
   @Get('/versions')
@@ -79,7 +87,7 @@ export class CatalogAdminController {
   async listVersions(): Promise<CatalogVersionListResponse> {
     this.caller.user();
     const versions = await this.catalog.listVersions();
-    return { items: versions.map(summaryOf) };
+    return { items: await this.directory.withEditorNames(versions.map(summaryOf)) };
   }
 
   @Get('/versions/:version')
@@ -88,17 +96,19 @@ export class CatalogAdminController {
   async getVersion(@Params() params: VersionParams): Promise<CatalogVersionDetailResponse> {
     this.caller.user();
     const row = await this.catalog.getVersion(params.version);
-    return detailOf(row ?? ServerErrorCode.S009.throw());
+    return this.directory.withEditorName(detailOf(row ?? ServerErrorCode.S009.throw()));
   }
 
   @Get('/draft')
   @RequirePermission(SYNAPSE_PERMISSIONS.catalogRead)
+  @HttpStatus(200)
   @RespondFor(200, DraftResponse)
-  async getDraft(): Promise<DraftResponse> {
+  @RespondFor(NO_CONTENT, NO_DRAFT)
+  async getDraft(@Res() response: HttpResponse): Promise<DraftResponse | HttpResponse> {
     this.caller.user();
     const view = await this.catalog.getDraft();
-    if (!view) throw ServerErrorCode.S009.create();
-    return { draft: detailOf(view.draft), fingerprint: view.fingerprint };
+    if (!view) return response.status(NO_CONTENT).send();
+    return { draft: await this.directory.withEditorName(detailOf(view.draft)), fingerprint: view.fingerprint };
   }
 
   @Put('/draft')
@@ -122,7 +132,7 @@ export class CatalogAdminController {
     const granted = await this.caller.permissions(user, DRAFT_PERMISSIONS, DRAFT_SENSITIVE_PERMISSIONS);
     return this.withIssues(response, async () => {
       const saved = await this.catalog.saveDraft(body.document, body.note, user.sub, draftAuthorizer(granted), expected);
-      return { draft: detailOf(saved.draft), fingerprint: saved.fingerprint, issues: saved.issues };
+      return { draft: await this.directory.withEditorName(detailOf(saved.draft)), fingerprint: saved.fingerprint, issues: saved.issues };
     });
   }
 
@@ -138,19 +148,26 @@ export class CatalogAdminController {
 
   @Post('/draft/validate')
   @RequirePermission(SYNAPSE_PERMISSIONS.catalogWrite)
+  @HttpStatus(200)
   @RespondFor(200, ValidateDraftResponse)
-  async validateDraft(): Promise<ValidateDraftResponse> {
+  @RespondFor(NO_CONTENT, NO_DRAFT)
+  async validateDraft(@Res() response: HttpResponse): Promise<ValidateDraftResponse | HttpResponse> {
     this.caller.user();
     const issues = await this.catalog.validateDraft();
+    if (!issues) return response.status(NO_CONTENT).send();
     return { valid: issues.length === 0, issues };
   }
 
   @Get('/draft/diff')
   @RequirePermission(SYNAPSE_PERMISSIONS.catalogRead)
+  @HttpStatus(200)
   @RespondFor(200, DraftDiffResponse)
-  async diffDraft(): Promise<DraftDiffResponse> {
+  @RespondFor(NO_CONTENT, NO_DRAFT)
+  async diffDraft(@Res() response: HttpResponse): Promise<DraftDiffResponse | HttpResponse> {
     this.caller.user();
-    return this.catalog.diff();
+    const diff = await this.catalog.diff();
+    if (!diff) return response.status(NO_CONTENT).send();
+    return diff;
   }
 
   @Post('/draft/publish')
@@ -162,7 +179,7 @@ export class CatalogAdminController {
     const user = this.caller.user();
     const fingerprint = body.fingerprint;
     if (!fingerprint) throw AppErrorCode.SYN_INVALID_REQUEST.create({ param: 'fingerprint', reason: 'the fingerprint of the draft being published is required' });
-    return this.withIssues(response, async () => summaryOf(await this.catalog.publish(user.sub, fingerprint)));
+    return this.withIssues(response, async () => this.directory.withEditorName(summaryOf(await this.catalog.publish(user.sub, fingerprint))));
   }
 
   @Put('/budgets')
@@ -172,7 +189,9 @@ export class CatalogAdminController {
   @RespondFor(UNPROCESSABLE, CatalogInvalidResponse)
   async publishBudgets(@Body() body: PublishBudgetsBody, @Res() response: HttpResponse): Promise<CatalogVersionSummaryResponse | HttpResponse> {
     const user = this.caller.user();
-    return this.withIssues(response, async () => summaryOf(await this.catalog.publishBudgets(body.budgets, body.expectedVersion, body.note, user.sub)));
+    return this.withIssues(response, async () =>
+      this.directory.withEditorName(summaryOf(await this.catalog.publishBudgets(body.budgets, body.expectedVersion, body.note, user.sub))),
+    );
   }
 
   @Post('/versions/:version/rollback')
@@ -181,7 +200,7 @@ export class CatalogAdminController {
   @RespondFor(UNPROCESSABLE, CatalogInvalidResponse)
   async rollback(@Params() params: VersionParams, @Res() response: HttpResponse): Promise<CatalogVersionSummaryResponse | HttpResponse> {
     const user = this.caller.user();
-    return this.withIssues(response, async () => summaryOf(await this.catalog.rollback(params.version, user.sub)));
+    return this.withIssues(response, async () => this.directory.withEditorName(summaryOf(await this.catalog.rollback(params.version, user.sub))));
   }
 
   @Get('/aliases/:key/impact')

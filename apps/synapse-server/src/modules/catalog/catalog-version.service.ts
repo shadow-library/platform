@@ -114,15 +114,17 @@ export class CatalogVersionService {
     return saved;
   }
 
-  async validateDraft(): Promise<CatalogIssue[]> {
-    const draft = await this.requireDraft();
+  async validateDraft(): Promise<CatalogIssue[] | null> {
+    const draft = await this.repository.findDraft();
+    if (!draft) return null;
     const active = await this.repository.findActive();
     const check = await checkPublishable(draft.document, active ? this.parseActive(active) : null, ids => this.repository.findCredentials(ids));
     return check.valid ? [] : check.issues;
   }
 
-  async diff(): Promise<DraftDiff> {
-    const draft = await this.requireDraft();
+  async diff(): Promise<DraftDiff | null> {
+    const draft = await this.repository.findDraft();
+    if (!draft) return null;
     const active = await this.repository.findActive();
     return { ...diffCatalog(draft.document, active?.document ?? {}), fingerprint: catalogFingerprint(draft.document) };
   }

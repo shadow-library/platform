@@ -36,6 +36,7 @@ function seedOver(existingRoles: Record<string, RoleRow[]>) {
   const grantPermissionToRole = mock<(roleId: number, permissionId: string) => Promise<void>>(() => Promise.resolve());
   const assignRole = mock(() => Promise.resolve());
   const ensureRedirectUris = mock<(clientId: string, uris: string[]) => Promise<void>>(() => Promise.resolve());
+  const grantScope = mock<(clientId: string, scopeId: string) => Promise<void>>(() => Promise.resolve());
 
   const applicationService = { getApplication: (name: string) => applications.get(name), getApplicationOrThrow: (name: string) => applications.get(name) };
   const oauthClientService = {
@@ -43,7 +44,7 @@ function seedOver(existingRoles: Record<string, RoleRow[]>) {
     listResources: () => Promise.resolve([...catalogue].map(([identifier, scopes]) => ({ identifier, scopes: [...scopes].map(name => ({ name, id: `${identifier}::${name}` })) }))),
     ensureResource: () => Promise.resolve({ id: 1 }),
     createScope: (_resource: number, name: string) => Promise.resolve(`scope:${name}`),
-    grantScope: () => Promise.resolve(),
+    grantScope,
     ensureRedirectUris,
     removeRedirectUri: () => Promise.resolve(),
     updateClient: () => Promise.resolve(),
@@ -56,7 +57,7 @@ function seedOver(existingRoles: Record<string, RoleRow[]>) {
     { ensurePermission, grantPermissionToRole, assignRole } as never,
     { create: () => Promise.resolve() } as never,
   );
-  return { service, applications, addRole, ensurePermission, grantPermissionToRole, assignRole, ensureRedirectUris };
+  return { service, applications, addRole, ensurePermission, grantPermissionToRole, assignRole, ensureRedirectUris, grantScope };
 }
 
 describe('EcosystemSeedService', () => {
@@ -125,6 +126,14 @@ describe('EcosystemSeedService', () => {
       const registered = new Map(seed.ensureRedirectUris.mock.calls);
       expect(registered.get('synapse')).toEqual(['https://synapse.shadow.test/api/auth/callback', 'http://localhost:8080/api/auth/callback']);
       expect(registered.get('pulse')).toEqual(['https://pulse.shadow.test/api/auth/callback', 'http://localhost:8080/api/auth/callback']);
+    });
+
+    it('should grant the user directory scope to an existing synapse client on boot', async () => {
+      const seed = seedOver({});
+
+      await seed.service.seed(OPERATOR);
+
+      expect(seed.grantScope).toHaveBeenCalledWith('synapse', 'shadow-identity::users:resolve');
     });
 
     it('should add the synapse admin role to an existing synapse application missing it and assign it to the bootstrap administrator', async () => {

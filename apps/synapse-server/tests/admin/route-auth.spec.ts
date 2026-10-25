@@ -13,6 +13,8 @@ import { UsageController } from '@modules/admin/usage.controller';
 interface DeclaredRoute {
   route: string;
   auth: RequiredAuthRoute | undefined;
+  status: unknown;
+  responses: Record<string, unknown>;
 }
 
 const CONTROLLERS = [AccessController, CatalogController, CatalogAdminController, UsageController, ProvidersController, CredentialsController, BudgetsController];
@@ -35,7 +37,9 @@ function declaredRoutes(): DeclaredRoute[] {
       for (const key of Reflect.getMetadataKeys(handler)) {
         const metadata = Reflect.getMetadata(key, handler) as Record<string | symbol, unknown> | undefined;
         if (metadata?.method === undefined) continue;
-        routes.push({ route: `${String(metadata.method)} ${base}${String(metadata.path ?? '')}`, auth: metadata[AUTH_ROUTE_METADATA] as RequiredAuthRoute | undefined });
+        const responses = (metadata.schemas as { response?: Record<string, unknown> } | undefined)?.response ?? {};
+        const auth = metadata[AUTH_ROUTE_METADATA] as RequiredAuthRoute | undefined;
+        routes.push({ route: `${String(metadata.method)} ${base}${String(metadata.path ?? '')}`, auth, status: metadata.status, responses });
       }
     }
   }
@@ -111,6 +115,20 @@ describe('admin route auth metadata', () => {
     expect(declared?.auth).toMatchObject({ access: 'required' });
     expect(declared?.auth?.permission).toBeUndefined();
     expect(declared?.auth?.scopes).toBeUndefined();
+  });
+
+  it('should answer the draft, its validation and its diff with 200, or a bodyless 204 when there is no draft', () => {
+    for (const route of ['GET /api/v1/admin/catalog/draft', 'POST /api/v1/admin/catalog/draft/validate', 'GET /api/v1/admin/catalog/draft/diff']) {
+      const declared = routes.find(candidate => candidate.route === route);
+      expect({ route, status: declared?.status, noDraft: declared?.responses['204'] }).toEqual({ route, status: 200, noDraft: expect.objectContaining({ type: 'null' }) });
+      expect(declared?.responses['200']).toBeDefined();
+    }
+  });
+
+  it('should keep a missing draft an error on the routes that act on it', () => {
+    for (const route of ['POST /api/v1/admin/catalog/draft/publish', 'DELETE /api/v1/admin/catalog/draft']) {
+      expect(routes.find(candidate => candidate.route === route)?.responses['204']).toBeUndefined();
+    }
   });
 
   it('should leave no route without a declared access policy', () => {

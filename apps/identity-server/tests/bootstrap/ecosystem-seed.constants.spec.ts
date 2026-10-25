@@ -64,6 +64,14 @@ describe('ECOSYSTEM_SEED synapse', () => {
     expect(synapse?.serviceAccess).toEqual(expected);
   });
 
+  it('should let synapse name the editors it stores by subject id through the user directory, and grant it nothing else on the platform', () => {
+    expect(synapse?.grants).toEqual([
+      { resource: 'shadow-identity', scope: 'authz:check' },
+      { resource: 'shadow-identity', scope: 'app-session:manage' },
+      { resource: 'shadow-identity', scope: 'users:resolve' },
+    ]);
+  });
+
   it('should never use a wildcard in a synapse service-access rule', () => {
     for (const rule of synapse?.serviceAccess ?? []) expect(rule.pathPattern).not.toContain('*');
   });

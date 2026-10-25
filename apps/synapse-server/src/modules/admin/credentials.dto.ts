@@ -66,6 +66,12 @@ export class CredentialResponse {
   @Field({ optional: true, description: 'Subject of the admin who created it, or `import` for the key imported from the environment' })
   createdBy?: string;
 
+  @Field(() => String, {
+    nullable: true,
+    description: 'Display name of `createdBy`, read from Identity when the response is built; null when Identity does not name that subject or cannot be reached',
+  })
+  createdByName: string | null;
+
   @Field(() => String, { format: 'date-time' })
   createdAt: Date;
 

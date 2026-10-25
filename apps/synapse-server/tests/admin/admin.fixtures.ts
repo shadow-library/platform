@@ -1,12 +1,13 @@
-import { type AuthClient, type AuthPrincipal } from '@shadow-library/auth';
+import { type AuthClient, type AuthPrincipal, type DirectoryUser } from '@shadow-library/auth';
 import { AUTH_PRINCIPAL, extendContextWithAuth } from '@shadow-library/auth/module';
 import { AppError, type ErrorCode } from '@shadow-library/common';
 import { ContextService, type HttpResponse } from '@shadow-library/fastify';
 import { expect } from 'bun:test';
 
 import { SYNAPSE_ROLES } from '@modules/auth';
-import { type ActiveCatalogCache } from '@modules/catalog';
+import { type ActiveCatalogCache, SYSTEM_TIMERS } from '@modules/catalog';
 import { CallerService } from '@modules/admin/caller.service';
+import { IdentityDirectoryService } from '@modules/admin/identity-directory.service';
 import { type LedgerReportRepository } from '@modules/admin/ledger-report.repository';
 import { type CatalogDocument } from '@modules/catalog/catalog.types';
 
@@ -20,22 +21,36 @@ export const MEMOIR: AuthPrincipal = { kind: 'service', sub: 'memoir', clientId:
 export const ANONYMOUS_SERVICE: AuthPrincipal = { kind: 'service', sub: 'unknown', scopes: [], claims: {} };
 export const BOT: AuthPrincipal = { kind: 'bot', sub: 'bot_1', clientId: 'bot_1', scopes: [], org: '1', botId: '1', keyId: 'key-1', rateLimitPerMinute: 60, claims: {} };
 
-export function userWith(role: keyof typeof SYNAPSE_ROLES): AuthPrincipal {
-  return { kind: 'user', sub: `user-${role}`, org: '1', scopes: [], claims: {} };
+type Role = keyof typeof SYNAPSE_ROLES;
+
+const ROLES = Object.keys(SYNAPSE_ROLES) as Role[];
+
+const subjectOf = (role: Role): string => String(ROLES.indexOf(role) + 1);
+
+export function userWith(role: Role): AuthPrincipal {
+  return { kind: 'user', sub: subjectOf(role), org: '1', scopes: [], claims: {} };
 }
 
-const ROLE_BY_SUBJECT = new Map(Object.entries(SYNAPSE_ROLES).map(([role, definition]) => [`user-${role}`, new Set<string>(definition.permissions)]));
+const PERMISSIONS_BY_SUBJECT = new Map(ROLES.map(role => [subjectOf(role), new Set<string>(SYNAPSE_ROLES[role].permissions)]));
 
 export const checkOptions: { action: string; highRisk?: boolean }[] = [];
+
+export function editorName(role: Role): string {
+  return `The ${role}`;
+}
 
 export const authClient = {
   checkAll: async (inputs: { action: string; principal: AuthPrincipal }[], options?: { highRisk?: boolean }): Promise<boolean[]> => {
     for (const input of inputs) checkOptions.push({ action: input.action, highRisk: options?.highRisk });
-    return inputs.map(input => ROLE_BY_SUBJECT.get(input.principal.sub)?.has(input.action) ?? false);
+    return inputs.map(input => PERMISSIONS_BY_SUBJECT.get(input.principal.sub)?.has(input.action) ?? false);
   },
+  lookupUsers: async (userIds: string[]): Promise<DirectoryUser[]> =>
+    ROLES.filter(role => userIds.includes(subjectOf(role))).map(role => ({ userId: subjectOf(role), displayName: editorName(role) })),
 } as unknown as AuthClient;
 
 export const caller = new CallerService(context, authClient);
+
+export const directory = new IdentityDirectoryService(authClient, SYSTEM_TIMERS);
 
 export function asPrincipal<T>(principal: AuthPrincipal, work: () => Promise<T>): Promise<T> {
   return new Promise((resolve, reject) => {

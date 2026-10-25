@@ -12,7 +12,7 @@
 ## Integrations
 
 ```text
-every server but identity ──auth SDK──> identity   (login, PDP checks, M2M tokens; identity registers every app)
+every server but identity ──auth SDK──> identity   (login, PDP checks, M2M tokens, user directory; identity registers every app)
 identity, memoir ──M2M──> pulse                    (notifications sink)
 novel-forge, memoir ──M2M──> synapse                (AI inference and model catalog)
 novel-forge ──M2M, one-way──> web-novel            (publish)

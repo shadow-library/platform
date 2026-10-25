@@ -166,7 +166,7 @@ export const ECOSYSTEM_SEED: EcosystemSeed = {
           grantToBootstrapAdmin: true,
         },
       ],
-      grants: [AUTHZ_CHECK, APP_SESSION],
+      grants: [AUTHZ_CHECK, APP_SESSION, USERS_RESOLVE],
       serviceAccess: [
         { callerClientId: 'novel-forge', method: 'POST', pathPattern: '/api/v1/chat/completions' },
         { callerClientId: 'novel-forge', method: 'POST', pathPattern: '/api/v1/embeddings' },

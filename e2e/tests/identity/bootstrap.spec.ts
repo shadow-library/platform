@@ -21,16 +21,16 @@ interface ClientRow {
 }
 
 /**
- * The ecosystem the bootstrap leaves on a deployed environment: platform application and organisation, bootstrap administrator, and the five seeded applications with clients,
+ * The ecosystem the bootstrap leaves on a deployed environment: platform application and organisation, bootstrap administrator, and the six seeded applications with clients,
  * resources, scope grants, service-access rules and derived redirect URIs. Read-only (the deployment is shared), so every query excludes the `e2e-` applications and clients and
  * organisation-owned applications the suite creates. Re-running the bootstrap is not covered: it needs an identity-server restart.
  */
 
-const SEEDED_APPLICATIONS = ['memoir', 'novel-forge', 'pulse', 'shadow-identity', 'web-novel'];
+const SEEDED_APPLICATIONS = ['memoir', 'novel-forge', 'pulse', 'shadow-identity', 'synapse', 'web-novel'];
 
 const IDENTITY_SERVICE_CLIENT = 'identity-server';
 
-const ECOSYSTEM_CLIENTS = ['memoir', 'novel-forge', 'pulse', 'web-novel'];
+const ECOSYSTEM_CLIENTS = ['memoir', 'novel-forge', 'pulse', 'synapse', 'web-novel'];
 
 const ECOSYSTEM_GRANT_TYPES = ['authorization_code', 'client_credentials', 'urn:ietf:params:oauth:grant-type:token-exchange'];
 
@@ -96,7 +96,7 @@ test.describe('identity bootstrap — platform and administrator', () => {
 });
 
 test.describe('identity bootstrap — ecosystem seed', () => {
-  test('should seed exactly the five ecosystem applications, with pulse and web-novel internal', async () => {
+  test('should seed exactly the six ecosystem applications, with pulse, synapse and web-novel internal', async () => {
     const applications = await seededApplications();
     expect(applications.map(application => application.name)).toEqual(SEEDED_APPLICATIONS);
     expect(
@@ -105,7 +105,7 @@ test.describe('identity bootstrap — ecosystem seed', () => {
     ).toBe(true);
 
     const visibility = Object.fromEntries(applications.map(application => [application.name, application.visibility]));
-    expect(visibility).toMatchObject({ pulse: 'INTERNAL', 'web-novel': 'INTERNAL' });
+    expect(visibility).toMatchObject({ pulse: 'INTERNAL', synapse: 'INTERNAL', 'web-novel': 'INTERNAL' });
   });
 
   test('should seed pulse with its three roles and the template and layout permissions', async () => {
@@ -150,8 +150,17 @@ test.describe('identity bootstrap — ecosystem seed', () => {
   test('should grant every seeded client exactly the scopes its application needs', async () => {
     expect(await seededScopeGrants()).toEqual({
       [IDENTITY_SERVICE_CLIENT]: ['api://novel-forge::novel-forge:bots:manage', 'api://pulse::notifications:send'],
-      memoir: ['api://pulse::notifications:send', 'shadow-identity::app-session:manage', 'shadow-identity::authz:check', 'shadow-identity::users:resolve'],
+      memoir: [
+        'api://pulse::notifications:send',
+        'api://synapse::synapse:catalog:read',
+        'api://synapse::synapse:infer',
+        'shadow-identity::app-session:manage',
+        'shadow-identity::authz:check',
+        'shadow-identity::users:resolve',
+      ],
       'novel-forge': [
+        'api://synapse::synapse:catalog:read',
+        'api://synapse::synapse:infer',
         'api://web-novel::web-novel:publish',
         'shadow-identity::app-session:manage',
         'shadow-identity::authz:check',
@@ -159,23 +168,26 @@ test.describe('identity bootstrap — ecosystem seed', () => {
         'shadow-identity::users:resolve',
       ],
       pulse: ['shadow-identity::app-session:manage', 'shadow-identity::authz:check', 'shadow-identity::authz:roles:sync'],
+      synapse: ['shadow-identity::app-session:manage', 'shadow-identity::authz:check', 'shadow-identity::users:resolve'],
       'web-novel': ['shadow-identity::app-session:manage', 'shadow-identity::authz:check', 'shadow-identity::users:resolve'],
     });
   });
 
   test('should declare exactly the platform and per-application API resources, with the service-only and sensitive scopes the seed names', async () => {
     const resources = await identityDb()<{ identifier: string }[]>`SELECT identifier FROM api_resources WHERE identifier NOT LIKE 'api://e2e-%' ORDER BY identifier`;
-    expect(resources.map(resource => resource.identifier)).toEqual(['api://memoir', 'api://novel-forge', 'api://pulse', 'api://web-novel', PLATFORM_AUDIENCE]);
+    expect(resources.map(resource => resource.identifier)).toEqual(['api://memoir', 'api://novel-forge', 'api://pulse', 'api://synapse', 'api://web-novel', PLATFORM_AUDIENCE]);
 
     const scopes = await identityDb()<{ identifier: string; name: string; principalType: string; isSensitive: boolean }[]>`
       SELECT r.identifier, s.name, s.principal_type::text AS "principalType", s.is_sensitive AS "isSensitive"
       FROM scopes s JOIN api_resources r ON r.id = s.api_resource_id
-      WHERE r.identifier IN ('api://memoir', 'api://web-novel') ORDER BY r.identifier, s.name
+      WHERE r.identifier IN ('api://memoir', 'api://synapse', 'api://web-novel') ORDER BY r.identifier, s.name
     `;
     expect(scopes).toEqual([
       { identifier: 'api://memoir', name: 'memoir:account', principalType: 'USER', isSensitive: false },
       { identifier: 'api://memoir', name: 'memoir:destructive', principalType: 'USER', isSensitive: true },
       { identifier: 'api://memoir', name: 'memoir:sync', principalType: 'USER', isSensitive: false },
+      { identifier: 'api://synapse', name: 'synapse:catalog:read', principalType: 'SERVICE', isSensitive: false },
+      { identifier: 'api://synapse', name: 'synapse:infer', principalType: 'SERVICE', isSensitive: false },
       { identifier: 'api://web-novel', name: 'web-novel:publish', principalType: 'SERVICE', isSensitive: false },
     ]);
   });
@@ -184,18 +196,26 @@ test.describe('identity bootstrap — ecosystem seed', () => {
     const rules = await identityDb()<{ application: string; callerClientId: string; method: string; pathPattern: string }[]>`
       SELECT a.name AS application, sra.caller_client_id AS "callerClientId", sra.method, sra.path_pattern AS "pathPattern"
       FROM service_route_access sra JOIN applications a ON a.id = sra.application_id
-      WHERE a.name NOT LIKE 'e2e-%' ORDER BY a.name, sra.caller_client_id
+      WHERE a.name NOT LIKE 'e2e-%' ORDER BY a.name, sra.caller_client_id, sra.method, sra.path_pattern
     `;
     expect(rules).toEqual([
       { application: 'novel-forge', callerClientId: IDENTITY_SERVICE_CLIENT, method: '*', pathPattern: '/internal/bots/*' },
       { application: 'pulse', callerClientId: IDENTITY_SERVICE_CLIENT, method: 'POST', pathPattern: '/api/v1/notifications' },
       { application: 'pulse', callerClientId: 'memoir', method: 'POST', pathPattern: '/api/v1/notifications' },
+      { application: 'synapse', callerClientId: 'memoir', method: 'GET', pathPattern: '/api/v1/catalog' },
+      { application: 'synapse', callerClientId: 'memoir', method: 'POST', pathPattern: '/api/v1/chat/completions' },
+      { application: 'synapse', callerClientId: 'memoir', method: 'POST', pathPattern: '/api/v1/embeddings' },
+      { application: 'synapse', callerClientId: 'memoir', method: 'POST', pathPattern: '/api/v1/images/generations' },
+      { application: 'synapse', callerClientId: 'novel-forge', method: 'GET', pathPattern: '/api/v1/catalog' },
+      { application: 'synapse', callerClientId: 'novel-forge', method: 'POST', pathPattern: '/api/v1/chat/completions' },
+      { application: 'synapse', callerClientId: 'novel-forge', method: 'POST', pathPattern: '/api/v1/embeddings' },
+      { application: 'synapse', callerClientId: 'novel-forge', method: 'POST', pathPattern: '/api/v1/images/generations' },
       { application: 'web-novel', callerClientId: 'novel-forge', method: '*', pathPattern: '/internal/*' },
     ]);
   });
 
   test('should derive every seeded redirect URI and public URL from the deployed host, dropping the hyphen from the subdomain', async () => {
-    const hosts: Record<string, string> = { memoir: 'memoir', 'novel-forge': 'novelforge', pulse: 'pulse', 'web-novel': 'webnovel' };
+    const hosts: Record<string, string> = { memoir: 'memoir', 'novel-forge': 'novelforge', pulse: 'pulse', synapse: 'synapse', 'web-novel': 'webnovel' };
     const applications = Object.fromEntries((await seededApplications()).map(application => [application.name, application]));
 
     for (const [name, subDomain] of Object.entries(hosts)) {

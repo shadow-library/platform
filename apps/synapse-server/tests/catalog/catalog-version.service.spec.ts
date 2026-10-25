@@ -247,7 +247,7 @@ describe('CatalogVersionService.validateDraft and diff', () => {
   it('should report the draft issues against the active document', async () => {
     repository.seed(catalogDocument(), 1);
     repository.seed(catalogDocument(withoutPreview), DRAFT_VERSION, 'DRAFT');
-    expect((await service.validateDraft()).map(issue => issue.path)).toEqual(['aliases.preview']);
+    expect((await service.validateDraft())?.map(issue => issue.path)).toEqual(['aliases.preview']);
   });
 
   it('should diff the draft against the active document', async () => {
@@ -267,13 +267,14 @@ describe('CatalogVersionService.validateDraft and diff', () => {
     const diffed = await service.diff();
     await service.saveDraft(catalogDocument(withOpusMax), undefined, 'admin-2', allowAll);
 
-    expect(diffed.fingerprint).toBe(first.fingerprint);
-    expect((await service.diff()).fingerprint).not.toBe(first.fingerprint);
+    expect(diffed?.fingerprint).toBe(first.fingerprint);
+    expect((await service.diff())?.fingerprint).not.toBe(first.fingerprint);
   });
 
-  it('should answer not found when there is no draft', async () => {
-    await expectFailure(service.validateDraft(), AppErrorCode.S009);
-    await expectFailure(service.diff(), AppErrorCode.S009);
+  it('should answer null rather than fail when there is no draft', async () => {
+    repository.seed(catalogDocument(), 1);
+    expect(await service.validateDraft()).toBeNull();
+    expect(await service.diff()).toBeNull();
   });
 });
 
@@ -618,7 +619,7 @@ describe('CatalogVersionService credential rules', () => {
 
   it('should refuse to publish a draft naming a credential that does not exist', async () => {
     await service.saveDraft(catalogDocument(withCredential), undefined, 'admin-1', allowAll);
-    expect((await service.validateDraft()).map(issue => issue.code)).toEqual(['unknown_credential']);
+    expect((await service.validateDraft())?.map(issue => issue.code)).toEqual(['unknown_credential']);
     await expectFailure(service.publish('admin-1', catalogFingerprint(catalogDocument(withCredential))), AppErrorCode.SYN_CATALOG_INVALID);
   });
 

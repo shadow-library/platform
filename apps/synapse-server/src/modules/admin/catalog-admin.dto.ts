@@ -58,6 +58,12 @@ export class CatalogVersionSummaryResponse {
   @Field({ optional: true, description: 'Subject of the admin who last saved or published it' })
   createdBy?: string;
 
+  @Field(() => String, {
+    nullable: true,
+    description: 'Display name of `createdBy`, read from Identity when the response is built; null when Identity does not name that subject or cannot be reached',
+  })
+  createdByName: string | null;
+
   @Field(() => String, { format: 'date-time' })
   createdAt: Date;
 

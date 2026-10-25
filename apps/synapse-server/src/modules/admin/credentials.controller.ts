@@ -18,6 +18,7 @@ import {
   KeyringStatusResponse,
   RotateCredentialBody,
 } from './credentials.dto';
+import { IdentityDirectoryService } from './identity-directory.service';
 
 const CONFLICT = 409;
 const MANAGE = SYNAPSE_PERMISSIONS.credentialsManage;
@@ -29,6 +30,7 @@ export class CredentialsController {
   constructor(
     private readonly caller: CallerService,
     private readonly credentials: CredentialService,
+    private readonly directory: IdentityDirectoryService,
   ) {}
 
   @Get()
@@ -36,16 +38,16 @@ export class CredentialsController {
   @RespondFor(200, CredentialListResponse)
   async listCredentials(): Promise<CredentialListResponse> {
     this.caller.user();
-    return { items: await this.credentials.list() };
+    return { items: await this.directory.withEditorNames(await this.credentials.list()) };
   }
 
   @Post()
   @RequirePermission(MANAGE, HIGH_RISK)
   @RespondFor(201, CredentialResponse)
   @RespondFor(CONFLICT, ErrorResponseDto)
-  createCredential(@Body() body: CreateCredentialBody): Promise<CredentialResponse> {
+  async createCredential(@Body() body: CreateCredentialBody): Promise<CredentialResponse> {
     const user = this.caller.user();
-    return this.credentials.create(body, user.sub);
+    return this.directory.withEditorName(await this.credentials.create(body, user.sub));
   }
 
   @Get('/status/keyring')
@@ -59,18 +61,18 @@ export class CredentialsController {
   @Get('/:id')
   @RequirePermission(MANAGE, HIGH_RISK)
   @RespondFor(200, CredentialResponse)
-  getCredential(@Params() params: CredentialParams): Promise<CredentialResponse> {
+  async getCredential(@Params() params: CredentialParams): Promise<CredentialResponse> {
     this.caller.user();
-    return this.credentials.get(params.id);
+    return this.directory.withEditorName(await this.credentials.get(params.id));
   }
 
   @Put('/:id/secret')
   @RequirePermission(MANAGE, HIGH_RISK)
   @RespondFor(200, CredentialResponse)
   @RespondFor(CONFLICT, ErrorResponseDto)
-  rotateCredential(@Params() params: CredentialParams, @Body() body: RotateCredentialBody): Promise<CredentialResponse> {
+  async rotateCredential(@Params() params: CredentialParams, @Body() body: RotateCredentialBody): Promise<CredentialResponse> {
     const user = this.caller.user();
-    return this.credentials.rotate(params.id, body.secret, user.sub);
+    return this.directory.withEditorName(await this.credentials.rotate(params.id, body.secret, user.sub));
   }
 
   @Post('/:id/test')
@@ -89,7 +91,7 @@ export class CredentialsController {
   async revokeCredential(@Params() params: CredentialParams, @Res() response: HttpResponse): Promise<CredentialResponse | HttpResponse> {
     const user = this.caller.user();
     try {
-      return await this.credentials.revoke(params.id, user.sub);
+      return await this.directory.withEditorName(await this.credentials.revoke(params.id, user.sub));
     } catch (error) {
       if (!AppError.is(error, AppErrorCode.CRED_IN_USE)) throw error;
       const referencedBy: unknown = error.data?.referencedBy;
