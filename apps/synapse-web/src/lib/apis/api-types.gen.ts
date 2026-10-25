@@ -789,6 +789,8 @@ export interface components {
       note?: string;
       /** @description Subject of the admin who last saved or published it */
       createdBy?: string;
+      /** @description Display name of `createdBy`, read from Identity when the response is built; null when Identity does not name that subject or cannot be reached */
+      createdByName: string | null;
       /** Format: date-time */
       createdAt: string;
       /** Format: date-time */
@@ -802,6 +804,8 @@ export interface components {
       note?: string;
       /** @description Subject of the admin who last saved or published it */
       createdBy?: string;
+      /** @description Display name of `createdBy`, read from Identity when the response is built; null when Identity does not name that subject or cannot be reached */
+      createdByName: string | null;
       /** Format: date-time */
       createdAt: string;
       /** Format: date-time */
@@ -816,6 +820,8 @@ export interface components {
       /** @description Content hash of the draft; publishing must present it to prove the draft was seen */
       fingerprint: string;
     };
+    /** @description No draft exists */
+    NoDraftResponse: null;
     SaveDraftBody: {
       /** @description The whole catalog document. It is saved as sent, even when invalid, so work in progress survives */
       document: {
@@ -1020,6 +1026,8 @@ export interface components {
       kid?: string;
       /** @description Subject of the admin who created it, or `import` for the key imported from the environment */
       createdBy?: string;
+      /** @description Display name of `createdBy`, read from Identity when the response is built; null when Identity does not name that subject or cannot be reached */
+      createdByName: string | null;
       /** Format: date-time */
       createdAt: string;
       /** Format: date-time */
@@ -1504,6 +1512,15 @@ export interface operations {
         };
       };
       /** @description Default Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['NoDraftResponse'];
+        };
+      };
+      /** @description Default Response */
       '4XX': {
         headers: {
           [name: string]: unknown;
@@ -1643,6 +1660,15 @@ export interface operations {
         };
       };
       /** @description Default Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['NoDraftResponse'];
+        };
+      };
+      /** @description Default Response */
       '4XX': {
         headers: {
           [name: string]: unknown;
@@ -1678,6 +1704,15 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['DraftDiffResponse'];
+        };
+      };
+      /** @description Default Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['NoDraftResponse'];
         };
       };
       /** @description Default Response */
@@ -2759,6 +2794,7 @@ export type CatalogVersionListResponse = components['schemas']['CatalogVersionLi
 export type CatalogVersionSummaryResponse = components['schemas']['CatalogVersionSummaryResponse'];
 export type CatalogVersionDetailResponse = components['schemas']['CatalogVersionDetailResponse'];
 export type DraftResponse = components['schemas']['DraftResponse'];
+export type NoDraftResponse = components['schemas']['NoDraftResponse'];
 export type SaveDraftBody = components['schemas']['SaveDraftBody'];
 export type SaveDraftResponse = components['schemas']['SaveDraftResponse'];
 export type CatalogIssueResponse = components['schemas']['CatalogIssueResponse'];
