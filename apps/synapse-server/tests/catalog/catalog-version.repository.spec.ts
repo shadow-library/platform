@@ -50,13 +50,13 @@ describe('CatalogVersionRepository.exclusive', () => {
     const pool = { transaction: (work: (handle: unknown) => Promise<unknown>) => work(tx), select: () => used.push('pool.select') };
     const repository = new CatalogVersionRepository(new FakeDatabaseService({ postgres: pool, constraintErrorMap }));
 
-    await repository.exclusive(store => store.findDraft());
+    await repository.exclusive(store => store.findVersion(1));
 
     expect(used).toEqual(['tx.execute', 'tx.select']);
   });
 
-  it('should surface a version or single-draft violation as a catalog conflict', async () => {
-    for (const constraint of ['catalog_versions_version_unique', 'catalog_versions_single_draft_idx']) {
+  it('should surface a version violation as a catalog conflict', async () => {
+    for (const constraint of ['catalog_versions_pkey', 'catalog_versions_version_unique']) {
       const repository = repositoryOver(async () => {
         throw postgresError(constraint);
       });

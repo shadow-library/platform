@@ -4,7 +4,7 @@ import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 
 import { checkCatalogDocument } from '@modules/catalog/catalog-validator';
-import { type CatalogVersionRepository, DRAFT_VERSION } from '@modules/catalog/catalog-version.repository';
+import { type CatalogVersionRepository, NO_VERSION } from '@modules/catalog/catalog-version.repository';
 import { type CatalogDocument } from '@modules/catalog/catalog.types';
 
 export async function applySeedCatalog(
@@ -15,7 +15,7 @@ export async function applySeedCatalog(
   const logger = Logger.getLogger(APP_NAME, 'seed-catalog');
   const result = await repository.exclusive(async store => {
     const version = await store.maxVersion();
-    if (version !== DRAFT_VERSION) return { seeded: false, version };
+    if (version !== NO_VERSION) return { seeded: false, version };
 
     const check = checkCatalogDocument(document, null);
     if (!check.valid) throw AppErrorCode.SYN_CATALOG_INVALID.create({ issues: check.issues });

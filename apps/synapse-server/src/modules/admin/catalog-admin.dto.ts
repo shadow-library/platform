@@ -1,6 +1,6 @@
 import { Field, Integer, Schema } from '@shadow-library/class-schema';
 
-const CATALOG_STATES = ['DRAFT', 'PUBLISHED', 'ARCHIVED'] as const;
+const CATALOG_STATES = ['PUBLISHED', 'ARCHIVED'] as const;
 
 @Schema()
 export class VersionParams {
@@ -46,7 +46,7 @@ export class CatalogInvalidResponse {
 
 @Schema()
 export class CatalogVersionSummaryResponse {
-  @Field(() => Integer, { description: 'Zero for the draft, which has no version until it is published' })
+  @Field(() => Integer)
   version: number;
 
   @Field(() => String, { enum: [...CATALOG_STATES] })
@@ -55,7 +55,7 @@ export class CatalogVersionSummaryResponse {
   @Field({ optional: true })
   note?: string;
 
-  @Field({ optional: true, description: 'Subject of the admin who last saved or published it' })
+  @Field({ optional: true, description: 'Subject of the admin whose change, budget update or rollback published it' })
   createdBy?: string;
 
   @Field(() => String, {
@@ -84,83 +84,40 @@ export class CatalogVersionListResponse {
 }
 
 @Schema()
-export class DraftResponse {
-  @Field(() => CatalogVersionDetailResponse)
-  draft: CatalogVersionDetailResponse;
-
-  @Field({ description: 'Content hash of the draft; publishing must present it to prove the draft was seen' })
-  fingerprint: string;
-}
-
-@Schema()
-export class SaveDraftBody {
-  @Field({ additionalProperties: true, description: 'The whole catalog document. It is saved as sent, even when invalid, so work in progress survives' })
+export class ApplyChangeBody {
+  @Field({
+    additionalProperties: true,
+    description: 'The whole catalog document as it should be live. It is validated before it is published; an invalid one is refused with 422 and its issues',
+  })
   document: Record<string, unknown>;
 
-  @Field({ optional: true, maxLength: 500, description: 'Free-text note stored with the draft' })
-  note?: string;
-
-  @Field({ optional: true, minLength: 1, description: 'Fingerprint of the draft this save replaces; the save is refused with 409 when the draft has changed since' })
-  expectedFingerprint?: string;
-
-  @Field({ optional: true, description: 'The save starts a new draft; it is refused with 409 when a draft already exists' })
-  expectNoDraft?: boolean;
-
   @Field(() => Integer, {
-    optional: true,
+    nullable: true,
     minimum: 1,
     description:
-      'The active version the document was built from; requires expectNoDraft and cannot be combined with expectedFingerprint. The save is refused with 409 when the active version differs at save time, e.g. after a budget-only publish, so the draft cannot silently revert it',
+      'Version of the active catalog the change was made against, or null when none has been published yet. Refused with 409 when the active version differs. A document equal to the active one publishes nothing and the response is that active version',
   })
-  expectedActiveVersion?: number;
+  expectedVersion: number | null;
+
+  @Field({ optional: true, maxLength: 500, description: 'Plain-language note stored with the new version and shown in history; defaults to "Catalog change"' })
+  note?: string;
 }
 
 @Schema()
-export class SaveDraftResponse extends DraftResponse {
-  @Field(() => [CatalogIssueResponse], { description: 'What would block publishing this draft; empty when it is publishable' })
-  issues: CatalogIssueResponse[];
-}
-
-@Schema()
-export class ValidateDraftResponse {
-  @Field()
-  valid: boolean;
-
-  @Field(() => [CatalogIssueResponse])
-  issues: CatalogIssueResponse[];
-}
-
-@Schema()
-export class DraftDiffResponse {
-  @Field({ description: 'Fingerprint of the draft this diff was computed from; publish with it' })
-  fingerprint: string;
-
-  @Field(() => [String], { description: 'Paths present in the draft only' })
-  added: string[];
-
-  @Field(() => [String], { description: 'Paths present in the active catalog only' })
-  removed: string[];
-
-  @Field(() => [String], { description: 'Paths whose values differ' })
-  changed: string[];
-}
-
-@Schema()
-export class PublishBody {
-  @Field({ minLength: 1, description: 'Fingerprint of the draft being published, as returned when it was read or saved' })
-  fingerprint: string;
-}
-
-@Schema()
-export class DiscardDraftQuery {
-  @Field({ minLength: 1, description: 'Fingerprint of the draft being discarded; the discard is refused with 409 when the draft has changed since' })
-  fingerprint: string;
+export class RollbackBody {
+  @Field(() => Integer, {
+    minimum: 1,
+    description:
+      'Version of the active catalog the caller saw when choosing to restore; refused with 409 when another version has been published since, so an undo never reverts a newer change. Restoring a document equal to the active one publishes nothing and the response is that active version',
+  })
+  expectedVersion: number;
 }
 
 @Schema()
 export class PublishBudgetsBody {
   @Field(() => [Object], {
-    description: 'The complete budget list that replaces the active one. Validated with the whole catalog, so an invalid entry is refused with 422 and its issues',
+    description:
+      'The complete budget list that replaces the active one. Validated with the whole catalog, so an invalid entry is refused with 422 and its issues. Budgets equal to the active ones publish nothing and the response is the active version',
   })
   budgets: Record<string, unknown>[];
 

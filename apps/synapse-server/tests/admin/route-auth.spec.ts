@@ -49,13 +49,8 @@ function declaredRoutes(): DeclaredRoute[] {
 const PERMISSIONS: Record<string, string> = {
   'GET /api/v1/admin/catalog/versions': 'synapse:catalog:read',
   'GET /api/v1/admin/catalog/versions/:version': 'synapse:catalog:read',
-  'GET /api/v1/admin/catalog/draft': 'synapse:catalog:read',
-  'PUT /api/v1/admin/catalog/draft': 'synapse:catalog:write',
-  'DELETE /api/v1/admin/catalog/draft': 'synapse:catalog:write',
-  'POST /api/v1/admin/catalog/draft/validate': 'synapse:catalog:write',
-  'GET /api/v1/admin/catalog/draft/diff': 'synapse:catalog:read',
-  'POST /api/v1/admin/catalog/draft/publish': 'synapse:catalog:publish',
-  'POST /api/v1/admin/catalog/versions/:version/rollback': 'synapse:catalog:publish',
+  'POST /api/v1/admin/catalog/changes': 'synapse:catalog:write',
+  'POST /api/v1/admin/catalog/versions/:version/rollback': 'synapse:catalog:write',
   'PUT /api/v1/admin/catalog/budgets': 'synapse:budgets:write',
   'GET /api/v1/admin/catalog/aliases/:key/impact': 'synapse:catalog:read',
   'GET /api/v1/admin/usage': 'synapse:usage:read',
@@ -96,7 +91,7 @@ describe('admin route auth metadata', () => {
     }
   });
 
-  it('should check budget publishing against the short high-risk cache, as a draft save changing budgets is', () => {
+  it('should check budget publishing against the short high-risk cache, as a change or rollback touching budgets is', () => {
     const declared = routes.find(candidate => candidate.route === 'PUT /api/v1/admin/catalog/budgets');
 
     expect(declared?.auth).toMatchObject({ access: 'required', permission: 'synapse:budgets:write', highRisk: true });
@@ -117,18 +112,15 @@ describe('admin route auth metadata', () => {
     expect(declared?.auth?.scopes).toBeUndefined();
   });
 
-  it('should answer the draft, its validation and its diff with 200, or a bodyless 204 when there is no draft', () => {
-    for (const route of ['GET /api/v1/admin/catalog/draft', 'POST /api/v1/admin/catalog/draft/validate', 'GET /api/v1/admin/catalog/draft/diff']) {
+  it('should answer a change and a rollback with the version, a 409 conflict or a 422 with issues', () => {
+    for (const route of ['POST /api/v1/admin/catalog/changes', 'POST /api/v1/admin/catalog/versions/:version/rollback']) {
       const declared = routes.find(candidate => candidate.route === route);
-      expect({ route, status: declared?.status, noDraft: declared?.responses['204'] }).toEqual({ route, status: 200, noDraft: expect.objectContaining({ type: 'null' }) });
-      expect(declared?.responses['200']).toBeDefined();
+      expect({ route, codes: Object.keys(declared?.responses ?? {}).sort() }).toEqual({ route, codes: ['200', '409', '422'] });
     }
   });
 
-  it('should keep a missing draft an error on the routes that act on it', () => {
-    for (const route of ['POST /api/v1/admin/catalog/draft/publish', 'DELETE /api/v1/admin/catalog/draft']) {
-      expect(routes.find(candidate => candidate.route === route)?.responses['204']).toBeUndefined();
-    }
+  it('should expose no draft route', () => {
+    expect(routes.filter(route => route.route.includes('/draft'))).toEqual([]);
   });
 
   it('should leave no route without a declared access policy', () => {

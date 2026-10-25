@@ -86,7 +86,7 @@ const PULSE_ADMIN_PERMISSIONS = [...PULSE_OPERATOR_PERMISSIONS, 'pulse:senders:w
 const SYNAPSE_VIEWER_PERMISSIONS = ['synapse:catalog:read', 'synapse:usage:read'] as const;
 const SYNAPSE_OPERATOR_PERMISSIONS = [...SYNAPSE_VIEWER_PERMISSIONS, 'synapse:catalog:write'] as const;
 const SYNAPSE_FINANCE_PERMISSIONS = [...SYNAPSE_VIEWER_PERMISSIONS, 'synapse:budgets:write'] as const;
-const SYNAPSE_ADMIN_PERMISSIONS = [...SYNAPSE_OPERATOR_PERMISSIONS, 'synapse:catalog:publish', 'synapse:providers:write', 'synapse:budgets:write'] as const;
+const SYNAPSE_ADMIN_PERMISSIONS = [...SYNAPSE_OPERATOR_PERMISSIONS, 'synapse:providers:write', 'synapse:budgets:write'] as const;
 const SYNAPSE_CREDENTIALS_ADMIN_PERMISSIONS = ['synapse:credentials:manage'] as const;
 
 const SYNAPSE_INFER = { resource: 'api://synapse', scope: 'synapse:infer' } as const;
@@ -146,9 +146,8 @@ export const ECOSYSTEM_SEED: EcosystemSeed = {
         { name: 'synapse:catalog:read', description: 'Read the Synapse model catalog for a calling app', principalType: 'SERVICE' },
       ],
       permissions: [
-        { name: 'synapse:catalog:read', description: 'Read the model catalog, its drafts and version history' },
-        { name: 'synapse:catalog:write', description: 'Create and edit model catalog drafts' },
-        { name: 'synapse:catalog:publish', description: 'Publish and roll back model catalog versions' },
+        { name: 'synapse:catalog:read', description: 'Read the model catalog and its version history' },
+        { name: 'synapse:catalog:write', description: 'Change the model catalog; every confirmed change goes live' },
         { name: 'synapse:providers:write', description: 'Manage inference providers and their endpoints' },
         { name: 'synapse:budgets:write', description: 'Manage per-app and per-subject usage budgets' },
         { name: 'synapse:usage:read', description: 'Read usage, cost and ledger reports' },
@@ -156,7 +155,11 @@ export const ECOSYSTEM_SEED: EcosystemSeed = {
       ],
       roles: [
         { name: 'SynapseViewer', description: 'Read-only access to the synapse catalog and usage', permissions: SYNAPSE_VIEWER_PERMISSIONS },
-        { name: 'SynapseOperator', description: 'Day-to-day operator: reads everything and edits catalog drafts', permissions: SYNAPSE_OPERATOR_PERMISSIONS },
+        {
+          name: 'SynapseOperator',
+          description: 'Day-to-day operator: reads everything and changes models, model names and features live',
+          permissions: SYNAPSE_OPERATOR_PERMISSIONS,
+        },
         { name: 'SynapseFinance', description: 'Reads usage and the catalog, and sets budgets', permissions: SYNAPSE_FINANCE_PERMISSIONS },
         { name: 'SynapseAdmin', description: 'Full control over the synapse catalog, providers and budgets', permissions: SYNAPSE_ADMIN_PERMISSIONS, grantToBootstrapAdmin: true },
         {

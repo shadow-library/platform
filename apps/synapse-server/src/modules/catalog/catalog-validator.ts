@@ -201,7 +201,7 @@ export function checkCatalogDocument(input: unknown, active: CatalogDocument | n
   return { valid: true, document: parsed.document };
 }
 
-/** `checkCatalogDocument` plus the rules that need the credentials table; what publish, rollback and a draft's issues apply. */
+/** `checkCatalogDocument` plus the rules that need the credentials table; what every change, budget publish and rollback applies. */
 export async function checkPublishable(input: unknown, active: CatalogDocument | null, lookup: CredentialLookup): Promise<CatalogCheck> {
   const parsed = parseCatalogDocument(input);
   if (!parsed.ok) return { valid: false, issues: parsed.issues };

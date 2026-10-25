@@ -29,8 +29,8 @@ describe('constraintErrorMap', () => {
     for (const name of ['catalog_versions_pkey', 'ledger_pkey', 'budget_counters_pk']) expect({ name, declared: DECLARED_NAMES.has(name) }).toEqual({ name, declared: true });
   });
 
-  it('should turn a clashing catalog id, version number or second draft into a catalog conflict the admin can retry', () => {
-    for (const name of ['catalog_versions_pkey', 'catalog_versions_version_unique', 'catalog_versions_single_draft_idx']) {
+  it('should turn a clashing catalog id or version number into a catalog conflict the admin can retry', () => {
+    for (const name of ['catalog_versions_pkey', 'catalog_versions_version_unique']) {
       expect(AppError.is(constraintErrorMap[name], AppErrorCode.SYN_CATALOG_CONFLICT)).toBe(true);
     }
   });

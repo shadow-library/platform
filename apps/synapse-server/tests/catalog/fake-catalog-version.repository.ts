@@ -1,26 +1,15 @@
 import { AppErrorCode } from '@server/classes';
 import { type Catalog } from '@server/database';
 
-import {
-  type CatalogVersionRepository,
-  type CatalogVersionStore,
-  type CatalogVersionSummary,
-  DRAFT_VERSION,
-  type DraftValues,
-  type PublishedValues,
-} from '@modules/catalog/catalog-version.repository';
+import { type CatalogVersionRepository, type CatalogVersionStore, type CatalogVersionSummary, NO_VERSION, type PublishedValues } from '@modules/catalog/catalog-version.repository';
 import { type CredentialState } from '@modules/catalog/catalog.types';
 import { referencingProviders } from '@modules/credentials/credential.utils';
 
 type Row = Catalog.Version;
 
-/** Mirrors the table's unique `version` and single-draft index, which the real constraint map turns into the same conflict. */
+/** Mirrors the table's unique `version`, which the real constraint map turns into the same conflict; `DRAFT` rows stand for ones the removed draft workflow left. */
 class InMemoryCatalogStore implements CatalogVersionStore {
   constructor(private readonly repository: FakeCatalogVersionRepository) {}
-
-  async findDraft(): Promise<Row | undefined> {
-    return this.repository.rows.find(row => row.state === 'DRAFT');
-  }
 
   async findActive(): Promise<Row | undefined> {
     return this.repository.published().at(0);
@@ -31,34 +20,11 @@ class InMemoryCatalogStore implements CatalogVersionStore {
   }
 
   async maxVersion(): Promise<number> {
-    return Math.max(DRAFT_VERSION, ...this.repository.rows.map(row => row.version));
-  }
-
-  async insertDraft(values: DraftValues): Promise<Row> {
-    return this.insert({ ...values, version: DRAFT_VERSION, state: 'DRAFT', publishedAt: null });
-  }
-
-  async updateDraft(id: bigint, values: DraftValues): Promise<Row | undefined> {
-    const row = this.repository.rows.find(candidate => candidate.id === id && candidate.state === 'DRAFT');
-    if (row) Object.assign(row, values);
-    return row;
-  }
-
-  async deleteDraft(id: bigint): Promise<boolean> {
-    const before = this.repository.rows.length;
-    this.repository.rows = this.repository.rows.filter(row => !(row.id === id && row.state === 'DRAFT'));
-    return this.repository.rows.length < before;
+    return Math.max(NO_VERSION, ...this.repository.rows.map(row => row.version));
   }
 
   async archivePublished(): Promise<void> {
     for (const row of this.repository.rows) if (row.state === 'PUBLISHED') row.state = 'ARCHIVED';
-  }
-
-  async promoteDraft(id: bigint, version: number, createdBy: string): Promise<Row | undefined> {
-    const row = this.repository.rows.find(candidate => candidate.id === id && candidate.state === 'DRAFT');
-    if (!row) return undefined;
-    this.assertVersionFree(version);
-    return Object.assign(row, { state: 'PUBLISHED', version, createdBy, publishedAt: new Date() } satisfies Partial<Row>);
   }
 
   async insertPublished(values: PublishedValues): Promise<Row> {
@@ -75,7 +41,6 @@ class InMemoryCatalogStore implements CatalogVersionStore {
 
   private insert(values: Omit<Row, 'id' | 'createdAt'>): Row {
     this.assertVersionFree(values.version);
-    if (values.state === 'DRAFT' && this.repository.rows.some(row => row.state === 'DRAFT')) throw AppErrorCode.SYN_CATALOG_CONFLICT.create();
     const row: Row = { ...values, id: this.repository.nextId(), createdAt: new Date() };
     this.repository.rows.push(row);
     return row;
@@ -123,10 +88,6 @@ export class FakeCatalogVersionRepository {
 
   findVersion(version: number): Promise<Row | undefined> {
     return new InMemoryCatalogStore(this).findVersion(version);
-  }
-
-  findDraft(): Promise<Row | undefined> {
-    return new InMemoryCatalogStore(this).findDraft();
   }
 
   findActive(): Promise<Row | undefined> {

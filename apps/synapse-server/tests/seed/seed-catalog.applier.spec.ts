@@ -5,7 +5,7 @@ import { type RestoreLogger, silenceLogger } from '@shadow-library/common/testin
 import { AppErrorCode } from '@server/classes';
 import { applySeedCatalog, buildSeedCatalog } from '@server/database/seed';
 
-import { DRAFT_VERSION } from '@modules/catalog/catalog-version.repository';
+import { NO_VERSION } from '@modules/catalog/catalog-version.repository';
 
 import { catalogDocument } from '../catalog/catalog.fixtures';
 import { FakeCatalogVersionRepository } from '../catalog/fake-catalog-version.repository';
@@ -44,11 +44,11 @@ describe('applySeedCatalog', () => {
     expect(repository.rows).toEqual([existing]);
   });
 
-  it('should seed when only a draft exists and preserve that draft', async () => {
-    const draft = repository.seed(EXISTING_DOCUMENT, DRAFT_VERSION, 'DRAFT');
+  it('should seed when only a draft row the removed draft workflow left exists, and leave that row alone', async () => {
+    const leftover = repository.seed(EXISTING_DOCUMENT, NO_VERSION, 'DRAFT');
     expect(await applySeedCatalog(repository, DOCUMENT, 'migration')).toEqual({ seeded: true, version: 1 });
     expect(repository.rows).toHaveLength(2);
-    expect(repository.rows[0]).toEqual(draft);
+    expect(repository.rows[0]).toEqual(leftover);
     expect(repository.published()[0]).toMatchObject({ version: 1, document: DOCUMENT, createdBy: 'migration' });
   });
 

@@ -2,7 +2,6 @@
 export const SYNAPSE_PERMISSIONS = {
   catalogRead: 'synapse:catalog:read',
   catalogWrite: 'synapse:catalog:write',
-  catalogPublish: 'synapse:catalog:publish',
   providersWrite: 'synapse:providers:write',
   budgetsWrite: 'synapse:budgets:write',
   usageRead: 'synapse:usage:read',
@@ -18,7 +17,7 @@ export const SYNAPSE_SCOPES = {
 const VIEWER_PERMISSIONS = [SYNAPSE_PERMISSIONS.catalogRead, SYNAPSE_PERMISSIONS.usageRead] as const;
 const OPERATOR_PERMISSIONS = [...VIEWER_PERMISSIONS, SYNAPSE_PERMISSIONS.catalogWrite] as const;
 const FINANCE_PERMISSIONS = [...VIEWER_PERMISSIONS, SYNAPSE_PERMISSIONS.budgetsWrite] as const;
-const ADMIN_PERMISSIONS = [...OPERATOR_PERMISSIONS, SYNAPSE_PERMISSIONS.catalogPublish, SYNAPSE_PERMISSIONS.providersWrite, SYNAPSE_PERMISSIONS.budgetsWrite] as const;
+const ADMIN_PERMISSIONS = [...OPERATOR_PERMISSIONS, SYNAPSE_PERMISSIONS.providersWrite, SYNAPSE_PERMISSIONS.budgetsWrite] as const;
 
 export const SYNAPSE_ROLES = {
   viewer: { name: 'SynapseViewer', permissions: VIEWER_PERMISSIONS },

@@ -5,11 +5,11 @@ import { AuthGuardErrorCode } from '@shadow-library/auth/module';
 
 import { SYNAPSE_PERMISSIONS } from '@modules/auth';
 import { type CatalogSection } from '@modules/catalog';
-import { draftAuthorizer } from '@modules/admin/draft-authorizer';
+import { changeAuthorizer } from '@modules/admin/change-authorizer';
 
 const authorize = (granted: string[], changed: CatalogSection[]): unknown => {
   try {
-    return draftAuthorizer(new Set(granted))(new Set(changed));
+    return changeAuthorizer(new Set(granted))(new Set(changed));
   } catch (error) {
     return error;
   }
@@ -17,12 +17,12 @@ const authorize = (granted: string[], changed: CatalogSection[]): unknown => {
 
 const { catalogWrite, providersWrite, budgetsWrite } = SYNAPSE_PERMISSIONS;
 
-describe('draftAuthorizer', () => {
+describe('changeAuthorizer', () => {
   it('should allow changes to models, aliases and tasks with catalog write alone', () => {
     expect(authorize([catalogWrite], ['models', 'aliases', 'tasks'])).toBeUndefined();
   });
 
-  it('should require catalog write even for a save that changes nothing', () => {
+  it('should require catalog write even for a change that changes nothing', () => {
     expect(AppError.is(authorize([providersWrite, budgetsWrite], []), AuthGuardErrorCode.IAM_002)).toBe(true);
   });
 

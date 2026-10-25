@@ -7,15 +7,14 @@ import { AppErrorCode } from '@server/classes';
 
 import { AliasImpactService } from '@modules/admin/alias-impact.service';
 import { CatalogAdminController } from '@modules/admin/catalog-admin.controller';
-import { type DraftDiffResponse, type DraftResponse, type ValidateDraftResponse } from '@modules/admin/catalog-admin.dto';
-import { catalogFingerprint } from '@modules/catalog/catalog-fingerprint';
 import { CatalogVersionService } from '@modules/catalog/catalog-version.service';
 import { type ActiveCatalogCache } from '@modules/catalog/active-catalog.cache';
+import { NO_VERSION } from '@modules/catalog/catalog-version.repository';
 import { type CatalogDocument } from '@modules/catalog/catalog.types';
 
 import { catalogDocument } from '../catalog/catalog.fixtures';
 import { FakeCatalogVersionRepository } from '../catalog/fake-catalog-version.repository';
-import { asPrincipal, caller, directory, editorName, expectFailure, fakeCache, fakeLedger, FakeReply, NOVEL_FORGE, userWith } from './admin.fixtures';
+import { asPrincipal, caller, checkOptions, directory, editorName, expectFailure, fakeCache, fakeLedger, FakeReply, NOVEL_FORGE, userWith } from './admin.fixtures';
 
 let repository: FakeCatalogVersionRepository;
 let controller: CatalogAdminController;
@@ -32,8 +31,19 @@ const withProviderUrl = (document: CatalogDocument): void => void (document.prov
 const withLabel = (document: CatalogDocument): void => void (document.models['grok-4.6']!.label = 'Grok Four');
 const withUnknownModel = (document: CatalogDocument): void => void (document.aliases.opus!.model = 'missing');
 
-function save(role: Parameters<typeof userWith>[0], change: (document: CatalogDocument) => void, reply = new FakeReply()) {
-  return asPrincipal(userWith(role), () => controller.saveDraft({ document: catalogDocument(change) as never, note: 'edit' }, reply.asResponse()));
+type Role = Parameters<typeof userWith>[0];
+
+function apply(role: Role, change: (document: CatalogDocument) => void, options: { expectedVersion?: number | null; note?: string; reply?: FakeReply } = {}) {
+  const body = { document: catalogDocument(change) as never, expectedVersion: options.expectedVersion === undefined ? 1 : options.expectedVersion, note: options.note };
+  return asPrincipal(userWith(role), () => controller.applyChange(body, (options.reply ?? new FakeReply()).asResponse()));
+}
+
+function rollback(role: Role, version: number, expectedVersion: number, reply = new FakeReply()) {
+  return asPrincipal(userWith(role), () => controller.rollback({ version }, { expectedVersion }, reply.asResponse()));
+}
+
+function liveVersions(): number[] {
+  return repository.published().map(row => row.version);
 }
 
 describe('CatalogAdminController', () => {
@@ -43,14 +53,9 @@ describe('CatalogAdminController', () => {
       const routes = {
         listVersions: () => controller.listVersions(),
         getVersion: () => controller.getVersion({ version: 1 }),
-        getDraft: () => controller.getDraft(reply),
-        saveDraft: () => controller.saveDraft({ document: {} }, reply),
-        discardDraft: () => controller.discardDraft({ fingerprint: 'x' }),
+        applyChange: () => controller.applyChange({ document: {}, expectedVersion: 1 }, reply),
         publishBudgets: () => controller.publishBudgets({ budgets: [], expectedVersion: 1 }, reply),
-        validateDraft: () => controller.validateDraft(reply),
-        diffDraft: () => controller.diffDraft(reply),
-        publish: () => controller.publish({ fingerprint: 'x' }, reply),
-        rollback: () => controller.rollback({ version: 1 }, reply),
+        rollback: () => controller.rollback({ version: 1 }, { expectedVersion: 1 }, reply),
         aliasImpact: () => controller.aliasImpact({ key: 'opus' }, {}),
       };
 
@@ -61,220 +66,84 @@ describe('CatalogAdminController', () => {
         );
         expect(error.status).toBe(403);
       }
-      expect(repository.rows.filter(row => row.state === 'DRAFT')).toHaveLength(0);
+      expect(liveVersions()).toEqual([1]);
     });
   });
 
-  describe('saveDraft', () => {
-    it('should let an operator edit models and keep the draft', async () => {
-      const saved = (await save('operator', withLabel)) as { fingerprint: string; issues: unknown[]; draft: { version: number; state: string } };
+  describe('applyChange', () => {
+    it('should publish an operator model change as the next version with the caller as its named author', async () => {
+      const published = await apply('operator', withLabel, { note: 'Rename Grok' });
 
-      expect(saved.issues).toEqual([]);
-      expect(saved.draft).toMatchObject({ version: 0, state: 'DRAFT' });
-      expect(saved.fingerprint).toBe(catalogFingerprint(repository.rows.find(row => row.state === 'DRAFT')!.document));
+      expect(published).toMatchObject({ version: 2, state: 'PUBLISHED', note: 'Rename Grok', createdBy: userWith('operator').sub, createdByName: editorName('operator') });
+      expect(repository.published()[0]?.document).toEqual(catalogDocument(withLabel));
     });
 
-    it('should refuse an operator who changes budgets and persist nothing', async () => {
-      await expectFailure(save('operator', withBudgets), AuthGuardErrorCode.IAM_002);
+    it('should refuse an operator who changes budgets and publish nothing', async () => {
+      await expectFailure(apply('operator', withBudgets), AuthGuardErrorCode.IAM_002);
 
-      expect(repository.rows.filter(row => row.state === 'DRAFT')).toHaveLength(0);
+      expect(liveVersions()).toEqual([1]);
     });
 
     it('should refuse an operator who changes providers', async () => {
-      await expectFailure(save('operator', withProviderUrl), AuthGuardErrorCode.IAM_002);
+      await expectFailure(apply('operator', withProviderUrl), AuthGuardErrorCode.IAM_002);
     });
 
-    it('should allow an admin to change budgets and providers', async () => {
-      const saved = (await save('admin', document => (withBudgets(document), withProviderUrl(document)))) as { issues: unknown[] };
+    it('should let an admin change budgets and providers', async () => {
+      const published = await apply('admin', document => (withBudgets(document), withProviderUrl(document)));
 
-      expect(saved.issues).toEqual([]);
-      expect(repository.rows.some(row => row.state === 'DRAFT')).toBe(true);
+      expect(published).toMatchObject({ version: 2 });
     });
 
     it('should refuse a viewer, who lacks catalog write', async () => {
-      await expectFailure(save('viewer', withLabel), AuthGuardErrorCode.IAM_002);
+      await expectFailure(apply('viewer', withLabel), AuthGuardErrorCode.IAM_002);
     });
 
-    it('should compare against the existing draft, so an operator can keep editing a draft an admin changed', async () => {
-      await save('admin', withBudgets);
+    it('should check provider and budget writes against the short high-risk cache', async () => {
+      checkOptions.length = 0;
 
-      const saved = (await save('operator', document => (withBudgets(document), withLabel(document)))) as { issues: unknown[] };
+      await apply('admin', withLabel);
 
-      expect(saved.issues).toEqual([]);
-    });
-
-    it('should refuse an operator who reverts an admin draft budget change', async () => {
-      await save('admin', withBudgets);
-
-      await expectFailure(
-        save('operator', () => undefined),
-        AuthGuardErrorCode.IAM_002,
+      expect(checkOptions).toEqual(
+        expect.arrayContaining([
+          { action: 'synapse:catalog:write', highRisk: false },
+          { action: 'synapse:providers:write', highRisk: true },
+          { action: 'synapse:budgets:write', highRisk: true },
+        ]),
       );
     });
 
-    it('should pass the expected fingerprint through and refuse a stale save with a conflict', async () => {
-      const first = (await save('admin', withLabel)) as { fingerprint: string };
-      await save('admin', withBudgets);
+    it('should map a stale expected version to a 409 conflict and publish nothing', async () => {
+      await apply('admin', withLabel);
 
-      const error = await expectFailure(
-        asPrincipal(userWith('admin'), () => controller.saveDraft({ document: catalogDocument() as never, expectedFingerprint: first.fingerprint }, new FakeReply().asResponse())),
-        AppErrorCode.SYN_CATALOG_CONFLICT,
-      );
+      const error = await expectFailure(apply('admin', withBudgets), AppErrorCode.SYN_CATALOG_CONFLICT);
+
       expect(error.status).toBe(409);
+      expect(liveVersions()).toEqual([2]);
     });
 
-    it('should refuse a save that expects no draft when one exists', async () => {
-      await save('admin', withLabel);
+    it('should answer the active version and publish nothing for a document equal to it', async () => {
+      const answered = await apply('operator', () => undefined);
 
-      await expectFailure(
-        asPrincipal(userWith('admin'), () => controller.saveDraft({ document: catalogDocument() as never, expectNoDraft: true }, new FakeReply().asResponse())),
-        AppErrorCode.SYN_CATALOG_CONFLICT,
-      );
+      expect(answered).toMatchObject({ version: 1, state: 'PUBLISHED', createdBy: 'seed', createdByName: null });
+      expect(repository.rows).toHaveLength(1);
     });
 
-    it('should refuse a save that expects both a draft and none', async () => {
-      await expectFailure(
-        asPrincipal(userWith('admin'), () =>
-          controller.saveDraft({ document: catalogDocument() as never, expectedFingerprint: 'x', expectNoDraft: true }, new FakeReply().asResponse()),
-        ),
-        AppErrorCode.SYN_INVALID_REQUEST,
-      );
-      expect(repository.rows.filter(row => row.state === 'DRAFT')).toHaveLength(0);
+    it('should publish the first catalog against no active version', async () => {
+      repository.rows = [];
+
+      const published = await apply('admin', () => undefined, { expectedVersion: null });
+
+      expect(published).toMatchObject({ version: 1, note: 'Catalog change' });
     });
 
-    it('should pass the pinned active version through and refuse the save once another version is active', async () => {
-      repository.seed(catalogDocument(), 1);
-      const reply = new FakeReply().asResponse();
-      const saved = await asPrincipal(userWith('admin'), () =>
-        controller.saveDraft({ document: catalogDocument() as never, expectNoDraft: true, expectedActiveVersion: 1 }, reply),
-      );
-      expect(saved).toHaveProperty('fingerprint');
-      await asPrincipal(userWith('admin'), () => controller.discardDraft({ fingerprint: (saved as { fingerprint: string }).fingerprint }));
-      await asPrincipal(userWith('admin'), () => controller.publishBudgets({ budgets: catalogDocument().budgets as never, expectedVersion: 1 }, new FakeReply().asResponse()));
-
-      await expectFailure(
-        asPrincipal(userWith('admin'), () =>
-          controller.saveDraft({ document: catalogDocument() as never, expectNoDraft: true, expectedActiveVersion: 1 }, new FakeReply().asResponse()),
-        ),
-        AppErrorCode.SYN_CATALOG_CONFLICT,
-      );
-    });
-
-    it('should refuse a pinned active version without expectNoDraft', async () => {
-      await expectFailure(
-        asPrincipal(userWith('admin'), () => controller.saveDraft({ document: catalogDocument() as never, expectedActiveVersion: 1 }, new FakeReply().asResponse())),
-        AppErrorCode.SYN_INVALID_REQUEST,
-      );
-      await expectFailure(
-        asPrincipal(userWith('admin'), () =>
-          controller.saveDraft({ document: catalogDocument() as never, expectedFingerprint: 'x', expectedActiveVersion: 1 }, new FakeReply().asResponse()),
-        ),
-        AppErrorCode.SYN_INVALID_REQUEST,
-      );
-    });
-
-    it('should save an invalid document and report its issues instead of failing', async () => {
-      const reply = new FakeReply();
-      const saved = (await save('operator', withUnknownModel, reply)) as { issues: { code: string; path: string }[] };
-
-      expect(reply.sent).toBe(false);
-      expect(saved.issues).toContainEqual(expect.objectContaining({ code: 'unknown_model', path: 'aliases.opus.model' }));
-      expect(repository.rows.some(row => row.state === 'DRAFT')).toBe(true);
-    });
-  });
-
-  describe('publish', () => {
-    it('should refuse a publish without a fingerprint', async () => {
-      await save('admin', withLabel);
-
-      for (const fingerprint of [undefined, '']) {
-        await expectFailure(
-          asPrincipal(userWith('admin'), () => controller.publish({ fingerprint } as never, new FakeReply().asResponse())),
-          AppErrorCode.SYN_INVALID_REQUEST,
-        );
-      }
-      expect(repository.published().map(row => row.version)).toEqual([1]);
-    });
-
-    it('should publish the draft the fingerprint names', async () => {
-      const saved = (await save('admin', withLabel)) as { fingerprint: string };
-
-      const published = await asPrincipal(userWith('admin'), () => controller.publish({ fingerprint: saved.fingerprint }, new FakeReply().asResponse()));
-
-      expect(published).toMatchObject({ version: 2, state: 'PUBLISHED', createdBy: userWith('admin').sub, createdByName: editorName('admin') });
-    });
-
-    it('should map a stale fingerprint to SYN_CATALOG_CONFLICT', async () => {
-      const first = (await save('admin', withLabel)) as { fingerprint: string };
-      await save('admin', document => (withLabel(document), withBudgets(document)));
-
-      await expectFailure(
-        asPrincipal(userWith('admin'), () => controller.publish({ fingerprint: first.fingerprint }, new FakeReply().asResponse())),
-        AppErrorCode.SYN_CATALOG_CONFLICT,
-      );
-    });
-
-    it('should render the issues of an invalid catalog in the 422 body', async () => {
-      const saved = (await save('admin', withUnknownModel)) as { fingerprint: string };
+    it('should render the issues of an invalid document in the 422 body', async () => {
       const reply = new FakeReply();
 
-      await asPrincipal(userWith('admin'), () => controller.publish({ fingerprint: saved.fingerprint }, reply.asResponse()));
+      await apply('operator', withUnknownModel, { reply });
 
       expect(reply.statusCode).toBe(422);
-      expect(reply.body).toMatchObject({ code: AppErrorCode.SYN_CATALOG_INVALID.code, issues: [expect.objectContaining({ code: 'unknown_model' })] });
-      expect(repository.published().map(row => row.version)).toEqual([1]);
-    });
-
-    it('should leave other publish failures to the error handler', async () => {
-      await expectFailure(
-        asPrincipal(userWith('admin'), () => controller.publish({ fingerprint: 'abc' }, new FakeReply().asResponse())),
-        ServerErrorCode.S009,
-      );
-    });
-  });
-
-  describe('discardDraft', () => {
-    it('should discard the draft for an operator when it reverts only sections catalog write covers', async () => {
-      const saved = (await save('operator', withLabel)) as { fingerprint: string };
-
-      await asPrincipal(userWith('operator'), () => controller.discardDraft({ fingerprint: saved.fingerprint }));
-
-      expect(repository.rows.filter(row => row.state === 'DRAFT')).toHaveLength(0);
-    });
-
-    it('should refuse an operator discarding a draft that changes budgets, as a save reverting them is refused', async () => {
-      const saved = (await save('admin', withBudgets)) as { fingerprint: string };
-
-      await expectFailure(
-        asPrincipal(userWith('operator'), () => controller.discardDraft({ fingerprint: saved.fingerprint })),
-        AuthGuardErrorCode.IAM_002,
-      );
-      expect(repository.rows.filter(row => row.state === 'DRAFT')).toHaveLength(1);
-    });
-
-    it('should let an admin discard a draft that changes budgets and providers', async () => {
-      const saved = (await save('admin', document => (withBudgets(document), withProviderUrl(document)))) as { fingerprint: string };
-
-      await asPrincipal(userWith('admin'), () => controller.discardDraft({ fingerprint: saved.fingerprint }));
-
-      expect(repository.rows.filter(row => row.state === 'DRAFT')).toHaveLength(0);
-    });
-
-    it('should map a stale fingerprint to SYN_CATALOG_CONFLICT and a missing draft to not found', async () => {
-      const first = (await save('operator', withLabel)) as { fingerprint: string };
-      await save('operator', withUnknownModel);
-
-      const error = await expectFailure(
-        asPrincipal(userWith('operator'), () => controller.discardDraft({ fingerprint: first.fingerprint })),
-        AppErrorCode.SYN_CATALOG_CONFLICT,
-      );
-      expect(error.status).toBe(409);
-
-      repository.rows = repository.rows.filter(row => row.state !== 'DRAFT');
-      await expectFailure(
-        asPrincipal(userWith('operator'), () => controller.discardDraft({ fingerprint: first.fingerprint })),
-        ServerErrorCode.S009,
-      );
+      expect(reply.body).toMatchObject({ code: AppErrorCode.SYN_CATALOG_INVALID.code, issues: [expect.objectContaining({ code: 'unknown_model', path: 'aliases.opus.model' })] });
+      expect(liveVersions()).toEqual([1]);
     });
   });
 
@@ -305,25 +174,57 @@ describe('CatalogAdminController', () => {
 
       expect(reply.statusCode).toBe(422);
       expect(reply.body).toMatchObject({ code: AppErrorCode.SYN_CATALOG_INVALID.code, issues: [expect.objectContaining({ path: 'budgets[0].app', code: 'unknown_app' })] });
-      expect(repository.published().map(row => row.version)).toEqual([1]);
+      expect(liveVersions()).toEqual([1]);
     });
   });
 
   describe('rollback', () => {
     it('should publish a new version copied from the old one', async () => {
-      const saved = (await save('admin', withLabel)) as { fingerprint: string };
-      await asPrincipal(userWith('admin'), () => controller.publish({ fingerprint: saved.fingerprint }, new FakeReply().asResponse()));
+      await apply('operator', withLabel);
 
-      const rolledBack = await asPrincipal(userWith('admin'), () => controller.rollback({ version: 1 }, new FakeReply().asResponse()));
+      const rolledBack = await rollback('operator', 1, 2);
 
-      expect(rolledBack).toMatchObject({ version: 3, note: 'Rollback to v1' });
+      expect(rolledBack).toMatchObject({ version: 3, note: 'Rollback to v1', createdByName: editorName('operator') });
+      expect(repository.published()[0]?.document).toEqual(catalogDocument());
+    });
+
+    it('should map a stale expected version to a 409 conflict, so an undo never reverts a newer change', async () => {
+      await apply('operator', withLabel);
+      await apply('operator', document => (withLabel(document), (document.aliases.opus!.label = 'Opus Max')), { expectedVersion: 2 });
+
+      const error = await expectFailure(rollback('operator', 1, 2), AppErrorCode.SYN_CATALOG_CONFLICT);
+
+      expect(error.status).toBe(409);
+      expect(liveVersions()).toEqual([3]);
+    });
+
+    it('should refuse an operator restoring a version whose providers or budgets differ from the active ones', async () => {
+      await apply('admin', withBudgets);
+
+      await expectFailure(rollback('operator', 1, 2), AuthGuardErrorCode.IAM_002);
+
+      expect(liveVersions()).toEqual([2]);
+    });
+
+    it('should let an admin restore a version whose budgets differ', async () => {
+      await apply('admin', withBudgets);
+
+      expect(await rollback('admin', 1, 2)).toMatchObject({ version: 3 });
+    });
+
+    it('should refuse a viewer, who lacks catalog write', async () => {
+      await apply('operator', withLabel);
+
+      await expectFailure(rollback('viewer', 1, 2), AuthGuardErrorCode.IAM_002);
+    });
+
+    it('should answer the active version and publish nothing when restoring it', async () => {
+      expect(await rollback('operator', 1, 1)).toMatchObject({ version: 1 });
+      expect(repository.rows).toHaveLength(1);
     });
 
     it('should answer not found for a version that does not exist', async () => {
-      await expectFailure(
-        asPrincipal(userWith('admin'), () => controller.rollback({ version: 99 }, new FakeReply().asResponse())),
-        ServerErrorCode.S009,
-      );
+      await expectFailure(rollback('admin', 99, 1), ServerErrorCode.S009);
     });
   });
 
@@ -337,6 +238,14 @@ describe('CatalogAdminController', () => {
       expect(items[0]).not.toHaveProperty('note');
     });
 
+    it('should never list or return a draft row the removed draft workflow left', async () => {
+      repository.seed(catalogDocument(withLabel), NO_VERSION, 'DRAFT');
+
+      const { items } = await asPrincipal(userWith('viewer'), () => controller.listVersions());
+
+      expect(items.map(item => item.state)).toEqual(['PUBLISHED']);
+    });
+
     it('should return a version with its document, and not found for an unknown one', async () => {
       const detail = await asPrincipal(userWith('viewer'), () => controller.getVersion({ version: 1 }));
 
@@ -345,56 +254,6 @@ describe('CatalogAdminController', () => {
         asPrincipal(userWith('viewer'), () => controller.getVersion({ version: 7 })),
         ServerErrorCode.S009,
       );
-    });
-
-    it('should answer 204 with no body from the draft, its validation and its diff when there is no draft', async () => {
-      const reads = [
-        (reply: FakeReply) => asPrincipal(userWith('viewer'), () => controller.getDraft(reply.asResponse())),
-        (reply: FakeReply) => asPrincipal(userWith('operator'), () => controller.validateDraft(reply.asResponse())),
-        (reply: FakeReply) => asPrincipal(userWith('viewer'), () => controller.diffDraft(reply.asResponse())),
-      ];
-
-      for (const read of reads) {
-        const reply = new FakeReply();
-        await read(reply);
-        expect({ statusCode: reply.statusCode, sent: reply.sent, body: reply.body }).toEqual({ statusCode: 204, sent: true, body: undefined });
-      }
-    });
-
-    it('should answer 204 once the draft is published or discarded, while publishing and discarding without a draft stay not found', async () => {
-      const saved = (await save('admin', withLabel)) as { fingerprint: string };
-      await asPrincipal(userWith('admin'), () => controller.publish({ fingerprint: saved.fingerprint }, new FakeReply().asResponse()));
-
-      const reply = new FakeReply();
-      await asPrincipal(userWith('viewer'), () => controller.getDraft(reply.asResponse()));
-
-      expect(reply.statusCode).toBe(204);
-      await expectFailure(
-        asPrincipal(userWith('admin'), () => controller.publish({ fingerprint: saved.fingerprint }, new FakeReply().asResponse())),
-        ServerErrorCode.S009,
-      );
-      await expectFailure(
-        asPrincipal(userWith('admin'), () => controller.discardDraft({ fingerprint: saved.fingerprint })),
-        ServerErrorCode.S009,
-      );
-    });
-
-    it('should return the draft with its fingerprint, validation and diff against the active catalog', async () => {
-      await save('operator', document => (withLabel(document), withUnknownModel(document)));
-      const replies = [new FakeReply(), new FakeReply(), new FakeReply()] as const;
-
-      const draft = (await asPrincipal(userWith('viewer'), () => controller.getDraft(replies[0].asResponse()))) as DraftResponse;
-      const validation = (await asPrincipal(userWith('operator'), () => controller.validateDraft(replies[1].asResponse()))) as ValidateDraftResponse;
-      const diff = (await asPrincipal(userWith('viewer'), () => controller.diffDraft(replies[2].asResponse()))) as DraftDiffResponse;
-
-      expect(replies.map(reply => reply.sent)).toEqual([false, false, false]);
-      expect(draft.draft).toMatchObject({ createdBy: userWith('operator').sub, createdByName: editorName('operator') });
-
-      expect(draft.fingerprint).toHaveLength(64);
-      expect(validation.valid).toBe(false);
-      expect(validation.issues).toContainEqual(expect.objectContaining({ code: 'unknown_model' }));
-      expect(diff.changed).toEqual(['models.grok-4.6.label', 'aliases.opus.model']);
-      expect(diff.fingerprint).toBe(draft.fingerprint);
     });
   });
 });

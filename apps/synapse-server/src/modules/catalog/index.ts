@@ -1,7 +1,6 @@
 export * from './active-catalog.cache';
 export * from './catalog-credentials';
 export * from './catalog-diff';
-export * from './catalog-fingerprint';
 export * from './catalog-parser';
 export * from './catalog-resolver';
 export * from './catalog-validator';

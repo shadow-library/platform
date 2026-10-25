@@ -11,9 +11,7 @@ import {
   freshClientIp,
   getSynapseUrl,
   readLatestCatalogVersion,
-  restoreCatalogDraft,
   runAll,
-  snapshotCatalogDraft,
   SynapseCatalogError,
   synapseGuest,
   type SynapseStaff,
@@ -26,10 +24,10 @@ export interface SynapseHarness {
   guest(): Promise<APIRequestContext>;
   credential(staff: SynapseStaff, options?: CredentialOptions): Promise<CreatedCredential>;
   trackCredential(id: string): void;
-  preserveCatalogDraft(): Promise<void>;
+  guardCatalog(): Promise<void>;
 }
 
-/** Credentials are only ever revoked through the API, so the rows a test made are deleted after it; the shared catalog draft is put back as found. */
+/** Credentials are only ever revoked through the API, so the rows a test made are deleted after it, unless a catalog version that may name them went live meanwhile. */
 export const test = base.extend<{ synapse: SynapseHarness }>({
   // eslint-disable-next-line no-empty-pattern
   synapse: async ({}, use) => {
@@ -38,9 +36,8 @@ export const test = base.extend<{ synapse: SynapseHarness }>({
     const contexts: APIRequestContext[] = [];
     const staffAccounts: SynapseStaff[] = [];
     const credentialIds: string[] = [];
-    let draftPreserved = false;
+    let catalogGuarded = false;
     let versionBefore = 0;
-    let draft: Awaited<ReturnType<typeof snapshotCatalogDraft>> = null;
 
     await use({
       clientIp,
@@ -62,20 +59,16 @@ export const test = base.extend<{ synapse: SynapseHarness }>({
       trackCredential: id => {
         credentialIds.push(id);
       },
-      preserveCatalogDraft: async () => {
-        if (draftPreserved) return;
-        draft = await snapshotCatalogDraft();
+      guardCatalog: async () => {
+        if (catalogGuarded) return;
         versionBefore = await readLatestCatalogVersion();
-        draftPreserved = true;
+        catalogGuarded = true;
       },
     });
 
     await runAll([
       async () => {
-        if (draftPreserved) await restoreCatalogDraft(draft);
-      },
-      async () => {
-        if (draftPreserved) {
+        if (catalogGuarded) {
           const versionAfter = await readLatestCatalogVersion();
           if (versionAfter > versionBefore)
             throw new SynapseCatalogError(`catalog v${versionAfter} was published during the run; its credentials were kept because the live catalog may reference them`);

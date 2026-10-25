@@ -9,12 +9,6 @@ import { type CredentialState } from './catalog.types';
 
 export type CatalogVersionSummary = Omit<Catalog.Version, 'document'>;
 
-export interface DraftValues {
-  document: unknown;
-  note: string | null;
-  createdBy: string | null;
-}
-
 export interface PublishedValues {
   version: number;
   document: unknown;
@@ -22,19 +16,12 @@ export interface PublishedValues {
   createdBy: string;
 }
 
-/** The writes publish, budget publish, rollback and draft saves and discards make, available only inside `CatalogVersionRepository.exclusive`. */
+/** The writes a change, budget publish and rollback make, available only inside `CatalogVersionRepository.exclusive`. */
 export interface CatalogVersionStore {
-  findDraft(): Promise<Catalog.Version | undefined>;
   findActive(): Promise<Catalog.Version | undefined>;
   findVersion(version: number): Promise<Catalog.Version | undefined>;
   maxVersion(): Promise<number>;
-  insertDraft(values: DraftValues): Promise<Catalog.Version>;
-  updateDraft(id: bigint, values: DraftValues): Promise<Catalog.Version | undefined>;
-  /** Resolves `false` when the row is no longer a draft */
-  deleteDraft(id: bigint): Promise<boolean>;
   archivePublished(): Promise<void>;
-  /** Resolves `undefined` when the row is no longer a draft */
-  promoteDraft(id: bigint, version: number, createdBy: string): Promise<Catalog.Version | undefined>;
   insertPublished(values: PublishedValues): Promise<Catalog.Version>;
   /** Read under the catalog lock, which a credential revocation also takes, so a publish never names a credential revoked concurrently */
   findCredentials(ids: readonly string[]): Promise<CredentialState[]>;
@@ -44,23 +31,18 @@ export interface CatalogVersionStore {
 
 type Executor = PrimaryDatabase | DatabaseTransaction;
 
-/** The single draft row holds a version below every published one, so the unique `version` column never collides with it. */
-export const DRAFT_VERSION = 0;
+/** What `maxVersion()` answers before anything is published; `DRAFT` rows left by the removed draft workflow also hold it and are never read. */
+export const NO_VERSION = 0;
 
 const versions = schema.catalogVersions;
 const credentials = schema.providerCredentials;
 const { document: _document, ...SUMMARY_COLUMNS } = getTableColumns(versions);
 
-/** Every catalog write takes this transaction-scoped lock, so publishers, rollbacks and draft saves run one at a time on every replica. */
+/** Every catalog write takes this transaction-scoped lock, so changes, budget publishes and rollbacks run one at a time on every replica. */
 export const CATALOG_WRITE_LOCK = sql`select pg_advisory_xact_lock(hashtext('synapse:catalog'))`;
 
 class DrizzleCatalogVersionStore implements CatalogVersionStore {
   constructor(private readonly executor: Executor) {}
-
-  async findDraft(): Promise<Catalog.Version | undefined> {
-    const [row] = await this.executor.select().from(versions).where(eq(versions.state, 'DRAFT')).limit(1);
-    return row;
-  }
 
   async findActive(): Promise<Catalog.Version | undefined> {
     const [row] = await this.executor.select().from(versions).where(eq(versions.state, 'PUBLISHED')).orderBy(desc(versions.version)).limit(1);
@@ -78,7 +60,7 @@ class DrizzleCatalogVersionStore implements CatalogVersionStore {
 
   async maxVersion(): Promise<number> {
     const [row] = await this.executor.select({ value: max(versions.version) }).from(versions);
-    return row?.value ?? DRAFT_VERSION;
+    return row?.value ?? NO_VERSION;
   }
 
   async activeVersion(): Promise<number | null> {
@@ -89,43 +71,8 @@ class DrizzleCatalogVersionStore implements CatalogVersionStore {
     return row?.value ?? null;
   }
 
-  async insertDraft(values: DraftValues): Promise<Catalog.Version> {
-    const [row] = await this.executor
-      .insert(versions)
-      .values({ ...values, version: DRAFT_VERSION, state: 'DRAFT' })
-      .returning();
-    if (!row) throw AppError.internal('Inserting the catalog draft returned no row');
-    return row;
-  }
-
-  async updateDraft(id: bigint, values: DraftValues): Promise<Catalog.Version | undefined> {
-    const [row] = await this.executor
-      .update(versions)
-      .set(values)
-      .where(and(eq(versions.id, id), eq(versions.state, 'DRAFT')))
-      .returning();
-    return row;
-  }
-
-  async deleteDraft(id: bigint): Promise<boolean> {
-    const rows = await this.executor
-      .delete(versions)
-      .where(and(eq(versions.id, id), eq(versions.state, 'DRAFT')))
-      .returning({ id: versions.id });
-    return rows.length > 0;
-  }
-
   async archivePublished(): Promise<void> {
     await this.executor.update(versions).set({ state: 'ARCHIVED' }).where(eq(versions.state, 'PUBLISHED'));
-  }
-
-  async promoteDraft(id: bigint, version: number, createdBy: string): Promise<Catalog.Version | undefined> {
-    const [row] = await this.executor
-      .update(versions)
-      .set({ state: 'PUBLISHED', version, createdBy, publishedAt: new Date() })
-      .where(and(eq(versions.id, id), eq(versions.state, 'DRAFT')))
-      .returning();
-    return row;
   }
 
   async insertPublished(values: PublishedValues): Promise<Catalog.Version> {
@@ -173,10 +120,6 @@ export class CatalogVersionRepository {
 
   findVersion(version: number): Promise<Catalog.Version | undefined> {
     return this.databaseService.run(() => this.reads.findVersion(version));
-  }
-
-  findDraft(): Promise<Catalog.Version | undefined> {
-    return this.databaseService.run(() => this.reads.findDraft());
   }
 
   findActive(): Promise<Catalog.Version | undefined> {

@@ -27,7 +27,6 @@ describe('ECOSYSTEM_SEED synapse', () => {
     expect([...permissionsOf('SynapseOperator')].sort()).toEqual(['synapse:catalog:read', 'synapse:catalog:write', 'synapse:usage:read']);
     expect([...permissionsOf('SynapseAdmin')].sort()).toEqual([
       'synapse:budgets:write',
-      'synapse:catalog:publish',
       'synapse:catalog:read',
       'synapse:catalog:write',
       'synapse:providers:write',
@@ -36,7 +35,11 @@ describe('ECOSYSTEM_SEED synapse', () => {
     expect(synapse?.roles?.filter(role => role.grantToBootstrapAdmin).map(role => role.name)).toEqual(['SynapseAdmin', 'SynapseCredentialsAdmin']);
   });
 
-  it('should give the finance role the viewer permissions plus budget writes and nothing that edits drafts or publishes them', () => {
+  it('should no longer declare the retired catalog publish permission, since every confirmed change goes live', () => {
+    expect(synapse?.permissions?.map(permission => permission.name)).not.toContain('synapse:catalog:publish');
+  });
+
+  it('should give the finance role the viewer permissions plus budget writes and nothing that changes the rest of the catalog', () => {
     expect([...permissionsOf('SynapseFinance')].sort()).toEqual(['synapse:budgets:write', 'synapse:catalog:read', 'synapse:usage:read']);
   });
 

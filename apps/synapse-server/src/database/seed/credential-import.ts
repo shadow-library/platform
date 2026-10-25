@@ -88,9 +88,6 @@ async function repoint(catalog: Pick<CatalogVersionRepository, 'exclusive'>, cre
     const version = (await store.maxVersion()) + 1;
     await store.archivePublished();
     await store.insertPublished({ version, document, note: REPOINT_NOTE, createdBy: IMPORT_ACTOR });
-    const draft = await store.findDraft();
-    if (draft && JSON.stringify(draft.document).includes(ENV_KEY))
-      logger.warn('The catalog draft still names the env key; publishing it as is moves providers back to it', { version });
     return repointed;
   });
 }
