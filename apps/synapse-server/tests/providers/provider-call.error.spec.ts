@@ -34,6 +34,19 @@ describe('classifyHttpFailure', () => {
     }
   });
 
+  it("should add the routed provider's own error message from OpenRouter's metadata", () => {
+    const raw = JSON.stringify({ type: 'error', error: { type: 'invalid_request_error', message: 'temperature is not allowed with thinking' } });
+    const error = { message: 'Provider returned error', code: 400, metadata: { raw, provider_name: 'Anthropic' } };
+
+    expect(classifyHttpFailure(400, body(error)).message).toBe('Provider returned error (Anthropic: temperature is not allowed with thinking)');
+  });
+
+  it("should never carry OpenRouter's raw provider body when it is not an error envelope", () => {
+    const error = { message: 'Provider returned error', code: 400, metadata: { raw: '<html>echoed prompt</html>', provider_name: 'Anthropic' } };
+
+    expect(classifyHttpFailure(400, body(error)).message).toBe('Provider returned error');
+  });
+
   it('should ignore a numeric error code as the code', () => {
     expect(classifyHttpFailure(429, body({ message: 'slow down', code: 429 })).code).toBeUndefined();
   });
@@ -51,6 +64,12 @@ describe('classifyPayloadError', () => {
   it("should retry the gateway's transient error types before any chunk was sent", () => {
     expect(classifyPayloadError({ message: 'busy', type: 'rate_limit_error', code: null }, false).retryable).toBe(true);
     expect(classifyPayloadError({ message: 'bad', type: 'invalid_request_error', code: null }, false).retryable).toBe(false);
+  });
+
+  it("should add the routed provider's error message to a mid-stream error", () => {
+    const error = { message: 'Provider returned error', code: 400, metadata: { raw: { error: { message: 'prompt is too long' } } } };
+
+    expect(classifyPayloadError(error, false).message).toBe('Provider returned error (prompt is too long)');
   });
 
   it('should never retry once a chunk was sent', () => {

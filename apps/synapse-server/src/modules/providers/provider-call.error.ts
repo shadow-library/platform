@@ -36,7 +36,7 @@ const RETRYABLE_STREAM_ERROR_TYPES = new Set(['rate_limit_error', 'server_error'
 
 /**
  * A failed upstream call, classified for failover; dispatch turns it into a `SYN_*` error. `message` is the upstream's own JSON
- * `error.message`, trimmed, or a fixed reason: never a raw body, the request or a credential.
+ * `error.message` (and that of the provider OpenRouter routed to), trimmed, or a fixed reason: never a raw body, the request or a credential.
  */
 export class ProviderCallError extends Error {
   readonly retryable: boolean;
@@ -72,10 +72,24 @@ function stringCode(error: Record<string, unknown> | undefined): string | undefi
   return typeof code === 'string' && code.length > 0 ? code : undefined;
 }
 
+function nonEmpty(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim().length > 0 ? value : undefined;
+}
+
+/** OpenRouter reports a routed provider's refusal as "Provider returned error" and puts that provider's own body in `metadata.raw` */
+function routedReason(error: Record<string, unknown> | undefined): string | undefined {
+  const metadata = asRecord(error?.['metadata']);
+  const raw = metadata?.['raw'];
+  const reason = nonEmpty(upstreamErrorOf(typeof raw === 'string' ? parseJson(raw) : raw)?.['message']);
+  if (!reason) return undefined;
+  const provider = nonEmpty(metadata?.['provider_name']);
+  return provider ? `${provider}: ${reason}` : reason;
+}
+
 function messageOf(error: Record<string, unknown> | undefined, fallback: string): string {
-  const message = error?.['message'];
-  const text = typeof message === 'string' && message.trim().length > 0 ? message : fallback;
-  return trimUpstreamMessage(text) || fallback;
+  const text = nonEmpty(error?.['message']) ?? fallback;
+  const reason = routedReason(error);
+  return trimUpstreamMessage(reason ? `${text} (${reason})` : text) || fallback;
 }
 
 export function classifyHttpFailure(status: number, bodyText: string): ProviderCallError {
