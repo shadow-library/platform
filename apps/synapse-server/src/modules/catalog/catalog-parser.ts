@@ -43,6 +43,7 @@ const TASK_DESCRIPTION_MAX = 280;
 const KEY_PATTERN = /^[A-Za-z0-9][\w.:/@-]*$/;
 const TASK_KEY_PATTERN = /^[a-z0-9][a-z0-9-]*\.[a-z0-9][a-z0-9._-]*$/;
 const URL_PROTOCOLS = ['http:', 'https:'];
+const HOST_SLUG_PATTERN = /^[a-z0-9][a-z0-9.-]*(?:\/[a-z0-9.-]+)?$/;
 const CREDENTIAL_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const CREDENTIAL_KEYS: readonly string[] = PROVIDER_CREDENTIAL_KEYS;
 
@@ -92,7 +93,7 @@ const CAPABILITY_FIELDS = keysOf<keyof ModelCapabilities>({
 });
 const EMBEDDING_FIELDS = keysOf<keyof NonNullable<ModelCapabilities['embedding']>>({ dimensions: true });
 const PRICE_FIELDS = keysOf<keyof ModelPrice>({ input: true, cachedInput: true, output: true, perImage: true });
-const DEPLOYMENT_FIELDS = keysOf<keyof ModelDeployment>({ provider: true, id: true });
+const DEPLOYMENT_FIELDS = keysOf<keyof ModelDeployment>({ provider: true, id: true, ignoreHosts: true });
 const ALIAS_FIELDS = keysOf<keyof AliasSpec>({ label: true, description: true, model: true, showVersion: true, state: true, available: true });
 const TASK_FIELDS = keysOf<keyof TaskSpec>({
   label: true,
@@ -204,6 +205,7 @@ class CatalogParser {
     this.object(value, path, DEPLOYMENT_FIELDS, fields => ({
       provider: fields.required('provider', this.text),
       id: fields.required('id', this.text),
+      ignoreHosts: fields.optional('ignoreHosts', this.nonEmpty(this.array(this.hostSlug))),
     }));
 
   private readonly alias: Reader<AliasSpec> = (value, path) =>
@@ -264,6 +266,12 @@ class CatalogParser {
     const id = this.text(value, path);
     if (id !== '' && !CREDENTIAL_ID_PATTERN.test(id)) this.report(path, 'invalid_value', 'Expected the id of a stored credential');
     return id;
+  };
+
+  private readonly hostSlug: Reader<string> = (value, path) => {
+    const slug = this.text(value, path);
+    if (slug !== '' && !HOST_SLUG_PATTERN.test(slug)) this.report(path, 'invalid_value', "Expected an OpenRouter provider slug such as 'azure'");
+    return slug;
   };
 
   private readonly configKey: Reader<string> = (value, path) => {

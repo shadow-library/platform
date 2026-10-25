@@ -1,5 +1,5 @@
 import { type CatalogDocument, type DocumentEdit } from '@/features/catalog/catalog-document';
-import { withModel, withoutModel } from '@/features/catalog/catalog-edits';
+import { deploymentSpec, withModel, withoutModel } from '@/features/catalog/catalog-edits';
 import { CATALOG_KEY_HINT, CATALOG_KEY_PATTERN } from '@/features/catalog/catalog-keys';
 import { type Effort, EFFORTS, type ModelCapabilities, type ModelEntry, type ModelSpec, type ReasoningMode } from '@/features/catalog/catalog-spec.types';
 import { readModels } from '@/features/catalog/catalog-readers';
@@ -15,6 +15,8 @@ export interface DeploymentRow {
   rowId: number;
   provider: string;
   id: string;
+  /** Not editable here; kept so saving the rows never drops it */
+  ignoreHosts?: string[];
 }
 
 export interface ModelForm {
@@ -102,7 +104,7 @@ export function modelFormOf(model: ModelEntry): ModelForm {
     efforts: [...(capabilities.efforts ?? [])],
     promptCache: capabilities.promptCache,
     sampling: capabilities.sampling,
-    deployments: model.deployments.map((deployment, rowId) => ({ rowId, provider: deployment.provider, id: deployment.id })),
+    deployments: model.deployments.map((deployment, rowId) => ({ rowId, ...deploymentSpec(deployment) })),
   };
 }
 
@@ -182,7 +184,7 @@ function specOf(form: ModelForm, input: number, output: number): ModelSpec {
       output,
       ...(form.perImage !== null && { perImage: form.perImage }),
     },
-    deployments: form.deployments.map(row => ({ provider: row.provider, id: row.id.trim() })),
+    deployments: form.deployments.map(row => deploymentSpec({ ...row, id: row.id.trim() })),
   };
 }
 
@@ -266,12 +268,7 @@ function patchEntry(raw: Entry, fields: readonly EditableField[], spec: ModelSpe
   const embedding = wanted.embedding ? { ...recordOf(capabilities.embedding), dimensions: wanted.embedding.dimensions } : undefined;
   for (const field of fields) {
     if (field === 'label' || field === 'version') entry = withField(entry, field, spec[field]);
-    else if (field === 'deployments')
-      entry = withField(
-        entry,
-        field,
-        spec.deployments.map(deployment => ({ provider: deployment.provider, id: deployment.id })),
-      );
+    else if (field === 'deployments') entry = withField(entry, field, spec.deployments.map(deploymentSpec));
     else if (field === 'input' || field === 'cachedInput' || field === 'output' || field === 'perImage') prices = withField(prices, field, spec.pricePerMTok[field]);
     else if (field === 'dimensions') capabilities = withField(capabilities, 'embedding', embedding);
     else if (field === 'imageOutput') capabilities = withField(capabilities, field, wanted.imageOutput);

@@ -51,6 +51,8 @@ export interface ProviderSpec {
 export interface ModelDeployment {
   provider: string;
   id: string;
+  /** OpenRouter only: the hosts it must never route this deployment to, by OpenRouter's provider slug (`azure`, `google-vertex`) */
+  ignoreHosts?: string[];
 }
 
 export interface ModelSpec {

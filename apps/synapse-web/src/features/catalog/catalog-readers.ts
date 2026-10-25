@@ -151,9 +151,11 @@ function capabilitiesOf(value: Record<string, unknown>): ModelCapabilities {
 }
 
 function deploymentsOf(value: unknown[]): ModelDeployment[] {
-  return value.flatMap((deployment): ModelDeployment[] =>
-    isRecord(deployment) && typeof deployment.provider === 'string' && typeof deployment.id === 'string' ? [{ provider: deployment.provider, id: deployment.id }] : [],
-  );
+  return value.flatMap((deployment): ModelDeployment[] => {
+    if (!isRecord(deployment) || typeof deployment.provider !== 'string' || typeof deployment.id !== 'string') return [];
+    const ignoreHosts = Array.isArray(deployment.ignoreHosts) ? deployment.ignoreHosts.filter(host => typeof host === 'string') : [];
+    return [{ provider: deployment.provider, id: deployment.id, ...(ignoreHosts.length > 0 && { ignoreHosts }) }];
+  });
 }
 
 export function readModels(document: CatalogDocument): ModelEntry[] {

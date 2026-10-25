@@ -1,5 +1,5 @@
 import { type CatalogDocument, type DocumentEdit } from './catalog-document';
-import { type AliasSpec, type DataPolicy, type ModelSpec, type ProviderSpec } from './catalog-spec.types';
+import { type AliasSpec, type DataPolicy, type ModelDeployment, type ModelSpec, type ProviderSpec } from './catalog-spec.types';
 import { isRecord, ownEntry } from './catalog-values';
 
 type Entry = Record<string, unknown>;
@@ -79,6 +79,10 @@ export function withAlias(document: CatalogDocument, aliasKey: string, alias: Al
   });
 }
 
+export function deploymentSpec({ provider, id, ignoreHosts }: ModelDeployment): ModelDeployment {
+  return { provider, id, ...(ignoreHosts && ignoreHosts.length > 0 && { ignoreHosts: [...ignoreHosts] }) };
+}
+
 export function withModel(document: CatalogDocument, modelKey: string, model: ModelSpec): DocumentEdit {
   const version = nonBlank(model.version);
   return upsertEntry(document, 'models', modelKey, {
@@ -86,7 +90,7 @@ export function withModel(document: CatalogDocument, modelKey: string, model: Mo
     ...(version && { version }),
     capabilities: { ...model.capabilities },
     pricePerMTok: { ...model.pricePerMTok },
-    deployments: model.deployments.map(deployment => ({ provider: deployment.provider, id: deployment.id })),
+    deployments: model.deployments.map(deploymentSpec),
   });
 }
 

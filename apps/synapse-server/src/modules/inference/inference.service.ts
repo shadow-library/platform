@@ -302,6 +302,7 @@ export class InferenceService {
       provider: deployment.provider,
       providerKey: deployment.providerKey,
       deploymentId: deployment.id,
+      ...(deployment.ignoreHosts && { ignoreHosts: deployment.ignoreHosts }),
       effort: admission.effort ?? null,
       envelope: admission.envelope,
       apiKey,

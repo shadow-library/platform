@@ -116,6 +116,18 @@ describe('parseCatalogDocument', () => {
     }
   });
 
+  it('should accept OpenRouter host slugs to ignore and reject an empty list or a malformed slug', () => {
+    const named = parseWith(document => (document.models['claude-opus-5.5'].deployments[1].ignoreHosts = ['azure', 'google-vertex/global']));
+    expect(issuesOf(named)).toEqual([]);
+    expect(issuesOf(parseWith(document => (document.models['claude-opus-5.5'].deployments[1].ignoreHosts = [])))).toEqual([
+      { path: 'models.claude-opus-5.5.deployments[1].ignoreHosts', code: 'invalid_value' },
+    ]);
+    for (const slug of ['Azure', 'azure us', '/azure']) {
+      const result = parseWith(document => (document.models['claude-opus-5.5'].deployments[1].ignoreHosts = [slug]));
+      expect(issuesOf(result)).toEqual([{ path: 'models.claude-opus-5.5.deployments[1].ignoreHosts[0]', code: 'invalid_value' }]);
+    }
+  });
+
   it('should accept a credential named by its id and reject anything else', () => {
     const named = parseWith(document => {
       delete document.providers.openrouter.apiKeyConfig;

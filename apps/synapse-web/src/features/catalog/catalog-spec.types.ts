@@ -73,6 +73,8 @@ export interface ModelPrice {
 export interface ModelDeployment {
   provider: string;
   id: string;
+  /** OpenRouter's provider slugs it never routes this deployment to */
+  ignoreHosts?: string[];
 }
 
 export interface TaskEntry {

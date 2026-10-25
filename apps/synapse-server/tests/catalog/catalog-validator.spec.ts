@@ -43,6 +43,13 @@ describe('validateCatalog', () => {
       expect(issues(document)).toEqual([{ path: 'models.grok-4.6.deployments[0].provider', code: 'unknown_provider' }]);
     });
 
+    it('should accept ignored hosts only on a deployment served by OpenRouter', () => {
+      const openrouter = catalogDocument(draft => (draft.models['claude-opus-5.5']!.deployments[1]!.ignoreHosts = ['azure']));
+      expect(issues(openrouter)).toEqual([]);
+      const gateway = catalogDocument(draft => (draft.models['claude-opus-5.5']!.deployments[0]!.ignoreHosts = ['azure']));
+      expect(issues(gateway)).toEqual([{ path: 'models.claude-opus-5.5.deployments[0].ignoreHosts', code: 'invalid_value' }]);
+    });
+
     it('should reject an alias targeting an unknown model', () => {
       const document = catalogDocument(draft => (draft.aliases.opus!.model = 'claude-opus-9'));
       expect(issues(document)).toEqual([{ path: 'aliases.opus.model', code: 'unknown_model' }]);

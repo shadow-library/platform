@@ -113,6 +113,18 @@ describe('readModels', () => {
     ]);
   });
 
+  it("should keep a deployment's ignored hosts and drop anything that is not a host", () => {
+    const deployments = [
+      { provider: 'openrouter', id: 'x', ignoreHosts: ['azure', 7] },
+      { provider: 'openrouter', id: 'y', ignoreHosts: [] },
+    ];
+    const models = { m: { label: 'M', capabilities: {}, pricePerMTok: { input: 1, output: 2 }, deployments } };
+    expect(readModels({ models })[0]?.deployments).toEqual([
+      { provider: 'openrouter', id: 'x', ignoreHosts: ['azure'] },
+      { provider: 'openrouter', id: 'y' },
+    ]);
+  });
+
   it('should skip models without both prices, capabilities or deployments', () => {
     const models = {
       noprice: { label: 'A', capabilities: {}, pricePerMTok: { input: 1 }, deployments: [] },
