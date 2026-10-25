@@ -66,12 +66,6 @@ const STATUS_MESSAGES: Readonly<Record<number, string>> = {
   404: 'This credential no longer exists.',
 };
 
-const ISSUE_ADVICE: Readonly<Record<string, string>> = {
-  unknown_credential: 'This stored key no longer exists. Pick one from the list.',
-  credential_revoked: 'A revoked credential is never used again. Pick an active one.',
-  credential_origin_mismatch: "The key is only ever sent to its own address. Fix the provider's address, or pick a key that is sent to this one.",
-};
-
 export function isRevoked(credential: Pick<CredentialResponse, 'revokedAt'>): boolean {
   return credential.revokedAt !== undefined;
 }
@@ -193,19 +187,15 @@ export function credentialErrorMessage(error: unknown): string {
 }
 
 export function inUseMessage(referencedBy: readonly string[]): string {
-  const repoint = 'Repoint those providers on the Providers screen and publish, then revoke it.';
-  if (referencedBy.length === 0) return `The published catalog still names it. ${repoint}`;
-  return `The published catalog still names it for ${referencedBy.join(', ')}. ${repoint}`;
+  const repoint = 'Switch those providers to another key on the Providers screen, then revoke it.';
+  if (referencedBy.length === 0) return `The live catalog still names it. ${repoint}`;
+  return `The live catalog still names it for ${referencedBy.join(', ')}. ${repoint}`;
 }
 
 export function revokeDescription(credential: Pick<CredentialResponse, 'name' | 'referencedBy'>): string {
   const consequence = `No provider can send "${credential.name}" again, and its name stays reserved. This cannot be undone.`;
   if (credential.referencedBy.length === 0) return consequence;
-  return `${consequence} The published catalog still names it for ${credential.referencedBy.join(', ')}, so the server will refuse until those providers are repointed and published.`;
-}
-
-export function issueAdvice(code: string): string | undefined {
-  return ownEntry(ISSUE_ADVICE, code);
+  return `${consequence} The live catalog still names it for ${credential.referencedBy.join(', ')}, so the server will refuse until those providers use another key.`;
 }
 
 export function keyStatusOf(provider: Pick<ProviderResponse, 'credential' | 'apiKeyConfigured'>, credentials?: readonly CredentialResponse[]): KeyStatus {

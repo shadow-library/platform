@@ -1,14 +1,11 @@
 import { type BadgeIntent } from '@shadow-library/ui';
 
-import { describeChanges } from '@/features/catalog/catalog-changes';
 import { type CatalogDocument } from '@/features/catalog/catalog-document';
 import { readAliases, readModels, readProviders, readTasks, splitTaskKey } from '@/features/catalog/catalog-readers';
 import { type AliasEntry, type AliasState, type ModelEntry, type TaskEntry, type TaskKind } from '@/features/catalog/catalog-spec.types';
 import { isRecord, ownEntry, strings } from '@/features/catalog/catalog-values';
-import { type DraftEditOutcome } from '@/features/catalog/draft-edit';
 import { modelDisplayName, type ModelNeeds, modelPriceText } from '@/features/shared/model-options';
 import { aliasName, appName, selectorName, taskName, taskTitle } from '@/features/shared/naming';
-import { type DraftNotice, draftOutcomeNotice, draftProblemsSentence } from '@/features/shared/draft-notice';
 
 export interface AliasStateInfo {
   label: string;
@@ -48,11 +45,8 @@ export interface AliasRow {
   state: AliasState;
   availability: string;
   usedBy: AliasUser[];
-  changed: boolean;
   entry: AliasEntry;
 }
-
-export type AliasAction = 'added' | 'updated' | 'retargeted';
 
 /** Mirrors synapse-server's `isAliasAvailable`: every rule must match, so one rule allowing no value makes the name available nowhere. */
 export function availabilitySentence(available: Record<string, string[]> | undefined): string {
@@ -79,23 +73,13 @@ export function aliasUsers(tasks: readonly TaskEntry[], aliasKey: string): Alias
     .sort((left, right) => left.title.localeCompare(right.title));
 }
 
-/** With no draft nothing is unpublished; with no active version every name in the draft is. */
-export function changedAliasKeys(active: CatalogDocument | null, draft: CatalogDocument | null): Set<string> {
-  if (!draft) return new Set();
-  return new Set(
-    describeChanges(active, draft)
-      .filter(change => change.area === 'alias')
-      .map(change => change.entityKey),
-  );
-}
-
 function targetOf(models: ReadonlyMap<string, ModelEntry>, key: string): AliasTarget {
   const model = models.get(key);
   if (!model) return { key };
   return { key, name: modelDisplayName(model), price: modelPriceText(model.pricePerMTok), ...(model.version && { version: model.version }) };
 }
 
-export function aliasRows(document: CatalogDocument, changed: ReadonlySet<string>): AliasRow[] {
+export function aliasRows(document: CatalogDocument): AliasRow[] {
   const models = new Map(readModels(document).map(model => [model.key, model]));
   const tasks = readTasks(document);
   return readAliases(document)
@@ -109,7 +93,6 @@ export function aliasRows(document: CatalogDocument, changed: ReadonlySet<string
       state: alias.state,
       availability: alias.state === 'retired' ? RETIRED_AVAILABILITY : availabilitySentence(alias.available),
       usedBy: aliasUsers(tasks, alias.key),
-      changed: changed.has(alias.key),
       entry: alias,
     }))
     .sort((left, right) => STATE_ORDER.indexOf(left.state) - STATE_ORDER.indexOf(right.state) || left.name.localeCompare(right.name));
@@ -153,17 +136,6 @@ export function featureNames(app: string, taskKey: string, tasks: ReadonlyMap<st
   return { app: appName(parts?.app ?? app), feature: parts ? taskName(parts) : taskKey };
 }
 
-export function defaultAliasNote(name: string, action: AliasAction, model?: string): string {
-  return action === 'retargeted' && model ? `Model name ${name} now uses ${model}` : `Model name ${name} ${action}`;
-}
-
-export function aliasOutcomeNotice(outcome: DraftEditOutcome, name: string, action: AliasAction): DraftNotice {
-  if (outcome.kind !== 'saved') return draftOutcomeNotice(outcome, name, 'updated');
-  const title = action === 'retargeted' ? `${name} now points to the new model in the draft` : `${name} ${action} in the draft`;
-  if (outcome.issues.length === 0) return { intent: 'success', title, body: 'Nothing changes for users until the draft is published.', changesLink: true };
-  return { intent: 'warning', title, body: draftProblemsSentence(outcome.issues.length), changesLink: true };
-}
-
 /**
  * Mirrors synapse-server's `isAliasAvailable` (every rule must match, each rule allows any of its values): the conditions under which a request
  * naming the alias used to resolve and would now be refused with `SYN_ALIAS_UNAVAILABLE`.
@@ -188,6 +160,6 @@ export function retireDescription(name: string, usedBy: readonly AliasUser[]): s
   const offered = usedBy.length === 0 ? '' : ` ${usedBy.map(user => user.title).join(', ')} will stop offering it.`;
   return (
     `People can no longer pick ${name}. Apps that stored it keep working: their requests use the feature's own rules instead.${offered} ` +
-    'A model name can never be deleted or renamed, but you can make it active again later. Nothing changes until the draft is published.'
+    'A model name can never be deleted or renamed, but you can make it active again later.'
   );
 }

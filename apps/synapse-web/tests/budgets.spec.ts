@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 
 import { type CatalogChange } from '../src/features/catalog/catalog-changes';
 import { type BudgetEntry } from '../src/features/catalog/catalog-spec.types';
-import { NOTE_MAX_LENGTH } from '../src/features/catalog/draft-edit';
+import { NOTE_MAX_LENGTH } from '../src/features/catalog/catalog-change';
 import {
   BUDGET_FORM_MESSAGES,
   budgetApps,
@@ -10,7 +10,6 @@ import {
   budgetFormOf,
   budgetNote,
   budgetsOf,
-  draftChangesBudgets,
   planBudgetPublish,
   sameBudgets,
   sharesCounter,
@@ -244,9 +243,7 @@ describe('budget changes', () => {
     expect(sameBudgets(raw, withBudgetChange(raw, { kind: 'edit', index: 0, budget: same }))).toBe(true);
   });
 
-  it('should tell whether the draft changes budgets', () => {
-    expect(draftChangesBudgets({ budgets: raw }, { budgets: raw })).toBe(false);
-    expect(draftChangesBudgets({ budgets: [] }, { budgets: raw })).toBe(true);
+  it('should read a catalog without budgets as an empty list', () => {
     expect(budgetsOf({})).toEqual([]);
   });
 

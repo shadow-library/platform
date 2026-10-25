@@ -1,7 +1,7 @@
 import { type ReactElement, useState } from 'react';
 import { Alert, Button, Combobox, type ComboboxOption, FormField } from '@shadow-library/ui';
 
-import { type CatalogDocument, featureNote, type ModelEntry, resolveSelectorKey, selectorValues, type TaskEntry } from '@/features/catalog';
+import { type CatalogDocument, type ModelEntry, resolveSelectorKey, selectorValues, type TaskEntry } from '@/features/catalog';
 import { modelDisplayName, ModelPicker, modelPriceText, Mono, Muted, selectorName } from '@/features/shared';
 import controls from '@/features/shared/controls.module.css';
 
@@ -109,7 +109,7 @@ function RoutingDrawer({ task, context, editor }: RoutingDrawerProps): ReactElem
   const [draft, setDraft] = useState<RoutingDraft>(() => routingFromRoutes(Array.isArray(editor.opened.routes) ? editor.opened.routes : []));
   const issues = validateRouting(draft);
   const knownKeys = Object.keys(context.vocabulary);
-  const save = (): void => void editor.save(routingEdit(task.key, editor.opened.routes, draft), featureNote(task, 'routing'));
+  const save = (): void => void editor.save(routingEdit(task.key, editor.opened.routes, draft));
   const pickerNeeds = { requires: task.requires, kind: task.kind, dataPolicy: task.dataPolicy, providers: context.providers };
 
   return (

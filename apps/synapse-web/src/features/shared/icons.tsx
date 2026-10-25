@@ -44,10 +44,6 @@ export function ModelIcon(): ReactElement {
   return <StrokeIcon paths={['M7 7h10v10H7z', 'M9 3v4', 'M15 3v4', 'M9 17v4', 'M15 17v4', 'M3 9h4', 'M3 15h4', 'M17 9h4', 'M17 15h4']} />;
 }
 
-export function PublishIcon(): ReactElement {
-  return <StrokeIcon paths={['M12 15V3', 'M7 8l5-5 5 5', 'M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4']} />;
-}
-
 export function HistoryIcon(): ReactElement {
   return <StrokeIcon paths={['M3 12a9 9 0 1 0 3-6.7', 'M3 4v4h4', 'M12 7v5l3 2']} />;
 }

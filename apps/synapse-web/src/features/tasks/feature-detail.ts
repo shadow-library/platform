@@ -1,7 +1,6 @@
-import { type CatalogDocument } from '@/features/catalog/catalog-document';
-import { issueOwner, issueSentence } from '@/features/catalog/catalog-issues';
+import { issueSentence } from '@/features/catalog/catalog-issues';
 import { type AliasEntry, type DataPolicy, type ModelEntry, type ProviderEntry, type TaskEntry } from '@/features/catalog/catalog-spec.types';
-import { type DraftEditOutcome } from '@/features/catalog/draft-edit';
+import { type ChangeResult } from '@/features/changes/change-notices';
 import { modelDisplayName, modelEligibility } from '@/features/shared/model-options';
 import { aliasName } from '@/features/shared/naming';
 import { type CatalogIssueResponse } from '@/lib/apis/api-types.gen';
@@ -39,8 +38,6 @@ export interface SaveFeedback {
   title: string;
   body?: string;
   issues: IssueLine[];
-  /** Whether to point at the review page, where the draft is published */
-  review: boolean;
   /** Whether the editor stays open with the person's values, or closes so it reopens on the reloaded ones */
   keepEditing: boolean;
 }
@@ -64,13 +61,13 @@ export function aliasOptions(aliases: readonly AliasEntry[], selected: readonly 
   return [...missing, ...options];
 }
 
-/** Mirrors the publish rule that every offered, non-retired name must point at a model able to serve the feature. */
+/** Mirrors the server rule that every offered, non-retired name must point at a model able to serve the feature. */
 export function aliasHints(selected: readonly string[], aliases: readonly AliasEntry[], models: readonly ModelEntry[], task: Pick<TaskEntry, 'requires' | 'kind'>): string[] {
   const aliasByKey = new Map(aliases.map(alias => [alias.key, alias]));
   const modelByKey = new Map(models.map(model => [model.key, model]));
   return selected.flatMap(key => {
     const alias = aliasByKey.get(key);
-    if (!alias) return [`${key} isn't in the catalog, so publishing will refuse it`];
+    if (!alias) return [`${key} isn't in the catalog, so Synapse will refuse it`];
     if (alias.state === 'retired') return [];
     const model = modelByKey.get(alias.model);
     if (!model) return [`${aliasName(alias)} points to ${alias.model}, which isn't in the catalog`];
@@ -115,40 +112,30 @@ function issueLines(issues: readonly CatalogIssueResponse[]): IssueLine[] {
   return issues.map(issue => ({ sentence: issueSentence(issue), path: issue.path }));
 }
 
-function belongsTo(issue: CatalogIssueResponse, taskKey: string, document: CatalogDocument): boolean {
-  const owner = issueOwner(issue.path, document);
-  return owner?.area === 'task' && owner.entityKey === taskKey;
-}
+const CLOSE = { keepEditing: false, issues: [] };
+const STAY = { keepEditing: true, issues: [] };
 
-const CLOSE = { review: false, keepEditing: false, issues: [] };
-const STAY = { review: false, keepEditing: true, issues: [] };
-
-export function saveFeedback(outcome: DraftEditOutcome, taskKey: string, document: CatalogDocument): SaveFeedback {
-  switch (outcome.kind) {
-    case 'saved': {
-      const total = outcome.issues.length;
-      const own = outcome.issues.filter(issue => belongsTo(issue, taskKey, document));
-      const body =
-        total === 0
-          ? 'Nothing changes for apps until the draft is published.'
-          : `The draft has ${total === 1 ? '1 issue' : `${total} issues`} to fix before it can be published${own.length > 0 ? `, ${own.length} of them in this feature` : ''}.`;
-      return { intent: total === 0 ? 'success' : 'warning', title: 'Saved to the draft', body, issues: issueLines(own), review: true, keepEditing: false };
-    }
+/** `null` when there is nothing to say here: the change went live and the page-wide notice reports it, or the person went back to editing. */
+export function saveFeedback(result: ChangeResult): SaveFeedback | null {
+  switch (result.kind) {
+    case 'applied':
+    case 'cancelled':
+      return null;
     case 'invalid':
-      return { ...STAY, intent: 'danger', title: "The draft wasn't saved", body: 'Synapse refused the change:', issues: issueLines(outcome.issues) };
+      return { ...STAY, intent: 'danger', title: "The change wasn't applied", body: 'Synapse refused it:', issues: issueLines(result.issues) };
     case 'unchanged':
-      return { ...CLOSE, intent: 'info', title: 'Nothing to save', body: 'The draft already has these values.' };
+      return { ...CLOSE, intent: 'info', title: 'Nothing to change', body: 'The catalog already has these values.' };
     case 'refused':
-      if (outcome.reason === SECTION_CHANGED) return { ...CLOSE, intent: 'warning', title: 'Nothing was saved', body: outcome.reason };
-      return { ...STAY, intent: 'danger', title: "This change can't be made", body: outcome.reason };
+      if (result.reason === SECTION_CHANGED) return { ...CLOSE, intent: 'warning', title: 'Nothing was changed', body: result.reason };
+      return { ...STAY, intent: 'danger', title: "This change can't be made", body: result.reason };
     case 'conflict':
       return {
         ...CLOSE,
         intent: 'warning',
-        title: 'Someone else changed the draft at the same time',
-        body: 'Nothing was saved and the page has reloaded with their changes. Check the values and edit again.',
+        title: 'Someone else changed the catalog at the same time',
+        body: 'Nothing was changed and the page has reloaded with their changes. Check the values and edit again.',
       };
     case 'failed':
-      return { ...STAY, intent: 'danger', title: "The draft couldn't be saved", body: outcome.message };
+      return { ...STAY, intent: 'danger', title: "The change couldn't be applied", body: result.message };
   }
 }

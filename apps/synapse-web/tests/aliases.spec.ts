@@ -18,10 +18,8 @@ import {
 } from '../src/features/aliases/alias-form';
 import {
   aliasModelNeeds,
-  aliasOutcomeNotice,
   aliasRows,
   availabilitySentence,
-  changedAliasKeys,
   featureNames,
   narrowedConditions,
   narrowingDescription,
@@ -33,7 +31,7 @@ import {
 import { resolveSelectorKey } from '../src/features/catalog/catalog-keys';
 import { type CatalogDocument } from '../src/features/catalog/catalog-document';
 import { readAliases, readTasks } from '../src/features/catalog/catalog-readers';
-import { runDraftEdit } from '../src/features/catalog/draft-edit';
+import { previewChange } from '../src/features/catalog/catalog-change';
 import { catalogFixture } from './catalog-fixture';
 
 const ODD_ALIAS = {
@@ -96,7 +94,7 @@ describe('seenLabel', () => {
 
 describe('aliasRows', () => {
   it('should describe each name with its target, state, availability and the features offering it', () => {
-    const [opus] = aliasRows(catalogFixture(), new Set(['opus']));
+    const [opus] = aliasRows(catalogFixture());
     expect(opus).toMatchObject({
       key: 'opus',
       name: 'Opus',
@@ -105,14 +103,13 @@ describe('aliasRows', () => {
       state: 'active',
       availability: 'Only when Tier is balanced or premium',
       usedBy: [{ key: 'novel-forge.chat', title: 'Novel Forge · Chat' }],
-      changed: true,
     });
   });
 
   it('should flag a target the catalog lacks and order names by state', () => {
     const document = oddDocument();
     aliasIn(document, 'odd').model = 'gone';
-    const rows = aliasRows(document, new Set());
+    const rows = aliasRows(document);
     expect(rows.map(row => row.key)).toEqual(['opus', 'sonnet', 'odd']);
     expect(rows[2]?.target).toEqual({ key: 'gone' });
   });
@@ -122,19 +119,7 @@ describe('aliasRows availability', () => {
   it('should say a retired name is not used rather than where it works', () => {
     const document = catalogFixture();
     document.aliases.opus.state = 'retired';
-    expect(aliasRows(document, new Set()).find(row => row.key === 'opus')?.availability).toBe('Not used — retired');
-  });
-});
-
-describe('changedAliasKeys', () => {
-  it('should list nothing without a draft', () => {
-    expect(changedAliasKeys(catalogFixture(), null).size).toBe(0);
-  });
-
-  it('should list the names the draft changed', () => {
-    const draft = catalogFixture();
-    draft.aliases.sonnet.state = 'retired';
-    expect([...changedAliasKeys(catalogFixture(), draft)]).toEqual(['sonnet']);
+    expect(aliasRows(document).find(row => row.key === 'opus')?.availability).toBe('Not used — retired');
   });
 });
 
@@ -213,16 +198,6 @@ describe('featureNames', () => {
 describe('retireDescription', () => {
   it('should name the features that stop offering it', () => {
     expect(retireDescription('Opus', [{ key: 'novel-forge.chat', title: 'Novel Forge · Chat' }])).toContain('Novel Forge · Chat will stop offering it.');
-  });
-});
-
-describe('aliasOutcomeNotice', () => {
-  it('should point to review after a clean save', () => {
-    expect(aliasOutcomeNotice({ kind: 'saved', issues: [] }, 'Opus', 'updated')).toMatchObject({ intent: 'success', title: 'Opus updated in the draft', changesLink: true });
-  });
-
-  it('should explain a conflict', () => {
-    expect(aliasOutcomeNotice({ kind: 'conflict' }, 'Opus', 'updated')).toMatchObject({ intent: 'warning', title: 'Someone else changed the draft' });
   });
 });
 
@@ -317,14 +292,10 @@ describe('editedAliasFields', () => {
 });
 
 describe('updateAliasEdit', () => {
-  it('should save nothing when the editor changed nothing, keeping unknown fields and an empty rule set', async () => {
+  it('should change nothing when the editor changed nothing, keeping unknown fields and an empty rule set', () => {
     const document = oddDocument();
     const initial = formFor(document, 'odd');
-    const ports = {
-      loadBase: () => Promise.resolve({ document, fingerprint: 'f' }),
-      save: () => Promise.reject(new Error('nothing should be saved')),
-    };
-    expect(await runDraftEdit(ports, updateEdit('odd', initial, { ...initial }), 'note')).toEqual({ kind: 'unchanged' });
+    expect(previewChange({ version: 3, document }, updateEdit('odd', initial, { ...initial }))).toEqual({ kind: 'unchanged' });
   });
 
   it('should write only the edited field over the stored entry', () => {
@@ -384,7 +355,7 @@ describe('updateAliasEdit', () => {
     expect(edit.ok && aliasIn(edit.document, 'opus').available).toEqual({ tier: ['balanced'] });
   });
 
-  it('should refuse to edit a name the draft lost meanwhile', () => {
+  it('should refuse to edit a name the catalog lost meanwhile', () => {
     const initial = formFor(catalogFixture(), 'sonnet');
     const document = catalogFixture();
     const { sonnet: _removed, ...aliases } = document.aliases;
@@ -399,40 +370,24 @@ describe('retargetAliasEdit', () => {
     expect(edit.ok && aliasIn(edit.document, 'odd')).toEqual({ ...ODD_ALIAS, model: 'opus-5.5' });
   });
 
-  it('should save nothing when the draft already points there', async () => {
-    const document = catalogFixture();
-    const ports = { loadBase: () => Promise.resolve({ document, fingerprint: null, activeVersion: 3 }), save: () => Promise.reject(new Error('nothing should be saved')) };
-    expect(await runDraftEdit(ports, retargetAliasEdit('opus', 'llama3.1', 'opus-5.5'), 'note')).toEqual({ kind: 'unchanged' });
+  it('should change nothing when the name already points there', () => {
+    expect(previewChange({ version: 3, document: catalogFixture() }, retargetAliasEdit('opus', 'llama3.1', 'opus-5.5'))).toEqual({ kind: 'unchanged' });
   });
 
   it('should refuse when someone else moved the name meanwhile', () => {
     expect(retargetAliasEdit('opus', 'llama3.1', 'sonnet-5.5')(catalogFixture())).toEqual({ ok: false, reason: CONCURRENT_ALIAS_CHANGE });
-  });
-
-  it('should pin a first draft to the active version it was built from', async () => {
-    const document = catalogFixture();
-    const saved: unknown[] = [];
-    const ports = {
-      loadBase: () => Promise.resolve({ document, fingerprint: null, activeVersion: 7 }),
-      save: (body: unknown) => {
-        saved.push(body);
-        return Promise.resolve({ kind: 'done' as const, value: { issues: [] } as never });
-      },
-    };
-    await runDraftEdit(ports, retargetAliasEdit('opus', 'opus-5.5', 'sonnet-5.5'), 'note');
-    expect(saved[0]).toMatchObject({ expectNoDraft: true, expectedActiveVersion: 7 });
   });
 });
 
 describe('addAliasEdit', () => {
   const spec = { label: 'Haiku', model: 'sonnet-5.5', state: 'active' as const, showVersion: false };
 
-  it('should add a new name to the draft', () => {
+  it('should add a new name to the catalog', () => {
     const edit = addAliasEdit('haiku', spec)(catalogFixture());
     expect(edit.ok && aliasIn(edit.document, 'haiku')).toEqual({ label: 'Haiku', model: 'sonnet-5.5', state: 'active' });
   });
 
-  it('should refuse a key the draft gained meanwhile, retired or differently cased', () => {
+  it('should refuse a key the catalog gained meanwhile, retired or differently cased', () => {
     const document = catalogFixture();
     document.aliases.sonnet.state = 'retired';
     expect(addAliasEdit('sonnet', spec)(document).ok).toBe(false);

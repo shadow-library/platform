@@ -6,8 +6,7 @@ describe('capabilitiesOf', () => {
   it('should grant a viewer reading only', () => {
     expect(capabilitiesOf([SYNAPSE_PERMISSIONS.catalogRead, SYNAPSE_PERMISSIONS.usageRead])).toEqual({
       readCatalog: true,
-      writeDraft: false,
-      publish: false,
+      writeCatalog: false,
       writeProviders: false,
       manageCredentials: false,
       setBudgets: false,
@@ -15,10 +14,13 @@ describe('capabilitiesOf', () => {
     });
   });
 
-  it('should let an operator edit the draft but not publish it', () => {
+  it('should let an operator change the catalog without touching providers or budgets', () => {
     const capabilities = capabilitiesOf([SYNAPSE_PERMISSIONS.catalogRead, SYNAPSE_PERMISSIONS.catalogWrite, SYNAPSE_PERMISSIONS.usageRead]);
-    expect(capabilities.writeDraft).toBe(true);
-    expect(capabilities.publish).toBe(false);
+    expect([capabilities.writeCatalog, capabilities.writeProviders, capabilities.setBudgets]).toEqual([true, false, false]);
+  });
+
+  it('should ignore the removed publish permission', () => {
+    expect(Object.values(capabilitiesOf(['synapse:catalog:publish'])).every(granted => !granted)).toBe(true);
   });
 
   it('should grant credential management on its own permission, not on the provider write permission', () => {
@@ -26,10 +28,10 @@ describe('capabilitiesOf', () => {
     expect(capabilitiesOf([SYNAPSE_PERMISSIONS.credentialsManage]).manageCredentials).toBe(true);
   });
 
-  it('should let a holder of the budget permission set budgets without editing the rest of the draft', () => {
+  it('should let a holder of the budget permission set budgets without changing the rest of the catalog', () => {
     const capabilities = capabilitiesOf([SYNAPSE_PERMISSIONS.catalogRead, SYNAPSE_PERMISSIONS.budgetsWrite]);
     expect(capabilities.setBudgets).toBe(true);
-    expect(capabilities.writeDraft).toBe(false);
+    expect(capabilities.writeCatalog).toBe(false);
   });
 
   it('should grant nothing for permissions of another application', () => {

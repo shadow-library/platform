@@ -1,8 +1,9 @@
 import { type ReactElement, useState } from 'react';
 import { Button, Drawer, FormField, Input, MultiSelect, NumberStepper, Select, Switch } from '@shadow-library/ui';
 
-import { EFFORTS, type ModelCapabilities, type ProviderEntry, type ReasoningMode, useDraftEdit } from '@/features/catalog';
-import { type DraftNotice, DraftNoticeAlert, draftOutcomeNotice, effortName, FormSection, modelDisplayName, providerName } from '@/features/shared';
+import { EFFORTS, type ModelCapabilities, type ProviderEntry, type ReasoningMode } from '@/features/catalog';
+import { changeResultNotice, isSettled, useChangeFlow } from '@/features/changes';
+import { effortName, FormSection, type IssueNotice, IssueNoticeAlert, modelDisplayName, providerName } from '@/features/shared';
 import formStyles from '@/features/shared/form.module.css';
 
 import {
@@ -18,7 +19,6 @@ import {
   updateModelEdit,
   validateModelForm,
 } from './model-form';
-import { defaultModelNote } from './model-view';
 import styles from './Models.module.css';
 
 const PRICE_STEP = 0.1;
@@ -43,14 +43,14 @@ export interface ModelEditorProps {
   providers: readonly ProviderEntry[];
   takenKeys: readonly string[];
   onClose: () => void;
-  onSaved: (notice: DraftNotice) => void;
+  onSaved: (notice: IssueNotice | null) => void;
 }
 
 export function ModelEditor({ mode, initial, providers, takenKeys, onClose, onSaved }: ModelEditorProps): ReactElement {
-  const draftEdit = useDraftEdit();
+  const flow = useChangeFlow();
   const [form, setForm] = useState<ModelForm>(initial);
   const [errors, setErrors] = useState<ModelFormErrors | null>(null);
-  const [failure, setFailure] = useState<DraftNotice | null>(null);
+  const [failure, setFailure] = useState<IssueNotice | null>(null);
   const providerKeys = providers.map(provider => provider.key);
   const context = { mode, takenKeys, providerKeys };
 
@@ -66,7 +66,7 @@ export function ModelEditor({ mode, initial, providers, takenKeys, onClose, onSa
     update({ deployments: form.deployments.map(row => (row.rowId === rowId ? { ...row, ...patch } : row)) });
 
   const submit = async (): Promise<void> => {
-    if (draftEdit.pending) return;
+    if (flow.pending) return;
     const result = validateModelForm(form, context);
     setErrors(result.ok ? null : result.errors);
     if (!result.ok) return;
@@ -74,9 +74,9 @@ export function ModelEditor({ mode, initial, providers, takenKeys, onClose, onSa
     const action = mode.kind === 'add' ? 'added' : 'updated';
     const name = modelDisplayName({ key: result.key, label: result.spec.label, version: result.spec.version });
     const edit = mode.kind === 'add' ? addModelEdit(result.key, result.spec) : updateModelEdit(result.key, initial, form, result.spec);
-    const outcome = await draftEdit.apply(edit, defaultModelNote(name, action));
-    const notice = draftOutcomeNotice(outcome, name, action);
-    if (outcome.kind === 'saved' || outcome.kind === 'unchanged') onSaved(notice);
+    const outcome = await flow.confirmChange(edit);
+    const notice = changeResultNotice(outcome, name, action);
+    if (isSettled(outcome)) onSaved(notice);
     else setFailure(notice);
   };
 
@@ -85,11 +85,11 @@ export function ModelEditor({ mode, initial, providers, takenKeys, onClose, onSa
   const title = mode.kind === 'add' ? 'Add model' : `Edit ${modelDisplayName({ key: mode.key, label: initial.label, version: initial.version })}`;
 
   return (
-    <Drawer open onOpenChange={open => open || draftEdit.pending || onClose()} size="lg">
-      <Drawer.Header title={title} meta="Saved to the draft; nothing changes for users until the draft is published." />
+    <Drawer open onOpenChange={open => open || flow.pending || onClose()} size="lg">
+      <Drawer.Header title={title} meta="Each change goes live for users as soon as you confirm it." />
       <Drawer.Body>
         <div className={formStyles.form}>
-          {failure ? <DraftNoticeAlert notice={failure} /> : null}
+          {failure ? <IssueNoticeAlert notice={failure} /> : null}
           {errors ? <p className={styles.problem}>Some settings need attention before the model can be saved.</p> : null}
 
           <FormSection title="About">
@@ -306,7 +306,7 @@ export function ModelEditor({ mode, initial, providers, takenKeys, onClose, onSa
           </FormSection>
         </div>
       </Drawer.Body>
-      <Drawer.Footer cancel="Cancel" action={mode.kind === 'add' ? 'Add model' : 'Save model'} onAction={() => void submit()} loading={draftEdit.pending} />
+      <Drawer.Footer cancel="Cancel" action={mode.kind === 'add' ? 'Add model' : 'Save model'} onAction={() => void submit()} loading={flow.pending} />
     </Drawer>
   );
 }

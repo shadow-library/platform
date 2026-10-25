@@ -2,34 +2,39 @@
   margin-bottom: 20px;
 }
 
-.origin {
-  margin: 0;
-  color: var(--sh-text-secondary);
-}
-
-.note {
-  margin: 6px 0 0;
-  color: var(--sh-text-primary);
-  overflow-wrap: anywhere;
-}
-
-.area {
-  margin-top: 28px;
-}
-
-.entities {
+.body {
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
-.lines {
-  margin: 0;
-  padding: 0;
-  list-style: none;
+.groupTitle {
+  margin: 0 0 8px;
+  font-size: var(--sh-text-body-sm);
+  font-weight: 600;
+  color: var(--sh-text-secondary);
+}
+
+.items {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 10px;
+}
+
+.itemLabel {
+  margin: 0 0 4px;
+  font-weight: 600;
+  color: var(--sh-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.lines {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--sh-text-primary);
   overflow-wrap: anywhere;
 }
 
@@ -49,89 +54,15 @@
 }
 
 .issues {
-  margin: 14px 0 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.issue {
-  padding: 10px 12px;
-  border: 1px solid var(--sh-border-subtle);
-  border-left: 3px solid var(--sh-danger-solid);
-  border-radius: var(--sh-radius-md);
-  background: var(--sh-surface-card);
-  overflow-wrap: anywhere;
-}
-
-.issueText {
-  color: var(--sh-danger-text);
+  margin: 8px 0 0;
+  padding-left: 18px;
 }
 
 .technical {
-  margin-top: 6px;
+  margin-top: 8px;
   font-size: var(--sh-text-body-sm);
-  color: var(--sh-text-tertiary);
 }
 
 .technical summary {
   cursor: pointer;
-}
-
-.technicalBody {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 12px;
-  margin-top: 4px;
-}
-
-.fix {
-  margin: 10px 0 0;
-  font-size: var(--sh-text-body-sm);
-}
-
-.problemLinks {
-  margin: 6px 0 0;
-  padding-left: 18px;
-}
-
-.publishForm {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 10px;
-}
-
-.noteField {
-  flex: 1 1 320px;
-  max-width: 520px;
-}
-
-.stale {
-  margin-top: 14px;
-}
-
-.confirmBody {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.confirmLine {
-  display: block;
-}
-
-.confirmList {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding-left: 12px;
-  border-left: var(--sh-border-width) solid var(--sh-border-subtle);
-}
-
-.confirmItem {
-  display: block;
-  color: var(--sh-text-primary);
 }

@@ -1,14 +1,15 @@
 import { Link } from '@tanstack/react-router';
 import { type ReactElement, type ReactNode, useMemo, useState } from 'react';
-import { Alert, Button, EmptyState, Input, Popover, SearchIcon, Spinner, Table, type TableColumn, Tag, useConfirm } from '@shadow-library/ui';
+import { Alert, Button, EmptyState, Input, Popover, SearchIcon, Spinner, Table, type TableColumn, Tag } from '@shadow-library/ui';
 
-import { type CatalogDocument, type ModelEntry, readModels, readProviders, useDraftEdit, useWorkingCatalog, type WorkingCatalog } from '@/features/catalog';
+import { type ActiveCatalogState, type CatalogDocument, type ModelEntry, readModels, readProviders, useActiveCatalog } from '@/features/catalog';
+import { changeResultNotice, useChangeFlow } from '@/features/changes';
 import {
-  type DraftNotice,
-  DraftNoticeAlert,
-  draftOutcomeNotice,
   EditIcon,
   formatPrice,
+  type IssueNotice,
+  IssueNoticeAlert,
+  LiveVersionHint,
   modelDisplayName,
   Mono,
   Muted,
@@ -29,7 +30,6 @@ import {
   CAPABILITY_FILTERS,
   capabilityChips,
   type CapabilityFilter,
-  defaultModelNote,
   filterModels,
   isInUse,
   keepVisible,
@@ -60,17 +60,17 @@ export function ModelsScreen(): ReactElement {
 }
 
 function ModelsView({ capabilities }: { capabilities: Capabilities }): ReactElement {
-  const working = useWorkingCatalog('optional');
+  const active = useActiveCatalog();
   const [editor, setEditor] = useState<EditorState>(null);
-  const [notice, setNotice] = useState<DraftNotice | null>(null);
-  const document = working.status === 'ready' ? working.document : null;
+  const [notice, setNotice] = useState<IssueNotice | null>(null);
+  const document = active.status === 'ready' ? active.document : null;
 
   const header = (
     <PageHeader
       title="Models"
       subtitle="The models features can use: their prices, what they can do, and who serves them."
       action={
-        capabilities.writeDraft && working.status !== 'loading' && working.status !== 'error' ? (
+        capabilities.writeCatalog && active.status !== 'loading' && active.status !== 'error' ? (
           <Button variant="primary" onClick={() => setEditor({ mode: { kind: 'add' } })}>
             Add model
           </Button>
@@ -79,7 +79,7 @@ function ModelsView({ capabilities }: { capabilities: Capabilities }): ReactElem
     />
   );
 
-  const handleSaved = (next: DraftNotice): void => {
+  const handleSaved = (next: IssueNotice | null): void => {
     setEditor(null);
     setNotice(next);
   };
@@ -87,8 +87,8 @@ function ModelsView({ capabilities }: { capabilities: Capabilities }): ReactElem
   return (
     <>
       {header}
-      {notice ? <DraftNoticeAlert notice={notice} onDismiss={() => setNotice(null)} className={styles.notice} /> : null}
-      <WorkingBody working={working} capabilities={capabilities} onEdit={setEditor} onNotice={setNotice} />
+      {notice ? <IssueNoticeAlert notice={notice} onDismiss={() => setNotice(null)} className={styles.notice} /> : null}
+      <CatalogBody active={active} capabilities={capabilities} onEdit={setEditor} onNotice={setNotice} />
       {editor ? (
         <ModelEditor
           mode={editor.mode}
@@ -103,15 +103,15 @@ function ModelsView({ capabilities }: { capabilities: Capabilities }): ReactElem
   );
 }
 
-interface WorkingBodyProps {
-  working: WorkingCatalog;
+interface CatalogBodyProps {
+  active: ActiveCatalogState;
   capabilities: Capabilities;
   onEdit: (editor: EditorState) => void;
-  onNotice: (notice: DraftNotice) => void;
+  onNotice: (notice: IssueNotice | null) => void;
 }
 
-function WorkingBody({ working, capabilities, onEdit, onNotice }: WorkingBodyProps): ReactElement {
-  switch (working.status) {
+function CatalogBody({ active, capabilities, onEdit, onNotice }: CatalogBodyProps): ReactElement {
+  switch (active.status) {
     case 'loading':
       return (
         <div className={controls.loading}>
@@ -121,30 +121,21 @@ function WorkingBody({ working, capabilities, onEdit, onNotice }: WorkingBodyPro
     case 'error':
       return (
         <Alert intent="danger" title="Couldn't load the catalog">
-          {working.error.message}
+          {active.error.message}
         </Alert>
       );
     case 'none':
       return (
         <EmptyState
           title="No catalog yet"
-          description={capabilities.writeDraft ? 'Add a model to start a draft catalog.' : 'Models appear here once a catalog version is published.'}
+          description={capabilities.writeCatalog ? 'Add a model to start the catalog.' : 'Models appear here once a first catalog version goes live.'}
         />
       );
     case 'ready':
       return (
         <>
-          <p className={controls.hint}>
-            {working.source.kind === 'draft' ? (
-              <>
-                Showing the draft, which may hold changes that aren’t live yet. <Link to="/changes">Review &amp; publish</Link>
-              </>
-            ) : (
-              `Showing published version ${working.source.version}. Saving a change starts a draft.`
-            )}
-            {capabilities.writeDraft ? null : ' Editing models needs permission to change the catalog.'}
-          </p>
-          <ModelTable document={working.document} capabilities={capabilities} onEdit={onEdit} onNotice={onNotice} />
+          <LiveVersionHint version={active.version} canEdit={capabilities.writeCatalog} readOnlyNote="Editing models needs permission to change the catalog." />
+          <ModelTable document={active.document} capabilities={capabilities} onEdit={onEdit} onNotice={onNotice} />
         </>
       );
   }
@@ -198,12 +189,11 @@ interface ModelTableProps {
   document: CatalogDocument;
   capabilities: Capabilities;
   onEdit: (editor: EditorState) => void;
-  onNotice: (notice: DraftNotice) => void;
+  onNotice: (notice: IssueNotice | null) => void;
 }
 
 function ModelTable({ document, capabilities, onEdit, onNotice }: ModelTableProps): ReactElement {
-  const confirm = useConfirm();
-  const draftEdit = useDraftEdit();
+  const flow = useChangeFlow();
   const [query, setQuery] = useState('');
   const [filters, setFilters] = useState<CapabilityFilter[]>([]);
   const [selection, setSelection] = useState<string[]>([]);
@@ -229,18 +219,12 @@ function ModelTable({ document, capabilities, onEdit, onNotice }: ModelTableProp
 
   const handleRemove = async (model: ModelEntry): Promise<void> => {
     const name = modelDisplayName(model);
-    const confirmed = await confirm({
-      title: `Remove ${name}?`,
-      description: 'The model leaves the draft. It stays live until the draft is published.',
-      confirmLabel: 'Remove',
-      intent: 'danger',
-    });
-    if (!confirmed) return;
     setRemoving(model.key);
-    const outcome = await draftEdit.apply(removeModelEdit(model.key), defaultModelNote(name, 'removed'));
+    const warning = { title: `This removes ${name}`, body: 'Nothing uses it any more. You can add it again later.' };
+    const outcome = await flow.confirmChange(removeModelEdit(model.key), { warning });
     setRemoving(null);
-    if (outcome.kind === 'saved') setSelection(current => current.filter(key => key !== model.key));
-    onNotice(draftOutcomeNotice(outcome, name, 'removed'));
+    if (outcome.kind === 'applied') setSelection(current => current.filter(key => key !== model.key));
+    onNotice(changeResultNotice(outcome, name, 'removed'));
   };
 
   const columns: TableColumn<ModelEntry>[] = [
@@ -297,7 +281,7 @@ function ModelTable({ document, capabilities, onEdit, onNotice }: ModelTableProp
     { id: 'usedBy', header: 'Used by', cell: row => <UsedBy usage={usageOf(usage, row.key)} /> },
   ];
 
-  if (capabilities.writeDraft)
+  if (capabilities.writeCatalog)
     columns.push({
       id: '_actions',
       header: <span className="sr-only">Actions</span>,
@@ -314,8 +298,8 @@ function ModelTable({ document, capabilities, onEdit, onNotice }: ModelTableProp
               label={inUse ? `Remove ${name}: unavailable. ${usageSentence(rowUsage)}` : `Remove ${name}`}
               tooltip={inUse ? `${usageSentence(rowUsage)}. Move them to another model first.` : 'Remove'}
               danger
-              disabled={inUse || draftEdit.pending}
-              loading={removing === row.key}
+              disabled={inUse || flow.pending}
+              loading={removing === row.key && flow.pending}
               onClick={() => void handleRemove(row)}
             />
           </RowActions>

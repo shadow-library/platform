@@ -118,26 +118,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/api/v1/admin/catalog/draft': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Get Draft */
-    get: operations['get_api_v1_admin_catalog_draft'];
-    /** Save Draft */
-    put: operations['put_api_v1_admin_catalog_draft'];
-    post?: never;
-    /** Discard Draft */
-    delete: operations['delete_api_v1_admin_catalog_draft'];
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/admin/catalog/draft/validate': {
+  '/api/v1/admin/catalog/changes': {
     parameters: {
       query?: never;
       header?: never;
@@ -146,42 +127,8 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Validate Draft */
-    post: operations['post_api_v1_admin_catalog_draft_validate'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/admin/catalog/draft/diff': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Diff Draft */
-    get: operations['get_api_v1_admin_catalog_draft_diff'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/admin/catalog/draft/publish': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Publish */
-    post: operations['post_api_v1_admin_catalog_draft_publish'];
+    /** Apply Change */
+    post: operations['post_api_v1_admin_catalog_changes'];
     delete?: never;
     options?: never;
     head?: never;
@@ -782,12 +729,11 @@ export interface components {
       items: components['schemas']['CatalogVersionSummaryResponse'][];
     };
     CatalogVersionSummaryResponse: {
-      /** @description Zero for the draft, which has no version until it is published */
       version: number;
       /** @enum {string} */
-      state: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+      state: 'PUBLISHED' | 'ARCHIVED';
       note?: string;
-      /** @description Subject of the admin who last saved or published it */
+      /** @description Subject of the admin whose change, budget update or rollback published it */
       createdBy?: string;
       /** @description Display name of `createdBy`, read from Identity when the response is built; null when Identity does not name that subject or cannot be reached */
       createdByName: string | null;
@@ -797,12 +743,11 @@ export interface components {
       publishedAt?: string;
     };
     CatalogVersionDetailResponse: {
-      /** @description Zero for the draft, which has no version until it is published */
       version: number;
       /** @enum {string} */
-      state: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+      state: 'PUBLISHED' | 'ARCHIVED';
       note?: string;
-      /** @description Subject of the admin who last saved or published it */
+      /** @description Subject of the admin whose change, budget update or rollback published it */
       createdBy?: string;
       /** @description Display name of `createdBy`, read from Identity when the response is built; null when Identity does not name that subject or cannot be reached */
       createdByName: string | null;
@@ -815,40 +760,15 @@ export interface components {
         [key: string]: unknown;
       };
     };
-    DraftResponse: {
-      draft: components['schemas']['CatalogVersionDetailResponse'];
-      /** @description Content hash of the draft; publishing must present it to prove the draft was seen */
-      fingerprint: string;
-    };
-    /** @description No draft exists */
-    NoDraftResponse: null;
-    SaveDraftBody: {
-      /** @description The whole catalog document. It is saved as sent, even when invalid, so work in progress survives */
+    ApplyChangeBody: {
+      /** @description The whole catalog document as it should be live. It is validated before it is published; an invalid one is refused with 422 and its issues */
       document: {
         [key: string]: unknown;
       };
-      /** @description Free-text note stored with the draft */
+      /** @description Version of the active catalog the change was made against, or null when none has been published yet. Refused with 409 when the active version differs. A document equal to the active one publishes nothing and the response is that active version */
+      expectedVersion: number | null;
+      /** @description Plain-language note stored with the new version and shown in history; defaults to "Catalog change" */
       note?: string;
-      /** @description Fingerprint of the draft this save replaces; the save is refused with 409 when the draft has changed since */
-      expectedFingerprint?: string;
-      /** @description The save starts a new draft; it is refused with 409 when a draft already exists */
-      expectNoDraft?: boolean;
-      /** @description The active version the document was built from; requires expectNoDraft and cannot be combined with expectedFingerprint. The save is refused with 409 when the active version differs at save time, e.g. after a budget-only publish, so the draft cannot silently revert it */
-      expectedActiveVersion?: number;
-    };
-    SaveDraftResponse: {
-      draft: components['schemas']['CatalogVersionDetailResponse'];
-      /** @description Content hash of the draft; publishing must present it to prove the draft was seen */
-      fingerprint: string;
-      /** @description What would block publishing this draft; empty when it is publishable */
-      issues: components['schemas']['CatalogIssueResponse'][];
-    };
-    CatalogIssueResponse: {
-      /** @description Location in the document, e.g. `tasks.novel-forge.chat.routes[1].model`; empty for the document itself */
-      path: string;
-      /** @description Machine-readable rule that failed, e.g. unknown_model or pinned_changed */
-      code: string;
-      message: string;
     };
     ErrorResponseDto: {
       code: string;
@@ -861,31 +781,24 @@ export interface components {
       message: string;
       issues: components['schemas']['CatalogIssueResponse'][];
     };
-    ValidateDraftResponse: {
-      valid: boolean;
-      issues: components['schemas']['CatalogIssueResponse'][];
-    };
-    DraftDiffResponse: {
-      /** @description Fingerprint of the draft this diff was computed from; publish with it */
-      fingerprint: string;
-      /** @description Paths present in the draft only */
-      added: string[];
-      /** @description Paths present in the active catalog only */
-      removed: string[];
-      /** @description Paths whose values differ */
-      changed: string[];
-    };
-    PublishBody: {
-      /** @description Fingerprint of the draft being published, as returned when it was read or saved */
-      fingerprint: string;
+    CatalogIssueResponse: {
+      /** @description Location in the document, e.g. `tasks.novel-forge.chat.routes[1].model`; empty for the document itself */
+      path: string;
+      /** @description Machine-readable rule that failed, e.g. unknown_model or pinned_changed */
+      code: string;
+      message: string;
     };
     PublishBudgetsBody: {
-      /** @description The complete budget list that replaces the active one. Validated with the whole catalog, so an invalid entry is refused with 422 and its issues */
+      /** @description The complete budget list that replaces the active one. Validated with the whole catalog, so an invalid entry is refused with 422 and its issues. Budgets equal to the active ones publish nothing and the response is the active version */
       budgets: Record<string, never>[];
       /** @description Version of the active catalog the budgets were edited against; refused with 409 when another version has been published since */
       expectedVersion: number;
       /** @description Free-text note stored with the new version; defaults to "Budgets updated" */
       note?: string;
+    };
+    RollbackBody: {
+      /** @description Version of the active catalog the caller saw when choosing to restore; refused with 409 when another version has been published since, so an undo never reverts a newer change. Restoring a document equal to the active one publishes nothing and the response is that active version */
+      expectedVersion: number;
     };
     AliasImpactResponse: {
       alias: string;
@@ -1493,54 +1406,7 @@ export interface operations {
       };
     };
   };
-  get_api_v1_admin_catalog_draft: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DraftResponse'];
-        };
-      };
-      /** @description Default Response */
-      204: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['NoDraftResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  put_api_v1_admin_catalog_draft: {
+  post_api_v1_admin_catalog_changes: {
     parameters: {
       query?: never;
       header?: never;
@@ -1549,202 +1415,7 @@ export interface operations {
     };
     requestBody: {
       content: {
-        'application/json': components['schemas']['SaveDraftBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['SaveDraftResponse'];
-        };
-      };
-      /** @description Default Response */
-      409: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['CatalogInvalidResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  delete_api_v1_admin_catalog_draft: {
-    parameters: {
-      query: {
-        /** @description Fingerprint of the draft being discarded; the discard is refused with 409 when the draft has changed since */
-        fingerprint: string;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      409: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  post_api_v1_admin_catalog_draft_validate: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ValidateDraftResponse'];
-        };
-      };
-      /** @description Default Response */
-      204: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['NoDraftResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  get_api_v1_admin_catalog_draft_diff: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DraftDiffResponse'];
-        };
-      };
-      /** @description Default Response */
-      204: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['NoDraftResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  post_api_v1_admin_catalog_draft_publish: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['PublishBody'];
+        'application/json': components['schemas']['ApplyChangeBody'];
       };
     };
     responses: {
@@ -1864,7 +1535,11 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: never;
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RollbackBody'];
+      };
+    };
     responses: {
       /** @description Default Response */
       200: {
@@ -1873,6 +1548,15 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['CatalogVersionSummaryResponse'];
+        };
+      };
+      /** @description Default Response */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -2793,17 +2477,12 @@ export type CatalogAliasView = components['schemas']['CatalogAliasView'];
 export type CatalogVersionListResponse = components['schemas']['CatalogVersionListResponse'];
 export type CatalogVersionSummaryResponse = components['schemas']['CatalogVersionSummaryResponse'];
 export type CatalogVersionDetailResponse = components['schemas']['CatalogVersionDetailResponse'];
-export type DraftResponse = components['schemas']['DraftResponse'];
-export type NoDraftResponse = components['schemas']['NoDraftResponse'];
-export type SaveDraftBody = components['schemas']['SaveDraftBody'];
-export type SaveDraftResponse = components['schemas']['SaveDraftResponse'];
-export type CatalogIssueResponse = components['schemas']['CatalogIssueResponse'];
+export type ApplyChangeBody = components['schemas']['ApplyChangeBody'];
 export type ErrorResponseDto = components['schemas']['ErrorResponseDto'];
 export type CatalogInvalidResponse = components['schemas']['CatalogInvalidResponse'];
-export type ValidateDraftResponse = components['schemas']['ValidateDraftResponse'];
-export type DraftDiffResponse = components['schemas']['DraftDiffResponse'];
-export type PublishBody = components['schemas']['PublishBody'];
+export type CatalogIssueResponse = components['schemas']['CatalogIssueResponse'];
 export type PublishBudgetsBody = components['schemas']['PublishBudgetsBody'];
+export type RollbackBody = components['schemas']['RollbackBody'];
 export type AliasImpactResponse = components['schemas']['AliasImpactResponse'];
 export type AliasImpactRowResponse = components['schemas']['AliasImpactRowResponse'];
 export type AliasRetargetResponse = components['schemas']['AliasRetargetResponse'];

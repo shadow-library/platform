@@ -95,12 +95,12 @@ export function BudgetDrawer({ target, basis, onSubmit, onClose }: BudgetDrawerP
       <Drawer.Body>
         <div className={styles.form}>
           {failure?.kind === 'invalid' ? (
-            <Alert intent="danger" title="The budgets were not published">
+            <Alert intent="danger" title="The budgets were not changed">
               <BudgetIssues issues={failure.issues} />
             </Alert>
           ) : null}
           {failure?.kind === 'failed' ? (
-            <Alert intent="danger" title="The budgets were not published">
+            <Alert intent="danger" title="The budgets were not changed">
               {failure.message}
             </Alert>
           ) : null}
@@ -148,13 +148,7 @@ export function BudgetDrawer({ target, basis, onSubmit, onClose }: BudgetDrawerP
         <Button variant="ghost" disabled={busy} onClick={onClose}>
           Cancel
         </Button>
-        <Button
-          variant="primary"
-          loading={stage === 'checking' || stage === 'publishing'}
-          loadingText={stage === 'checking' ? 'Checking the draft…' : undefined}
-          disabled={unchanged}
-          onClick={() => void submit()}
-        >
+        <Button variant="primary" loading={stage === 'checking' || stage === 'publishing'} disabled={unchanged} onClick={() => void submit()}>
           Save
         </Button>
       </Drawer.Footer>

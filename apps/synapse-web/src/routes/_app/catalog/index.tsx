@@ -1,6 +1,6 @@
 import { createFileRoute, redirect } from '@tanstack/react-router';
 
-const TAB_DESTINATIONS = { draft: '/advanced', publish: '/changes', versions: '/history' } as const;
+const TAB_DESTINATIONS = { draft: '/advanced', publish: '/history', versions: '/history' } as const;
 
 type CatalogTab = keyof typeof TAB_DESTINATIONS;
 

@@ -116,7 +116,7 @@ export interface ModelEntry extends ModelSpec {
   key: string;
 }
 
-/** Fields a draft may hold invalid while it is being edited are optional here, read as "not set". */
+/** Fields a hand-edited catalog may hold invalid are optional here, read as "not set". */
 export interface ProviderSpec {
   kind?: ProviderKind;
   flavor?: ProviderFlavor;

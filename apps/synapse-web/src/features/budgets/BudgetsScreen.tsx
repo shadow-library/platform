@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { type ReactElement, useEffect, useState } from 'react';
 import { Alert, Button, EmptyState, Spinner, useConfirm } from '@shadow-library/ui';
 
-import { type ActiveCatalogState, type CatalogDocument, useActiveCatalog } from '@/features/catalog';
+import { type ActiveCatalogState, useActiveCatalog } from '@/features/catalog';
 import { type Notice, PageHeader, PermissionGate } from '@/features/shared';
 import controls from '@/features/shared/controls.module.css';
 import {
@@ -10,7 +10,6 @@ import {
   type Capabilities,
   type CatalogIssueResponse,
   catalogKeys,
-  draftQueryOptions,
   isApiError,
   isCatalogConflict,
   isNoActiveCatalog,
@@ -20,14 +19,12 @@ import {
 
 import { BudgetCard, type BudgetCardActions } from './BudgetCard';
 import { BudgetDrawer, type BudgetDrawerTarget, type BudgetSubmitOutcome, type PublishStage } from './BudgetDrawer';
-import { type BudgetBasis, budgetBasisOf, type BudgetChange, budgetNote, draftChangesBudgets, planBudgetPublish } from './budget-form';
+import { type BudgetBasis, budgetBasisOf, type BudgetChange, budgetNote, planBudgetPublish } from './budget-form';
 import { BudgetIssues } from './BudgetIssues';
 import styles from './Budgets.module.css';
 import { budgetCards, type BudgetCardView } from './budget-view';
 
 type ScreenNotice = Notice & { issues?: CatalogIssueResponse[] };
-
-type DraftCheck = 'clean' | 'differs' | 'unknown';
 
 interface Editor {
   target: BudgetDrawerTarget;
@@ -39,7 +36,7 @@ const STATUS_REFRESH_MS = 30_000;
 const CONFLICT_NOTICE: ScreenNotice = {
   intent: 'warning',
   title: 'The catalog changed meanwhile',
-  body: 'Someone published a new catalog version while you were editing, so the budgets were not changed. The screen has reloaded; make your change again.',
+  body: 'Someone else changed the catalog while you were editing, so the budgets were not changed. The screen has reloaded; make your change again.',
 };
 
 const SUBTITLE = 'Limits on what each app may spend on AI, and how close each one is to its limit right now.';
@@ -60,22 +57,8 @@ function editHint(capabilities: Capabilities, active: ActiveCatalogState): strin
   return null;
 }
 
-async function checkDraft(load: () => Promise<{ draft: { document: CatalogDocument } } | null>, active: CatalogDocument): Promise<DraftCheck> {
-  try {
-    const draft = await load();
-    return draft && draftChangesBudgets(draft.draft.document, active) ? 'differs' : 'clean';
-  } catch {
-    return 'unknown';
-  }
-}
-
-const DRAFT_WARNINGS: Readonly<Record<Exclude<DraftCheck, 'clean'>, string>> = {
-  differs: 'The unpublished draft also changes budgets; publishing here replaces those draft changes.',
-  unknown: 'The unpublished draft couldn’t be checked. If it also changes budgets, publishing here replaces those draft changes.',
-};
-
 /** A dialog description renders inside a paragraph, so this keeps to inline elements laid out as blocks. */
-function ConfirmBody({ sentences, draft }: { sentences: readonly string[]; draft: DraftCheck }): ReactElement {
+function ConfirmBody({ sentences }: { sentences: readonly string[] }): ReactElement {
   return (
     <span className={styles.confirmBody}>
       <span className={styles.confirmLine}>This takes effect for every app within a minute.</span>
@@ -84,7 +67,6 @@ function ConfirmBody({ sentences, draft }: { sentences: readonly string[]; draft
           {sentence}
         </span>
       ))}
-      {draft === 'clean' ? null : <span className={styles.confirmWarning}>{DRAFT_WARNINGS[draft]}</span>}
     </span>
   );
 }
@@ -120,13 +102,12 @@ function BudgetsView({ capabilities }: { capabilities: Capabilities }): ReactEle
   const publishChange = async (from: BudgetBasis, change: BudgetChange, typedNote: string, onStage: (stage: PublishStage) => void): Promise<BudgetSubmitOutcome> => {
     const plan = planBudgetPublish(from, change);
     if (!plan) return { kind: 'kept' };
-    const draft = await checkDraft(() => queryClient.fetchQuery({ ...draftQueryOptions(), staleTime: 0 }), from.document);
     const removal = change.kind === 'remove';
     onStage('confirming');
     const confirmed = await confirm({
-      title: removal ? 'Remove this budget?' : 'Publish this budget change?',
-      description: <ConfirmBody sentences={plan.changes.map(item => item.sentence)} draft={draft} />,
-      confirmLabel: removal ? 'Remove budget' : 'Publish',
+      title: removal ? 'Remove this budget?' : 'Apply this budget change?',
+      description: <ConfirmBody sentences={plan.changes.map(item => item.sentence)} />,
+      confirmLabel: removal ? 'Remove budget' : 'Apply',
       intent: removal ? 'danger' : 'primary',
     });
     if (!confirmed) return { kind: 'kept' };
@@ -139,7 +120,7 @@ function BudgetsView({ capabilities }: { capabilities: Capabilities }): ReactEle
       setNotice({ intent: 'success', title: `Budgets updated — live as version ${outcome.value.version}`, body: 'Every app applies the new limits within a minute.' });
       return { kind: 'done' };
     } catch (error) {
-      if (!isCatalogConflict(error)) return { kind: 'failed', message: isApiError(error) ? error.message : 'The budgets couldn’t be published.' };
+      if (!isCatalogConflict(error)) return { kind: 'failed', message: isApiError(error) ? error.message : 'The budgets couldn’t be changed.' };
       setEditor(null);
       setNotice(CONFLICT_NOTICE);
       return { kind: 'done' };
@@ -178,7 +159,7 @@ function BudgetsView({ capabilities }: { capabilities: Capabilities }): ReactEle
     return (
       <>
         {header}
-        <EmptyState title="No catalog is live yet" description="Budgets apply once a catalog version is published." />
+        <EmptyState title="No catalog is live yet" description="Budgets apply once a first catalog version goes live." />
       </>
     );
 

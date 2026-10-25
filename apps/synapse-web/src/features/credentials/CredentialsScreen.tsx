@@ -61,7 +61,7 @@ function CredentialsView(): ReactElement {
 
   const handleCreated = (credential: CredentialResponse): void => {
     setDialog(null);
-    setNotice({ intent: 'success', title: `Created "${credential.name}"`, body: 'Choose it for a provider on the Providers screen, then publish the draft.', providersLink: true });
+    setNotice({ intent: 'success', title: `Created "${credential.name}"`, body: 'Choose it for a provider on the Providers screen.', providersLink: true });
     void refresh();
   };
 

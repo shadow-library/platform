@@ -2,7 +2,7 @@ import { type CatalogDocument, type DocumentEdit } from '@/features/catalog/cata
 import { type TaskMeta, withTaskAliases, withTaskDataPolicy, withTaskFieldValue, withTaskMeta } from '@/features/catalog/catalog-edits';
 import { type DataPolicy } from '@/features/catalog/catalog-spec.types';
 import { isRecord, isSameValue, ownEntry } from '@/features/catalog/catalog-values';
-import { type CatalogEdit } from '@/features/catalog/draft-edit';
+import { type CatalogEdit } from '@/features/catalog/catalog-change';
 
 import { type EffortForm, effortOf } from './effort-range';
 import { type AboutForm } from './feature-detail';

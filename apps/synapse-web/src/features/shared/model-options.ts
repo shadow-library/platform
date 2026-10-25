@@ -50,7 +50,7 @@ function outsideCluster(model: Pick<ModelEntry, 'deployments'>, providers: reado
   return [...new Set(outside.map(deployment => deployment.provider))];
 }
 
-/** A display hint only: the server validates every rule at publish, so this never blocks a save. */
+/** A display hint only: the server validates every rule on each change, so this never blocks one. */
 export function modelEligibility(model: Pick<ModelEntry, 'capabilities' | 'deployments'>, needs: ModelNeeds): ModelEligibility {
   const reasons: string[] = [];
   if (needs.kind && !modelServesKind(model, needs.kind)) reasons.push(`Can't serve ${taskKindName(needs.kind).toLowerCase()} features`);

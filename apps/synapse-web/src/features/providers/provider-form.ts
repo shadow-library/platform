@@ -12,7 +12,7 @@ import {
   type ProviderSpec,
 } from '@/features/catalog/catalog-spec.types';
 import { isRecord, isSameValue, ownEntry, text } from '@/features/catalog/catalog-values';
-import { type CatalogEdit } from '@/features/catalog/draft-edit';
+import { type CatalogEdit } from '@/features/catalog/catalog-change';
 import { originOfUrl } from '@/features/credentials/credential-view';
 import { type CredentialResponse } from '@/lib/apis/api-types.gen';
 
@@ -197,7 +197,7 @@ function patchEntry(raw: Entry, fields: readonly EditableProviderField[], spec: 
 
 export function addProviderEdit(key: string, spec: ProviderSpec): CatalogEdit {
   return (document: CatalogDocument): DocumentEdit => {
-    if (providerKeysOf(document).includes(key)) return { ok: false, reason: `The draft already has a provider with the key "${key}"` };
+    if (providerKeysOf(document).includes(key)) return { ok: false, reason: `The catalog already has a provider with the key "${key}"` };
     return withProvider(document, key, spec);
   };
 }
@@ -207,13 +207,13 @@ function freshForm(key: string, raw: Entry): ProviderForm | undefined {
   return fresh ? providerFormOf(fresh) : undefined;
 }
 
-/** Re-applied to the fresh draft on every save attempt: untouched fields keep what is stored now, and an edited field someone else also changed is refused. */
+/** Re-applied to the live catalog on every attempt: untouched fields keep what is stored now, and an edited field someone else also changed is refused. */
 export function updateProviderEdit(key: string, initial: ProviderForm, form: ProviderForm, spec: ProviderSpec): CatalogEdit {
   const fields = editedProviderFields(initial, form);
   return (document: CatalogDocument): DocumentEdit => {
     const providers = document.providers;
     const raw = isRecord(providers) ? ownEntry(providers, key) : undefined;
-    if (!isRecord(providers) || !isRecord(raw)) return { ok: false, reason: `The draft no longer has the provider "${key}"; someone may have removed it` };
+    if (!isRecord(providers) || !isRecord(raw)) return { ok: false, reason: `The catalog no longer has the provider "${key}"; someone may have removed it` };
     if (fields.length === 0) return { ok: true, document };
     const current = freshForm(key, raw);
     if (!current || fields.some(field => !isSameValue(projection(current, field), projection(initial, field)))) return { ok: false, reason: CONCURRENT_PROVIDER_CHANGE };
@@ -221,11 +221,11 @@ export function updateProviderEdit(key: string, initial: ProviderForm, form: Pro
   };
 }
 
-/** Checked again on the draft the removal is applied to, since a model may have started using the provider meanwhile. */
+/** Checked again on the catalog the removal is applied to, since a model may have started using the provider meanwhile. */
 export function removeProviderEdit(key: string): CatalogEdit {
   return (document: CatalogDocument): DocumentEdit => {
     const providers = document.providers;
-    if (!isRecord(providers) || !Object.hasOwn(providers, key)) return { ok: false, reason: `The draft has no provider "${key}"` };
+    if (!isRecord(providers) || !Object.hasOwn(providers, key)) return { ok: false, reason: `The catalog has no provider "${key}"` };
     const users = providerUsers(document, key);
     if (users.length > 0) return { ok: false, reason: `It is still in use. ${usersSentence(users)}.` };
     const { [key]: _removed, ...rest } = providers;
@@ -242,7 +242,7 @@ export function assignCredentialEdit(key: string, seen: KeySnapshot, credentialI
   return (document: CatalogDocument): DocumentEdit => {
     const providers = document.providers;
     const raw = isRecord(providers) ? ownEntry(providers, key) : undefined;
-    if (!isRecord(raw)) return { ok: false, reason: `The draft no longer has the provider "${key}"; someone may have removed it` };
+    if (!isRecord(raw)) return { ok: false, reason: `The catalog no longer has the provider "${key}"; someone may have removed it` };
     const stored: KeySnapshot = keySnapshotOf({ credential: text(raw.credential), apiKeyConfig: text(raw.apiKeyConfig) });
     if (!isSameValue(stored, seen)) return { ok: false, reason: CONCURRENT_KEY_CHANGE };
     return credentialId === null ? withoutProviderCredential(document, key) : withProviderCredential(document, key, credentialId);

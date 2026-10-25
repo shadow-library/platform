@@ -1,7 +1,7 @@
 import { type ReactElement, useState } from 'react';
 import { Alert, FormField, Select } from '@shadow-library/ui';
 
-import { type CatalogDocument, DATA_POLICIES, type DataPolicy, featureNote, type TaskEntry } from '@/features/catalog';
+import { type CatalogDocument, DATA_POLICIES, type DataPolicy, type TaskEntry } from '@/features/catalog';
 import { dataPolicyName } from '@/features/shared';
 import controls from '@/features/shared/controls.module.css';
 
@@ -41,7 +41,7 @@ function DataPolicyDrawer({ task, context, editor }: { task: TaskEntry; context:
   const [opened] = useState<DataPolicy>(task.dataPolicy);
   const [policy, setPolicy] = useState<DataPolicy>(opened);
   const hints = dataPolicyHints(task, policy, context);
-  const save = (): void => void editor.save(dataPolicyEdit(task.key, opened, policy), featureNote(task, 'data policy'));
+  const save = (): void => void editor.save(dataPolicyEdit(task.key, opened, policy));
   return (
     <EditorDrawer title="Data policy" meta={SUBTITLE} editor={editor} canSave onSave={save}>
       <FormField label="Data policy" helper={EXPLANATIONS[policy]}>
@@ -54,7 +54,7 @@ function DataPolicyDrawer({ task, context, editor }: { task: TaskEntry; context:
         </Select>
       </FormField>
       {hints.length > 0 ? (
-        <Alert intent="warning" title="Publishing will refuse this until these models change">
+        <Alert intent="warning" title="Synapse will refuse this until these models change">
           <ul className={styles.issueList}>
             {hints.map(hint => (
               <li key={hint}>{hint}</li>

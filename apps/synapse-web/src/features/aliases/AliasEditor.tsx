@@ -1,8 +1,9 @@
 import { type ReactElement, useState } from 'react';
-import { Alert, Button, Combobox, type ComboboxOption, Drawer, FormField, Input, RadioGroup, Switch, Textarea, TokenInput, useConfirm } from '@shadow-library/ui';
+import { Alert, Button, Combobox, type ComboboxOption, Drawer, FormField, Input, RadioGroup, Switch, Textarea, TokenInput } from '@shadow-library/ui';
 
-import { ALIAS_STATES, type AliasState, type CatalogDocument, readModels, resolveSelectorKey, selectorVocabulary, useDraftEdit } from '@/features/catalog';
-import { type DraftNotice, DraftNoticeAlert, FormSection, modelDisplayName, ModelPicker, Mono, selectorName } from '@/features/shared';
+import { ALIAS_STATES, type AliasState, type CatalogDocument, readModels, resolveSelectorKey, selectorVocabulary } from '@/features/catalog';
+import { changeResultNotice, type ChangeWarning, isSettled, useChangeFlow } from '@/features/changes';
+import { FormSection, type IssueNotice, IssueNoticeAlert, modelDisplayName, ModelPicker, Mono, selectorName } from '@/features/shared';
 import formStyles from '@/features/shared/form.module.css';
 
 import {
@@ -19,7 +20,7 @@ import {
   validateAliasForm,
   valueSuggestions,
 } from './alias-form';
-import { ALIAS_STATE_INFO, aliasModelNeeds, aliasOutcomeNotice, type AliasUser, defaultAliasNote, narrowedConditions, narrowingDescription, retireDescription } from './alias-view';
+import { ALIAS_STATE_INFO, aliasModelNeeds, type AliasUser, narrowedConditions, narrowingDescription, retireDescription } from './alias-view';
 import styles from './Aliases.module.css';
 
 export interface AliasEditorProps {
@@ -29,15 +30,14 @@ export interface AliasEditorProps {
   takenKeys: readonly string[];
   usedBy: readonly AliasUser[];
   onClose: () => void;
-  onSaved: (notice: DraftNotice) => void;
+  onSaved: (notice: IssueNotice | null) => void;
 }
 
 export function AliasEditor({ mode, initial, document, takenKeys, usedBy, onClose, onSaved }: AliasEditorProps): ReactElement {
-  const confirm = useConfirm();
-  const draftEdit = useDraftEdit();
+  const flow = useChangeFlow();
   const [form, setForm] = useState<AliasForm>(initial);
   const [errors, setErrors] = useState<AliasFormErrors | null>(null);
-  const [failure, setFailure] = useState<DraftNotice | null>(null);
+  const [failure, setFailure] = useState<IssueNotice | null>(null);
   const models = readModels(document);
   const vocabulary = selectorVocabulary(document);
   const needs = mode.kind === 'edit' ? aliasModelNeeds(document, mode.key, form.state) : {};
@@ -52,30 +52,25 @@ export function AliasEditor({ mode, initial, document, takenKeys, usedBy, onClos
     setErrors(result.ok ? null : result.errors);
   };
 
+  const warningOf = (name: string, fields: readonly string[], state: AliasState, available: Record<string, string[]> | undefined): ChangeWarning | undefined => {
+    if (mode.kind !== 'edit') return undefined;
+    if (fields.includes('state') && state === 'retired') return { title: `This retires ${name}`, body: retireDescription(name, usedBy) };
+    const narrowed = fields.includes('available') && state !== 'retired' ? narrowedConditions(availableOfRules(initial.rules), available) : [];
+    return narrowed.length > 0 ? { title: `This narrows where ${name} works`, body: narrowingDescription(name, narrowed) } : undefined;
+  };
+
   const submit = async (): Promise<void> => {
-    if (draftEdit.pending) return;
+    if (flow.pending) return;
     const result = validateAliasForm(form, context);
     setErrors(result.ok ? null : result.errors);
     if (!result.ok) return;
     const name = result.spec.label || result.key;
-    if (mode.kind === 'edit' && result.fields.includes('state') && result.spec.state === 'retired') {
-      const confirmed = await confirm({ title: `Retire ${name}?`, description: retireDescription(name, usedBy), confirmLabel: 'Retire', intent: 'danger' });
-      if (!confirmed) return;
-    }
-    const narrowed =
-      mode.kind === 'edit' && result.fields.includes('available') && result.spec.state !== 'retired'
-        ? narrowedConditions(availableOfRules(initial.rules), result.spec.available)
-        : [];
-    if (narrowed.length > 0) {
-      const confirmed = await confirm({ title: `Narrow where ${name} works?`, description: narrowingDescription(name, narrowed), confirmLabel: 'Save anyway', intent: 'danger' });
-      if (!confirmed) return;
-    }
+    const warning = warningOf(name, result.fields, result.spec.state, result.spec.available);
     setFailure(null);
-    const action = mode.kind === 'add' ? 'added' : 'updated';
     const edit = mode.kind === 'add' ? addAliasEdit(result.key, result.spec) : updateAliasEdit(result.key, initial, result.fields, result.spec);
-    const outcome = await draftEdit.apply(edit, defaultAliasNote(name, action));
-    const notice = aliasOutcomeNotice(outcome, name, action);
-    if (outcome.kind === 'saved' || outcome.kind === 'unchanged') onSaved(notice);
+    const outcome = await flow.confirmChange(edit, warning ? { warning } : {});
+    const notice = changeResultNotice(outcome, name, mode.kind === 'add' ? 'added' : 'updated');
+    if (isSettled(outcome)) onSaved(notice);
     else setFailure(notice);
   };
 
@@ -83,11 +78,11 @@ export function AliasEditor({ mode, initial, document, takenKeys, usedBy, onClos
   const title = mode.kind === 'add' ? 'Add model name' : `Edit ${initial.label || mode.key}`;
 
   return (
-    <Drawer open onOpenChange={open => open || draftEdit.pending || onClose()} size="lg">
-      <Drawer.Header title={title} meta="Saved to the draft; nothing changes for users until the draft is published." />
+    <Drawer open onOpenChange={open => open || flow.pending || onClose()} size="lg">
+      <Drawer.Header title={title} meta="Each change goes live for users as soon as you confirm it." />
       <Drawer.Body>
         <div className={formStyles.form}>
-          {failure ? <DraftNoticeAlert notice={failure} /> : null}
+          {failure ? <IssueNoticeAlert notice={failure} /> : null}
           {errors ? <p className={styles.problem}>Some settings need attention before the model name can be saved.</p> : null}
 
           <FormSection title="About">
@@ -128,7 +123,7 @@ export function AliasEditor({ mode, initial, document, takenKeys, usedBy, onClos
               <ModelPicker {...needs} models={models} value={form.model || null} onValueChange={model => update({ model })} invalid={fieldError.model !== undefined} />
             </FormField>
             {models.length === 0 ? <p className={formStyles.formSectionHint}>The catalog has no models yet. Add one on the Models screen first.</p> : null}
-            {target && form.model !== initial.model ? <p className={formStyles.formSectionHint}>Points to {modelDisplayName(target)} once published.</p> : null}
+            {target && form.model !== initial.model ? <p className={formStyles.formSectionHint}>Points to {modelDisplayName(target)} once you apply the change.</p> : null}
           </FormSection>
 
           <FormSection title="State">
@@ -162,7 +157,7 @@ export function AliasEditor({ mode, initial, document, takenKeys, usedBy, onClos
           </FormSection>
         </div>
       </Drawer.Body>
-      <Drawer.Footer cancel="Cancel" action={mode.kind === 'add' ? 'Add model name' : 'Save model name'} onAction={() => void submit()} loading={draftEdit.pending} />
+      <Drawer.Footer cancel="Cancel" action={mode.kind === 'add' ? 'Add model name' : 'Save model name'} onAction={() => void submit()} loading={flow.pending} />
     </Drawer>
   );
 }

@@ -5,7 +5,6 @@ import { isRecord } from '@/features/catalog/catalog-values';
 import { formatNumber, formatPrice } from '@/features/shared/format';
 import { modelDisplayName } from '@/features/shared/model-options';
 import { aliasName, effortName, providerName, taskTitle } from '@/features/shared/naming';
-import { type DraftAction } from '@/features/shared/draft-notice';
 
 export interface ModelUser {
   key: string;
@@ -220,8 +219,4 @@ export function compareModels(models: readonly ModelEntry[], usage: UsageIndex, 
       return isInUse(users) ? [...users.features, ...users.modelNames].map(user => user.name).join(', ') : 'Not used';
     }),
   ];
-}
-
-export function defaultModelNote(name: string, action: DraftAction): string {
-  return `Model ${name} ${action}`;
 }

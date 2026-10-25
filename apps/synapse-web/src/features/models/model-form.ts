@@ -4,7 +4,7 @@ import { CATALOG_KEY_HINT, CATALOG_KEY_PATTERN } from '@/features/catalog/catalo
 import { type Effort, EFFORTS, type ModelCapabilities, type ModelEntry, type ModelSpec, type ReasoningMode } from '@/features/catalog/catalog-spec.types';
 import { readModels } from '@/features/catalog/catalog-readers';
 import { isRecord, isSameValue, ownEntry } from '@/features/catalog/catalog-values';
-import { type CatalogEdit } from '@/features/catalog/draft-edit';
+import { type CatalogEdit } from '@/features/catalog/catalog-change';
 
 import { isInUse, modelKeysOf, modelUsageIndex, usageOf, usageSentence } from './model-view';
 
@@ -276,13 +276,13 @@ function patchEntry(raw: Entry, fields: readonly EditableField[], spec: ModelSpe
 
 export function addModelEdit(key: string, spec: ModelSpec): CatalogEdit {
   return (document: CatalogDocument): DocumentEdit => {
-    if (modelKeysOf(document).includes(key)) return { ok: false, reason: `The draft already has a model with the key "${key}"` };
+    if (modelKeysOf(document).includes(key)) return { ok: false, reason: `The catalog already has a model with the key "${key}"` };
     return withModel(document, key, spec);
   };
 }
 
 /**
- * Applied to the draft as it is when saved (and again on a conflict retry): a field the editor left alone keeps whatever is stored now, and a field
+ * Applied to the live catalog as it is when confirmed (and again on a conflict retry): a field the editor left alone keeps whatever is stored now, and a field
  * the editor changed is refused if someone else changed it too since the form opened.
  */
 export function updateModelEdit(key: string, initial: ModelForm, form: ModelForm, spec: ModelSpec): CatalogEdit {
@@ -290,7 +290,7 @@ export function updateModelEdit(key: string, initial: ModelForm, form: ModelForm
   return (document: CatalogDocument): DocumentEdit => {
     const models = document.models;
     const raw = isRecord(models) ? ownEntry(models, key) : undefined;
-    if (!isRecord(models) || !isRecord(raw)) return { ok: false, reason: `The draft no longer has the model "${key}"; someone may have removed it` };
+    if (!isRecord(models) || !isRecord(raw)) return { ok: false, reason: `The catalog no longer has the model "${key}"; someone may have removed it` };
     if (fields.length === 0) return { ok: true, document };
     const fresh = readModels({ models: Object.fromEntries([[key, raw]]) })[0];
     const current = fresh ? modelFormOf(fresh) : undefined;
@@ -299,7 +299,7 @@ export function updateModelEdit(key: string, initial: ModelForm, form: ModelForm
   };
 }
 
-/** Checked again on the draft the removal is applied to, since a feature or model name may have started using the model meanwhile. */
+/** Checked again on the catalog the removal is applied to, since a feature or model name may have started using the model meanwhile. */
 export function removeModelEdit(key: string): CatalogEdit {
   return (document: CatalogDocument): DocumentEdit => {
     const usage = usageOf(modelUsageIndex(document), key);

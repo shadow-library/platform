@@ -3,7 +3,7 @@ import { describe, expect, it } from 'bun:test';
 import { type CatalogDocument } from '../src/features/catalog/catalog-document';
 import { readProviders } from '../src/features/catalog/catalog-readers';
 import { type ProviderEntry } from '../src/features/catalog/catalog-spec.types';
-import { runDraftEdit } from '../src/features/catalog/draft-edit';
+import { previewChange } from '../src/features/catalog/catalog-change';
 import {
   addProviderEdit,
   assignCredentialEdit,
@@ -66,10 +66,6 @@ function liveOf(key: string, patch: Partial<ProviderResponse> = {}): ProviderRes
 
 const HEALTH = [liveOf('openrouter'), liveOf('subscription'), liveOf('ollama')];
 
-function withProviders(document: CatalogDocument, providers: Record<string, unknown>): CatalogDocument {
-  return { ...document, providers };
-}
-
 function rowOf(rows: readonly ProviderRow[], key: string): ProviderRow {
   const row = rows.find(candidate => candidate.key === key);
   if (!row) throw new Error(`no row ${key}`);
@@ -110,77 +106,31 @@ describe('errorRateIntent', () => {
 });
 
 describe('providerRows', () => {
-  it('should treat every provider as live when the published catalog is shown', () => {
+  it('should list every readable provider by name with its health', () => {
+    const rows = providerRows({ document: catalogFixture(), health: [liveOf('openrouter')] });
+    expect(rows.map(row => [row.key, row.health.kind])).toEqual([
+      ['ollama', 'unavailable'],
+      ['openrouter', 'measured'],
+      ['subscription', 'unavailable'],
+    ]);
+  });
+
+  it('should skip a malformed provider and keep the settings when the health is unknown', () => {
     const document = catalogFixture();
-    const rows = providerRows({ working: document, active: document, health: [liveOf('openrouter')] });
-    expect(rows.map(row => [row.key, row.presence, row.health.kind])).toEqual([
-      ['ollama', 'live', 'unavailable'],
-      ['openrouter', 'live', 'measured'],
-      ['subscription', 'live', 'unavailable'],
+    (document.providers as Record<string, unknown>).ollama = 'broken';
+    const rows = providerRows({ document, health: undefined });
+    expect(rows.map(row => [row.key, row.health.kind])).toEqual([
+      ['openrouter', 'unavailable'],
+      ['subscription', 'unavailable'],
     ]);
   });
 
-  it('should mark draft-only providers as not live and keep published ones the draft removed', () => {
-    const active = catalogFixture();
-    const { ollama: _removed, ...rest } = catalogFixture().providers;
-    const draft = withProviders(catalogFixture(), { ...rest, local: { kind: 'mock', url: 'http://mock', locality: 'in_cluster', cost: 'zero' } });
-    const rows = providerRows({ working: draft, active, health: HEALTH });
-    expect(rows.map(row => [row.key, row.presence, row.health.kind])).toEqual([
-      ['local', 'draft_only', 'not_live'],
-      ['ollama', 'removed_in_draft', 'measured'],
-      ['openrouter', 'live', 'measured'],
-      ['subscription', 'live', 'measured'],
-    ]);
-    expect(rowOf(rows, 'ollama').entry).toMatchObject({ kind: 'ollama', url: 'http://ollama:11434' });
-  });
-
-  it('should mark a provider changed when the draft adds an unknown field or a malformed value', () => {
-    const active = catalogFixture();
-    const draft = catalogFixture();
-    rawProvider(draft, 'openrouter').extra = true;
-    rawProvider(draft, 'subscription').maxInflightPerReplica = 'many';
-    const rows = providerRows({ working: draft, active, health: HEALTH });
-    expect([rowOf(rows, 'openrouter').presence, rowOf(rows, 'subscription').presence, rowOf(rows, 'ollama').presence]).toEqual(['changed', 'changed', 'live']);
-  });
-
-  it('should mark a provider changed when the draft adds an old key setting beside its stored key', () => {
-    const draft = catalogFixture();
-    rawProvider(draft, 'openrouter').apiKeyConfig = 'synapse.provider.openrouter.api-key';
-    expect(rowOf(providerRows({ working: draft, active: catalogFixture(), health: HEALTH }), 'openrouter').presence).toBe('changed');
-  });
-
-  it('should not invent a removal for a provider the draft holds malformed', () => {
-    const draft = catalogFixture();
-    (draft.providers as Record<string, unknown>).ollama = 'broken';
-    const rows = providerRows({ working: draft, active: catalogFixture(), health: HEALTH });
-    expect(rows.map(row => row.key)).toEqual(['openrouter', 'subscription']);
-  });
-
-  it('should list a malformed published provider the draft removed', () => {
-    const active = withProviders(catalogFixture(), { ...catalogFixture().providers, legacy: 'broken' });
-    const row = rowOf(providerRows({ working: catalogFixture(), active, health: HEALTH }), 'legacy');
-    expect([row.presence, row.health.kind, row.entry.url]).toEqual(['removed_in_draft', 'unavailable', '']);
-  });
-
-  it('should keep presence and settings without health, and health without the published catalog', () => {
-    const draft = catalogFixture();
-    rawProvider(draft, 'openrouter').url = 'https://openrouter.ai/api/v2';
-    const noHealth = providerRows({ working: draft, active: catalogFixture(), health: undefined });
-    expect([rowOf(noHealth, 'openrouter').presence, rowOf(noHealth, 'openrouter').health.kind]).toEqual(['changed', 'unavailable']);
-    const noActive = providerRows({ working: draft, active: undefined, health: HEALTH });
-    expect([rowOf(noActive, 'openrouter').presence, rowOf(noActive, 'openrouter').health.kind]).toEqual(['unknown', 'measured']);
-  });
-
-  it('should take whether the old key setting holds a value only while the draft names the same one', () => {
-    const active = catalogFixture();
-    rawProvider(active, 'subscription').apiKeyConfig = 'synapse.provider.openrouter.api-key';
-    const health = [liveOf('subscription', { apiKeyConfigured: true })];
-    const same = structuredClone(active);
-    expect(rowOf(providerRows({ working: same, active, health }), 'subscription').apiKeyConfigured).toBe(true);
-    const dropped = catalogFixture();
-    const row = rowOf(providerRows({ working: dropped, active, health }), 'subscription');
-    expect(row.apiKeyConfigured).toBeUndefined();
-    expect(providerKeyStatus(row)).toEqual({ kind: 'none' });
+  it('should take whether the old key setting holds a value from the live health', () => {
+    const document = catalogFixture();
+    rawProvider(document, 'subscription').apiKeyConfig = 'synapse.provider.openrouter.api-key';
+    const row = rowOf(providerRows({ document, health: [liveOf('subscription', { apiKeyConfigured: true })] }), 'subscription');
+    expect(row.apiKeyConfigured).toBe(true);
+    expect(rowOf(providerRows({ document, health: HEALTH }), 'ollama').apiKeyConfigured).toBeUndefined();
   });
 });
 
@@ -331,24 +281,22 @@ describe('updateProviderEdit', () => {
     return document;
   }
 
-  it('should save nothing after the kind went to ollama and back', async () => {
+  it('should change nothing after the kind went to ollama and back', () => {
     const document = catalogFixture();
     const initial = formFor(document, 'openrouter');
     const viaOllama = { ...initial, ...kindPatch(initial, 'ollama', initial) };
     const form = { ...viaOllama, ...kindPatch(viaOllama, 'openai', initial) };
     const result = validateProviderForm(form, { mode: { kind: 'edit', key: 'openrouter' }, takenKeys: [] });
     if (!result.ok) throw new Error('form should be valid');
-    const ports = { loadBase: () => Promise.resolve({ document, fingerprint: 'f' }), save: () => Promise.reject(new Error('nothing should be saved')) };
-    expect(await runDraftEdit(ports, updateProviderEdit('openrouter', initial, form, result.spec), 'note')).toEqual({ kind: 'unchanged' });
+    expect(previewChange({ version: 3, document }, updateProviderEdit('openrouter', initial, form, result.spec))).toEqual({ kind: 'unchanged' });
   });
 
-  it('should save nothing when the editor changed nothing, whatever the form cannot show', async () => {
+  it('should change nothing when the editor changed nothing, whatever the form cannot show', () => {
     const document = lossyDocument();
     const initial = formFor(document, 'odd');
-    const ports = { loadBase: () => Promise.resolve({ document, fingerprint: 'f' }), save: () => Promise.reject(new Error('nothing should be saved')) };
     const result = validateProviderForm(initial, { mode: { kind: 'edit', key: 'odd' }, takenKeys: [] });
     if (!result.ok) throw new Error('fixture form should be valid');
-    expect(await runDraftEdit(ports, updateProviderEdit('odd', initial, { ...initial }, result.spec), 'note')).toEqual({ kind: 'unchanged' });
+    expect(previewChange({ version: 3, document }, updateProviderEdit('odd', initial, { ...initial }, result.spec))).toEqual({ kind: 'unchanged' });
   });
 
   it('should write only the edited field over the stored entry', () => {
@@ -417,7 +365,7 @@ describe('updateProviderEdit', () => {
     expect(updateEdit(fresh, 'openrouter', initial, { ...initial, flavor: 'openai-compatible' })).toEqual({ ok: false, reason: CONCURRENT_PROVIDER_CHANGE });
   });
 
-  it('should refuse to edit a provider the draft lost meanwhile', () => {
+  it('should refuse to edit a provider the catalog lost meanwhile', () => {
     const initial = formFor(catalogFixture(), 'ollama');
     const fresh = catalogFixture();
     const { ollama: _removed, ...providers } = fresh.providers;
@@ -428,14 +376,14 @@ describe('updateProviderEdit', () => {
 describe('addProviderEdit', () => {
   const spec = { kind: 'mock' as const, url: 'http://mock', locality: 'in_cluster' as const, cost: 'zero' as const, features: [] };
 
-  it('should add a new provider to the draft', () => {
+  it('should add a new provider to the catalog', () => {
     const edit = addProviderEdit('mock', spec)(catalogFixture());
     expect(edit.ok && rawProvider(edit.document, 'mock')).toEqual({ kind: 'mock', url: 'http://mock', locality: 'in_cluster', cost: 'zero' });
   });
 
-  it('should refuse a key the draft gained meanwhile, malformed entries included', () => {
+  it('should refuse a key the catalog gained meanwhile, malformed entries included', () => {
     const document = { ...catalogFixture(), providers: { ...catalogFixture().providers, mock: 'broken' } };
-    expect(addProviderEdit('mock', spec)(document)).toEqual({ ok: false, reason: 'The draft already has a provider with the key "mock"' });
+    expect(addProviderEdit('mock', spec)(document)).toEqual({ ok: false, reason: 'The catalog already has a provider with the key "mock"' });
   });
 });
 
@@ -522,10 +470,7 @@ describe('legacyKeyLabel', () => {
 });
 
 describe('healthWindowSentence', () => {
-  it('should describe the window, adding when draft-only providers get numbers while a draft is shown', () => {
-    expect(healthWindowSentence(24, 3, 'active')).toBe('Calls and errors over the last 24 hours, from published version 3.');
-    expect(healthWindowSentence(24, 3, 'draft')).toBe(
-      'Calls and errors over the last 24 hours, from published version 3. New providers show traffic after the draft is published.',
-    );
+  it('should describe the window and the version it was measured on', () => {
+    expect(healthWindowSentence(24, 3)).toBe('Calls and errors over the last 24 hours, from version 3.');
   });
 });

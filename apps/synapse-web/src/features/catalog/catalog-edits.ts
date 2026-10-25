@@ -17,9 +17,9 @@ export interface TaskMeta {
 function editEntry(document: CatalogDocument, section: Section, key: string, edit: (entry: Entry) => Entry | string): DocumentEdit {
   const entries = document[section];
   const noun = NOUNS[section];
-  if (!isRecord(entries) || !Object.hasOwn(entries, key)) return { ok: false, reason: `The draft has no ${noun} "${key}"` };
+  if (!isRecord(entries) || !Object.hasOwn(entries, key)) return { ok: false, reason: `The catalog has no ${noun} "${key}"` };
   const entry = ownEntry(entries, key);
-  if (!isRecord(entry)) return { ok: false, reason: `The draft's ${noun} "${key}" is not an object` };
+  if (!isRecord(entry)) return { ok: false, reason: `The catalog's ${noun} "${key}" is not an object` };
   const next = edit(entry);
   if (typeof next === 'string') return { ok: false, reason: next };
   return { ok: true, document: { ...document, [section]: { ...entries, [key]: next } } };
@@ -27,7 +27,7 @@ function editEntry(document: CatalogDocument, section: Section, key: string, edi
 
 function upsertEntry(document: CatalogDocument, section: Section, key: string, entry: Entry): DocumentEdit {
   const entries = document[section] ?? {};
-  if (!isRecord(entries)) return { ok: false, reason: `The draft's ${section} section is not an object` };
+  if (!isRecord(entries)) return { ok: false, reason: `The catalog's ${section} section is not an object` };
   return { ok: true, document: { ...document, [section]: { ...entries, [key]: entry } } };
 }
 
@@ -92,7 +92,7 @@ export function withModel(document: CatalogDocument, modelKey: string, model: Mo
 
 export function withoutModel(document: CatalogDocument, modelKey: string): DocumentEdit {
   const models = document.models;
-  if (!isRecord(models) || !Object.hasOwn(models, modelKey)) return { ok: false, reason: `The draft has no model "${modelKey}"` };
+  if (!isRecord(models) || !Object.hasOwn(models, modelKey)) return { ok: false, reason: `The catalog has no model "${modelKey}"` };
   const { [modelKey]: _removed, ...rest } = models;
   return { ok: true, document: { ...document, models: rest } };
 }

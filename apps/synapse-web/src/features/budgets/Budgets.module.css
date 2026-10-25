@@ -113,11 +113,6 @@
   display: block;
 }
 
-.confirmWarning {
-  display: block;
-  color: var(--sh-warning-text-on-subtle);
-}
-
 .footerNote {
   margin-right: auto;
   font-size: var(--sh-text-body-sm);

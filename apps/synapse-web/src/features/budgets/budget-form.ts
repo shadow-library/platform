@@ -3,7 +3,7 @@ import { type CatalogDocument } from '@/features/catalog/catalog-document';
 import { readBudgets } from '@/features/catalog/catalog-readers';
 import { type BudgetEntry, type BudgetScope, type BudgetSpec, type BudgetWindow } from '@/features/catalog/catalog-spec.types';
 import { isSameValue } from '@/features/catalog/catalog-values';
-import { NOTE_MAX_LENGTH } from '@/features/catalog/draft-edit';
+import { truncateNote } from '@/features/catalog/catalog-change';
 
 export interface BudgetFormValues {
   app: string;
@@ -65,7 +65,7 @@ export function budgetFormOf(budget: BudgetSpec | undefined, apps: readonly stri
   };
 }
 
-/** Mirrors the server's `budget_without_limit` rule; the server still validates the whole catalog on publish. */
+/** Mirrors the server's `budget_without_limit` rule; the server still validates the whole catalog on every change. */
 export function validateBudgetForm(values: BudgetFormValues, original?: BudgetSpec): BudgetFormResult {
   const cost = parseLimit(values.cost, AMOUNT);
   const calls = parseLimit(values.calls, COUNT);
@@ -130,15 +130,11 @@ export function budgetBasisOf(version: number, document: CatalogDocument): Budge
   return { version, document, rawBudgets: budgetsOf(document), entries: readBudgets(document) };
 }
 
-/** Planned on the version the edit started from, never a newer one, so a publish made meanwhile is refused with 409 rather than edited over. */
+/** Planned on the version the edit started from, never a newer one, so a change made meanwhile is refused with 409 rather than edited over. */
 export function planBudgetPublish(basis: BudgetBasis, change: BudgetChange): BudgetPublishPlan | null {
   const budgets = withBudgetChange(basis.rawBudgets, change);
   if (sameBudgets(basis.rawBudgets, budgets)) return null;
   return { budgets, expectedVersion: basis.version, changes: describeChanges(basis.document, { ...basis.document, budgets }) };
-}
-
-export function draftChangesBudgets(draft: CatalogDocument, active: CatalogDocument): boolean {
-  return !sameBudgets(budgetsOf(draft), budgetsOf(active));
 }
 
 /** Admission collapses budgets of one app, scope and window into one counter under the tightest limits. */
@@ -149,5 +145,5 @@ export function sharesCounter(budgets: readonly BudgetEntry[], budget: Pick<Budg
 export function budgetNote(changes: readonly CatalogChange[], typed: string): string | undefined {
   const note = typed.trim() || changes.map(change => change.sentence).join('; ');
   if (!note) return undefined;
-  return note.length > NOTE_MAX_LENGTH ? `${note.slice(0, NOTE_MAX_LENGTH - 1)}…` : note;
+  return truncateNote(note);
 }

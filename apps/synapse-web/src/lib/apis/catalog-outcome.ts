@@ -6,10 +6,16 @@ export const UNPROCESSABLE = 422;
 
 const CONFLICT = 409;
 
+const FORBIDDEN = 403;
+
 const CATALOG_INVALID = 'SYN_CATALOG_INVALID';
 
 export function isCatalogConflict(error: unknown): boolean {
   return isApiError(error) && error.status === CONFLICT;
+}
+
+export function isForbidden(error: unknown): boolean {
+  return isApiError(error) && error.status === FORBIDDEN;
 }
 
 export type CatalogWriteOutcome<T> = { kind: 'done'; value: T } | { kind: 'invalid'; issues: CatalogInvalidResponse['issues'] };

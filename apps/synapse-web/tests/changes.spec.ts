@@ -1,36 +1,19 @@
 import { describe, expect, it } from 'bun:test';
-import { ApiError } from '@shadow-library/web';
 
 import { type CatalogChange, describeChanges } from '../src/features/catalog/catalog-changes';
-import {
-  blockedTitle,
-  buildReview,
-  changeCountLines,
-  changeLine,
-  changesBudgets,
-  discardBlocker,
-  discardDescription,
-  discardFailureOf,
-  draftOriginText,
-  fixTargetOf,
-  publishBlocker,
-  publishSummary,
-  publishSummaryLines,
-  readinessOf,
-  validationStateOf,
-  WHOLE_CATALOG_ID,
-} from '../src/features/changes/changes-review';
+import { appliedNotice, type ChangeResult, changeResultNotice, CONFLICT_NOTICE, isSettled, undoNotice } from '../src/features/changes/change-notices';
+import { affectedApps, changeLine, effectSentence, lockedSectionsSentence, summarizeChanges } from '../src/features/changes/change-summary';
 import { credentialNamer, nameCredentialChanges } from '../src/features/changes/credential-names';
 import { catalogFixture, CREDENTIAL_ID } from './catalog-fixture';
 
-const issue = (path: string, code = 'unknown_model'): { path: string; code: string; message: string } => ({ path, code, message: `${code} at ${path}` });
+const ISSUE = { path: 'aliases.opus.model', code: 'unknown_model', message: 'Unknown model' };
 
-function editedDraft(): ReturnType<typeof catalogFixture> {
-  const draft = catalogFixture();
-  draft.tasks['novel-forge.chat'].routes = [{ when: { tier: 'economy' }, model: 'llama3.1' }, { model: 'sonnet-5.5' }];
-  draft.budgets[0] = { ...draft.budgets[0], maxListCostUsd: 80 } as (typeof draft.budgets)[0];
-  draft.models['sonnet-5.5'].pricePerMTok.input = 4;
-  return draft;
+function editedCatalog(): ReturnType<typeof catalogFixture> {
+  const edited = catalogFixture();
+  edited.tasks['novel-forge.chat'].routes = [{ when: { tier: 'economy' }, model: 'llama3.1' }, { model: 'sonnet-5.5' }];
+  edited.budgets[0] = { ...edited.budgets[0], maxListCostUsd: 80 } as (typeof edited.budgets)[0];
+  edited.models['sonnet-5.5'].pricePerMTok.input = 4;
+  return edited;
 }
 
 describe('changeLine', () => {
@@ -65,190 +48,145 @@ describe('changeLine', () => {
   });
 });
 
-describe('buildReview', () => {
-  it('should group changes by area in the fixed order and then by entity', () => {
+describe('summarizeChanges', () => {
+  it('should group changes by area in a fixed order, then by item without repeating the kind of item', () => {
+    const groups = summarizeChanges(describeChanges(catalogFixture(), editedCatalog()));
+    expect(groups.map(group => group.title)).toEqual(['Budgets', 'Features', 'Models']);
+    expect(groups[1]?.items.map(item => item.label)).toEqual(['Novel Forge · Chat']);
+    expect(groups[1]?.items[0]?.lines[0]).toEqual({ kind: 'transition', lead: 'Default model', before: 'Opus 5.5', after: 'Sonnet 5.5', suffix: '' });
+    expect(groups[2]?.items.map(item => item.label)).toEqual(['Sonnet 5.5']);
+  });
+
+  it('should be empty when nothing is described', () => {
+    expect(summarizeChanges([])).toEqual([]);
+  });
+});
+
+describe('affectedApps', () => {
+  const appsFor = (edit: (document: ReturnType<typeof catalogFixture>) => void): string[] => {
+    const after = catalogFixture();
+    edit(after);
+    return affectedApps(catalogFixture(), after, describeChanges(catalogFixture(), after));
+  };
+
+  it('should name the app of a feature or a budget', () => {
+    expect(appsFor(document => (document.tasks['novel-forge.chat'].dataPolicy = 'in_cluster_only'))).toEqual(['novel-forge']);
+    expect(appsFor(document => (document.budgets[1] = { ...document.budgets[1], maxCalls: 5 } as (typeof document.budgets)[1]))).toEqual(['memoir']);
+  });
+
+  it('should follow a model to every feature routing to it or offering a name for it', () => {
+    expect(appsFor(document => (document.models['llama3.1'].pricePerMTok.input = 1))).toEqual(['memoir', 'novel-forge']);
+    expect(appsFor(document => (document.models['sonnet-5.5'].pricePerMTok.input = 4))).toEqual(['novel-forge']);
+  });
+
+  it('should follow a provider to the apps using its models', () => {
+    expect(appsFor(document => (document.providers.ollama.url = 'http://ollama-2:11434'))).toEqual(['memoir', 'novel-forge']);
+    expect(appsFor(document => (document.providers.openrouter.url = 'https://openrouter.ai/api/v2'))).toEqual(['novel-forge']);
+  });
+
+  it('should count the apps on both sides of a change, and none for something unused', () => {
     const before = catalogFixture();
-    const after = editedDraft();
-    const review = buildReview(describeChanges(before, after), [], after);
-    expect(review.areas.map(area => area.title)).toEqual(['Budgets', 'Features', 'Models']);
-    expect(review.areas[1]?.entities.map(entity => entity.label)).toEqual(['Novel Forge · Chat']);
-    expect(review.areas[1]?.entities[0]?.lines[0]).toEqual({ kind: 'transition', lead: 'Default model', before: 'Opus 5.5', after: 'Sonnet 5.5', suffix: '' });
-    expect(review.changeCount).toBe(3);
-  });
-
-  it('should attach each issue to the entity it belongs to and keep unowned ones for the whole catalog', () => {
-    const after = editedDraft();
-    const issues = [issue('tasks.novel-forge.chat.routes[1].model'), issue('', 'invalid_type'), issue('budgets[0].maxListCostUsd', 'invalid_value')];
-    const review = buildReview(describeChanges(catalogFixture(), after), issues, after);
-    const chat = review.areas.find(area => area.area === 'task')?.entities[0];
-    expect(chat?.issues.map(entry => entry.code)).toEqual(['unknown_model']);
-    expect(review.areas[0]?.entities[0]?.issues.map(entry => entry.code)).toEqual(['invalid_value']);
-    expect(review.catalogIssues.map(entry => entry.code)).toEqual(['invalid_type']);
-    expect(review.issueCount).toBe(3);
-  });
-
-  it('should add a labelled group for an entity that has problems but no changes', () => {
-    const after = editedDraft();
-    const review = buildReview(describeChanges(catalogFixture(), after), [issue('aliases.opus.model'), issue('providers.openrouter.credential', 'credential_revoked')], after);
-    const opus = review.areas.find(area => area.area === 'alias')?.entities[0];
-    expect(opus).toMatchObject({ label: 'Model name Opus', lines: [], fix: { screen: 'alias', alias: 'opus' } });
-    expect(review.areas.find(area => area.area === 'alias')?.changeCount).toBe(0);
-    expect(review.areas.find(area => area.area === 'provider')?.entities[0]?.label).toBe('Provider OpenRouter');
-  });
-
-  it('should collect top-level settings outside the known sections into one group', () => {
-    const after = { ...catalogFixture(), version: 2, owner: 'platform' };
-    const review = buildReview(describeChanges(catalogFixture(), after), [], after);
-    expect(review.areas).toHaveLength(1);
-    expect(review.areas[0]).toMatchObject({ area: 'other', title: 'Other', changeCount: 2 });
-    expect(review.areas[0]?.entities).toHaveLength(1);
-  });
-
-  it('should give every entity a unique anchor', () => {
-    const after = editedDraft();
-    const review = buildReview(describeChanges(catalogFixture(), after), [issue('aliases.opus.model')], after);
-    const ids = review.areas.flatMap(area => area.entities.map(entity => entity.id));
-    expect(new Set(ids).size).toBe(ids.length);
+    before.tasks['novel-forge.chat'].aliases = ['opus'];
+    const after = structuredClone(before);
+    after.aliases.sonnet.model = 'llama3.1';
+    expect(affectedApps(before, after, describeChanges(before, after))).toEqual([]);
   });
 });
 
-describe('fixTargetOf', () => {
-  it('should send each area to its structured screen and anything else to the advanced editor', () => {
-    expect(fixTargetOf('task', 'novel-forge.chat')).toEqual({ screen: 'feature', task: 'novel-forge.chat' });
-    expect(fixTargetOf('alias', 'opus')).toEqual({ screen: 'alias', alias: 'opus' });
-    expect(fixTargetOf('budget', 'memoir/app/30d')).toEqual({ screen: 'budgets' });
-    expect(fixTargetOf('model', 'llama3.1')).toEqual({ screen: 'models' });
-    expect(fixTargetOf('provider', 'ollama')).toEqual({ screen: 'providers' });
-    expect(fixTargetOf('other', 'version')).toEqual({ screen: 'advanced' });
+describe('effectSentence', () => {
+  it('should say the change takes effect immediately, and for whom', () => {
+    expect(effectSentence(['memoir', 'novel-forge'])).toBe('It takes effect immediately for Memoir and Novel Forge.');
+    expect(effectSentence([])).toBe('It takes effect immediately. No app uses what it changes yet.');
   });
 });
 
-describe('readinessOf', () => {
-  const after = editedDraft();
-  const changes = describeChanges(catalogFixture(), after);
+describe('lockedSectionsSentence', () => {
+  const providerChange = { area: 'provider', sentence: 'Provider OpenRouter — url changed' } as CatalogChange;
+  const budgetChange = { area: 'budget', sentence: 'Budget for Memoir — added' } as CatalogChange;
 
-  it('should be ready when the checks found nothing', () => {
-    expect(readinessOf({ status: 'checked', issues: [] }, buildReview(changes, [], after))).toEqual({ kind: 'ready' });
+  it('should name the sections the role cannot change', () => {
+    expect(lockedSectionsSentence([providerChange, budgetChange], { writeProviders: false, setBudgets: false })).toBe(
+      "This changes providers and budgets, which your role can't change. Ask a Synapse administrator if you need it.",
+    );
+    expect(lockedSectionsSentence([providerChange], { writeProviders: false, setBudgets: true })).toContain('providers');
   });
 
-  it('should link to every group that has problems, the whole catalog last', () => {
-    const issues = [issue('tasks.novel-forge.chat.routes[1].model'), issue('tasks.novel-forge.chat.routes[0].model'), issue('', 'invalid_type')];
-    const review = buildReview(changes, issues, after);
-    const readiness = readinessOf({ status: 'checked', issues }, review);
-    expect(readiness).toMatchObject({ kind: 'blocked', problems: 3 });
-    if (readiness.kind !== 'blocked') return;
-    expect(readiness.links.map(link => [link.label, link.count])).toEqual([
-      ['Novel Forge · Chat', 2],
-      ['Whole catalog', 1],
-    ]);
-    expect(readiness.links.at(-1)?.id).toBe(WHOLE_CATALOG_ID);
-  });
-
-  it('should report checks that are running, failed or not allowed', () => {
-    const review = buildReview(changes, [], after);
-    expect(readinessOf({ status: 'checking' }, review)).toEqual({ kind: 'checking' });
-    expect(readinessOf({ status: 'unavailable', message: 'Down' }, review)).toEqual({ kind: 'unavailable', message: 'Down' });
-    expect(readinessOf({ status: 'not_allowed' }, review)).toEqual({ kind: 'unchecked' });
-  });
-
-  it('should word the problem count', () => {
-    expect(blockedTitle(1)).toBe('1 problem must be fixed before publishing');
-    expect(blockedTitle(4)).toBe('4 problems must be fixed before publishing');
+  it('should allow a change to sections the role may change', () => {
+    expect(lockedSectionsSentence([providerChange, budgetChange], { writeProviders: true, setBudgets: true })).toBeNull();
+    expect(lockedSectionsSentence([{ area: 'task' } as CatalogChange], { writeProviders: false, setBudgets: false })).toBeNull();
   });
 });
 
-describe('publishBlocker', () => {
-  it('should allow publishing only when nothing is known to block it and the diff is of the draft shown', () => {
-    expect(publishBlocker({ kind: 'ready' }, 'current')).toBeNull();
-    expect(publishBlocker({ kind: 'unchecked' }, 'current')).toBeNull();
-    expect(publishBlocker({ kind: 'unavailable', message: 'Down' }, 'current')).toBeNull();
-    expect(publishBlocker({ kind: 'blocked', problems: 1, links: [] }, 'current')).toContain('Fix the problems');
-    expect(publishBlocker({ kind: 'checking' }, 'current')).toContain('Checking');
-    expect(publishBlocker({ kind: 'ready' }, 'loading')).toContain('Comparing');
-    expect(publishBlocker({ kind: 'ready' }, 'failed')).toContain("couldn't be loaded");
-    expect(publishBlocker({ kind: 'ready' }, 'stale')).toContain('changed while you were reviewing');
+describe('changeResultNotice', () => {
+  it('should say nothing for a change that went live or was cancelled', () => {
+    expect(changeResultNotice({ kind: 'applied', version: 5, previous: 4 }, 'Opus', 'updated')).toBeNull();
+    expect(changeResultNotice({ kind: 'cancelled' }, 'Opus', 'updated')).toBeNull();
+  });
+
+  it('should explain each way a change can fail, in plain words', () => {
+    expect(changeResultNotice({ kind: 'invalid', issues: [ISSUE] }, 'Opus', 'added')).toEqual({
+      intent: 'danger',
+      title: "Opus wasn't added",
+      body: 'Synapse refused the change:',
+      issues: [ISSUE],
+    });
+    expect(changeResultNotice({ kind: 'refused', reason: 'Gone' }, 'Opus', 'removed')).toEqual({ intent: 'danger', title: "Opus wasn't removed", body: 'Gone' });
+    expect(changeResultNotice({ kind: 'failed', message: 'offline' }, 'Opus', 'updated')).toEqual({ intent: 'danger', title: "Opus wasn't changed", body: 'offline' });
+    expect(changeResultNotice({ kind: 'conflict' }, 'Opus', 'updated')).toBe(CONFLICT_NOTICE);
+    expect(changeResultNotice({ kind: 'unchanged' }, 'Opus', 'updated')).toMatchObject({ intent: 'info', title: 'Nothing to change' });
+  });
+
+  it('should never mention drafts or publishing', () => {
+    const kinds: ChangeResult[] = [
+      { kind: 'invalid', issues: [] },
+      { kind: 'unchanged' },
+      { kind: 'refused', reason: 'r' },
+      { kind: 'conflict' },
+      { kind: 'failed', message: 'm' },
+    ];
+    const text = kinds.map(result => JSON.stringify(changeResultNotice(result, 'Opus', 'updated'))).join(' ');
+    expect(text).not.toMatch(/draft|publish/i);
   });
 });
 
-describe('discardBlocker', () => {
-  const access = { setBudgets: false, writeProviders: false };
-
-  it('should refuse a discard that reverts budgets the role cannot edit', () => {
-    expect(discardBlocker(editedDraft(), catalogFixture(), access)).toContain('changes budgets');
-    expect(discardBlocker(editedDraft(), catalogFixture(), { setBudgets: true, writeProviders: false })).toBeNull();
-  });
-
-  it('should catch a budget reorder and an unknown budget field that read as no change', () => {
-    const reordered = catalogFixture();
-    reordered.budgets.reverse();
-    expect(discardBlocker(reordered, catalogFixture(), access)).toContain('changes budgets');
-    const extra = { ...catalogFixture(), budgets: catalogFixture().budgets.map(budget => ({ ...budget, owner: 'finance' })) };
-    expect(discardBlocker(extra, catalogFixture(), access)).toContain('changes budgets');
-  });
-
-  it('should name both sections when both are locked', () => {
-    const draft = editedDraft();
-    draft.providers.ollama.url = 'http://ollama:11435';
-    expect(discardBlocker(draft, catalogFixture(), access)).toContain('budgets and providers');
-  });
-
-  it('should treat an absent section as empty on either side, ignoring key order', () => {
-    const { budgets: _budgets, providers: _providers, ...bare } = catalogFixture();
-    expect(discardBlocker({ ...bare, budgets: [], providers: {} }, bare, access)).toBeNull();
-    expect(discardBlocker(bare, null, access)).toBeNull();
-    expect(discardBlocker(catalogFixture(), null, access)).toContain('budgets and providers');
-    const reversedKeys = { ...catalogFixture(), providers: Object.fromEntries(Object.entries(catalogFixture().providers).reverse()) };
-    expect(discardBlocker(reversedKeys, catalogFixture(), access)).toBeNull();
+describe('isSettled', () => {
+  it('should close the form only when the change went live or there was nothing to change', () => {
+    expect([isSettled({ kind: 'applied', version: 2, previous: 1 }), isSettled({ kind: 'unchanged' })]).toEqual([true, true]);
+    expect([isSettled({ kind: 'cancelled' }), isSettled({ kind: 'invalid', issues: [] }), isSettled({ kind: 'conflict' })]).toEqual([false, false, false]);
   });
 });
 
-describe('discardDescription', () => {
-  it('should agree with the number of changes', () => {
-    expect(discardDescription(1)).toStartWith('The 1 unpublished change is thrown away');
-    expect(discardDescription(3)).toStartWith('All 3 unpublished changes are thrown away');
+describe('appliedNotice', () => {
+  it('should say which version is live and what changed', () => {
+    expect(appliedNotice(12, [{ sentence: 'Provider OpenRouter — API key set to a stored key' }])).toEqual({
+      intent: 'success',
+      title: 'Live now (version 12)',
+      body: 'Provider OpenRouter — API key set to a stored key.',
+    });
+    expect(appliedNotice(12, [{ sentence: 'A' }, { sentence: 'B' }, { sentence: 'C' }]).body).toBe('A, and 2 more changes.');
+    expect(appliedNotice(12, []).body).toBeUndefined();
   });
 });
 
-describe('discardFailureOf', () => {
-  const failure = (status: number): ApiError => new ApiError(status, { type: 'CLIENT_ERROR', code: 'X', message: `status ${status}` });
-
-  it('should tell a conflict, a refusal and a missing draft apart from other failures', () => {
-    expect(discardFailureOf(failure(409))).toEqual({ kind: 'conflict' });
-    expect(discardFailureOf(failure(403))).toEqual({ kind: 'forbidden' });
-    expect(discardFailureOf(failure(404))).toEqual({ kind: 'absent' });
-    expect(discardFailureOf(failure(500))).toEqual({ kind: 'failed', message: 'status 500' });
-    expect(discardFailureOf('boom')).toEqual({ kind: 'failed', message: 'The draft could not be discarded' });
-  });
-});
-
-describe('changeCountLines', () => {
-  it('should count changes and the entities they touch in plain words', () => {
-    const draft = editedDraft();
-    draft.tasks['novel-forge.chat'].effort.default = 'high';
-    const review = buildReview(describeChanges(catalogFixture(), draft), [issue('aliases.opus.model')], draft);
-    expect(changeCountLines(review)).toEqual(['1 change to 1 budget', '2 changes to 1 feature', '1 change to 1 model']);
-    expect(publishSummary(review)).toBe('This publishes 1 change to 1 budget, 2 changes to 1 feature, and 1 change to 1 model.');
-    expect(changesBudgets(review)).toBe(true);
-  });
-});
-
-describe('publishSummaryLines', () => {
-  it('should list each changed item under its area with its own count', () => {
-    const draft = editedDraft();
-    draft.tasks['novel-forge.chat'].effort.default = 'high';
-    const review = buildReview(describeChanges(catalogFixture(), draft), [issue('aliases.opus.model')], draft);
-    expect(publishSummaryLines(review)).toEqual([
-      'Budgets: Novel Forge, each user, per hour (1 change)',
-      'Features: Novel Forge · Chat (2 changes)',
-      'Models: Sonnet 5.5 (1 change)',
-    ]);
+describe('undoNotice', () => {
+  const version = (number: number) => ({
+    kind: 'done' as const,
+    value: { version: number, state: 'PUBLISHED' as const, createdAt: '2026-10-25T00:00:00.000Z', createdByName: null },
   });
 
-  it('should end a long list with a count of the items left out', () => {
-    const draft = editedDraft();
-    draft.tasks['novel-forge.chat'].effort.default = 'high';
-    const review = buildReview(describeChanges(catalogFixture(), draft), [], draft);
-    expect(publishSummaryLines(review, 2)).toEqual(['Budgets: Novel Forge, each user, per hour (1 change)', 'and 2 more items']);
+  it('should report the version the undo made live', () => {
+    expect(undoNotice({ kind: 'done', outcome: version(13), undone: 12 })).toMatchObject({ intent: 'success', title: 'Change undone, live now (version 13)' });
+  });
+
+  it('should report an undo that changed nothing or was refused', () => {
+    expect(undoNotice({ kind: 'done', outcome: version(12), undone: 12 })).toMatchObject({ intent: 'info', title: 'Nothing to undo' });
+    expect(undoNotice({ kind: 'done', outcome: { kind: 'invalid', issues: [ISSUE] }, undone: 12 })).toMatchObject({ intent: 'danger', issues: [ISSUE] });
+  });
+
+  it('should refuse to revert a newer change someone else made', () => {
+    expect(undoNotice({ kind: 'conflict' })).toMatchObject({ intent: 'warning', title: "Your change wasn't undone" });
+    expect(undoNotice({ kind: 'forbidden' }).intent).toBe('danger');
+    expect(undoNotice({ kind: 'failed', message: 'offline' }).body).toBe('offline');
   });
 });
 
@@ -284,43 +222,8 @@ describe('nameCredentialChanges', () => {
   });
 
   it('should leave every other change untouched', () => {
-    const draft = editedDraft();
-    const changes = describeChanges(catalogFixture(), draft);
-    expect(nameCredentialChanges(changes, catalogFixture(), draft, credentialNamer(names))).toEqual(changes);
-  });
-});
-
-describe('validationStateOf', () => {
-  it('should read a validation result as checked', () => {
-    expect(validationStateOf({ data: { valid: true, issues: [] }, error: null }, true)).toEqual({ status: 'checked', issues: [] });
-  });
-
-  it('should say the draft is gone when the server answered 204', () => {
-    expect(validationStateOf({ data: null, error: null }, true)).toMatchObject({ status: 'unavailable', message: expect.stringContaining('gone') });
-  });
-
-  it('should keep not-allowed ahead of a missing draft', () => {
-    expect(validationStateOf({ data: null, error: null }, false)).toEqual({ status: 'not_allowed' });
-  });
-
-  it('should be checking until data or an error arrives', () => {
-    expect(validationStateOf({ error: null }, true)).toEqual({ status: 'checking' });
-    expect(validationStateOf({ error: new Error('boom') }, true)).toEqual({ status: 'unavailable', message: 'boom' });
-  });
-});
-
-describe('draftOriginText', () => {
-  const now = Date.parse('2026-10-25T12:00:00Z');
-  const draft = { createdAt: '2026-10-25T10:00:00Z', createdBy: 'subject-1', createdByName: 'Ada' };
-
-  it('should say you for the viewer, the name for others, and nothing when unnamed', () => {
-    expect(draftOriginText(draft, 'subject-1', now)).toBe('Draft started 2h ago · last saved by you');
-    expect(draftOriginText(draft, 'subject-2', now)).toBe('Draft started 2h ago · last saved by Ada');
-    expect(draftOriginText({ ...draft, createdByName: null }, 'subject-2', now)).toBe('Draft started 2h ago');
-    expect(draftOriginText({ createdAt: draft.createdAt }, undefined, now)).toBe('Draft started 2h ago');
-  });
-
-  it('should print an absolute time until the clock is available', () => {
-    expect(draftOriginText({ createdAt: draft.createdAt }, 'subject-1', null)).toBe('Draft started Oct 25, 2026 10:00 UTC');
+    const edited = editedCatalog();
+    const changes = describeChanges(catalogFixture(), edited);
+    expect(nameCredentialChanges(changes, catalogFixture(), edited, credentialNamer(names))).toEqual(changes);
   });
 });

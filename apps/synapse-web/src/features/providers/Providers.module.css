@@ -43,19 +43,8 @@
   flex: 1;
 }
 
-.issue {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  font-size: var(--sh-text-caption);
-}
-
 .issueMessage {
   color: var(--sh-danger-text);
-}
-
-.issueAdvice {
-  color: var(--sh-text-tertiary);
 }
 
 .cell {

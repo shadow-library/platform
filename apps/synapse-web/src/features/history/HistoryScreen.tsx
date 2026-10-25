@@ -11,6 +11,7 @@ import {
   type CatalogVersionSummaryResponse,
   credentialsQueryOptions,
   isApiError,
+  isCatalogConflict,
   meQuery,
   useCapabilities,
   useRollbackMutation,
@@ -31,7 +32,7 @@ export function HistoryScreen(): ReactElement {
   const capabilities = useCapabilities();
   return (
     <PermissionGate allowed={capabilities.readCatalog} area="the model catalog">
-      <HistoryView canRollBack={capabilities.publish} />
+      <HistoryView canRollBack={capabilities.writeCatalog} />
     </PermissionGate>
   );
 }
@@ -145,7 +146,7 @@ function VersionItem({ row, predecessor, active, open, now, meSubject, canRollBa
           <span className={styles.summary}>
             <span className={styles.heading}>
               <span className={styles.version}>Version {row.version}</span>
-              {active || row.state === 'ARCHIVED' ? <VersionStateBadge state={row.state} active={active} /> : null}
+              <VersionStateBadge active={active} />
               {row.note ? <span className={styles.note}>{row.note}</span> : null}
             </span>
             <span className={styles.meta}>
@@ -235,6 +236,7 @@ function HistoryView({ canRollBack }: { canRollBack: boolean }): ReactElement {
   };
 
   const handleRollback = async (version: number): Promise<void> => {
+    if (activeVersion === undefined) return;
     const confirmed = await confirm({
       title: `Roll back to version ${version}?`,
       description: rollbackDescription(version),
@@ -244,18 +246,29 @@ function HistoryView({ canRollBack }: { canRollBack: boolean }): ReactElement {
     if (!confirmed) return;
     setNotice(null);
     setFailure(null);
-    rollback.mutate(version, {
-      onSuccess: outcome => {
-        if (outcome.kind === 'invalid') return void reportInvalid(version, outcome.issues);
-        setNotice({ intent: 'success', title: `Rolled back to version ${version}`, body: `It is now live as version ${outcome.value.version}.` });
+    rollback.mutate(
+      { version, expectedVersion: activeVersion },
+      {
+        onSuccess: outcome => {
+          if (outcome.kind === 'invalid') return void reportInvalid(version, outcome.issues);
+          setNotice({ intent: 'success', title: `Rolled back to version ${version}`, body: `It is now live as version ${outcome.value.version}.` });
+        },
+        onError: error => {
+          if (isCatalogConflict(error))
+            return setNotice({
+              intent: 'warning',
+              title: "Couldn't roll back",
+              body: 'Someone else changed the catalog meanwhile. The list now shows their version; check it and try again.',
+            });
+          setNotice({ intent: 'danger', title: "Couldn't roll back", body: isApiError(error) ? error.message : undefined });
+        },
       },
-      onError: error => setNotice({ intent: 'danger', title: "Couldn't roll back", body: isApiError(error) ? error.message : undefined }),
-    });
+    );
   };
 
   return (
     <>
-      <PageHeader title="History" subtitle="Every published version of the catalog: what changed, who changed it and when." />
+      <PageHeader title="History" subtitle="Every version of the catalog that went live: what changed, who changed it and when." />
       {notice ? (
         <Alert intent={notice.intent} title={notice.title} onDismiss={() => setNotice(null)} className={styles.notice}>
           {notice.body}
@@ -271,7 +284,7 @@ function HistoryView({ canRollBack }: { canRollBack: boolean }): ReactElement {
           <Spinner aria-label="Loading the version history" />
         </div>
       ) : items.length === 0 ? (
-        <EmptyState title="Nothing has been published yet" description="Published versions appear here once the first draft goes live." />
+        <EmptyState title="No catalog is live yet" description="Versions appear here once the first change goes live." />
       ) : (
         <ul className={styles.list} aria-label="Catalog versions">
           {items.map(row => (
@@ -284,7 +297,7 @@ function HistoryView({ canRollBack }: { canRollBack: boolean }): ReactElement {
               now={now}
               meSubject={me.data?.sub}
               canRollBack={canRollBack}
-              rollingBack={rollback.isPending && rollback.variables === row.version}
+              rollingBack={rollback.isPending && rollback.variables?.version === row.version}
               rollbackBusy={rollback.isPending}
               onToggle={() => toggle(row.version)}
               onViewRaw={() => setRawVersion(row.version)}

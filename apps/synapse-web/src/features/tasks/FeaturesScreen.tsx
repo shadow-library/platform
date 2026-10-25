@@ -1,16 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { type ReactElement, useMemo } from 'react';
-import { Alert, Badge, EmptyState, Skeleton, Spinner, Table, type TableColumn, Tag } from '@shadow-library/ui';
+import { Alert, EmptyState, Skeleton, Spinner, Table, type TableColumn, Tag } from '@shadow-library/ui';
 
-import { type CatalogDocument, useWorkingCatalog, type WorkingSource } from '@/features/catalog';
-import { CostLabel, effortName, formatUsd, modelPriceText, Muted, PageHeader, PermissionGate, SectionHeader, taskKindName } from '@/features/shared';
+import { type CatalogDocument, useActiveCatalog } from '@/features/catalog';
+import { CostLabel, effortName, formatUsd, LiveVersionHint, modelPriceText, Muted, PageHeader, PermissionGate, SectionHeader, taskKindName } from '@/features/shared';
 import controls from '@/features/shared/controls.module.css';
 import { type Capabilities, usageQueryOptions, useCapabilities } from '@/lib';
 
-import { buildFeatureGroups, changedTaskKeys, type FeatureSummary } from './feature-list';
+import { buildFeatureGroups, type FeatureSummary } from './feature-list';
 import styles from './Features.module.css';
-import { WorkingHint } from './WorkingHint';
 
 const USAGE_PARAMS = { groupBy: 'task' } as const;
 
@@ -28,27 +27,26 @@ export function FeaturesScreen(): ReactElement {
 }
 
 function FeatureList({ capabilities }: { capabilities: Capabilities }): ReactElement {
-  const working = useWorkingCatalog('required');
-  if (working.status === 'loading')
+  const active = useActiveCatalog();
+  if (active.status === 'loading')
     return (
       <div className={controls.loading}>
         <Spinner aria-label="Loading features" />
       </div>
     );
-  if (working.status === 'error')
+  if (active.status === 'error')
     return (
       <Alert intent="danger" title="Couldn't load the catalog">
-        {working.error.message}
+        {active.error.message}
       </Alert>
     );
-  if (working.status === 'none') return <EmptyState title="No catalog published yet" description="Features appear here once a catalog version is published." />;
-  return <FeatureGroups document={working.document} active={working.active} source={working.source} readUsage={capabilities.readUsage} canEdit={capabilities.writeDraft} />;
+  if (active.status === 'none') return <EmptyState title="No catalog is live yet" description="Features appear here once a first catalog version goes live." />;
+  return <FeatureGroups document={active.document} version={active.version} readUsage={capabilities.readUsage} canEdit={capabilities.writeCatalog} />;
 }
 
 interface FeatureGroupsProps {
   document: CatalogDocument;
-  active: CatalogDocument | null;
-  source: WorkingSource;
+  version: number;
   readUsage: boolean;
   canEdit: boolean;
 }
@@ -58,11 +56,10 @@ function SpendCell({ value, loading }: { value?: number; loading: boolean }): Re
   return value === undefined ? <Muted>—</Muted> : <span className={controls.tabular}>{formatUsd(value)}</span>;
 }
 
-function FeatureGroups({ document, active, source, readUsage, canEdit }: FeatureGroupsProps): ReactElement {
+function FeatureGroups({ document, version, readUsage, canEdit }: FeatureGroupsProps): ReactElement {
   const usage = useQuery({ ...usageQueryOptions(USAGE_PARAMS), enabled: readUsage });
   const rows = usage.data?.rows ?? null;
-  const changed = useMemo(() => changedTaskKeys(active, source.kind === 'draft' ? document : null), [active, source.kind, document]);
-  const groups = useMemo(() => buildFeatureGroups(document, changed, rows), [document, changed, rows]);
+  const groups = useMemo(() => buildFeatureGroups(document, rows), [document, rows]);
   const spendLoading = readUsage && usage.isLoading;
 
   const columns: TableColumn<FeatureSummary>[] = [
@@ -75,11 +72,6 @@ function FeatureGroups({ document, active, source, readUsage, canEdit }: Feature
             <Link to="/features/$task" params={{ task: row.key }} className={styles.featureLink}>
               {row.name}
             </Link>
-            {row.unpublished ? (
-              <Badge intent="warning" variant="soft" size="sm">
-                Unpublished changes
-              </Badge>
-            ) : null}
           </span>
           {row.description ? (
             <span className={styles.featureDescription}>
@@ -144,7 +136,7 @@ function FeatureGroups({ document, active, source, readUsage, canEdit }: Feature
 
   return (
     <>
-      <WorkingHint source={source} canEdit={canEdit} />
+      <LiveVersionHint version={version} canEdit={canEdit} />
       {readUsage ? (
         usage.error ? (
           <Alert intent="warning" title="Spend couldn't be loaded" className={styles.notice}>

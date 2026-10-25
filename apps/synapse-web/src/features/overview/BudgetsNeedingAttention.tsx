@@ -34,7 +34,7 @@ function AttentionList({ items }: { items: readonly BudgetAttention[] }): ReactE
 function AttentionBody(): ReactElement {
   const status = useQuery(budgetStatusQueryOptions());
   if (status.error && isNoActiveCatalog(status.error))
-    return <EmptyState size="inline" title="No catalog is live yet" description="Budgets apply once a catalog version is published." />;
+    return <EmptyState size="inline" title="No catalog is live yet" description="Budgets apply once a first catalog version goes live." />;
   if (status.error)
     return (
       <Alert intent="danger" title="Couldn’t load budgets">

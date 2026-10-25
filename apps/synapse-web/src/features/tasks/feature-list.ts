@@ -1,4 +1,3 @@
-import { describeChanges } from '@/features/catalog/catalog-changes';
 import { type CatalogDocument } from '@/features/catalog/catalog-document';
 import { readAliases, readModels, readTasks } from '@/features/catalog/catalog-readers';
 import { type Effort, type ModelPrice, type TaskEntry, type TaskKind } from '@/features/catalog/catalog-spec.types';
@@ -31,7 +30,6 @@ export interface FeatureSummary {
   extraRules: number;
   effort?: Effort;
   aliases: NamedRef[];
-  unpublished: boolean;
   /** Absent while usage is unknown: not loaded, failed, or not readable by this user */
   spend?: FeatureSpend;
 }
@@ -42,22 +40,12 @@ export interface FeatureGroup {
   features: FeatureSummary[];
 }
 
-/** With no draft nothing is unpublished; with no active version every task in the draft is. */
-export function changedTaskKeys(active: CatalogDocument | null, draft: CatalogDocument | null): Set<string> {
-  if (!draft) return new Set();
-  return new Set(
-    describeChanges(active, draft)
-      .filter(change => change.area === 'task')
-      .map(change => change.entityKey),
-  );
-}
-
 export function defaultRouteOf(task: Pick<TaskEntry, 'routes'>): TaskEntry['routes'][number] | undefined {
   return task.routes.find(route => Object.keys(route.when ?? {}).length === 0);
 }
 
 /** Usage counts every settled call; a task with no row in the window spent nothing. */
-export function buildFeatureGroups(document: CatalogDocument, changed: ReadonlySet<string>, usage: readonly UsageRowResponse[] | null): FeatureGroup[] {
+export function buildFeatureGroups(document: CatalogDocument, usage: readonly UsageRowResponse[] | null): FeatureGroup[] {
   const models = new Map(readModels(document).map(model => [model.key, model]));
   const aliases = new Map(readAliases(document).map(alias => [alias.key, alias]));
   const spendByTask = new Map((usage ?? []).flatMap(row => (row.key === null ? [] : [[row.key, { billed: row.billedCostUsd, list: row.listCostUsd }] as const])));
@@ -76,7 +64,6 @@ export function buildFeatureGroups(document: CatalogDocument, changed: ReadonlyS
       extraRules: task.routes.length - (fallback ? 1 : 0),
       ...(task.effort && { effort: task.effort.default }),
       aliases: task.aliases.map(key => ({ key, name: aliasName({ key, label: aliases.get(key)?.label }) })),
-      unpublished: changed.has(task.key),
       ...(usage && { spend: spendByTask.get(task.key) ?? { billed: 0, list: 0 } }),
     };
     groups.set(task.app, [...(groups.get(task.app) ?? []), summary]);

@@ -9,7 +9,6 @@ import {
   destinationName,
   hintLabel,
   inUseMessage,
-  issueAdvice,
   keyDestinations,
   keyStatusOf,
   keyVersionLabel,
@@ -301,14 +300,7 @@ describe('inUseMessage and revokeDescription', () => {
     const description = revokeDescription({ name: 'openrouter', referencedBy: [] });
     expect(description).toContain('cannot be undone');
     expect(description).toContain('name stays reserved');
-    expect(description).not.toContain('published catalog');
-  });
-});
-
-describe('issueAdvice', () => {
-  it('should advise on each credential rule and on nothing else', () => {
-    for (const code of ['unknown_credential', 'credential_revoked', 'credential_origin_mismatch']) expect(issueAdvice(code)).toBeString();
-    expect(issueAdvice('unknown_model')).toBeUndefined();
+    expect(description).not.toContain('live catalog');
   });
 });
 
@@ -340,8 +332,6 @@ describe('credential messages with prototype codes', () => {
   it('should not read a message off the prototype for a code named like one', () => {
     const unknownCode = JSON.parse('{"ok":false,"code":"constructor"}') as Parameters<typeof describeTest>[0];
     expect(describeTest(unknownCode)).toEqual({ ok: false, message: 'The test failed (constructor).' });
-    expect(issueAdvice('__proto__')).toBeUndefined();
-    expect(issueAdvice('toString')).toBeUndefined();
     expect(credentialErrorMessage(new ApiError(400, { type: 'CLIENT_ERROR', code: 'constructor', message: 'Server says no' }))).toBe('Server says no');
   });
 });

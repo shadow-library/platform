@@ -7,7 +7,7 @@ const ISSUE = { path: 'aliases.opus.model', code: 'unknown_model', message: 'Unk
 
 describe('catalogWriteOutcome', () => {
   it('should read a body without an error code as the written value, whatever fields it carries', () => {
-    const saved = { draft: { version: 0 }, fingerprint: 'abc', issues: [ISSUE] };
+    const saved = { version: 4, state: 'PUBLISHED', issues: [ISSUE] };
     expect(catalogWriteOutcome(saved)).toEqual({ kind: 'done', value: saved });
   });
 

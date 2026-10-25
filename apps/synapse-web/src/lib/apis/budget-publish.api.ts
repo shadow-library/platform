@@ -14,7 +14,6 @@ export interface PublishBudgetsInput {
 
 export type PublishBudgetsOutcome = CatalogWriteOutcome<CatalogVersionSummaryResponse>;
 
-/** Publishes the active catalog with only its budgets replaced; the server also rewrites a pending draft's budgets so its later publish cannot revert them. */
 export async function publishBudgets(input: PublishBudgetsInput): Promise<PublishBudgetsOutcome> {
   const body: PublishBudgetsBody = { ...input, budgets: input.budgets as PublishBudgetsBody['budgets'] };
   return catalogWriteOutcome(await APIRequest.put('/admin/catalog/budgets').body(body).modeled(UNPROCESSABLE).execute<CatalogVersionSummaryResponse | CatalogInvalidResponse>());

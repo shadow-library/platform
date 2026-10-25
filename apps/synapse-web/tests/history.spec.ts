@@ -10,12 +10,12 @@ type Summary = Parameters<typeof listVersions>[0][number];
 const summary = (version: number, state: Summary['state'] = 'ARCHIVED'): Summary => ({ version, state, createdAt: '2026-10-01T00:00:00.000Z', createdByName: null });
 
 describe('listVersions', () => {
-  it('should order versions newest first and drop the draft', () => {
-    const versions = [summary(1), summary(3, 'PUBLISHED'), summary(0, 'DRAFT'), summary(2)];
+  it('should order versions newest first', () => {
+    const versions = [summary(1), summary(3, 'PUBLISHED'), summary(2)];
     expect(listVersions(versions).map(version => version.version)).toEqual([3, 2, 1]);
   });
 
-  it('should be empty when nothing is published', () => {
+  it('should be empty when no version is live yet', () => {
     expect(listVersions([])).toEqual([]);
   });
 });
@@ -85,7 +85,7 @@ describe('rollbackIssueRows', () => {
 });
 
 describe('rollbackDescription', () => {
-  it('should say the version becomes live and the draft is untouched', () => {
-    expect(rollbackDescription(4)).toBe("Version 4's settings become live for every app as a new version. Your unpublished draft is not touched.");
+  it('should say the version becomes live again as a new version', () => {
+    expect(rollbackDescription(4)).toBe("Version 4's settings become live for every app as a new version. Every change since stays in History.");
   });
 });

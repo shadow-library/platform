@@ -3,7 +3,7 @@ import { describe, expect, it } from 'bun:test';
 import { readModels } from '../src/features/catalog/catalog-readers';
 import { type ModelEntry, type ModelSpec } from '../src/features/catalog/catalog-spec.types';
 import { type CatalogDocument } from '../src/features/catalog/catalog-document';
-import { runDraftEdit } from '../src/features/catalog/draft-edit';
+import { previewChange } from '../src/features/catalog/catalog-change';
 import {
   addDeploymentRow,
   addModelEdit,
@@ -36,7 +36,6 @@ import {
   usageSentence,
   usageSummary,
 } from '../src/features/models/model-view';
-import { draftOutcomeNotice } from '../src/features/shared/draft-notice';
 import { catalogFixture } from './catalog-fixture';
 
 const PROVIDERS = ['openrouter', 'subscription', 'ollama'];
@@ -181,31 +180,6 @@ describe('compareModels', () => {
     expect(rows.find(row => row.id === 'usedBy')?.values).toEqual(['Novel Forge · Chat, Opus', 'Sonnet']);
     expect(rows.find(row => row.id === 'efforts')?.values).toEqual(['Low, Medium, High', '—']);
     expect(rows.find(row => row.id === 'cachedInput')).toMatchObject({ values: ['$1.50', 'Same as input ($3.00)'], cheapest: [true, false] });
-  });
-});
-
-describe('draftOutcomeNotice', () => {
-  it('should point a clean save at review and publish', () => {
-    expect(draftOutcomeNotice({ kind: 'saved', issues: [] }, 'Opus 5.5', 'updated')).toEqual({
-      intent: 'success',
-      title: 'Opus 5.5 updated in the draft',
-      body: 'It goes live once the draft is published.',
-      changesLink: true,
-    });
-  });
-
-  it('should warn when the saved draft has problems', () => {
-    const notice = draftOutcomeNotice({ kind: 'saved', issues: [{ path: 'models.x', code: 'no_deployments', message: 'x' }] }, 'X', 'added');
-    expect(notice).toMatchObject({ intent: 'warning', body: 'The draft now has 1 problem to fix before it can be published.', changesLink: true });
-  });
-
-  it('should explain every outcome that saved nothing', () => {
-    const issues = [{ path: 'models.x.label', code: 'invalid_value', message: 'Must not be empty' }];
-    expect(draftOutcomeNotice({ kind: 'invalid', issues }, 'X', 'added')).toMatchObject({ intent: 'danger', title: "X wasn't saved", issues });
-    expect(draftOutcomeNotice({ kind: 'unchanged' }, 'X', 'updated').intent).toBe('info');
-    expect(draftOutcomeNotice({ kind: 'refused', reason: 'Gone' }, 'X', 'removed')).toEqual({ intent: 'danger', title: "X wasn't removed", body: 'Gone' });
-    expect(draftOutcomeNotice({ kind: 'conflict' }, 'X', 'updated').title).toBe('Someone else changed the draft');
-    expect(draftOutcomeNotice({ kind: 'failed', message: 'Network down' }, 'X', 'updated')).toEqual({ intent: 'danger', title: "X wasn't saved", body: 'Network down' });
   });
 });
 
@@ -357,14 +331,10 @@ function updateEdit(key: string, initial: ModelForm, form: ModelForm): ReturnTyp
 }
 
 describe('updateModelEdit', () => {
-  it('should save nothing when the editor changed nothing, whatever the form cannot show', async () => {
+  it('should change nothing when the editor changed nothing, whatever the form cannot show', () => {
     const document = lossyDocument();
     const initial = formFor(document, 'odd');
-    const ports = {
-      loadBase: () => Promise.resolve({ document, fingerprint: 'f' }),
-      save: () => Promise.reject(new Error('nothing should be saved')),
-    };
-    expect(await runDraftEdit(ports, updateEdit('odd', initial, { ...initial }), 'note')).toEqual({ kind: 'unchanged' });
+    expect(previewChange({ version: 3, document }, updateEdit('odd', initial, { ...initial }))).toEqual({ kind: 'unchanged' });
   });
 
   it('should write only the edited field over the stored entry', () => {
@@ -412,7 +382,7 @@ describe('updateModelEdit', () => {
     expect(updateEdit('opus-5.5', initial, { ...initial, input: 20 })(fresh)).toEqual({ ok: false, reason: CONCURRENT_MODEL_CHANGE });
   });
 
-  it('should refuse to edit a model the draft lost meanwhile', () => {
+  it('should refuse to edit a model the catalog lost meanwhile', () => {
     const initial = formFor(catalogFixture(), 'sonnet-5.5');
     const document = catalogFixture();
     const { 'sonnet-5.5': _removed, ...models } = document.models;
@@ -423,13 +393,13 @@ describe('updateModelEdit', () => {
 describe('addModelEdit', () => {
   const spec: ModelSpec = { ...modelOf('sonnet-5.5'), label: 'Sonnet 6' };
 
-  it('should add a new model to the draft', () => {
+  it('should add a new model to the catalog', () => {
     const edit = addModelEdit('sonnet-6', spec)(catalogFixture());
     expect(edit.ok && modelIn(edit.document, 'sonnet-6')).toMatchObject({ label: 'Sonnet 6' });
   });
 
-  it('should refuse to add a key the draft gained meanwhile', () => {
-    expect(addModelEdit('sonnet-5.5', spec)(catalogFixture())).toEqual({ ok: false, reason: 'The draft already has a model with the key "sonnet-5.5"' });
+  it('should refuse to add a key the catalog gained meanwhile', () => {
+    expect(addModelEdit('sonnet-5.5', spec)(catalogFixture())).toEqual({ ok: false, reason: 'The catalog already has a model with the key "sonnet-5.5"' });
   });
 });
 
@@ -462,7 +432,7 @@ describe('removeModelEdit', () => {
     expect(edit.ok && Object.keys(edit.document.models as Record<string, unknown>)).toEqual(['opus-5.5', 'llama3.1']);
   });
 
-  it('should refuse a model still in use on the draft it is applied to', () => {
+  it('should refuse a model still in use on the catalog it is applied to', () => {
     expect(removeModelEdit('sonnet-5.5')(catalogFixture())).toEqual({ ok: false, reason: 'It is still in use. Used by Sonnet.' });
   });
 });

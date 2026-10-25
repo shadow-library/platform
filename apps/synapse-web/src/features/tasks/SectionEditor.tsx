@@ -1,8 +1,8 @@
-import { Link } from '@tanstack/react-router';
 import { type ReactElement, type ReactNode, useState } from 'react';
 import { Alert, Button, Card, Drawer } from '@shadow-library/ui';
 
-import { type CatalogDocument, type CatalogEdit, useDraftEdit } from '@/features/catalog';
+import { type CatalogDocument, type CatalogEdit } from '@/features/catalog';
+import { useChangeFlow } from '@/features/changes';
 import { Mono, SectionHeader } from '@/features/shared';
 
 import { type SaveFeedback, saveFeedback } from './feature-detail';
@@ -13,24 +13,24 @@ export interface SectionEditor {
   open: boolean;
   /** Changes on every opening, so a form keyed by it starts again from the values on screen */
   session: number;
-  /** The section's raw fields when the editor opened; a save applies only while the draft still holds them */
+  /** The section's raw fields when the editor opened; a change applies only while the live catalog still holds them */
   opened: TaskFields;
   saving: boolean;
   feedback: SaveFeedback | null;
   start: () => void;
   cancel: () => void;
-  save: (edit: CatalogEdit, note: string) => Promise<void>;
+  save: (edit: CatalogEdit) => Promise<void>;
 }
 
 export function useSectionEditor(taskKey: string, document: CatalogDocument, section: FeatureSection): SectionEditor {
-  const editor = useDraftEdit();
+  const flow = useChangeFlow();
   const fields = SECTION_FIELDS[section];
   const [editing, setEditing] = useState(() => ({ open: false, session: 0, opened: rawTaskFields(document, taskKey, fields) }));
   const [feedback, setFeedback] = useState<SaveFeedback | null>(null);
   const close = (): void => setEditing(current => ({ ...current, open: false }));
   return {
     ...editing,
-    saving: editor.pending,
+    saving: flow.pending,
     feedback,
     start: () => {
       setFeedback(null);
@@ -40,11 +40,13 @@ export function useSectionEditor(taskKey: string, document: CatalogDocument, sec
       setFeedback(null);
       close();
     },
-    save: async (edit, note) => {
+    save: async edit => {
       setFeedback(null);
-      const next = saveFeedback(await editor.apply(guardedTaskEdit(taskKey, fields, editing.opened, edit), note), taskKey, document);
+      const result = await flow.confirmChange(guardedTaskEdit(taskKey, fields, editing.opened, edit));
+      if (result.kind === 'cancelled') return;
+      const next = saveFeedback(result);
       setFeedback(next);
-      if (!next.keepEditing) close();
+      if (!next?.keepEditing) close();
     },
   };
 }
@@ -53,12 +55,6 @@ export function FeedbackAlert({ feedback }: { feedback: SaveFeedback }): ReactEl
   return (
     <Alert intent={feedback.intent} title={feedback.title} className={styles.feedback}>
       {feedback.body}
-      {feedback.review ? (
-        <>
-          {' '}
-          <Link to="/changes">Review and publish</Link>
-        </>
-      ) : null}
       {feedback.issues.length > 0 ? (
         <>
           <ul className={styles.issueList}>
@@ -116,7 +112,7 @@ export interface EditorDrawerProps {
   title: string;
   meta?: ReactNode;
   editor: SectionEditor;
-  /** Blocks Save while the form has problems the server would refuse anyway */
+  /** Blocks saving while the form has problems the server would refuse anyway */
   canSave: boolean;
   onSave: () => void;
   size?: 'sm' | 'md' | 'lg';
@@ -138,7 +134,7 @@ export function EditorDrawer({ title, meta, editor, canSave, onSave, size = 'md'
           Cancel
         </Button>
         <Button variant="primary" onClick={onSave} loading={editor.saving} disabled={!canSave}>
-          Save to draft
+          Save change
         </Button>
       </Drawer.Footer>
     </Drawer>

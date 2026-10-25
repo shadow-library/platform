@@ -1,7 +1,7 @@
 import { type ReactElement, useState } from 'react';
 import { DescriptionList, FormField, Input, Textarea } from '@shadow-library/ui';
 
-import { type CatalogDocument, featureNote, type TaskEntry } from '@/features/catalog';
+import { type CatalogDocument, type TaskEntry } from '@/features/catalog';
 import { Muted, sentenceCase, taskName } from '@/features/shared';
 
 import { type AboutForm, aboutProblems, TASK_DESCRIPTION_MAX, TASK_LABEL_MAX } from './feature-detail';
@@ -31,7 +31,7 @@ function AboutDrawer({ task, editor }: { task: TaskEntry; editor: SectionEditor 
   const [opened] = useState<AboutForm>(() => ({ label: task.label ?? '', description: task.description ?? '' }));
   const [form, setForm] = useState<AboutForm>(opened);
   const problems = aboutProblems(form);
-  const save = (): void => void editor.save(aboutEdit(task.key, opened, form), featureNote(task, 'details'));
+  const save = (): void => void editor.save(aboutEdit(task.key, opened, form));
   return (
     <EditorDrawer title="About this feature" editor={editor} canSave={!problems.label && !problems.description} onSave={save}>
       <FormField label="Name" helper={`Leave blank to use "${sentenceCase(task.name)}".`} error={problems.label} optional>

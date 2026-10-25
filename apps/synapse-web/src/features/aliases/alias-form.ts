@@ -4,7 +4,7 @@ import { CATALOG_KEY_HINT, CATALOG_KEY_PATTERN } from '@/features/catalog/catalo
 import { readAliases, selectorValues } from '@/features/catalog/catalog-readers';
 import { type AliasEntry, type AliasSpec, type AliasState } from '@/features/catalog/catalog-spec.types';
 import { isRecord, isSameValue, ownEntry } from '@/features/catalog/catalog-values';
-import { type CatalogEdit } from '@/features/catalog/draft-edit';
+import { type CatalogEdit } from '@/features/catalog/catalog-change';
 
 export const CONCURRENT_ALIAS_CHANGE = 'Someone else changed this model name while you were editing. Reopen it to see their change.';
 
@@ -183,7 +183,7 @@ function patchAlias(raw: Entry, fields: readonly AliasField[], spec: AliasSpec):
 function rawAliasOf(document: CatalogDocument, key: string): { aliases: Entry; raw: Entry } | string {
   const aliases = document.aliases;
   const raw = isRecord(aliases) ? ownEntry(aliases, key) : undefined;
-  if (!isRecord(aliases) || !isRecord(raw)) return `The draft no longer has the model name "${key}"; someone may have changed it in the Advanced editor`;
+  if (!isRecord(aliases) || !isRecord(raw)) return `The catalog no longer has the model name "${key}"; someone may have changed it in the Advanced editor`;
   return { aliases, raw };
 }
 
@@ -211,13 +211,13 @@ export function retargetAliasEdit(key: string, opened: string, model: string): C
   };
 }
 
-/** Checked again on the draft it is applied to, since a key can never be reused once it exists, even retired. */
+/** Checked again on the catalog it is applied to, since a key can never be reused once it exists, even retired. */
 export function addAliasEdit(key: string, spec: AliasSpec): CatalogEdit {
   return (document: CatalogDocument): DocumentEdit => {
     const folded = key.toLowerCase();
     const aliases = document.aliases;
     if (isRecord(aliases) && Object.keys(aliases).some(taken => taken.toLowerCase() === folded))
-      return { ok: false, reason: `The draft already has a model name with the key "${key}"` };
+      return { ok: false, reason: `The catalog already has a model name with the key "${key}"` };
     return withAlias(document, key, spec);
   };
 }

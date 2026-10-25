@@ -200,7 +200,7 @@ export interface BudgetCardSources {
   active?: { version: number; budgets: readonly BudgetEntry[] };
 }
 
-/** The report trails a publish by up to a minute, so the active catalog sets budgets and limits; counters are keyed by app, scope and window, never limits. */
+/** The report trails a new version by up to a minute, so the active catalog sets budgets and limits; counters are keyed by app, scope and window, never limits. */
 export function budgetCards({ status, active }: BudgetCardSources): BudgetCardView[] {
   if (!active) return status ? statusCards(status) : [];
   if (!status) return catalogCards(active.budgets);

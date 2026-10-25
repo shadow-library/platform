@@ -4,12 +4,11 @@ import { type CatalogDocument, type DocumentEdit } from '../src/features/catalog
 import { resolveSelectorKey } from '../src/features/catalog/catalog-keys';
 import { readAliases, readModels, readProviders, readTasks } from '../src/features/catalog/catalog-readers';
 import { type ModelEntry, type TaskEntry } from '../src/features/catalog/catalog-spec.types';
-import { type CatalogEdit } from '../src/features/catalog/draft-edit';
+import { type CatalogEdit } from '../src/features/catalog/catalog-change';
 import { modelCapabilityNames, modelDisplayName, modelEligibility, modelPriceText } from '../src/features/shared/model-options';
 import { effortFormOf, effortOf, effortProblems } from '../src/features/tasks/effort-range';
-import { featureNote } from '../src/features/catalog/draft-edit';
 import { aboutProblems, aliasHints, aliasOptions, dataPolicyHints, saveFeedback } from '../src/features/tasks/feature-detail';
-import { buildFeatureGroups, changedTaskKeys } from '../src/features/tasks/feature-list';
+import { buildFeatureGroups } from '../src/features/tasks/feature-list';
 import {
   addCondition,
   addRule,
@@ -257,7 +256,7 @@ describe('feature list', () => {
   it('should group tasks by app with their default model, extra rules, effort, names offered and spend', () => {
     const { document } = fixture();
     const usage = [{ key: CHAT, calls: 3, inputTokens: 0, cachedInputTokens: 0, outputTokens: 0, reasoningTokens: 0, listCostUsd: 1.5, billedCostUsd: 0.25 }];
-    const groups = buildFeatureGroups(document, new Set([CHAT]), usage);
+    const groups = buildFeatureGroups(document, usage);
     expect(groups.map(group => group.name)).toEqual(['Memoir', 'Novel Forge']);
     const chat = groups[1]?.features[0];
     expect(chat).toMatchObject({
@@ -270,27 +269,17 @@ describe('feature list', () => {
         { key: 'opus', name: 'Opus' },
         { key: 'sonnet', name: 'Sonnet' },
       ],
-      unpublished: true,
       spend: { billed: 0.25, list: 1.5 },
     });
-    expect(groups[0]?.features[0]).toMatchObject({ name: 'Receipt structuring', extraRules: 0, unpublished: false, spend: { billed: 0, list: 0 } });
+    expect(groups[0]?.features[0]).toMatchObject({ name: 'Receipt structuring', extraRules: 0, spend: { billed: 0, list: 0 } });
   });
 
   it('should leave spend unknown without usage and keep a default model the catalog lacks', () => {
     const document = catalogFixture();
     document.tasks['memoir.receipt-structuring'].routes = [{ model: 'gone' }];
-    const memoir = buildFeatureGroups(document, new Set(), null)[0]?.features[0];
+    const memoir = buildFeatureGroups(document, null)[0]?.features[0];
     expect(memoir?.spend).toBeUndefined();
     expect(memoir?.defaultModel).toEqual({ key: 'gone', name: 'gone' });
-  });
-
-  it('should mark only the tasks a draft changes as unpublished', () => {
-    const active = catalogFixture();
-    const draft = catalogFixture();
-    draft.tasks[CHAT].dataPolicy = 'in_cluster_only';
-    expect([...changedTaskKeys(active, draft)]).toEqual([CHAT]);
-    expect(changedTaskKeys(active, null).size).toBe(0);
-    expect(changedTaskKeys(null, draft).has('memoir.receipt-structuring')).toBe(true);
   });
 });
 
@@ -301,10 +290,6 @@ describe('feature detail', () => {
       label: 'Keep the name to 60 characters',
       description: 'Keep the description to 280 characters',
     });
-  });
-
-  it('should note the feature and the change', () => {
-    expect(featureNote({ app: 'novel-forge', name: 'chat', label: 'Chat' }, 'routing')).toBe('Novel Forge · Chat: routing updated');
   });
 
   it('should keep offered names the catalog lacks and label retired ones', () => {
@@ -323,7 +308,7 @@ describe('feature detail', () => {
     expect(aliasHints(['opus', 'sonnet'], aliases, models, chat)).toEqual([]);
     expect(aliasHints(['opus', 'gone'], aliases, models, { ...chat, requires: ['image_output'] })).toEqual([
       "Opus points to Opus 5.5: doesn't support image output",
-      "gone isn't in the catalog, so publishing will refuse it",
+      "gone isn't in the catalog, so Synapse will refuse it",
     ]);
   });
 
@@ -341,22 +326,17 @@ describe('feature detail', () => {
 describe('save feedback', () => {
   const issue = (path: string): { path: string; code: string; message: string } => ({ path, code: 'missing_capability', message: 'lacks tools' });
 
-  it('should count the draft issues and pick out this feature’s', () => {
-    const { document } = fixture();
-    const feedback = saveFeedback({ kind: 'saved', issues: [issue(`tasks.${CHAT}.routes[0].model`), issue('aliases.opus.model')] }, CHAT, document);
-    expect(feedback).toMatchObject({ intent: 'warning', review: true, keepEditing: false });
-    expect(feedback.body).toBe('The draft has 2 issues to fix before it can be published, 1 of them in this feature.');
-    expect(feedback.issues).toEqual([{ sentence: 'The chosen model lacks a capability this feature needs', path: `tasks.${CHAT}.routes[0].model` }]);
-    expect(saveFeedback({ kind: 'saved', issues: [] }, CHAT, document).intent).toBe('success');
+  it('should say nothing here once the change is live or the person went back to editing', () => {
+    expect(saveFeedback({ kind: 'applied', version: 5, previous: 4 })).toBeNull();
+    expect(saveFeedback({ kind: 'cancelled' })).toBeNull();
   });
 
   it('should keep the editor open on a refusal or failure and close it on a conflict', () => {
-    const { document } = fixture();
-    expect(saveFeedback({ kind: 'invalid', issues: [issue('tasks')] }, CHAT, document)).toMatchObject({ intent: 'danger', keepEditing: true, issues: [{ path: 'tasks' }] });
-    expect(saveFeedback({ kind: 'refused', reason: 'pinned' }, CHAT, document)).toMatchObject({ keepEditing: true, body: 'pinned' });
-    expect(saveFeedback({ kind: 'failed', message: 'offline' }, CHAT, document)).toMatchObject({ keepEditing: true, body: 'offline' });
-    expect(saveFeedback({ kind: 'conflict' }, CHAT, document)).toMatchObject({ intent: 'warning', keepEditing: false });
-    expect(saveFeedback({ kind: 'unchanged' }, CHAT, document)).toMatchObject({ intent: 'info', keepEditing: false });
+    expect(saveFeedback({ kind: 'invalid', issues: [issue('tasks')] })).toMatchObject({ intent: 'danger', keepEditing: true, issues: [{ path: 'tasks' }] });
+    expect(saveFeedback({ kind: 'refused', reason: 'pinned' })).toMatchObject({ keepEditing: true, body: 'pinned' });
+    expect(saveFeedback({ kind: 'failed', message: 'offline' })).toMatchObject({ keepEditing: true, body: 'offline' });
+    expect(saveFeedback({ kind: 'conflict' })).toMatchObject({ intent: 'warning', keepEditing: false });
+    expect(saveFeedback({ kind: 'unchanged' })).toMatchObject({ intent: 'info', keepEditing: false });
   });
 });
 
@@ -460,6 +440,6 @@ describe('section edits', () => {
   });
 
   it('should close the editor when the section changed underneath it', () => {
-    expect(saveFeedback({ kind: 'refused', reason: SECTION_CHANGED }, CHAT, catalogFixture())).toMatchObject({ intent: 'warning', keepEditing: false, body: SECTION_CHANGED });
+    expect(saveFeedback({ kind: 'refused', reason: SECTION_CHANGED })).toMatchObject({ intent: 'warning', keepEditing: false, body: SECTION_CHANGED });
   });
 });

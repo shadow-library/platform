@@ -1,26 +1,17 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { type ReactElement, useMemo, useState } from 'react';
-import { Alert, Badge, Button, EmptyState, Spinner, Table, type TableColumn, Tag, useConfirm } from '@shadow-library/ui';
+import { Alert, Badge, Button, EmptyState, Spinner, Table, type TableColumn, Tag } from '@shadow-library/ui';
 
+import { type ActiveCatalogState, type CatalogDocument, readProviders, useActiveCatalog } from '@/features/catalog';
+import { changeResultNotice, useChangeFlow } from '@/features/changes';
 import {
-  type CatalogDocument,
-  credentialIssuesByProvider,
-  EMPTY_CATALOG,
-  readProviders,
-  useActiveCatalog,
-  useDraftEdit,
-  useWorkingCatalog,
-  type WorkingCatalog,
-} from '@/features/catalog';
-import { issueAdvice } from '@/features/credentials/credential-view';
-import {
-  type DraftNotice,
-  DraftNoticeAlert,
-  draftOutcomeNotice,
   EditIcon,
   formatNumber,
   formatRate,
+  type IssueNotice,
+  IssueNoticeAlert,
+  LiveVersionHint,
   Mono,
   Muted,
   PageHeader,
@@ -32,27 +23,16 @@ import {
 } from '@/features/shared';
 import cells from '@/features/shared/cells.module.css';
 import controls from '@/features/shared/controls.module.css';
-import {
-  type Capabilities,
-  type CatalogIssueResponse,
-  credentialsQueryOptions,
-  draftValidationQueryOptions,
-  providersQueryOptions,
-  type ProvidersResponse,
-  useCapabilities,
-} from '@/lib';
+import { type Capabilities, credentialsQueryOptions, providersQueryOptions, type ProvidersResponse, useCapabilities } from '@/lib';
 
 import { type CredentialList, credentialListOf, CredentialPicker, LegacyKeyBadge, listedCredentials } from './CredentialPicker';
 import { ProviderEditor } from './ProviderEditor';
 import { assignCredentialEdit, emptyProviderForm, keySnapshotOf, type ProviderEditorMode, providerFormOf, removeProviderEdit } from './provider-form';
 import {
-  type CatalogSource,
-  defaultProviderNote,
   errorRateIntent,
   featureName,
   healthWindowSentence,
   legacyKeyLabel,
-  presenceLabel,
   providerFacts,
   providerKeysOf,
   providerKeyStatus,
@@ -80,15 +60,15 @@ export function ProvidersScreen(): ReactElement {
 }
 
 function ProvidersView({ capabilities }: { capabilities: Capabilities }): ReactElement {
-  const working = useWorkingCatalog('optional');
+  const active = useActiveCatalog();
   const credentials = useQuery({ ...credentialsQueryOptions(), enabled: capabilities.manageCredentials });
   const [editor, setEditor] = useState<EditorState | null>(null);
-  const [notice, setNotice] = useState<DraftNotice | null>(null);
-  const canEdit = capabilities.writeDraft && capabilities.writeProviders;
+  const [notice, setNotice] = useState<IssueNotice | null>(null);
+  const canEdit = capabilities.writeCatalog && capabilities.writeProviders;
   const credentialList = credentialListOf(capabilities.manageCredentials, credentials);
-  const document = working.status === 'ready' ? working.document : null;
+  const document = active.status === 'ready' ? active.document : null;
 
-  const handleSaved = (next: DraftNotice): void => {
+  const handleSaved = (next: IssueNotice | null): void => {
     setEditor(null);
     setNotice(next);
   };
@@ -99,15 +79,15 @@ function ProvidersView({ capabilities }: { capabilities: Capabilities }): ReactE
         title="Providers"
         subtitle="The services that run our models, how they are holding up, and the API key each one uses."
         action={
-          canEdit && working.status !== 'loading' && working.status !== 'error' ? (
+          canEdit && active.status !== 'loading' && active.status !== 'error' ? (
             <Button variant="primary" onClick={() => setEditor({ mode: { kind: 'add' } })}>
               Add provider
             </Button>
           ) : null
         }
       />
-      {notice ? <DraftNoticeAlert notice={notice} onDismiss={() => setNotice(null)} className={styles.notice} /> : null}
-      <WorkingBody working={working} capabilities={capabilities} credentials={credentialList} onEdit={setEditor} onNotice={setNotice} />
+      {notice ? <IssueNoticeAlert notice={notice} onDismiss={() => setNotice(null)} className={styles.notice} /> : null}
+      <CatalogBody active={active} capabilities={capabilities} credentials={credentialList} onEdit={setEditor} onNotice={setNotice} />
       {editor ? (
         <ProviderEditor
           mode={editor.mode}
@@ -122,17 +102,17 @@ function ProvidersView({ capabilities }: { capabilities: Capabilities }): ReactE
   );
 }
 
-interface WorkingBodyProps {
-  working: WorkingCatalog;
+interface CatalogBodyProps {
+  active: ActiveCatalogState;
   capabilities: Capabilities;
   credentials: CredentialList;
   onEdit: (editor: EditorState) => void;
-  onNotice: (notice: DraftNotice) => void;
+  onNotice: (notice: IssueNotice | null) => void;
 }
 
-function WorkingBody({ working, capabilities, credentials, onEdit, onNotice }: WorkingBodyProps): ReactElement {
-  const canEdit = capabilities.writeDraft && capabilities.writeProviders;
-  switch (working.status) {
+function CatalogBody({ active, capabilities, credentials, onEdit, onNotice }: CatalogBodyProps): ReactElement {
+  const canEdit = capabilities.writeCatalog && capabilities.writeProviders;
+  switch (active.status) {
     case 'loading':
       return (
         <div className={controls.loading}>
@@ -142,30 +122,16 @@ function WorkingBody({ working, capabilities, credentials, onEdit, onNotice }: W
     case 'error':
       return (
         <Alert intent="danger" title="Couldn't load the catalog">
-          {working.error.message}
+          {active.error.message}
         </Alert>
       );
     case 'none':
-      return (
-        <EmptyState title="No catalog yet" description={canEdit ? 'Add a provider to start a draft catalog.' : 'Providers appear here once a catalog version is published.'} />
-      );
+      return <EmptyState title="No catalog yet" description={canEdit ? 'Add a provider to start the catalog.' : 'Providers appear here once a first catalog version goes live.'} />;
     case 'ready':
       return (
         <>
-          <p className={controls.hint}>
-            {working.source.kind === 'draft' ? 'Showing the draft, which may hold changes that aren’t live yet.' : `Showing published version ${working.source.version}.`} Changes
-            here are saved to the shared draft; apps keep using the published providers until it is published on <Link to="/changes">Review &amp; publish</Link>.
-            {canEdit ? null : ' Editing providers needs permission to change the catalog and its providers.'}
-          </p>
-          <ProviderTable
-            document={working.document}
-            source={working.source.kind}
-            fingerprint={working.source.kind === 'draft' ? working.source.fingerprint : undefined}
-            capabilities={capabilities}
-            credentials={credentials}
-            onEdit={onEdit}
-            onNotice={onNotice}
-          />
+          <LiveVersionHint version={active.version} canEdit={canEdit} readOnlyNote="Editing providers needs permission to change the catalog and its providers." />
+          <ProviderTable document={active.document} capabilities={capabilities} credentials={credentials} onEdit={onEdit} onNotice={onNotice} />
           {credentials.status === 'not_allowed' ? (
             <p className={controls.hint}>Your role cannot list stored API keys, so only whether one is set is shown and none can be picked.</p>
           ) : null}
@@ -208,23 +174,8 @@ function KeyStatusText({ status }: { status: ProviderKeyStatus }): ReactElement 
   }
 }
 
-function KeyIssues({ issues }: { issues: readonly CatalogIssueResponse[] }): ReactElement | null {
-  if (issues.length === 0) return null;
-  return (
-    <>
-      {issues.map(issue => (
-        <span key={`${issue.path}:${issue.code}`} className={styles.issue}>
-          <span className={styles.issueMessage}>{issue.message}</span>
-          {issueAdvice(issue.code) ? <span className={styles.issueAdvice}>{issueAdvice(issue.code)}</span> : null}
-        </span>
-      ))}
-    </>
-  );
-}
-
 function HealthCell({ row, column }: { row: ProviderRow; column: 'calls' | 'errors' | 'errorRate' }): ReactElement {
   const { health } = row;
-  if (health.kind === 'not_live') return column === 'calls' ? <Muted>Not live yet</Muted> : <Muted>—</Muted>;
   if (health.kind === 'unavailable') return <Muted>—</Muted>;
   if (column === 'calls') return <span className={controls.tabular}>{formatNumber(health.calls)}</span>;
   if (column === 'errors') return <span className={controls.tabular}>{formatNumber(health.errors)}</span>;
@@ -236,75 +187,60 @@ function HealthCell({ row, column }: { row: ProviderRow; column: 'calls' | 'erro
   );
 }
 
-function healthSubtitle(health: ProvidersResponse | undefined, source: CatalogSource): string | undefined {
-  return health ? healthWindowSentence(health.windowHours, health.catalogVersion, source) : undefined;
+function healthSubtitle(health: ProvidersResponse | undefined): string | undefined {
+  return health ? healthWindowSentence(health.windowHours, health.catalogVersion) : undefined;
 }
 
 interface ProviderTableProps {
   document: CatalogDocument;
-  source: CatalogSource;
-  fingerprint: string | undefined;
   capabilities: Capabilities;
   credentials: CredentialList;
   onEdit: (editor: EditorState) => void;
-  onNotice: (notice: DraftNotice) => void;
+  onNotice: (notice: IssueNotice | null) => void;
 }
 
-function ProviderTable({ document, source, fingerprint, capabilities, credentials, onEdit, onNotice }: ProviderTableProps): ReactElement {
-  const confirm = useConfirm();
-  const draftEdit = useDraftEdit();
+function ProviderTable({ document, capabilities, credentials, onEdit, onNotice }: ProviderTableProps): ReactElement {
+  const flow = useChangeFlow();
   const [busy, setBusy] = useState<string | null>(null);
   const health = useQuery(providersQueryOptions());
-  const validation = useQuery({ ...draftValidationQueryOptions(fingerprint ?? ''), enabled: capabilities.writeDraft && fingerprint !== undefined });
-  const published = useActiveCatalog(source === 'draft');
-  const canEdit = capabilities.writeDraft && capabilities.writeProviders;
+  const editable = capabilities.writeCatalog && capabilities.writeProviders;
   const listed = listedCredentials(credentials);
-  const active = source === 'active' ? document : published.status === 'ready' ? published.document : published.status === 'none' ? EMPTY_CATALOG : undefined;
 
-  const working = useMemo(() => readProviders(document), [document]);
-  const rows = useMemo(() => providerRows({ working: document, active, health: health.data?.providers }), [document, active, health.data]);
-  const issuesByProvider = useMemo(() => credentialIssuesByProvider(fingerprint === undefined ? [] : (validation.data?.issues ?? [])), [fingerprint, validation.data]);
-  const unreadable = unreadableProviderCount(document, working);
+  const readable = useMemo(() => readProviders(document), [document]);
+  const rows = useMemo(() => providerRows({ document, health: health.data?.providers }), [document, health.data]);
+  const unreadable = unreadableProviderCount(document, readable);
 
   const assign = async (row: ProviderRow, credentialId: string | null): Promise<void> => {
+    onNotice(null);
     setBusy(row.key);
-    const outcome = await draftEdit.apply(assignCredentialEdit(row.key, keySnapshotOf(row.entry), credentialId), defaultProviderNote(row.name, 'updated'));
+    const outcome = await flow.confirmChange(assignCredentialEdit(row.key, keySnapshotOf(row.entry), credentialId));
     setBusy(null);
-    onNotice(draftOutcomeNotice(outcome, row.name, 'updated'));
+    onNotice(changeResultNotice(outcome, row.name, 'updated'));
   };
 
   const remove = async (row: ProviderRow): Promise<void> => {
-    const live = row.presence === 'live' || row.presence === 'changed';
-    const confirmed = await confirm({
-      title: `Remove ${row.name}?`,
-      description: live ? 'The provider leaves the draft. Apps keep using it until the draft is published.' : 'The provider leaves the draft.',
-      confirmLabel: 'Remove',
-      intent: 'danger',
-    });
-    if (!confirmed) return;
+    onNotice(null);
     setBusy(row.key);
-    const outcome = await draftEdit.apply(removeProviderEdit(row.key), defaultProviderNote(row.name, 'removed'));
+    const warning = { title: `This removes ${row.name}`, body: 'No model uses it any more. You can add it again later.' };
+    const outcome = await flow.confirmChange(removeProviderEdit(row.key), { warning });
     setBusy(null);
-    onNotice(draftOutcomeNotice(outcome, row.name, 'removed'));
+    onNotice(changeResultNotice(outcome, row.name, 'removed'));
   };
 
   const keyCell = (row: ProviderRow): ReactElement => {
     const { entry } = row;
-    const issues = issuesByProvider.get(row.key) ?? [];
     const status = providerKeyStatus(row, listed);
-    const editable = canEdit && row.presence !== 'removed_in_draft';
     if (entry.kind === 'ollama' && entry.credential !== undefined)
       return (
         <span className={styles.cell}>
           <span className={styles.issueMessage}>Names a stored key, but Ollama never sends one</span>
           {editable ? (
             <span>
-              <Button variant="secondary" size="sm" aria-label={`Remove the API key of ${row.name}`} disabled={draftEdit.pending} onClick={() => void assign(row, null)}>
+              <Button variant="secondary" size="sm" aria-label={`Remove the API key of ${row.name}`} disabled={flow.pending} onClick={() => void assign(row, null)}>
                 Remove key
               </Button>
             </span>
           ) : null}
-          <KeyIssues issues={issues} />
         </span>
       );
     if (!editable || listed === undefined || entry.kind === 'ollama')
@@ -312,7 +248,6 @@ function ProviderTable({ document, source, fingerprint, capabilities, credential
         <span className={styles.cell}>
           {entry.apiKeyConfig && entry.kind !== 'ollama' ? <LegacyKeyBadge apiKeyConfig={entry.apiKeyConfig} alongside={entry.credential !== undefined} /> : null}
           {status.kind === 'legacy_setting' || status.kind === 'configured' ? null : <KeyStatusText status={status} />}
-          <KeyIssues issues={issues} />
         </span>
       );
     return (
@@ -323,11 +258,10 @@ function ProviderTable({ document, source, fingerprint, capabilities, credential
           value={entry.credential ?? ''}
           {...(entry.apiKeyConfig !== undefined && { apiKeyConfig: entry.apiKeyConfig })}
           credentials={listed}
-          disabled={draftEdit.pending}
+          disabled={flow.pending}
           onChange={id => void assign(row, id)}
         />
         {status.kind === 'credential_revoked' || status.kind === 'credential_unknown' ? <KeyStatusText status={status} /> : null}
-        <KeyIssues issues={issues} />
       </span>
     );
   };
@@ -336,31 +270,23 @@ function ProviderTable({ document, source, fingerprint, capabilities, credential
     {
       id: 'provider',
       header: 'Provider',
-      cell: row => {
-        const presence = presenceLabel(row.presence);
-        return (
-          <span className={styles.cell}>
-            <span className={styles.inline}>
-              <span>{row.name}</span>
-              {presence ? (
-                <Badge intent={row.presence === 'removed_in_draft' ? 'danger' : 'info'} variant="soft">
-                  {presence}
-                </Badge>
-              ) : null}
-            </span>
-            <span className={styles.tags}>
-              <Muted>{providerFacts(row.entry)}</Muted>
-              {row.entry.features.map(feature => (
-                <Tag key={feature} size="sm">
-                  {featureName(feature)}
-                </Tag>
-              ))}
-            </span>
-            <Mono>{row.key}</Mono>
-            <span className={cells.url}>{row.entry.url || 'No address'}</span>
+      cell: row => (
+        <span className={styles.cell}>
+          <span className={styles.inline}>
+            <span>{row.name}</span>
           </span>
-        );
-      },
+          <span className={styles.tags}>
+            <Muted>{providerFacts(row.entry)}</Muted>
+            {row.entry.features.map(feature => (
+              <Tag key={feature} size="sm">
+                {featureName(feature)}
+              </Tag>
+            ))}
+          </span>
+          <Mono>{row.key}</Mono>
+          <span className={cells.url}>{row.entry.url || 'No address'}</span>
+        </span>
+      ),
     },
     { id: 'apiKey', header: 'API key', cell: keyCell },
     { id: 'calls', header: 'Calls', align: 'end', cell: row => <HealthCell row={row} column="calls" /> },
@@ -368,13 +294,12 @@ function ProviderTable({ document, source, fingerprint, capabilities, credential
     { id: 'errorRate', header: 'Error rate', align: 'end', cell: row => <HealthCell row={row} column="errorRate" /> },
   ];
 
-  if (canEdit)
+  if (editable)
     columns.push({
       id: '_actions',
       header: <span className="sr-only">Actions</span>,
       align: 'end',
       cell: row => {
-        if (row.presence === 'removed_in_draft') return <Muted>—</Muted>;
         const users = providerUsers(document, row.key);
         const inUse = users.length > 0;
         return (
@@ -385,8 +310,8 @@ function ProviderTable({ document, source, fingerprint, capabilities, credential
               label={inUse ? `Remove ${row.name}: unavailable. ${usersSentence(users)}` : `Remove ${row.name}`}
               tooltip={inUse ? `${usersSentence(users)}. Move those models to another provider first.` : 'Remove'}
               danger
-              disabled={inUse || draftEdit.pending}
-              loading={busy === row.key && draftEdit.pending}
+              disabled={inUse || flow.pending}
+              loading={busy === row.key && flow.pending}
               onClick={() => void remove(row)}
             />
           </RowActions>
@@ -396,15 +321,10 @@ function ProviderTable({ document, source, fingerprint, capabilities, credential
 
   return (
     <section className={styles.section} aria-label="Providers">
-      <SectionHeader title="Providers and their health" subtitle={healthSubtitle(health.data, source)} />
+      <SectionHeader title="Providers and their health" subtitle={healthSubtitle(health.data)} />
       {unreadable > 0 ? (
         <Alert intent="warning" title={`${unreadable === 1 ? '1 provider' : `${unreadable} providers`} couldn't be read`} className={styles.notice}>
           Their settings are malformed, so they aren’t listed. Fix them in the <Link to="/advanced">Advanced editor</Link>.
-        </Alert>
-      ) : null}
-      {source === 'draft' && published.status === 'error' ? (
-        <Alert intent="warning" title="Couldn't load the published catalog" className={styles.notice}>
-          {published.error.message} Which providers are new, changed or removed in the draft isn’t marked.
         </Alert>
       ) : null}
       {health.error ? (
@@ -418,7 +338,7 @@ function ProviderTable({ document, source, fingerprint, capabilities, credential
         rowKey="key"
         loading={health.isLoading && rows.length === 0}
         aria-label="Providers, their API keys and error rates"
-        emptyState={canEdit ? 'The catalog names no providers yet. Add one to get started.' : 'The catalog names no providers yet.'}
+        emptyState={editable ? 'The catalog names no providers yet. Add one to get started.' : 'The catalog names no providers yet.'}
       />
     </section>
   );

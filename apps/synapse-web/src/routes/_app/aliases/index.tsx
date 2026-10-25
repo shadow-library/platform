@@ -3,7 +3,7 @@ import { type ReactElement } from 'react';
 
 import { AliasesScreen, type AliasesSearch, aliasKeysOf } from '@/features/aliases';
 import { activeVersionOf, prefetchActiveCatalog } from '@/features/catalog';
-import { aliasImpactQueryOptions, draftQueryOptions, loadCapabilities, versionQueryOptions, versionsQueryOptions } from '@/lib';
+import { aliasImpactQueryOptions, loadCapabilities, versionQueryOptions, versionsQueryOptions } from '@/lib';
 
 const text = (value: unknown): string | undefined => (typeof value === 'string' && value.length > 0 ? value : undefined);
 
@@ -17,7 +17,7 @@ export const Route = createFileRoute('/_app/aliases/')({
   loader: async ({ context: { queryClient }, deps }) => {
     const capabilities = await loadCapabilities(queryClient);
     if (!capabilities.readCatalog) return;
-    await Promise.all([queryClient.prefetchQuery(draftQueryOptions()), prefetchActiveCatalog(queryClient)]);
+    await prefetchActiveCatalog(queryClient);
     if (!deps.alias) return;
     const versions = await queryClient.ensureQueryData(versionsQueryOptions());
     const active = activeVersionOf(versions.items);

@@ -1,3 +1,4 @@
+export * from './catalog-change';
 export * from './catalog-changes';
 export * from './catalog-document';
 export * from './catalog-edits';
@@ -5,7 +6,5 @@ export * from './catalog-issues';
 export * from './catalog-keys';
 export * from './catalog-readers';
 export * from './catalog-spec.types';
-export * from './draft-edit';
 export * from './use-active-catalog';
-export * from './use-draft-edit';
-export * from './use-working-catalog';
+export * from './use-catalog-change';

@@ -10,11 +10,6 @@
   margin-top: 14px;
 }
 
-.note {
-  flex: 1 1 320px;
-  max-width: 520px;
-}
-
 .spacer {
   flex: 1;
 }

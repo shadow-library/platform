@@ -8,7 +8,7 @@ const MAX_RETRIES = 3;
 
 export const budgetKeys = { all: ['budgets'], status: () => [...budgetKeys.all, 'status'] } as const;
 
-/** Answered with 503 until a catalog is published: a state to show, which retrying cannot change. */
+/** Answered with 503 until a first catalog version goes live: a state to show, which retrying cannot change. */
 export function isNoActiveCatalog(error: unknown): boolean {
   return isApiError(error) && error.code === NO_ACTIVE_CATALOG;
 }

@@ -2,19 +2,8 @@ import { useNavigate } from '@tanstack/react-router';
 import { type ReactElement, useMemo } from 'react';
 import { Alert, Badge, EmptyState, Spinner } from '@shadow-library/ui';
 
-import {
-  type CatalogDocument,
-  readAliases,
-  readModels,
-  readProviders,
-  readTasks,
-  selectorVocabulary,
-  splitTaskKey,
-  type TaskEntry,
-  useWorkingCatalog,
-  type WorkingSource,
-} from '@/features/catalog';
-import { Mono, PageHeader, PermissionGate, taskKindName, taskTitle } from '@/features/shared';
+import { type CatalogDocument, readAliases, readModels, readProviders, readTasks, selectorVocabulary, splitTaskKey, type TaskEntry, useActiveCatalog } from '@/features/catalog';
+import { LiveVersionHint, Mono, PageHeader, PermissionGate, taskKindName, taskTitle } from '@/features/shared';
 import controls from '@/features/shared/controls.module.css';
 import { useCapabilities } from '@/lib';
 
@@ -23,10 +12,8 @@ import { AliasesSection } from './AliasesSection';
 import { DataPolicySection } from './DataPolicySection';
 import { EffortSection } from './EffortSection';
 import { type FeatureContext } from './feature-detail';
-import { changedTaskKeys } from './feature-list';
 import styles from './Features.module.css';
 import { RoutingSection } from './RoutingSection';
-import { WorkingHint } from './WorkingHint';
 
 const SUBTITLE = 'Which model answers this feature, how much effort it spends, and which model names people may pick.';
 
@@ -34,18 +21,18 @@ export function FeatureDetailScreen({ taskKey }: { taskKey: string }): ReactElem
   const capabilities = useCapabilities();
   return (
     <PermissionGate allowed={capabilities.readCatalog} area="the model catalog">
-      <FeatureDetail taskKey={taskKey} canEdit={capabilities.writeDraft} />
+      <FeatureDetail taskKey={taskKey} canEdit={capabilities.writeCatalog} />
     </PermissionGate>
   );
 }
 
 function FeatureDetail({ taskKey, canEdit }: { taskKey: string; canEdit: boolean }): ReactElement {
   const navigate = useNavigate();
-  const working = useWorkingCatalog('required');
+  const active = useActiveCatalog();
   const parts = splitTaskKey(taskKey);
   const fallbackHeader = <PageHeader title={parts ? taskTitle(parts) : taskKey} subtitle={SUBTITLE} />;
 
-  if (working.status === 'loading')
+  if (active.status === 'loading')
     return (
       <>
         {fallbackHeader}
@@ -54,42 +41,40 @@ function FeatureDetail({ taskKey, canEdit }: { taskKey: string; canEdit: boolean
         </div>
       </>
     );
-  if (working.status === 'error')
+  if (active.status === 'error')
     return (
       <>
         {fallbackHeader}
         <Alert intent="danger" title="Couldn't load the catalog">
-          {working.error.message}
+          {active.error.message}
         </Alert>
       </>
     );
 
-  const task = working.status === 'ready' ? readTasks(working.document).find(candidate => candidate.key === taskKey) : undefined;
-  if (working.status === 'none' || !task)
+  const task = active.status === 'ready' ? readTasks(active.document).find(candidate => candidate.key === taskKey) : undefined;
+  if (active.status === 'none' || !task)
     return (
       <>
         {fallbackHeader}
         <EmptyState
           title="This feature isn't in the catalog"
-          description={`Neither the draft nor the published catalog has a feature called "${taskKey}". New features are added by the app's developers.`}
+          description={`The live catalog has no feature called "${taskKey}". New features are added by the app's developers.`}
           action={{ label: 'All features', onClick: () => void navigate({ to: '/features' }) }}
         />
       </>
     );
 
-  return <FeatureSections document={working.document} active={working.active} source={working.source} task={task} canEdit={canEdit} />;
+  return <FeatureSections document={active.document} version={active.version} task={task} canEdit={canEdit} />;
 }
 
 interface FeatureSectionsProps {
   document: CatalogDocument;
-  active: CatalogDocument | null;
-  source: WorkingSource;
+  version: number;
   task: TaskEntry;
   canEdit: boolean;
 }
 
-function FeatureSections({ document, active, source, task, canEdit }: FeatureSectionsProps): ReactElement {
-  const unpublished = useMemo(() => changedTaskKeys(active, source.kind === 'draft' ? document : null).has(task.key), [active, source.kind, document, task.key]);
+function FeatureSections({ document, version, task, canEdit }: FeatureSectionsProps): ReactElement {
   const context = useMemo<FeatureContext>(
     () => ({ models: readModels(document), aliases: readAliases(document), providers: readProviders(document), vocabulary: selectorVocabulary(document) }),
     [document],
@@ -103,16 +88,11 @@ function FeatureSections({ document, active, source, task, canEdit }: FeatureSec
         <Mono>{task.key}</Mono>
         <Badge variant="outline">{taskKindName(task.kind)}</Badge>
         {task.pinned ? <Badge variant="outline">Pinned</Badge> : null}
-        {unpublished ? (
-          <Badge intent="warning" variant="soft" dot>
-            Unpublished changes
-          </Badge>
-        ) : null}
       </div>
-      <WorkingHint source={source} canEdit={canEdit} />
+      <LiveVersionHint version={version} canEdit={canEdit} />
       {canEdit ? null : (
         <Alert intent="info" title="You can view this feature but not change it" className={styles.notice}>
-          Changing a feature needs permission to edit the catalog draft. Ask a Synapse administrator if you need it.
+          Changing a feature needs permission to change the catalog. Ask a Synapse administrator if you need it.
         </Alert>
       )}
       <div className={styles.sections}>

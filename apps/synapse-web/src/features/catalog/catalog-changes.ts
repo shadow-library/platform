@@ -379,7 +379,6 @@ function diffOther(before: CatalogDocument | null, after: CatalogDocument): Cata
     .map(key => ({ area: 'other' as const, entityKey: key, entityLabel: 'Catalog', kind: 'changed' as const, field: key, sentence: `Catalog — ${key} changed` }));
 }
 
-/** Presentation only: the server's path diff stays the authority for what a publish changes. */
 export function describeChanges(before: CatalogDocument | null, after: CatalogDocument): CatalogChange[] {
   const names = { before: namesOf(before), after: namesOf(after) };
   const fallbackTitle = (key: string): string => {

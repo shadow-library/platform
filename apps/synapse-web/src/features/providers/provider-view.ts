@@ -11,35 +11,26 @@ import {
   type ProviderLocality,
 } from '@/features/catalog/catalog-spec.types';
 import { readProviders } from '@/features/catalog/catalog-readers';
-import { isRecord, isSameValue, ownEntry, text } from '@/features/catalog/catalog-values';
+import { isRecord, text } from '@/features/catalog/catalog-values';
 import { type KeyStatus, keyStatusOf } from '@/features/credentials/credential-view';
-import { type DraftAction } from '@/features/shared/draft-notice';
 import { providerName } from '@/features/shared/naming';
 import { type CredentialResponse, type ProviderResponse } from '@/lib/apis/api-types.gen';
 
-export type ProviderPresence = 'live' | 'changed' | 'draft_only' | 'removed_in_draft' | 'unknown';
-
-export type ProviderHealth = { kind: 'measured'; calls: number; errors: number; errorRate?: number } | { kind: 'not_live' } | { kind: 'unavailable' };
+export type ProviderHealth = { kind: 'measured'; calls: number; errors: number; errorRate?: number } | { kind: 'unavailable' };
 
 export type ProviderKeyStatus = KeyStatus | { kind: 'none' } | { kind: 'legacy_setting' };
-
-export type CatalogSource = 'draft' | 'active';
 
 export interface ProviderRow {
   key: string;
   name: string;
   entry: ProviderEntry;
-  presence: ProviderPresence;
   health: ProviderHealth;
-  /** Whether the deprecated Config key holds a value, known only while the draft names the same one as the published catalog */
+  /** Whether the deprecated Config key holds a value; unknown while the health is loading or could not be read */
   apiKeyConfigured?: boolean;
 }
 
 export interface ProviderRowsInput {
-  /** The draft, or the published document when there is no draft */
-  working: CatalogDocument;
-  /** The published document; `undefined` while it is loading or could not be read */
-  active: CatalogDocument | undefined;
+  document: CatalogDocument;
   /** `undefined` while the live health is loading or could not be read */
   health: readonly ProviderResponse[] | undefined;
 }
@@ -128,9 +119,8 @@ export function legacyKeyLabel(alongside: boolean): string {
   return alongside ? 'The old environment key setting is also set' : 'Uses the old environment key setting';
 }
 
-export function healthWindowSentence(windowHours: number, catalogVersion: number, source: CatalogSource): string {
-  const window = `Calls and errors over the last ${windowHours} hours, from published version ${catalogVersion}.`;
-  return source === 'draft' ? `${window} New providers show traffic after the draft is published.` : window;
+export function healthWindowSentence(windowHours: number, catalogVersion: number): string {
+  return `Calls and errors over the last ${windowHours} hours, from version ${catalogVersion}.`;
 }
 
 export function sortFeatures(features: readonly string[]): ProviderFeature[] {
@@ -147,51 +137,22 @@ function measured(live: ProviderResponse | undefined): ProviderHealth {
   return { kind: 'measured', calls: live.calls, errors: live.errors, ...(live.errorRate !== undefined && { errorRate: live.errorRate }) };
 }
 
-function rawProviders(document: CatalogDocument): Record<string, unknown> {
-  return isRecord(document.providers) ? document.providers : {};
-}
-
-function presenceOf(key: string, working: Record<string, unknown>, active: Record<string, unknown> | undefined): ProviderPresence {
-  if (active === undefined) return 'unknown';
-  if (!Object.hasOwn(active, key)) return 'draft_only';
-  return isSameValue(ownEntry(working, key), ownEntry(active, key)) ? 'live' : 'changed';
-}
-
-/** The health endpoint reports whether the published Config key holds a value, which says nothing about a key the draft names instead. */
-function configuredOf(key: string, working: Record<string, unknown>, active: Record<string, unknown> | undefined, live: ProviderResponse | undefined): boolean | undefined {
-  if (active === undefined || live?.apiKeyConfigured === undefined) return undefined;
-  const draft = ownEntry(working, key);
-  const published = ownEntry(active, key);
-  if (!isRecord(draft) || !isRecord(published) || draft.apiKeyConfig !== published.apiKeyConfig) return undefined;
-  return live.apiKeyConfigured;
-}
-
-function readOne(key: string, raw: unknown): ProviderEntry {
-  return readProviders({ providers: Object.fromEntries([[key, raw]]) })[0] ?? { key, url: '', features: [] };
-}
-
 const byName = (left: ProviderRow, right: ProviderRow): number => left.name.localeCompare(right.name) || left.key.localeCompare(right.key);
 
-/** Presence compares the raw entries, so a change the readers cannot show (an unknown field, a malformed value) still marks the provider as changed. */
 export function providerRows(input: ProviderRowsInput): ProviderRow[] {
-  const working = rawProviders(input.working);
-  const active = input.active ? rawProviders(input.active) : undefined;
   const liveByKey = new Map((input.health ?? []).map(live => [live.key, live]));
-  const rowOf = (key: string, entry: ProviderEntry, presence: ProviderPresence, apiKeyConfigured: boolean | undefined): ProviderRow => ({
-    key,
-    name: providerName(key),
-    entry,
-    presence,
-    health: presence === 'draft_only' ? { kind: 'not_live' } : measured(liveByKey.get(key)),
-    ...(apiKeyConfigured !== undefined && { apiKeyConfigured }),
-  });
-  const rows = readProviders(input.working).map(entry =>
-    rowOf(entry.key, entry, presenceOf(entry.key, working, active), configuredOf(entry.key, working, active, liveByKey.get(entry.key))),
-  );
-  const removed = Object.keys(active ?? {})
-    .filter(key => !Object.hasOwn(working, key))
-    .map(key => rowOf(key, readOne(key, ownEntry(active ?? {}, key)), 'removed_in_draft', liveByKey.get(key)?.apiKeyConfigured));
-  return [...rows, ...removed].sort(byName);
+  return readProviders(input.document)
+    .map(entry => {
+      const live = liveByKey.get(entry.key);
+      return {
+        key: entry.key,
+        name: providerName(entry.key),
+        entry,
+        health: measured(live),
+        ...(live?.apiKeyConfigured !== undefined && { apiKeyConfigured: live.apiKeyConfigured }),
+      };
+    })
+    .sort(byName);
 }
 
 export function providerKeyStatus(row: Pick<ProviderRow, 'entry' | 'apiKeyConfigured'>, credentials?: readonly CredentialResponse[]): ProviderKeyStatus {
@@ -200,20 +161,6 @@ export function providerKeyStatus(row: Pick<ProviderRow, 'entry' | 'apiKeyConfig
   if (entry.credential === undefined && entry.apiKeyConfig === undefined && row.apiKeyConfigured === undefined) return { kind: 'none' };
   if (entry.credential === undefined && row.apiKeyConfigured === undefined) return { kind: 'legacy_setting' };
   return keyStatusOf({ ...(entry.credential !== undefined && { credential: entry.credential }), apiKeyConfigured: row.apiKeyConfigured }, credentials);
-}
-
-export function presenceLabel(presence: ProviderPresence): string | undefined {
-  switch (presence) {
-    case 'changed':
-      return 'Changed in the draft';
-    case 'draft_only':
-      return 'Not live yet';
-    case 'removed_in_draft':
-      return 'Removed in the draft';
-    case 'live':
-    case 'unknown':
-      return undefined;
-  }
 }
 
 /** Keys of every entry, the ones the reader skips as malformed included, so a new provider can never overwrite one. */
@@ -236,8 +183,4 @@ export function providerUsers(document: CatalogDocument, providerKey: string): P
 
 export function usersSentence(users: readonly ProviderUser[]): string {
   return users.length === 0 ? 'No model uses it' : `Used by ${users.map(user => user.name).join(', ')}`;
-}
-
-export function defaultProviderNote(name: string, action: DraftAction): string {
-  return `Provider ${name} ${action}`;
 }

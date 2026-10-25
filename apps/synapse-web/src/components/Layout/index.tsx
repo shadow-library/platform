@@ -6,6 +6,7 @@ import { AppShell, type NavConfig, type NavLeaf, type NavSection } from '@shadow
 import { userDisplayName } from '@shadow-library/web';
 import { useOrganisationSwitch } from '@shadow-library/web/router';
 
+import { ChangeFlowProvider } from '@/features/changes';
 import {
   AliasIcon,
   BudgetIcon,
@@ -17,14 +18,12 @@ import {
   MoonIcon,
   OverviewIcon,
   ProviderIcon,
-  PublishIcon,
   SunIcon,
   SynapseMark,
   UsageIcon,
 } from '@/features/shared';
 import { type Capabilities, logout, meQuery, organisationsQueryOptions, switchOrganisation, useAccessCheck, useCapabilities } from '@/lib';
 
-import { ChangesBar } from './ChangesBar';
 import styles from './Layout.module.css';
 
 function section(label: string, items: NavLeaf[]): NavSection {
@@ -47,10 +46,7 @@ function navFor(capabilities: Capabilities): NavConfig {
         { to: '/aliases', label: 'Model names', icon: <AliasIcon />, hidden: catalogHidden },
         { to: '/models', label: 'Models', icon: <ModelIcon />, hidden: catalogHidden },
       ]),
-      section('Changes', [
-        { to: '/changes', label: 'Review & publish', icon: <PublishIcon />, hidden: catalogHidden },
-        { to: '/history', label: 'History', icon: <HistoryIcon />, hidden: catalogHidden },
-      ]),
+      section('Changes', [{ to: '/history', label: 'History', icon: <HistoryIcon />, hidden: catalogHidden }]),
       section('Infrastructure', [
         { to: '/providers', label: 'Providers', icon: <ProviderIcon />, hidden: catalogHidden },
         { to: '/credentials', label: 'Credentials', icon: <KeyIcon />, hidden: !capabilities.manageCredentials },
@@ -109,8 +105,7 @@ export function Layout({ children }: PropsWithChildren): ReactElement {
           Controls are hidden until they can be. The server still decides what you may do.
         </Alert>
       ) : null}
-      <ChangesBar />
-      {children}
+      <ChangeFlowProvider>{children}</ChangeFlowProvider>
     </AppShell>
   );
 }

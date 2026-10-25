@@ -26,11 +26,11 @@ function entry(document: CatalogDocument, section: string, key: string): Record<
 }
 
 describe('task edits', () => {
-  it('should refuse a task the draft does not have, one inherited from the prototype, or one that is not an object', () => {
+  it('should refuse a task the catalog does not have, one inherited from the prototype, or one that is not an object', () => {
     const document = { ...catalogFixture(), tasks: { ...catalogFixture().tasks, 'app.broken': 'task' } };
-    expect(withTaskDataPolicy(document, 'app.missing', 'any')).toEqual({ ok: false, reason: 'The draft has no feature "app.missing"' });
+    expect(withTaskDataPolicy(document, 'app.missing', 'any')).toEqual({ ok: false, reason: 'The catalog has no feature "app.missing"' });
     expect(withTaskDataPolicy(document, 'toString', 'any').ok).toBe(false);
-    expect(withTaskDataPolicy(document, 'app.broken', 'any')).toEqual({ ok: false, reason: 'The draft\'s feature "app.broken" is not an object' });
+    expect(withTaskDataPolicy(document, 'app.broken', 'any')).toEqual({ ok: false, reason: 'The catalog\'s feature "app.broken" is not an object' });
   });
 
   it('should trim the label and description, remove a blank one and leave an omitted one alone', () => {
@@ -69,7 +69,7 @@ describe('alias edits', () => {
 
   it('should refuse an upsert into a section that is not an object', () => {
     const alias = { label: 'Haiku', model: 'sonnet-5.5', state: 'active' as const, showVersion: false };
-    expect(withAlias({ aliases: [] }, 'haiku', alias)).toEqual({ ok: false, reason: "The draft's aliases section is not an object" });
+    expect(withAlias({ aliases: [] }, 'haiku', alias)).toEqual({ ok: false, reason: "The catalog's aliases section is not an object" });
   });
 });
 
@@ -87,9 +87,9 @@ describe('model edits', () => {
     expect(entry(documentOf(withModel(catalogFixture(), 'haiku-5', model)), 'models', 'haiku-5')).toEqual(expected);
   });
 
-  it('should remove a model, and refuse one the draft does not have', () => {
+  it('should remove a model, and refuse one the catalog does not have', () => {
     expect(documentOf(withoutModel(catalogFixture(), 'llama3.1')).models).not.toHaveProperty('llama3.1');
-    expect(withoutModel(catalogFixture(), 'gpt-9')).toEqual({ ok: false, reason: 'The draft has no model "gpt-9"' });
+    expect(withoutModel(catalogFixture(), 'gpt-9')).toEqual({ ok: false, reason: 'The catalog has no model "gpt-9"' });
   });
 });
 
@@ -130,7 +130,7 @@ describe('provider edits', () => {
     expect(entry(documentOf(withoutProviderCredential(catalogFixture(), 'openrouter')), 'providers', 'openrouter')).not.toHaveProperty('credential');
   });
 
-  it('should refuse a credential for a provider the draft does not have', () => {
-    expect(withProviderCredential(catalogFixture(), 'missing', CREDENTIAL_ID)).toEqual({ ok: false, reason: 'The draft has no provider "missing"' });
+  it('should refuse a credential for a provider the catalog does not have', () => {
+    expect(withProviderCredential(catalogFixture(), 'missing', CREDENTIAL_ID)).toEqual({ ok: false, reason: 'The catalog has no provider "missing"' });
   });
 });

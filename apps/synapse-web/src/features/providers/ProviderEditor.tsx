@@ -11,9 +11,9 @@ import {
   type ProviderFlavor,
   type ProviderKind,
   type ProviderLocality,
-  useDraftEdit,
 } from '@/features/catalog';
-import { type DraftNotice, DraftNoticeAlert, draftOutcomeNotice, FormSection, Mono, providerName } from '@/features/shared';
+import { changeResultNotice, isSettled, useChangeFlow } from '@/features/changes';
+import { FormSection, type IssueNotice, IssueNoticeAlert, Mono, providerName } from '@/features/shared';
 import formStyles from '@/features/shared/form.module.css';
 
 import { type CredentialList, CredentialPicker, LegacyKeyBadge, listedCredentials } from './CredentialPicker';
@@ -30,7 +30,6 @@ import {
 import {
   COST_DESCRIPTIONS,
   costName,
-  defaultProviderNote,
   featureName,
   FLAVOR_DESCRIPTIONS,
   flavorName,
@@ -50,7 +49,7 @@ export interface ProviderEditorProps {
   takenKeys: readonly string[];
   credentials: CredentialList;
   onClose: () => void;
-  onSaved: (notice: DraftNotice) => void;
+  onSaved: (notice: IssueNotice | null) => void;
 }
 
 function unlistedReason(list: Exclude<CredentialList, { status: 'ready' }>): string {
@@ -75,7 +74,7 @@ function KeyField({ form, credentials, onChange }: KeyFieldProps): ReactElement 
   if (form.kind === 'ollama')
     return (
       <div className={styles.inline}>
-        <p className={styles.problem}>An Ollama provider never sends an API key, yet this one still names a stored key, so the draft can&apos;t be published.</p>
+        <p className={styles.problem}>An Ollama provider never sends an API key, yet this one still names a stored key, so Synapse will refuse the change.</p>
         <Button variant="secondary" size="sm" onClick={() => onChange('')}>
           Remove key
         </Button>
@@ -107,10 +106,10 @@ function KeyField({ form, credentials, onChange }: KeyFieldProps): ReactElement 
 }
 
 export function ProviderEditor({ mode, initial, takenKeys, credentials, onClose, onSaved }: ProviderEditorProps): ReactElement {
-  const draftEdit = useDraftEdit();
+  const flow = useChangeFlow();
   const [form, setForm] = useState<ProviderForm>(initial);
   const [errors, setErrors] = useState<ProviderFormErrors | null>(null);
-  const [failure, setFailure] = useState<DraftNotice | null>(null);
+  const [failure, setFailure] = useState<IssueNotice | null>(null);
   const context = { mode, takenKeys };
 
   const update = (patch: Partial<ProviderForm>): void => {
@@ -122,7 +121,7 @@ export function ProviderEditor({ mode, initial, takenKeys, credentials, onClose,
   };
 
   const submit = async (): Promise<void> => {
-    if (draftEdit.pending) return;
+    if (flow.pending) return;
     const result = validateProviderForm(form, context);
     setErrors(result.ok ? null : result.errors);
     if (!result.ok) return;
@@ -130,9 +129,9 @@ export function ProviderEditor({ mode, initial, takenKeys, credentials, onClose,
     const action = mode.kind === 'add' ? 'added' : 'updated';
     const name = providerName(result.key);
     const edit = mode.kind === 'add' ? addProviderEdit(result.key, result.spec) : updateProviderEdit(result.key, initial, form, result.spec);
-    const outcome = await draftEdit.apply(edit, defaultProviderNote(name, action));
-    const notice = draftOutcomeNotice(outcome, name, action);
-    if (outcome.kind === 'saved' || outcome.kind === 'unchanged') onSaved(notice);
+    const outcome = await flow.confirmChange(edit);
+    const notice = changeResultNotice(outcome, name, action);
+    if (isSettled(outcome)) onSaved(notice);
     else setFailure(notice);
   };
 
@@ -141,11 +140,11 @@ export function ProviderEditor({ mode, initial, takenKeys, credentials, onClose,
   const title = mode.kind === 'add' ? 'Add provider' : `Edit ${providerName(mode.key)}`;
 
   return (
-    <Drawer open onOpenChange={open => open || draftEdit.pending || onClose()} size="lg">
-      <Drawer.Header title={title} meta="Saved to the draft; nothing changes for apps until the draft is published." />
+    <Drawer open onOpenChange={open => open || flow.pending || onClose()} size="lg">
+      <Drawer.Header title={title} meta="Each change goes live for apps as soon as you confirm it." />
       <Drawer.Body>
         <div className={formStyles.form}>
-          {failure ? <DraftNoticeAlert notice={failure} /> : null}
+          {failure ? <IssueNoticeAlert notice={failure} /> : null}
           {errors ? <p className={styles.problem}>Some settings need attention before the provider can be saved.</p> : null}
 
           <FormSection title="About">
@@ -273,7 +272,7 @@ export function ProviderEditor({ mode, initial, takenKeys, credentials, onClose,
           </FormSection>
         </div>
       </Drawer.Body>
-      <Drawer.Footer cancel="Cancel" action={mode.kind === 'add' ? 'Add provider' : 'Save provider'} onAction={() => void submit()} loading={draftEdit.pending} />
+      <Drawer.Footer cancel="Cancel" action={mode.kind === 'add' ? 'Add provider' : 'Save provider'} onAction={() => void submit()} loading={flow.pending} />
     </Drawer>
   );
 }

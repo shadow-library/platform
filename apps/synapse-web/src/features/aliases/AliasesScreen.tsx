@@ -2,13 +2,13 @@ import { Link, useNavigate } from '@tanstack/react-router';
 import { type ReactElement, useMemo, useRef, useState } from 'react';
 import { Alert, Badge, Button, EmptyState, Spinner, Table, type TableColumn } from '@shadow-library/ui';
 
-import { useWorkingCatalog, type WorkingCatalog, type WorkingSource } from '@/features/catalog';
-import { type DraftNotice, DraftNoticeAlert, EditIcon, ImpactIcon, Mono, Muted, PageHeader, PermissionGate, RowAction, RowActions } from '@/features/shared';
+import { type ActiveCatalogState, type CatalogDocument, useActiveCatalog } from '@/features/catalog';
+import { EditIcon, ImpactIcon, type IssueNotice, IssueNoticeAlert, LiveVersionHint, Mono, Muted, PageHeader, PermissionGate, RowAction, RowActions } from '@/features/shared';
 import controls from '@/features/shared/controls.module.css';
 import { type Capabilities, useCapabilities } from '@/lib';
 
 import { type AliasEditorMode, aliasFormOf, emptyAliasForm } from './alias-form';
-import { ALIAS_STATE_INFO, aliasKeysOf, type AliasRow, aliasRows, changedAliasKeys, seenNote, unreadableAliasCount } from './alias-view';
+import { ALIAS_STATE_INFO, aliasKeysOf, type AliasRow, aliasRows, seenNote, unreadableAliasCount } from './alias-view';
 import { AliasEditor } from './AliasEditor';
 import { AliasImpactPanel } from './AliasImpactPanel';
 import styles from './Aliases.module.css';
@@ -30,17 +30,17 @@ export function AliasesScreen({ search }: { search: AliasesSearch }): ReactEleme
 }
 
 function AliasesView({ search, capabilities }: { search: AliasesSearch; capabilities: Capabilities }): ReactElement {
-  const working = useWorkingCatalog('required');
+  const active = useActiveCatalog();
   const [editor, setEditor] = useState<EditorState>(null);
-  const [notice, setNotice] = useState<DraftNotice | null>(null);
-  const ready = working.status === 'ready' ? working : null;
+  const [notice, setNotice] = useState<IssueNotice | null>(null);
+  const ready = active.status === 'ready' ? active : null;
 
   const header = (
     <PageHeader
       title="Model names"
       subtitle="The names people pick a model by, such as Opus. Each points to one model, so moving a name changes what everyone who picked it gets."
       action={
-        capabilities.writeDraft && ready ? (
+        capabilities.writeCatalog && ready ? (
           <Button variant="primary" onClick={() => setEditor({ mode: { kind: 'add' } })}>
             Add model name
           </Button>
@@ -49,7 +49,7 @@ function AliasesView({ search, capabilities }: { search: AliasesSearch; capabili
     />
   );
 
-  const handleSaved = (next: DraftNotice): void => {
+  const handleSaved = (next: IssueNotice | null): void => {
     setEditor(null);
     setNotice(next);
   };
@@ -57,14 +57,14 @@ function AliasesView({ search, capabilities }: { search: AliasesSearch; capabili
   return (
     <>
       {header}
-      {notice ? <DraftNoticeAlert notice={notice} onDismiss={() => setNotice(null)} className={styles.notice} /> : null}
-      <WorkingBody working={working} search={search} capabilities={capabilities} onEdit={setEditor} />
+      {notice ? <IssueNoticeAlert notice={notice} onDismiss={() => setNotice(null)} className={styles.notice} /> : null}
+      <CatalogBody active={active} search={search} capabilities={capabilities} onEdit={setEditor} />
       {editor && ready ? (
         <AliasEditor
           mode={editor.mode}
           initial={editor.row ? aliasFormOf(editor.row.entry) : emptyAliasForm()}
           document={ready.document}
-          takenKeys={[...new Set([...aliasKeysOf(ready.document), ...aliasKeysOf(ready.active)])]}
+          takenKeys={aliasKeysOf(ready.document)}
           usedBy={editor.row?.usedBy ?? []}
           onClose={() => setEditor(null)}
           onSaved={handleSaved}
@@ -74,15 +74,15 @@ function AliasesView({ search, capabilities }: { search: AliasesSearch; capabili
   );
 }
 
-interface WorkingBodyProps {
-  working: WorkingCatalog;
+interface CatalogBodyProps {
+  active: ActiveCatalogState;
   search: AliasesSearch;
   capabilities: Capabilities;
   onEdit: (editor: EditorState) => void;
 }
 
-function WorkingBody({ working, search, capabilities, onEdit }: WorkingBodyProps): ReactElement {
-  switch (working.status) {
+function CatalogBody({ active, search, capabilities, onEdit }: CatalogBodyProps): ReactElement {
+  switch (active.status) {
     case 'loading':
       return (
         <div className={controls.loading}>
@@ -92,50 +92,32 @@ function WorkingBody({ working, search, capabilities, onEdit }: WorkingBodyProps
     case 'error':
       return (
         <Alert intent="danger" title="Couldn't load the catalog">
-          {working.error.message}
+          {active.error.message}
         </Alert>
       );
     case 'none':
-      return <EmptyState title="No catalog yet" description="Model names appear here once a catalog version is published or a draft is started." />;
+      return <EmptyState title="No catalog yet" description="Model names appear here once a first catalog version goes live." />;
     case 'ready':
       return (
         <>
-          <WorkingHint source={working.source} canEdit={capabilities.writeDraft} />
-          <AliasTable working={working} search={search} capabilities={capabilities} onEdit={onEdit} />
+          <LiveVersionHint version={active.version} canEdit={capabilities.writeCatalog} readOnlyNote="Changing model names needs permission to change the catalog." />
+          <AliasTable document={active.document} search={search} capabilities={capabilities} onEdit={onEdit} />
         </>
       );
   }
 }
 
-function WorkingHint({ source, canEdit }: { source: WorkingSource; canEdit: boolean }): ReactElement {
-  const permission = canEdit ? null : ' Changing model names needs permission to change the catalog.';
-  if (source.kind === 'active')
-    return (
-      <p className={controls.hint}>
-        Showing published version {source.version}. Saving a change starts a draft that changes nothing until it is published.{permission}
-      </p>
-    );
-  return (
-    <p className={controls.hint}>
-      Showing the draft, including changes not yet published{source.activeVersion === null ? '; nothing has been published yet' : ` over version ${source.activeVersion}`}.{' '}
-      <Link to="/changes">Review &amp; publish</Link>
-      {permission}
-    </p>
-  );
-}
-
 interface AliasTableProps {
-  working: Extract<WorkingCatalog, { status: 'ready' }>;
+  document: CatalogDocument;
   search: AliasesSearch;
   capabilities: Capabilities;
   onEdit: (editor: EditorState) => void;
 }
 
-function AliasTable({ working, search, capabilities, onEdit }: AliasTableProps): ReactElement {
+function AliasTable({ document, search, capabilities, onEdit }: AliasTableProps): ReactElement {
   const navigate = useNavigate();
   const impactButtons = useRef(new Map<string, HTMLButtonElement>());
-  const { document, active, source } = working;
-  const rows = useMemo(() => aliasRows(document, changedAliasKeys(active, source.kind === 'draft' ? document : null)), [document, active, source.kind]);
+  const rows = useMemo(() => aliasRows(document), [document]);
   const unreadable = unreadableAliasCount(document);
   const selected = rows.find(row => row.key === search.alias);
 
@@ -156,14 +138,7 @@ function AliasTable({ working, search, capabilities, onEdit }: AliasTableProps):
         const note = seenNote(row);
         return (
           <span className={styles.cell}>
-            <span className={styles.name}>
-              {row.name}
-              {row.changed ? (
-                <Badge intent="info" variant="soft" size="sm">
-                  Unpublished changes
-                </Badge>
-              ) : null}
-            </span>
+            <span className={styles.name}>{row.name}</span>
             {row.description ? <Muted>{row.description}</Muted> : null}
             {note ? <Muted>{note}</Muted> : null}
             <Mono>{row.key}</Mono>
@@ -221,7 +196,7 @@ function AliasTable({ working, search, capabilities, onEdit }: AliasTableProps):
       align: 'end',
       cell: row => (
         <RowActions>
-          {capabilities.writeDraft ? (
+          {capabilities.writeCatalog ? (
             <RowAction icon={<EditIcon />} label={`Edit ${row.name}`} tooltip="Edit" onClick={() => onEdit({ mode: { kind: 'edit', key: row.key }, row })} />
           ) : null}
           <RowAction
@@ -249,15 +224,7 @@ function AliasTable({ working, search, capabilities, onEdit }: AliasTableProps):
       ) : null}
       <Table data={rows} columns={columns} rowKey="key" aria-label="Model names" emptyState="The catalog has no model names yet." />
       {selected ? (
-        <AliasImpactPanel
-          key={selected.key}
-          alias={selected}
-          workingDocument={document}
-          activeDocument={active}
-          candidate={search.model}
-          capabilities={capabilities}
-          onClose={() => closeImpact(selected.key)}
-        />
+        <AliasImpactPanel key={selected.key} alias={selected} document={document} candidate={search.model} capabilities={capabilities} onClose={() => closeImpact(selected.key)} />
       ) : search.alias ? (
         <Alert intent="warning" title={`The catalog has no model name "${search.alias}"`} className={styles.result} />
       ) : null}

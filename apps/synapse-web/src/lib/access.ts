@@ -6,7 +6,6 @@ import { accessQueryOptions, isApiError } from './apis';
 export const SYNAPSE_PERMISSIONS = {
   catalogRead: 'synapse:catalog:read',
   catalogWrite: 'synapse:catalog:write',
-  catalogPublish: 'synapse:catalog:publish',
   providersWrite: 'synapse:providers:write',
   credentialsManage: 'synapse:credentials:manage',
   budgetsWrite: 'synapse:budgets:write',
@@ -26,8 +25,7 @@ export interface AccessCheck {
 
 export interface Capabilities {
   readCatalog: boolean;
-  writeDraft: boolean;
-  publish: boolean;
+  writeCatalog: boolean;
   writeProviders: boolean;
   manageCredentials: boolean;
   setBudgets: boolean;
@@ -38,8 +36,7 @@ export function capabilitiesOf(permissions: readonly string[]): Capabilities {
   const held = new Set(permissions);
   return {
     readCatalog: held.has(SYNAPSE_PERMISSIONS.catalogRead),
-    writeDraft: held.has(SYNAPSE_PERMISSIONS.catalogWrite),
-    publish: held.has(SYNAPSE_PERMISSIONS.catalogPublish),
+    writeCatalog: held.has(SYNAPSE_PERMISSIONS.catalogWrite),
     writeProviders: held.has(SYNAPSE_PERMISSIONS.providersWrite),
     manageCredentials: held.has(SYNAPSE_PERMISSIONS.credentialsManage),
     setBudgets: held.has(SYNAPSE_PERMISSIONS.budgetsWrite),

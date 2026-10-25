@@ -26,7 +26,7 @@ const AREA_TITLES: Readonly<Record<ChangeArea, string>> = {
 };
 
 export function listVersions(versions: readonly CatalogVersionSummaryResponse[]): CatalogVersionSummaryResponse[] {
-  return versions.filter(version => version.state !== 'DRAFT' && version.version > 0).sort((a, b) => b.version - a.version);
+  return [...versions].sort((a, b) => b.version - a.version);
 }
 
 export function predecessorOf(versions: readonly CatalogVersionSummaryResponse[], version: number): number | null {
@@ -48,5 +48,5 @@ export function rollbackIssueRows(issues: readonly CatalogIssueResponse[], docum
 }
 
 export function rollbackDescription(version: number): string {
-  return `Version ${version}'s settings become live for every app as a new version. Your unpublished draft is not touched.`;
+  return `Version ${version}'s settings become live for every app as a new version. Every change since stays in History.`;
 }
