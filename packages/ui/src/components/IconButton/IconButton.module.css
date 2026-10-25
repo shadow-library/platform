@@ -71,11 +71,11 @@
 .root[data-variant='ghost'] {
   background-color: transparent;
 }
-.root[data-variant='ghost']:not(:disabled):hover {
+.root[data-variant='ghost']:not(:disabled):not([aria-disabled='true']):hover {
   background-color: var(--sh-bg-hover);
   color: var(--sh-text-primary);
 }
-.root[data-variant='ghost']:not(:disabled):active {
+.root[data-variant='ghost']:not(:disabled):not([aria-disabled='true']):active {
   background-color: var(--sh-bg-pressed);
 }
 
@@ -83,12 +83,12 @@
   background-color: var(--sh-surface-card);
   border-color: var(--sh-border-default);
 }
-.root[data-variant='secondary']:not(:disabled):hover {
+.root[data-variant='secondary']:not(:disabled):not([aria-disabled='true']):hover {
   background-color: var(--sh-surface-well);
   border-color: var(--sh-border-strong);
   color: var(--sh-text-primary);
 }
-.root[data-variant='secondary']:not(:disabled):active {
+.root[data-variant='secondary']:not(:disabled):not([aria-disabled='true']):active {
   background-color: var(--sh-bg-pressed);
 }
 
@@ -96,10 +96,10 @@
   background-color: var(--sh-accent);
   color: var(--sh-on-accent);
 }
-.root[data-variant='primary']:not(:disabled):hover {
+.root[data-variant='primary']:not(:disabled):not([aria-disabled='true']):hover {
   background-color: var(--sh-accent-hover);
 }
-.root[data-variant='primary']:not(:disabled):active {
+.root[data-variant='primary']:not(:disabled):not([aria-disabled='true']):active {
   background-color: var(--sh-accent-active);
 }
 
@@ -107,11 +107,11 @@
 .root[data-variant='danger'] {
   background-color: transparent;
 }
-.root[data-variant='danger']:not(:disabled):hover {
+.root[data-variant='danger']:not(:disabled):not([aria-disabled='true']):hover {
   background-color: var(--sh-danger-bg-subtle);
   color: var(--sh-danger-text-on-subtle);
 }
-.root[data-variant='danger']:not(:disabled):active {
+.root[data-variant='danger']:not(:disabled):not([aria-disabled='true']):active {
   background-color: color-mix(in srgb, var(--sh-danger-solid) 18%, transparent);
   color: var(--sh-danger-text-on-subtle);
 }
@@ -122,7 +122,7 @@
   border-color: transparent;
   color: var(--sh-accent);
 }
-.root[data-pressed='true']:not(:disabled):hover {
+.root[data-pressed='true']:not(:disabled):not([aria-disabled='true']):hover {
   background-color: color-mix(in srgb, var(--sh-accent) 20%, transparent);
 }
 

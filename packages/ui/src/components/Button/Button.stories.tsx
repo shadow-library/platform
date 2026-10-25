@@ -95,6 +95,11 @@ export const Disabled: Story = {
   args: { variant: 'primary', disabled: true, children: 'Unavailable' },
 };
 
+export const UnavailableAriaDisabled: Story = {
+  name: 'Unavailable (aria-disabled)',
+  args: { variant: 'danger', 'aria-disabled': true, children: 'Unavailable' },
+};
+
 export const FullWidth: Story = {
   args: { variant: 'primary', fullWidth: true, children: 'Full width' },
   decorators: [

@@ -102,6 +102,11 @@ export const Disabled: Story = {
   args: { variant: 'secondary', disabled: true },
 };
 
+export const UnavailableAriaDisabled: Story = {
+  name: 'Unavailable (aria-disabled)',
+  args: { variant: 'danger', 'aria-disabled': true },
+};
+
 export const Toolbar: Story = {
   render: () => (
     <div style={{ display: 'flex', gap: 4, alignItems: 'center', padding: 4, border: '1px solid var(--sh-border-default)', borderRadius: 'var(--sh-radius-lg)' }}>

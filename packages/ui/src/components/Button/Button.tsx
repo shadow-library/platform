@@ -1,14 +1,29 @@
 import { Slot } from '@radix-ui/react-slot';
 import { forwardRef } from 'react';
 
-import { cn } from '@/lib';
+import { cn, guardAriaDisabled } from '@/lib';
 
 import { useButtonGroupContext } from '../ButtonGroup/ButtonGroup.context';
 import styles from './Button.module.css';
 import { type ButtonProps } from './Button.types';
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
-  { variant: variantProp, size: sizeProp, loading = false, loadingText, fullWidth = false, prefix, suffix, asChild = false, type, disabled, className, children, ...props },
+  {
+    variant: variantProp,
+    size: sizeProp,
+    loading = false,
+    loadingText,
+    fullWidth = false,
+    prefix,
+    suffix,
+    asChild = false,
+    type,
+    disabled,
+    onClick,
+    className,
+    children,
+    ...props
+  },
   ref,
 ) {
   // Inside a ButtonGroup the group's variant/size win — the whole set stays uniform by design.
@@ -22,12 +37,13 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
     console.warn('Button: `variant`/`size` are controlled by the enclosing ButtonGroup and the value passed here is ignored.');
 
   const rootClassName = cn(styles.root, className);
+  const handleClick = guardAriaDisabled(props['aria-disabled'], onClick);
 
   // asChild delegates rendering to the consumer's element (e.g. a router link); the loading
   // spinner and adornment wrappers do not apply — the child owns its content.
   if (asChild) {
     return (
-      <Slot ref={ref} className={rootClassName} data-variant={variant} data-size={size} data-full-width={fullWidth || undefined} {...props}>
+      <Slot ref={ref} className={rootClassName} data-variant={variant} data-size={size} data-full-width={fullWidth || undefined} onClick={handleClick} {...props}>
         {children}
       </Slot>
     );
@@ -46,6 +62,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       data-full-width={fullWidth || undefined}
       disabled={disabled ?? loading}
       aria-busy={loading || undefined}
+      onClick={handleClick}
       {...props}
     >
       {loading && !showLoadingText ? <span className={styles.spinner} data-overlay="true" aria-hidden="true" /> : null}

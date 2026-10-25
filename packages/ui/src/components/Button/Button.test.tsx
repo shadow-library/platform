@@ -78,6 +78,23 @@ describe('Button', () => {
     expect(onClick).not.toHaveBeenCalled();
   });
 
+  it('should stay focusable but not fire onClick on click, Enter or Space when aria-disabled', async () => {
+    const onClick = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <Button aria-disabled="true" onClick={onClick}>
+        Unavailable
+      </Button>,
+    );
+    const button = screen.getByRole('button');
+    expect(button).toBeEnabled();
+    await user.click(button);
+    await user.keyboard('{Enter}');
+    await user.keyboard(' ');
+    expect(button).toHaveFocus();
+    expect(onClick).not.toHaveBeenCalled();
+  });
+
   it('marks loading with aria-busy, disables, blocks clicks, and announces "Loading"', async () => {
     const onClick = vi.fn();
     const user = userEvent.setup();
