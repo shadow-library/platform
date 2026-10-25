@@ -1,16 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
-import { Link, useNavigate } from '@tanstack/react-router';
+import { Link } from '@tanstack/react-router';
 import { type ReactElement, useMemo } from 'react';
 import { Alert, Badge, EmptyState, Skeleton, Spinner, Table, type TableColumn, Tag } from '@shadow-library/ui';
 
-import { type CatalogDocument } from '@/features/catalog';
+import { type CatalogDocument, useWorkingCatalog, type WorkingSource } from '@/features/catalog';
 import { CostLabel, effortName, formatUsd, modelPriceText, Muted, PageHeader, PermissionGate, SectionHeader, taskKindName } from '@/features/shared';
 import controls from '@/features/shared/controls.module.css';
 import { type Capabilities, usageQueryOptions, useCapabilities } from '@/lib';
 
-import { buildFeatureGroups, type FeatureSummary } from './feature-list';
+import { buildFeatureGroups, changedTaskKeys, type FeatureSummary } from './feature-list';
 import styles from './Features.module.css';
-import { useWorkingCatalog, type WorkingSource } from './use-working-catalog';
 import { WorkingHint } from './WorkingHint';
 
 const USAGE_PARAMS = { groupBy: 'task' } as const;
@@ -26,7 +25,7 @@ export function FeaturesScreen(): ReactElement {
 }
 
 function FeatureList({ capabilities }: { capabilities: Capabilities }): ReactElement {
-  const working = useWorkingCatalog();
+  const working = useWorkingCatalog('required');
   if (working.status === 'loading')
     return (
       <div className={controls.loading}>
@@ -40,13 +39,13 @@ function FeatureList({ capabilities }: { capabilities: Capabilities }): ReactEle
       </Alert>
     );
   if (working.status === 'none') return <EmptyState title="No catalog published yet" description="Features appear here once a catalog version is published." />;
-  return <FeatureGroups document={working.document} source={working.source} changed={working.changed} readUsage={capabilities.readUsage} />;
+  return <FeatureGroups document={working.document} active={working.active} source={working.source} readUsage={capabilities.readUsage} />;
 }
 
 interface FeatureGroupsProps {
   document: CatalogDocument;
+  active: CatalogDocument | null;
   source: WorkingSource;
-  changed: ReadonlySet<string>;
   readUsage: boolean;
 }
 
@@ -55,10 +54,10 @@ function SpendCell({ value, loading }: { value?: number; loading: boolean }): Re
   return value === undefined ? <Muted>—</Muted> : <span className={controls.tabular}>{formatUsd(value)}</span>;
 }
 
-function FeatureGroups({ document, source, changed, readUsage }: FeatureGroupsProps): ReactElement {
-  const navigate = useNavigate();
+function FeatureGroups({ document, active, source, readUsage }: FeatureGroupsProps): ReactElement {
   const usage = useQuery({ ...usageQueryOptions(USAGE_PARAMS), enabled: readUsage });
   const rows = usage.data?.rows ?? null;
+  const changed = useMemo(() => changedTaskKeys(active, source.kind === 'draft' ? document : null), [active, source.kind, document]);
   const groups = useMemo(() => buildFeatureGroups(document, changed, rows), [document, changed, rows]);
   const spendLoading = readUsage && usage.isLoading;
 
@@ -69,7 +68,7 @@ function FeatureGroups({ document, source, changed, readUsage }: FeatureGroupsPr
       cell: row => (
         <span className={styles.featureCell}>
           <span className={styles.featureName}>
-            <Link to="/features/$task" params={{ task: row.key }} className={styles.featureLink} onClick={event => event.stopPropagation()}>
+            <Link to="/features/$task" params={{ task: row.key }} className={styles.featureLink}>
               {row.name}
             </Link>
             {row.unpublished ? (
@@ -78,7 +77,11 @@ function FeatureGroups({ document, source, changed, readUsage }: FeatureGroupsPr
               </Badge>
             ) : null}
           </span>
-          {row.description ? <Muted>{row.description}</Muted> : null}
+          {row.description ? (
+            <span className={styles.featureDescription}>
+              <Muted>{row.description}</Muted>
+            </span>
+          ) : null}
         </span>
       ),
     },
@@ -145,13 +148,9 @@ function FeatureGroups({ document, source, changed, readUsage }: FeatureGroupsPr
         groups.map(group => (
           <section key={group.app} className={styles.group} aria-label={group.name}>
             <SectionHeader title={group.name} subtitle={group.features.length === 1 ? '1 feature' : `${group.features.length} features`} />
-            <Table
-              data={group.features}
-              columns={columns}
-              rowKey="key"
-              onRowClick={row => void navigate({ to: '/features/$task', params: { task: row.key } })}
-              aria-label={`${group.name} features`}
-            />
+            <div className={styles.linkedRows}>
+              <Table data={group.features} columns={columns} rowKey="key" aria-label={`${group.name} features`} />
+            </div>
           </section>
         ))
       )}

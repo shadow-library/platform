@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { readAliases, readBudgets, readModels, readProviders, readTasks, selectorVocabulary, splitTaskKey } from '../src/features/catalog/catalog-readers';
+import { readAliases, readBudgets, readModels, readProviders, readTasks, selectorValues, selectorVocabulary, splitTaskKey } from '../src/features/catalog/catalog-readers';
 import { catalogFixture, CREDENTIAL_ID } from './catalog-fixture';
 
 describe('splitTaskKey', () => {
@@ -184,5 +184,24 @@ describe('selectorVocabulary', () => {
 
   it('should be empty for a catalog without selectors', () => {
     expect(selectorVocabulary({ tasks: { 'app.task': { kind: 'chat', dataPolicy: 'any', routes: [{ model: 'm' }] } } })).toEqual({});
+  });
+});
+
+describe('selectorValues', () => {
+  it('should list the values used for a selector', () => {
+    expect(selectorValues({ tier: ['balanced', 'premium'] }, 'tier')).toEqual(['balanced', 'premium']);
+    expect(selectorValues({ tier: ['balanced'] }, 'plan')).toEqual([]);
+  });
+
+  it('should find nothing for a selector named like a prototype key', () => {
+    for (const selector of ['constructor', '__proto__', 'toString']) expect(selectorValues({ tier: ['balanced'] }, selector)).toEqual([]);
+  });
+
+  it('should read a selector really named like a prototype key', () => {
+    const vocabulary = selectorVocabulary({
+      tasks: { 'novel-forge.chat': { kind: 'chat', dataPolicy: 'any', routes: [JSON.parse('{"when":{"__proto__":"x"},"model":"m"}'), { model: 'm' }] } },
+    });
+    expect(selectorValues(vocabulary, '__proto__')).toEqual(['x']);
+    expect(selectorValues(vocabulary, 'constructor')).toEqual([]);
   });
 });

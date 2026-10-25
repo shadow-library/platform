@@ -4,7 +4,7 @@ import { budgetKeyOf, type ChangeArea } from './catalog-changes';
 import { type CatalogDocument } from './catalog-document';
 import { readBudgets } from './catalog-readers';
 import { ENTRY_FIELDS, type KeyedSection } from './catalog-spec.types';
-import { isRecord } from './catalog-values';
+import { isRecord, ownEntry } from './catalog-values';
 
 export interface IssueOwner {
   area: Exclude<ChangeArea, 'other'>;
@@ -74,7 +74,7 @@ export function issueOwner(path: string, document: CatalogDocument): IssueOwner 
 }
 
 export function issueSentence(issue: CatalogIssueResponse): string {
-  const sentence = ISSUE_SENTENCES[issue.code];
+  const sentence = ownEntry(ISSUE_SENTENCES, issue.code);
   if (!sentence) return issue.message;
   return DETAILED_CODES.includes(issue.code) && issue.message ? `${sentence}: ${issue.message}` : sentence;
 }

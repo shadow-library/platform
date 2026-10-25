@@ -3,11 +3,18 @@ import { Link } from '@tanstack/react-router';
 import { type ReactElement, useMemo, useState } from 'react';
 import { Alert, Badge, Button, EmptyState, Spinner, Table, type TableColumn, Tag, Tooltip, useConfirm } from '@shadow-library/ui';
 
-import { type CatalogDocument, credentialIssuesByProvider, EMPTY_CATALOG, readProviders, useActiveCatalog, useDraft, useDraftEdit } from '@/features/catalog';
+import {
+  type CatalogDocument,
+  credentialIssuesByProvider,
+  EMPTY_CATALOG,
+  readProviders,
+  useActiveCatalog,
+  useDraftEdit,
+  useWorkingCatalog,
+  type WorkingCatalog,
+} from '@/features/catalog';
 import { issueAdvice } from '@/features/credentials/credential-view';
-import { draftOutcomeNotice, type ModelNotice } from '@/features/models/model-view';
-import { NoticeAlert } from '@/features/models/NoticeAlert';
-import { formatNumber, formatRate, Mono, Muted, PageHeader, PermissionGate, SectionHeader } from '@/features/shared';
+import { type DraftNotice, DraftNoticeAlert, draftOutcomeNotice, formatNumber, formatRate, Mono, Muted, PageHeader, PermissionGate, SectionHeader } from '@/features/shared';
 import cells from '@/features/shared/cells.module.css';
 import controls from '@/features/shared/controls.module.css';
 import {
@@ -43,12 +50,6 @@ import {
 } from './provider-view';
 import styles from './Providers.module.css';
 
-type WorkingCatalog =
-  | { status: 'loading' }
-  | { status: 'error'; message: string }
-  | { status: 'none' }
-  | { status: 'ready'; document: CatalogDocument; source: { kind: 'draft'; fingerprint: string } | { kind: 'active'; version: number } };
-
 interface EditorState {
   mode: ProviderEditorMode;
   row?: ProviderRow;
@@ -63,28 +64,16 @@ export function ProvidersScreen(): ReactElement {
   );
 }
 
-function useWorkingCatalog(): WorkingCatalog {
-  const draft = useDraft();
-  const saved = draft.status === 'ready' ? draft.draft : undefined;
-  const active = useActiveCatalog(saved === null);
-  if (draft.status === 'error') return { status: 'error', message: draft.error.message };
-  if (saved) return { status: 'ready', document: saved.draft.document, source: { kind: 'draft', fingerprint: saved.fingerprint } };
-  if (saved === undefined || active.status === 'loading') return { status: 'loading' };
-  if (active.status === 'error') return { status: 'error', message: active.error.message };
-  if (active.status === 'none') return { status: 'none' };
-  return { status: 'ready', document: active.document, source: { kind: 'active', version: active.version } };
-}
-
 function ProvidersView({ capabilities }: { capabilities: Capabilities }): ReactElement {
-  const working = useWorkingCatalog();
+  const working = useWorkingCatalog('optional');
   const credentials = useQuery({ ...credentialsQueryOptions(), enabled: capabilities.manageCredentials });
   const [editor, setEditor] = useState<EditorState | null>(null);
-  const [notice, setNotice] = useState<ModelNotice | null>(null);
+  const [notice, setNotice] = useState<DraftNotice | null>(null);
   const canEdit = capabilities.writeDraft && capabilities.writeProviders;
   const credentialList = credentialListOf(capabilities.manageCredentials, credentials);
   const document = working.status === 'ready' ? working.document : null;
 
-  const handleSaved = (next: ModelNotice): void => {
+  const handleSaved = (next: DraftNotice): void => {
     setEditor(null);
     setNotice(next);
   };
@@ -102,7 +91,7 @@ function ProvidersView({ capabilities }: { capabilities: Capabilities }): ReactE
           ) : null
         }
       />
-      {notice ? <NoticeAlert notice={notice} onDismiss={() => setNotice(null)} className={styles.notice} /> : null}
+      {notice ? <DraftNoticeAlert notice={notice} onDismiss={() => setNotice(null)} className={styles.notice} /> : null}
       <WorkingBody working={working} capabilities={capabilities} credentials={credentialList} onEdit={setEditor} onNotice={setNotice} />
       {editor ? (
         <ProviderEditor
@@ -123,7 +112,7 @@ interface WorkingBodyProps {
   capabilities: Capabilities;
   credentials: CredentialList;
   onEdit: (editor: EditorState) => void;
-  onNotice: (notice: ModelNotice) => void;
+  onNotice: (notice: DraftNotice) => void;
 }
 
 function WorkingBody({ working, capabilities, credentials, onEdit, onNotice }: WorkingBodyProps): ReactElement {
@@ -138,7 +127,7 @@ function WorkingBody({ working, capabilities, credentials, onEdit, onNotice }: W
     case 'error':
       return (
         <Alert intent="danger" title="Couldn't load the catalog">
-          {working.message}
+          {working.error.message}
         </Alert>
       );
     case 'none':
@@ -245,7 +234,7 @@ interface ProviderTableProps {
   capabilities: Capabilities;
   credentials: CredentialList;
   onEdit: (editor: EditorState) => void;
-  onNotice: (notice: ModelNotice) => void;
+  onNotice: (notice: DraftNotice) => void;
 }
 
 function ProviderTable({ document, source, fingerprint, capabilities, credentials, onEdit, onNotice }: ProviderTableProps): ReactElement {

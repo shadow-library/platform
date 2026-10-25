@@ -1,6 +1,7 @@
 import { type DateRange, type RangePreset } from '@shadow-library/ui';
 
 import { splitTaskKey } from '@/features/catalog/catalog-readers';
+import { ownEntry } from '@/features/catalog/catalog-values';
 import { type TaskEntry } from '@/features/catalog/catalog-spec.types';
 import { taskTitle } from '@/features/shared/naming';
 import { type GetUsageQueryParams, type GetUsageSeriesQueryParams } from '@/lib/apis/api-types.gen';
@@ -62,7 +63,7 @@ function filterToken(value: unknown): string | undefined {
 
 function groupOf(value: unknown): UsageGroup {
   if (typeof value !== 'string') return 'app';
-  return USAGE_GROUPS.find(group => group === value) ?? LEGACY_GROUPS[value] ?? 'app';
+  return USAGE_GROUPS.find(group => group === value) ?? ownEntry(LEGACY_GROUPS, value) ?? 'app';
 }
 
 export function taskBelongsTo(task: string, app: string): boolean {

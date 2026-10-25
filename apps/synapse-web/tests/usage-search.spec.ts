@@ -297,3 +297,9 @@ describe('lastIncludedInstant', () => {
     expect(lastIncludedInstant('soon')).toBe('soon');
   });
 });
+
+describe('parseUsageSearch with prototype keys', () => {
+  it('should group by app when the grouping names a prototype key', () => {
+    for (const groupBy of ['constructor', '__proto__', 'toString']) expect(parseUsageSearch({ groupBy }, new Date('2026-10-25T12:00:00Z')).groupBy).toBe('app');
+  });
+});

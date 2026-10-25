@@ -20,11 +20,6 @@ export const UNKNOWN_SERIES_KEY = '~unknown';
 
 const MEASURE_FIELDS = { billed: 'billedCostUsd', list: 'listCostUsd' } as const satisfies Record<SpendMeasure, 'billedCostUsd' | 'listCostUsd'>;
 
-const DAY_LABEL = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
-const COMPACT_USD = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', notation: 'compact', maximumFractionDigits: 1 });
-const WHOLE_USD = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 2 });
-const CENTS_USD = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumSignificantDigits: 2 });
-
 const seriesKeyOf = (entry: UsageSeriesEntryResponse): string => entry.key ?? UNKNOWN_SERIES_KEY;
 
 function byListCost(left: UsageSeriesEntryResponse, right: UsageSeriesEntryResponse): number {
@@ -52,26 +47,13 @@ export function dailySpendOf(response: UsageSeriesResponse, measure: SpendMeasur
   const foldedValues = folded.map(entry => pointValues(entry, measure));
 
   const data = response.days.map(day => {
-    const values: Record<string, number> = {};
-    for (const { key, values: byDay } of shownValues) values[key] = byDay.get(day) ?? 0;
-    if (folds) values[OTHER_SERIES_KEY] = foldedValues.reduce((sum, byDay) => sum + (byDay.get(day) ?? 0), 0);
-    return { x: day, values };
+    const shownOnDay = shownValues.map(({ key, values }): [string, number] => [key, values.get(day) ?? 0]);
+    const otherOnDay: [string, number][] = folds ? [[OTHER_SERIES_KEY, foldedValues.reduce((sum, byDay) => sum + (byDay.get(day) ?? 0), 0)]] : [];
+    return { x: day, values: Object.fromEntries([...shownOnDay, ...otherOnDay]) };
   });
   const series: ChartSeries[] = [
     ...shown.map(entry => ({ key: seriesKeyOf(entry), label: entry.key === null ? 'Unknown app' : appName(entry.key), slot: slots.get(entry.key) })),
     ...(folds ? [{ key: OTHER_SERIES_KEY, label: `${folded.length} other apps`, tone: 'neutral' as const }] : []),
   ];
   return { data, series, total: response.totals[MEASURE_FIELDS[measure]] };
-}
-
-export function formatDay(day: string): string {
-  const time = Date.parse(`${day}T00:00:00Z`);
-  return Number.isNaN(time) ? day : DAY_LABEL.format(time);
-}
-
-export function formatUsdTick(value: number): string {
-  const magnitude = Math.abs(value);
-  if (magnitude >= 1000) return COMPACT_USD.format(value);
-  if (magnitude >= 1 || magnitude === 0) return WHOLE_USD.format(value);
-  return CENTS_USD.format(value);
 }

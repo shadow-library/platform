@@ -1,5 +1,6 @@
 import { type CatalogDocument, type DocumentEdit } from '@/features/catalog/catalog-document';
 import { withoutProviderCredential, withProvider, withProviderCredential } from '@/features/catalog/catalog-edits';
+import { CATALOG_KEY_HINT, CATALOG_KEY_PATTERN } from '@/features/catalog/catalog-keys';
 import { readProviders } from '@/features/catalog/catalog-readers';
 import {
   type ProviderCost,
@@ -16,9 +17,6 @@ import { originOfUrl } from '@/features/credentials/credential-view';
 import { type CredentialResponse } from '@/lib/apis/api-types.gen';
 
 import { providerKeysOf, providerUsers, sortFeatures, usersSentence } from './provider-view';
-
-/** Mirrors the server parser's rule for provider keys. */
-export const PROVIDER_KEY_PATTERN = /^[A-Za-z0-9][\w.:/@-]*$/;
 
 export const CONCURRENT_PROVIDER_CHANGE = 'Someone else changed this provider while you were editing. Reopen it to see their change.';
 
@@ -118,7 +116,7 @@ function urlError(input: string): string | undefined {
 function keyError(key: string, context: ProviderFormContext): string | undefined {
   if (context.mode.kind === 'edit') return undefined;
   if (key === '') return 'Enter a key';
-  if (!PROVIDER_KEY_PATTERN.test(key)) return 'Start with a letter or digit, then use only letters, digits and . _ - : / @';
+  if (!CATALOG_KEY_PATTERN.test(key)) return CATALOG_KEY_HINT;
   return context.takenKeys.includes(key) ? 'Another provider already uses this key' : undefined;
 }
 

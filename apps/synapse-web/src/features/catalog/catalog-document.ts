@@ -53,10 +53,7 @@ export function editorSourceOf(draft: DraftResponse | null, active: ActiveDocume
   return { text: formatCatalog(active?.document ?? EMPTY_CATALOG), note: '', fingerprint: null, ...(active && { activeVersion: active.version }) };
 }
 
-/**
- * Tells the server which draft a save replaces, so it refuses the save when someone else's draft has taken that one's place. A first draft is
- * pinned to the active version it was built from, so a publish made meanwhile (a budget-only one, say) is not silently reverted by it.
- */
+/** Names the draft a save replaces so the server refuses a stale one; a first draft pins its active version so it can't revert a publish made meanwhile. */
 export function draftExpectation(fingerprint: string | null, activeVersion?: number): DraftExpectation {
   if (fingerprint !== null) return { expectedFingerprint: fingerprint };
   return { expectNoDraft: true, ...(activeVersion !== undefined && { expectedActiveVersion: activeVersion }) };
@@ -70,13 +67,7 @@ export function activeVersionOf(versions: readonly CatalogVersionSummaryResponse
 }
 
 export function issuePathLabel(path: string): string {
-  return path === '' ? '(document)' : path;
-}
-
-export function describeAvailability(available?: Record<string, string[]>): string {
-  const rules = Object.entries(available ?? {});
-  if (rules.length === 0) return 'Everywhere';
-  return rules.map(([selector, values]) => `${selector}: ${values.join(', ')}`).join('; ');
+  return path === '' ? '(whole catalog)' : path;
 }
 
 export function credentialIssuesByProvider(issues: readonly CatalogIssueResponse[]): Map<string, CatalogIssueResponse[]> {

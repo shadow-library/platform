@@ -4,7 +4,7 @@ import { type ReactElement } from 'react';
 import { Alert, Table, type TableColumn } from '@shadow-library/ui';
 
 import { readTasks, useActiveCatalog } from '@/features/catalog';
-import { COST_PHRASES, CostLabel, formatRate, formatUsd, Mono, SectionHeader } from '@/features/shared';
+import { COST_PHRASES, CostLabel, formatUsd, Mono, SectionHeader, ShareCell } from '@/features/shared';
 import controls from '@/features/shared/controls.module.css';
 
 import { featureSpendOf, type FeatureSpendRow, windowSearch } from './feature-spend';
@@ -22,17 +22,6 @@ function FeatureCell({ row }: { row: FeatureSpendRow }): ReactElement {
         <span>{row.title}</span>
       )}
       {row.taskKey ? <Mono>{row.taskKey}</Mono> : null}
-    </span>
-  );
-}
-
-function ShareCell({ share }: { share: number }): ReactElement {
-  return (
-    <span className={styles.share}>
-      <span className={styles.bar} aria-hidden>
-        <span className={styles.barFill} style={{ width: `${Math.round(share * 100)}%` }} />
-      </span>
-      <span className={controls.tabular}>{formatRate(share)}</span>
     </span>
   );
 }

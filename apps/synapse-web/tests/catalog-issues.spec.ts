@@ -58,3 +58,9 @@ describe('issueSentence', () => {
     expect(issueSentence({ path: '', code: 'something_new', message: 'Something new went wrong' })).toBe('Something new went wrong');
   });
 });
+
+describe('issueSentence with prototype codes', () => {
+  it('should fall back to the server message for a code named like a prototype key', () => {
+    for (const code of ['constructor', '__proto__', 'toString']) expect(issueSentence({ path: 'tasks', code, message: 'Raw message' })).toBe('Raw message');
+  });
+});

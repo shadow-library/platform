@@ -1,4 +1,4 @@
-import { type ReactElement, type ReactNode, useState } from 'react';
+import { type ReactElement, useState } from 'react';
 import { Alert, Button, Drawer, FormField, Input, MultiSelect, NumberStepper, Select } from '@shadow-library/ui';
 
 import {
@@ -13,9 +13,8 @@ import {
   type ProviderLocality,
   useDraftEdit,
 } from '@/features/catalog';
-import { draftOutcomeNotice, type ModelNotice } from '@/features/models/model-view';
-import { NoticeAlert } from '@/features/models/NoticeAlert';
-import { Mono, providerName } from '@/features/shared';
+import { type DraftNotice, DraftNoticeAlert, draftOutcomeNotice, FormSection, Mono, providerName } from '@/features/shared';
+import formStyles from '@/features/shared/form.module.css';
 
 import { type CredentialList, CredentialPicker, LegacyKeyBadge, listedCredentials } from './CredentialPicker';
 import {
@@ -51,19 +50,7 @@ export interface ProviderEditorProps {
   takenKeys: readonly string[];
   credentials: CredentialList;
   onClose: () => void;
-  onSaved: (notice: ModelNotice) => void;
-}
-
-function Section({ title, hint, children }: { title: string; hint?: string; children: ReactNode }): ReactElement {
-  return (
-    <section className={styles.formSection}>
-      <div>
-        <h3 className={styles.formSectionTitle}>{title}</h3>
-        {hint ? <p className={styles.formSectionHint}>{hint}</p> : null}
-      </div>
-      {children}
-    </section>
-  );
+  onSaved: (notice: DraftNotice) => void;
 }
 
 function unlistedReason(list: Exclude<CredentialList, { status: 'ready' }>): string {
@@ -84,7 +71,7 @@ interface KeyFieldProps {
 }
 
 function KeyField({ form, credentials, onChange }: KeyFieldProps): ReactElement {
-  if (form.kind === 'ollama' && form.credential === '') return <p className={styles.formSectionHint}>An Ollama provider never sends an API key, so none is needed.</p>;
+  if (form.kind === 'ollama' && form.credential === '') return <p className={formStyles.formSectionHint}>An Ollama provider never sends an API key, so none is needed.</p>;
   if (form.kind === 'ollama')
     return (
       <div className={styles.inline}>
@@ -99,7 +86,7 @@ function KeyField({ form, credentials, onChange }: KeyFieldProps): ReactElement 
       <div className={styles.stack}>
         {form.apiKeyConfig ? <LegacyKeyBadge apiKeyConfig={form.apiKeyConfig} alongside={form.credential !== ''} /> : null}
         {form.credential ? <Mono>{form.credential}</Mono> : null}
-        <p className={styles.formSectionHint}>
+        <p className={formStyles.formSectionHint}>
           {form.credential ? 'A stored key is chosen. ' : 'No stored key is chosen. '}
           {unlistedReason(credentials)}
         </p>
@@ -123,7 +110,7 @@ export function ProviderEditor({ mode, initial, takenKeys, credentials, onClose,
   const draftEdit = useDraftEdit();
   const [form, setForm] = useState<ProviderForm>(initial);
   const [errors, setErrors] = useState<ProviderFormErrors | null>(null);
-  const [failure, setFailure] = useState<ModelNotice | null>(null);
+  const [failure, setFailure] = useState<DraftNotice | null>(null);
   const context = { mode, takenKeys };
 
   const update = (patch: Partial<ProviderForm>): void => {
@@ -157,11 +144,11 @@ export function ProviderEditor({ mode, initial, takenKeys, credentials, onClose,
     <Drawer open onOpenChange={open => open || draftEdit.pending || onClose()} size="lg">
       <Drawer.Header title={title} meta="Saved to the draft; nothing changes for apps until the draft is published." />
       <Drawer.Body>
-        <div className={styles.form}>
-          {failure ? <NoticeAlert notice={failure} /> : null}
+        <div className={formStyles.form}>
+          {failure ? <DraftNoticeAlert notice={failure} /> : null}
           {errors ? <p className={styles.problem}>Some settings need attention before the provider can be saved.</p> : null}
 
-          <Section title="About">
+          <FormSection title="About">
             {mode.kind === 'add' ? (
               <FormField label="Key" required error={fieldError.key} helper="How models refer to this provider. It can't be changed later.">
                 <Input value={form.key} onValueChange={key => update({ key })} placeholder="openrouter" autoComplete="off" spellCheck={false} />
@@ -171,8 +158,8 @@ export function ProviderEditor({ mode, initial, takenKeys, credentials, onClose,
                 <Input value={mode.key} readOnly />
               </FormField>
             )}
-            <div className={styles.formRow}>
-              <FormField label="Kind" required error={fieldError.kind} className={styles.formGrow}>
+            <div className={formStyles.formRow}>
+              <FormField label="Kind" required error={fieldError.kind} className={formStyles.formGrow}>
                 <Select
                   value={form.kind}
                   onValueChange={kind => update(kindPatch(form, kind as ProviderKind, initial))}
@@ -188,7 +175,7 @@ export function ProviderEditor({ mode, initial, takenKeys, credentials, onClose,
                 </Select>
               </FormField>
               {form.kind === 'openai' ? (
-                <FormField label="Service" required error={fieldError.flavor} className={styles.formGrow}>
+                <FormField label="Service" required error={fieldError.flavor} className={formStyles.formGrow}>
                   <Select
                     value={form.flavor}
                     onValueChange={flavor => update({ flavor: flavor as ProviderFlavor })}
@@ -208,11 +195,11 @@ export function ProviderEditor({ mode, initial, takenKeys, credentials, onClose,
             <FormField label="Address" required error={fieldError.url} helper="The base URL Synapse sends calls to.">
               <Input value={form.url} onValueChange={url => update({ url })} placeholder="https://openrouter.ai/api/v1" autoComplete="off" spellCheck={false} />
             </FormField>
-          </Section>
+          </FormSection>
 
-          <Section title="Where it runs and what it costs" hint="Features restricted to our cluster can only use providers that run inside it.">
-            <div className={styles.formRow}>
-              <FormField label="Where it runs" required error={fieldError.locality} className={styles.formGrow}>
+          <FormSection title="Where it runs and what it costs" hint="Features restricted to our cluster can only use providers that run inside it.">
+            <div className={formStyles.formRow}>
+              <FormField label="Where it runs" required error={fieldError.locality} className={formStyles.formGrow}>
                 <Select
                   value={form.locality}
                   onValueChange={locality => update({ locality: locality as ProviderLocality })}
@@ -227,7 +214,7 @@ export function ProviderEditor({ mode, initial, takenKeys, credentials, onClose,
                   ))}
                 </Select>
               </FormField>
-              <FormField label="Cost" required error={fieldError.cost} className={styles.formGrow}>
+              <FormField label="Cost" required error={fieldError.cost} className={formStyles.formGrow}>
                 <Select
                   value={form.cost}
                   onValueChange={cost => update({ cost: cost as ProviderCost })}
@@ -243,8 +230,8 @@ export function ProviderEditor({ mode, initial, takenKeys, credentials, onClose,
                 </Select>
               </FormField>
             </div>
-            <div className={styles.formRow}>
-              <FormField label="Features" optional helper="What the provider offers beyond plain calls." className={styles.formGrow}>
+            <div className={formStyles.formRow}>
+              <FormField label="Features" optional helper="What the provider offers beyond plain calls." className={formStyles.formGrow}>
                 <MultiSelect
                   options={FEATURE_OPTIONS}
                   value={form.features}
@@ -258,7 +245,7 @@ export function ProviderEditor({ mode, initial, takenKeys, credentials, onClose,
                 optional
                 error={fieldError.maxInflightPerReplica}
                 helper="Most calls each Synapse server sends it at the same time. Leave empty for no limit."
-                className={styles.formGrow}
+                className={formStyles.formGrow}
               >
                 <NumberStepper
                   value={form.maxInflightPerReplica}
@@ -271,9 +258,9 @@ export function ProviderEditor({ mode, initial, takenKeys, credentials, onClose,
                 />
               </FormField>
             </div>
-          </Section>
+          </FormSection>
 
-          <Section title="API key" hint="Keys are stored sealed in Synapse and are only ever sent to the site they are bound to.">
+          <FormSection title="API key" hint="Keys are stored sealed in Synapse and are only ever sent to the site they are bound to.">
             <KeyField form={form} credentials={credentials} onChange={credential => update({ credential })} />
             {warning ? (
               <Alert intent="warning" title="The API key won't work at this address">
@@ -281,9 +268,9 @@ export function ProviderEditor({ mode, initial, takenKeys, credentials, onClose,
               </Alert>
             ) : null}
             {form.apiKeyConfig && form.kind !== 'ollama' && credentials.status === 'ready' && form.credential === '' ? (
-              <p className={styles.formSectionHint}>The old key setting is being retired. Choosing a stored key replaces it.</p>
+              <p className={formStyles.formSectionHint}>The old key setting is being retired. Choosing a stored key replaces it.</p>
             ) : null}
-          </Section>
+          </FormSection>
         </div>
       </Drawer.Body>
       <Drawer.Footer cancel="Cancel" action={mode.kind === 'add' ? 'Add provider' : 'Save provider'} onAction={() => void submit()} loading={draftEdit.pending} />

@@ -1,5 +1,6 @@
 import { isApiError } from '@shadow-library/web';
 
+import { ownEntry } from '@/features/catalog/catalog-values';
 import { formatDate } from '@/features/shared/format';
 import { type CreateCredentialBody, type CredentialResponse, type CredentialTestResponse, type ProviderResponse } from '@/lib/apis/api-types.gen';
 
@@ -97,8 +98,12 @@ export function hintLabel(hint: string): string {
   return hint === '' || hint === HIDDEN_HINT ? 'Hidden' : hint;
 }
 
-export function rotatedLabel(credential: Pick<CredentialResponse, 'rotatedAt'>): string {
-  return credential.rotatedAt ? formatDate(credential.rotatedAt) : 'Never';
+export function keyVersionLabel(credential: Pick<CredentialResponse, 'version' | 'rotatedAt'>): string {
+  return `Version ${credential.version}, ${credential.rotatedAt ? `last replaced ${formatDate(credential.rotatedAt)}` : 'never replaced'}`;
+}
+
+export function revokedLabel(credential: Pick<CredentialResponse, 'revokedAt'>): string | undefined {
+  return credential.revokedAt ? `Since ${formatDate(credential.revokedAt)}` : undefined;
 }
 
 export function validateSecret(input: string): SecretValidation {
@@ -124,17 +129,18 @@ export function validateCreateForm(values: { name: string; allowedOrigin: string
 export function describeTest(result: CredentialTestResponse): TestReport {
   if (result.ok) return { ok: true, message: 'The provider accepted the key.' };
   const code = result.code;
-  return { ok: false, message: (code && TEST_MESSAGES[code]) || `The test failed${code ? ` (${code})` : ''}.` };
+  return { ok: false, message: (code && ownEntry(TEST_MESSAGES, code)) || `The test failed${code ? ` (${code})` : ''}.` };
 }
 
 export function credentialErrorMessage(error: unknown): string {
   if (!isApiError(error)) return 'The request could not be completed.';
-  return ERROR_MESSAGES[error.code] ?? STATUS_MESSAGES[error.status] ?? error.message;
+  return ownEntry(ERROR_MESSAGES, error.code) ?? STATUS_MESSAGES[error.status] ?? error.message;
 }
 
 export function inUseMessage(referencedBy: readonly string[]): string {
-  if (referencedBy.length === 0) return 'The published catalog still names it. Repoint those providers and publish the catalog, then revoke it.';
-  return `The published catalog still names it for ${referencedBy.join(', ')}. Repoint those providers in the catalog editor and publish, then revoke it.`;
+  const repoint = 'Repoint those providers on the Providers screen and publish, then revoke it.';
+  if (referencedBy.length === 0) return `The published catalog still names it. ${repoint}`;
+  return `The published catalog still names it for ${referencedBy.join(', ')}. ${repoint}`;
 }
 
 export function revokeDescription(credential: Pick<CredentialResponse, 'name' | 'referencedBy'>): string {
@@ -144,7 +150,7 @@ export function revokeDescription(credential: Pick<CredentialResponse, 'name' | 
 }
 
 export function issueAdvice(code: string): string | undefined {
-  return ISSUE_ADVICE[code];
+  return ownEntry(ISSUE_ADVICE, code);
 }
 
 export function keyStatusOf(provider: Pick<ProviderResponse, 'credential' | 'apiKeyConfigured'>, credentials?: readonly CredentialResponse[]): KeyStatus {

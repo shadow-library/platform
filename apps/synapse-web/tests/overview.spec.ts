@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'bun:test';
 
 import { budgetAttentionOf } from '../src/features/overview/budget-attention';
-import { dailySpendOf, formatDay, formatUsdTick, OTHER_SERIES_KEY, UNKNOWN_SERIES_KEY } from '../src/features/overview/daily-spend';
+import { dailySpendOf, OTHER_SERIES_KEY, UNKNOWN_SERIES_KEY } from '../src/features/overview/daily-spend';
 import { featureSpendOf, featureTitle, featureUsageSearch } from '../src/features/overview/feature-spend';
 import { changeFrom, lastDays, monthToDate, overviewPeriods } from '../src/features/overview/overview-periods';
+import { chartDayFormatter, formatChartDay, formatUsdTick } from '../src/features/shared/chart-format';
 import {
   type BudgetStatusEntryResponse,
   type BudgetStatusResponse,
@@ -152,6 +153,12 @@ describe('dailySpendOf', () => {
     expect(spend.data[0]?.values[OTHER_SERIES_KEY]).toBe(93 + 92 + 91);
   });
 
+  it('should chart an app keyed like a prototype key as its own value', () => {
+    const data = dailySpendOf(seriesResponse([entry('__proto__', [[1, 3]]), entry('constructor', [[2, 4]])]), 'billed').data;
+    expect(data[0]?.values).toEqual(JSON.parse('{"__proto__":3,"constructor":4}'));
+    expect(Object.getPrototypeOf(data[0]?.values)).toBe(Object.prototype);
+  });
+
   it('should keep eight series without folding', () => {
     const series = Array.from({ length: 8 }, (_, position) => entry(`app-${position}`, [[1, 1]]));
     expect(dailySpendOf(seriesResponse(series), 'list').series.some(item => item.key === OTHER_SERIES_KEY)).toBe(false);
@@ -162,10 +169,22 @@ describe('dailySpendOf', () => {
   });
 });
 
-describe('formatDay', () => {
+describe('formatChartDay', () => {
   it('should print a UTC day as a short month and day', () => {
-    expect(formatDay('2026-10-24')).toBe('Oct 24');
-    expect(formatDay('not-a-day')).toBe('not-a-day');
+    expect(formatChartDay('2026-10-24')).toBe('Oct 24');
+    expect(formatChartDay('not-a-day')).toBe('not-a-day');
+  });
+});
+
+describe('chartDayFormatter', () => {
+  it('should mark only the current UTC day as partial', () => {
+    const format = chartDayFormatter('2026-10-25');
+    expect(format('2026-10-25')).toBe('Oct 25 (so far)');
+    expect(format('2026-10-24')).toBe('Oct 24');
+  });
+
+  it('should mark nothing while the day is not known', () => {
+    expect(chartDayFormatter(null)('2026-10-25')).toBe('Oct 25');
   });
 });
 

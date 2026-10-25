@@ -25,7 +25,6 @@ import {
   capabilityChips,
   cheapest,
   compareModels,
-  draftOutcomeNotice,
   filterModels,
   formatContext,
   keepVisible,
@@ -38,6 +37,7 @@ import {
   usageSentence,
   usageSummary,
 } from '../src/features/models/model-view';
+import { draftOutcomeNotice } from '../src/features/shared/draft-notice';
 import { catalogFixture } from './catalog-fixture';
 
 const PROVIDERS = ['openrouter', 'subscription', 'ollama'];

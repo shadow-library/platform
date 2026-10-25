@@ -4,14 +4,25 @@ import { type ReactElement, useState } from 'react';
 import { Alert, Button, Card, FormField, Statistic, Table, type TableColumn } from '@shadow-library/ui';
 
 import { type CatalogDocument, readAliases, readModels, readTasks, useDraftEdit } from '@/features/catalog';
-import { formatNumber, formatSignedUsd, modelDisplayName, modelEligibility, ModelPicker, Mono, SectionHeader, signedUsdFormat, usdFormat } from '@/features/shared';
+import {
+  type DraftNotice,
+  DraftNoticeAlert,
+  formatNumber,
+  formatSignedUsd,
+  modelDisplayName,
+  modelEligibility,
+  ModelPicker,
+  Mono,
+  SectionHeader,
+  signedUsdFormat,
+  usdFormat,
+} from '@/features/shared';
 import controls from '@/features/shared/controls.module.css';
 import { aliasImpactQueryOptions, type AliasImpactRowResponse, type Capabilities } from '@/lib';
 
 import { relativeChange } from './alias-impact';
 import { retargetAliasEdit } from './alias-form';
-import { aliasModelNeeds, aliasOutcomeNotice, type AliasRow, defaultAliasNote, featureNames, type AliasFeedback as Notice } from './alias-view';
-import { AliasNotice } from './AliasNotice';
+import { aliasModelNeeds, aliasOutcomeNotice, type AliasRow, defaultAliasNote, featureNames } from './alias-view';
 import styles from './Aliases.module.css';
 
 interface AliasImpactPanelProps {
@@ -33,7 +44,7 @@ function deltaClass(delta: number): string | undefined {
 export function AliasImpactPanel({ alias, workingDocument, activeDocument, candidate, capabilities }: AliasImpactPanelProps): ReactElement {
   const navigate = useNavigate();
   const draftEdit = useDraftEdit();
-  const [notice, setNotice] = useState<Notice | null>(null);
+  const [notice, setNotice] = useState<DraftNotice | null>(null);
   const published = activeDocument ? readAliases(activeDocument).find(entry => entry.key === alias.key) : undefined;
   const impact = useQuery({ ...aliasImpactQueryOptions(alias.key, candidate), enabled: published !== undefined });
 
@@ -157,7 +168,7 @@ export function AliasImpactPanel({ alias, workingDocument, activeDocument, candi
         </p>
       ) : null}
       {candidate && !capabilities.writeDraft ? <p className={controls.hint}>Changing the target needs permission to change the catalog.</p> : null}
-      {notice ? <AliasNotice notice={notice} onDismiss={() => setNotice(null)} className={styles.result} /> : null}
+      {notice ? <DraftNoticeAlert notice={notice} onDismiss={() => setNotice(null)} className={styles.result} /> : null}
 
       {impact.error ? (
         <Alert intent="danger" title="Couldn't load the impact" className={styles.result}>

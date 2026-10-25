@@ -11,11 +11,6 @@ export function Muted({ children }: { children: ReactNode }): ReactElement {
   return <span className={styles.muted}>{children}</span>;
 }
 
-export function TextOrDash({ value, mono }: { value?: string | null; mono?: boolean }): ReactElement {
-  if (!value) return <span className={styles.muted}>—</span>;
-  return mono ? <Mono>{value}</Mono> : <span className={styles.text}>{value}</span>;
-}
-
 export type CatalogState = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
 
 export function VersionStateBadge({ state, active }: { state: CatalogState; active?: boolean }): ReactElement {

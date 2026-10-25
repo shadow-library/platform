@@ -1,7 +1,7 @@
 import { type ReactElement } from 'react';
 import { Card, Statistic, type StatisticPositiveIs, Tooltip } from '@shadow-library/ui';
 
-import { COST_EXPLANATIONS, COST_LABELS, type CostKind, InfoIcon, usdFormat } from '@/features/shared';
+import { COST_EXPLANATIONS, COST_LABELS, COST_PHRASES, type CostKind, InfoIcon, usdFormat } from '@/features/shared';
 import costStyles from '@/features/shared/CostLabel.module.css';
 import { type UsageTotalsResponse } from '@/lib';
 
@@ -40,7 +40,7 @@ function TotalCard({ label, value, format, delta, positiveIs, comparison, loadin
         />
         {cost ? (
           <Tooltip content={COST_EXPLANATIONS[cost]}>
-            <button type="button" className={`${costStyles.info} ${styles.totalInfo}`} aria-label={`What ${COST_LABELS[cost].toLowerCase()} means`}>
+            <button type="button" className={`${costStyles.info} ${styles.totalInfo}`} aria-label={`What ${COST_PHRASES[cost]} means`}>
               <InfoIcon />
             </button>
           </Tooltip>

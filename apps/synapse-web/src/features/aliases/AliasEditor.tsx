@@ -1,8 +1,9 @@
-import { type ReactElement, type ReactNode, useState } from 'react';
+import { type ReactElement, useState } from 'react';
 import { Alert, Button, Combobox, type ComboboxOption, Drawer, FormField, Input, RadioGroup, Switch, Textarea, TokenInput, useConfirm } from '@shadow-library/ui';
 
-import { ALIAS_STATES, type AliasState, type CatalogDocument, readModels, selectorVocabulary, useDraftEdit } from '@/features/catalog';
-import { modelDisplayName, ModelPicker, Mono, selectorName } from '@/features/shared';
+import { ALIAS_STATES, type AliasState, type CatalogDocument, readModels, resolveSelectorKey, selectorVocabulary, useDraftEdit } from '@/features/catalog';
+import { type DraftNotice, DraftNoticeAlert, FormSection, modelDisplayName, ModelPicker, Mono, selectorName } from '@/features/shared';
+import formStyles from '@/features/shared/form.module.css';
 
 import {
   addAliasEdit,
@@ -13,24 +14,12 @@ import {
   type AvailabilityRule,
   availableOfRules,
   removeRule,
-  resolveSelectorKey,
   updateAliasEdit,
   updateRule,
   validateAliasForm,
   valueSuggestions,
 } from './alias-form';
-import {
-  ALIAS_STATE_INFO,
-  aliasModelNeeds,
-  aliasOutcomeNotice,
-  type AliasUser,
-  defaultAliasNote,
-  narrowedConditions,
-  narrowingDescription,
-  type AliasFeedback as Notice,
-  retireDescription,
-} from './alias-view';
-import { AliasNotice } from './AliasNotice';
+import { ALIAS_STATE_INFO, aliasModelNeeds, aliasOutcomeNotice, type AliasUser, defaultAliasNote, narrowedConditions, narrowingDescription, retireDescription } from './alias-view';
 import styles from './Aliases.module.css';
 
 export interface AliasEditorProps {
@@ -40,19 +29,7 @@ export interface AliasEditorProps {
   takenKeys: readonly string[];
   usedBy: readonly AliasUser[];
   onClose: () => void;
-  onSaved: (notice: Notice) => void;
-}
-
-function Section({ title, hint, children }: { title: string; hint?: string; children: ReactNode }): ReactElement {
-  return (
-    <section className={styles.formSection}>
-      <div>
-        <h3 className={styles.formSectionTitle}>{title}</h3>
-        {hint ? <p className={styles.formSectionHint}>{hint}</p> : null}
-      </div>
-      {children}
-    </section>
-  );
+  onSaved: (notice: DraftNotice) => void;
 }
 
 export function AliasEditor({ mode, initial, document, takenKeys, usedBy, onClose, onSaved }: AliasEditorProps): ReactElement {
@@ -60,7 +37,7 @@ export function AliasEditor({ mode, initial, document, takenKeys, usedBy, onClos
   const draftEdit = useDraftEdit();
   const [form, setForm] = useState<AliasForm>(initial);
   const [errors, setErrors] = useState<AliasFormErrors | null>(null);
-  const [failure, setFailure] = useState<Notice | null>(null);
+  const [failure, setFailure] = useState<DraftNotice | null>(null);
   const models = readModels(document);
   const vocabulary = selectorVocabulary(document);
   const needs = mode.kind === 'edit' ? aliasModelNeeds(document, mode.key, form.state) : {};
@@ -109,11 +86,11 @@ export function AliasEditor({ mode, initial, document, takenKeys, usedBy, onClos
     <Drawer open onOpenChange={open => open || draftEdit.pending || onClose()} size="lg">
       <Drawer.Header title={title} meta="Saved to the draft; nothing changes for users until the draft is published." />
       <Drawer.Body>
-        <div className={styles.form}>
-          {failure ? <AliasNotice notice={failure} /> : null}
+        <div className={formStyles.form}>
+          {failure ? <DraftNoticeAlert notice={failure} /> : null}
           {errors ? <p className={styles.problem}>Some settings need attention before the model name can be saved.</p> : null}
 
-          <Section title="About">
+          <FormSection title="About">
             {mode.kind === 'add' ? (
               <>
                 <Alert intent="info" title="The key is permanent">
@@ -144,25 +121,25 @@ export function AliasEditor({ mode, initial, document, takenKeys, usedBy, onClos
               checked={form.showVersion}
               onCheckedChange={showVersion => update({ showVersion })}
             />
-          </Section>
+          </FormSection>
 
-          <Section title="Target model" hint="Requests made with this name go to this model. Change it to move everyone who picked the name.">
+          <FormSection title="Target model" hint="Requests made with this name go to this model. Change it to move everyone who picked the name.">
             <FormField label="Model" required error={fieldError.model}>
               <ModelPicker {...needs} models={models} value={form.model || null} onValueChange={model => update({ model })} invalid={fieldError.model !== undefined} />
             </FormField>
-            {models.length === 0 ? <p className={styles.formSectionHint}>The catalog has no models yet. Add one on the Models screen first.</p> : null}
-            {target && form.model !== initial.model ? <p className={styles.formSectionHint}>Points to {modelDisplayName(target)} once published.</p> : null}
-          </Section>
+            {models.length === 0 ? <p className={formStyles.formSectionHint}>The catalog has no models yet. Add one on the Models screen first.</p> : null}
+            {target && form.model !== initial.model ? <p className={formStyles.formSectionHint}>Points to {modelDisplayName(target)} once published.</p> : null}
+          </FormSection>
 
-          <Section title="State">
+          <FormSection title="State">
             <RadioGroup aria-label="State" value={form.state} onValueChange={value => update({ state: value as AliasState })}>
               {ALIAS_STATES.map(state => (
                 <RadioGroup.Item key={state} value={state} label={ALIAS_STATE_INFO[state].label} description={ALIAS_STATE_INFO[state].meaning} />
               ))}
             </RadioGroup>
-          </Section>
+          </FormSection>
 
-          <Section
+          <FormSection
             title="Available when"
             hint="Apps send conditions such as tier with each request. The name works only when every rule matches; with no rules it works everywhere. Outside these conditions, requests that name this model name are refused — they do not fall back to the feature's default model."
           >
@@ -182,7 +159,7 @@ export function AliasEditor({ mode, initial, document, takenKeys, usedBy, onClos
                 Add rule
               </Button>
             </div>
-          </Section>
+          </FormSection>
         </div>
       </Drawer.Body>
       <Drawer.Footer cancel="Cancel" action={mode.kind === 'add' ? 'Add model name' : 'Save model name'} onAction={() => void submit()} loading={draftEdit.pending} />
@@ -217,8 +194,8 @@ function RuleEditor({ rule, position, vocabulary, errors, onChange, onRemove }: 
           Remove
         </Button>
       </div>
-      <div className={styles.formRow}>
-        <FormField label="Condition" error={errors?.selector} className={styles.formGrow}>
+      <div className={formStyles.formRow}>
+        <FormField label="Condition" error={errors?.selector} className={formStyles.formGrow}>
           <Combobox
             options={selectorOptions(knownKeys, selector)}
             value={selector || null}
@@ -230,7 +207,7 @@ function RuleEditor({ rule, position, vocabulary, errors, onChange, onRemove }: 
             aria-label={`Rule ${position} condition`}
           />
         </FormField>
-        <FormField label="Is one of" error={errors?.values} helper="Press Enter or comma after each value." className={styles.formGrow}>
+        <FormField label="Is one of" error={errors?.values} helper="Press Enter or comma after each value." className={formStyles.formGrow}>
           <TokenInput
             value={rule.values.map(value => ({ value, valid: true }))}
             onValueChange={tokens => onChange({ values: tokens.map(token => token.value) })}
@@ -241,10 +218,12 @@ function RuleEditor({ rule, position, vocabulary, errors, onChange, onRemove }: 
           />
         </FormField>
       </div>
-      {unknownSelector ? <p className={styles.formSectionHint}>Nothing else in the catalog uses “{selector}” yet; check the exact name with the app&apos;s developers.</p> : null}
+      {unknownSelector ? (
+        <p className={formStyles.formSectionHint}>Nothing else in the catalog uses “{selector}” yet; check the exact name with the app&apos;s developers.</p>
+      ) : null}
       {suggestions.length > 0 ? (
         <div className={styles.suggestions}>
-          <span className={styles.formSectionHint}>Values in use:</span>
+          <span className={styles.suggestionsLabel}>Values in use:</span>
           {suggestions.map(value => (
             <Button key={value} variant="text" size="sm" onClick={() => onChange({ values: [...rule.values, value] })} aria-label={`Add ${value} to rule ${position}`}>
               + {value}

@@ -2,11 +2,9 @@ import { type CatalogDocument } from '@/features/catalog/catalog-document';
 import { readAliases, readTasks } from '@/features/catalog/catalog-readers';
 import { type ModelCapabilities, type ModelEntry, type ModelPrice } from '@/features/catalog/catalog-spec.types';
 import { isRecord } from '@/features/catalog/catalog-values';
-import { type DraftEditOutcome } from '@/features/catalog/draft-edit';
 import { formatNumber, formatPrice } from '@/features/shared/format';
 import { aliasName, effortName, modelName, providerName, taskTitle } from '@/features/shared/naming';
-import { type Notice } from '@/features/shared/notice.types';
-import { type CatalogIssueResponse } from '@/lib/apis/api-types.gen';
+import { type DraftAction } from '@/features/shared/draft-notice';
 
 export interface ModelUser {
   key: string;
@@ -39,13 +37,6 @@ export interface ComparisonRow {
   values: string[];
   /** Per model: whether its price is the lowest one shown, marked only when some other model pays more */
   cheapest: boolean[];
-}
-
-export type ModelAction = 'added' | 'updated' | 'removed';
-
-export interface ModelNotice extends Notice {
-  changesLink?: boolean;
-  issues?: CatalogIssueResponse[];
 }
 
 export const CAPABILITY_FILTERS: readonly CapabilityFilter[] = ['tools', 'vision', 'imageOutput', 'embedding', 'reasoning'];
@@ -236,32 +227,6 @@ export function compareModels(models: readonly ModelEntry[], usage: UsageIndex, 
   ];
 }
 
-export function defaultModelNote(name: string, action: ModelAction): string {
+export function defaultModelNote(name: string, action: DraftAction): string {
   return `Model ${name} ${action}`;
-}
-
-export function draftOutcomeNotice(outcome: DraftEditOutcome, name: string, action: ModelAction): ModelNotice {
-  const failed = action === 'removed' ? `${name} wasn't removed` : `${name} wasn't saved`;
-  switch (outcome.kind) {
-    case 'saved': {
-      const title = `${name} ${action} in the draft`;
-      if (outcome.issues.length === 0) return { intent: 'success', title, body: 'It goes live once the draft is published.', changesLink: true };
-      return {
-        intent: 'warning',
-        title,
-        body: `The draft now has ${plural(outcome.issues.length, 'problem')} to fix before it can be published.`,
-        changesLink: true,
-      };
-    }
-    case 'invalid':
-      return { intent: 'danger', title: failed, body: "Synapse couldn't accept the draft with this change.", issues: outcome.issues };
-    case 'unchanged':
-      return { intent: 'info', title: 'Nothing to save', body: `The draft already has these settings for ${name}.` };
-    case 'refused':
-      return { intent: 'danger', title: failed, body: outcome.reason };
-    case 'conflict':
-      return { intent: 'warning', title: 'Someone else changed the draft', body: "Your change wasn't saved. The screen now shows their version; check it and try again." };
-    case 'failed':
-      return { intent: 'danger', title: failed, body: outcome.message };
-  }
 }

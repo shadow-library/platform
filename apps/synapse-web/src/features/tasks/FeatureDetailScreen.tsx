@@ -2,7 +2,18 @@ import { useNavigate } from '@tanstack/react-router';
 import { type ReactElement, useMemo } from 'react';
 import { Alert, Badge, EmptyState, Spinner } from '@shadow-library/ui';
 
-import { type CatalogDocument, readAliases, readModels, readProviders, readTasks, selectorVocabulary, splitTaskKey, type TaskEntry } from '@/features/catalog';
+import {
+  type CatalogDocument,
+  readAliases,
+  readModels,
+  readProviders,
+  readTasks,
+  selectorVocabulary,
+  splitTaskKey,
+  type TaskEntry,
+  useWorkingCatalog,
+  type WorkingSource,
+} from '@/features/catalog';
 import { Mono, PageHeader, PermissionGate, taskKindName, taskTitle } from '@/features/shared';
 import controls from '@/features/shared/controls.module.css';
 import { useCapabilities } from '@/lib';
@@ -12,9 +23,9 @@ import { AliasesSection } from './AliasesSection';
 import { DataPolicySection } from './DataPolicySection';
 import { EffortSection } from './EffortSection';
 import { type FeatureContext } from './feature-detail';
+import { changedTaskKeys } from './feature-list';
 import styles from './Features.module.css';
 import { RoutingSection } from './RoutingSection';
-import { useWorkingCatalog, type WorkingSource } from './use-working-catalog';
 import { WorkingHint } from './WorkingHint';
 
 const SUBTITLE = 'Which model answers this feature, how much effort it spends, and which model names people may pick.';
@@ -30,7 +41,7 @@ export function FeatureDetailScreen({ taskKey }: { taskKey: string }): ReactElem
 
 function FeatureDetail({ taskKey, canEdit }: { taskKey: string; canEdit: boolean }): ReactElement {
   const navigate = useNavigate();
-  const working = useWorkingCatalog();
+  const working = useWorkingCatalog('required');
   const parts = splitTaskKey(taskKey);
   const fallbackHeader = <PageHeader title={parts ? taskTitle(parts) : taskKey} subtitle={SUBTITLE} />;
 
@@ -66,18 +77,19 @@ function FeatureDetail({ taskKey, canEdit }: { taskKey: string; canEdit: boolean
       </>
     );
 
-  return <FeatureSections document={working.document} source={working.source} unpublished={working.changed.has(task.key)} task={task} canEdit={canEdit} />;
+  return <FeatureSections document={working.document} active={working.active} source={working.source} task={task} canEdit={canEdit} />;
 }
 
 interface FeatureSectionsProps {
   document: CatalogDocument;
+  active: CatalogDocument | null;
   source: WorkingSource;
-  unpublished: boolean;
   task: TaskEntry;
   canEdit: boolean;
 }
 
-function FeatureSections({ document, source, unpublished, task, canEdit }: FeatureSectionsProps): ReactElement {
+function FeatureSections({ document, active, source, task, canEdit }: FeatureSectionsProps): ReactElement {
+  const unpublished = useMemo(() => changedTaskKeys(active, source.kind === 'draft' ? document : null).has(task.key), [active, source.kind, document, task.key]);
   const context = useMemo<FeatureContext>(
     () => ({ models: readModels(document), aliases: readAliases(document), providers: readProviders(document), vocabulary: selectorVocabulary(document) }),
     [document],

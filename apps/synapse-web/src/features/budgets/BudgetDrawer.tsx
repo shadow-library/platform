@@ -25,11 +25,15 @@ export type BudgetDrawerTarget = { kind: 'add' } | { kind: 'edit'; entry: Budget
 
 export type BudgetSubmitOutcome = { kind: 'done' } | { kind: 'kept' } | { kind: 'invalid'; issues: CatalogIssueResponse[] } | { kind: 'failed'; message: string };
 
+export type PublishStage = 'confirming' | 'publishing';
+
+type DrawerStage = 'editing' | 'checking' | PublishStage;
+
 export interface BudgetDrawerProps {
   target: BudgetDrawerTarget;
   /** The active catalog as it was when the drawer opened; a newer one arriving meanwhile must not move the edit onto it */
   basis: BudgetBasis;
-  onSubmit: (basis: BudgetBasis, change: BudgetChange, note: string, onConfirmed: () => void) => Promise<BudgetSubmitOutcome>;
+  onSubmit: (basis: BudgetBasis, change: BudgetChange, note: string, onStage: (stage: PublishStage) => void) => Promise<BudgetSubmitOutcome>;
   onClose: () => void;
 }
 
@@ -54,7 +58,7 @@ function changeOf(target: BudgetDrawerTarget, values: BudgetFormValues): BudgetC
   return target.kind === 'add' ? { kind: 'add', budget: result.budget } : { kind: 'edit', index: target.entry.index, budget: result.budget };
 }
 
-/** The parent mounts the drawer only while it is open; closing is held while a publish is in flight so its outcome is never lost. */
+/** The parent mounts the drawer only while it is open. */
 export function BudgetDrawer({ target, basis, onSubmit, onClose }: BudgetDrawerProps): ReactElement {
   const editing: BudgetEntry | undefined = target.kind === 'edit' ? target.entry : undefined;
   const [apps] = useState(() => budgetApps(readTasks(basis.document), editing?.app));
@@ -62,7 +66,8 @@ export function BudgetDrawer({ target, basis, onSubmit, onClose }: BudgetDrawerP
   const [note, setNote] = useState('');
   const [errors, setErrors] = useState<BudgetFormErrors>({});
   const [failure, setFailure] = useState<Failure>(null);
-  const [pending, setPending] = useState(false);
+  const [stage, setStage] = useState<DrawerStage>('editing');
+  const busy = stage !== 'editing';
 
   const change = changeOf(target, values);
   const unchanged = change !== null && planBudgetPublish(basis, change) === null;
@@ -74,18 +79,19 @@ export function BudgetDrawer({ target, basis, onSubmit, onClose }: BudgetDrawerP
   };
 
   const submit = async (): Promise<void> => {
-    if (pending || unchanged) return;
+    if (busy || unchanged) return;
     const result = validateBudgetForm(values, editing);
     setFailure(null);
     setErrors(result.ok ? {} : result.errors);
     if (!result.ok || !change) return;
-    const outcome = await onSubmit(basis, change, note, () => setPending(true));
-    setPending(false);
+    setStage('checking');
+    const outcome = await onSubmit(basis, change, note, setStage);
+    setStage('editing');
     if (outcome.kind === 'invalid' || outcome.kind === 'failed') setFailure(outcome);
   };
 
   return (
-    <Drawer open onOpenChange={next => next || pending || onClose()} size="md">
+    <Drawer open onOpenChange={next => next || busy || onClose()} size="md">
       <Drawer.Header title={editing ? 'Edit budget' : 'Add budget'} meta={editing ? budgetTitle(editing) : 'Limits what an app may spend on AI in each window.'} />
       <Drawer.Body>
         <div className={styles.form}>
@@ -140,10 +146,16 @@ export function BudgetDrawer({ target, basis, onSubmit, onClose }: BudgetDrawerP
       </Drawer.Body>
       <Drawer.Footer>
         {unchanged ? <span className={styles.footerNote}>Nothing has changed yet.</span> : null}
-        <Button variant="ghost" disabled={pending} onClick={onClose}>
+        <Button variant="ghost" disabled={busy} onClick={onClose}>
           Cancel
         </Button>
-        <Button variant="primary" loading={pending} disabled={unchanged} onClick={() => void submit()}>
+        <Button
+          variant="primary"
+          loading={stage === 'checking' || stage === 'publishing'}
+          loadingText={stage === 'checking' ? 'Checking the draft…' : undefined}
+          disabled={unchanged}
+          onClick={() => void submit()}
+        >
           Save
         </Button>
       </Drawer.Footer>

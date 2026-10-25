@@ -9,10 +9,11 @@ import {
   inUseMessage,
   issueAdvice,
   keyStatusOf,
+  keyVersionLabel,
   normaliseOriginInput,
   originOfUrl,
   revokeDescription,
-  rotatedLabel,
+  revokedLabel,
   sortCredentials,
   validateCreateForm,
   validateSecret,
@@ -96,16 +97,21 @@ describe('sortCredentials', () => {
   });
 });
 
-describe('hintLabel and rotatedLabel', () => {
+describe('hintLabel, keyVersionLabel and revokedLabel', () => {
   it('should show a hint as given, and say so when the key was too short to show any', () => {
     expect(hintLabel('sk-or-…a1b2')).toBe('sk-or-…a1b2');
     expect(hintLabel('…')).toBe('Hidden');
     expect(hintLabel('')).toBe('Hidden');
   });
 
-  it('should print the rotation date in UTC, or Never for a key that has not been rotated', () => {
-    expect(rotatedLabel({ rotatedAt: '2026-10-17T23:45:00.000Z' })).toBe('Oct 17, 2026');
-    expect(rotatedLabel({})).toBe('Never');
+  it('should give the key version with the UTC day it was last replaced, if ever', () => {
+    expect(keyVersionLabel({ version: 3, rotatedAt: '2026-10-17T23:45:00.000Z' })).toBe('Version 3, last replaced Oct 17, 2026');
+    expect(keyVersionLabel({ version: 1 })).toBe('Version 1, never replaced');
+  });
+
+  it('should date a revocation and say nothing for an active key', () => {
+    expect(revokedLabel({ revokedAt: '2026-10-20T08:00:00.000Z' })).toBe('Since Oct 20, 2026');
+    expect(revokedLabel({})).toBeUndefined();
   });
 });
 
@@ -259,5 +265,15 @@ describe('keyStatusOf', () => {
 
   it('should not guess about a credential it cannot list', () => {
     expect(keyStatusOf({ credential: 'live' })).toEqual({ kind: 'credential' });
+  });
+});
+
+describe('credential messages with prototype codes', () => {
+  it('should not read a message off the prototype for a code named like one', () => {
+    const unknownCode = JSON.parse('{"ok":false,"code":"constructor"}') as Parameters<typeof describeTest>[0];
+    expect(describeTest(unknownCode)).toEqual({ ok: false, message: 'The test failed (constructor).' });
+    expect(issueAdvice('__proto__')).toBeUndefined();
+    expect(issueAdvice('toString')).toBeUndefined();
+    expect(credentialErrorMessage(new ApiError(400, { type: 'CLIENT_ERROR', code: 'constructor', message: 'Server says no' }))).toBe('Server says no');
   });
 });

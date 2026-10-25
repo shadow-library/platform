@@ -63,7 +63,7 @@ const COST_NAMES: Readonly<Record<string, string>> = { zero: 'Free', metered: 'M
 const REASONING_NAMES: Readonly<Record<string, string>> = { none: 'None', optional: 'Optional', mandatory: 'Always on' };
 
 const yesNo = (value: boolean | undefined): string => (value ? 'Yes' : 'No');
-const named = (names: Readonly<Record<string, string>>, value: string | undefined): string => (value === undefined ? NOT_SET : (names[value] ?? sentenceCase(value)));
+const named = (names: Readonly<Record<string, string>>, value: string | undefined): string => (value === undefined ? NOT_SET : (ownEntry(names, value) ?? sentenceCase(value)));
 const listOf = (values: readonly string[]): string => (values.length === 0 ? NONE : values.join(', '));
 const usdOr = (value: number | undefined, absent: string): string => (value === undefined ? absent : formatUsd(value));
 

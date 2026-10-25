@@ -1,13 +1,12 @@
 import { type ReactElement, useId } from 'react';
 import { Alert, Button, Card, FormField, Input, Textarea } from '@shadow-library/ui';
 
-import { type Notice } from '@/features/shared';
+import { draftExpectation, type EditorSource, formatCatalog, type ParsedCatalog } from '@/features/catalog';
+import { type DraftNotice } from '@/features/shared';
 import controls from '@/features/shared/controls.module.css';
 import { type Capabilities, type CatalogIssueResponse, isApiError, isCatalogConflict, useSaveDraftMutation, useValidateDraftMutation } from '@/lib';
 
-import { draftExpectation, type EditorSource, formatCatalog, type ParsedCatalog } from './catalog-document';
-import { type IssueReport } from './catalog-editor.types';
-import styles from './Catalog.module.css';
+import styles from './Advanced.module.css';
 import { IssueList } from './IssueList';
 
 const NOTE_MAX_LENGTH = 500;
@@ -19,17 +18,17 @@ interface DraftPanelProps {
   parsed: ParsedCatalog;
   source: EditorSource;
   dirty: boolean;
-  report: IssueReport | null;
+  issues: readonly CatalogIssueResponse[] | null;
   onTextChange: (text: string) => void;
   onNoteChange: (note: string) => void;
   onRevert: () => void;
   onSaved: (saved: EditorSource, issues: CatalogIssueResponse[]) => void;
-  onReport: (report: IssueReport) => void;
-  onNotice: (notice: Notice | null) => void;
+  onIssues: (issues: CatalogIssueResponse[]) => void;
+  onNotice: (notice: DraftNotice | null) => void;
   onConflict: () => Promise<void>;
 }
 
-function errorNotice(title: string, error: unknown): Notice {
+function errorNotice(title: string, error: unknown): DraftNotice {
   return { intent: 'danger', title, body: isApiError(error) || error instanceof Error ? error.message : undefined };
 }
 
@@ -46,12 +45,12 @@ export function DraftPanel({
   parsed,
   source,
   dirty,
-  report,
+  issues,
   onTextChange,
   onNoteChange,
   onRevert,
   onSaved,
-  onReport,
+  onIssues,
   onNotice,
   onConflict,
 }: DraftPanelProps): ReactElement {
@@ -71,15 +70,20 @@ export function DraftPanel({
       {
         onSuccess: outcome => {
           if (outcome.kind === 'invalid') {
-            onReport({ source: 'save', issues: outcome.issues });
+            onIssues(outcome.issues);
             onNotice({ intent: 'danger', title: 'The draft was not saved', body: 'The document was refused; the issues are listed under the editor.' });
             return;
           }
           onSaved({ text: sentText, note: trimmed, fingerprint: outcome.value.fingerprint }, outcome.value.issues);
           onNotice(
             outcome.value.issues.length === 0
-              ? { intent: 'success', title: 'Draft saved', body: 'It passes validation. Review the diff and publish it when ready.' }
-              : { intent: 'warning', title: 'Draft saved with issues', body: `${outcome.value.issues.length} issue(s) would block publishing; they are listed under the editor.` },
+              ? { intent: 'success', title: 'Draft saved', body: 'It passes validation. Review the changes and publish them when ready.', changesLink: true }
+              : {
+                  intent: 'warning',
+                  title: 'Draft saved with issues',
+                  body: `${outcome.value.issues.length} issue(s) would block publishing; they are listed under the editor.`,
+                  changesLink: true,
+                },
           );
         },
         onError: error => {
@@ -94,7 +98,7 @@ export function DraftPanel({
     onNotice(null);
     validate.mutate(undefined, {
       onSuccess: result => {
-        onReport({ source: 'validate', issues: result.issues });
+        onIssues(result.issues);
         onNotice(result.valid ? { intent: 'success', title: 'The saved draft is publishable' } : { intent: 'warning', title: `${result.issues.length} issue(s) block publishing` });
       },
       onError: error => onNotice(errorNotice("Couldn't validate the draft", error)),
@@ -106,7 +110,6 @@ export function DraftPanel({
   };
 
   const hint = capabilities.writeDraft ? sectionHint(capabilities) : 'Your role can read the catalog but not edit it.';
-  const shownIssues = report && (report.source === 'save' || report.source === 'validate') ? report : null;
 
   return (
     <Card padding="md">
@@ -162,12 +165,12 @@ export function DraftPanel({
             </Button>
           </div>
         )}
-        {shownIssues && shownIssues.issues.length > 0 ? (
-          <Alert intent="warning" title={`${shownIssues.issues.length} issue(s) block publishing`} className={styles.confirm}>
-            Each issue names the JSON path it was found at.
+        {issues && issues.length > 0 ? (
+          <Alert intent="warning" title={`${issues.length} issue(s) block publishing`} className={styles.confirm}>
+            Each issue shows the path in the document where it was found.
           </Alert>
         ) : null}
-        {shownIssues ? <IssueList issues={shownIssues.issues} label="Issues in the saved draft" /> : null}
+        {issues ? <IssueList issues={issues} label="Issues in the saved draft" /> : null}
       </Card.Body>
     </Card>
   );

@@ -1,7 +1,7 @@
 import { type ReactElement, useState } from 'react';
 import { Switch, Table, type TableColumn } from '@shadow-library/ui';
 
-import { CostLabel, formatNumber, formatRate, formatSignedUsd, formatUsd, Mono, Muted, SectionHeader } from '@/features/shared';
+import { CostLabel, formatNumber, formatSignedUsd, formatUsd, Mono, Muted, SectionHeader, ShareCell } from '@/features/shared';
 import controls from '@/features/shared/controls.module.css';
 
 import { BASIS_NOUNS, type CostBasis, formatPerCall, type UsageChange, type UsageRowView } from './usage-report';
@@ -41,17 +41,6 @@ function NameCell({ row }: { row: UsageRowView }): ReactElement {
     <span className={styles.name}>
       <span>{row.name}</span>
       {row.name === row.key ? null : <Mono>{row.key}</Mono>}
-    </span>
-  );
-}
-
-function ShareCell({ share }: { share: number | null }): ReactElement {
-  return (
-    <span className={styles.share}>
-      <span className={styles.bar} aria-hidden>
-        <span className={styles.barFill} style={{ width: `${Math.round((share ?? 0) * 100)}%` }} />
-      </span>
-      <Numeric>{formatRate(share)}</Numeric>
     </span>
   );
 }

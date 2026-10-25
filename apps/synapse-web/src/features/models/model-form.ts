@@ -1,14 +1,12 @@
 import { type CatalogDocument, type DocumentEdit } from '@/features/catalog/catalog-document';
 import { withModel, withoutModel } from '@/features/catalog/catalog-edits';
+import { CATALOG_KEY_HINT, CATALOG_KEY_PATTERN } from '@/features/catalog/catalog-keys';
 import { type Effort, EFFORTS, type ModelCapabilities, type ModelEntry, type ModelSpec, type ReasoningMode } from '@/features/catalog/catalog-spec.types';
 import { readModels } from '@/features/catalog/catalog-readers';
 import { isRecord, isSameValue, ownEntry } from '@/features/catalog/catalog-values';
 import { type CatalogEdit } from '@/features/catalog/draft-edit';
 
 import { isInUse, modelKeysOf, modelUsageIndex, usageOf, usageSentence } from './model-view';
-
-/** Mirrors the server parser's rule for model keys. */
-export const MODEL_KEY_PATTERN = /^[A-Za-z0-9][\w.:/@-]*$/;
 
 export type EditorMode = { kind: 'add' } | { kind: 'edit'; key: string };
 
@@ -143,7 +141,7 @@ function countError(value: number | null, missing?: string): string | undefined 
 function keyError(key: string, context: ModelFormContext): string | undefined {
   if (context.mode.kind === 'edit') return undefined;
   if (key === '') return 'Enter a key';
-  if (!MODEL_KEY_PATTERN.test(key)) return 'Start with a letter or digit, then use only letters, digits and . _ - : / @';
+  if (!CATALOG_KEY_PATTERN.test(key)) return CATALOG_KEY_HINT;
   return context.takenKeys.includes(key) ? 'Another model already uses this key' : undefined;
 }
 

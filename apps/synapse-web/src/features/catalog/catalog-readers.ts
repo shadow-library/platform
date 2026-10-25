@@ -23,7 +23,7 @@ import {
   type TaskEntry,
   type TaskRoute,
 } from './catalog-spec.types';
-import { finite, isOneOf, isRecord, strings, text } from './catalog-values';
+import { finite, isOneOf, isRecord, ownEntry, strings, text } from './catalog-values';
 
 type CatalogDocument = Record<string, unknown>;
 
@@ -224,4 +224,8 @@ export function selectorVocabulary(document: CatalogDocument): Record<string, st
   for (const alias of readAliases(document)) for (const [selector, values] of Object.entries(alias.available ?? {})) add(selector, values);
   const sorted = [...vocabulary.entries()].sort(([left], [right]) => left.localeCompare(right));
   return Object.fromEntries(sorted.map(([selector, values]) => [selector, [...values].sort((left, right) => left.localeCompare(right))]));
+}
+
+export function selectorValues(vocabulary: Readonly<Record<string, readonly string[]>>, selector: string): string[] {
+  return strings(ownEntry(vocabulary, selector));
 }

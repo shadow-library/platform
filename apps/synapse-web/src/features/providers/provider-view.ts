@@ -13,6 +13,7 @@ import {
 import { readProviders } from '@/features/catalog/catalog-readers';
 import { isRecord, isSameValue, ownEntry, text } from '@/features/catalog/catalog-values';
 import { type KeyStatus, keyStatusOf } from '@/features/credentials/credential-view';
+import { type DraftAction } from '@/features/shared/draft-notice';
 import { providerName } from '@/features/shared/naming';
 import { type CredentialResponse, type ProviderResponse } from '@/lib/apis/api-types.gen';
 
@@ -219,6 +220,6 @@ export function usersSentence(users: readonly ProviderUser[]): string {
   return users.length === 0 ? 'No model uses it' : `Used by ${users.map(user => user.name).join(', ')}`;
 }
 
-export function defaultProviderNote(name: string, action: 'added' | 'updated' | 'removed'): string {
+export function defaultProviderNote(name: string, action: DraftAction): string {
   return `Provider ${name} ${action}`;
 }

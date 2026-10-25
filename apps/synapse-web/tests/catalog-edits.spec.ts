@@ -3,7 +3,6 @@ import { describe, expect, it } from 'bun:test';
 import { type CatalogDocument, type DocumentEdit } from '../src/features/catalog/catalog-document';
 import {
   withAlias,
-  withAliasModel,
   withModel,
   withoutModel,
   withoutProviderCredential,
@@ -11,9 +10,7 @@ import {
   withProviderCredential,
   withTaskAliases,
   withTaskDataPolicy,
-  withTaskEffort,
   withTaskMeta,
-  withTaskRoutes,
 } from '../src/features/catalog/catalog-edits';
 import { catalogFixture, CREDENTIAL_ID } from './catalog-fixture';
 
@@ -34,28 +31,6 @@ describe('task edits', () => {
     expect(withTaskDataPolicy(document, 'app.missing', 'any')).toEqual({ ok: false, reason: 'The draft has no feature "app.missing"' });
     expect(withTaskDataPolicy(document, 'toString', 'any').ok).toBe(false);
     expect(withTaskDataPolicy(document, 'app.broken', 'any')).toEqual({ ok: false, reason: 'The draft\'s feature "app.broken" is not an object' });
-  });
-
-  it('should replace the routes, writing no selectors for the default route', () => {
-    const document = documentOf(
-      withTaskRoutes(catalogFixture(), CHAT, [
-        { when: { tier: 'premium' }, model: 'opus-5.5' },
-        { when: {}, model: 'sonnet-5.5' },
-      ]),
-    );
-    expect(entry(document, 'tasks', CHAT)?.routes).toEqual([{ when: { tier: 'premium' }, model: 'opus-5.5' }, { model: 'sonnet-5.5' }]);
-  });
-
-  it('should refuse to change the routes of a pinned task', () => {
-    const document = catalogFixture();
-    const pinned = { ...document, tasks: { ...document.tasks, [CHAT]: { ...document.tasks[CHAT], pinned: true } } };
-    expect(withTaskRoutes(pinned, CHAT, [{ model: 'sonnet-5.5' }]).ok).toBe(false);
-  });
-
-  it('should set an effort range or remove it entirely', () => {
-    const ranged = documentOf(withTaskEffort(catalogFixture(), CHAT, { default: 'high', max: 'max' }));
-    expect(entry(ranged, 'tasks', CHAT)?.effort).toEqual({ default: 'high', max: 'max' });
-    expect(entry(documentOf(withTaskEffort(catalogFixture(), CHAT, null)), 'tasks', CHAT)).not.toHaveProperty('effort');
   });
 
   it('should trim the label and description, remove a blank one and leave an omitted one alone', () => {
@@ -85,12 +60,6 @@ describe('task edits', () => {
 });
 
 describe('alias edits', () => {
-  it('should retarget an alias and refuse a retarget the draft already has', () => {
-    expect(entry(documentOf(withAliasModel(catalogFixture(), 'opus', 'sonnet-5.5')), 'aliases', 'opus')?.model).toBe('sonnet-5.5');
-    expect(withAliasModel(catalogFixture(), 'opus', 'opus-5.5')).toEqual({ ok: false, reason: 'The draft already targets opus-5.5' });
-    expect(withAliasModel(catalogFixture(), 'gpt', 'opus-5.5')).toEqual({ ok: false, reason: 'The draft has no model name "gpt"' });
-  });
-
   it('should add or replace a whole alias, leaving out empty optional fields', () => {
     const alias = { label: ' Haiku ', description: ' ', model: 'sonnet-5.5', state: 'hidden' as const, showVersion: false, available: {} };
     expect(entry(documentOf(withAlias(catalogFixture(), 'haiku', alias)), 'aliases', 'haiku')).toEqual({ label: 'Haiku', model: 'sonnet-5.5', state: 'hidden' });

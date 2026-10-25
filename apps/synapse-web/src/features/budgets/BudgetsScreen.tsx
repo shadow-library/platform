@@ -19,7 +19,7 @@ import {
 } from '@/lib';
 
 import { BudgetCard, type BudgetCardActions } from './BudgetCard';
-import { BudgetDrawer, type BudgetDrawerTarget, type BudgetSubmitOutcome } from './BudgetDrawer';
+import { BudgetDrawer, type BudgetDrawerTarget, type BudgetSubmitOutcome, type PublishStage } from './BudgetDrawer';
 import { type BudgetBasis, budgetBasisOf, type BudgetChange, budgetNote, draftChangesBudgets, planBudgetPublish } from './budget-form';
 import { BudgetIssues } from './BudgetIssues';
 import styles from './Budgets.module.css';
@@ -117,11 +117,12 @@ function BudgetsView({ capabilities }: { capabilities: Capabilities }): ReactEle
     if (basis) setEditor({ target, basis });
   };
 
-  const publishChange = async (from: BudgetBasis, change: BudgetChange, typedNote: string, onConfirmed: () => void): Promise<BudgetSubmitOutcome> => {
+  const publishChange = async (from: BudgetBasis, change: BudgetChange, typedNote: string, onStage: (stage: PublishStage) => void): Promise<BudgetSubmitOutcome> => {
     const plan = planBudgetPublish(from, change);
     if (!plan) return { kind: 'kept' };
     const draft = await checkDraft(() => queryClient.fetchQuery({ ...draftQueryOptions(), staleTime: 0 }), from.document);
     const removal = change.kind === 'remove';
+    onStage('confirming');
     const confirmed = await confirm({
       title: removal ? 'Remove this budget?' : 'Publish this budget change?',
       description: <ConfirmBody sentences={plan.changes.map(item => item.sentence)} draft={draft} />,
@@ -129,7 +130,7 @@ function BudgetsView({ capabilities }: { capabilities: Capabilities }): ReactEle
       intent: removal ? 'danger' : 'primary',
     });
     if (!confirmed) return { kind: 'kept' };
-    onConfirmed();
+    onStage('publishing');
     setNotice(null);
     try {
       const outcome = await publish.mutateAsync({ budgets: plan.budgets, expectedVersion: plan.expectedVersion, note: budgetNote(plan.changes, typedNote) });
@@ -147,7 +148,7 @@ function BudgetsView({ capabilities }: { capabilities: Capabilities }): ReactEle
 
   const remove = async (card: BudgetCardView): Promise<void> => {
     if (!basis || removing !== null) return;
-    const outcome = await publishChange(basis, { kind: 'remove', index: card.index }, '', () => setRemoving(card.index));
+    const outcome = await publishChange(basis, { kind: 'remove', index: card.index }, '', stage => stage === 'publishing' && setRemoving(card.index));
     setRemoving(null);
     if (outcome.kind === 'invalid') setNotice({ intent: 'danger', title: 'The budget was not removed', issues: outcome.issues });
     if (outcome.kind === 'failed') setNotice({ intent: 'danger', title: 'The budget was not removed', body: outcome.message });

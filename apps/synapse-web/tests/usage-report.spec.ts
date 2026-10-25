@@ -1,12 +1,11 @@
 import { describe, expect, it } from 'bun:test';
 
+import { formatChartDay, formatUsdTick } from '../src/features/shared/chart-format';
 import { csvField, toCsv, usageCsv, usageCsvFilename } from '../src/features/usage/usage-csv';
 import {
   comparisonLabel,
   EMPTY_NAMES,
   formatPerCall,
-  formatShortDay,
-  formatUsdTick,
   NOT_RECORDED,
   OTHER_SERIES_KEY,
   previousPeriod,
@@ -216,8 +215,8 @@ describe('usageKeyName', () => {
 
 describe('formatters', () => {
   it('should print a short UTC day', () => {
-    expect(formatShortDay('2026-10-03')).toBe('Oct 3');
-    expect(formatShortDay('not a day')).toBe('not a day');
+    expect(formatChartDay('2026-10-03')).toBe('Oct 3');
+    expect(formatChartDay('not a day')).toBe('not a day');
   });
 
   it('should keep small ticks distinct and large ones compact', () => {

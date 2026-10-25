@@ -10,7 +10,6 @@ import {
   editedAliasFields,
   emptyAliasForm,
   removeRule,
-  resolveSelectorKey,
   retargetAliasEdit,
   updateAliasEdit,
   updateRule,
@@ -30,6 +29,7 @@ import {
   seenLabel,
   unreadableAliasCount,
 } from '../src/features/aliases/alias-view';
+import { resolveSelectorKey } from '../src/features/catalog/catalog-keys';
 import { type CatalogDocument } from '../src/features/catalog/catalog-document';
 import { readAliases, readTasks } from '../src/features/catalog/catalog-readers';
 import { runDraftEdit } from '../src/features/catalog/draft-edit';

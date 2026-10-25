@@ -3,17 +3,28 @@ import { Link } from '@tanstack/react-router';
 import { type ReactElement, useState } from 'react';
 import { Alert, Badge, Button, Table, type TableColumn, Tag, useConfirm } from '@shadow-library/ui';
 
-import { Mono, Muted, type Notice, PageHeader, PermissionGate } from '@/features/shared';
+import { Mono, Muted, type Notice, PageHeader, PermissionGate, providerName } from '@/features/shared';
 import controls from '@/features/shared/controls.module.css';
 import { credentialKeys, type CredentialResponse, credentialsQueryOptions, revokeCredential, testCredential, useCapabilities } from '@/lib';
 
 import { CreateCredentialDialog, RotateCredentialDialog } from './CredentialDialogs';
-import { credentialErrorMessage, describeTest, hintLabel, inUseMessage, isRevoked, revokeDescription, rotatedLabel, sortCredentials, type TestReport } from './credential-view';
+import {
+  credentialErrorMessage,
+  describeTest,
+  hintLabel,
+  inUseMessage,
+  isRevoked,
+  keyVersionLabel,
+  revokeDescription,
+  revokedLabel,
+  sortCredentials,
+  type TestReport,
+} from './credential-view';
 import styles from './Credentials.module.css';
 
 type DialogState = { kind: 'create' } | { kind: 'rotate'; credential: CredentialResponse } | null;
 
-type ScreenNotice = Notice & { catalogLink?: boolean };
+type ScreenNotice = Notice & { providersLink?: boolean };
 
 type RowTest = { status: 'running' } | ({ status: 'done' } & TestReport);
 
@@ -26,8 +37,8 @@ export function CredentialsScreen(): ReactElement {
   );
 }
 
-function TestResult({ test }: { test?: RowTest }): ReactElement | null {
-  if (!test) return null;
+function TestResult({ test }: { test?: RowTest }): ReactElement {
+  if (!test) return <Muted>Not tested in this session</Muted>;
   if (test.status === 'running') return <span className={styles.testRunning}>Testing…</span>;
   return <span className={test.ok ? styles.testOk : styles.testFailed}>{test.message}</span>;
 }
@@ -47,7 +58,7 @@ function CredentialsView(): ReactElement {
 
   const handleCreated = (credential: CredentialResponse): void => {
     setDialog(null);
-    setNotice({ intent: 'success', title: `Created "${credential.name}"`, body: 'Point a provider at it in the catalog editor, then publish the catalog.' });
+    setNotice({ intent: 'success', title: `Created "${credential.name}"`, body: 'Choose it for a provider on the Providers screen, then publish the draft.', providersLink: true });
     void refresh();
   };
 
@@ -77,7 +88,7 @@ function CredentialsView(): ReactElement {
     setRevoking(current => [...current, credential.id]);
     try {
       const outcome = await revokeCredential(credential.id);
-      if (outcome.kind === 'in_use') setNotice({ intent: 'danger', title: `"${credential.name}" is still in use`, body: inUseMessage(outcome.referencedBy), catalogLink: true });
+      if (outcome.kind === 'in_use') setNotice({ intent: 'danger', title: `"${credential.name}" is still in use`, body: inUseMessage(outcome.referencedBy), providersLink: true });
       else {
         forgetTest(credential.id);
         setNotice({ intent: 'success', title: `Revoked "${credential.name}"` });
@@ -104,41 +115,59 @@ function CredentialsView(): ReactElement {
     {
       id: 'status',
       header: 'Status',
+      cell: row => {
+        const revoked = revokedLabel(row);
+        return (
+          <span className={styles.stack}>
+            <span>
+              {revoked ? (
+                <Badge intent="neutral" variant="soft" dot>
+                  Revoked
+                </Badge>
+              ) : (
+                <Badge intent="success" variant="soft" dot>
+                  Active
+                </Badge>
+              )}
+            </span>
+            {revoked ? <Muted>{revoked}</Muted> : <TestResult test={tests[row.id]} />}
+          </span>
+        );
+      },
+    },
+    {
+      id: 'key',
+      header: 'API key',
       cell: row => (
         <span className={styles.stack}>
-          {isRevoked(row) ? (
-            <Badge intent="neutral" variant="soft" dot>
-              Revoked
-            </Badge>
-          ) : (
-            <Badge intent="success" variant="soft" dot>
-              Active
-            </Badge>
-          )}
-          <TestResult test={tests[row.id]} />
+          <Mono>{hintLabel(row.hint)}</Mono>
+          <Muted>{keyVersionLabel(row)}</Muted>
+          {row.kid ? (
+            <details className={styles.details}>
+              <summary>Technical details</summary>
+              Sealed with keyring key <Mono>{row.kid}</Mono>
+            </details>
+          ) : null}
         </span>
       ),
     },
-    { id: 'hint', header: 'Key', cell: row => <Mono>{hintLabel(row.hint)}</Mono> },
-    { id: 'origin', header: 'Origin', cell: row => <Mono>{row.allowedOrigin}</Mono> },
+    { id: 'origin', header: 'Only sent to', cell: row => <Mono>{row.allowedOrigin}</Mono> },
     {
       id: 'referencedBy',
-      header: 'Used by',
+      header: 'Used by providers',
       cell: row =>
         row.referencedBy.length === 0 ? (
-          <Muted>—</Muted>
+          <Muted>None yet</Muted>
         ) : (
           <span className={styles.tags}>
             {row.referencedBy.map(provider => (
               <Tag key={provider} size="sm">
-                {provider}
+                {providerName(provider)}
               </Tag>
             ))}
           </span>
         ),
     },
-    { id: 'rotatedAt', header: 'Rotated', cell: row => (row.rotatedAt ? rotatedLabel(row) : <Muted>{rotatedLabel(row)}</Muted>) },
-    { id: 'kid', header: 'Wrapped by', cell: row => (row.kid ? <Mono>{row.kid}</Mono> : <Muted>—</Muted>) },
     {
       id: '_actions',
       header: <span className="sr-only">Actions</span>,
@@ -176,12 +205,10 @@ function CredentialsView(): ReactElement {
       {notice ? (
         <Alert intent={notice.intent} title={notice.title} onDismiss={() => setNotice(null)} className={styles.notice}>
           {notice.body}
-          {notice.catalogLink ? (
+          {notice.providersLink ? (
             <>
               {' '}
-              <Link to="/catalog" search={{ tab: 'draft' }}>
-                Open the catalog editor
-              </Link>
+              <Link to="/providers">Open Providers</Link>
             </>
           ) : null}
         </Alert>
@@ -197,7 +224,7 @@ function CredentialsView(): ReactElement {
           rowKey="id"
           loading={credentials.isLoading}
           aria-label="Provider credentials"
-          emptyState="No credentials yet. Create one to bind a provider API key to its origin."
+          emptyState="No API keys stored yet. Add one with New credential, then choose it for a provider on the Providers screen."
         />
       )}
       {dialog?.kind === 'create' ? <CreateCredentialDialog onClose={() => setDialog(null)} onCreated={handleCreated} /> : null}

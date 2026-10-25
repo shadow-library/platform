@@ -1,6 +1,6 @@
-import { type ModelEntry, type TaskRoute } from '@/features/catalog/catalog-spec.types';
+import { type TaskRoute } from '@/features/catalog/catalog-spec.types';
+import { CATALOG_KEY_PATTERN } from '@/features/catalog/catalog-keys';
 import { isRecord } from '@/features/catalog/catalog-values';
-import { modelDisplayName, modelPriceText } from '@/features/shared/model-options';
 import { selectorName } from '@/features/shared/naming';
 
 export interface ConditionDraft {
@@ -40,9 +40,6 @@ export interface ConditionPart {
   value: string;
 }
 
-/** synapse-server's `KEY_PATTERN` for selector names. */
-const SELECTOR_KEY = /^[A-Za-z0-9][\w.:/@-]*$/;
-
 const isDefault = (route: TaskRoute): boolean => Object.keys(route.when ?? {}).length === 0;
 
 function storedConditions(route: RawRoute): [string, string][] {
@@ -50,10 +47,7 @@ function storedConditions(route: RawRoute): [string, string][] {
   return Object.entries(route.when).filter((pair): pair is [string, string] => typeof pair[1] === 'string');
 }
 
-/**
- * Takes the stored route objects, not the reader's normalised ones, so a save writes back exactly what it did not change. A document with no
- * default route, or several, still loads: the extra ones become condition-less rules that validation then flags.
- */
+/** Reads the stored routes, not the reader's normalised ones, so a save writes back what it left alone; extra default routes load as rules validation flags. */
 export function routingFromRoutes(routes: readonly unknown[]): RoutingDraft {
   const stored = routes.filter(isRecord);
   const fallbackIndex = stored.findIndex(route => storedConditions(route).length === 0);
@@ -139,12 +133,6 @@ export function setCondition(draft: RoutingDraft, index: number, conditionIndex:
   }));
 }
 
-export function resolveSelectorKey(input: string, knownKeys: readonly string[]): string {
-  const typed = input.trim();
-  const folded = typed.toLowerCase();
-  return knownKeys.find(key => key === typed) ?? knownKeys.find(key => key.toLowerCase() === folded || selectorName(key).toLowerCase() === folded) ?? typed;
-}
-
 function signature(rule: RuleDraft): string {
   const pairs = rule.conditions.map(condition => [condition.key, condition.value]).sort(([left = ''], [right = '']) => left.localeCompare(right));
   return JSON.stringify(pairs);
@@ -156,7 +144,7 @@ function ruleIssues(rule: RuleDraft, index: number): string[] {
   if (rule.conditions.length === 0) issues.push(`Rule ${position} needs at least one condition; only "everyone else" has none`);
   if (rule.conditions.some(condition => !condition.key.trim() || !condition.value.trim())) issues.push(`Rule ${position} has a condition without a name or a value`);
   const keys = rule.conditions.map(condition => condition.key).filter(key => key.trim().length > 0);
-  const invalid = keys.filter(key => !SELECTOR_KEY.test(key));
+  const invalid = keys.filter(key => !CATALOG_KEY_PATTERN.test(key));
   if (invalid.length > 0) issues.push(`Rule ${position}: "${invalid.join('", "')}" can't be a condition name; use letters, digits and _ . : / @ - without spaces`);
   const repeated = [...new Set(keys.filter((key, at) => keys.indexOf(key) !== at))];
   if (repeated.length > 0) issues.push(`Rule ${position} uses ${repeated.map(selectorName).join(', ')} more than once`);
@@ -181,21 +169,6 @@ export function validateRouting(draft: RoutingDraft): RoutingIssue[] {
 
 export function conditionParts(when: Readonly<Record<string, string>> | undefined): ConditionPart[] {
   return Object.entries(when ?? {}).map(([key, value]) => ({ selector: selectorName(key), value }));
-}
-
-export function conditionText(when: Readonly<Record<string, string>> | undefined): string {
-  const parts = conditionParts(when);
-  if (parts.length === 0) return 'Everyone else';
-  return `When ${parts.map(part => `${part.selector} is ${part.value}`).join(' and ')}`;
-}
-
-export function routeModelText(modelKey: string, model: ModelEntry | undefined): string {
-  if (!model) return `${modelKey} (not in the catalog)`;
-  return `${modelDisplayName(model)} (${modelPriceText(model.pricePerMTok)})`;
-}
-
-export function ruleSentence(route: TaskRoute, models: ReadonlyMap<string, ModelEntry>): string {
-  return `${conditionText(route.when)} → ${routeModelText(route.model, models.get(route.model))}`;
 }
 
 export function displayRoutes(routes: readonly TaskRoute[]): TaskRoute[] {

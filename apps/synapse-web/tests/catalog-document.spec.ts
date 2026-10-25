@@ -3,7 +3,6 @@ import { describe, expect, it } from 'bun:test';
 import {
   activeVersionOf,
   credentialIssuesByProvider,
-  describeAvailability,
   draftExpectation,
   editorSourceOf,
   EMPTY_CATALOG,
@@ -58,19 +57,9 @@ describe('activeVersionOf', () => {
   });
 });
 
-describe('describeAvailability', () => {
-  it('should call an alias without rules available everywhere', () => {
-    expect(describeAvailability(undefined)).toBe('Everywhere');
-  });
-
-  it('should list each selector and its values', () => {
-    expect(describeAvailability({ tier: ['pro', 'max'], content_mode: ['standard'] })).toBe('tier: pro, max; content_mode: standard');
-  });
-});
-
 describe('issuePathLabel', () => {
-  it('should name the document itself for an empty path', () => {
-    expect(issuePathLabel('')).toBe('(document)');
+  it('should name the whole catalog for an empty path', () => {
+    expect(issuePathLabel('')).toBe('(whole catalog)');
     expect(issuePathLabel('tasks.novel-forge.chat.routes[1].model')).toBe('tasks.novel-forge.chat.routes[1].model');
   });
 });

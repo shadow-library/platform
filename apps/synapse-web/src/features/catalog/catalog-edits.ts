@@ -1,5 +1,5 @@
 import { type CatalogDocument, type DocumentEdit } from './catalog-document';
-import { type AliasSpec, type DataPolicy, type ModelSpec, type ProviderSpec, type TaskEffort, type TaskRoute } from './catalog-spec.types';
+import { type AliasSpec, type DataPolicy, type ModelSpec, type ProviderSpec } from './catalog-spec.types';
 import { isRecord, ownEntry } from './catalog-values';
 
 type Entry = Record<string, unknown>;
@@ -42,28 +42,13 @@ function nonBlank(value: string | undefined): string | undefined {
   return trimmed ? trimmed : undefined;
 }
 
-function routeValue(route: TaskRoute): Entry {
-  const when = route.when && Object.keys(route.when).length > 0 ? route.when : undefined;
-  return when ? { when: { ...when }, model: route.model } : { model: route.model };
-}
-
 const PINNED_ROUTES = 'A pinned feature keeps its models: stored embeddings depend on them';
-
-/** The server refuses any change to a pinned task's routes, since stored vectors depend on their models, so this refuses it first. */
-export function withTaskRoutes(document: CatalogDocument, taskKey: string, routes: readonly TaskRoute[]): DocumentEdit {
-  return editEntry(document, 'tasks', taskKey, task => (task.pinned === true ? PINNED_ROUTES : withField(task, 'routes', routes.map(routeValue))));
-}
 
 export type RawTaskField = 'routes' | 'effort';
 
 /** Writes the value as given, so fields inside routes or effort that this console does not model survive a save; `undefined` removes the field. */
 export function withTaskFieldValue(document: CatalogDocument, taskKey: string, field: RawTaskField, value: unknown): DocumentEdit {
   return editEntry(document, 'tasks', taskKey, task => (field === 'routes' && task.pinned === true ? PINNED_ROUTES : withField(task, field, value)));
-}
-
-export function withTaskEffort(document: CatalogDocument, taskKey: string, effort: TaskEffort | null): DocumentEdit {
-  const value = effort ? { default: effort.default, ...(effort.min && { min: effort.min }), ...(effort.max && { max: effort.max }) } : undefined;
-  return editEntry(document, 'tasks', taskKey, task => withField(task, 'effort', value));
 }
 
 export function withTaskMeta(document: CatalogDocument, taskKey: string, meta: TaskMeta): DocumentEdit {
@@ -79,10 +64,6 @@ export function withTaskAliases(document: CatalogDocument, taskKey: string, alia
 
 export function withTaskDataPolicy(document: CatalogDocument, taskKey: string, dataPolicy: DataPolicy): DocumentEdit {
   return editEntry(document, 'tasks', taskKey, task => withField(task, 'dataPolicy', dataPolicy));
-}
-
-export function withAliasModel(document: CatalogDocument, aliasKey: string, model: string): DocumentEdit {
-  return editEntry(document, 'aliases', aliasKey, alias => (alias.model === model ? `The draft already targets ${model}` : withField(alias, 'model', model)));
 }
 
 export function withAlias(document: CatalogDocument, aliasKey: string, alias: AliasSpec): DocumentEdit {

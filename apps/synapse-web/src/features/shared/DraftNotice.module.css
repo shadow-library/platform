@@ -1,0 +1,13 @@
+.issues {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+.details {
+  margin-top: 8px;
+  font-size: var(--sh-text-body-sm);
+}
+
+.details summary {
+  cursor: pointer;
+}

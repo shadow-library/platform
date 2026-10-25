@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import { type CatalogDocument, type DocumentEdit } from '../src/features/catalog/catalog-document';
+import { resolveSelectorKey } from '../src/features/catalog/catalog-keys';
 import { readAliases, readModels, readProviders, readTasks } from '../src/features/catalog/catalog-readers';
 import { type ModelEntry, type TaskEntry } from '../src/features/catalog/catalog-spec.types';
 import { type CatalogEdit } from '../src/features/catalog/draft-edit';
@@ -11,15 +12,12 @@ import { buildFeatureGroups, changedTaskKeys } from '../src/features/tasks/featu
 import {
   addCondition,
   addRule,
-  conditionText,
   displayRoutes,
   moveRule,
   removeRule,
-  resolveSelectorKey,
   routesFromRouting,
   type RoutingDraft,
   routingFromRoutes,
-  ruleSentence,
   setCondition,
   setFallback,
   setRuleModel,
@@ -63,21 +61,7 @@ const EMBEDDER: ModelEntry = {
   deployments: [{ provider: 'ollama', id: 'nomic-embed-text' }],
 };
 
-describe('rule sentences', () => {
-  it('should name each condition and the model with its prices', () => {
-    const { models } = fixture();
-    const byKey = new Map(models.map(entry => [entry.key, entry]));
-    expect(ruleSentence({ when: { tier: 'economy', content_mode: 'standard' }, model: 'llama3.1' }, byKey)).toBe(
-      'When Tier is economy and Content mode is standard → Llama 3.1 ($0.00 in / $0.00 out per M tokens)',
-    );
-    expect(ruleSentence({ model: 'opus-5.5' }, byKey)).toBe('Everyone else → Opus 5.5 ($15.00 in / $75.00 out per M tokens)');
-  });
-
-  it('should keep a model the catalog lacks visible by its key', () => {
-    expect(ruleSentence({ model: 'gone' }, new Map())).toBe('Everyone else → gone (not in the catalog)');
-    expect(conditionText({})).toBe('Everyone else');
-  });
-
+describe('rule display', () => {
   it('should list the default rule last whatever its position in the document', () => {
     const routes = [{ model: 'opus-5.5' }, { when: { tier: 'economy' }, model: 'llama3.1' }];
     expect(displayRoutes(routes).map(route => route.model)).toEqual(['llama3.1', 'opus-5.5']);
@@ -173,6 +157,25 @@ describe('routing draft', () => {
     expect(resolveSelectorKey(' Content mode ', known)).toBe('content_mode');
     expect(resolveSelectorKey('TIER', known)).toBe('tier');
     expect(resolveSelectorKey('plan', known)).toBe('plan');
+  });
+});
+
+describe('routing draft with prototype keys', () => {
+  it('should keep a condition named like a prototype key as an own field of the route', () => {
+    for (const key of ['__proto__', 'constructor']) {
+      const draft = setCondition(addRule(routingFromRoutes([{ model: 'sonnet-5.5' }])), 0, 0, { key, value: 'x' });
+      const rule = routesFromRouting(setRuleModel(draft, 0, 'opus-5.5')).find(route => route.when !== undefined);
+      expect(Object.hasOwn(rule?.when as object, key)).toBe(true);
+      expect(Object.getPrototypeOf(rule?.when)).toBe(Object.prototype);
+      expect(JSON.parse(JSON.stringify(rule))).toEqual(JSON.parse(`{"when":{"${key}":"x"},"model":"opus-5.5"}`));
+    }
+  });
+
+  it('should read a stored condition named like a prototype key', () => {
+    const stored = JSON.parse('[{"when":{"__proto__":"x"},"model":"opus-5.5"},{"model":"sonnet-5.5"}]') as unknown[];
+    const draft = routingFromRoutes(stored);
+    expect(draft.rules[0]?.conditions.map(condition => [condition.key, condition.value])).toEqual([['__proto__', 'x']]);
+    expect(routesFromRouting(draft)).toEqual(stored as ReturnType<typeof routesFromRouting>);
   });
 });
 
@@ -303,7 +306,7 @@ describe('feature detail', () => {
     const aliases = readAliases(document);
     expect(aliasHints(['opus', 'sonnet'], aliases, models, chat)).toEqual([]);
     expect(aliasHints(['opus', 'gone'], aliases, models, { ...chat, requires: ['image_output'] })).toEqual([
-      "Opus points to Opus 5.5: doesn't support images",
+      "Opus points to Opus 5.5: doesn't support image output",
       "gone isn't in the catalog, so publishing will refuse it",
     ]);
   });

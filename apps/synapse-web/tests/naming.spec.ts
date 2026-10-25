@@ -1,6 +1,20 @@
 import { describe, expect, it } from 'bun:test';
 
-import { aliasName, appName, effortName, modelName, providerName, scopeName, selectorName, taskName, taskTitle, windowName } from '../src/features/shared/naming';
+import {
+  aliasName,
+  appName,
+  capabilityName,
+  dataPolicyName,
+  effortName,
+  modelName,
+  providerName,
+  scopeName,
+  selectorName,
+  taskKindName,
+  taskName,
+  taskTitle,
+  windowName,
+} from '../src/features/shared/naming';
 
 describe('naming', () => {
   it('should title-case an app key', () => {
@@ -33,5 +47,22 @@ describe('naming', () => {
 
   it('should word efforts', () => {
     expect([effortName('xhigh'), effortName('max'), effortName('none')]).toEqual(['Extra high', 'Maximum', 'None']);
+  });
+});
+
+describe('capabilityName', () => {
+  it('should call image output by the name the Models screen uses', () => {
+    expect(capabilityName('image_output')).toBe('Image output');
+  });
+});
+
+describe('naming lookups', () => {
+  it('should never resolve a prototype key to an inherited value', () => {
+    expect(windowName('constructor')).toBe('per constructor');
+    expect(scopeName('constructor')).toBe('constructor');
+    expect(effortName('toString')).toBe('ToString');
+    expect(dataPolicyName('constructor')).toBe('Constructor');
+    expect(taskKindName('__proto__')).toBe('Proto');
+    expect(capabilityName('hasOwnProperty')).toBe('HasOwnProperty');
   });
 });

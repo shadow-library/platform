@@ -1,3 +1,5 @@
+import { ownEntry } from '@/features/catalog/catalog-values';
+
 const WORD_SEPARATOR = /[-_\s]+/;
 
 const WINDOW_NAMES: Readonly<Record<string, string>> = { '1h': 'per hour', '1d': 'per day', '30d': 'per 30 days' };
@@ -18,7 +20,7 @@ const CAPABILITY_NAMES: Readonly<Record<string, string>> = {
   structured_output: 'Structured output',
   vision: 'Vision',
   streaming: 'Streaming',
-  image_output: 'Images',
+  image_output: 'Image output',
   embedding: 'Embeddings',
 };
 
@@ -68,25 +70,25 @@ export function selectorName(selector: string): string {
 }
 
 export function windowName(window: string): string {
-  return WINDOW_NAMES[window] ?? `per ${window}`;
+  return ownEntry(WINDOW_NAMES, window) ?? `per ${window}`;
 }
 
 export function scopeName(scope: string): string {
-  return SCOPE_NAMES[scope] ?? scope;
+  return ownEntry(SCOPE_NAMES, scope) ?? scope;
 }
 
 export function effortName(effort: string): string {
-  return EFFORT_NAMES[effort] ?? sentenceCase(effort);
+  return ownEntry(EFFORT_NAMES, effort) ?? sentenceCase(effort);
 }
 
 export function dataPolicyName(policy: string): string {
-  return DATA_POLICY_NAMES[policy] ?? sentenceCase(policy);
+  return ownEntry(DATA_POLICY_NAMES, policy) ?? sentenceCase(policy);
 }
 
 export function taskKindName(kind: string): string {
-  return TASK_KIND_NAMES[kind] ?? sentenceCase(kind);
+  return ownEntry(TASK_KIND_NAMES, kind) ?? sentenceCase(kind);
 }
 
 export function capabilityName(capability: string): string {
-  return CAPABILITY_NAMES[capability] ?? sentenceCase(capability);
+  return ownEntry(CAPABILITY_NAMES, capability) ?? sentenceCase(capability);
 }

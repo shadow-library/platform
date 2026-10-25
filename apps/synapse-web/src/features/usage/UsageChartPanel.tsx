@@ -2,13 +2,13 @@ import { type UseQueryResult } from '@tanstack/react-query';
 import { type ReactElement } from 'react';
 import { Alert, Card, Chart, EmptyState, Spinner } from '@shadow-library/ui';
 
-import { formatUsd, SectionHeader } from '@/features/shared';
+import { chartDayFormatter, formatUsd, formatUsdTick, SectionHeader, useMinuteClock } from '@/features/shared';
 import controls from '@/features/shared/controls.module.css';
 import { type ApiError, type UsageSeriesResponse } from '@/lib';
 
-import { BASIS_NOUNS, type CostBasis, formatShortDay, formatUsdTick, usageChart, usageKeyName, type UsageNames, usageSlotKeys } from './usage-report';
+import { BASIS_NOUNS, type CostBasis, usageChart, usageKeyName, type UsageNames, usageSlotKeys } from './usage-report';
 import styles from './Usage.module.css';
-import { USAGE_GROUP_LABELS, type UsageGroup } from './usage-search';
+import { USAGE_GROUP_LABELS, type UsageGroup, utcToday } from './usage-search';
 
 interface UsageChartPanelProps {
   query: UseQueryResult<UsageSeriesResponse, ApiError>;
@@ -19,6 +19,8 @@ interface UsageChartPanelProps {
 }
 
 export function UsageChartPanel({ query, group, basis, names, subtitle }: UsageChartPanelProps): ReactElement {
+  const now = useMinuteClock();
+  const formatDay = chartDayFormatter(now === null ? null : utcToday(new Date(now)));
   const noun = BASIS_NOUNS[basis];
   const title = `Daily ${noun} by ${USAGE_GROUP_LABELS[group].toLowerCase()}`;
 
@@ -44,7 +46,7 @@ export function UsageChartPanel({ query, group, basis, names, subtitle }: UsageC
         series={chart.series}
         formatValue={formatUsd}
         formatTick={formatUsdTick}
-        formatX={formatShortDay}
+        formatX={formatDay}
         aria-label={title}
         emptyState={<EmptyState size="inline" title={`No ${noun} in this range`} description="Try a longer range or clear the filters." />}
       />

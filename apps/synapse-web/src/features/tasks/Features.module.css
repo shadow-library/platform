@@ -22,10 +22,6 @@
   text-decoration: none;
 }
 
-.featureLink:hover {
-  text-decoration: underline;
-}
-
 .tags {
   display: flex;
   flex-wrap: wrap;
@@ -160,4 +156,19 @@
   .effortBounds {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+.linkedRows tbody tr {
+  position: relative;
+}
+
+.linkedRows .featureLink::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+
+.linkedRows .featureDescription {
+  position: relative;
+  z-index: 1;
 }

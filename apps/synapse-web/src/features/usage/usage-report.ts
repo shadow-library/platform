@@ -70,10 +70,6 @@ export interface UsageChartView {
   data: ChartDatum[];
 }
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const COMPACT_USD = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', notation: 'compact', maximumFractionDigits: 1 });
-const WHOLE_USD = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 2 });
-const SMALL_USD = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumSignificantDigits: 2 });
 const PER_CALL_OPTIONS: Intl.NumberFormatOptions = { style: 'currency', currency: 'USD', minimumSignificantDigits: 2, maximumSignificantDigits: 2 };
 const CENT = 0.01;
 const PER_CALL_USD = new Intl.NumberFormat('en-US', PER_CALL_OPTIONS);
@@ -243,13 +239,6 @@ export function usageChart(
   return { series, data };
 }
 
-export function formatShortDay(day: string): string {
-  const time = Date.parse(`${day}T00:00:00Z`);
-  if (Number.isNaN(time)) return day;
-  const date = new Date(time);
-  return `${MONTHS[date.getUTCMonth()] ?? ''} ${date.getUTCDate()}`;
-}
-
 /** A call often costs a fraction of a cent, which `usdFormat`'s four decimals would print as $0.0000. */
 export function perCallFormat(value: number): Intl.NumberFormatOptions {
   return value === 0 || Math.abs(value) >= CENT ? usdFormat(value) : PER_CALL_OPTIONS;
@@ -257,12 +246,4 @@ export function perCallFormat(value: number): Intl.NumberFormatOptions {
 
 export function formatPerCall(value: number): string {
   return value === 0 || Math.abs(value) >= CENT ? formatUsd(value) : PER_CALL_USD.format(value);
-}
-
-/** Daily API-price costs are often cents, so sub-dollar ticks keep two significant digits instead of rounding every gridline to $0. */
-export function formatUsdTick(value: number): string {
-  const size = Math.abs(value);
-  if (size === 0) return '$0';
-  if (size >= 1000) return COMPACT_USD.format(value);
-  return size >= 1 ? WHOLE_USD.format(value) : SMALL_USD.format(value);
 }

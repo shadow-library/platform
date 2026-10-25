@@ -2,11 +2,11 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { type ReactElement, useState } from 'react';
 import { Alert, Card, Chart, EmptyState, SegmentedControl, Spinner } from '@shadow-library/ui';
 
-import { COST_LABELS, COST_PHRASES, formatUsd, SectionHeader } from '@/features/shared';
+import { chartDayFormatter, COST_LABELS, COST_PHRASES, formatUsd, formatUsdTick, SectionHeader } from '@/features/shared';
 import controls from '@/features/shared/controls.module.css';
 import { type UsageSeriesResponse } from '@/lib';
 
-import { dailySpendOf, formatDay, formatUsdTick, type SpendMeasure } from './daily-spend';
+import { dailySpendOf, type SpendMeasure } from './daily-spend';
 import styles from './Overview.module.css';
 import { SPEND_RANGES, type SpendRange } from './overview-periods';
 import { dailySpendOptions, DEFAULT_SPEND_RANGE } from './overview-queries';
@@ -23,13 +23,14 @@ function rangeOf(value: string): SpendRange | undefined {
 
 interface ChartBodyProps {
   data: UsageSeriesResponse;
+  today: string;
   days: number;
   measure: SpendMeasure;
   stale: boolean;
   onShowList: () => void;
 }
 
-function ChartBody({ data, days, measure, stale, onShowList }: ChartBodyProps): ReactElement {
+function ChartBody({ data, today, days, measure, stale, onShowList }: ChartBodyProps): ReactElement {
   const spend = dailySpendOf(data, measure);
   if (spend.series.length === 0) return <EmptyState size="inline" title={`No calls in the last ${days} days`} description="Spend appears here once apps call Synapse." />;
   if (spend.total === 0 && measure === 'billed')
@@ -50,7 +51,7 @@ function ChartBody({ data, days, measure, stale, onShowList }: ChartBodyProps): 
         series={spend.series}
         formatValue={formatUsd}
         formatTick={formatUsdTick}
-        formatX={formatDay}
+        formatX={chartDayFormatter(today)}
         aria-label={`Daily ${COST_PHRASES[measure]} by app over the last ${days} days`}
       />
     </div>
@@ -76,7 +77,7 @@ export function DailySpendChart({ today }: { today: string }): ReactElement {
           <Spinner aria-label="Loading daily spend" />
         </div>
       );
-    return <ChartBody data={series.data} days={days} measure={measure} stale={series.isPlaceholderData} onShowList={() => setMeasure('list')} />;
+    return <ChartBody data={series.data} today={today} days={days} measure={measure} stale={series.isPlaceholderData} onShowList={() => setMeasure('list')} />;
   })();
 
   return (

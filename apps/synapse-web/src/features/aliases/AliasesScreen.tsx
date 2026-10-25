@@ -2,30 +2,21 @@ import { Link, useNavigate } from '@tanstack/react-router';
 import { type ReactElement, useMemo, useState } from 'react';
 import { Alert, Badge, Button, EmptyState, Spinner, Table, type TableColumn } from '@shadow-library/ui';
 
-import { type CatalogDocument, useActiveCatalog, useDraft } from '@/features/catalog';
-import { Mono, Muted, PageHeader, PermissionGate } from '@/features/shared';
+import { useWorkingCatalog, type WorkingCatalog, type WorkingSource } from '@/features/catalog';
+import { type DraftNotice, DraftNoticeAlert, Mono, Muted, PageHeader, PermissionGate } from '@/features/shared';
 import controls from '@/features/shared/controls.module.css';
-import { type ApiError, type Capabilities, useCapabilities } from '@/lib';
+import { type Capabilities, useCapabilities } from '@/lib';
 
 import { type AliasEditorMode, aliasFormOf, emptyAliasForm } from './alias-form';
-import { ALIAS_STATE_INFO, aliasKeysOf, type AliasRow, aliasRows, changedAliasKeys, type AliasFeedback as Notice, unreadableAliasCount } from './alias-view';
+import { ALIAS_STATE_INFO, aliasKeysOf, type AliasRow, aliasRows, changedAliasKeys, unreadableAliasCount } from './alias-view';
 import { AliasEditor } from './AliasEditor';
 import { AliasImpactPanel } from './AliasImpactPanel';
-import { AliasNotice } from './AliasNotice';
 import styles from './Aliases.module.css';
 
 export interface AliasesSearch {
   alias?: string;
   model?: string;
 }
-
-type WorkingSource = { kind: 'draft'; activeVersion: number | null } | { kind: 'active'; version: number };
-
-type WorkingCatalog =
-  | { status: 'loading' }
-  | { status: 'error'; error: ApiError }
-  | { status: 'none' }
-  | { status: 'ready'; document: CatalogDocument; active: CatalogDocument | null; source: WorkingSource };
 
 type EditorState = { mode: AliasEditorMode; row?: AliasRow } | null;
 
@@ -38,23 +29,10 @@ export function AliasesScreen({ search }: { search: AliasesSearch }): ReactEleme
   );
 }
 
-function useWorkingCatalog(): WorkingCatalog {
-  const active = useActiveCatalog();
-  const draft = useDraft();
-  if (active.status === 'error') return { status: 'error', error: active.error };
-  if (draft.status === 'error') return { status: 'error', error: draft.error };
-  if (active.status === 'loading' || draft.status === 'loading') return { status: 'loading' };
-  const activeDocument = active.status === 'ready' ? active.document : null;
-  const saved = draft.draft?.draft.document;
-  if (saved) return { status: 'ready', document: saved, active: activeDocument, source: { kind: 'draft', activeVersion: active.status === 'ready' ? active.version : null } };
-  if (active.status === 'ready') return { status: 'ready', document: active.document, active: active.document, source: { kind: 'active', version: active.version } };
-  return { status: 'none' };
-}
-
 function AliasesView({ search, capabilities }: { search: AliasesSearch; capabilities: Capabilities }): ReactElement {
-  const working = useWorkingCatalog();
+  const working = useWorkingCatalog('required');
   const [editor, setEditor] = useState<EditorState>(null);
-  const [notice, setNotice] = useState<Notice | null>(null);
+  const [notice, setNotice] = useState<DraftNotice | null>(null);
   const ready = working.status === 'ready' ? working : null;
 
   const header = (
@@ -71,7 +49,7 @@ function AliasesView({ search, capabilities }: { search: AliasesSearch; capabili
     />
   );
 
-  const handleSaved = (next: Notice): void => {
+  const handleSaved = (next: DraftNotice): void => {
     setEditor(null);
     setNotice(next);
   };
@@ -79,7 +57,7 @@ function AliasesView({ search, capabilities }: { search: AliasesSearch; capabili
   return (
     <>
       {header}
-      {notice ? <AliasNotice notice={notice} onDismiss={() => setNotice(null)} className={styles.notice} /> : null}
+      {notice ? <DraftNoticeAlert notice={notice} onDismiss={() => setNotice(null)} className={styles.notice} /> : null}
       <WorkingBody working={working} search={search} capabilities={capabilities} onEdit={setEditor} />
       {editor && ready ? (
         <AliasEditor

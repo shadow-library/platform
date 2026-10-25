@@ -15,7 +15,7 @@ export function strings(value: unknown): string[] {
 }
 
 /** Admin-typed keys such as `constructor` must never resolve through the prototype. */
-export function ownEntry(record: Record<string, unknown>, key: string): unknown {
+export function ownEntry<T>(record: Readonly<Record<string, T>>, key: string): T | undefined {
   return Object.hasOwn(record, key) ? record[key] : undefined;
 }
 

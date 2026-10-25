@@ -2,19 +2,20 @@ import { Link } from '@tanstack/react-router';
 import { type ReactElement } from 'react';
 import { Alert } from '@shadow-library/ui';
 
-import { issueSentence } from '@/features/catalog';
-import { Mono } from '@/features/shared';
+import { issuePathLabel } from '@/features/catalog/catalog-document';
+import { issueSentence } from '@/features/catalog/catalog-issues';
 
-import { type ModelNotice } from './model-view';
-import styles from './Models.module.css';
+import { Mono } from './cells';
+import { type DraftNotice } from './draft-notice';
+import styles from './DraftNotice.module.css';
 
-export interface NoticeAlertProps {
-  notice: ModelNotice;
+export interface DraftNoticeAlertProps {
+  notice: DraftNotice;
   onDismiss?: () => void;
   className?: string;
 }
 
-export function NoticeAlert({ notice, onDismiss, className }: NoticeAlertProps): ReactElement {
+export function DraftNoticeAlert({ notice, onDismiss, className }: DraftNoticeAlertProps): ReactElement {
   const issues = notice.issues ?? [];
   return (
     <Alert intent={notice.intent} title={notice.title} onDismiss={onDismiss} className={className}>
@@ -37,7 +38,7 @@ export function NoticeAlert({ notice, onDismiss, className }: NoticeAlertProps):
             <ul className={styles.issues}>
               {issues.map(issue => (
                 <li key={`${issue.path}:${issue.code}:${issue.message}`}>
-                  <Mono>{issue.path || '(whole catalog)'}</Mono> {issue.message}
+                  <Mono>{issuePathLabel(issue.path)}</Mono> {issue.message}
                 </li>
               ))}
             </ul>

@@ -1,7 +1,7 @@
 import { type ReactElement, useState } from 'react';
 import { Alert, Button, Combobox, type ComboboxOption, FormField } from '@shadow-library/ui';
 
-import { type CatalogDocument, type ModelEntry, type TaskEntry } from '@/features/catalog';
+import { type CatalogDocument, type ModelEntry, resolveSelectorKey, selectorValues, type TaskEntry } from '@/features/catalog';
 import { modelDisplayName, ModelPicker, modelPriceText, Mono, Muted, selectorName } from '@/features/shared';
 import controls from '@/features/shared/controls.module.css';
 
@@ -15,7 +15,6 @@ import {
   moveRule,
   removeCondition,
   removeRule,
-  resolveSelectorKey,
   type RoutingDraft,
   routingFromRoutes,
   type RuleDraft,
@@ -200,7 +199,7 @@ function RuleEditor({ rule, index, count, knownKeys, context, issues, onChange, 
             <span className={styles.conditionWord}>is</span>
             <Combobox
               className={styles.conditionField}
-              options={valueOptions(context.vocabulary[key] ?? [], condition.value.trim())}
+              options={valueOptions(selectorValues(context.vocabulary, key), condition.value.trim())}
               value={condition.value.trim() || null}
               onValueChange={next => onChange(draft => setCondition(draft, index, conditionIndex, { value: next ?? '' }))}
               creatable

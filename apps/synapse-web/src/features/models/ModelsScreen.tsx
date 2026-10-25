@@ -2,8 +2,8 @@ import { Link } from '@tanstack/react-router';
 import { type ReactElement, type ReactNode, useMemo, useState } from 'react';
 import { Alert, Button, EmptyState, Input, Popover, SearchIcon, Spinner, Table, type TableColumn, Tag, Tooltip, useConfirm } from '@shadow-library/ui';
 
-import { type CatalogDocument, type ModelEntry, readModels, readProviders, useActiveCatalog, useDraft, useDraftEdit } from '@/features/catalog';
-import { formatPrice, Mono, Muted, PageHeader, PermissionGate } from '@/features/shared';
+import { type CatalogDocument, type ModelEntry, readModels, readProviders, useDraftEdit, useWorkingCatalog, type WorkingCatalog } from '@/features/catalog';
+import { type DraftNotice, DraftNoticeAlert, draftOutcomeNotice, formatPrice, Mono, Muted, PageHeader, PermissionGate } from '@/features/shared';
 import controls from '@/features/shared/controls.module.css';
 import { type Capabilities, useCapabilities } from '@/lib';
 
@@ -17,12 +17,10 @@ import {
   capabilityChips,
   type CapabilityFilter,
   defaultModelNote,
-  draftOutcomeNotice,
   filterModels,
   isInUse,
   keepVisible,
   modelKeysOf,
-  type ModelNotice,
   modelTitle,
   type ModelUsage,
   modelUsageIndex,
@@ -33,17 +31,10 @@ import {
   usageSentence,
   usageSummary,
 } from './model-view';
-import { NoticeAlert } from './NoticeAlert';
 import styles from './Models.module.css';
 
 const COMPARE_MIN = 2;
 const COMPARE_MAX = 3;
-
-type WorkingCatalog =
-  | { status: 'loading' }
-  | { status: 'error'; message: string }
-  | { status: 'none' }
-  | { status: 'ready'; document: CatalogDocument; source: { kind: 'draft' } | { kind: 'active'; version: number } };
 
 type EditorState = { mode: EditorMode; model?: ModelEntry } | null;
 
@@ -56,22 +47,10 @@ export function ModelsScreen(): ReactElement {
   );
 }
 
-function useWorkingCatalog(): WorkingCatalog {
-  const draft = useDraft();
-  const saved = draft.status === 'ready' ? draft.draft : undefined;
-  const active = useActiveCatalog(saved === null);
-  if (draft.status === 'error') return { status: 'error', message: draft.error.message };
-  if (saved) return { status: 'ready', document: saved.draft.document, source: { kind: 'draft' } };
-  if (saved === undefined || active.status === 'loading') return { status: 'loading' };
-  if (active.status === 'error') return { status: 'error', message: active.error.message };
-  if (active.status === 'none') return { status: 'none' };
-  return { status: 'ready', document: active.document, source: { kind: 'active', version: active.version } };
-}
-
 function ModelsView({ capabilities }: { capabilities: Capabilities }): ReactElement {
-  const working = useWorkingCatalog();
+  const working = useWorkingCatalog('optional');
   const [editor, setEditor] = useState<EditorState>(null);
-  const [notice, setNotice] = useState<ModelNotice | null>(null);
+  const [notice, setNotice] = useState<DraftNotice | null>(null);
   const document = working.status === 'ready' ? working.document : null;
 
   const header = (
@@ -88,7 +67,7 @@ function ModelsView({ capabilities }: { capabilities: Capabilities }): ReactElem
     />
   );
 
-  const handleSaved = (next: ModelNotice): void => {
+  const handleSaved = (next: DraftNotice): void => {
     setEditor(null);
     setNotice(next);
   };
@@ -96,7 +75,7 @@ function ModelsView({ capabilities }: { capabilities: Capabilities }): ReactElem
   return (
     <>
       {header}
-      {notice ? <NoticeAlert notice={notice} onDismiss={() => setNotice(null)} className={styles.notice} /> : null}
+      {notice ? <DraftNoticeAlert notice={notice} onDismiss={() => setNotice(null)} className={styles.notice} /> : null}
       <WorkingBody working={working} capabilities={capabilities} onEdit={setEditor} onNotice={setNotice} />
       {editor ? (
         <ModelEditor
@@ -116,7 +95,7 @@ interface WorkingBodyProps {
   working: WorkingCatalog;
   capabilities: Capabilities;
   onEdit: (editor: EditorState) => void;
-  onNotice: (notice: ModelNotice) => void;
+  onNotice: (notice: DraftNotice) => void;
 }
 
 function WorkingBody({ working, capabilities, onEdit, onNotice }: WorkingBodyProps): ReactElement {
@@ -130,7 +109,7 @@ function WorkingBody({ working, capabilities, onEdit, onNotice }: WorkingBodyPro
     case 'error':
       return (
         <Alert intent="danger" title="Couldn't load the catalog">
-          {working.message}
+          {working.error.message}
         </Alert>
       );
     case 'none':
@@ -207,7 +186,7 @@ interface ModelTableProps {
   document: CatalogDocument;
   capabilities: Capabilities;
   onEdit: (editor: EditorState) => void;
-  onNotice: (notice: ModelNotice) => void;
+  onNotice: (notice: DraftNotice) => void;
 }
 
 function ModelTable({ document, capabilities, onEdit, onNotice }: ModelTableProps): ReactElement {

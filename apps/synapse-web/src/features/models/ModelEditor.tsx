@@ -1,8 +1,9 @@
-import { type ReactElement, type ReactNode, useState } from 'react';
+import { type ReactElement, useState } from 'react';
 import { Button, Drawer, FormField, Input, MultiSelect, NumberStepper, Select, Switch } from '@shadow-library/ui';
 
 import { EFFORTS, type ModelCapabilities, type ProviderEntry, type ReasoningMode, useDraftEdit } from '@/features/catalog';
-import { effortName, providerName } from '@/features/shared';
+import { type DraftNotice, DraftNoticeAlert, draftOutcomeNotice, effortName, FormSection, providerName } from '@/features/shared';
+import formStyles from '@/features/shared/form.module.css';
 
 import {
   addDeploymentRow,
@@ -17,8 +18,7 @@ import {
   updateModelEdit,
   validateModelForm,
 } from './model-form';
-import { defaultModelNote, draftOutcomeNotice, type ModelNotice, modelTitle } from './model-view';
-import { NoticeAlert } from './NoticeAlert';
+import { defaultModelNote, modelTitle } from './model-view';
 import styles from './Models.module.css';
 
 const PRICE_STEP = 0.1;
@@ -43,26 +43,14 @@ export interface ModelEditorProps {
   providers: readonly ProviderEntry[];
   takenKeys: readonly string[];
   onClose: () => void;
-  onSaved: (notice: ModelNotice) => void;
-}
-
-function Section({ title, hint, children }: { title: string; hint?: string; children: ReactNode }): ReactElement {
-  return (
-    <section className={styles.formSection}>
-      <div>
-        <h3 className={styles.formSectionTitle}>{title}</h3>
-        {hint ? <p className={styles.formSectionHint}>{hint}</p> : null}
-      </div>
-      {children}
-    </section>
-  );
+  onSaved: (notice: DraftNotice) => void;
 }
 
 export function ModelEditor({ mode, initial, providers, takenKeys, onClose, onSaved }: ModelEditorProps): ReactElement {
   const draftEdit = useDraftEdit();
   const [form, setForm] = useState<ModelForm>(initial);
   const [errors, setErrors] = useState<ModelFormErrors | null>(null);
-  const [failure, setFailure] = useState<ModelNotice | null>(null);
+  const [failure, setFailure] = useState<DraftNotice | null>(null);
   const providerKeys = providers.map(provider => provider.key);
   const context = { mode, takenKeys, providerKeys };
 
@@ -100,11 +88,11 @@ export function ModelEditor({ mode, initial, providers, takenKeys, onClose, onSa
     <Drawer open onOpenChange={open => open || draftEdit.pending || onClose()} size="lg">
       <Drawer.Header title={title} meta="Saved to the draft; nothing changes for users until the draft is published." />
       <Drawer.Body>
-        <div className={styles.form}>
-          {failure ? <NoticeAlert notice={failure} /> : null}
+        <div className={formStyles.form}>
+          {failure ? <DraftNoticeAlert notice={failure} /> : null}
           {errors ? <p className={styles.problem}>Some settings need attention before the model can be saved.</p> : null}
 
-          <Section title="About">
+          <FormSection title="About">
             {mode.kind === 'add' ? (
               <FormField label="Key" required error={fieldError.key} helper="How features and model names refer to this model. It can't be changed later.">
                 <Input value={form.key} onValueChange={key => update({ key })} placeholder="sonnet-5.5" autoComplete="off" spellCheck={false} />
@@ -114,18 +102,18 @@ export function ModelEditor({ mode, initial, providers, takenKeys, onClose, onSa
                 <Input value={mode.key} readOnly />
               </FormField>
             )}
-            <div className={styles.formRow}>
-              <FormField label="Name" required error={fieldError.label} className={styles.formGrow}>
+            <div className={formStyles.formRow}>
+              <FormField label="Name" required error={fieldError.label} className={formStyles.formGrow}>
                 <Input value={form.label} onValueChange={label => update({ label })} placeholder="Sonnet 5.5" />
               </FormField>
-              <FormField label="Version" optional helper="Shown only where a model name opts in." className={styles.formGrow}>
+              <FormField label="Version" optional helper="Shown only where a model name opts in." className={formStyles.formGrow}>
                 <Input value={form.version} onValueChange={version => update({ version })} placeholder="5.5" />
               </FormField>
             </div>
-          </Section>
+          </FormSection>
 
-          <Section title="Prices" hint="List prices in US dollars per million tokens. Budgets count these, even for calls a subscription covers.">
-            <div className={styles.formRow}>
+          <FormSection title="Prices" hint="List prices in US dollars per million tokens. Budgets count these, even for calls a subscription covers.">
+            <div className={formStyles.formRow}>
               <PriceField label="Input" required value={form.input} error={fieldError.input} onChange={input => update({ input })} />
               <PriceField
                 label="Cached input"
@@ -143,9 +131,9 @@ export function ModelEditor({ mode, initial, providers, takenKeys, onClose, onSa
                 onChange={perImage => update({ perImage })}
               />
             </div>
-          </Section>
+          </FormSection>
 
-          <Section title="What it can do">
+          <FormSection title="What it can do">
             <Switch label="Tools" description="Can call functions the feature offers." checked={form.tools} onCheckedChange={tools => update({ tools })} />
             <Switch label="Vision" description="Can read images in the prompt." checked={form.vision} onCheckedChange={vision => update({ vision })} />
             <Switch
@@ -166,8 +154,8 @@ export function ModelEditor({ mode, initial, providers, takenKeys, onClose, onSa
               checked={form.sampling}
               onCheckedChange={sampling => update({ sampling })}
             />
-            <div className={styles.formRow}>
-              <FormField label="Structured output" className={styles.formGrow}>
+            <div className={formStyles.formRow}>
+              <FormField label="Structured output" className={formStyles.formGrow}>
                 <Select
                   value={form.structuredOutput}
                   onValueChange={value => update({ structuredOutput: value as ModelCapabilities['structuredOutput'] })}
@@ -180,7 +168,7 @@ export function ModelEditor({ mode, initial, providers, takenKeys, onClose, onSa
                   ))}
                 </Select>
               </FormField>
-              <FormField label="Context window" optional error={fieldError.context} helper="In tokens" className={styles.formGrow}>
+              <FormField label="Context window" optional error={fieldError.context} helper="In tokens" className={formStyles.formGrow}>
                 <NumberStepper
                   value={form.context}
                   onValueChange={value => update({ context: value })}
@@ -193,8 +181,8 @@ export function ModelEditor({ mode, initial, providers, takenKeys, onClose, onSa
                 />
               </FormField>
             </div>
-            <div className={styles.formRow}>
-              <FormField label="Reasoning" className={styles.formGrow}>
+            <div className={formStyles.formRow}>
+              <FormField label="Reasoning" className={formStyles.formGrow}>
                 <Select value={form.reasoning} onValueChange={value => update(reasoningPatch(value as ReasoningMode, form.efforts))} aria-label="Reasoning">
                   {REASONING_OPTIONS.map(option => (
                     <Select.Item key={option.value} value={option.value} description={option.description}>
@@ -207,7 +195,7 @@ export function ModelEditor({ mode, initial, providers, takenKeys, onClose, onSa
                 label="Supported efforts"
                 optional
                 helper={form.reasoning === 'none' ? 'Used only by a model that reasons' : 'A requested effort the model lacks is adjusted to one it supports'}
-                className={styles.formGrow}
+                className={formStyles.formGrow}
               >
                 <MultiSelect
                   options={EFFORT_OPTIONS}
@@ -235,9 +223,9 @@ export function ModelEditor({ mode, initial, providers, takenKeys, onClose, onSa
                 aria-label="Embedding dimensions"
               />
             </FormField>
-          </Section>
+          </FormSection>
 
-          <Section title="Served by" hint="Tried in order; the next is used if one fails.">
+          <FormSection title="Served by" hint="Tried in order; the next is used if one fails.">
             {fieldError.deployments ? <p className={styles.problem}>{fieldError.deployments}</p> : null}
             <ol className={styles.deployments}>
               {form.deployments.map((row, index) => {
@@ -314,8 +302,8 @@ export function ModelEditor({ mode, initial, providers, takenKeys, onClose, onSa
                 Add provider
               </Button>
             </div>
-            {providers.length === 0 ? <p className={styles.formSectionHint}>The catalog has no providers yet. Add one on the Providers screen first.</p> : null}
-          </Section>
+            {providers.length === 0 ? <p className={formStyles.formSectionHint}>The catalog has no providers yet. Add one on the Providers screen first.</p> : null}
+          </FormSection>
         </div>
       </Drawer.Body>
       <Drawer.Footer cancel="Cancel" action={mode.kind === 'add' ? 'Add model' : 'Save model'} onAction={() => void submit()} loading={draftEdit.pending} />
@@ -334,7 +322,7 @@ interface PriceFieldProps {
 
 function PriceField({ label, value, required, error, helper, onChange }: PriceFieldProps): ReactElement {
   return (
-    <FormField label={label} required={required} optional={!required} error={error} helper={helper} className={styles.formGrow}>
+    <FormField label={label} required={required} optional={!required} error={error} helper={helper} className={formStyles.formGrow}>
       <NumberStepper
         value={value}
         onValueChange={onChange}

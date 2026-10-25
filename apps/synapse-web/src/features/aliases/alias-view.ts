@@ -6,10 +6,9 @@ import { readAliases, readModels, readProviders, readTasks, splitTaskKey } from 
 import { type AliasEntry, type AliasState, type ModelEntry, type TaskEntry, type TaskKind } from '@/features/catalog/catalog-spec.types';
 import { isRecord, ownEntry, strings } from '@/features/catalog/catalog-values';
 import { type DraftEditOutcome } from '@/features/catalog/draft-edit';
-import { type CatalogIssueResponse } from '@/lib/apis/api-types.gen';
 import { modelDisplayName, type ModelNeeds, modelPriceText } from '@/features/shared/model-options';
 import { aliasName, appName, selectorName, taskName, taskTitle } from '@/features/shared/naming';
-import { type Notice } from '@/features/shared/notice.types';
+import { type DraftNotice, draftOutcomeNotice, draftProblemsSentence } from '@/features/shared/draft-notice';
 
 export interface AliasStateInfo {
   label: string;
@@ -53,14 +52,7 @@ export interface AliasRow {
   entry: AliasEntry;
 }
 
-export interface AliasFeedback extends Notice {
-  changesLink?: boolean;
-  issues?: CatalogIssueResponse[];
-}
-
 export type AliasAction = 'added' | 'updated' | 'retargeted';
-
-const plural = (count: number, noun: string): string => `${count} ${noun}${count === 1 ? '' : 's'}`;
 
 /** Mirrors synapse-server's `isAliasAvailable`: every rule must match, so one rule allowing no value makes the name available nowhere. */
 export function availabilitySentence(available: Record<string, string[]> | undefined): string {
@@ -161,30 +153,11 @@ export function defaultAliasNote(name: string, action: AliasAction, model?: stri
   return action === 'retargeted' && model ? `Model name ${name} now uses ${model}` : `Model name ${name} ${action}`;
 }
 
-export function aliasOutcomeNotice(outcome: DraftEditOutcome, name: string, action: AliasAction): AliasFeedback {
-  const failed = `${name} wasn't saved`;
-  switch (outcome.kind) {
-    case 'saved': {
-      const title = action === 'retargeted' ? `${name} now points to the new model in the draft` : `${name} ${action} in the draft`;
-      if (outcome.issues.length === 0) return { intent: 'success', title, body: 'Nothing changes for users until the draft is published.', changesLink: true };
-      return {
-        intent: 'warning',
-        title,
-        body: `The draft now has ${plural(outcome.issues.length, 'problem')} to fix before it can be published.`,
-        changesLink: true,
-      };
-    }
-    case 'invalid':
-      return { intent: 'danger', title: failed, body: "Synapse couldn't accept the draft with this change.", issues: outcome.issues };
-    case 'unchanged':
-      return { intent: 'info', title: 'Nothing to save', body: `The draft already has these settings for ${name}.` };
-    case 'refused':
-      return { intent: 'danger', title: failed, body: outcome.reason };
-    case 'conflict':
-      return { intent: 'warning', title: 'Someone else changed the draft', body: "Your change wasn't saved. The screen now shows their version; check it and try again." };
-    case 'failed':
-      return { intent: 'danger', title: failed, body: outcome.message };
-  }
+export function aliasOutcomeNotice(outcome: DraftEditOutcome, name: string, action: AliasAction): DraftNotice {
+  if (outcome.kind !== 'saved') return draftOutcomeNotice(outcome, name, 'updated');
+  const title = action === 'retargeted' ? `${name} now points to the new model in the draft` : `${name} ${action} in the draft`;
+  if (outcome.issues.length === 0) return { intent: 'success', title, body: 'Nothing changes for users until the draft is published.', changesLink: true };
+  return { intent: 'warning', title, body: draftProblemsSentence(outcome.issues.length), changesLink: true };
 }
 
 /**

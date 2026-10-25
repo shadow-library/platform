@@ -1,13 +1,10 @@
 import { type CatalogDocument, type DocumentEdit } from '@/features/catalog/catalog-document';
 import { withAlias } from '@/features/catalog/catalog-edits';
-import { readAliases } from '@/features/catalog/catalog-readers';
+import { CATALOG_KEY_HINT, CATALOG_KEY_PATTERN } from '@/features/catalog/catalog-keys';
+import { readAliases, selectorValues } from '@/features/catalog/catalog-readers';
 import { type AliasEntry, type AliasSpec, type AliasState } from '@/features/catalog/catalog-spec.types';
-import { isRecord, isSameValue, ownEntry, strings } from '@/features/catalog/catalog-values';
+import { isRecord, isSameValue, ownEntry } from '@/features/catalog/catalog-values';
 import { type CatalogEdit } from '@/features/catalog/draft-edit';
-import { selectorName } from '@/features/shared/naming';
-
-/** Mirrors the server parser's rule for alias and selector keys. */
-export const ALIAS_KEY_PATTERN = /^[A-Za-z0-9][\w.:/@-]*$/;
 
 export const CONCURRENT_ALIAS_CHANGE = 'Someone else changed this model name while you were editing. Reopen it to see their change.';
 
@@ -86,14 +83,8 @@ export function removeRule(rules: readonly AvailabilityRule[], rowId: number): A
   return rules.filter(rule => rule.rowId !== rowId);
 }
 
-export function resolveSelectorKey(input: string, knownKeys: readonly string[]): string {
-  const typed = input.trim();
-  const folded = typed.toLowerCase();
-  return knownKeys.find(key => key === typed) ?? knownKeys.find(key => key.toLowerCase() === folded || selectorName(key).toLowerCase() === folded) ?? typed;
-}
-
 export function valueSuggestions(vocabulary: Readonly<Record<string, string[]>>, selector: string, values: readonly string[]): string[] {
-  return strings(ownEntry(vocabulary, selector)).filter(value => !values.includes(value));
+  return selectorValues(vocabulary, selector).filter(value => !values.includes(value));
 }
 
 function cleanValues(values: readonly string[]): string[] {
@@ -125,7 +116,7 @@ export function editedAliasFields(initial: AliasForm, form: AliasForm): AliasFie
 function keyError(key: string, context: AliasFormContext): string | undefined {
   if (context.mode.kind === 'edit') return undefined;
   if (key === '') return 'Enter a key';
-  if (!ALIAS_KEY_PATTERN.test(key)) return 'Start with a letter or digit, then use only letters, digits and . _ - : / @';
+  if (!CATALOG_KEY_PATTERN.test(key)) return CATALOG_KEY_HINT;
   const folded = key.toLowerCase();
   return context.takenKeys.some(taken => taken.toLowerCase() === folded) ? 'Another model name already uses this key, retired ones included' : undefined;
 }
@@ -138,7 +129,7 @@ function ruleErrors(rules: readonly AvailabilityRule[]): Record<number, RuleErro
     const selectorError =
       selector === ''
         ? 'Choose or type a condition'
-        : !ALIAS_KEY_PATTERN.test(selector)
+        : !CATALOG_KEY_PATTERN.test(selector)
           ? 'Use only letters, digits and . _ - : / @'
           : seen.has(selector)
             ? 'Another rule already uses this condition; put all its values in one rule'
