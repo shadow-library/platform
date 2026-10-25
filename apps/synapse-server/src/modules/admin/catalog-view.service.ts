@@ -23,7 +23,8 @@ export interface CatalogView {
 }
 
 function priceOf(model: ModelSpec): Pick<CatalogModelView, 'price' | 'capabilities'> {
-  return { price: structuredClone(model.pricePerMTok), capabilities: structuredClone(model.capabilities) };
+  const { maxOptionalProperties: _dispatchOnly, ...capabilities } = model.capabilities;
+  return { price: structuredClone(model.pricePerMTok), capabilities: structuredClone(capabilities) };
 }
 
 function requireModel(document: CatalogDocument, modelKey: string): ModelSpec {

@@ -116,6 +116,14 @@ describe('parseCatalogDocument', () => {
     }
   });
 
+  it('should accept a non-negative integer limit on native optional properties', () => {
+    expect(issuesOf(parseWith(document => (document.models['claude-opus-5.5'].capabilities.maxOptionalProperties = 24)))).toEqual([]);
+    for (const limit of [-1, 2.5, '24']) {
+      const result = parseWith(document => (document.models['claude-opus-5.5'].capabilities.maxOptionalProperties = limit));
+      expect(issuesOf(result)).toEqual([{ path: 'models.claude-opus-5.5.capabilities.maxOptionalProperties', code: expect.any(String) }]);
+    }
+  });
+
   it('should accept a credential named by its id and reject anything else', () => {
     const named = parseWith(document => {
       delete document.providers.openrouter.apiKeyConfig;

@@ -3,6 +3,7 @@ import { type SynapseEnvelope } from '@shadow-library/synapse';
 import { type Effort, type ModelSpec, type ProviderFlavor, type ProviderSpec } from '@modules/catalog';
 
 import { ProviderCallError } from './provider-call.error';
+import { optionalPropertyCount } from './schema-complexity.util';
 import {
   type ChatContentPart,
   type ChatMessage,
@@ -105,6 +106,11 @@ function reasoningFor({ effort, model }: ChatTranslationInput, dialect: Provider
   return dialect === 'subscription-gateway' && effort !== 'none' ? { effort } : undefined;
 }
 
+function promptsSchema({ capabilities }: ModelSpec, schema: unknown): boolean {
+  if (capabilities.structuredOutput === 'prompt') return true;
+  return capabilities.maxOptionalProperties !== undefined && optionalPropertyCount(schema) > capabilities.maxOptionalProperties;
+}
+
 type WebSearchRoute = 'not_requested' | 'gateway_tools' | 'openrouter_plugin' | 'unavailable';
 
 function webSearchRoute({ body, provider, envelope }: ChatTranslationInput, dialect: ProviderDialect): WebSearchRoute {
@@ -125,7 +131,7 @@ export function translateChatRequest(input: ChatTranslationInput): TranslatedReq
 
   let messages = model.capabilities.promptCache === 'anthropic' ? body.messages : body.messages.map(stripCacheControl);
   const responseFormat = body.response_format;
-  if (responseFormat?.type === 'json_schema' && model.capabilities.structuredOutput === 'prompt') {
+  if (responseFormat?.type === 'json_schema' && promptsSchema(model, responseFormat.json_schema.schema)) {
     delete translated['response_format'];
     messages = [...messages, { role: 'system', content: `${JSON_SCHEMA_INSTRUCTION}${JSON.stringify(responseFormat.json_schema.schema ?? {})}` }];
     if (dialect === 'ollama') translated['response_format'] = { type: 'json_object' };

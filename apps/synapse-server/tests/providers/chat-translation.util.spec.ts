@@ -25,6 +25,8 @@ const API_KEY = 'sk-or-secret';
 
 const SCHEMA = { type: 'object', properties: { title: { type: 'string' } }, required: ['title'] };
 const JSON_SCHEMA_FORMAT: ChatRequestBody['response_format'] = { type: 'json_schema', json_schema: { name: 'answer', schema: SCHEMA } };
+const ONE_OPTIONAL = { ...SCHEMA, properties: { ...SCHEMA.properties, subtitle: { type: 'string' } } };
+const ONE_OPTIONAL_FORMAT: ChatRequestBody['response_format'] = { type: 'json_schema', json_schema: { name: 'answer', schema: ONE_OPTIONAL } };
 
 describe('translateChatRequest', () => {
   describe('model id and envelope', () => {
@@ -205,6 +207,19 @@ describe('translateChatRequest', () => {
         role: 'system',
         content: `Respond with only a JSON object that matches this JSON Schema: ${JSON.stringify(SCHEMA)}`,
       });
+    });
+
+    it("should prompt a schema with more optional properties than the model's native structured output takes", () => {
+      const { body } = translate({ body: chatBody({ response_format: ONE_OPTIONAL_FORMAT }), capabilities: { structuredOutput: 'native', maxOptionalProperties: 0 } });
+
+      expect(body).not.toHaveProperty('response_format');
+      expect((body['messages'] as { content: string }[]).at(-1)?.content).toContain(JSON.stringify(ONE_OPTIONAL));
+    });
+
+    it('should keep a schema within the limit native', () => {
+      const { body } = translate({ body: chatBody({ response_format: ONE_OPTIONAL_FORMAT }), capabilities: { structuredOutput: 'native', maxOptionalProperties: 1 } });
+
+      expect(body['response_format']).toEqual(ONE_OPTIONAL_FORMAT);
     });
 
     it("should also switch on Ollama's JSON mode through its OpenAI-compatible response format, keeping the schema in the prompt", () => {

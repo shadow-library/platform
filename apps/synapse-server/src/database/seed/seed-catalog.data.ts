@@ -70,6 +70,7 @@ export const SEED_CATALOG_DATA = utils.object.deepFreeze<Omit<CatalogDocument, '
         efforts: ['max', 'high', 'medium', 'low'],
         promptCache: 'anthropic',
         sampling: true,
+        maxOptionalProperties: 24,
       },
       pricePerMTok: {
         input: 2,
@@ -98,6 +99,7 @@ export const SEED_CATALOG_DATA = utils.object.deepFreeze<Omit<CatalogDocument, '
         efforts: ['max', 'high', 'medium', 'low'],
         promptCache: 'anthropic',
         sampling: true,
+        maxOptionalProperties: 24,
       },
       pricePerMTok: {
         input: 4,
@@ -126,6 +128,7 @@ export const SEED_CATALOG_DATA = utils.object.deepFreeze<Omit<CatalogDocument, '
         efforts: ['max', 'high', 'medium', 'low'],
         promptCache: 'anthropic',
         sampling: true,
+        maxOptionalProperties: 24,
       },
       pricePerMTok: {
         input: 5,
@@ -153,6 +156,7 @@ export const SEED_CATALOG_DATA = utils.object.deepFreeze<Omit<CatalogDocument, '
         reasoning: 'optional',
         promptCache: 'anthropic',
         sampling: true,
+        maxOptionalProperties: 24,
       },
       pricePerMTok: {
         input: 1,

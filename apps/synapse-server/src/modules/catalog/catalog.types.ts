@@ -26,7 +26,10 @@ export type BudgetWindow = '1h' | '1d' | '30d';
 
 export type Selectors = Record<string, string>;
 
-export type ModelCapabilities = CatalogCapabilities;
+export interface ModelCapabilities extends CatalogCapabilities {
+  /** Native structured output refuses a response schema with more optional properties than this, so such a call is prompted instead; never shown to apps */
+  maxOptionalProperties?: number;
+}
 
 export type ModelPrice = CatalogPrice;
 

@@ -26,6 +26,14 @@ describe('CatalogViewService', () => {
     expect(view.default.capabilities.reasoning).toBe('mandatory');
   });
 
+  it('should never show apps the dispatch-only limit on native structured output', () => {
+    const document = catalogDocument(draft => (draft.models['claude-opus-5.5']!.capabilities.maxOptionalProperties = 24));
+    const view = new CatalogViewService(fakeCache(document)).view('novel-forge', 'novel-forge.chat', parseSelectors('')).body as CatalogTaskResponse;
+
+    expect(view.default.model).toBe('claude-opus-5.5');
+    expect(view.default.capabilities).not.toHaveProperty('maxOptionalProperties');
+  });
+
   it('should fall back to the default route when no selector matches', () => {
     expect(taskView('novel-forge.chat').default.model).toBe('claude-opus-5.5');
     expect(taskView('novel-forge.chat', 'tier:unknown').default.model).toBe('claude-opus-5.5');

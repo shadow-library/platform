@@ -89,6 +89,7 @@ const CAPABILITY_FIELDS = keysOf<keyof ModelCapabilities>({
   efforts: true,
   promptCache: true,
   sampling: true,
+  maxOptionalProperties: true,
 });
 const EMBEDDING_FIELDS = keysOf<keyof NonNullable<ModelCapabilities['embedding']>>({ dimensions: true });
 const PRICE_FIELDS = keysOf<keyof ModelPrice>({ input: true, cachedInput: true, output: true, perImage: true });
@@ -190,6 +191,7 @@ class CatalogParser {
       efforts: fields.optional('efforts', this.nonEmpty(this.array(this.literal(EFFORTS)))),
       promptCache: fields.required('promptCache', this.literal(PROMPT_CACHE)),
       sampling: fields.required('sampling', this.flag),
+      maxOptionalProperties: fields.optional('maxOptionalProperties', this.number({ integer: true, min: 0 })),
     }));
 
   private readonly price: Reader<ModelPrice> = (value, path) =>
