@@ -93,7 +93,7 @@ describe('buildReview', () => {
     const opus = review.areas.find(area => area.area === 'alias')?.entities[0];
     expect(opus).toMatchObject({ label: 'Model name Opus', lines: [], fix: { screen: 'alias', alias: 'opus' } });
     expect(review.areas.find(area => area.area === 'alias')?.changeCount).toBe(0);
-    expect(review.areas.find(area => area.area === 'provider')?.entities[0]?.label).toBe('Provider Openrouter');
+    expect(review.areas.find(area => area.area === 'provider')?.entities[0]?.label).toBe('Provider OpenRouter');
   });
 
   it('should collect top-level settings outside the known sections into one group', () => {

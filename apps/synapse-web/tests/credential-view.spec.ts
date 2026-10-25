@@ -5,9 +5,12 @@ import {
   credentialErrorMessage,
   credentialsForUrl,
   describeTest,
+  destinationLabel,
+  destinationName,
   hintLabel,
   inUseMessage,
   issueAdvice,
+  keyDestinations,
   keyStatusOf,
   keyVersionLabel,
   normaliseOriginInput,
@@ -16,6 +19,7 @@ import {
   revokeDescription,
   revokedLabel,
   sortCredentials,
+  suggestedName,
   validateCreateForm,
   validateSecret,
 } from '../src/features/credentials/credential-view';
@@ -142,20 +146,20 @@ describe('validateSecret', () => {
 
 describe('validateCreateForm', () => {
   it('should send the trimmed name, the normalised origin and the trimmed key', () => {
-    expect(validateCreateForm({ name: ' openrouter ', allowedOrigin: 'https://OpenRouter.ai/', secret: ` ${KEY} ` })).toEqual({
+    expect(validateCreateForm({ name: ' openrouter ', destination: { kind: 'address', input: 'https://OpenRouter.ai/' }, secret: ` ${KEY} ` })).toEqual({
       ok: true,
       body: { name: 'openrouter', allowedOrigin: 'https://openrouter.ai', secret: KEY },
     });
   });
 
   it('should report every invalid field at once', () => {
-    const result = validateCreateForm({ name: 'Open Router', allowedOrigin: 'https://openrouter.ai/api', secret: 'short' });
+    const result = validateCreateForm({ name: 'Open Router', destination: { kind: 'address', input: 'https://openrouter.ai/api' }, secret: 'short' });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(Object.keys(result.errors).sort()).toEqual(['allowedOrigin', 'name', 'secret']);
   });
 
   it('should hold a name to the server pattern', () => {
-    const attempt = (name: string) => validateCreateForm({ name, allowedOrigin: 'https://openrouter.ai', secret: KEY }).ok;
+    const attempt = (name: string) => validateCreateForm({ name, destination: { kind: 'provider', origin: 'https://openrouter.ai' }, secret: KEY }).ok;
     expect(attempt('a')).toBe(true);
     expect(attempt('open.router_v2-1')).toBe(true);
     expect(attempt('a'.repeat(64))).toBe(true);
@@ -163,6 +167,68 @@ describe('validateCreateForm', () => {
     expect(attempt('-leading')).toBe(false);
     expect(attempt('UPPER')).toBe(false);
     expect(attempt('')).toBe(false);
+  });
+});
+
+describe('validateCreateForm with a provider', () => {
+  it("should send the chosen provider's origin as is", () => {
+    const result = validateCreateForm({ name: 'openrouter', destination: { kind: 'provider', origin: 'https://openrouter.ai' }, secret: KEY });
+    expect(result).toEqual({ ok: true, body: { name: 'openrouter', allowedOrigin: 'https://openrouter.ai', secret: KEY } });
+  });
+
+  it('should ask for a provider when none is chosen', () => {
+    const result = validateCreateForm({ name: 'openrouter', destination: { kind: 'provider', origin: null }, secret: KEY });
+    expect(result).toEqual({ ok: false, errors: { allowedOrigin: 'Choose the provider this key is for.' } });
+  });
+});
+
+describe('keyDestinations', () => {
+  it('should group providers by the origin a key would be bound to', () => {
+    const destinations = keyDestinations([
+      { key: 'openrouter', kind: 'openai', url: 'https://openrouter.ai/api/v1' },
+      { key: 'gateway', kind: 'openai', url: 'http://host.k3d.internal:8090/v1' },
+      { key: 'openrouter-free', kind: 'openai', url: 'https://openrouter.ai/api/v1' },
+      { key: 'openrouter', kind: 'openai', url: 'https://openrouter.ai/api/v1' },
+    ]);
+    expect(destinations).toEqual([
+      { origin: 'http://host.k3d.internal:8090', providers: ['gateway'] },
+      { origin: 'https://openrouter.ai', providers: ['openrouter', 'openrouter-free'] },
+    ]);
+  });
+
+  it('should leave out providers that never send a key or have no web address', () => {
+    expect(
+      keyDestinations([
+        { key: 'local', kind: 'ollama', url: 'http://ollama:11434' },
+        { key: 'broken', kind: 'openai', url: 'not a url' },
+        { key: 'ftp', kind: 'openai', url: 'ftp://example.com' },
+      ]),
+    ).toEqual([]);
+  });
+});
+
+describe('destination naming', () => {
+  const destination = { origin: 'https://openrouter.ai', providers: ['openrouter', 'openrouter-free'] };
+
+  it('should name every provider at the address', () => {
+    expect(destinationName(destination)).toBe('OpenRouter, OpenRouter Free');
+  });
+
+  it('should suggest the first provider key the name rule accepts', () => {
+    expect(suggestedName(destination, new Set())).toBe('openrouter');
+    expect(suggestedName({ origin: 'https://x.ai', providers: ['X_AI'] }, new Set())).toBeUndefined();
+  });
+
+  it('should suggest a name no stored credential holds', () => {
+    expect(suggestedName(destination, new Set(['openrouter']))).toBe('openrouter-free');
+    expect(suggestedName(destination, new Set(['openrouter', 'openrouter-free', 'openrouter-2']))).toBe('openrouter-3');
+    expect(suggestedName({ origin: 'https://x.ai', providers: ['a'.repeat(64)] }, new Set(['a'.repeat(64)]))).toBeUndefined();
+  });
+
+  it('should say which provider a stored key is for', () => {
+    expect(destinationLabel('https://openrouter.ai', [destination])).toBe('For OpenRouter, OpenRouter Free, only sent to openrouter.ai');
+    expect(destinationLabel('https://api.example.com', [destination])).toBe('Only sent to api.example.com');
+    expect(destinationLabel('https://openrouter.ai')).toBe('Only sent to openrouter.ai');
   });
 });
 

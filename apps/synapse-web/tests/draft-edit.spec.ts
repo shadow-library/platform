@@ -145,7 +145,7 @@ describe('nextDraftNote', () => {
 
   it('should start a draft with the default note', () => {
     expect(nextDraftNote(undefined, routing, known)).toBe(routing);
-    expect(nextDraftNote('  ', 'Provider Openrouter updated', known)).toBe('Provider Openrouter updated');
+    expect(nextDraftNote('  ', 'Provider OpenRouter updated', known)).toBe('Provider OpenRouter updated');
   });
 
   it('should add a new edit to a note the console wrote, once', () => {
@@ -154,7 +154,7 @@ describe('nextDraftNote', () => {
   });
 
   it('should recognise the notes the provider, model and model name screens write about what the draft holds', () => {
-    for (const note of ['Provider Openrouter updated', 'Model Opus 5.5 removed', 'Model Llama 3.1 updated', 'Model name Opus retargeted', 'Model name Sonnet now uses Llama 3.1'])
+    for (const note of ['Provider OpenRouter updated', 'Model Opus 5.5 removed', 'Model Llama 3.1 updated', 'Model name Opus retargeted', 'Model name Sonnet now uses Llama 3.1'])
       expect(isGeneratedNote(note, known)).toBe(true);
     expect(nextDraftNote('Model name Sonnet now uses Llama 3.1', routing, known)).toBe(`Model name Sonnet now uses Llama 3.1; ${routing}`);
   });
@@ -183,7 +183,7 @@ describe('nextDraftNote', () => {
 
   it('should stay within the note limit, and stop growing once cut', () => {
     const long = Array.from({ length: 40 }, () => 'Model Llama 3.1 updated').join('; ');
-    const next = nextDraftNote(long, 'Provider Openrouter added', known);
+    const next = nextDraftNote(long, 'Provider OpenRouter added', known);
     expect(next.length).toBeLessThanOrEqual(NOTE_MAX_LENGTH);
     expect(next.endsWith('…')).toBe(true);
     expect(nextDraftNote(next, 'Model Opus 5.5 added', known)).toBe(next);

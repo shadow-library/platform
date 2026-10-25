@@ -74,7 +74,7 @@ describe('describeChanges', () => {
       document => (document.providers.ollama.url = 'http://ollama.internal:11434'),
       ['Provider Ollama — address: http://ollama:11434 → http://ollama.internal:11434'],
     ],
-    ['a removed credential', document => Reflect.deleteProperty(document.providers.openrouter, 'credential'), ['Provider Openrouter — API key removed']],
+    ['a removed credential', document => Reflect.deleteProperty(document.providers.openrouter, 'credential'), ['Provider OpenRouter — API key removed']],
     ['an unknown task field', document => Object.assign(document.tasks[CHAT], { temperature: 0.2 }), ['Novel Forge · Chat — temperature changed']],
     ['an unknown top-level key', document => Object.assign(document, { notes: 'x' }), ['Catalog — notes changed']],
     ['a task the console cannot read any more', document => Object.assign(document.tasks[CHAT], { routes: 'every' }), ['Novel Forge · Chat — other settings changed']],

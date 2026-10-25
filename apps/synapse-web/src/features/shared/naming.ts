@@ -15,6 +15,7 @@ const EFFORT_NAMES: Readonly<Record<string, string>> = {
 };
 const DATA_POLICY_NAMES: Readonly<Record<string, string>> = { any: 'Any provider', in_cluster_only: 'Only models running inside our cluster' };
 const TASK_KIND_NAMES: Readonly<Record<string, string>> = { chat: 'Chat', embedding: 'Embeddings', image: 'Image generation' };
+const BRAND_WORDS: Readonly<Record<string, string>> = { openrouter: 'OpenRouter', openai: 'OpenAI', deepseek: 'DeepSeek' };
 const CAPABILITY_NAMES: Readonly<Record<string, string>> = {
   tools: 'Tools',
   structured_output: 'Structured output',
@@ -62,7 +63,9 @@ export function aliasName(alias: { key: string; label?: string }): string {
 }
 
 export function providerName(provider: string): string {
-  return titleCase(provider);
+  return words(provider)
+    .map(word => ownEntry(BRAND_WORDS, word.toLowerCase()) ?? capitalise(word))
+    .join(' ');
 }
 
 export function selectorName(selector: string): string {

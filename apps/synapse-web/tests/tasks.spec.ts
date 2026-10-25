@@ -236,7 +236,7 @@ describe('model eligibility hints', () => {
     const providers = readProviders(document);
     expect(modelEligibility(model(models, 'opus-5.5'), { dataPolicy: 'in_cluster_only', providers })).toEqual({
       eligible: false,
-      reasons: ['Runs outside our cluster, on Subscription, Openrouter'],
+      reasons: ['Runs outside our cluster, on Subscription, OpenRouter'],
     });
     expect(modelEligibility(model(models, 'llama3.1'), { dataPolicy: 'in_cluster_only', providers })).toEqual({ eligible: true });
     expect(modelEligibility(model(models, 'opus-5.5'), { dataPolicy: 'in_cluster_only', providers: [] })).toEqual({ eligible: true });
@@ -332,8 +332,8 @@ describe('feature detail', () => {
     const context = { aliases: readAliases(document), models, providers: readProviders(document) };
     expect(dataPolicyHints(chat, 'any', context)).toEqual([]);
     expect(dataPolicyHints(chat, 'in_cluster_only', context)).toEqual([
-      'Opus 5.5: runs outside our cluster, on Subscription, Openrouter',
-      'Sonnet 5.5: runs outside our cluster, on Openrouter',
+      'Opus 5.5: runs outside our cluster, on Subscription, OpenRouter',
+      'Sonnet 5.5: runs outside our cluster, on OpenRouter',
     ]);
   });
 });

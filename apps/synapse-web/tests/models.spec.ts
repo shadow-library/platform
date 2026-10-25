@@ -177,7 +177,7 @@ describe('compareModels', () => {
     const rows = compareModels([modelOf('opus-5.5'), modelOf('sonnet-5.5')], modelUsageIndex(document), new Set(PROVIDERS));
     const input = rows.find(row => row.id === 'input');
     expect(input).toEqual({ id: 'input', label: 'Input, per million tokens', values: ['$15.00', '$3.00'], cheapest: [false, true] });
-    expect(rows.find(row => row.id === 'servedBy')?.values).toEqual(['Subscription, then Openrouter', 'Openrouter']);
+    expect(rows.find(row => row.id === 'servedBy')?.values).toEqual(['Subscription, then OpenRouter', 'OpenRouter']);
     expect(rows.find(row => row.id === 'usedBy')?.values).toEqual(['Novel Forge · Chat, Opus', 'Sonnet']);
     expect(rows.find(row => row.id === 'efforts')?.values).toEqual(['Low, Medium, High', '—']);
     expect(rows.find(row => row.id === 'cachedInput')).toMatchObject({ values: ['$1.50', 'Same as input ($3.00)'], cheapest: [true, false] });

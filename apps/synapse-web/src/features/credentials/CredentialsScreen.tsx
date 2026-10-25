@@ -10,17 +10,18 @@ import { CreateCredentialDialog, RotateCredentialDialog } from './CredentialDial
 import {
   credentialErrorMessage,
   describeTest,
+  destinationLabel,
   hintLabel,
   inUseMessage,
   isRevoked,
   keyVersionLabel,
-  originHost,
   revokeDescription,
   revokedLabel,
   sortCredentials,
   type TestReport,
 } from './credential-view';
 import styles from './Credentials.module.css';
+import { useKeyDestinations } from './use-key-destinations';
 
 type DialogState = { kind: 'create' } | { kind: 'rotate'; credential: CredentialResponse } | null;
 
@@ -47,6 +48,8 @@ function CredentialsView(): ReactElement {
   const queryClient = useQueryClient();
   const confirm = useConfirm();
   const credentials = useQuery(credentialsQueryOptions());
+  const destinations = useKeyDestinations();
+  const keyDestinations = destinations.status === 'ready' ? destinations.items : undefined;
   const [dialog, setDialog] = useState<DialogState>(null);
   const [notice, setNotice] = useState<ScreenNotice | null>(null);
   const [tests, setTests] = useState<Record<string, RowTest>>({});
@@ -108,7 +111,7 @@ function CredentialsView(): ReactElement {
       cell: row => (
         <span className={styles.cell}>
           <span>{row.name}</span>
-          <Muted>Only sent to {originHost(row.allowedOrigin)}</Muted>
+          <Muted>{destinationLabel(row.allowedOrigin, keyDestinations)}</Muted>
           <details className={styles.details}>
             <summary>Technical details</summary>
             <span className={styles.detailLines}>
@@ -251,7 +254,9 @@ function CredentialsView(): ReactElement {
           emptyState="No API keys stored yet. Add one with New credential, then choose it for a provider on the Providers screen."
         />
       )}
-      {dialog?.kind === 'create' ? <CreateCredentialDialog onClose={() => setDialog(null)} onCreated={handleCreated} /> : null}
+      {dialog?.kind === 'create' ? (
+        <CreateCredentialDialog takenNames={credentials.data?.items.map(item => item.name) ?? []} onClose={() => setDialog(null)} onCreated={handleCreated} />
+      ) : null}
       {dialog?.kind === 'rotate' ? <RotateCredentialDialog credential={dialog.credential} onClose={() => setDialog(null)} onRotated={handleRotated} /> : null}
     </>
   );

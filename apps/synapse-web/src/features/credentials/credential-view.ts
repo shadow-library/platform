@@ -1,7 +1,9 @@
 import { isApiError } from '@shadow-library/web';
 
+import { type ProviderEntry } from '@/features/catalog/catalog-spec.types';
 import { ownEntry } from '@/features/catalog/catalog-values';
 import { formatDate } from '@/features/shared/format';
+import { providerName } from '@/features/shared/naming';
 import { type CreateCredentialBody, type CredentialResponse, type CredentialTestResponse, type ProviderResponse } from '@/lib/apis/api-types.gen';
 
 export const CREDENTIAL_NAME_PATTERN = /^[a-z0-9][a-z0-9._-]{0,63}$/;
@@ -15,6 +17,13 @@ const HIDDEN_HINT = '…';
 
 export type CreateField = keyof CreateCredentialBody;
 export type FieldErrors = Partial<Record<CreateField, string>>;
+
+export type Destination = { kind: 'provider'; origin: string | null } | { kind: 'address'; input: string };
+
+export interface KeyDestination {
+  origin: string;
+  providers: string[];
+}
 
 export type CreateValidation = { ok: true; body: CreateCredentialBody } | { ok: false; errors: FieldErrors };
 export type SecretValidation = { ok: true; secret: string } | { ok: false; error: string };
@@ -95,6 +104,42 @@ export function originHost(origin: string): string {
   return protocol === 'https:' ? host : `${protocol}//${host}`;
 }
 
+/** A key is bound to an origin rather than a provider, so providers sharing an address share one destination; ollama never sends a key. */
+export function keyDestinations(providers: readonly Pick<ProviderEntry, 'key' | 'kind' | 'url'>[]): KeyDestination[] {
+  const byOrigin = new Map<string, Set<string>>();
+  for (const provider of providers) {
+    const origin = originOfUrl(provider.url);
+    if (provider.kind === 'ollama' || origin === null) continue;
+    byOrigin.set(origin, (byOrigin.get(origin) ?? new Set()).add(provider.key));
+  }
+  return [...byOrigin]
+    .map(([origin, keys]) => ({ origin, providers: [...keys].sort() }))
+    .sort((a, b) => a.providers.join().localeCompare(b.providers.join()) || a.origin.localeCompare(b.origin));
+}
+
+export function destinationName(destination: KeyDestination): string {
+  return destination.providers.map(providerName).join(', ');
+}
+
+/** Revoked credentials keep their names, so `taken` holds every stored name, not just the active ones. */
+export function suggestedName(destination: KeyDestination, taken: ReadonlySet<string>): string | undefined {
+  const candidates = destination.providers.filter(provider => CREDENTIAL_NAME_PATTERN.test(provider));
+  const free = candidates.find(provider => !taken.has(provider));
+  if (free !== undefined || candidates[0] === undefined) return free;
+  const base = candidates[0];
+  for (let suffix = 2; ; suffix++) {
+    const name = `${base}-${suffix}`;
+    if (!CREDENTIAL_NAME_PATTERN.test(name)) return undefined;
+    if (!taken.has(name)) return name;
+  }
+}
+
+export function destinationLabel(origin: string, destinations: readonly KeyDestination[] = []): string {
+  const destination = destinations.find(candidate => candidate.origin === origin);
+  const host = originHost(origin);
+  return destination ? `For ${destinationName(destination)}, only sent to ${host}` : `Only sent to ${host}`;
+}
+
 export function credentialsForUrl(credentials: readonly CredentialResponse[], url: string): CredentialResponse[] {
   const origin = originOfUrl(url);
   if (origin === null) return [];
@@ -121,13 +166,16 @@ export function validateSecret(input: string): SecretValidation {
   return { ok: true, secret };
 }
 
-export function validateCreateForm(values: { name: string; allowedOrigin: string; secret: string }): CreateValidation {
+export function validateCreateForm(values: { name: string; destination: Destination; secret: string }): CreateValidation {
   const errors: FieldErrors = {};
   const name = values.name.trim();
-  const allowedOrigin = normaliseOriginInput(values.allowedOrigin);
+  const { destination } = values;
+  const allowedOrigin = destination.kind === 'provider' ? destination.origin : normaliseOriginInput(destination.input);
   const secret = validateSecret(values.secret);
   if (!CREDENTIAL_NAME_PATTERN.test(name)) errors.name = 'Use 1 to 64 lowercase letters, digits, dots, underscores or hyphens, starting with a letter or digit.';
-  if (allowedOrigin === null) errors.allowedOrigin = 'Enter an address like https://openrouter.ai: scheme, host and optional port, with no path.';
+  if (allowedOrigin === null)
+    errors.allowedOrigin =
+      destination.kind === 'provider' ? 'Choose the provider this key is for.' : 'Enter an address like https://openrouter.ai: scheme, host and optional port, with no path.';
   if (!secret.ok) errors.secret = secret.error;
   if (errors.name || errors.allowedOrigin || !secret.ok || allowedOrigin === null) return { ok: false, errors };
   return { ok: true, body: { name, allowedOrigin, secret: secret.secret } };

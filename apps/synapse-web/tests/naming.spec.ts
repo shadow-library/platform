@@ -37,6 +37,8 @@ describe('naming', () => {
 
   it('should humanise provider and selector keys', () => {
     expect(providerName('subscription')).toBe('Subscription');
+    expect(providerName('openrouter-free')).toBe('OpenRouter Free');
+    expect(providerName('constructor')).toBe('Constructor');
     expect(selectorName('content_mode')).toBe('Content mode');
   });
 
