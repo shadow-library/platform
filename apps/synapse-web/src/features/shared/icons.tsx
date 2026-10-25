@@ -60,6 +60,30 @@ export function InfoIcon(): ReactElement {
   return <StrokeIcon paths={['M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z', 'M12 16v-4', 'M12 8h.01']} size={14} />;
 }
 
+export function EditIcon(): ReactElement {
+  return <StrokeIcon paths={['M12 20h9', 'M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z']} size={16} />;
+}
+
+export function RemoveIcon(): ReactElement {
+  return <StrokeIcon paths={['M3 6h18', 'M8 6V4h8v2', 'M19 6l-1 14H6L5 6', 'M10 11v6', 'M14 11v6']} size={16} />;
+}
+
+export function ImpactIcon(): ReactElement {
+  return <StrokeIcon paths={['M3 17l6-6 4 4 8-8', 'M14 7h7v7']} size={16} />;
+}
+
+export function TestIcon(): ReactElement {
+  return <StrokeIcon paths={['M22 12h-4l-3 9L9 3l-3 9H2']} size={16} />;
+}
+
+export function RotateIcon(): ReactElement {
+  return <StrokeIcon paths={['M21 12a9 9 0 0 1-15.5 6.2', 'M3 12a9 9 0 0 1 15.5-6.2', 'M21 4v5h-5', 'M3 20v-5h5']} size={16} />;
+}
+
+export function RevokeIcon(): ReactElement {
+  return <StrokeIcon paths={['M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z', 'M5.6 5.6l12.8 12.8']} size={16} />;
+}
+
 export function MoonIcon(): ReactElement {
   return <StrokeIcon paths={['M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z']} size={16} />;
 }

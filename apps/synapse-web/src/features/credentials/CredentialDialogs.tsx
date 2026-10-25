@@ -3,7 +3,7 @@ import { Alert, Button, Dialog, FormField, Input } from '@shadow-library/ui';
 
 import { createCredential, type CredentialResponse, isApiError, rotateCredential } from '@/lib';
 
-import { credentialErrorMessage, type FieldErrors, hintLabel, validateCreateForm, validateSecret } from './credential-view';
+import { credentialErrorMessage, type FieldErrors, hintLabel, originHost, validateCreateForm, validateSecret } from './credential-view';
 import styles from './Credentials.module.css';
 
 interface DialogActionsProps {
@@ -65,7 +65,7 @@ export function CreateCredentialDialog({ onClose, onCreated }: CreateCredentialD
   return (
     <Dialog open onOpenChange={next => next || pending || onClose()}>
       <Dialog.Content size="md">
-        <Dialog.Header title="New credential" description="Store a provider API key, bound to the one origin it may be sent to." />
+        <Dialog.Header title="New credential" description="Store a provider API key. It is only ever sent to the address you give here." />
         <Dialog.Body>
           <div className={styles.form}>
             {failure ? (
@@ -76,7 +76,12 @@ export function CreateCredentialDialog({ onClose, onCreated }: CreateCredentialD
             <FormField label="Name" required error={errors.name} helper="Kept by the credential even once revoked, so it cannot be reused.">
               <Input value={name} onValueChange={edit('name', setName)} placeholder="openrouter" autoComplete="off" spellCheck={false} />
             </FormField>
-            <FormField label="Allowed origin" required error={errors.allowedOrigin} helper="The only origin the key is ever sent to, e.g. https://openrouter.ai">
+            <FormField
+              label="Only sent to"
+              required
+              error={errors.allowedOrigin}
+              helper="The address the key is sent to: scheme, host and optional port, with no path. For example https://openrouter.ai"
+            >
               <Input value={allowedOrigin} onValueChange={edit('allowedOrigin', setAllowedOrigin)} placeholder="https://openrouter.ai" autoComplete="off" spellCheck={false} />
             </FormField>
             <FormField label="API key" required error={errors.secret} helper="Stored sealed and never shown again; only a short hint is kept.">
@@ -131,7 +136,7 @@ export function RotateCredentialDialog({ credential, onClose, onRotated }: Rotat
       <Dialog.Content size="md">
         <Dialog.Header
           title={`Rotate "${credential.name}"`}
-          description={`Providers keep using this credential; only the key behind it changes. It stays bound to ${credential.allowedOrigin}.`}
+          description={`Providers keep using this credential; only the key behind it changes. It is still only sent to ${originHost(credential.allowedOrigin)}.`}
         />
         <Dialog.Body>
           <div className={styles.form}>

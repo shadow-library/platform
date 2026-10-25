@@ -15,5 +15,6 @@ export * from './naming';
 export * from './notice.types';
 export * from './PageHeader';
 export * from './PermissionGate';
+export * from './RowAction';
 export * from './ShareCell';
 export * from './use-minute-clock';

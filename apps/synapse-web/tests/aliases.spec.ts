@@ -27,6 +27,7 @@ import {
   narrowingDescription,
   retireDescription,
   seenLabel,
+  seenNote,
   unreadableAliasCount,
 } from '../src/features/aliases/alias-view';
 import { resolveSelectorKey } from '../src/features/catalog/catalog-keys';
@@ -436,5 +437,12 @@ describe('addAliasEdit', () => {
     document.aliases.sonnet.state = 'retired';
     expect(addAliasEdit('sonnet', spec)(document).ok).toBe(false);
     expect(addAliasEdit('SONNET', spec)(document).ok).toBe(false);
+  });
+});
+
+describe('seenNote', () => {
+  it('should mention what users see only when it differs from the name', () => {
+    expect(seenNote({ name: 'Opus', seen: 'Opus 5.5' })).toBe('Users see "Opus 5.5"');
+    expect(seenNote({ name: 'Opus', seen: 'Opus' })).toBeUndefined();
   });
 });

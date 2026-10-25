@@ -2,9 +2,9 @@ import { type ReactElement } from 'react';
 import { Drawer, Table, type TableColumn } from '@shadow-library/ui';
 
 import { type ModelEntry } from '@/features/catalog';
-import { Mono } from '@/features/shared';
+import { modelDisplayName, Mono } from '@/features/shared';
 
-import { compareModels, type ComparisonRow, modelTitle, type UsageIndex } from './model-view';
+import { compareModels, type ComparisonRow, type UsageIndex } from './model-view';
 import styles from './Models.module.css';
 
 export interface ModelCompareProps {
@@ -22,7 +22,7 @@ export function ModelCompare({ models, usage, providerKeys, onClose }: ModelComp
       id: `model-${model.key}`,
       header: (
         <span className={styles.stack}>
-          <span>{modelTitle(model)}</span>
+          <span>{modelDisplayName(model)}</span>
           <Mono>{model.key}</Mono>
         </span>
       ),

@@ -64,10 +64,19 @@ export function modelEligibility(model: Pick<ModelEntry, 'capabilities' | 'deplo
   return reasons.length === 0 ? { eligible: true } : { eligible: false, reasons };
 }
 
+const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/** Whole-token and case-insensitive, with an optional leading "v" on either side, so "DeepSeek V4 Pro" holds "v4" but "Opus 5.5" does not hold "5". */
+export function nameHoldsVersion(name: string, version: string): boolean {
+  const bare = version.trim().replace(/^v(?=\d)/i, '');
+  if (bare === '') return true;
+  return new RegExp(`(?<![\\p{L}\\p{N}.])v?${escapeRegExp(bare)}(?![\\p{L}\\p{N}]|\\.\\p{N})`, 'iu').test(name);
+}
+
 export function modelDisplayName(model: Pick<ModelEntry, 'key' | 'label' | 'version'>): string {
   const name = modelName(model);
   const version = model.version?.trim();
-  return version && !name.includes(version) ? `${name} ${version}` : name;
+  return version && !nameHoldsVersion(name, version) ? `${name} ${version}` : name;
 }
 
 export function modelPriceText(price: ModelPrice): string {

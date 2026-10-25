@@ -3,7 +3,8 @@ import { readAliases, readTasks } from '@/features/catalog/catalog-readers';
 import { type ModelCapabilities, type ModelEntry, type ModelPrice } from '@/features/catalog/catalog-spec.types';
 import { isRecord } from '@/features/catalog/catalog-values';
 import { formatNumber, formatPrice } from '@/features/shared/format';
-import { aliasName, effortName, modelName, providerName, taskTitle } from '@/features/shared/naming';
+import { modelDisplayName } from '@/features/shared/model-options';
+import { aliasName, effortName, providerName, taskTitle } from '@/features/shared/naming';
 import { type DraftAction } from '@/features/shared/draft-notice';
 
 export interface ModelUser {
@@ -96,12 +97,6 @@ export function usageSentence(usage: ModelUsage): string {
   return names.length === 0 ? 'Not used by any feature or model name' : `Used by ${names.join(', ')}`;
 }
 
-/** Labels often carry the version already ("Opus 5.5"), so it is appended only when it would add something. */
-export function modelTitle(model: Pick<ModelEntry, 'key' | 'label' | 'version'>): string {
-  const name = modelName(model);
-  return model.version && !name.includes(model.version) ? `${name} ${model.version}` : name;
-}
-
 export function formatContext(tokens: number): string {
   return CONTEXT.format(tokens);
 }
@@ -136,13 +131,13 @@ export function capabilityChips(capabilities: ModelCapabilities): string[] {
 export function filterModels(models: readonly ModelEntry[], filter: ModelFilter): ModelEntry[] {
   const query = filter.query.trim().toLowerCase();
   return models.filter(model => {
-    const text = [modelTitle(model), model.key].join(' ').toLowerCase();
+    const text = [modelDisplayName(model), model.key].join(' ').toLowerCase();
     return (query === '' || text.includes(query)) && filter.capabilities.every(capability => hasCapability(model.capabilities, capability));
   });
 }
 
 export function sortModels(models: readonly ModelEntry[]): ModelEntry[] {
-  return [...models].sort((left, right) => modelTitle(left).localeCompare(modelTitle(right)) || left.key.localeCompare(right.key));
+  return [...models].sort((left, right) => modelDisplayName(left).localeCompare(modelDisplayName(right)) || left.key.localeCompare(right.key));
 }
 
 export function servedBy(model: Pick<ModelEntry, 'deployments'>, providerKeys: ReadonlySet<string>): ProviderLink[] {

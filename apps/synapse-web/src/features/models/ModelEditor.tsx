@@ -2,7 +2,7 @@ import { type ReactElement, useState } from 'react';
 import { Button, Drawer, FormField, Input, MultiSelect, NumberStepper, Select, Switch } from '@shadow-library/ui';
 
 import { EFFORTS, type ModelCapabilities, type ProviderEntry, type ReasoningMode, useDraftEdit } from '@/features/catalog';
-import { type DraftNotice, DraftNoticeAlert, draftOutcomeNotice, effortName, FormSection, providerName } from '@/features/shared';
+import { type DraftNotice, DraftNoticeAlert, draftOutcomeNotice, effortName, FormSection, modelDisplayName, providerName } from '@/features/shared';
 import formStyles from '@/features/shared/form.module.css';
 
 import {
@@ -18,7 +18,7 @@ import {
   updateModelEdit,
   validateModelForm,
 } from './model-form';
-import { defaultModelNote, modelTitle } from './model-view';
+import { defaultModelNote } from './model-view';
 import styles from './Models.module.css';
 
 const PRICE_STEP = 0.1;
@@ -72,7 +72,7 @@ export function ModelEditor({ mode, initial, providers, takenKeys, onClose, onSa
     if (!result.ok) return;
     setFailure(null);
     const action = mode.kind === 'add' ? 'added' : 'updated';
-    const name = modelTitle({ key: result.key, label: result.spec.label, version: result.spec.version });
+    const name = modelDisplayName({ key: result.key, label: result.spec.label, version: result.spec.version });
     const edit = mode.kind === 'add' ? addModelEdit(result.key, result.spec) : updateModelEdit(result.key, initial, form, result.spec);
     const outcome = await draftEdit.apply(edit, defaultModelNote(name, action));
     const notice = draftOutcomeNotice(outcome, name, action);
@@ -82,7 +82,7 @@ export function ModelEditor({ mode, initial, providers, takenKeys, onClose, onSa
 
   const fieldError = errors?.fields ?? {};
   const unknownProviders = [...new Set(form.deployments.map(row => row.provider))].filter(key => key !== '' && !providerKeys.includes(key));
-  const title = mode.kind === 'add' ? 'Add model' : `Edit ${modelTitle({ key: mode.key, label: initial.label, version: initial.version })}`;
+  const title = mode.kind === 'add' ? 'Add model' : `Edit ${modelDisplayName({ key: mode.key, label: initial.label, version: initial.version })}`;
 
   return (
     <Drawer open onOpenChange={open => open || draftEdit.pending || onClose()} size="lg">

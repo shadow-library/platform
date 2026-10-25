@@ -11,6 +11,7 @@ import {
   keyStatusOf,
   keyVersionLabel,
   normaliseOriginInput,
+  originHost,
   originOfUrl,
   revokeDescription,
   revokedLabel,
@@ -206,7 +207,7 @@ describe('credentialErrorMessage', () => {
   });
 
   it('should explain a refused origin or key, which the server reports without saying which', () => {
-    expect(credentialErrorMessage(failure(400, 'SYN_INVALID_REQUEST', 'Invalid request'))).toContain('origin or the key');
+    expect(credentialErrorMessage(failure(400, 'SYN_INVALID_REQUEST', 'Invalid request'))).toContain('address or the key');
   });
 
   it('should explain a missing permission or credential', () => {
@@ -276,5 +277,22 @@ describe('credential messages with prototype codes', () => {
     expect(issueAdvice('__proto__')).toBeUndefined();
     expect(issueAdvice('toString')).toBeUndefined();
     expect(credentialErrorMessage(new ApiError(400, { type: 'CLIENT_ERROR', code: 'constructor', message: 'Server says no' }))).toBe('Server says no');
+  });
+});
+
+describe('originHost', () => {
+  it('should show an https host alone, keeping only a non-default port', () => {
+    expect(originHost('https://openrouter.ai')).toBe('openrouter.ai');
+    expect(originHost('https://api.example.com:443')).toBe('api.example.com');
+    expect(originHost('https://api.example.com:8443')).toBe('api.example.com:8443');
+  });
+
+  it('should keep the scheme when the key is not sent over https', () => {
+    expect(originHost('http://localhost:11434')).toBe('http://localhost:11434');
+    expect(originHost('http://example.com')).toBe('http://example.com');
+  });
+
+  it('should fall back to the stored value when it is not a URL', () => {
+    expect(originHost('not a url')).toBe('not a url');
   });
 });

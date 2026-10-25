@@ -63,6 +63,10 @@ export function availabilitySentence(available: Record<string, string[]> | undef
   return `Only when ${rules.map(([selector, values]) => `${selectorName(selector)} is ${values.join(' or ')}`).join(' and ')}`;
 }
 
+export function seenNote(row: Pick<AliasRow, 'name' | 'seen'>): string | undefined {
+  return row.seen === row.name ? undefined : `Users see "${row.seen}"`;
+}
+
 /** Mirrors synapse-server's label rule for responses. */
 export function seenLabel(alias: Pick<AliasEntry, 'label' | 'showVersion'>, model: Pick<ModelEntry, 'version'> | undefined): string {
   return alias.showVersion && model?.version ? `${alias.label} ${model.version}` : alias.label;

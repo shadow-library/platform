@@ -38,7 +38,7 @@ const TEST_MESSAGES: Readonly<Record<string, string>> = {
   invalid_api_key: 'The provider rejected the key as invalid.',
   unauthorized: 'The provider refused the key.',
   rate_limited: 'The provider is rate limiting this key; try again shortly.',
-  not_found: 'The provider has no key-check endpoint at this origin.',
+  not_found: 'The provider has no key-check endpoint at this address.',
   redirected: 'The provider redirected the check; a key is never sent across a redirect.',
   rejected: 'The provider rejected the check.',
   upstream_error: 'The provider answered with a server error.',
@@ -49,7 +49,7 @@ const TEST_MESSAGES: Readonly<Record<string, string>> = {
 const ERROR_MESSAGES: Readonly<Record<string, string>> = {
   CRED_NAME_TAKEN: 'A credential with this name already exists. A revoked credential keeps its name, so pick another.',
   CRED_REVOKED: 'This credential is revoked, so it can no longer be rotated.',
-  SYN_INVALID_REQUEST: 'The origin or the key was refused. The origin is a scheme, host and optional port with no path; the key is 8 to 4096 visible characters with no spaces.',
+  SYN_INVALID_REQUEST: 'The address or the key was refused. The address is a scheme, host and optional port with no path; the key is 8 to 4096 visible characters with no spaces.',
 };
 
 const STATUS_MESSAGES: Readonly<Record<number, string>> = {
@@ -58,9 +58,9 @@ const STATUS_MESSAGES: Readonly<Record<number, string>> = {
 };
 
 const ISSUE_ADVICE: Readonly<Record<string, string>> = {
-  unknown_credential: 'No stored credential has this id. Pick one from the list.',
+  unknown_credential: 'This stored key no longer exists. Pick one from the list.',
   credential_revoked: 'A revoked credential is never used again. Pick an active one.',
-  credential_origin_mismatch: 'The key is only ever sent to the origin it is bound to. Fix the URL, or pick a credential bound to this origin.',
+  credential_origin_mismatch: "The key is only ever sent to its own address. Fix the provider's address, or pick a key that is sent to this one.",
 };
 
 export function isRevoked(credential: Pick<CredentialResponse, 'revokedAt'>): boolean {
@@ -86,6 +86,13 @@ export function normaliseOriginInput(input: string): string | null {
   if (!HTTP_PROTOCOLS.includes(parsed.protocol)) return null;
   if (parsed.username || parsed.password || parsed.pathname !== '/' || value.includes('?') || value.includes('#')) return null;
   return parsed.origin;
+}
+
+/** "openrouter.ai" for https; any other scheme stays visible ("http://localhost:8080") so an unencrypted binding is never disguised. */
+export function originHost(origin: string): string {
+  if (!URL.canParse(origin)) return origin;
+  const { protocol, host } = new URL(origin);
+  return protocol === 'https:' ? host : `${protocol}//${host}`;
 }
 
 export function credentialsForUrl(credentials: readonly CredentialResponse[], url: string): CredentialResponse[] {
@@ -120,7 +127,7 @@ export function validateCreateForm(values: { name: string; allowedOrigin: string
   const allowedOrigin = normaliseOriginInput(values.allowedOrigin);
   const secret = validateSecret(values.secret);
   if (!CREDENTIAL_NAME_PATTERN.test(name)) errors.name = 'Use 1 to 64 lowercase letters, digits, dots, underscores or hyphens, starting with a letter or digit.';
-  if (allowedOrigin === null) errors.allowedOrigin = 'Enter an http(s) origin: scheme, host and optional port, with no path.';
+  if (allowedOrigin === null) errors.allowedOrigin = 'Enter an address like https://openrouter.ai: scheme, host and optional port, with no path.';
   if (!secret.ok) errors.secret = secret.error;
   if (errors.name || errors.allowedOrigin || !secret.ok || allowedOrigin === null) return { ok: false, errors };
   return { ok: true, body: { name, allowedOrigin, secret: secret.secret } };

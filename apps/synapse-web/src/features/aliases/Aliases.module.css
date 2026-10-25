@@ -13,10 +13,19 @@
   font-weight: 560;
 }
 
+.cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 0;
+  white-space: normal;
+}
+
 .users {
   margin: 0;
-  padding: 0;
+  padding: 8px 0;
   list-style: none;
+  white-space: normal;
 }
 
 .problem {
@@ -30,6 +39,7 @@
 
 .panel {
   margin-top: 28px;
+  scroll-margin-top: 28px;
 }
 
 .controls {

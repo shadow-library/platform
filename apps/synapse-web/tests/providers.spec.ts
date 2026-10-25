@@ -21,7 +21,18 @@ import {
   updateProviderEdit,
   validateProviderForm,
 } from '../src/features/providers/provider-form';
-import { errorRateIntent, kindName, providerKeyStatus, type ProviderRow, providerRows, providerUsers, unreadableProviderCount } from '../src/features/providers/provider-view';
+import {
+  errorRateIntent,
+  healthWindowSentence,
+  kindName,
+  legacyKeyLabel,
+  providerFacts,
+  providerKeyStatus,
+  type ProviderRow,
+  providerRows,
+  providerUsers,
+  unreadableProviderCount,
+} from '../src/features/providers/provider-view';
 import { type CredentialResponse, type ProviderResponse } from '../src/lib/apis/api-types.gen';
 import { catalogFixture, CREDENTIAL_ID } from './catalog-fixture';
 
@@ -488,6 +499,33 @@ describe('keyBindingWarning', () => {
 
   it('should warn when the old key setting would follow the provider to another site', () => {
     const form: ProviderForm = { ...formFor(catalogFixture(), 'subscription'), apiKeyConfig: 'synapse.provider.openrouter.api-key' };
-    expect(keyBindingWarning({ ...form, url: 'https://elsewhere.io' }, form.url)).toContain('old key setting');
+    expect(keyBindingWarning({ ...form, url: 'https://elsewhere.io' }, form.url)).toContain('old environment key setting');
+  });
+});
+
+describe('providerFacts', () => {
+  it('should describe the service, where it runs and what it costs on one line', () => {
+    expect(providerFacts({ kind: 'openai', flavor: 'openrouter', locality: 'third_party', cost: 'metered' })).toBe('OpenRouter · Third party · Metered');
+    expect(providerFacts({ kind: 'ollama', locality: 'host', cost: 'zero' })).toBe('Ollama · On the host · Free');
+  });
+
+  it('should name each missing setting instead of repeating "Not set"', () => {
+    expect(providerFacts({})).toBe('Kind not set · Where it runs not set · Cost not set');
+  });
+});
+
+describe('legacyKeyLabel', () => {
+  it('should say the provider uses the old environment key setting, or also has it beside a stored key', () => {
+    expect(legacyKeyLabel(false)).toBe('Uses the old environment key setting');
+    expect(legacyKeyLabel(true)).toBe('The old environment key setting is also set');
+  });
+});
+
+describe('healthWindowSentence', () => {
+  it('should describe the window, adding when draft-only providers get numbers while a draft is shown', () => {
+    expect(healthWindowSentence(24, 3, 'active')).toBe('Calls and errors over the last 24 hours, from published version 3.');
+    expect(healthWindowSentence(24, 3, 'draft')).toBe(
+      'Calls and errors over the last 24 hours, from published version 3. New providers show traffic after the draft is published.',
+    );
   });
 });

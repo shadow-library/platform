@@ -28,7 +28,6 @@ import {
   filterModels,
   formatContext,
   keepVisible,
-  modelTitle,
   modelUsageIndex,
   servedBy,
   servedBySentence,
@@ -88,16 +87,6 @@ describe('usageSummary', () => {
 
   it('should name every user in the sentence', () => {
     expect(usageSentence(usageOf(modelUsageIndex(catalogFixture()), 'opus-5.5'))).toBe('Used by Novel Forge · Chat, Opus');
-  });
-});
-
-describe('modelTitle', () => {
-  it('should not repeat a version the name already carries', () => {
-    expect(modelTitle({ key: 'opus-5.5', label: 'Opus 5.5', version: '5.5' })).toBe('Opus 5.5');
-  });
-
-  it('should append a version the name lacks', () => {
-    expect(modelTitle({ key: 'opus', label: 'Opus', version: '5.5' })).toBe('Opus 5.5');
   });
 });
 

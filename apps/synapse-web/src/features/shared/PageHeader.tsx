@@ -1,4 +1,4 @@
-import { type ReactElement, type ReactNode } from 'react';
+import { type ReactElement, type ReactNode, type Ref } from 'react';
 
 import styles from './PageHeader.module.css';
 
@@ -20,11 +20,18 @@ export function PageHeader({ title, subtitle, action }: PageHeaderProps): ReactE
   );
 }
 
-export function SectionHeader({ title, subtitle, action }: PageHeaderProps): ReactElement {
+export interface SectionHeaderProps extends PageHeaderProps {
+  /** Makes the heading a programmatic focus target, for a section that opens on demand */
+  headingRef?: Ref<HTMLHeadingElement>;
+}
+
+export function SectionHeader({ title, subtitle, action, headingRef }: SectionHeaderProps): ReactElement {
   return (
     <div className={styles.sectionHeader}>
       <div className={styles.sectionHeading}>
-        <h2 className={styles.sectionTitle}>{title}</h2>
+        <h2 ref={headingRef} tabIndex={headingRef ? -1 : undefined} className={styles.sectionTitle}>
+          {title}
+        </h2>
         {subtitle ? <p className={styles.sectionSubtitle}>{subtitle}</p> : null}
       </div>
       {action}

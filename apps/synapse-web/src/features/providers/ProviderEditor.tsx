@@ -268,7 +268,7 @@ export function ProviderEditor({ mode, initial, takenKeys, credentials, onClose,
               </Alert>
             ) : null}
             {form.apiKeyConfig && form.kind !== 'ollama' && credentials.status === 'ready' && form.credential === '' ? (
-              <p className={formStyles.formSectionHint}>The old key setting is being retired. Choosing a stored key replaces it.</p>
+              <p className={formStyles.formSectionHint}>The old environment key setting is being retired. Choosing a stored key replaces it.</p>
             ) : null}
           </FormSection>
         </div>

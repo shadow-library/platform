@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { type ReactElement, useMemo, useState } from 'react';
-import { Alert, Badge, Button, EmptyState, Spinner, Table, type TableColumn, Tag, Tooltip, useConfirm } from '@shadow-library/ui';
+import { Alert, Badge, Button, EmptyState, Spinner, Table, type TableColumn, Tag, useConfirm } from '@shadow-library/ui';
 
 import {
   type CatalogDocument,
@@ -14,7 +14,22 @@ import {
   type WorkingCatalog,
 } from '@/features/catalog';
 import { issueAdvice } from '@/features/credentials/credential-view';
-import { type DraftNotice, DraftNoticeAlert, draftOutcomeNotice, formatNumber, formatRate, Mono, Muted, PageHeader, PermissionGate, SectionHeader } from '@/features/shared';
+import {
+  type DraftNotice,
+  DraftNoticeAlert,
+  draftOutcomeNotice,
+  EditIcon,
+  formatNumber,
+  formatRate,
+  Mono,
+  Muted,
+  PageHeader,
+  PermissionGate,
+  RemoveIcon,
+  RowAction,
+  RowActions,
+  SectionHeader,
+} from '@/features/shared';
 import cells from '@/features/shared/cells.module.css';
 import controls from '@/features/shared/controls.module.css';
 import {
@@ -32,13 +47,13 @@ import { ProviderEditor } from './ProviderEditor';
 import { assignCredentialEdit, emptyProviderForm, keySnapshotOf, type ProviderEditorMode, providerFormOf, removeProviderEdit } from './provider-form';
 import {
   type CatalogSource,
-  costName,
   defaultProviderNote,
   errorRateIntent,
   featureName,
-  kindName,
-  localityName,
+  healthWindowSentence,
+  legacyKeyLabel,
   presenceLabel,
+  providerFacts,
   providerKeysOf,
   providerKeyStatus,
   type ProviderKeyStatus,
@@ -167,13 +182,13 @@ function KeyStatusText({ status }: { status: ProviderKeyStatus }): ReactElement 
     case 'none':
       return <Muted>No key</Muted>;
     case 'legacy_setting':
-      return <>Old key setting</>;
+      return <>{legacyKeyLabel(false)}</>;
     case 'configured':
-      return <>Set (old key setting)</>;
+      return <>Set in the old environment key setting</>;
     case 'missing':
       return (
         <Badge intent="danger" variant="soft">
-          Old key setting is empty
+          The old environment key setting is empty
         </Badge>
       );
     case 'credential':
@@ -222,9 +237,7 @@ function HealthCell({ row, column }: { row: ProviderRow; column: 'calls' | 'erro
 }
 
 function healthSubtitle(health: ProvidersResponse | undefined, source: CatalogSource): string | undefined {
-  if (!health) return undefined;
-  const window = `Calls and errors over the last ${health.windowHours} hours, from published version ${health.catalogVersion}.`;
-  return source === 'draft' ? `${window} Providers only the draft has get numbers once it is published.` : window;
+  return health ? healthWindowSentence(health.windowHours, health.catalogVersion, source) : undefined;
 }
 
 interface ProviderTableProps {
@@ -282,7 +295,7 @@ function ProviderTable({ document, source, fingerprint, capabilities, credential
     const editable = canEdit && row.presence !== 'removed_in_draft';
     if (entry.kind === 'ollama' && entry.credential !== undefined)
       return (
-        <span className={styles.stack}>
+        <span className={styles.cell}>
           <span className={styles.issueMessage}>Names a stored key, but Ollama never sends one</span>
           {editable ? (
             <span>
@@ -296,14 +309,14 @@ function ProviderTable({ document, source, fingerprint, capabilities, credential
       );
     if (!editable || listed === undefined || entry.kind === 'ollama')
       return (
-        <span className={styles.stack}>
+        <span className={styles.cell}>
           {entry.apiKeyConfig && entry.kind !== 'ollama' ? <LegacyKeyBadge apiKeyConfig={entry.apiKeyConfig} alongside={entry.credential !== undefined} /> : null}
           {status.kind === 'legacy_setting' || status.kind === 'configured' ? null : <KeyStatusText status={status} />}
           <KeyIssues issues={issues} />
         </span>
       );
     return (
-      <span className={styles.stack}>
+      <span className={styles.cell}>
         <CredentialPicker
           providerName={row.name}
           url={entry.url}
@@ -326,7 +339,7 @@ function ProviderTable({ document, source, fingerprint, capabilities, credential
       cell: row => {
         const presence = presenceLabel(row.presence);
         return (
-          <span className={styles.stack}>
+          <span className={styles.cell}>
             <span className={styles.inline}>
               <span>{row.name}</span>
               {presence ? (
@@ -335,30 +348,19 @@ function ProviderTable({ document, source, fingerprint, capabilities, credential
                 </Badge>
               ) : null}
             </span>
+            <span className={styles.tags}>
+              <Muted>{providerFacts(row.entry)}</Muted>
+              {row.entry.features.map(feature => (
+                <Tag key={feature} size="sm">
+                  {featureName(feature)}
+                </Tag>
+              ))}
+            </span>
             <Mono>{row.key}</Mono>
             <span className={cells.url}>{row.entry.url || 'No address'}</span>
           </span>
         );
       },
-    },
-    { id: 'kind', header: 'Kind', cell: row => kindName(row.entry.kind, row.entry.flavor) },
-    { id: 'locality', header: 'Where it runs', cell: row => localityName(row.entry.locality) },
-    { id: 'cost', header: 'Cost', cell: row => costName(row.entry.cost) },
-    {
-      id: 'features',
-      header: 'Features',
-      cell: row =>
-        row.entry.features.length === 0 ? (
-          <Muted>—</Muted>
-        ) : (
-          <span className={styles.tags}>
-            {row.entry.features.map(feature => (
-              <Tag key={feature} size="sm">
-                {featureName(feature)}
-              </Tag>
-            ))}
-          </span>
-        ),
     },
     { id: 'apiKey', header: 'API key', cell: keyCell },
     { id: 'calls', header: 'Calls', align: 'end', cell: row => <HealthCell row={row} column="calls" /> },
@@ -374,31 +376,20 @@ function ProviderTable({ document, source, fingerprint, capabilities, credential
       cell: row => {
         if (row.presence === 'removed_in_draft') return <Muted>—</Muted>;
         const users = providerUsers(document, row.key);
-        const removeButton = (
-          <Button
-            variant="ghost"
-            size="sm"
-            aria-label={users.length > 0 ? `Remove ${row.name}: unavailable. ${usersSentence(users)}` : `Remove ${row.name}`}
-            disabled={users.length > 0 || draftEdit.pending}
-            loading={busy === row.key && draftEdit.pending}
-            onClick={() => void remove(row)}
-          >
-            Remove
-          </Button>
-        );
+        const inUse = users.length > 0;
         return (
-          <div className={controls.rowActions}>
-            <Button variant="ghost" size="sm" aria-label={`Edit ${row.name}`} onClick={() => onEdit({ mode: { kind: 'edit', key: row.key }, row })}>
-              Edit
-            </Button>
-            {users.length > 0 ? (
-              <Tooltip content={`${usersSentence(users)}. Move those models to another provider first.`}>
-                <span className={styles.disabledTrigger}>{removeButton}</span>
-              </Tooltip>
-            ) : (
-              removeButton
-            )}
-          </div>
+          <RowActions>
+            <RowAction icon={<EditIcon />} label={`Edit ${row.name}`} tooltip="Edit" onClick={() => onEdit({ mode: { kind: 'edit', key: row.key }, row })} />
+            <RowAction
+              icon={<RemoveIcon />}
+              label={inUse ? `Remove ${row.name}: unavailable. ${usersSentence(users)}` : `Remove ${row.name}`}
+              tooltip={inUse ? `${usersSentence(users)}. Move those models to another provider first.` : 'Remove'}
+              danger
+              disabled={inUse || draftEdit.pending}
+              loading={busy === row.key && draftEdit.pending}
+              onClick={() => void remove(row)}
+            />
+          </RowActions>
         );
       },
     });

@@ -3,8 +3,7 @@ import { Link } from '@tanstack/react-router';
 import { type ReactElement, useState } from 'react';
 import { Alert, Badge, Button, Table, type TableColumn, Tag, useConfirm } from '@shadow-library/ui';
 
-import { Mono, Muted, type Notice, PageHeader, PermissionGate, providerName } from '@/features/shared';
-import controls from '@/features/shared/controls.module.css';
+import { Mono, Muted, type Notice, PageHeader, PermissionGate, providerName, RevokeIcon, RotateIcon, RowAction, RowActions, TestIcon } from '@/features/shared';
 import { credentialKeys, type CredentialResponse, credentialsQueryOptions, revokeCredential, testCredential, useCapabilities } from '@/lib';
 
 import { CreateCredentialDialog, RotateCredentialDialog } from './CredentialDialogs';
@@ -15,6 +14,7 @@ import {
   inUseMessage,
   isRevoked,
   keyVersionLabel,
+  originHost,
   revokeDescription,
   revokedLabel,
   sortCredentials,
@@ -106,9 +106,25 @@ function CredentialsView(): ReactElement {
       id: 'name',
       header: 'Name',
       cell: row => (
-        <span className={styles.stack}>
+        <span className={styles.cell}>
           <span>{row.name}</span>
-          <Mono>{row.id}</Mono>
+          <Muted>Only sent to {originHost(row.allowedOrigin)}</Muted>
+          <details className={styles.details}>
+            <summary>Technical details</summary>
+            <span className={styles.detailLines}>
+              <span>
+                ID <Mono>{row.id}</Mono>
+              </span>
+              <span>
+                Address <Mono>{row.allowedOrigin}</Mono>
+              </span>
+              {row.kid ? (
+                <span>
+                  Sealed with keyring key <Mono>{row.kid}</Mono>
+                </span>
+              ) : null}
+            </span>
+          </details>
         </span>
       ),
     },
@@ -118,7 +134,7 @@ function CredentialsView(): ReactElement {
       cell: row => {
         const revoked = revokedLabel(row);
         return (
-          <span className={styles.stack}>
+          <span className={styles.cell}>
             <span>
               {revoked ? (
                 <Badge intent="neutral" variant="soft" dot>
@@ -139,19 +155,12 @@ function CredentialsView(): ReactElement {
       id: 'key',
       header: 'API key',
       cell: row => (
-        <span className={styles.stack}>
+        <span className={styles.cell}>
           <Mono>{hintLabel(row.hint)}</Mono>
           <Muted>{keyVersionLabel(row)}</Muted>
-          {row.kid ? (
-            <details className={styles.details}>
-              <summary>Technical details</summary>
-              Sealed with keyring key <Mono>{row.kid}</Mono>
-            </details>
-          ) : null}
         </span>
       ),
     },
-    { id: 'origin', header: 'Only sent to', cell: row => <Mono>{row.allowedOrigin}</Mono> },
     {
       id: 'referencedBy',
       header: 'Used by providers',
@@ -175,17 +184,32 @@ function CredentialsView(): ReactElement {
       cell: row => {
         const revoked = isRevoked(row);
         return (
-          <div className={controls.rowActions}>
-            <Button variant="ghost" size="sm" aria-label={`Test ${row.name}`} disabled={revoked} loading={tests[row.id]?.status === 'running'} onClick={() => void handleTest(row)}>
-              Test
-            </Button>
-            <Button variant="ghost" size="sm" aria-label={`Rotate the key of ${row.name}`} disabled={revoked} onClick={() => setDialog({ kind: 'rotate', credential: row })}>
-              Rotate
-            </Button>
-            <Button variant="ghost" size="sm" aria-label={`Revoke ${row.name}`} disabled={revoked} loading={revoking.includes(row.id)} onClick={() => void handleRevoke(row)}>
-              Revoke
-            </Button>
-          </div>
+          <RowActions>
+            <RowAction
+              icon={<TestIcon />}
+              label={`Test ${row.name}`}
+              tooltip={revoked ? 'A revoked key can no longer be tested' : 'Test the key'}
+              disabled={revoked}
+              loading={tests[row.id]?.status === 'running'}
+              onClick={() => void handleTest(row)}
+            />
+            <RowAction
+              icon={<RotateIcon />}
+              label={`Rotate the key of ${row.name}`}
+              tooltip={revoked ? 'A revoked key can no longer be replaced' : 'Replace the key'}
+              disabled={revoked}
+              onClick={() => setDialog({ kind: 'rotate', credential: row })}
+            />
+            <RowAction
+              icon={<RevokeIcon />}
+              label={`Revoke ${row.name}`}
+              tooltip={revoked ? 'Already revoked' : 'Revoke'}
+              danger
+              disabled={revoked}
+              loading={revoking.includes(row.id)}
+              onClick={() => void handleRevoke(row)}
+            />
+          </RowActions>
         );
       },
     },
@@ -195,7 +219,7 @@ function CredentialsView(): ReactElement {
     <>
       <PageHeader
         title="Credentials"
-        subtitle="Provider API keys, sealed at rest and bound to the one origin each may be sent to. A catalog provider names a credential instead of holding a key."
+        subtitle="Provider API keys, stored encrypted. Each key is only ever sent to one address. A provider picks a stored key here instead of holding one."
         action={
           <Button variant="primary" onClick={() => setDialog({ kind: 'create' })}>
             New credential

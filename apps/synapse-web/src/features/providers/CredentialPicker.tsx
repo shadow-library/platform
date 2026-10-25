@@ -1,10 +1,11 @@
 import { type ReactElement } from 'react';
 import { Badge, Button, Select } from '@shadow-library/ui';
 
-import { credentialsForUrl, hintLabel, isRevoked, originOfUrl } from '@/features/credentials/credential-view';
+import { credentialsForUrl, hintLabel, isRevoked, originHost, originOfUrl } from '@/features/credentials/credential-view';
 import { Mono } from '@/features/shared';
 import { type CredentialResponse } from '@/lib';
 
+import { legacyKeyLabel } from './provider-view';
 import styles from './Providers.module.css';
 
 export type CredentialList = { status: 'not_allowed' } | { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; items: readonly CredentialResponse[] };
@@ -37,11 +38,16 @@ function placeholderOf(url: string, choices: number, legacy: boolean): string {
 
 export function LegacyKeyBadge({ apiKeyConfig, alongside }: { apiKeyConfig: string; alongside: boolean }): ReactElement {
   return (
-    <span className={styles.inline}>
-      <Badge intent="warning" variant="soft">
-        {alongside ? 'Old key setting also set' : 'Old key setting'}
-      </Badge>
-      <Mono>{apiKeyConfig}</Mono>
+    <span className={styles.stack}>
+      <span>
+        <Badge intent="warning" variant="soft">
+          {legacyKeyLabel(alongside)}
+        </Badge>
+      </span>
+      <details className={styles.details}>
+        <summary>Technical details</summary>
+        Environment setting <Mono>{apiKeyConfig}</Mono>
+      </details>
     </span>
   );
 }
@@ -66,7 +72,7 @@ export function CredentialPicker({ providerName, url, value, apiKeyConfig, crede
           aria-label={`API key for ${providerName}`}
         >
           {orphan !== undefined ? (
-            <Select.Item value={orphan} description={known ? `Only sent to ${known.allowedOrigin}` : orphan}>
+            <Select.Item value={orphan} description={known ? `Only sent to ${originHost(known.allowedOrigin)}` : orphan}>
               {known ? `${known.name}${isRevoked(known) ? ' (revoked)' : ''}` : 'Unknown key'}
             </Select.Item>
           ) : null}

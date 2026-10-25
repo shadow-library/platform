@@ -4,10 +4,19 @@
   gap: 2px;
 }
 
+.cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 0;
+  white-space: normal;
+}
+
 .tags {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
+  padding: 8px 0;
 }
 
 .notice {
@@ -30,10 +39,6 @@
 .problem {
   margin: 0;
   color: var(--sh-danger-text);
-}
-
-.disabledTrigger {
-  display: inline-flex;
 }
 
 .usageTrigger {

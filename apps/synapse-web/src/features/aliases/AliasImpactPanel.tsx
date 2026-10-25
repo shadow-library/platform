@@ -1,9 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
-import { type ReactElement, useState } from 'react';
+import { type ReactElement, useEffect, useRef, useState } from 'react';
 import { Alert, Button, Card, FormField, Statistic, Table, type TableColumn } from '@shadow-library/ui';
 
-import { type CatalogDocument, readAliases, readModels, readTasks, useDraftEdit } from '@/features/catalog';
+import { type CatalogDocument, type ModelEntry, readAliases, readModels, readTasks, useDraftEdit } from '@/features/catalog';
 import {
   type DraftNotice,
   DraftNoticeAlert,
@@ -20,7 +20,7 @@ import {
 import controls from '@/features/shared/controls.module.css';
 import { aliasImpactQueryOptions, type AliasImpactRowResponse, type Capabilities } from '@/lib';
 
-import { relativeChange } from './alias-impact';
+import { needsImageCaveat, relativeChange } from './alias-impact';
 import { retargetAliasEdit } from './alias-form';
 import { aliasModelNeeds, aliasOutcomeNotice, type AliasRow, defaultAliasNote, featureNames } from './alias-view';
 import styles from './Aliases.module.css';
@@ -33,6 +33,7 @@ interface AliasImpactPanelProps {
   activeDocument: CatalogDocument | null;
   candidate?: string;
   capabilities: Capabilities;
+  onClose: () => void;
 }
 
 function deltaClass(delta: number): string | undefined {
@@ -41,23 +42,31 @@ function deltaClass(delta: number): string | undefined {
   return undefined;
 }
 
-export function AliasImpactPanel({ alias, workingDocument, activeDocument, candidate, capabilities }: AliasImpactPanelProps): ReactElement {
+export function AliasImpactPanel({ alias, workingDocument, activeDocument, candidate, capabilities, onClose }: AliasImpactPanelProps): ReactElement {
   const navigate = useNavigate();
+  const sectionRef = useRef<HTMLElement>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
   const draftEdit = useDraftEdit();
   const [notice, setNotice] = useState<DraftNotice | null>(null);
   const published = activeDocument ? readAliases(activeDocument).find(entry => entry.key === alias.key) : undefined;
   const impact = useQuery({ ...aliasImpactQueryOptions(alias.key, candidate), enabled: published !== undefined });
 
+  useEffect(() => {
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    sectionRef.current?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+    headingRef.current?.focus({ preventScroll: true });
+  }, []);
+
   const close = (
-    <Button variant="ghost" size="sm" onClick={() => void navigate({ to: '/aliases', search: {} })}>
+    <Button variant="ghost" size="sm" onClick={onClose}>
       Close
     </Button>
   );
 
   if (!activeDocument || !published)
     return (
-      <section className={styles.panel} aria-label={`Impact of changing ${alias.name}`}>
-        <SectionHeader title={`Impact: ${alias.name}`} action={close} />
+      <section ref={sectionRef} className={styles.panel} aria-label={`Impact of changing ${alias.name}`}>
+        <SectionHeader title={`Impact: ${alias.name}`} action={close} headingRef={headingRef} />
         <Alert intent="info" title={`${alias.name} isn't published yet`}>
           No calls have used it, so there is nothing to compare. Point it at a model with Edit.
         </Alert>
@@ -72,7 +81,8 @@ export function AliasImpactPanel({ alias, workingDocument, activeDocument, candi
     return model ? modelDisplayName(model) : key;
   };
   const needs = aliasModelNeeds(workingDocument, alias.key);
-  const candidateModel = candidate ? (readModels(workingDocument).find(model => model.key === candidate) ?? modelByKey.get(candidate)) : undefined;
+  const workingModels = readModels(workingDocument);
+  const candidateModel = candidate ? (workingModels.find(model => model.key === candidate) ?? modelByKey.get(candidate)) : undefined;
   const eligibility = candidateModel ? modelEligibility(candidateModel, needs) : undefined;
   const draftMoved = alias.target.key !== published.model;
 
@@ -93,6 +103,7 @@ export function AliasImpactPanel({ alias, workingDocument, activeDocument, candi
   };
 
   const data = impact.data;
+  const comparedModel = (key: string): ModelEntry | undefined => modelByKey.get(key) ?? workingModels.find(model => model.key === key);
   const columns: TableColumn<AliasImpactRowResponse>[] = [
     {
       id: 'feature',
@@ -126,11 +137,12 @@ export function AliasImpactPanel({ alias, workingDocument, activeDocument, candi
   ];
 
   return (
-    <section className={styles.panel} aria-label={`Impact of changing ${alias.name}`}>
+    <section ref={sectionRef} className={styles.panel} aria-label={`Impact of changing ${alias.name}`}>
       <SectionHeader
         title={`Impact: ${alias.name}`}
         subtitle={data ? `Calls made with this name in the last ${data.windowDays} days, priced at the published catalog's list prices.` : undefined}
         action={close}
+        headingRef={headingRef}
       />
       {draftMoved ? (
         <p className={controls.hint}>
@@ -205,7 +217,9 @@ export function AliasImpactPanel({ alias, workingDocument, activeDocument, candi
               aria-label={`Calls made with ${alias.name} by feature`}
               emptyState="No calls used this name in the window."
             />
-            {data?.retarget ? <p className={controls.hint}>Image output is not priced.</p> : null}
+            {data?.retarget && needsImageCaveat([comparedModel(data.retarget.fromModel), comparedModel(data.retarget.toModel)]) ? (
+              <p className={controls.hint}>Image output is not priced.</p>
+            ) : null}
           </Card.Body>
         </Card>
       )}

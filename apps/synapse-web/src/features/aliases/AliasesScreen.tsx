@@ -1,14 +1,14 @@
 import { Link, useNavigate } from '@tanstack/react-router';
-import { type ReactElement, useMemo, useState } from 'react';
+import { type ReactElement, useMemo, useRef, useState } from 'react';
 import { Alert, Badge, Button, EmptyState, Spinner, Table, type TableColumn } from '@shadow-library/ui';
 
 import { useWorkingCatalog, type WorkingCatalog, type WorkingSource } from '@/features/catalog';
-import { type DraftNotice, DraftNoticeAlert, Mono, Muted, PageHeader, PermissionGate } from '@/features/shared';
+import { type DraftNotice, DraftNoticeAlert, EditIcon, ImpactIcon, Mono, Muted, PageHeader, PermissionGate, RowAction, RowActions } from '@/features/shared';
 import controls from '@/features/shared/controls.module.css';
 import { type Capabilities, useCapabilities } from '@/lib';
 
 import { type AliasEditorMode, aliasFormOf, emptyAliasForm } from './alias-form';
-import { ALIAS_STATE_INFO, aliasKeysOf, type AliasRow, aliasRows, changedAliasKeys, unreadableAliasCount } from './alias-view';
+import { ALIAS_STATE_INFO, aliasKeysOf, type AliasRow, aliasRows, changedAliasKeys, seenNote, unreadableAliasCount } from './alias-view';
 import { AliasEditor } from './AliasEditor';
 import { AliasImpactPanel } from './AliasImpactPanel';
 import styles from './Aliases.module.css';
@@ -133,45 +133,49 @@ interface AliasTableProps {
 
 function AliasTable({ working, search, capabilities, onEdit }: AliasTableProps): ReactElement {
   const navigate = useNavigate();
+  const impactButtons = useRef(new Map<string, HTMLButtonElement>());
   const { document, active, source } = working;
   const rows = useMemo(() => aliasRows(document, changedAliasKeys(active, source.kind === 'draft' ? document : null)), [document, active, source.kind]);
   const unreadable = unreadableAliasCount(document);
   const selected = rows.find(row => row.key === search.alias);
 
+  const toggleImpact = (row: AliasRow): void => {
+    void navigate({ to: '/aliases', search: row.key === selected?.key ? {} : { alias: row.key } });
+  };
+
+  const closeImpact = (aliasKey: string): void => {
+    impactButtons.current.get(aliasKey)?.focus();
+    void navigate({ to: '/aliases', search: {} });
+  };
+
   const columns: TableColumn<AliasRow>[] = [
     {
       id: 'name',
       header: 'Name',
-      cell: row => (
-        <span className={styles.stack}>
-          <span className={styles.name}>
-            {row.name}
-            {row.changed ? (
-              <Badge intent="info" variant="soft" size="sm">
-                Unpublished changes
-              </Badge>
-            ) : null}
+      cell: row => {
+        const note = seenNote(row);
+        return (
+          <span className={styles.cell}>
+            <span className={styles.name}>
+              {row.name}
+              {row.changed ? (
+                <Badge intent="info" variant="soft" size="sm">
+                  Unpublished changes
+                </Badge>
+              ) : null}
+            </span>
+            {row.description ? <Muted>{row.description}</Muted> : null}
+            {note ? <Muted>{note}</Muted> : null}
+            <Mono>{row.key}</Mono>
           </span>
-          {row.description ? <Muted>{row.description}</Muted> : null}
-          <Mono>{row.key}</Mono>
-        </span>
-      ),
-    },
-    {
-      id: 'seen',
-      header: 'What users see',
-      cell: row => (
-        <span>
-          {row.seen}
-          {row.showVersion ? <Muted> · version shown</Muted> : null}
-        </span>
-      ),
+        );
+      },
     },
     {
       id: 'target',
       header: 'Target model',
       cell: row => (
-        <span className={styles.stack}>
+        <span className={styles.cell}>
           {row.target.name ? <span>{row.target.name}</span> : <span className={styles.problem}>Not in the catalog</span>}
           {row.target.price ? <Muted>{row.target.price}</Muted> : null}
           <Mono>{row.target.key}</Mono>
@@ -182,7 +186,7 @@ function AliasTable({ working, search, capabilities, onEdit }: AliasTableProps):
       id: 'state',
       header: 'State',
       cell: row => (
-        <span className={styles.stack}>
+        <span className={styles.cell}>
           <span>
             <Badge intent={ALIAS_STATE_INFO[row.state].intent} variant="soft" dot>
               {ALIAS_STATE_INFO[row.state].label}
@@ -192,7 +196,7 @@ function AliasTable({ working, search, capabilities, onEdit }: AliasTableProps):
         </span>
       ),
     },
-    { id: 'availability', header: 'Available when', cell: row => <span>{row.availability}</span> },
+    { id: 'availability', header: 'Available when', cell: row => <span className={styles.cell}>{row.availability}</span> },
     {
       id: 'usedBy',
       header: 'Used by',
@@ -216,22 +220,22 @@ function AliasTable({ working, search, capabilities, onEdit }: AliasTableProps):
       header: <span className="sr-only">Actions</span>,
       align: 'end',
       cell: row => (
-        <div className={controls.rowActions}>
+        <RowActions>
           {capabilities.writeDraft ? (
-            <Button variant="ghost" size="sm" aria-label={`Edit ${row.name}`} onClick={() => onEdit({ mode: { kind: 'edit', key: row.key }, row })}>
-              Edit
-            </Button>
+            <RowAction icon={<EditIcon />} label={`Edit ${row.name}`} tooltip="Edit" onClick={() => onEdit({ mode: { kind: 'edit', key: row.key }, row })} />
           ) : null}
-          <Button
-            variant={row.key === selected?.key ? 'secondary' : 'ghost'}
-            size="sm"
-            aria-pressed={row.key === selected?.key}
-            aria-label={`Impact of changing ${row.name}`}
-            onClick={() => void navigate({ to: '/aliases', search: { alias: row.key } })}
-          >
-            Impact
-          </Button>
-        </div>
+          <RowAction
+            ref={node => {
+              if (node) impactButtons.current.set(row.key, node);
+              else impactButtons.current.delete(row.key);
+            }}
+            icon={<ImpactIcon />}
+            label={`Impact of changing ${row.name}`}
+            tooltip={row.key === selected?.key ? 'Close the impact' : 'Impact of changing it'}
+            pressed={row.key === selected?.key}
+            onClick={() => toggleImpact(row)}
+          />
+        </RowActions>
       ),
     },
   ];
@@ -245,7 +249,15 @@ function AliasTable({ working, search, capabilities, onEdit }: AliasTableProps):
       ) : null}
       <Table data={rows} columns={columns} rowKey="key" aria-label="Model names" emptyState="The catalog has no model names yet." />
       {selected ? (
-        <AliasImpactPanel key={selected.key} alias={selected} workingDocument={document} activeDocument={active} candidate={search.model} capabilities={capabilities} />
+        <AliasImpactPanel
+          key={selected.key}
+          alias={selected}
+          workingDocument={document}
+          activeDocument={active}
+          candidate={search.model}
+          capabilities={capabilities}
+          onClose={() => closeImpact(selected.key)}
+        />
       ) : search.alias ? (
         <Alert intent="warning" title={`The catalog has no model name "${search.alias}"`} className={styles.result} />
       ) : null}

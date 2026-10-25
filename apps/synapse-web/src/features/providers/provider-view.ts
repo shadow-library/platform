@@ -115,6 +115,24 @@ export function featureName(feature: ProviderFeature): string {
   return FEATURE_NAMES[feature];
 }
 
+/** One line for the provider cell; a missing setting names itself rather than reading as a bare "Not set". */
+export function providerFacts(entry: Pick<ProviderEntry, 'kind' | 'flavor' | 'locality' | 'cost'>): string {
+  return [
+    entry.kind === undefined ? 'Kind not set' : kindName(entry.kind, entry.flavor),
+    entry.locality ? LOCALITY_NAMES[entry.locality] : 'Where it runs not set',
+    entry.cost ? COST_NAMES[entry.cost] : 'Cost not set',
+  ].join(' · ');
+}
+
+export function legacyKeyLabel(alongside: boolean): string {
+  return alongside ? 'The old environment key setting is also set' : 'Uses the old environment key setting';
+}
+
+export function healthWindowSentence(windowHours: number, catalogVersion: number, source: CatalogSource): string {
+  const window = `Calls and errors over the last ${windowHours} hours, from published version ${catalogVersion}.`;
+  return source === 'draft' ? `${window} New providers show traffic after the draft is published.` : window;
+}
+
 export function sortFeatures(features: readonly string[]): ProviderFeature[] {
   return PROVIDER_FEATURES.filter(feature => features.includes(feature));
 }

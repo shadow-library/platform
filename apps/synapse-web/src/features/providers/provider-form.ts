@@ -262,6 +262,6 @@ export function keyBindingWarning(form: ProviderForm, initialUrl: string, creden
     if (!bound && moved) return `The chosen API key is bound to the old address's site, so it can't be used at ${origin}. Pick a key for the new address.`;
     return undefined;
   }
-  if (form.apiKeyConfig !== '' && moved) return `The old key setting only works with the provider's original site. Pick a stored API key for ${origin} instead.`;
+  if (form.apiKeyConfig !== '' && moved) return `The old environment key setting only works with the provider's original site. Pick a stored API key for ${origin} instead.`;
   return undefined;
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { relativeChange } from '../src/features/aliases/alias-impact';
+import { needsImageCaveat, relativeChange } from '../src/features/aliases/alias-impact';
 
 describe('relativeChange', () => {
   it('should express a saving as a negative fraction of the current cost', () => {
@@ -14,5 +14,20 @@ describe('relativeChange', () => {
   it('should leave the delta out when the current cost is zero', () => {
     expect(relativeChange(3, 0)).toBeUndefined();
     expect(relativeChange(0, 0)).toBeUndefined();
+  });
+});
+
+describe('needsImageCaveat', () => {
+  const text = { capabilities: { imageOutput: false } };
+  const image = { capabilities: { imageOutput: true } };
+
+  it('should caveat the comparison when either model can produce images', () => {
+    expect(needsImageCaveat([text, image])).toBeTrue();
+    expect(needsImageCaveat([image, undefined])).toBeTrue();
+  });
+
+  it('should leave the caveat out for text-only or unknown models', () => {
+    expect(needsImageCaveat([text, text])).toBeFalse();
+    expect(needsImageCaveat([undefined, undefined])).toBeFalse();
   });
 });

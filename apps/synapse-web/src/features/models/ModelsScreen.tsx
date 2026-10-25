@@ -1,9 +1,23 @@
 import { Link } from '@tanstack/react-router';
 import { type ReactElement, type ReactNode, useMemo, useState } from 'react';
-import { Alert, Button, EmptyState, Input, Popover, SearchIcon, Spinner, Table, type TableColumn, Tag, Tooltip, useConfirm } from '@shadow-library/ui';
+import { Alert, Button, EmptyState, Input, Popover, SearchIcon, Spinner, Table, type TableColumn, Tag, useConfirm } from '@shadow-library/ui';
 
 import { type CatalogDocument, type ModelEntry, readModels, readProviders, useDraftEdit, useWorkingCatalog, type WorkingCatalog } from '@/features/catalog';
-import { type DraftNotice, DraftNoticeAlert, draftOutcomeNotice, formatPrice, Mono, Muted, PageHeader, PermissionGate } from '@/features/shared';
+import {
+  type DraftNotice,
+  DraftNoticeAlert,
+  draftOutcomeNotice,
+  EditIcon,
+  formatPrice,
+  modelDisplayName,
+  Mono,
+  Muted,
+  PageHeader,
+  PermissionGate,
+  RemoveIcon,
+  RowAction,
+  RowActions,
+} from '@/features/shared';
 import controls from '@/features/shared/controls.module.css';
 import { type Capabilities, useCapabilities } from '@/lib';
 
@@ -11,7 +25,6 @@ import { ModelCompare } from './ModelCompare';
 import { ModelEditor } from './ModelEditor';
 import { type EditorMode, emptyModelForm, modelFormOf, removeModelEdit } from './model-form';
 import {
-  cachedInputLabel,
   CAPABILITY_FILTER_NAMES,
   CAPABILITY_FILTERS,
   capabilityChips,
@@ -21,7 +34,6 @@ import {
   isInUse,
   keepVisible,
   modelKeysOf,
-  modelTitle,
   type ModelUsage,
   modelUsageIndex,
   servedBy,
@@ -216,7 +228,7 @@ function ModelTable({ document, capabilities, onEdit, onNotice }: ModelTableProp
   const toggleFilter = (filter: CapabilityFilter): void => applyFilter(query, filters.includes(filter) ? filters.filter(item => item !== filter) : [...filters, filter]);
 
   const handleRemove = async (model: ModelEntry): Promise<void> => {
-    const name = modelTitle(model);
+    const name = modelDisplayName(model);
     const confirmed = await confirm({
       title: `Remove ${name}?`,
       description: 'The model leaves the draft. It stays live until the draft is published.',
@@ -236,30 +248,30 @@ function ModelTable({ document, capabilities, onEdit, onNotice }: ModelTableProp
       id: 'model',
       header: 'Model',
       cell: row => (
-        <span className={styles.stack}>
-          <span>{modelTitle(row)}</span>
+        <span className={styles.cell}>
+          <span>{modelDisplayName(row)}</span>
           <Mono>{row.key}</Mono>
+          <ServedBy model={row} providerKeys={providerKeys} />
         </span>
       ),
     },
-    { id: 'input', header: 'Input', align: 'end', cell: row => <span className={controls.tabular}>{formatPrice(row.pricePerMTok.input)}</span> },
     {
-      id: 'cachedInput',
-      header: 'Cached input',
+      id: 'input',
+      header: 'Input',
       align: 'end',
-      cell: row =>
-        row.pricePerMTok.cachedInput === undefined ? (
-          <Muted>{cachedInputLabel(row.pricePerMTok)}</Muted>
-        ) : (
-          <span className={controls.tabular}>{formatPrice(row.pricePerMTok.cachedInput)}</span>
-        ),
+      cell: row => (
+        <span className={styles.cell}>
+          <span className={controls.tabular}>{formatPrice(row.pricePerMTok.input)}</span>
+          {row.pricePerMTok.cachedInput === undefined ? null : <Muted>{formatPrice(row.pricePerMTok.cachedInput)} cached</Muted>}
+        </span>
+      ),
     },
     {
       id: 'output',
       header: 'Output',
       align: 'end',
       cell: row => (
-        <span className={styles.stack}>
+        <span className={styles.cell}>
           <span className={controls.tabular}>{formatPrice(row.pricePerMTok.output)}</span>
           {row.pricePerMTok.perImage === undefined ? null : <Muted>{formatPrice(row.pricePerMTok.perImage)} per image</Muted>}
         </span>
@@ -282,7 +294,6 @@ function ModelTable({ document, capabilities, onEdit, onNotice }: ModelTableProp
         );
       },
     },
-    { id: 'servedBy', header: 'Served by', cell: row => <ServedBy model={row} providerKeys={providerKeys} /> },
     { id: 'usedBy', header: 'Used by', cell: row => <UsedBy usage={usageOf(usage, row.key)} /> },
   ];
 
@@ -293,32 +304,21 @@ function ModelTable({ document, capabilities, onEdit, onNotice }: ModelTableProp
       align: 'end',
       cell: row => {
         const rowUsage = usageOf(usage, row.key);
-        const name = modelTitle(row);
-        const remove = (
-          <Button
-            variant="ghost"
-            size="sm"
-            aria-label={isInUse(rowUsage) ? `Remove ${name}: unavailable. ${usageSentence(rowUsage)}` : `Remove ${name}`}
-            disabled={isInUse(rowUsage) || draftEdit.pending}
-            loading={removing === row.key}
-            onClick={() => void handleRemove(row)}
-          >
-            Remove
-          </Button>
-        );
+        const name = modelDisplayName(row);
+        const inUse = isInUse(rowUsage);
         return (
-          <div className={controls.rowActions}>
-            <Button variant="ghost" size="sm" aria-label={`Edit ${name}`} onClick={() => onEdit({ mode: { kind: 'edit', key: row.key }, model: row })}>
-              Edit
-            </Button>
-            {isInUse(rowUsage) ? (
-              <Tooltip content={`${usageSentence(rowUsage)}. Move them to another model first.`}>
-                <span className={styles.disabledTrigger}>{remove}</span>
-              </Tooltip>
-            ) : (
-              remove
-            )}
-          </div>
+          <RowActions>
+            <RowAction icon={<EditIcon />} label={`Edit ${name}`} tooltip="Edit" onClick={() => onEdit({ mode: { kind: 'edit', key: row.key }, model: row })} />
+            <RowAction
+              icon={<RemoveIcon />}
+              label={inUse ? `Remove ${name}: unavailable. ${usageSentence(rowUsage)}` : `Remove ${name}`}
+              tooltip={inUse ? `${usageSentence(rowUsage)}. Move them to another model first.` : 'Remove'}
+              danger
+              disabled={inUse || draftEdit.pending}
+              loading={removing === row.key}
+              onClick={() => void handleRemove(row)}
+            />
+          </RowActions>
         );
       },
     });
@@ -373,7 +373,7 @@ function ServedBy({ model, providerKeys }: { model: ModelEntry; providerKeys: Re
   if (links.length === 0) return <span className={styles.problem}>No provider</span>;
   const parts: ReactNode[] = [];
   links.forEach((link, index) => {
-    if (index > 0) parts.push(<Muted key={`then-${index}`}> then </Muted>);
+    if (index > 0) parts.push(<span key={`then-${index}`}>, then </span>);
     parts.push(
       link.known ? (
         <span key={`${link.key}-${index}`}>{link.name}</span>
@@ -384,5 +384,5 @@ function ServedBy({ model, providerKeys }: { model: ModelEntry; providerKeys: Re
       ),
     );
   });
-  return <span>{parts}</span>;
+  return <Muted>Served by {parts}</Muted>;
 }
