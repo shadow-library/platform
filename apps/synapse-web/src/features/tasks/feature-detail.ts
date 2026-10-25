@@ -3,7 +3,7 @@ import { issueOwner, issueSentence } from '@/features/catalog/catalog-issues';
 import { type AliasEntry, type DataPolicy, type ModelEntry, type ProviderEntry, type TaskEntry } from '@/features/catalog/catalog-spec.types';
 import { type DraftEditOutcome } from '@/features/catalog/draft-edit';
 import { modelDisplayName, modelEligibility } from '@/features/shared/model-options';
-import { aliasName, taskTitle } from '@/features/shared/naming';
+import { aliasName } from '@/features/shared/naming';
 import { type CatalogIssueResponse } from '@/lib/apis/api-types.gen';
 
 import { SECTION_CHANGED } from './section-edits';
@@ -50,10 +50,6 @@ export function aboutProblems(form: AboutForm): AboutProblems {
     ...(form.label.trim().length > TASK_LABEL_MAX && { label: `Keep the name to ${TASK_LABEL_MAX} characters` }),
     ...(form.description.trim().length > TASK_DESCRIPTION_MAX && { description: `Keep the description to ${TASK_DESCRIPTION_MAX} characters` }),
   };
-}
-
-export function featureNote(task: Pick<TaskEntry, 'app' | 'name' | 'label'>, what: string): string {
-  return `${taskTitle(task)}: ${what}`;
 }
 
 const reasonText = (reasons: readonly string[]): string => reasons.map(reason => reason.charAt(0).toLowerCase() + reason.slice(1)).join('; ');

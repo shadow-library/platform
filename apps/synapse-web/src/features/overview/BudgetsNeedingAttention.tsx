@@ -57,7 +57,15 @@ function AttentionBody(): ReactElement {
 export function BudgetsNeedingAttention(): ReactElement {
   return (
     <section className={styles.section} aria-label="Budgets needing attention">
-      <SectionHeader title="Budgets needing attention" subtitle="Budgets at 80% or more of a limit right now." action={<Link to="/budgets">All budgets</Link>} />
+      <SectionHeader
+        title="Budgets needing attention"
+        subtitle="Budgets at 80% or more of a limit right now."
+        action={
+          <Link to="/budgets" className={styles.headerLink}>
+            All budgets
+          </Link>
+        }
+      />
       <Card padding="md">
         <Card.Body>
           <AttentionBody />

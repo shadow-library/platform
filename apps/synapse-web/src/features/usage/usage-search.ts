@@ -3,8 +3,11 @@ import { type DateRange, type RangePreset } from '@shadow-library/ui';
 import { splitTaskKey } from '@/features/catalog/catalog-readers';
 import { ownEntry } from '@/features/catalog/catalog-values';
 import { type TaskEntry } from '@/features/catalog/catalog-spec.types';
+import { formatDate } from '@/features/shared/format';
 import { taskTitle } from '@/features/shared/naming';
 import { type GetUsageQueryParams, type GetUsageSeriesQueryParams } from '@/lib/apis/api-types.gen';
+
+import { type CostBasis } from './usage-report';
 
 export const USAGE_GROUPS = ['app', 'task', 'alias', 'model', 'provider'] as const;
 
@@ -16,6 +19,8 @@ export interface UsageSearch {
   app?: string;
   task?: string;
   groupBy: UsageGroup;
+  /** Absent means billed, so a plain link keeps the default */
+  basis?: 'list';
 }
 
 export type UsageFilters = Pick<UsageSearch, 'app' | 'task'>;
@@ -61,6 +66,19 @@ function filterToken(value: unknown): string | undefined {
   return typeof value === 'string' && FILTER_TOKEN.test(value) ? value : undefined;
 }
 
+function basisOf(value: unknown): Pick<UsageSearch, 'basis'> {
+  return value === 'list' ? { basis: 'list' } : {};
+}
+
+export function costBasisOf(search: Pick<UsageSearch, 'basis'>): CostBasis {
+  return search.basis ?? 'billed';
+}
+
+export function withBasis(search: UsageSearch, basis: CostBasis): UsageSearch {
+  const { basis: _basis, ...rest } = search;
+  return { ...rest, ...basisOf(basis) };
+}
+
 function groupOf(value: unknown): UsageGroup {
   if (typeof value !== 'string') return 'app';
   return USAGE_GROUPS.find(group => group === value) ?? ownEntry(LEGACY_GROUPS, value) ?? 'app';
@@ -82,7 +100,7 @@ function filtersOf(search: Record<string, unknown>): UsageFilters {
 export function parseUsageSearch(search: Record<string, unknown>, now: Date): UsageSearch {
   const from = calendarDate(search.from);
   const to = calendarDate(search.to);
-  const rest = { ...filtersOf(search), groupBy: groupOf(search.groupBy) };
+  const rest = { ...filtersOf(search), groupBy: groupOf(search.groupBy), ...basisOf(search.basis) };
   if (from && !isReportableRange(from, to, now)) return rest;
   return { ...(from && { from }), ...(to && { to }), ...rest };
 }
@@ -143,9 +161,16 @@ export function utcToday(now: Date): string {
   return now.toISOString().slice(0, 10);
 }
 
-/** The picker selects whole days inclusively while the server's `to` is exclusive, so the stored bound sits one UTC day past the shown one. */
-export function pickerRangeOf(search: Pick<UsageSearch, 'from' | 'to'>): DateRange {
-  return { start: search.from ?? null, end: search.to ? addUtcDays(search.to, -1) : null };
+/** Shows the server's exclusive `to` as the last included day; an open end shows the report's own last day, so server and browser render alike. */
+export function pickerRangeOf(search: Pick<UsageSearch, 'from' | 'to'>, reportLastDay: string | null): DateRange {
+  if (search.to) return { start: search.from ?? null, end: addUtcDays(search.to, -1) };
+  return { start: search.from ?? null, end: search.from ? reportLastDay : null };
+}
+
+/** `period` is the report's own `[from, to)`; `today` is null until the clock is read after hydration, so the server render prints a date. */
+export function usagePeriodText(period: { from: string; to: string }, today: string | null): string {
+  const last = lastIncludedInstant(period.to);
+  return `${formatDate(period.from)} – ${today !== null && last.slice(0, 10) === today ? 'today' : formatDate(last)}`;
 }
 
 export function searchRangeOf(range: DateRange): Pick<UsageSearch, 'from' | 'to'> {

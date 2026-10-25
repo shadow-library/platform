@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 
 import { type CatalogChange } from '../src/features/catalog/catalog-changes';
 import { type BudgetEntry } from '../src/features/catalog/catalog-spec.types';
+import { NOTE_MAX_LENGTH } from '../src/features/catalog/draft-edit';
 import {
   BUDGET_FORM_MESSAGES,
   budgetApps,
@@ -10,7 +11,6 @@ import {
   budgetNote,
   budgetsOf,
   draftChangesBudgets,
-  NOTE_MAX_LENGTH,
   planBudgetPublish,
   sameBudgets,
   sharesCounter,

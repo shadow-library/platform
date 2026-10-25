@@ -18,8 +18,14 @@
 }
 
 .featureLink {
-  color: inherit;
+  color: var(--sh-accent-text);
   text-decoration: none;
+}
+
+.featureLink:hover,
+.featureLink:focus-visible {
+  color: var(--sh-accent-hover);
+  text-decoration: underline;
 }
 
 .tags {
@@ -156,6 +162,17 @@
   .effortBounds {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+.linkedRows table {
+  table-layout: fixed;
+  min-width: 960px;
+}
+
+.linkedRows td {
+  padding-block: 8px;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .linkedRows tbody tr {

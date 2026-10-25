@@ -3,6 +3,7 @@ import { describe, expect, it } from 'bun:test';
 import { type TaskEntry } from '../src/features/catalog/catalog-spec.types';
 import {
   addUtcDays,
+  costBasisOf,
   filterApps,
   filterTasks,
   isReportableRange,
@@ -12,9 +13,11 @@ import {
   pickerRangeOf,
   searchRangeOf,
   usageParams,
+  usagePeriodText,
   usageRangePresets,
   utcToday,
   withApp,
+  withBasis,
   withRange,
   withTask,
 } from '../src/features/usage/usage-search';
@@ -229,12 +232,51 @@ describe('utcToday', () => {
 
 describe('pickerRangeOf', () => {
   it('should show the exclusive end as the last included day', () => {
-    expect(pickerRangeOf({ from: '2026-09-01', to: '2026-10-01' })).toEqual({ start: '2026-09-01', end: '2026-09-30' });
+    expect(pickerRangeOf({ from: '2026-09-01', to: '2026-10-01' }, '2026-10-25')).toEqual({ start: '2026-09-01', end: '2026-09-30' });
   });
 
-  it('should leave unset bounds empty', () => {
-    expect(pickerRangeOf({})).toEqual({ start: null, end: null });
-    expect(pickerRangeOf({ from: '2026-09-01' })).toEqual({ start: '2026-09-01', end: null });
+  it("should end a range left open on the report's own last day, and leave it open until the report arrives", () => {
+    expect(pickerRangeOf({ from: '2026-09-26' }, '2026-10-25')).toEqual({ start: '2026-09-26', end: '2026-10-25' });
+    expect(pickerRangeOf({ from: '2026-09-26' }, null)).toEqual({ start: '2026-09-26', end: null });
+  });
+
+  it('should leave the default range empty', () => {
+    expect(pickerRangeOf({}, '2026-10-25')).toEqual({ start: null, end: null });
+  });
+});
+
+describe('usagePeriodText', () => {
+  it('should name today for a report that runs to now or to tonight', () => {
+    expect(usagePeriodText({ from: '2026-09-26T00:00:00.000Z', to: '2026-10-25T14:03:12.000Z' }, '2026-10-25')).toBe('Sep 26, 2026 – today');
+    expect(usagePeriodText({ from: '2026-09-26T00:00:00.000Z', to: '2026-10-26T00:00:00.000Z' }, '2026-10-25')).toBe('Sep 26, 2026 – today');
+  });
+
+  it('should print both days, unpadded, for a range that ended earlier', () => {
+    expect(usagePeriodText({ from: '2026-09-01T00:00:00.000Z', to: '2026-10-01T00:00:00.000Z' }, '2026-10-25')).toBe('Sep 1, 2026 – Sep 30, 2026');
+  });
+
+  it('should print the date until the clock is read after hydration', () => {
+    expect(usagePeriodText({ from: '2026-09-26T00:00:00.000Z', to: '2026-10-25T14:03:12.000Z' }, null)).toBe('Sep 26, 2026 – Oct 25, 2026');
+  });
+});
+
+describe('cost basis', () => {
+  it('should read API-price from the URL and default anything else to billed', () => {
+    const now = new Date('2026-10-25T12:00:00Z');
+    expect(parseUsageSearch({ basis: 'list', groupBy: 'task' }, now)).toEqual({ groupBy: 'task', basis: 'list' });
+    for (const basis of ['billed', 'LIST', 'constructor', 1, undefined]) expect(parseUsageSearch({ basis }, now)).toEqual({ groupBy: 'app' });
+    expect(costBasisOf({})).toBe('billed');
+    expect(costBasisOf({ basis: 'list' })).toBe('list');
+  });
+
+  it('should keep billed out of the URL and the other filters in it', () => {
+    const search = { groupBy: 'model' as const, from: '2026-09-01', app: 'memoir' };
+    expect(withBasis(search, 'list')).toEqual({ ...search, basis: 'list' });
+    expect(withBasis({ ...search, basis: 'list' }, 'billed')).toEqual(search);
+  });
+
+  it('should not send the basis to the server, which reports both costs', () => {
+    expect(usageParams({ groupBy: 'app', basis: 'list' })).toEqual({ groupBy: 'app' });
   });
 });
 
@@ -254,7 +296,7 @@ describe('searchRangeOf', () => {
 
   it('should round-trip through the picker unchanged', () => {
     const search = { from: '2026-01-15', to: '2026-03-01' };
-    expect(searchRangeOf(pickerRangeOf(search))).toEqual(search);
+    expect(searchRangeOf(pickerRangeOf(search, '2026-10-25'))).toEqual(search);
   });
 });
 

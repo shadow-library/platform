@@ -7,17 +7,20 @@ import { type ModelEntry, type TaskEntry } from '../src/features/catalog/catalog
 import { type CatalogEdit } from '../src/features/catalog/draft-edit';
 import { modelCapabilityNames, modelDisplayName, modelEligibility, modelPriceText } from '../src/features/shared/model-options';
 import { effortFormOf, effortOf, effortProblems } from '../src/features/tasks/effort-range';
-import { aboutProblems, aliasHints, aliasOptions, dataPolicyHints, featureNote, saveFeedback } from '../src/features/tasks/feature-detail';
+import { featureNote } from '../src/features/catalog/draft-edit';
+import { aboutProblems, aliasHints, aliasOptions, dataPolicyHints, saveFeedback } from '../src/features/tasks/feature-detail';
 import { buildFeatureGroups, changedTaskKeys } from '../src/features/tasks/feature-list';
 import {
   addCondition,
   addRule,
   displayRoutes,
+  FALLBACK_MODEL_LABEL,
   moveRule,
   removeRule,
   routesFromRouting,
   type RoutingDraft,
   routingFromRoutes,
+  ruleModelLabel,
   setCondition,
   setFallback,
   setRuleModel,
@@ -160,6 +163,19 @@ describe('routing draft', () => {
   });
 });
 
+describe('ruleModelLabel', () => {
+  it('should name each rule by its position and complete conditions', () => {
+    const draft = routingFromRoutes([{ when: { tier: 'economy', content_mode: 'standard' }, model: 'llama3.1' }, { model: 'opus-5.5' }]);
+    expect(draft.rules[0] && ruleModelLabel(draft.rules[0], 1)).toBe('Answered by, rule 2: when Tier is economy and Content mode is standard');
+    expect(FALLBACK_MODEL_LABEL).toBe('Answered by, everyone else');
+  });
+
+  it('should leave out half-filled conditions and fall back to the position alone', () => {
+    const draft = setCondition(addRule(routingFromRoutes([{ model: 'opus-5.5' }])), 0, 0, { key: 'tier', value: ' ' });
+    expect(draft.rules[0] && ruleModelLabel(draft.rules[0], 0)).toBe('Answered by, rule 1');
+  });
+});
+
 describe('routing draft with prototype keys', () => {
   it('should keep a condition named like a prototype key as an own field of the route', () => {
     for (const key of ['__proto__', 'constructor']) {
@@ -288,7 +304,7 @@ describe('feature detail', () => {
   });
 
   it('should note the feature and the change', () => {
-    expect(featureNote({ app: 'novel-forge', name: 'chat', label: 'Chat' }, 'routing updated')).toBe('Novel Forge · Chat: routing updated');
+    expect(featureNote({ app: 'novel-forge', name: 'chat', label: 'Chat' }, 'routing')).toBe('Novel Forge · Chat: routing updated');
   });
 
   it('should keep offered names the catalog lacks and label retired ones', () => {

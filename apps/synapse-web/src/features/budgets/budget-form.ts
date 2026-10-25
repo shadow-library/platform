@@ -3,6 +3,7 @@ import { type CatalogDocument } from '@/features/catalog/catalog-document';
 import { readBudgets } from '@/features/catalog/catalog-readers';
 import { type BudgetEntry, type BudgetScope, type BudgetSpec, type BudgetWindow } from '@/features/catalog/catalog-spec.types';
 import { isSameValue } from '@/features/catalog/catalog-values';
+import { NOTE_MAX_LENGTH } from '@/features/catalog/draft-edit';
 
 export interface BudgetFormValues {
   app: string;
@@ -19,8 +20,6 @@ export type BudgetFormErrors = Partial<Record<BudgetFormField, string>>;
 export type BudgetFormResult = { ok: true; budget: BudgetSpec } | { ok: false; errors: BudgetFormErrors };
 
 export type BudgetChange = { kind: 'add'; budget: BudgetSpec } | { kind: 'edit'; index: number; budget: BudgetSpec } | { kind: 'remove'; index: number };
-
-export const NOTE_MAX_LENGTH = 500;
 
 export const BUDGET_FORM_MESSAGES = {
   app: 'Choose the app this budget limits',

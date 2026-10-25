@@ -1,12 +1,11 @@
 import { type ReactElement, useState } from 'react';
 import { DescriptionList, FormField, Select } from '@shadow-library/ui';
 
-import { type CatalogDocument, type Effort, EFFORTS, type TaskEntry } from '@/features/catalog';
+import { type CatalogDocument, type Effort, EFFORTS, featureNote, type TaskEntry } from '@/features/catalog';
 import { effortName, Muted } from '@/features/shared';
 import controls from '@/features/shared/controls.module.css';
 
 import { type EffortForm, effortFormOf, effortProblems, hasEffortProblems } from './effort-range';
-import { featureNote } from './feature-detail';
 import styles from './Features.module.css';
 import { effortEdit } from './section-edits';
 import { EditorDrawer, SectionCard, type SectionEditor, useSectionEditor } from './SectionEditor';
@@ -66,7 +65,7 @@ function EffortDrawer({ task, editor }: { task: TaskEntry; editor: SectionEditor
   const [form, setForm] = useState<EffortForm>(opened);
   const problems = effortProblems(form);
   const bounded = form.default !== null;
-  const save = (): void => void editor.save(effortEdit(task.key, opened, form), featureNote(task, 'effort updated'));
+  const save = (): void => void editor.save(effortEdit(task.key, opened, form), featureNote(task, 'effort'));
   return (
     <EditorDrawer title="Effort" meta={EXPLANATION} editor={editor} canSave={!hasEffortProblems(problems)} onSave={save}>
       <FormField label="Default" helper="Used when the app asks for no particular effort.">

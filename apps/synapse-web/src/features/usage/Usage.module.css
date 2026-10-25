@@ -1,9 +1,14 @@
 .filters {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
+  align-items: flex-start;
   gap: 12px;
   margin-bottom: 20px;
+}
+
+/* A FormField's label row (20px line) and its 6px gap, so the button sits level with the controls, not with a field's helper text. */
+.reset {
+  margin-top: 26px;
 }
 
 .field {
@@ -33,16 +38,6 @@
   margin-bottom: 24px;
 }
 
-.total {
-  position: relative;
-}
-
-.totalInfo {
-  position: absolute;
-  top: 0;
-  right: 0;
-}
-
 .section {
   margin-bottom: 24px;
 }
@@ -51,6 +46,7 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
+  padding-block: 8px;
 }
 
 .cheaper {

@@ -9,13 +9,13 @@ const USD_FORMATTERS = new Map<string, Intl.NumberFormat>();
 export function formatDateTime(iso?: string | null): string {
   const date = iso ? new Date(iso) : null;
   if (!date || Number.isNaN(date.getTime())) return '—';
-  return `${MONTHS[date.getUTCMonth()] ?? ''} ${pad(date.getUTCDate())}, ${date.getUTCFullYear()} ${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())} UTC`;
+  return `${MONTHS[date.getUTCMonth()] ?? ''} ${date.getUTCDate()}, ${date.getUTCFullYear()} ${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())} UTC`;
 }
 
 export function formatDate(iso?: string | null): string {
   const date = iso ? new Date(iso) : null;
   if (!date || Number.isNaN(date.getTime())) return '—';
-  return `${MONTHS[date.getUTCMonth()] ?? ''} ${pad(date.getUTCDate())}, ${date.getUTCFullYear()}`;
+  return `${MONTHS[date.getUTCMonth()] ?? ''} ${date.getUTCDate()}, ${date.getUTCFullYear()}`;
 }
 
 const MINUTE_MS = 60_000;

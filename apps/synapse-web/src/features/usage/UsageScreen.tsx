@@ -1,15 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
-import { type ReactElement, useMemo, useState } from 'react';
+import { type ReactElement, useMemo } from 'react';
 import { Alert, Button, downloadTextFile } from '@shadow-library/ui';
 
 import { readTasks, useActiveCatalog } from '@/features/catalog';
-import { formatDate, PageHeader, PermissionGate } from '@/features/shared';
+import { PageHeader, PermissionGate } from '@/features/shared';
 import { usageQueryOptions, usageSeriesQueryOptions, useCapabilities } from '@/lib';
 
 import { CSV_BOM, usageCsv, usageCsvFilename } from './usage-csv';
-import { type CostBasis, previousPeriod, totalsDeltas, usageNamesOf, usageRows } from './usage-report';
+import { previousPeriod, totalsDeltas, usageNamesOf, usageRows } from './usage-report';
 import { previousUsageQueryOptions } from './usage-previous.query';
-import { lastIncludedInstant, USAGE_GROUP_LABELS, usageParams, type UsageSearch } from './usage-search';
+import { costBasisOf, lastIncludedInstant, USAGE_GROUP_LABELS, usageParams, type UsageSearch } from './usage-search';
 import { UsageChartPanel } from './UsageChartPanel';
 import { UsageFilters } from './UsageFilters';
 import { UsageTable } from './UsageTable';
@@ -28,7 +28,7 @@ export function UsageScreen({ search }: { search: UsageSearch }): ReactElement {
 }
 
 function UsageReport({ search, readCatalog }: { search: UsageSearch; readCatalog: boolean }): ReactElement {
-  const [basis, setBasis] = useState<CostBasis>('billed');
+  const basis = costBasisOf(search);
   const params = usageParams(search);
   const usage = useQuery(usageQueryOptions(params));
   const series = useQuery(usageSeriesQueryOptions(params));
@@ -62,7 +62,7 @@ function UsageReport({ search, readCatalog }: { search: UsageSearch; readCatalog
           </Button>
         }
       />
-      <UsageFilters search={search} tasks={tasks} basis={basis} onBasisChange={setBasis} />
+      <UsageFilters search={search} tasks={tasks} reportLastDay={data ? lastIncludedInstant(data.to).slice(0, 10) : null} />
       {usage.error ? (
         <Alert intent="danger" title="Couldn't load usage">
           {usage.error.message}
@@ -70,13 +70,7 @@ function UsageReport({ search, readCatalog }: { search: UsageSearch; readCatalog
       ) : (
         <>
           <UsageTotals totals={data?.totals} deltas={data ? totalsDeltas(data.totals, previousTotals) : {}} period={data} loading={usage.isLoading} />
-          <UsageChartPanel
-            query={series}
-            group={search.groupBy}
-            basis={basis}
-            names={names}
-            subtitle={data ? `${formatDate(data.from)} through ${formatDate(lastIncludedInstant(data.to))}, UTC days.` : undefined}
-          />
+          <UsageChartPanel query={series} group={search.groupBy} basis={basis} names={names} period={data} />
           <UsageTable rows={rows} groupLabel={groupLabel} basis={basis} previousFailed={period !== null && previous.isError} loading={usage.isLoading} />
         </>
       )}

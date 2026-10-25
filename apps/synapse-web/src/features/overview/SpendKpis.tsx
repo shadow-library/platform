@@ -1,9 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { type ReactElement, type ReactNode } from 'react';
-import { Alert, Card, Statistic, type StatisticPositiveIs } from '@shadow-library/ui';
+import { Alert, Statistic, type StatisticPositiveIs } from '@shadow-library/ui';
 
-import { COST_LABELS, CostLabel, formatNumber, usdFormat } from '@/features/shared';
+import { COST_LABELS, CostLabel, formatNumber, KpiCard, usdFormat } from '@/features/shared';
 import { budgetStatusQueryOptions, isNoActiveCatalog, type UsageTotalsResponse } from '@/lib';
 
 import { budgetAttentionOf } from './budget-attention';
@@ -26,18 +26,6 @@ const MONTH_METRICS: readonly MonthMetric[] = [
   { field: 'listCostUsd', name: COST_LABELS.list, title: <CostLabel kind="list" />, positiveIs: 'down', money: true },
   { field: 'calls', name: 'Calls', title: 'Calls', positiveIs: 'neither', money: false },
 ];
-
-/** The Statistic announces only its own label, so the group names the metric that the card header shows. */
-function KpiCard({ name, title, children }: { name: string; title: ReactNode; children: ReactNode }): ReactElement {
-  return (
-    <Card padding="md">
-      <Card.Header title={title} />
-      <Card.Body className={styles.kpiBody} role="group" aria-label={name}>
-        {children}
-      </Card.Body>
-    </Card>
-  );
-}
 
 function BudgetKpi(): ReactElement {
   const status = useQuery(budgetStatusQueryOptions());

@@ -46,9 +46,16 @@ export function windowSearch(window: UsageWindow): Pick<UsageSearch, 'from' | 't
   return { from: window.from, ...(window.to && { to: window.to }) };
 }
 
-export function featureUsageSearch(key: string, window: UsageWindow): FeatureUsageSearch {
+export function featureUsageSearch(key: string, window: UsageWindow, basis: SpendMeasure = 'billed'): FeatureUsageSearch {
   const parts = splitTaskKey(key);
-  return { groupBy: 'task', ...windowSearch(window), ...(parts && { app: parts.app }), task: key };
+  return { groupBy: 'task', ...windowSearch(window), ...(parts && { app: parts.app }), task: key, ...(basis === 'list' && { basis }) };
+}
+
+/** `null` while the report loads; ranking by API-price is explained only when there were calls but none was billed. */
+export function topFeaturesSubtitle(spend: FeatureSpend | null, days: number): string {
+  const period = `Last ${days} days`;
+  if (!spend || spend.rows.length === 0) return `${period}.`;
+  return spend.basis === 'billed' ? `${period}, ranked by billed spend.` : `${period}, ranked by API-price cost, since nothing was billed.`;
 }
 
 export function featureSpendOf(rows: readonly UsageRowResponse[], tasks: readonly TaskNames[], window: UsageWindow, limit = TOP_FEATURES): FeatureSpend {
@@ -64,7 +71,7 @@ export function featureSpendOf(rows: readonly UsageRowResponse[], tasks: readonl
     rows: ranked.slice(0, limit).map(row => ({
       id: row.key ?? UNKNOWN_ROW_ID,
       title: row.key === null ? 'Unknown feature' : featureTitle(row.key, names),
-      ...(row.key !== null && { taskKey: row.key, usage: featureUsageSearch(row.key, window) }),
+      ...(row.key !== null && { taskKey: row.key, usage: featureUsageSearch(row.key, window, basis) }),
       billedCostUsd: row.billedCostUsd,
       listCostUsd: row.listCostUsd,
       share: total > 0 ? measureOf(row, basis) / total : 0,

@@ -174,3 +174,15 @@ export function conditionParts(when: Readonly<Record<string, string>> | undefine
 export function displayRoutes(routes: readonly TaskRoute[]): TaskRoute[] {
   return [...routes.filter(route => !isDefault(route)), ...routes.filter(isDefault)];
 }
+
+export const FALLBACK_MODEL_LABEL = 'Answered by, everyone else';
+
+/** Starts with the visible "Answered by" label, so voice control finds each picker by what it shows. */
+export function ruleModelLabel(rule: Pick<RuleDraft, 'conditions'>, index: number): string {
+  const parts = rule.conditions
+    .map(condition => ({ key: condition.key.trim(), value: condition.value.trim() }))
+    .filter(condition => condition.key && condition.value)
+    .map(condition => `${selectorName(condition.key)} is ${condition.value}`);
+  const name = `Answered by, rule ${index + 1}`;
+  return parts.length === 0 ? name : `${name}: when ${parts.join(' and ')}`;
+}

@@ -3,7 +3,16 @@ import { ApiError } from '@shadow-library/web';
 
 import { type CatalogDocument } from '../src/features/catalog/catalog-document';
 import { withTaskDataPolicy } from '../src/features/catalog/catalog-edits';
-import { type DraftBase, type DraftEditPorts, runDraftEdit } from '../src/features/catalog/draft-edit';
+import {
+  type DraftBase,
+  type DraftEditPorts,
+  featureNote,
+  generatedNotesOf,
+  isGeneratedNote,
+  nextDraftNote,
+  NOTE_MAX_LENGTH,
+  runDraftEdit,
+} from '../src/features/catalog/draft-edit';
 import { type CatalogWriteOutcome } from '../src/lib/apis/catalog-outcome';
 import { type SaveDraftBody, type SaveDraftResponse } from '../src/lib/apis/api-types.gen';
 import { catalogFixture } from './catalog-fixture';
@@ -126,5 +135,63 @@ describe('runDraftEdit', () => {
       kind: 'failed',
       message: 'Your role cannot change budgets',
     });
+  });
+});
+
+describe('nextDraftNote', () => {
+  const known = generatedNotesOf(catalogFixture());
+  const routing = 'Novel Forge · Chat: routing updated';
+  const effort = 'Novel Forge · Chat: effort updated';
+
+  it('should start a draft with the default note', () => {
+    expect(nextDraftNote(undefined, routing, known)).toBe(routing);
+    expect(nextDraftNote('  ', 'Provider Openrouter updated', known)).toBe('Provider Openrouter updated');
+  });
+
+  it('should add a new edit to a note the console wrote, once', () => {
+    expect(nextDraftNote(routing, effort, known)).toBe(`${routing}; ${effort}`);
+    expect(nextDraftNote(`${routing}; ${effort}`, routing, known)).toBe(`${routing}; ${effort}`);
+  });
+
+  it('should recognise the notes the provider, model and model name screens write about what the draft holds', () => {
+    for (const note of ['Provider Openrouter updated', 'Model Opus 5.5 removed', 'Model Llama 3.1 updated', 'Model name Opus retargeted', 'Model name Sonnet now uses Llama 3.1'])
+      expect(isGeneratedNote(note, known)).toBe(true);
+    expect(nextDraftNote('Model name Sonnet now uses Llama 3.1', routing, known)).toBe(`Model name Sonnet now uses Llama 3.1; ${routing}`);
+  });
+
+  it('should keep a note a person wrote as written, even one shaped like a console note', () => {
+    for (const note of [
+      'Pricing updated',
+      'Model pricing updated',
+      'Provider costs removed',
+      'Model name cleanup now uses ',
+      'Q4 refresh: routing updated',
+      'Novel Forge · Chat: pricing updated',
+      'Price review; Model Opus 5.5 updated',
+    ])
+      expect(nextDraftNote(` ${note} `, effort, known)).toBe(note.trim());
+  });
+
+  it('should stop growing a note about something no longer in the draft', () => {
+    expect(isGeneratedNote('Model GLM 5.2 removed', known)).toBe(false);
+  });
+
+  it('should match the note a feature section writes', () => {
+    expect(featureNote({ app: 'novel-forge', name: 'chat' }, 'data policy')).toBe('Novel Forge · Chat: data policy updated');
+    expect(isGeneratedNote(featureNote({ app: 'novel-forge', name: 'chat' }, 'data policy'), known)).toBe(true);
+  });
+
+  it('should stay within the note limit, and stop growing once cut', () => {
+    const long = Array.from({ length: 40 }, () => 'Model Llama 3.1 updated').join('; ');
+    const next = nextDraftNote(long, 'Provider Openrouter added', known);
+    expect(next.length).toBeLessThanOrEqual(NOTE_MAX_LENGTH);
+    expect(next.endsWith('…')).toBe(true);
+    expect(nextDraftNote(next, 'Model Opus 5.5 added', known)).toBe(next);
+  });
+
+  it('should save the grown note with the edit', async () => {
+    const ports = fakePorts([{ document: catalogFixture(), fingerprint: 'abc', note: routing }]);
+    await runDraftEdit(ports, restrictChat, 'Novel Forge · Chat: data policy updated');
+    expect(ports.saved[0]?.note).toBe(`${routing}; Novel Forge · Chat: data policy updated`);
   });
 });

@@ -15,10 +15,12 @@ import {
   fixTargetOf,
   publishBlocker,
   publishSummary,
+  publishSummaryLines,
   readinessOf,
   WHOLE_CATALOG_ID,
 } from '../src/features/changes/changes-review';
-import { catalogFixture } from './catalog-fixture';
+import { credentialNamer, nameCredentialChanges } from '../src/features/changes/credential-names';
+import { catalogFixture, CREDENTIAL_ID } from './catalog-fixture';
 
 const issue = (path: string, code = 'unknown_model'): { path: string; code: string; message: string } => ({ path, code, message: `${code} at ${path}` });
 
@@ -226,6 +228,64 @@ describe('changeCountLines', () => {
     expect(changeCountLines(review)).toEqual(['1 change to 1 budget', '2 changes to 1 feature', '1 change to 1 model']);
     expect(publishSummary(review)).toBe('This publishes 1 change to 1 budget, 2 changes to 1 feature, and 1 change to 1 model.');
     expect(changesBudgets(review)).toBe(true);
+  });
+});
+
+describe('publishSummaryLines', () => {
+  it('should list each changed item under its area with its own count', () => {
+    const draft = editedDraft();
+    draft.tasks['novel-forge.chat'].effort.default = 'high';
+    const review = buildReview(describeChanges(catalogFixture(), draft), [issue('aliases.opus.model')], draft);
+    expect(publishSummaryLines(review)).toEqual([
+      'Budgets: Novel Forge, each user, per hour (1 change)',
+      'Features: Novel Forge · Chat (2 changes)',
+      'Models: Sonnet 5.5 (1 change)',
+    ]);
+  });
+
+  it('should end a long list with a count of the items left out', () => {
+    const draft = editedDraft();
+    draft.tasks['novel-forge.chat'].effort.default = 'high';
+    const review = buildReview(describeChanges(catalogFixture(), draft), [], draft);
+    expect(publishSummaryLines(review, 2)).toEqual(['Budgets: Novel Forge, each user, per hour (1 change)', 'and 2 more items']);
+  });
+});
+
+describe('nameCredentialChanges', () => {
+  const keyChange = (before: ReturnType<typeof catalogFixture>, after: ReturnType<typeof catalogFixture>, names: { id: string; name: string }[] | undefined): string[] =>
+    nameCredentialChanges(describeChanges(before, after), before, after, credentialNamer(names))
+      .filter(change => change.field === 'credential')
+      .map(change => changeLine(change))
+      .map(line => (line.kind === 'text' ? line.text : `${line.lead}: ${line.before} → ${line.after}`));
+
+  const withKey = (credential: string | undefined): ReturnType<typeof catalogFixture> => {
+    const document = catalogFixture();
+    if (credential) document.providers.openrouter.credential = credential;
+    else delete (document.providers.openrouter as { credential?: string }).credential;
+    return document;
+  };
+
+  const names = [
+    { id: CREDENTIAL_ID, name: 'openrouter-prod' },
+    { id: 'next', name: 'openrouter-2027' },
+  ];
+
+  it('should name the credentials when the viewer can list them', () => {
+    expect(keyChange(withKey(undefined), withKey(CREDENTIAL_ID), names)).toEqual(['API key set to “openrouter-prod”']);
+    expect(keyChange(withKey(CREDENTIAL_ID), withKey('next'), names)).toEqual(['API key: openrouter-prod → openrouter-2027']);
+    expect(keyChange(withKey(CREDENTIAL_ID), withKey(undefined), names)).toEqual(['API key “openrouter-prod” removed']);
+  });
+
+  it('should say "a stored key" when the credentials cannot be listed or the id is unknown', () => {
+    expect(keyChange(withKey(undefined), withKey(CREDENTIAL_ID), undefined)).toEqual(['API key set to a stored key']);
+    expect(keyChange(withKey(CREDENTIAL_ID), withKey('gone'), names)).toEqual(['API key replaced with another stored key']);
+    expect(keyChange(withKey(CREDENTIAL_ID), withKey(undefined), undefined)).toEqual(['API key removed']);
+  });
+
+  it('should leave every other change untouched', () => {
+    const draft = editedDraft();
+    const changes = describeChanges(catalogFixture(), draft);
+    expect(nameCredentialChanges(changes, catalogFixture(), draft, credentialNamer(names))).toEqual(changes);
   });
 });
 

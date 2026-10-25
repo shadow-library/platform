@@ -3,11 +3,13 @@ import { type ReactElement, useState } from 'react';
 import { Alert, Button, Dialog, EmptyState, Spinner, Textarea, useConfirm } from '@shadow-library/ui';
 
 import { activeVersionOf, type CatalogDocument, describeChanges, formatCatalog } from '@/features/catalog';
+import { credentialNamer, nameCredentialChanges } from '@/features/changes';
 import { formatDateTime, formatRelativeTime, Mono, type Notice, PageHeader, PermissionGate, useMinuteClock, VersionStateBadge } from '@/features/shared';
 import controls from '@/features/shared/controls.module.css';
 import {
   type CatalogIssueResponse,
   type CatalogVersionSummaryResponse,
+  credentialsQueryOptions,
   isApiError,
   meQuery,
   useCapabilities,
@@ -78,6 +80,8 @@ function RawDocumentDialog({ version, onClose }: { version: number; onClose: () 
 function VersionChanges({ version, predecessor }: { version: number; predecessor: number | null }): ReactElement {
   const current = useQuery(versionQueryOptions(version));
   const previous = useQuery({ ...versionQueryOptions(predecessor ?? 0), enabled: predecessor !== null });
+  const { manageCredentials } = useCapabilities();
+  const credentials = useQuery({ ...credentialsQueryOptions(), enabled: manageCredentials });
 
   const error = current.error ?? previous.error;
   if (error)
@@ -94,7 +98,9 @@ function VersionChanges({ version, predecessor }: { version: number; predecessor
     );
   if (predecessor === null) return <p className={controls.hint}>First version.</p>;
 
-  const groups = groupChanges(describeChanges(previous.data?.document ?? null, current.data.document));
+  const before = previous.data?.document ?? null;
+  const changes = describeChanges(before, current.data.document);
+  const groups = groupChanges(nameCredentialChanges(changes, before, current.data.document, credentialNamer(credentials.data?.items)));
   if (groups.length === 0) return <p className={controls.hint}>No settings changed compared with version {predecessor}.</p>;
 
   return (

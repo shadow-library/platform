@@ -7,11 +7,10 @@ import { loadCapabilities, usageQueryOptions, usageSeriesQueryOptions } from '@/
 
 export const Route = createFileRoute('/_app/usage/')({
   validateSearch: (search: Record<string, unknown>) => parseUsageSearch(search, new Date()),
-  loaderDeps: ({ search }) => search,
-  loader: async ({ context: { queryClient }, deps }) => {
+  loaderDeps: ({ search }) => usageParams(search),
+  loader: async ({ context: { queryClient }, deps: params }) => {
     const capabilities = await loadCapabilities(queryClient);
     if (!capabilities.readUsage) return;
-    const params = usageParams(deps);
     await Promise.all([
       queryClient.prefetchQuery(usageQueryOptions(params)),
       queryClient.prefetchQuery(usageSeriesQueryOptions(params)),

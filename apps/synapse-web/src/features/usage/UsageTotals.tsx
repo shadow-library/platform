@@ -1,8 +1,7 @@
-import { type ReactElement } from 'react';
-import { Card, Statistic, type StatisticPositiveIs, Tooltip } from '@shadow-library/ui';
+import { type ReactElement, type ReactNode } from 'react';
+import { Statistic, type StatisticPositiveIs } from '@shadow-library/ui';
 
-import { COST_EXPLANATIONS, COST_LABELS, COST_PHRASES, type CostKind, InfoIcon, usdFormat } from '@/features/shared';
-import costStyles from '@/features/shared/CostLabel.module.css';
+import { COST_LABELS, CostLabel, KpiCard, usdFormat } from '@/features/shared';
 import { type UsageTotalsResponse } from '@/lib';
 
 import { averageListCost, comparisonLabel, perCallFormat, type UsagePeriod, type UsageTotalsDeltas } from './usage-report';
@@ -16,37 +15,30 @@ interface UsageTotalsProps {
 }
 
 interface TotalCardProps {
-  label: string;
+  name: string;
+  title: ReactNode;
   value: number;
   format?: Intl.NumberFormatOptions;
   delta: number | undefined;
   positiveIs: StatisticPositiveIs;
   comparison: string | undefined;
   loading: boolean;
-  cost?: CostKind;
 }
 
-function TotalCard({ label, value, format, delta, positiveIs, comparison, loading, cost }: TotalCardProps): ReactElement {
+const RANGE_LABEL = 'In this range';
+
+function TotalCard({ name, title, value, format, delta, positiveIs, comparison, loading }: TotalCardProps): ReactElement {
   return (
-    <Card padding="md">
-      <Card.Body className={styles.total}>
-        <Statistic
-          label={label}
-          value={value}
-          {...(format && { format })}
-          {...(delta !== undefined && { delta, positiveIs })}
-          {...(comparison && { comparison })}
-          loading={loading}
-        />
-        {cost ? (
-          <Tooltip content={COST_EXPLANATIONS[cost]}>
-            <button type="button" className={`${costStyles.info} ${styles.totalInfo}`} aria-label={`What ${COST_PHRASES[cost]} means`}>
-              <InfoIcon />
-            </button>
-          </Tooltip>
-        ) : null}
-      </Card.Body>
-    </Card>
+    <KpiCard name={`${name}, ${RANGE_LABEL.toLowerCase()}`} title={title}>
+      <Statistic
+        label={RANGE_LABEL}
+        value={value}
+        {...(format && { format })}
+        {...(delta !== undefined && { delta, positiveIs })}
+        {...(comparison && { comparison })}
+        loading={loading}
+      />
+    </KpiCard>
   );
 }
 
@@ -55,28 +47,19 @@ export function UsageTotals({ totals, deltas, period, loading }: UsageTotalsProp
   const list = totals?.listCostUsd ?? 0;
   const average = (totals && averageListCost(totals)) ?? 0;
   const comparison = period ? comparisonLabel(period) : undefined;
+  const shared = { positiveIs: 'down' as const, comparison, loading };
   return (
     <div className={styles.totals}>
+      <TotalCard name={COST_LABELS.billed} title={<CostLabel kind="billed" />} value={billed} format={usdFormat(billed)} delta={deltas.billed} {...shared} />
+      <TotalCard name={COST_LABELS.list} title={<CostLabel kind="list" />} value={list} format={usdFormat(list)} delta={deltas.list} {...shared} />
+      <TotalCard name="Calls" title="Calls" value={totals?.calls ?? 0} delta={deltas.calls} {...shared} positiveIs="neither" />
       <TotalCard
-        label={COST_LABELS.billed}
-        cost="billed"
-        value={billed}
-        format={usdFormat(billed)}
-        delta={deltas.billed}
-        positiveIs="down"
-        comparison={comparison}
-        loading={loading}
-      />
-      <TotalCard label={COST_LABELS.list} cost="list" value={list} format={usdFormat(list)} delta={deltas.list} positiveIs="down" comparison={comparison} loading={loading} />
-      <TotalCard label="Calls" value={totals?.calls ?? 0} delta={deltas.calls} positiveIs="neither" comparison={comparison} loading={loading} />
-      <TotalCard
-        label="Avg API-price cost per call"
+        name="Avg API-price cost per call"
+        title="Avg API-price cost per call"
         value={average}
         format={perCallFormat(average)}
         delta={deltas.averageListCost}
-        positiveIs="down"
-        comparison={comparison}
-        loading={loading}
+        {...shared}
       />
     </div>
   );

@@ -6,21 +6,22 @@ import { chartDayFormatter, formatUsd, formatUsdTick, SectionHeader, useMinuteCl
 import controls from '@/features/shared/controls.module.css';
 import { type ApiError, type UsageSeriesResponse } from '@/lib';
 
-import { BASIS_NOUNS, type CostBasis, usageChart, usageKeyName, type UsageNames, usageSlotKeys } from './usage-report';
+import { BASIS_NOUNS, type CostBasis, usageChart, usageKeyName, type UsageNames, type UsagePeriod, usageSlotKeys } from './usage-report';
 import styles from './Usage.module.css';
-import { USAGE_GROUP_LABELS, type UsageGroup, utcToday } from './usage-search';
+import { USAGE_GROUP_LABELS, type UsageGroup, usagePeriodText, utcToday } from './usage-search';
 
 interface UsageChartPanelProps {
   query: UseQueryResult<UsageSeriesResponse, ApiError>;
   group: UsageGroup;
   basis: CostBasis;
   names: UsageNames;
-  subtitle: string | undefined;
+  period: UsagePeriod | undefined;
 }
 
-export function UsageChartPanel({ query, group, basis, names, subtitle }: UsageChartPanelProps): ReactElement {
+export function UsageChartPanel({ query, group, basis, names, period }: UsageChartPanelProps): ReactElement {
   const now = useMinuteClock();
-  const formatDay = chartDayFormatter(now === null ? null : utcToday(new Date(now)));
+  const today = now === null ? null : utcToday(new Date(now));
+  const formatDay = chartDayFormatter(today);
   const noun = BASIS_NOUNS[basis];
   const title = `Daily ${noun} by ${USAGE_GROUP_LABELS[group].toLowerCase()}`;
 
@@ -55,7 +56,7 @@ export function UsageChartPanel({ query, group, basis, names, subtitle }: UsageC
 
   return (
     <section className={styles.section} aria-label={title}>
-      <SectionHeader title={title} subtitle={subtitle} />
+      <SectionHeader title={title} subtitle={period ? `${usagePeriodText(period, today)}, UTC days.` : undefined} />
       <Card padding="md">
         <Card.Body>{body()}</Card.Body>
       </Card>

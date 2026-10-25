@@ -3,13 +3,14 @@ import { Link, useNavigate } from '@tanstack/react-router';
 import { type ReactElement, type ReactNode, useMemo, useState } from 'react';
 import { Alert, Badge, Button, Card, EmptyState, FormField, Input, Spinner, useConfirm } from '@shadow-library/ui';
 
-import { type CatalogChange, type CatalogDocument, describeChanges, issueSentence, useActiveCatalog, useDraft } from '@/features/catalog';
+import { type CatalogChange, type CatalogDocument, describeChanges, issueSentence, NOTE_MAX_LENGTH, useActiveCatalog, useDraft } from '@/features/catalog';
 import { Mono, type Notice, PageHeader, PermissionGate, SectionHeader, useMinuteClock } from '@/features/shared';
 import controls from '@/features/shared/controls.module.css';
 import {
   type Capabilities,
   type CatalogIssueResponse,
   catalogKeys,
+  credentialsQueryOptions,
   diffQueryOptions,
   type DraftResponse,
   draftValidationQueryOptions,
@@ -40,13 +41,13 @@ import {
   plural,
   publishBlocker,
   publishSummary,
+  publishSummaryLines,
   type Readiness,
   readinessOf,
   type ValidationState,
   WHOLE_CATALOG_ID,
 } from './changes-review';
-
-const NOTE_MAX_LENGTH = 500;
+import { credentialNamer, nameCredentialChanges } from './credential-names';
 
 const CONFLICT_NOTICE: Notice = {
   intent: 'warning',
@@ -115,7 +116,13 @@ function ChangesContent({ capabilities, onNotice, onReload }: ContentProps): Rea
   const active = useActiveCatalog(saved !== null);
   const activeDocument = active.status === 'ready' ? active.document : null;
   const settled = active.status === 'ready' || active.status === 'none';
-  const changes = useMemo(() => (saved && settled ? describeChanges(activeDocument, saved.draft.document) : []), [saved, settled, activeDocument]);
+  const credentials = useQuery({ ...credentialsQueryOptions(), enabled: capabilities.manageCredentials && saved !== null });
+  const nameOf = useMemo(() => credentialNamer(credentials.data?.items), [credentials.data]);
+  const changes = useMemo(() => {
+    if (!saved || !settled) return [];
+    const document = saved.draft.document;
+    return nameCredentialChanges(describeChanges(activeDocument, document), activeDocument, document, nameOf);
+  }, [saved, settled, activeDocument, nameOf]);
 
   if (draft.status === 'loading') return <Loading label="Loading the draft" />;
   if (draft.status === 'error')
@@ -408,6 +415,23 @@ function FixLink({ target }: { target: FixTarget }): ReactElement {
   );
 }
 
+/** A dialog description renders inside a paragraph, so this keeps to inline elements laid out as blocks. */
+function PublishConfirmBody({ review }: { review: ChangesReview }): ReactElement {
+  return (
+    <span className={styles.confirmBody}>
+      <span className={styles.confirmLine}>{publishSummary(review)}</span>
+      <span className={styles.confirmList}>
+        {publishSummaryLines(review).map((line, index) => (
+          <span key={`${index}:${line}`} className={styles.confirmItem}>
+            {line}
+          </span>
+        ))}
+      </span>
+      <span className={styles.confirmLine}>Every app switches to the new catalog within a minute; the current version is archived and can be restored from History.</span>
+    </span>
+  );
+}
+
 function diffStateOf(diff: { data?: { fingerprint: string } | null; isFetching: boolean; error: Error | null }, fingerprint: string): DiffState {
   if (diff.isFetching) return 'loading';
   if (diff.error) return 'failed';
@@ -465,11 +489,7 @@ function PublishCard({ capabilities, saved, review, readiness, onNotice, onReloa
   const handlePublish = async (): Promise<void> => {
     const fingerprint = diff.data?.fingerprint;
     if (!fingerprint || blocker) return;
-    const confirmed = await confirm({
-      title: 'Publish these changes?',
-      description: `${publishSummary(review)} Every app switches to the new catalog within a minute; the current version is archived and can be restored from History.`,
-      confirmLabel: 'Publish',
-    });
+    const confirmed = await confirm({ title: 'Publish these changes?', description: <PublishConfirmBody review={review} />, confirmLabel: 'Publish' });
     if (!confirmed) return;
     onNotice(null);
     if (noteChanged && !(await saveNote())) return;

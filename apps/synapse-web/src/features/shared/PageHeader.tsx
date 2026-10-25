@@ -23,7 +23,7 @@ export function PageHeader({ title, subtitle, action }: PageHeaderProps): ReactE
 export function SectionHeader({ title, subtitle, action }: PageHeaderProps): ReactElement {
   return (
     <div className={styles.sectionHeader}>
-      <div>
+      <div className={styles.sectionHeading}>
         <h2 className={styles.sectionTitle}>{title}</h2>
         {subtitle ? <p className={styles.sectionSubtitle}>{subtitle}</p> : null}
       </div>

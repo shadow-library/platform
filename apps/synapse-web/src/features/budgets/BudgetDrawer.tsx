@@ -1,7 +1,7 @@
 import { type ReactElement, useState } from 'react';
 import { Alert, Button, Drawer, FormField, Input, RadioGroup, Select } from '@shadow-library/ui';
 
-import { type BudgetEntry, type BudgetScope, type BudgetWindow, readTasks } from '@/features/catalog';
+import { type BudgetEntry, type BudgetScope, type BudgetWindow, NOTE_MAX_LENGTH, readTasks } from '@/features/catalog';
 import { appName } from '@/features/shared';
 import { type CatalogIssueResponse } from '@/lib';
 
@@ -12,7 +12,6 @@ import {
   type BudgetFormErrors,
   budgetFormOf,
   type BudgetFormValues,
-  NOTE_MAX_LENGTH,
   planBudgetPublish,
   sharesCounter,
   validateBudgetForm,
@@ -50,7 +49,7 @@ const WINDOWS: readonly { value: BudgetWindow; label: string }[] = [
   { value: '30d', label: 'Per 30 days' },
 ];
 
-const WINDOW_HELPER = 'Fixed UTC periods: an hour starts on the hour, a day at midnight UTC, and 30-day periods are counted from 1 January 1970, not by calendar month.';
+const WINDOW_HELPER = 'Fixed UTC periods: each hour, each day, or 30-day blocks — not calendar months.';
 
 function changeOf(target: BudgetDrawerTarget, values: BudgetFormValues): BudgetChange | null {
   const result = validateBudgetForm(values, target.kind === 'edit' ? target.entry : undefined);

@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'bun:test';
 
-import { formatDateTime, formatPrice, formatRate, formatRelativeTime, formatSignedUsd, formatUsd, usdFormat } from '../src/features/shared/format';
+import { formatDate, formatDateTime, formatPrice, formatRate, formatRelativeTime, formatSignedUsd, formatUsd, usdFormat } from '../src/features/shared/format';
 
 describe('formatDateTime', () => {
   it('should print in UTC so the server and the browser agree', () => {
     expect(formatDateTime('2026-10-17T23:45:00.000Z')).toBe('Oct 17, 2026 23:45 UTC');
+  });
+
+  it('should print a single-digit day without padding, as the date pickers do', () => {
+    expect(formatDateTime('2026-09-01T08:05:00.000Z')).toBe('Sep 1, 2026 08:05 UTC');
+    expect(formatDate('2026-09-01T00:00:00.000Z')).toBe('Sep 1, 2026');
   });
 
   it('should print a dash for a missing or unparseable value', () => {
@@ -60,7 +65,7 @@ describe('formatRelativeTime', () => {
   });
 
   it('should fall back to the date past a month, and read a future instant as just now', () => {
-    expect(formatRelativeTime('2026-08-01T12:00:00.000Z', now)).toBe('Aug 01, 2026');
+    expect(formatRelativeTime('2026-08-01T12:00:00.000Z', now)).toBe('Aug 1, 2026');
     expect(formatRelativeTime('2026-10-24T12:05:00.000Z', now)).toBe('just now');
     expect(formatRelativeTime('later', now)).toBe('—');
   });

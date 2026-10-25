@@ -109,7 +109,7 @@ function FeatureSections({ document, active, source, task, canEdit }: FeatureSec
           </Badge>
         ) : null}
       </div>
-      <WorkingHint source={source} />
+      <WorkingHint source={source} canEdit={canEdit} />
       {canEdit ? null : (
         <Alert intent="info" title="You can view this feature but not change it" className={styles.notice}>
           Changing a feature needs permission to edit the catalog draft. Ask a Synapse administrator if you need it.

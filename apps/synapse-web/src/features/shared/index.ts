@@ -7,6 +7,7 @@ export * from './DraftNoticeAlert';
 export * from './format';
 export * from './FormSection';
 export * from './icons';
+export * from './KpiCard';
 export * from './model-options';
 export * from './ModelPicker';
 export * from './naming';

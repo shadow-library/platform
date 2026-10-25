@@ -1,13 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { type ReactElement } from 'react';
-import { Alert, Table, type TableColumn } from '@shadow-library/ui';
+import { Alert, Card, EmptyState, Table, type TableColumn } from '@shadow-library/ui';
 
 import { readTasks, useActiveCatalog } from '@/features/catalog';
 import { COST_PHRASES, CostLabel, formatUsd, Mono, SectionHeader, ShareCell } from '@/features/shared';
 import controls from '@/features/shared/controls.module.css';
 
-import { featureSpendOf, type FeatureSpendRow, windowSearch } from './feature-spend';
+import { featureSpendOf, type FeatureSpendRow, topFeaturesSubtitle, windowSearch } from './feature-spend';
 import styles from './Overview.module.css';
 import { FEATURE_SPEND_DAYS, featureSpendOptions, featureSpendWindow } from './overview-queries';
 
@@ -32,7 +32,7 @@ export function TopFeatures({ today, readCatalog }: { today: string; readCatalog
   const tasks = catalog.status === 'ready' ? readTasks(catalog.document) : [];
   const period = featureSpendWindow(today);
   const spend = featureSpendOf(usage.data?.rows ?? [], tasks, period);
-  const ranking = spend.basis === 'billed' ? 'ranked by billed spend' : 'ranked by API-price cost, since nothing was billed';
+  const empty = usage.data !== undefined && spend.rows.length === 0;
 
   const columns: TableColumn<FeatureSpendRow>[] = [
     { id: 'feature', header: 'Feature', cell: row => <FeatureCell row={row} /> },
@@ -43,23 +43,24 @@ export function TopFeatures({ today, readCatalog }: { today: string; readCatalog
 
   return (
     <section className={styles.section} aria-label="Top features by spend">
-      <SectionHeader title="Top features by spend" subtitle={usage.data ? `Last ${FEATURE_SPEND_DAYS} days, ${ranking}.` : `Last ${FEATURE_SPEND_DAYS} days.`} />
+      <SectionHeader title="Top features by spend" subtitle={topFeaturesSubtitle(usage.data ? spend : null, FEATURE_SPEND_DAYS)} />
       {usage.error ? (
         <Alert intent="danger" title="Couldn’t load spend by feature">
           {usage.error.message}
         </Alert>
       ) : (
         <>
-          <Table
-            data={spend.rows}
-            columns={columns}
-            rowKey="id"
-            loading={usage.isPending}
-            aria-label={`Features with the most spend over the last ${FEATURE_SPEND_DAYS} days`}
-            emptyState={`No calls in the last ${FEATURE_SPEND_DAYS} days.`}
-          />
+          {empty ? (
+            <Card padding="md">
+              <Card.Body>
+                <EmptyState size="inline" title={`No calls in the last ${FEATURE_SPEND_DAYS} days`} description="Features appear here once apps call Synapse." />
+              </Card.Body>
+            </Card>
+          ) : (
+            <Table data={spend.rows} columns={columns} rowKey="id" loading={usage.isPending} aria-label={`Features with the most spend over the last ${FEATURE_SPEND_DAYS} days`} />
+          )}
           <div className={styles.footerLink}>
-            <Link to="/usage" search={{ groupBy: 'task', ...windowSearch(period) }}>
+            <Link to="/usage" search={{ groupBy: 'task', ...windowSearch(period), ...(spend.basis === 'list' && !empty && { basis: spend.basis }) }}>
               Every feature on the Usage screen
             </Link>
           </div>

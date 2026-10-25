@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 
 import { budgetAttentionOf } from '../src/features/overview/budget-attention';
 import { dailySpendOf, OTHER_SERIES_KEY, UNKNOWN_SERIES_KEY } from '../src/features/overview/daily-spend';
-import { featureSpendOf, featureTitle, featureUsageSearch } from '../src/features/overview/feature-spend';
+import { featureSpendOf, featureTitle, featureUsageSearch, topFeaturesSubtitle } from '../src/features/overview/feature-spend';
 import { changeFrom, lastDays, monthToDate, overviewPeriods } from '../src/features/overview/overview-periods';
 import { chartDayFormatter, formatChartDay, formatUsdTick } from '../src/features/shared/chart-format';
 import {
@@ -215,6 +215,20 @@ describe('featureUsageSearch', () => {
   it('should filter the usage report to the task and its app', () => {
     expect(featureUsageSearch('novel-forge.chat', WINDOW)).toEqual({ groupBy: 'task', from: '2026-09-26', app: 'novel-forge', task: 'novel-forge.chat' });
     expect(featureUsageSearch('orphan', { from: '2026-09-01', to: '2026-10-01' })).toEqual({ groupBy: 'task', from: '2026-09-01', to: '2026-10-01', task: 'orphan' });
+  });
+
+  it('should open the Usage screen on API-price when that is what the ranking used', () => {
+    expect(featureUsageSearch('memoir.chat', WINDOW, 'list')).toEqual({ groupBy: 'task', from: '2026-09-26', app: 'memoir', task: 'memoir.chat', basis: 'list' });
+    expect(featureSpendOf([usageRow('memoir.chat', 1, 0)], [], WINDOW).rows[0]?.usage?.basis).toBe('list');
+  });
+});
+
+describe('topFeaturesSubtitle', () => {
+  it('should explain the API-price ranking only when there were calls but nothing was billed', () => {
+    expect(topFeaturesSubtitle(null, 30)).toBe('Last 30 days.');
+    expect(topFeaturesSubtitle(featureSpendOf([], [], WINDOW), 30)).toBe('Last 30 days.');
+    expect(topFeaturesSubtitle(featureSpendOf([usageRow('memoir.chat', 1, 0)], [], WINDOW), 30)).toBe('Last 30 days, ranked by API-price cost, since nothing was billed.');
+    expect(topFeaturesSubtitle(featureSpendOf([usageRow('memoir.chat', 1, 1)], [], WINDOW), 30)).toBe('Last 30 days, ranked by billed spend.');
   });
 });
 

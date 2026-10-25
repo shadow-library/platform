@@ -14,6 +14,9 @@ import { WorkingHint } from './WorkingHint';
 
 const USAGE_PARAMS = { groupBy: 'task' } as const;
 
+/** Every app's table shares these widths so the columns line up down the page; feature and model split what is left. */
+const COLUMN_WIDTHS = { kind: 120, effort: 96, aliases: 184, billed: 148, list: 160 } as const;
+
 export function FeaturesScreen(): ReactElement {
   const capabilities = useCapabilities();
   return (
@@ -39,7 +42,7 @@ function FeatureList({ capabilities }: { capabilities: Capabilities }): ReactEle
       </Alert>
     );
   if (working.status === 'none') return <EmptyState title="No catalog published yet" description="Features appear here once a catalog version is published." />;
-  return <FeatureGroups document={working.document} active={working.active} source={working.source} readUsage={capabilities.readUsage} />;
+  return <FeatureGroups document={working.document} active={working.active} source={working.source} readUsage={capabilities.readUsage} canEdit={capabilities.writeDraft} />;
 }
 
 interface FeatureGroupsProps {
@@ -47,6 +50,7 @@ interface FeatureGroupsProps {
   active: CatalogDocument | null;
   source: WorkingSource;
   readUsage: boolean;
+  canEdit: boolean;
 }
 
 function SpendCell({ value, loading }: { value?: number; loading: boolean }): ReactElement {
@@ -54,7 +58,7 @@ function SpendCell({ value, loading }: { value?: number; loading: boolean }): Re
   return value === undefined ? <Muted>—</Muted> : <span className={controls.tabular}>{formatUsd(value)}</span>;
 }
 
-function FeatureGroups({ document, active, source, readUsage }: FeatureGroupsProps): ReactElement {
+function FeatureGroups({ document, active, source, readUsage, canEdit }: FeatureGroupsProps): ReactElement {
   const usage = useQuery({ ...usageQueryOptions(USAGE_PARAMS), enabled: readUsage });
   const rows = usage.data?.rows ?? null;
   const changed = useMemo(() => changedTaskKeys(active, source.kind === 'draft' ? document : null), [active, source.kind, document]);
@@ -85,7 +89,7 @@ function FeatureGroups({ document, active, source, readUsage }: FeatureGroupsPro
         </span>
       ),
     },
-    { id: 'kind', header: 'Kind', cell: row => taskKindName(row.kind) },
+    { id: 'kind', header: 'Kind', width: COLUMN_WIDTHS.kind, cell: row => taskKindName(row.kind) },
     {
       id: 'model',
       header: 'Default model',
@@ -100,10 +104,11 @@ function FeatureGroups({ document, active, source, readUsage }: FeatureGroupsPro
           <Muted>No default</Muted>
         ),
     },
-    { id: 'effort', header: 'Effort', cell: row => (row.effort ? effortName(row.effort) : <Muted>—</Muted>) },
+    { id: 'effort', header: 'Effort', width: COLUMN_WIDTHS.effort, cell: row => (row.effort ? effortName(row.effort) : <Muted>—</Muted>) },
     {
       id: 'aliases',
       header: 'Model names offered',
+      width: COLUMN_WIDTHS.aliases,
       cell: row =>
         row.aliases.length === 0 ? (
           <Muted>None</Muted>
@@ -123,16 +128,23 @@ function FeatureGroups({ document, active, source, readUsage }: FeatureGroupsPro
             id: 'billed',
             header: <CostLabel kind="billed" />,
             align: 'end' as const,
+            width: COLUMN_WIDTHS.billed,
             cell: (row: FeatureSummary) => <SpendCell value={row.spend?.billed} loading={spendLoading} />,
           },
-          { id: 'list', header: <CostLabel kind="list" />, align: 'end' as const, cell: (row: FeatureSummary) => <SpendCell value={row.spend?.list} loading={spendLoading} /> },
+          {
+            id: 'list',
+            header: <CostLabel kind="list" />,
+            align: 'end' as const,
+            width: COLUMN_WIDTHS.list,
+            cell: (row: FeatureSummary) => <SpendCell value={row.spend?.list} loading={spendLoading} />,
+          },
         ]
       : []),
   ];
 
   return (
     <>
-      <WorkingHint source={source} />
+      <WorkingHint source={source} canEdit={canEdit} />
       {readUsage ? (
         usage.error ? (
           <Alert intent="warning" title="Spend couldn't be loaded" className={styles.notice}>

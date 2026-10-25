@@ -1,15 +1,13 @@
 import { type ReactElement, useId } from 'react';
 import { Alert, Button, Card, FormField, Input, Textarea } from '@shadow-library/ui';
 
-import { draftExpectation, type EditorSource, formatCatalog, type ParsedCatalog } from '@/features/catalog';
+import { draftExpectation, type EditorSource, formatCatalog, NOTE_MAX_LENGTH, type ParsedCatalog } from '@/features/catalog';
 import { type DraftNotice } from '@/features/shared';
 import controls from '@/features/shared/controls.module.css';
 import { type Capabilities, type CatalogIssueResponse, isApiError, isCatalogConflict, useSaveDraftMutation, useValidateDraftMutation } from '@/lib';
 
 import styles from './Advanced.module.css';
 import { IssueList } from './IssueList';
-
-const NOTE_MAX_LENGTH = 500;
 
 interface DraftPanelProps {
   capabilities: Capabilities;

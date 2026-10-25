@@ -54,7 +54,7 @@ export function BudgetsScreen(): ReactElement {
 }
 
 function editHint(capabilities: Capabilities, active: ActiveCatalogState): string | null {
-  if (!capabilities.setBudgets) return 'Changing budgets needs the SynapseFinance or SynapseAdmin role.';
+  if (!capabilities.setBudgets) return 'Ask a Synapse administrator for budget access.';
   if (!capabilities.readCatalog) return 'Changing budgets also needs permission to read the catalog.';
   if (active.status === 'error') return 'Budgets can’t be changed right now: the active catalog couldn’t be loaded.';
   return null;
@@ -186,12 +186,9 @@ function BudgetsView({ capabilities }: { capabilities: Capabilities }): ReactEle
     <>
       {header}
       <Alert intent="info" title="Budgets count API-price cost" className={styles.notice}>
-        Budgets count API-price cost — what calls would cost at the providers’ list prices — so free subscription calls still use budget. Billed spend is on the Usage screen.
+        That is what calls would cost at the providers’ list prices, so free subscription calls still use budget. Billed spend is on the Usage screen.
       </Alert>
-      <p className={styles.windows}>
-        Each window is a fixed UTC period: an hour starts on the hour, a day at midnight UTC, and 30-day windows are counted from 1 January 1970, so they don’t follow calendar
-        months. Counts start again from zero when a window ends.
-      </p>
+      <p className={styles.windows}>Windows are fixed UTC periods: each hour, each day, or 30-day blocks — not calendar months. Counts start again from zero when a window ends.</p>
       {hint ? <p className={controls.hint}>{hint}</p> : null}
       {notice ? (
         <Alert intent={notice.intent} title={notice.title} onDismiss={() => setNotice(null)} className={styles.notice}>

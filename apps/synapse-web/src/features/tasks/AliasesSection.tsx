@@ -1,11 +1,11 @@
 import { type ReactElement, useState } from 'react';
 import { Alert, FormField, MultiSelect, Tag } from '@shadow-library/ui';
 
-import { type CatalogDocument, type TaskEntry } from '@/features/catalog';
+import { type CatalogDocument, featureNote, type TaskEntry } from '@/features/catalog';
 import { aliasName } from '@/features/shared';
 import controls from '@/features/shared/controls.module.css';
 
-import { aliasHints, aliasOptions, type FeatureContext, featureNote } from './feature-detail';
+import { aliasHints, aliasOptions, type FeatureContext } from './feature-detail';
 import styles from './Features.module.css';
 import { aliasesEdit } from './section-edits';
 import { EditorDrawer, SectionCard, type SectionEditor, useSectionEditor } from './SectionEditor';
@@ -43,7 +43,7 @@ function AliasesDrawer({ task, context, editor }: { task: TaskEntry; context: Fe
   const [opened] = useState<readonly string[]>(task.aliases);
   const [selected, setSelected] = useState<string[]>(task.aliases);
   const hints = aliasHints(selected, context.aliases, context.models, task);
-  const save = (): void => void editor.save(aliasesEdit(task.key, opened, selected), featureNote(task, 'model names updated'));
+  const save = (): void => void editor.save(aliasesEdit(task.key, opened, selected), featureNote(task, 'model names'));
   return (
     <EditorDrawer title="Model names offered" meta={SUBTITLE} editor={editor} canSave onSave={save}>
       <FormField label="Model names" helper="Retired names are never offered, even when listed here.">

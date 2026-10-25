@@ -1,23 +1,25 @@
 import { type ReactElement, useState } from 'react';
 import { Alert, Button, Combobox, type ComboboxOption, FormField } from '@shadow-library/ui';
 
-import { type CatalogDocument, type ModelEntry, resolveSelectorKey, selectorValues, type TaskEntry } from '@/features/catalog';
+import { type CatalogDocument, featureNote, type ModelEntry, resolveSelectorKey, selectorValues, type TaskEntry } from '@/features/catalog';
 import { modelDisplayName, ModelPicker, modelPriceText, Mono, Muted, selectorName } from '@/features/shared';
 import controls from '@/features/shared/controls.module.css';
 
-import { type FeatureContext, featureNote } from './feature-detail';
+import { type FeatureContext } from './feature-detail';
 import styles from './Features.module.css';
 import {
   addCondition,
   addRule,
   conditionParts,
   displayRoutes,
+  FALLBACK_MODEL_LABEL,
   moveRule,
   removeCondition,
   removeRule,
   type RoutingDraft,
   routingFromRoutes,
   type RuleDraft,
+  ruleModelLabel,
   setCondition,
   setFallback,
   setRuleModel,
@@ -107,7 +109,7 @@ function RoutingDrawer({ task, context, editor }: RoutingDrawerProps): ReactElem
   const [draft, setDraft] = useState<RoutingDraft>(() => routingFromRoutes(Array.isArray(editor.opened.routes) ? editor.opened.routes : []));
   const issues = validateRouting(draft);
   const knownKeys = Object.keys(context.vocabulary);
-  const save = (): void => void editor.save(routingEdit(task.key, editor.opened.routes, draft), featureNote(task, 'routing updated'));
+  const save = (): void => void editor.save(routingEdit(task.key, editor.opened.routes, draft), featureNote(task, 'routing'));
   const pickerNeeds = { requires: task.requires, kind: task.kind, dataPolicy: task.dataPolicy, providers: context.providers };
 
   return (
@@ -134,7 +136,13 @@ function RoutingDrawer({ task, context, editor }: RoutingDrawerProps): ReactElem
         <h3 className={styles.ruleTitle}>Everyone else</h3>
         <p className={controls.hint}>Requests no rule above matches. This rule is always last and can&apos;t be removed.</p>
         <FormField label="Answered by" error={issues.find(issue => issue.rule === null)?.message}>
-          <ModelPicker {...pickerNeeds} models={context.models} value={draft.fallback} onValueChange={model => setDraft(current => setFallback(current, model))} />
+          <ModelPicker
+            {...pickerNeeds}
+            models={context.models}
+            value={draft.fallback}
+            onValueChange={model => setDraft(current => setFallback(current, model))}
+            aria-label={FALLBACK_MODEL_LABEL}
+          />
         </FormField>
       </section>
     </EditorDrawer>
@@ -225,7 +233,13 @@ function RuleEditor({ rule, index, count, knownKeys, context, issues, onChange, 
         </Button>
       </div>
       <FormField label="Answered by">
-        <ModelPicker {...pickerNeeds} models={context.models} value={rule.model || null} onValueChange={model => onChange(draft => setRuleModel(draft, index, model))} />
+        <ModelPicker
+          {...pickerNeeds}
+          models={context.models}
+          value={rule.model || null}
+          onValueChange={model => onChange(draft => setRuleModel(draft, index, model))}
+          aria-label={ruleModelLabel(rule, index)}
+        />
       </FormField>
       {issues.length > 0 ? (
         <Alert intent="danger" className={styles.ruleIssues}>

@@ -266,6 +266,26 @@ export function publishSummary(review: ChangesReview): string {
   return `This publishes ${LIST.format(changeCountLines(review))}.`;
 }
 
+export const PUBLISH_SUMMARY_LIMIT = 8;
+
+const AREA_LABEL_PREFIXES: Readonly<Partial<Record<ChangeArea, string>>> = { budget: 'Budget for ', alias: 'Model name ', model: 'Model ', provider: 'Provider ' };
+
+/** The area heading already says what kind of item it is, so "Models: Model Sonnet 5.5" drops the repeat. */
+function itemName(area: ChangeArea, label: string): string {
+  const prefix = AREA_LABEL_PREFIXES[area];
+  return prefix && label.startsWith(prefix) ? label.slice(prefix.length) : label;
+}
+
+/** One line per changed item, e.g. "Features: Novel Forge · Chat (2 changes)"; a long draft ends in a count of the rest. */
+export function publishSummaryLines(review: ChangesReview, limit = PUBLISH_SUMMARY_LIMIT): string[] {
+  const lines = review.areas.flatMap(area =>
+    area.entities.filter(entity => entity.lines.length > 0).map(entity => `${area.title}: ${itemName(area.area, entity.label)} (${plural(entity.lines.length, 'change')})`),
+  );
+  if (lines.length <= limit) return lines;
+  const shown = lines.slice(0, limit - 1);
+  return [...shown, `and ${plural(lines.length - shown.length, 'more item')}`];
+}
+
 export function changesBudgets(review: ChangesReview): boolean {
   return review.areas.some(area => area.area === 'budget' && area.changeCount > 0);
 }

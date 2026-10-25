@@ -8,6 +8,7 @@ import { appName } from '@/features/shared';
 import { COST_BASES, COST_BASIS_LABELS, type CostBasis } from './usage-report';
 import styles from './Usage.module.css';
 import {
+  costBasisOf,
   filterApps,
   filterTasks,
   isReportableRange,
@@ -21,6 +22,7 @@ import {
   type UsageSearch,
   utcToday,
   withApp,
+  withBasis,
   withRange,
   withTask,
 } from './usage-search';
@@ -28,13 +30,12 @@ import {
 interface UsageFiltersProps {
   search: UsageSearch;
   tasks: readonly TaskEntry[];
-  basis: CostBasis;
-  onBasisChange: (basis: CostBasis) => void;
+  reportLastDay: string | null;
 }
 
 const ALL = '[all]';
 
-export function UsageFilters({ search, tasks, basis, onBasisChange }: UsageFiltersProps): ReactElement {
+export function UsageFilters({ search, tasks, reportLastDay }: UsageFiltersProps): ReactElement {
   const navigate = useNavigate();
   const [today] = useState(() => utcToday(new Date()));
   const [tooLong, setTooLong] = useState(false);
@@ -48,12 +49,20 @@ export function UsageFilters({ search, tasks, basis, onBasisChange }: UsageFilte
     show(next);
   };
   const apps = filterApps(tasks, search.app);
+  const basis = costBasisOf(search);
   const features = filterTasks(tasks, search.app, search.task);
 
   return (
     <div className={styles.filters} role="group" aria-label="Usage filters">
       <FormField label="Range" helper="Whole days, UTC" error={tooLong ? `Pick at most ${MAX_USAGE_RANGE_DAYS} days` : undefined} className={styles.range}>
-        <DateRangePicker value={pickerRangeOf(search)} onValueChange={pick} presets={usageRangePresets(today)} max={today} confirm placeholder="Default: last 30 days" />
+        <DateRangePicker
+          value={pickerRangeOf(search, reportLastDay)}
+          onValueChange={pick}
+          presets={usageRangePresets(today)}
+          max={today}
+          confirm
+          placeholder="Default: last 30 days"
+        />
       </FormField>
       <FormField label="App" className={styles.field}>
         <Select value={search.app ?? ALL} onValueChange={value => show(withApp(search, value === ALL ? undefined : value))} aria-label="Only show this app">
@@ -85,7 +94,7 @@ export function UsageFilters({ search, tasks, basis, onBasisChange }: UsageFilte
         </SegmentedControl>
       </FormField>
       <FormField label="Cost" className={styles.segments}>
-        <SegmentedControl value={basis} onValueChange={value => onBasisChange(value as CostBasis)} aria-label="Cost shown in the chart and table">
+        <SegmentedControl value={basis} onValueChange={value => show(withBasis(search, value as CostBasis))} aria-label="Cost shown in the chart and table">
           {COST_BASES.map(option => (
             <SegmentedControl.Item key={option} value={option}>
               {COST_BASIS_LABELS[option]}
@@ -94,7 +103,7 @@ export function UsageFilters({ search, tasks, basis, onBasisChange }: UsageFilte
         </SegmentedControl>
       </FormField>
       {search.from || search.to ? (
-        <Button type="button" variant="ghost" onClick={() => show(withRange(search, {}))}>
+        <Button type="button" variant="secondary" className={styles.reset} onClick={() => show(withRange(search, {}))}>
           Default range
         </Button>
       ) : null}
