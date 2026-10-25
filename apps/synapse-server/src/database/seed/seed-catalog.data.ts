@@ -83,7 +83,6 @@ export const SEED_CATALOG_DATA = utils.object.deepFreeze<Omit<CatalogDocument, '
         {
           provider: 'openrouter',
           id: 'anthropic/claude-sonnet-5',
-          ignoreHosts: ['azure'],
         },
       ],
     },
@@ -112,7 +111,6 @@ export const SEED_CATALOG_DATA = utils.object.deepFreeze<Omit<CatalogDocument, '
         {
           provider: 'openrouter',
           id: 'anthropic/claude-opus-5.5',
-          ignoreHosts: ['azure'],
         },
       ],
     },
@@ -141,7 +139,6 @@ export const SEED_CATALOG_DATA = utils.object.deepFreeze<Omit<CatalogDocument, '
         {
           provider: 'openrouter',
           id: 'anthropic/claude-opus-5',
-          ignoreHosts: ['azure'],
         },
       ],
     },
@@ -169,7 +166,6 @@ export const SEED_CATALOG_DATA = utils.object.deepFreeze<Omit<CatalogDocument, '
         {
           provider: 'openrouter',
           id: 'anthropic/claude-haiku-4.5',
-          ignoreHosts: ['azure'],
         },
       ],
     },

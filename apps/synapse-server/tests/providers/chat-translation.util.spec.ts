@@ -188,23 +188,6 @@ describe('translateChatRequest', () => {
     });
   });
 
-  describe('OpenRouter host routing', () => {
-    it('should tell OpenRouter which hosts to ignore', () => {
-      expect(translate({ ignoreHosts: ['azure'] }).body['provider']).toEqual({ ignore: ['azure'] });
-    });
-
-    it('should send no host routing to any other provider, or when none is ignored', () => {
-      expect(translate({ provider: GATEWAY, ignoreHosts: ['azure'] }).body).not.toHaveProperty('provider');
-      expect(translate({ ignoreHosts: [] }).body).not.toHaveProperty('provider');
-    });
-
-    it("should never forward an app's own provider routing", () => {
-      const body = { ...chatBody(), provider: { only: ['azure'] } } as ChatRequestBody;
-
-      expect(translate({ body }).body).not.toHaveProperty('provider');
-    });
-  });
-
   describe('response_format', () => {
     it('should pass a json_schema response format through to a model with native structured output', () => {
       const { body } = translate({ body: chatBody({ response_format: JSON_SCHEMA_FORMAT }) });

@@ -351,17 +351,6 @@ describe('updateModelEdit', () => {
     expect(edit.ok && modelIn(edit.document, 'odd')).toEqual({ ...LOSSY_MODEL, label: 'Renamed' });
   });
 
-  it("should keep a deployment's ignored hosts when the deployments are edited", () => {
-    const document = lossyDocument();
-    modelIn(document, 'odd').deployments = [{ provider: 'openrouter', id: 'anthropic/odd', ignoreHosts: ['azure'] }];
-    const initial = formFor(document, 'odd');
-    const edit = updateEdit('odd', initial, { ...initial, deployments: [...initial.deployments, { rowId: 1, provider: 'subscription', id: 'odd' }] })(document);
-    expect(edit.ok && modelIn(edit.document, 'odd').deployments).toEqual([
-      { provider: 'openrouter', id: 'anthropic/odd', ignoreHosts: ['azure'] },
-      { provider: 'subscription', id: 'odd' },
-    ]);
-  });
-
   it('should keep stored embedding fields the form does not show when dimensions change', () => {
     const document = lossyDocument();
     Object.assign(modelIn(document, 'odd').capabilities as object, { embedding: { dimensions: 512, normalised: true } });

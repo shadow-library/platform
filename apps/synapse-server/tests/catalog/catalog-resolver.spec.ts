@@ -118,14 +118,6 @@ describe('resolve', () => {
       expect(deploymentIds(catalogDocument(), CHAT)).toEqual(['subscription:claude-opus-5.5', 'openrouter:anthropic/claude-opus-5.5']);
     });
 
-    it("should carry a deployment's ignored hosts and leave them absent elsewhere", () => {
-      const document = catalogDocument(draft => (draft.models['claude-opus-5.5']!.deployments[1]!.ignoreHosts = ['azure']));
-      const [gateway, openrouter] = resolve(document, CHAT).deployments;
-
-      expect(gateway).not.toHaveProperty('ignoreHosts');
-      expect(openrouter?.ignoreHosts).toEqual(['azure']);
-    });
-
     it('should keep only in-cluster deployments for an in_cluster_only task', () => {
       const document = catalogDocument(draft => {
         draft.tasks['novel-forge.chat']!.dataPolicy = 'in_cluster_only';

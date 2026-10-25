@@ -39,7 +39,6 @@ export interface ResolvedDeployment {
   providerKey: string;
   provider: ProviderSpec;
   id: string;
-  ignoreHosts?: string[];
 }
 
 export interface Resolution {
@@ -86,8 +85,7 @@ export function eligibleDeployments(document: CatalogDocument, task: TaskSpec, m
   for (const deployment of model.deployments) {
     const provider = ownEntry(document.providers, deployment.provider);
     if (!provider) throw AppError.internal(`Catalog deployment names unknown provider '${deployment.provider}'`);
-    if (!deploymentServes(provider, task, needs)) continue;
-    deployments.push({ providerKey: deployment.provider, provider, id: deployment.id, ...(deployment.ignoreHosts && { ignoreHosts: deployment.ignoreHosts }) });
+    if (deploymentServes(provider, task, needs)) deployments.push({ providerKey: deployment.provider, provider, id: deployment.id });
   }
   return deployments;
 }

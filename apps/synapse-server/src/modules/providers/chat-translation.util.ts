@@ -21,8 +21,6 @@ export interface ChatTranslationInput {
   provider: ProviderSpec;
   providerKey: string;
   deploymentId: string;
-  /** OpenRouter's provider slugs this call must never be routed to */
-  ignoreHosts?: readonly string[];
   /** Already clamped and snapped by dispatch; `null` sends no reasoning control */
   effort: Effort | null | undefined;
   envelope: SynapseEnvelope;
@@ -54,7 +52,7 @@ export const VISIBLE_ASCII = /^[\x21-\x7e]+$/;
 const MAX_SESSION_LENGTH = 256;
 const SAMPLING_FIELDS = ['temperature', 'top_p', 'top_k', 'min_p', 'seed', 'stop', 'frequency_penalty', 'presence_penalty', 'repetition_penalty'];
 /** Provider dialect is Synapse's alone: an app's own copy of these never reaches an upstream */
-const DIALECT_FIELDS = ['synapse', 'reasoning', 'reasoning_effort', 'plugins', 'format', 'provider'];
+const DIALECT_FIELDS = ['synapse', 'reasoning', 'reasoning_effort', 'plugins', 'format'];
 
 function baseUrl(provider: ProviderSpec): string {
   return provider.url.replace(/\/+$/, '');
@@ -143,7 +141,6 @@ export function translateChatRequest(input: ChatTranslationInput): TranslatedReq
   const webSearch = webSearchRoute(input, dialect);
   if (webSearch === 'gateway_tools') headers[GATEWAY_WEB_TOOLS_HEADER] = 'on';
   if (webSearch === 'openrouter_plugin') translated['plugins'] = [{ id: 'web' }];
-  if (dialect === 'openrouter' && input.ignoreHosts?.length) translated['provider'] = { ignore: [...input.ignoreHosts] };
 
   return { url: endpoint(provider, 'chat/completions'), headers, body: translated, ...(webSearch === 'not_requested' ? {} : { webSearch: webSearch !== 'unavailable' }) };
 }

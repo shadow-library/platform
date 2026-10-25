@@ -64,10 +64,8 @@ class CatalogValidator {
       const path = childPath(childPath('models', modelKey), 'deployments');
       if (model.deployments.length === 0) this.report(path, 'no_deployments', `Model '${modelKey}' has no deployments`);
       model.deployments.forEach((deployment, index) => {
-        const provider = ownEntry(this.document.providers, deployment.provider);
-        if (!provider) this.report(childPath(itemPath(path, index), 'provider'), 'unknown_provider', `Unknown provider '${deployment.provider}'`);
-        else if (deployment.ignoreHosts && provider.flavor !== 'openrouter') {
-          this.report(childPath(itemPath(path, index), 'ignoreHosts'), 'invalid_value', 'Only a deployment on an OpenRouter provider can ignore hosts');
+        if (!ownEntry(this.document.providers, deployment.provider)) {
+          this.report(childPath(itemPath(path, index), 'provider'), 'unknown_provider', `Unknown provider '${deployment.provider}'`);
         }
       });
     }
