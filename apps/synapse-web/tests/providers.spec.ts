@@ -66,7 +66,18 @@ function rowOf(rows: readonly ProviderRow[], key: string): ProviderRow {
 }
 
 function credential(id: string, name: string, allowedOrigin: string, revokedAt?: string): CredentialResponse {
-  return { id, name, allowedOrigin, hint: '…', kid: 'k1', version: 1, createdAt: '2026-10-01T00:00:00Z', referencedBy: [], ...(revokedAt && { revokedAt }) } as CredentialResponse;
+  return {
+    id,
+    name,
+    allowedOrigin,
+    hint: '…',
+    kid: 'k1',
+    version: 1,
+    createdAt: '2026-10-01T00:00:00Z',
+    createdByName: null,
+    referencedBy: [],
+    ...(revokedAt && { revokedAt }),
+  } as CredentialResponse;
 }
 
 describe('kindName', () => {

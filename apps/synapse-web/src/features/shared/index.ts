@@ -4,6 +4,7 @@ export * from './chart-slots';
 export * from './CostLabel';
 export * from './draft-notice';
 export * from './DraftNoticeAlert';
+export * from './editor-label';
 export * from './format';
 export * from './FormSection';
 export * from './icons';

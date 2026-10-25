@@ -4,7 +4,7 @@ import { Alert, Button, Dialog, EmptyState, Spinner, Textarea, useConfirm } from
 
 import { activeVersionOf, type CatalogDocument, describeChanges, formatCatalog } from '@/features/catalog';
 import { credentialNamer, nameCredentialChanges } from '@/features/changes';
-import { formatDateTime, formatRelativeTime, Mono, type Notice, PageHeader, PermissionGate, useMinuteClock, VersionStateBadge } from '@/features/shared';
+import { editorLabel, formatDateTime, formatRelativeTime, Mono, type Notice, PageHeader, PermissionGate, useMinuteClock, VersionStateBadge } from '@/features/shared';
 import controls from '@/features/shared/controls.module.css';
 import {
   type CatalogIssueResponse,
@@ -18,7 +18,7 @@ import {
   versionsQueryOptions,
 } from '@/lib';
 
-import { authorOf, groupChanges, listVersions, predecessorOf, rollbackDescription, rollbackIssueRows } from './history-view';
+import { groupChanges, listVersions, predecessorOf, rollbackDescription, rollbackIssueRows } from './history-view';
 import styles from './History.module.css';
 
 interface RollbackFailure {
@@ -135,7 +135,7 @@ interface VersionItemProps {
 }
 
 function VersionItem({ row, predecessor, active, open, now, meSubject, canRollBack, rollingBack, rollbackBusy, onToggle, onViewRaw, onRollBack }: VersionItemProps): ReactElement {
-  const author = authorOf(row.createdBy, meSubject);
+  const editor = editorLabel(row, meSubject);
   const when = row.publishedAt ?? row.createdAt;
   return (
     <li className={styles.item}>
@@ -151,8 +151,7 @@ function VersionItem({ row, predecessor, active, open, now, meSubject, canRollBa
             <span className={styles.meta}>
               <span>{formatDateTime(when)}</span>
               {now === null ? null : <span>{formatRelativeTime(when, new Date(now))}</span>}
-              {author?.kind === 'you' ? <span>by you</span> : null}
-              {author?.kind === 'other' ? <Mono>{author.subject}</Mono> : null}
+              {editor ? <span>by {editor}</span> : null}
             </span>
           </span>
         </button>

@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'bun:test';
 
 import { describeChanges } from '../src/features/catalog/catalog-changes';
-import { authorOf, groupChanges, listVersions, predecessorOf, rollbackDescription, rollbackIssueRows } from '../src/features/history/history-view';
+import { editorLabel } from '../src/features/shared/editor-label';
+import { groupChanges, listVersions, predecessorOf, rollbackDescription, rollbackIssueRows } from '../src/features/history/history-view';
 import { catalogFixture } from './catalog-fixture';
 
 type Summary = Parameters<typeof listVersions>[0][number];
 
-const summary = (version: number, state: Summary['state'] = 'ARCHIVED'): Summary => ({ version, state, createdAt: '2026-10-01T00:00:00.000Z' });
+const summary = (version: number, state: Summary['state'] = 'ARCHIVED'): Summary => ({ version, state, createdAt: '2026-10-01T00:00:00.000Z', createdByName: null });
 
 describe('listVersions', () => {
   it('should order versions newest first and drop the draft', () => {
@@ -32,19 +33,22 @@ describe('predecessorOf', () => {
   });
 });
 
-describe('authorOf', () => {
-  it('should say you when the subject is the signed-in one', () => {
-    expect(authorOf('sub-1', 'sub-1')).toEqual({ kind: 'you' });
+describe('editorLabel', () => {
+  it('should say you when the subject is the signed-in one, whatever the name', () => {
+    expect(editorLabel({ createdBy: 'sub-1', createdByName: 'Ada' }, 'sub-1')).toBe('you');
+    expect(editorLabel({ createdBy: 'sub-1', createdByName: null }, 'sub-1')).toBe('you');
   });
 
-  it('should keep another subject as secondary data', () => {
-    expect(authorOf('sub-2', 'sub-1')).toEqual({ kind: 'other', subject: 'sub-2' });
-    expect(authorOf('sub-2', undefined)).toEqual({ kind: 'other', subject: 'sub-2' });
+  it('should name another editor and never fall back to the subject id', () => {
+    expect(editorLabel({ createdBy: 'sub-2', createdByName: 'Grace' }, 'sub-1')).toBe('Grace');
+    expect(editorLabel({ createdBy: 'sub-2', createdByName: 'Grace' }, undefined)).toBe('Grace');
+    expect(editorLabel({ createdBy: 'sub-2', createdByName: null }, 'sub-1')).toBeNull();
+    expect(editorLabel({ createdBy: 'sub-2', createdByName: '' }, 'sub-1')).toBeNull();
   });
 
   it('should be null when nobody is recorded', () => {
-    expect(authorOf(undefined, 'sub-1')).toBeNull();
-    expect(authorOf('', 'sub-1')).toBeNull();
+    expect(editorLabel({}, 'sub-1')).toBeNull();
+    expect(editorLabel({ createdBy: '', createdByName: null }, '')).toBeNull();
   });
 });
 

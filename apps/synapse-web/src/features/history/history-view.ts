@@ -1,8 +1,6 @@
 import { type CatalogChange, type CatalogDocument, type ChangeArea, issueOwner, issueSentence } from '@/features/catalog';
 import { type CatalogIssueResponse, type CatalogVersionSummaryResponse } from '@/lib';
 
-export type VersionAuthor = { kind: 'you' } | { kind: 'other'; subject: string };
-
 export interface ChangeGroup {
   area: ChangeArea;
   title: string;
@@ -34,12 +32,6 @@ export function listVersions(versions: readonly CatalogVersionSummaryResponse[])
 export function predecessorOf(versions: readonly CatalogVersionSummaryResponse[], version: number): number | null {
   const lower = listVersions(versions).filter(candidate => candidate.version < version);
   return lower[0]?.version ?? null;
-}
-
-export function authorOf(createdBy: string | undefined, meSubject: string | undefined): VersionAuthor | null {
-  if (!createdBy) return null;
-  if (meSubject !== undefined && createdBy === meSubject) return { kind: 'you' };
-  return { kind: 'other', subject: createdBy };
 }
 
 export function groupChanges(changes: readonly CatalogChange[]): ChangeGroup[] {

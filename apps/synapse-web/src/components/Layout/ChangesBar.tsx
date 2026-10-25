@@ -4,7 +4,7 @@ import { type ReactElement, useMemo } from 'react';
 import { Banner } from '@shadow-library/ui';
 
 import { describeChanges, useActiveCatalog, useDraft } from '@/features/catalog';
-import { formatDateTime, formatRelativeTime, useMinuteClock } from '@/features/shared';
+import { editorLabel, formatDateTime, formatRelativeTime, useMinuteClock } from '@/features/shared';
 import { meQuery, useCapabilities } from '@/lib';
 
 import styles from './Layout.module.css';
@@ -26,7 +26,7 @@ export function ChangesBar(): ReactElement | null {
   if (!saved || count === 0 || pathname.replace(/\/$/, '') === CHANGES_PATH) return null;
 
   const started = now !== null ? formatRelativeTime(saved.draft.createdAt, new Date(now)) : formatDateTime(saved.draft.createdAt);
-  const yours = me.data !== undefined && saved.draft.createdBy === me.data.sub;
+  const editor = editorLabel(saved.draft, me.data?.sub);
   return (
     <Banner
       intent="info"
@@ -34,7 +34,7 @@ export function ChangesBar(): ReactElement | null {
       message={
         <>
           {count === 1 ? '1 unpublished change' : `${count} unpublished changes`}
-          {yours ? ' · last saved by you' : ''} · draft started {started} · <Link to={CHANGES_PATH}>Review</Link>
+          {editor ? ` · last saved by ${editor}` : ''} · draft started {started} · <Link to={CHANGES_PATH}>Review</Link>
         </>
       }
     />

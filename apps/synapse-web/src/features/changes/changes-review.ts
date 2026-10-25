@@ -5,9 +5,10 @@ import { type CatalogDocument } from '@/features/catalog/catalog-document';
 import { issueOwner, type IssueOwner } from '@/features/catalog/catalog-issues';
 import { readAliases, readBudgets, readModels, readTasks, splitTaskKey } from '@/features/catalog/catalog-readers';
 import { isSameValue, ownEntry } from '@/features/catalog/catalog-values';
+import { editorLabel, type EditorRef } from '@/features/shared/editor-label';
 import { formatDateTime, formatRelativeTime } from '@/features/shared/format';
 import { aliasName, modelName, providerName, taskTitle } from '@/features/shared/naming';
-import { type CatalogIssueResponse } from '@/lib/apis/api-types.gen';
+import { type CatalogIssueResponse, type ValidateDraftResponse } from '@/lib/apis/api-types.gen';
 
 const ARROW = '→';
 const CONFLICT = 409;
@@ -182,6 +183,13 @@ export function buildReview(changes: readonly CatalogChange[], issues: readonly 
 
 const NO_ISSUES: CatalogIssueResponse[] = [];
 
+export function validationStateOf(query: { data?: ValidateDraftResponse | null; error: Error | null }, allowed: boolean): ValidationState {
+  if (query.data) return { status: 'checked', issues: query.data.issues };
+  if (!allowed) return { status: 'not_allowed' };
+  if (query.data === null) return { status: 'unavailable', message: 'The draft is gone: someone published or discarded it.' };
+  return query.error ? { status: 'unavailable', message: query.error.message } : { status: 'checking' };
+}
+
 export function issuesOf(validation: ValidationState): CatalogIssueResponse[] {
   return validation.status === 'checked' ? validation.issues : NO_ISSUES;
 }
@@ -290,14 +298,13 @@ export function changesBudgets(review: ChangesReview): boolean {
   return review.areas.some(area => area.area === 'budget' && area.changeCount > 0);
 }
 
-export interface DraftOrigin {
+export interface DraftOrigin extends EditorRef {
   createdAt: string;
-  createdBy?: string;
 }
 
-/** Subjects are opaque ids, so only the viewer's own saves are named. */
 export function draftOriginText(draft: DraftOrigin, viewer: string | undefined, now: number | null): string {
   const started = now === null ? formatDateTime(draft.createdAt) : formatRelativeTime(draft.createdAt, new Date(now));
-  const savedBy = viewer !== undefined && draft.createdBy === viewer ? ' · last saved by you' : '';
+  const editor = editorLabel(draft, viewer);
+  const savedBy = editor ? ` · last saved by ${editor}` : '';
   return `Draft started ${started}${savedBy}`;
 }

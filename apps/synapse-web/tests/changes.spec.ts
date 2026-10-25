@@ -17,6 +17,7 @@ import {
   publishSummary,
   publishSummaryLines,
   readinessOf,
+  validationStateOf,
   WHOLE_CATALOG_ID,
 } from '../src/features/changes/changes-review';
 import { credentialNamer, nameCredentialChanges } from '../src/features/changes/credential-names';
@@ -289,14 +290,34 @@ describe('nameCredentialChanges', () => {
   });
 });
 
+describe('validationStateOf', () => {
+  it('should read a validation result as checked', () => {
+    expect(validationStateOf({ data: { valid: true, issues: [] }, error: null }, true)).toEqual({ status: 'checked', issues: [] });
+  });
+
+  it('should say the draft is gone when the server answered 204', () => {
+    expect(validationStateOf({ data: null, error: null }, true)).toMatchObject({ status: 'unavailable', message: expect.stringContaining('gone') });
+  });
+
+  it('should keep not-allowed ahead of a missing draft', () => {
+    expect(validationStateOf({ data: null, error: null }, false)).toEqual({ status: 'not_allowed' });
+  });
+
+  it('should be checking until data or an error arrives', () => {
+    expect(validationStateOf({ error: null }, true)).toEqual({ status: 'checking' });
+    expect(validationStateOf({ error: new Error('boom') }, true)).toEqual({ status: 'unavailable', message: 'boom' });
+  });
+});
+
 describe('draftOriginText', () => {
   const now = Date.parse('2026-10-25T12:00:00Z');
-  const draft = { createdAt: '2026-10-25T10:00:00Z', createdBy: 'subject-1' };
+  const draft = { createdAt: '2026-10-25T10:00:00Z', createdBy: 'subject-1', createdByName: 'Ada' };
 
-  it('should name only the viewer', () => {
+  it('should say you for the viewer, the name for others, and nothing when unnamed', () => {
     expect(draftOriginText(draft, 'subject-1', now)).toBe('Draft started 2h ago · last saved by you');
-    expect(draftOriginText(draft, 'subject-2', now)).toBe('Draft started 2h ago');
-    expect(draftOriginText(draft, undefined, now)).toBe('Draft started 2h ago');
+    expect(draftOriginText(draft, 'subject-2', now)).toBe('Draft started 2h ago · last saved by Ada');
+    expect(draftOriginText({ ...draft, createdByName: null }, 'subject-2', now)).toBe('Draft started 2h ago');
+    expect(draftOriginText({ createdAt: draft.createdAt }, undefined, now)).toBe('Draft started 2h ago');
   });
 
   it('should print an absolute time until the clock is available', () => {

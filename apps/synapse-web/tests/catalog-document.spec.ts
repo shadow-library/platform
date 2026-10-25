@@ -11,7 +11,12 @@ import {
 } from '../src/features/catalog/catalog-document';
 import { type CatalogVersionSummaryResponse, type DraftResponse } from '../src/lib/apis/api-types.gen';
 
-const summary = (version: number, state: CatalogVersionSummaryResponse['state']): CatalogVersionSummaryResponse => ({ version, state, createdAt: '2026-10-01T00:00:00.000Z' });
+const summary = (version: number, state: CatalogVersionSummaryResponse['state']): CatalogVersionSummaryResponse => ({
+  version,
+  state,
+  createdAt: '2026-10-01T00:00:00.000Z',
+  createdByName: null,
+});
 
 describe('parseCatalog', () => {
   it('should accept a JSON object', () => {
@@ -32,7 +37,7 @@ describe('parseCatalog', () => {
 describe('editorSourceOf', () => {
   it('should start from the draft and remember its note and fingerprint', () => {
     const draft = {
-      draft: { version: 0, state: 'DRAFT', note: 'retire glm', createdAt: '2026-10-01T00:00:00.000Z', document: { aliases: {} } },
+      draft: { version: 0, state: 'DRAFT', note: 'retire glm', createdAt: '2026-10-01T00:00:00.000Z', createdByName: null, document: { aliases: {} } },
       fingerprint: 'abc',
     } as DraftResponse;
     expect(editorSourceOf(draft, { version: 7, document: EMPTY_CATALOG })).toEqual({ text: '{\n  "aliases": {}\n}\n', note: 'retire glm', fingerprint: 'abc' });

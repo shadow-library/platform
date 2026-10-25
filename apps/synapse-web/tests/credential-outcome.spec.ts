@@ -11,6 +11,7 @@ const CREDENTIAL: CredentialResponse = {
   hint: 'sk-or-…a1b2',
   version: 2,
   createdAt: '2026-10-01T00:00:00.000Z',
+  createdByName: null,
   referencedBy: [],
 };
 

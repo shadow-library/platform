@@ -44,7 +44,7 @@ import {
   publishSummaryLines,
   type Readiness,
   readinessOf,
-  type ValidationState,
+  validationStateOf,
   WHOLE_CATALOG_ID,
 } from './changes-review';
 import { credentialNamer, nameCredentialChanges } from './credential-names';
@@ -141,12 +141,6 @@ function ChangesContent({ capabilities, onNotice, onReload }: ContentProps): Rea
     );
   if (changes.length === 0) return <NothingPending />;
   return <DraftReview capabilities={capabilities} saved={saved} activeDocument={activeDocument} changes={changes} onNotice={onNotice} onReload={onReload} />;
-}
-
-function validationStateOf(query: { data?: ValidateDraftResponse; error: Error | null }, allowed: boolean): ValidationState {
-  if (query.data) return { status: 'checked', issues: query.data.issues };
-  if (!allowed) return { status: 'not_allowed' };
-  return query.error ? { status: 'unavailable', message: query.error.message } : { status: 'checking' };
 }
 
 interface DraftReviewProps extends ContentProps {

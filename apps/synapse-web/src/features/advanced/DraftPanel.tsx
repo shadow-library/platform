@@ -1,12 +1,14 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { type ReactElement, useId } from 'react';
 import { Alert, Button, Card, FormField, Input, Textarea } from '@shadow-library/ui';
 
 import { draftExpectation, type EditorSource, formatCatalog, NOTE_MAX_LENGTH, type ParsedCatalog } from '@/features/catalog';
 import { type DraftNotice } from '@/features/shared';
 import controls from '@/features/shared/controls.module.css';
-import { type Capabilities, type CatalogIssueResponse, isApiError, isCatalogConflict, useSaveDraftMutation, useValidateDraftMutation } from '@/lib';
+import { type Capabilities, type CatalogIssueResponse, catalogKeys, isApiError, isCatalogConflict, useSaveDraftMutation, useValidateDraftMutation } from '@/lib';
 
 import styles from './Advanced.module.css';
+import { validationOutcomeOf } from './draft-validation';
 import { IssueList } from './IssueList';
 
 interface DraftPanelProps {
@@ -55,6 +57,7 @@ export function DraftPanel({
   const errorId = useId();
   const save = useSaveDraftMutation();
   const validate = useValidateDraftMutation();
+  const queryClient = useQueryClient();
   const readOnly = !capabilities.writeDraft;
   const hasDraft = source.fingerprint !== null;
 
@@ -96,8 +99,10 @@ export function DraftPanel({
     onNotice(null);
     validate.mutate(undefined, {
       onSuccess: result => {
-        onIssues(result.issues);
-        onNotice(result.valid ? { intent: 'success', title: 'The saved draft is publishable' } : { intent: 'warning', title: `${result.issues.length} issue(s) block publishing` });
+        const outcome = validationOutcomeOf(result);
+        if (outcome.kind === 'absent') void queryClient.invalidateQueries({ queryKey: catalogKeys.draft() });
+        else onIssues(outcome.issues);
+        onNotice(outcome.notice);
       },
       onError: error => onNotice(errorNotice("Couldn't validate the draft", error)),
     });

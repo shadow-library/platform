@@ -25,7 +25,7 @@ function savedOutcome(body: SaveDraftBody): CatalogWriteOutcome<SaveDraftRespons
   return {
     kind: 'done',
     value: {
-      draft: { version: 0, state: 'DRAFT', createdAt: '2026-10-24T00:00:00.000Z', document: body.document, ...(body.note && { note: body.note }) },
+      draft: { version: 0, state: 'DRAFT', createdAt: '2026-10-24T00:00:00.000Z', createdByName: null, document: body.document, ...(body.note && { note: body.note }) },
       fingerprint: 'next',
       issues: [],
     },

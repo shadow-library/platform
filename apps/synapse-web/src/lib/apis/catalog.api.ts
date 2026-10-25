@@ -1,5 +1,4 @@
 import { type QueryClient, queryOptions, useMutation, type UseMutationResult, useQueryClient, type UseQueryOptions } from '@tanstack/react-query';
-import { type ApiResult } from '@shadow-library/web';
 
 import {
   type AliasImpactResponse,
@@ -17,9 +16,8 @@ import { budgetKeys } from './budgets.api';
 import { catalogWriteOutcome, type CatalogWriteOutcome, isCatalogConflict, UNPROCESSABLE } from './catalog-outcome';
 import { credentialKeys } from './credentials.api';
 import { providerKeys } from './providers.api';
-import { ApiError, APIRequest } from './transport';
-
-const NOT_FOUND = 404;
+import { nullWhenEmpty } from './empty-response';
+import { type ApiError, APIRequest } from './transport';
 
 export const catalogKeys = {
   all: ['catalog'],
@@ -30,17 +28,6 @@ export const catalogKeys = {
   validation: (fingerprint: string) => [...catalogKeys.draft(), 'validation', fingerprint],
   impact: (alias: string, model?: string) => [...catalogKeys.all, 'aliases', alias, 'impact', model ?? null],
 } as const;
-
-interface ResultRequest {
-  result<T>(): Promise<ApiResult<T>>;
-}
-
-async function orNullWhenAbsent<T>(request: ResultRequest): Promise<T | null> {
-  const result = await request.result<T>();
-  if (result.ok) return result.data;
-  if (result.failure.status === NOT_FOUND) return null;
-  throw new ApiError(result.failure.status, result.failure, result.failure.retryAfterSeconds);
-}
 
 export const versionsQueryOptions = (): UseQueryOptions<CatalogVersionListResponse, ApiError> =>
   queryOptions<CatalogVersionListResponse, ApiError>({
@@ -55,17 +42,17 @@ export const versionQueryOptions = (version: number): UseQueryOptions<CatalogVer
     staleTime: Infinity,
   });
 
-/** No draft is a state, not a failure: the draft disappears every time it is published. */
+/** No draft is a state, not a failure: the draft disappears every time it is published, and the server answers 204. */
 export const draftQueryOptions = (): UseQueryOptions<DraftResponse | null, ApiError> =>
   queryOptions<DraftResponse | null, ApiError>({
     queryKey: catalogKeys.draft(),
-    queryFn: ({ signal }) => orNullWhenAbsent<DraftResponse>(APIRequest.get('/admin/catalog/draft').signal(signal)),
+    queryFn: ({ signal }) => APIRequest.get('/admin/catalog/draft').signal(signal).execute<DraftResponse | undefined>().then(nullWhenEmpty),
   });
 
 export const diffQueryOptions = (): UseQueryOptions<DraftDiffResponse | null, ApiError> =>
   queryOptions<DraftDiffResponse | null, ApiError>({
     queryKey: catalogKeys.diff(),
-    queryFn: ({ signal }) => orNullWhenAbsent<DraftDiffResponse>(APIRequest.get('/admin/catalog/draft/diff').signal(signal)),
+    queryFn: ({ signal }) => APIRequest.get('/admin/catalog/draft/diff').signal(signal).execute<DraftDiffResponse | undefined>().then(nullWhenEmpty),
     staleTime: 0,
   });
 
@@ -103,16 +90,19 @@ export function useSaveDraftMutation(): UseMutationResult<CatalogWriteOutcome<Sa
   });
 }
 
+const validateDraft = (): Promise<ValidateDraftResponse | null> =>
+  APIRequest.post('/admin/catalog/draft/validate').execute<ValidateDraftResponse | undefined>().then(nullWhenEmpty);
+
 /** Validates whatever draft the server holds, so the result is keyed by the fingerprint the caller saw and re-run when it changes. */
-export const draftValidationQueryOptions = (fingerprint: string): UseQueryOptions<ValidateDraftResponse, ApiError> =>
-  queryOptions<ValidateDraftResponse, ApiError>({
+export const draftValidationQueryOptions = (fingerprint: string): UseQueryOptions<ValidateDraftResponse | null, ApiError> =>
+  queryOptions<ValidateDraftResponse | null, ApiError>({
     queryKey: catalogKeys.validation(fingerprint),
-    queryFn: () => APIRequest.post('/admin/catalog/draft/validate').execute(),
+    queryFn: validateDraft,
     staleTime: 0,
   });
 
-export function useValidateDraftMutation(): UseMutationResult<ValidateDraftResponse, ApiError, undefined> {
-  return useMutation<ValidateDraftResponse, ApiError, undefined>({ mutationFn: () => APIRequest.post('/admin/catalog/draft/validate').execute() });
+export function useValidateDraftMutation(): UseMutationResult<ValidateDraftResponse | null, ApiError, undefined> {
+  return useMutation<ValidateDraftResponse | null, ApiError, undefined>({ mutationFn: validateDraft });
 }
 
 type VersionOutcome = CatalogWriteOutcome<CatalogVersionSummaryResponse>;
