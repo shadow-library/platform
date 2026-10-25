@@ -4,7 +4,7 @@ import { CATALOG_KEY_HINT, CATALOG_KEY_PATTERN } from '@/features/catalog/catalo
 import { type Effort, EFFORTS, type ModelCapabilities, type ModelEntry, type ModelSpec, type ReasoningMode } from '@/features/catalog/catalog-spec.types';
 import { readModels } from '@/features/catalog/catalog-readers';
 import { isRecord, isSameValue, ownEntry } from '@/features/catalog/catalog-values';
-import { type CatalogEdit } from '@/features/catalog/catalog-change';
+import { type CatalogEdit, compareAndSet } from '@/features/catalog/catalog-change';
 
 import { isInUse, modelKeysOf, modelUsageIndex, usageOf, usageSentence } from './model-view';
 
@@ -247,6 +247,12 @@ function withField(entry: Entry, field: string, value: unknown): Entry {
   return rest;
 }
 
+function storedModel(document: CatalogDocument, key: string): { models: Entry; raw: Entry } | null {
+  const models = document.models;
+  const raw = isRecord(models) ? ownEntry(models, key) : undefined;
+  return isRecord(models) && isRecord(raw) ? { models, raw } : null;
+}
+
 function recordOf(value: unknown): Entry {
   return isRecord(value) ? value : {};
 }
@@ -287,16 +293,19 @@ export function addModelEdit(key: string, spec: ModelSpec): CatalogEdit {
  */
 export function updateModelEdit(key: string, initial: ModelForm, form: ModelForm, spec: ModelSpec): CatalogEdit {
   const fields = editedFields(initial, form);
-  return (document: CatalogDocument): DocumentEdit => {
-    const models = document.models;
-    const raw = isRecord(models) ? ownEntry(models, key) : undefined;
-    if (!isRecord(models) || !isRecord(raw)) return { ok: false, reason: `The catalog no longer has the model "${key}"; someone may have removed it` };
-    if (fields.length === 0) return { ok: true, document };
-    const fresh = readModels({ models: Object.fromEntries([[key, raw]]) })[0];
+  const isAsOpened = (document: CatalogDocument): boolean => {
+    const stored = storedModel(document, key);
+    const fresh = stored ? readModels({ models: Object.fromEntries([[key, stored.raw]]) })[0] : undefined;
     const current = fresh ? modelFormOf(fresh) : undefined;
-    if (!current || fields.some(field => !isSameValue(projection(current, field), projection(initial, field)))) return { ok: false, reason: CONCURRENT_MODEL_CHANGE };
-    return { ok: true, document: { ...document, models: { ...models, [key]: patchEntry(raw, fields, spec) } } };
+    return current !== undefined && fields.every(field => isSameValue(projection(current, field), projection(initial, field)));
   };
+  const patch = (document: CatalogDocument): DocumentEdit => {
+    const stored = storedModel(document, key);
+    if (!stored) return { ok: false, reason: `The catalog no longer has the model "${key}"; someone may have removed it` };
+    if (fields.length === 0) return { ok: true, document };
+    return { ok: true, document: { ...document, models: { ...stored.models, [key]: patchEntry(stored.raw, fields, spec) } } };
+  };
+  return compareAndSet(patch, isAsOpened, CONCURRENT_MODEL_CHANGE);
 }
 
 /** Checked again on the catalog the removal is applied to, since a feature or model name may have started using the model meanwhile. */

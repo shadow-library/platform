@@ -12,7 +12,7 @@ import {
   type ProviderSpec,
 } from '@/features/catalog/catalog-spec.types';
 import { isRecord, isSameValue, ownEntry, text } from '@/features/catalog/catalog-values';
-import { type CatalogEdit } from '@/features/catalog/catalog-change';
+import { type CatalogEdit, compareAndSet } from '@/features/catalog/catalog-change';
 import { originOfUrl } from '@/features/credentials/credential-view';
 import { type CredentialResponse } from '@/lib/apis/api-types.gen';
 
@@ -202,6 +202,14 @@ export function addProviderEdit(key: string, spec: ProviderSpec): CatalogEdit {
   };
 }
 
+function storedProvider(document: CatalogDocument, key: string): { providers: Entry; raw: Entry } | null {
+  const providers = document.providers;
+  const raw = isRecord(providers) ? ownEntry(providers, key) : undefined;
+  return isRecord(providers) && isRecord(raw) ? { providers, raw } : null;
+}
+
+const missingProvider = (key: string): DocumentEdit => ({ ok: false, reason: `The catalog no longer has the provider "${key}"; someone may have removed it` });
+
 function freshForm(key: string, raw: Entry): ProviderForm | undefined {
   const fresh = readProviders({ providers: Object.fromEntries([[key, raw]]) })[0];
   return fresh ? providerFormOf(fresh) : undefined;
@@ -210,15 +218,18 @@ function freshForm(key: string, raw: Entry): ProviderForm | undefined {
 /** Re-applied to the live catalog on every attempt: untouched fields keep what is stored now, and an edited field someone else also changed is refused. */
 export function updateProviderEdit(key: string, initial: ProviderForm, form: ProviderForm, spec: ProviderSpec): CatalogEdit {
   const fields = editedProviderFields(initial, form);
-  return (document: CatalogDocument): DocumentEdit => {
-    const providers = document.providers;
-    const raw = isRecord(providers) ? ownEntry(providers, key) : undefined;
-    if (!isRecord(providers) || !isRecord(raw)) return { ok: false, reason: `The catalog no longer has the provider "${key}"; someone may have removed it` };
-    if (fields.length === 0) return { ok: true, document };
-    const current = freshForm(key, raw);
-    if (!current || fields.some(field => !isSameValue(projection(current, field), projection(initial, field)))) return { ok: false, reason: CONCURRENT_PROVIDER_CHANGE };
-    return { ok: true, document: { ...document, providers: { ...providers, [key]: patchEntry(raw, fields, spec) } } };
+  const isAsOpened = (document: CatalogDocument): boolean => {
+    const stored = storedProvider(document, key);
+    const current = stored ? freshForm(key, stored.raw) : undefined;
+    return current !== undefined && fields.every(field => isSameValue(projection(current, field), projection(initial, field)));
   };
+  const patch = (document: CatalogDocument): DocumentEdit => {
+    const stored = storedProvider(document, key);
+    if (!stored) return missingProvider(key);
+    if (fields.length === 0) return { ok: true, document };
+    return { ok: true, document: { ...document, providers: { ...stored.providers, [key]: patchEntry(stored.raw, fields, spec) } } };
+  };
+  return compareAndSet(patch, isAsOpened, CONCURRENT_PROVIDER_CHANGE);
 }
 
 /** Checked again on the catalog the removal is applied to, since a model may have started using the provider meanwhile. */
@@ -239,14 +250,15 @@ export function keySnapshotOf(provider: Pick<ProviderEntry, 'credential' | 'apiK
 
 /** Refused when the stored key differs from the one the table showed, so picking never overwrites a choice someone else just saved. */
 export function assignCredentialEdit(key: string, seen: KeySnapshot, credentialId: string | null): CatalogEdit {
-  return (document: CatalogDocument): DocumentEdit => {
-    const providers = document.providers;
-    const raw = isRecord(providers) ? ownEntry(providers, key) : undefined;
-    if (!isRecord(raw)) return { ok: false, reason: `The catalog no longer has the provider "${key}"; someone may have removed it` };
-    const stored: KeySnapshot = keySnapshotOf({ credential: text(raw.credential), apiKeyConfig: text(raw.apiKeyConfig) });
-    if (!isSameValue(stored, seen)) return { ok: false, reason: CONCURRENT_KEY_CHANGE };
+  const isAsOpened = (document: CatalogDocument): boolean => {
+    const stored = storedProvider(document, key);
+    return stored !== null && isSameValue(keySnapshotOf({ credential: text(stored.raw.credential), apiKeyConfig: text(stored.raw.apiKeyConfig) }), seen);
+  };
+  const assign = (document: CatalogDocument): DocumentEdit => {
+    if (!storedProvider(document, key)) return missingProvider(key);
     return credentialId === null ? withoutProviderCredential(document, key) : withProviderCredential(document, key, credentialId);
   };
+  return compareAndSet(assign, isAsOpened, CONCURRENT_KEY_CHANGE);
 }
 
 /** A key is only ever sent to the site it is bound to, so moving the URL elsewhere silently strands it until someone picks another. */

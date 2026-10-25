@@ -22,15 +22,15 @@ interface EditorPanelProps {
 }
 
 function sectionHint(capabilities: Capabilities): string | null {
-  const locked = [!capabilities.writeProviders && '`providers`', !capabilities.setBudgets && '`budgets`'].filter(Boolean);
+  const locked = [!capabilities.writeProviders && 'providers', !capabilities.setBudgets && 'budgets'].filter(Boolean);
   if (locked.length === 0) return null;
-  return `Your role cannot change ${locked.join(' or ')}: a change to them is refused.`;
+  return `Your role can't change ${locked.join(' or ')}, so a change to them can't be applied.`;
 }
 
 export function EditorPanel({ capabilities, text, parsed, version, dirty, applying, issues, onTextChange, onRevert, onApply }: EditorPanelProps): ReactElement {
   const errorId = useId();
   const readOnly = !capabilities.writeCatalog;
-  const hint = readOnly ? 'Your role can read the catalog but not change it.' : sectionHint(capabilities);
+  const hint = readOnly ? "Your role can read the catalog but can't change it." : sectionHint(capabilities);
 
   const handleFormat = (): void => {
     if (parsed.ok) onTextChange(formatCatalog(parsed.document));
@@ -59,9 +59,9 @@ export function EditorPanel({ capabilities, text, parsed, version, dirty, applyi
           aria-describedby={parsed.ok ? undefined : errorId}
         />
         {parsed.ok ? null : (
-          <p id={errorId} className={controls.hint} role="alert">
-            Not valid: {parsed.error}
-          </p>
+          <Alert id={errorId} intent="warning" title="This text can't be applied yet" className={styles.refused}>
+            It isn&apos;t a valid catalog document: {parsed.error}
+          </Alert>
         )}
         {hint ? <p className={controls.hint}>{hint}</p> : null}
         {readOnly ? null : (
@@ -79,7 +79,7 @@ export function EditorPanel({ capabilities, text, parsed, version, dirty, applyi
           </div>
         )}
         {issues && issues.length > 0 ? (
-          <Alert intent="warning" title={`Synapse refused the change: ${issues.length === 1 ? '1 issue' : `${issues.length} issues`}`} className={styles.confirm}>
+          <Alert intent="warning" title={`Synapse refused the change: ${issues.length === 1 ? '1 issue' : `${issues.length} issues`}`} className={styles.refused}>
             Each issue shows the path in the document where it was found.
           </Alert>
         ) : null}

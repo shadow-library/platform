@@ -9,6 +9,21 @@ export type ChangeResult = ChangeOutcome | { kind: 'cancelled' };
 
 export type ChangeAction = 'added' | 'updated' | 'removed';
 
+export type RestoreKind = 'undo' | 'restore';
+
+/** `expectedLive` is the live version the person saw; a restore applies only while it is still live. */
+export interface RestoreTarget {
+  kind: RestoreKind;
+  version: number;
+  expectedLive: number;
+}
+
+export interface ReviewCopy {
+  title: string;
+  lead?: string;
+  applyLabel: string;
+}
+
 export type UndoResult = { kind: 'done'; outcome: VersionOutcome; undone: number } | { kind: 'conflict' } | { kind: 'forbidden' } | { kind: 'failed'; message: string };
 
 export const CONFLICT_NOTICE: IssueNotice = {
@@ -17,6 +32,18 @@ export const CONFLICT_NOTICE: IssueNotice = {
   body: "Your change wasn't applied. The screen now shows their version; check it and try again.",
 };
 
+export const ALREADY_LIVE_NOTICE: IssueNotice = {
+  intent: 'success',
+  title: 'This change is already live',
+  body: 'An earlier try went through, or someone made the same change, so nothing more was changed.',
+};
+
+const RETRY_IS_SAFE = "Applying again is safe: a change that already went through isn't made twice.";
+
+const SENTENCE_END = /[.!?…]$/;
+
+export const CHANGE_COPY: ReviewCopy = { title: 'Apply this change?', applyLabel: 'Apply' };
+
 const FAILED_TITLES: Readonly<Record<ChangeAction, (name: string) => string>> = {
   added: name => `${name} wasn't added`,
   updated: name => `${name} wasn't changed`,
@@ -24,13 +51,14 @@ const FAILED_TITLES: Readonly<Record<ChangeAction, (name: string) => string>> = 
 };
 
 export function isSettled(result: ChangeResult): boolean {
-  return result.kind === 'applied' || result.kind === 'unchanged';
+  return result.kind === 'applied' || result.kind === 'alreadyLive' || result.kind === 'unchanged';
 }
 
 export function changeResultNotice(result: ChangeResult, name: string, action: ChangeAction): IssueNotice | null {
   const failed = FAILED_TITLES[action](name);
   switch (result.kind) {
     case 'applied':
+    case 'alreadyLive':
     case 'cancelled':
       return null;
     case 'invalid':
@@ -46,11 +74,30 @@ export function changeResultNotice(result: ChangeResult, name: string, action: C
   }
 }
 
-export function appliedNotice(version: number, changes: readonly Pick<CatalogChange, 'sentence'>[]): IssueNotice {
+export function appliedNotice(version: number, changes: readonly Pick<CatalogChange, 'sentence'>[], title = `Live now (version ${version})`): IssueNotice {
   const [first] = changes;
   const more = changes.length - 1;
   const body = first ? `${first.sentence}${more > 0 ? `, and ${plural(more, 'more change')}` : ''}.` : undefined;
-  return { intent: 'success', title: `Live now (version ${version})`, ...(body && { body }) };
+  return { intent: 'success', title, ...(body && { body }) };
+}
+
+export function failedApplyBody(message: string): string {
+  const reason = message.trim();
+  return `${SENTENCE_END.test(reason) ? reason : `${reason}.`} ${RETRY_IS_SAFE}`;
+}
+
+export function restoreCopy({ kind, version, expectedLive }: RestoreTarget): ReviewCopy {
+  if (kind === 'undo')
+    return {
+      title: `Undo version ${expectedLive}?`,
+      lead: `Version ${version}'s settings come back as a new version. Version ${expectedLive} stays in History.`,
+      applyLabel: 'Undo',
+    };
+  return { title: `Restore version ${version}?`, lead: 'Its settings come back as a new version. Every version since stays in History.', applyLabel: 'Restore' };
+}
+
+export function restoredTitle({ kind, version, expectedLive }: RestoreTarget, live: number): string {
+  return kind === 'undo' ? `Version ${expectedLive} undone, live now (version ${live})` : `Version ${version} restored, live now (version ${live})`;
 }
 
 export function undoNotice(result: UndoResult): IssueNotice {

@@ -10,6 +10,7 @@ import {
   budgetFormOf,
   budgetNote,
   budgetsOf,
+  budgetUndoInput,
   planBudgetPublish,
   sameBudgets,
   sharesCounter,
@@ -272,5 +273,12 @@ describe('budget changes', () => {
     expect(budgetNote([change], 'Raise for launch')).toBe('Raise for launch');
     expect(budgetNote([], '')).toBeUndefined();
     expect(budgetNote([], 'x'.repeat(600))).toHaveLength(NOTE_MAX_LENGTH);
+  });
+});
+
+describe('budgetUndoInput', () => {
+  it('should put back the budgets the change replaced, only while the version it made is still live', () => {
+    const basis = budgetBasisOf(4, { budgets: [{ app: 'memoir', per: 'app', window: '30d', maxCalls: 1000 }] });
+    expect(budgetUndoInput(basis, 5)).toEqual({ budgets: basis.rawBudgets, expectedVersion: 5, note: 'Restored the budgets of version 4' });
   });
 });

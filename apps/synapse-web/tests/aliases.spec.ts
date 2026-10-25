@@ -345,6 +345,13 @@ describe('updateAliasEdit', () => {
     expect(updateEdit('opus', initial, { ...initial, label: 'Opus Max' })(fresh)).toEqual({ ok: false, reason: CONCURRENT_ALIAS_CHANGE });
   });
 
+  it('should change nothing when the model name already holds the edited values, as after a retry whose answer was lost', () => {
+    const initial = formFor(catalogFixture(), 'opus');
+    const live = catalogFixture();
+    live.aliases.opus.label = 'Opus Max';
+    expect(previewChange({ version: 5, document: live }, updateEdit('opus', initial, { ...initial, label: 'Opus Max' }))).toEqual({ kind: 'unchanged' });
+  });
+
   it('should not mistake a reordered rule set for someone else changing it', () => {
     const document = catalogFixture();
     document.aliases.opus.available = { tier: ['balanced'], plan: ['paid'] } as never;

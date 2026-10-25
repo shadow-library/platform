@@ -142,6 +142,11 @@ export function sharesCounter(budgets: readonly BudgetEntry[], budget: Pick<Budg
   return budgets.some(other => other.index !== exceptIndex && other.app === budget.app && other.per === budget.per && other.window === budget.window);
 }
 
+/** Puts back the budgets the change replaced, only while the version it made is still live. */
+export function budgetUndoInput(basis: Pick<BudgetBasis, 'version' | 'rawBudgets'>, liveVersion: number): { budgets: unknown[]; expectedVersion: number; note: string } {
+  return { budgets: basis.rawBudgets, expectedVersion: liveVersion, note: `Restored the budgets of version ${basis.version}` };
+}
+
 export function budgetNote(changes: readonly CatalogChange[], typed: string): string | undefined {
   const note = typed.trim() || changes.map(change => change.sentence).join('; ');
   if (!note) return undefined;

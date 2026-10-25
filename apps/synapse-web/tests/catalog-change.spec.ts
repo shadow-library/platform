@@ -4,11 +4,15 @@ import { ApiError } from '@shadow-library/web';
 import {
   type CatalogChangePorts,
   changeNote,
+  compareAndSet,
   type LiveCatalog,
   NOT_ALLOWED,
   NOTE_MAX_LENGTH,
   previewChange,
+  previewRestore,
+  type RestorePorts,
   runCatalogChange,
+  runRestore,
   truncateNote,
 } from '../src/features/catalog/catalog-change';
 import { type CatalogDocument } from '../src/features/catalog/catalog-document';
@@ -116,9 +120,25 @@ describe('runCatalogChange', () => {
     });
   });
 
-  it('should read the active version coming back as nothing to change', async () => {
+  it('should read the active version coming back as the change already being live', async () => {
     const ports = fakePorts([{ version: 4, document: catalogFixture() }], [published(4)]);
-    expect(await runCatalogChange(ports, restrictChat, 'n')).toEqual({ kind: 'unchanged' });
+    expect(await runCatalogChange(ports, restrictChat, 'n')).toEqual({ kind: 'alreadyLive' });
+  });
+
+  it('should report a retry whose first answer was lost as already live, not as a conflict', async () => {
+    const opened = { version: 4, document: catalogFixture() };
+    const applied = restrictChat(opened.document);
+    if (!applied.ok) throw new Error('fixture edit refused');
+    const guarded = compareAndSet(restrictChat, document => (document.tasks as Record<string, { dataPolicy: string }>)['novel-forge.chat']?.dataPolicy === 'any', 'Changed');
+    const ports = fakePorts([{ version: 5, document: applied.document }], [refuse(failure(409, 'SYN_CATALOG_CONFLICT', 'conflict'))]);
+    expect(await runCatalogChange(ports, guarded, 'n', opened)).toEqual({ kind: 'alreadyLive' });
+    expect(ports.sent).toHaveLength(1);
+  });
+
+  it('should still say there is nothing to change when the edit changes nothing on its first try', async () => {
+    const ports = fakePorts([{ version: 4, document: catalogFixture() }]);
+    expect(await runCatalogChange(ports, document => ({ ok: true, document }), 'n')).toEqual({ kind: 'unchanged' });
+    expect(ports.sent).toHaveLength(0);
   });
 
   it('should report a refused document as invalid', async () => {
@@ -142,6 +162,108 @@ describe('runCatalogChange', () => {
     const ports = fakePorts([{ version: 4, document: catalogFixture() }]);
     await runCatalogChange(ports, restrictChat, 'x'.repeat(600));
     expect(ports.sent[0]?.note?.length).toBe(NOTE_MAX_LENGTH);
+  });
+});
+
+describe('compareAndSet', () => {
+  type Tasks = Record<string, Record<string, unknown>>;
+  const policyOf = (document: CatalogDocument): unknown => (document.tasks as Tasks)['novel-forge.chat']?.dataPolicy;
+  const withPolicy = (policy: string): CatalogDocument => {
+    const document = catalogFixture();
+    (document.tasks as Tasks)['novel-forge.chat']!.dataPolicy = policy;
+    return document;
+  };
+  const guarded = compareAndSet(restrictChat, document => policyOf(document) === 'any', 'Someone else changed it');
+
+  it('should apply the edit while the field still holds what the form opened with', () => {
+    const next = guarded(withPolicy('any'));
+    expect(next.ok && policyOf(next.document)).toBe('in_cluster_only');
+  });
+
+  it('should change nothing when the field already holds the value the edit sets', () => {
+    const live = withPolicy('in_cluster_only');
+    expect(guarded(live)).toEqual({ ok: true, document: live });
+    expect(previewChange({ version: 5, document: live }, guarded)).toEqual({ kind: 'unchanged' });
+  });
+
+  it('should refuse when someone else set the field to another value', () => {
+    expect(guarded(withPolicy('other'))).toEqual({ ok: false, reason: 'Someone else changed it' });
+  });
+
+  it('should keep the reason the edit itself gives for refusing', () => {
+    const refusing = compareAndSet(
+      () => ({ ok: false, reason: 'Pinned' }),
+      () => false,
+      'Someone else changed it',
+    );
+    expect(refusing(catalogFixture())).toEqual({ ok: false, reason: 'Pinned' });
+  });
+});
+
+describe('previewRestore', () => {
+  const live = { version: 7, document: catalogFixture() };
+  const older = { ...catalogFixture(), aliases: {} };
+
+  it('should describe what restoring the version would change on the live one', () => {
+    const preview = previewRestore(live, older, 7);
+    expect(preview.kind).toBe('ready');
+    if (preview.kind === 'ready') expect(preview.changes.every(change => change.area === 'alias' && change.kind === 'removed')).toBe(true);
+  });
+
+  it('should refuse once another version went live than the one the person saw', () => {
+    expect(previewRestore({ ...live, version: 8 }, older, 7)).toEqual({ kind: 'conflict' });
+  });
+
+  it('should find nothing to restore when the version matches the live one', () => {
+    expect(previewRestore(live, catalogFixture(), 7)).toEqual({ kind: 'unchanged' });
+  });
+});
+
+describe('runRestore', () => {
+  const target = { ...catalogFixture(), aliases: {} };
+
+  function restorePorts(answer: Answer, live: LiveCatalog): RestorePorts & { sent: { version: number; expectedVersion: number }[] } {
+    const sent: { version: number; expectedVersion: number }[] = [];
+    return {
+      sent,
+      loadLive: async () => live,
+      rollback: async input => {
+        sent.push(input);
+        return answer({ document: {}, expectedVersion: input.expectedVersion });
+      },
+    };
+  }
+
+  it('should restore against the live version the person saw', async () => {
+    const ports = restorePorts(published(8), { version: 7, document: catalogFixture() });
+    expect(await runRestore(ports, 3, target, 7)).toEqual({ kind: 'applied', version: 8, previous: 7 });
+    expect(ports.sent).toEqual([{ version: 3, expectedVersion: 7 }]);
+  });
+
+  it('should report someone else changing the catalog meanwhile as a conflict', async () => {
+    const ports = restorePorts(refuse(failure(409, 'SYN_CATALOG_CONFLICT', 'conflict')), { version: 8, document: catalogFixture() });
+    expect(await runRestore(ports, 3, target, 7)).toEqual({ kind: 'conflict' });
+  });
+
+  it('should report a retry whose first answer was lost as already live', async () => {
+    const ports = restorePorts(refuse(failure(409, 'SYN_CATALOG_CONFLICT', 'conflict')), { version: 8, document: { ...target } });
+    expect(await runRestore(ports, 3, target, 7)).toEqual({ kind: 'alreadyLive' });
+  });
+
+  it('should report refused checks and a missing permission in plain words', async () => {
+    const issues = [{ path: 'aliases', code: 'x', message: 'y' }];
+    expect(
+      await runRestore(
+        restorePorts(() => ({ kind: 'invalid', issues }), { version: 7, document: {} }),
+        3,
+        target,
+        7,
+      ),
+    ).toEqual({ kind: 'invalid', issues });
+    expect(await runRestore(restorePorts(refuse(failure(403, 'IAM_002', 'Permission denied')), { version: 7, document: {} }), 3, target, 7)).toEqual({
+      kind: 'refused',
+      reason: NOT_ALLOWED,
+    });
   });
 });
 

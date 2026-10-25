@@ -21,17 +21,27 @@ export type ChangePreview =
   | { kind: 'refused'; reason: string }
   | { kind: 'failed'; message: string };
 
+export type RestorePreview = Extract<ChangePreview, { kind: 'ready' | 'unchanged' }> | { kind: 'conflict' };
+
 export type ChangeOutcome =
   | { kind: 'applied'; version: number; previous: number | null }
   | { kind: 'invalid'; issues: CatalogIssueResponse[] }
   | { kind: 'unchanged' }
+  | { kind: 'alreadyLive' }
   | { kind: 'refused'; reason: string }
   | { kind: 'conflict' }
   | { kind: 'failed'; message: string };
 
+type VersionOutcome = CatalogWriteOutcome<CatalogVersionSummaryResponse>;
+
 export interface CatalogChangePorts {
   loadLive: () => Promise<LiveCatalog>;
-  apply: (body: ApplyChangeBody) => Promise<CatalogWriteOutcome<CatalogVersionSummaryResponse>>;
+  apply: (body: ApplyChangeBody) => Promise<VersionOutcome>;
+}
+
+export interface RestorePorts {
+  loadLive: () => Promise<LiveCatalog>;
+  rollback: (input: { version: number; expectedVersion: number }) => Promise<VersionOutcome>;
 }
 
 /** synapse-server's limit on a version note. */
@@ -39,14 +49,24 @@ export const NOTE_MAX_LENGTH = 500;
 
 export const NOT_ALLOWED = "Your role isn't allowed to make this change. Ask a Synapse administrator if you need it.";
 
-const MAX_ATTEMPTS = 2;
-
 const NOTE_SEPARATOR = '; ';
 
 const ELLIPSIS = '…';
 
 export function changeErrorMessage(error: unknown): string {
   return isApiError(error) || error instanceof Error ? error.message : 'Synapse could not be reached';
+}
+
+/**
+ * A compare-and-set that is also idempotent: when the live catalog already holds what the edit sets, as after a retry whose first response was lost,
+ * it changes nothing instead of refusing; otherwise it applies only while `isAsOpened` holds.
+ */
+export function compareAndSet(edit: CatalogEdit, isAsOpened: (document: CatalogDocument) => boolean, reason: string): CatalogEdit {
+  return document => {
+    const next = edit(document);
+    if (!next.ok || isSameValue(next.document, document) || isAsOpened(document)) return next;
+    return { ok: false, reason };
+  };
 }
 
 export function previewChange(base: LiveCatalog, edit: CatalogEdit): Exclude<ChangePreview, { kind: 'failed' }> {
@@ -90,20 +110,50 @@ async function attempt(ports: CatalogChangePorts, edit: CatalogEdit, note: strin
   if (!next.ok) return { kind: 'refused', reason: next.reason };
   if (isSameValue(next.document, base.document)) return { kind: 'unchanged' };
   try {
-    const outcome = await ports.apply({ document: next.document, expectedVersion: base.version, ...(note && { note: truncateNote(note) }) });
-    if (outcome.kind === 'invalid') return { kind: 'invalid', issues: outcome.issues };
-    if (outcome.value.version === base.version) return { kind: 'unchanged' };
-    return { kind: 'applied', version: outcome.value.version, previous: base.version };
+    return writeOutcome(await ports.apply({ document: next.document, expectedVersion: base.version, ...(note && { note: truncateNote(note) }) }), base.version);
   } catch (error) {
-    if (isCatalogConflict(error)) return { kind: 'conflict' };
-    if (isForbidden(error)) return { kind: 'refused', reason: NOT_ALLOWED };
-    return { kind: 'failed', message: changeErrorMessage(error) };
+    return writeFailure(error);
   }
 }
 
-/** Edits compare-and-set the fields their form opened with, so re-running one on a version someone made live meanwhile cannot revert their change. */
+function writeOutcome(outcome: VersionOutcome, previous: number | null): ChangeOutcome {
+  if (outcome.kind === 'invalid') return { kind: 'invalid', issues: outcome.issues };
+  if (outcome.value.version === previous) return { kind: 'alreadyLive' };
+  return { kind: 'applied', version: outcome.value.version, previous };
+}
+
+function writeFailure(error: unknown): ChangeOutcome {
+  if (isCatalogConflict(error)) return { kind: 'conflict' };
+  if (isForbidden(error)) return { kind: 'refused', reason: NOT_ALLOWED };
+  return { kind: 'failed', message: changeErrorMessage(error) };
+}
+
+/**
+ * Edits compare-and-set the fields their form opened with, so re-running one on a version someone made live meanwhile cannot revert their change; one
+ * that finds nothing left to change there was already made, by an earlier try whose answer was lost or by someone else.
+ */
 export async function runCatalogChange(ports: CatalogChangePorts, edit: CatalogEdit, note: string, base?: LiveCatalog): Promise<ChangeOutcome> {
-  let outcome = await attempt(ports, edit, note, base);
-  for (let tries = 1; tries < MAX_ATTEMPTS && outcome.kind === 'conflict'; tries++) outcome = await attempt(ports, edit, note);
-  return outcome;
+  const outcome = await attempt(ports, edit, note, base);
+  if (outcome.kind !== 'conflict') return outcome;
+  const retried = await attempt(ports, edit, note);
+  return retried.kind === 'unchanged' ? { kind: 'alreadyLive' } : retried;
+}
+
+/** Checked against the live version the person saw, so restoring never reverts a change they haven't seen. */
+export function previewRestore(live: LiveCatalog, target: CatalogDocument, expectedLive: number): RestorePreview {
+  if (live.version !== expectedLive) return { kind: 'conflict' };
+  if (isSameValue(target, live.document)) return { kind: 'unchanged' };
+  return { kind: 'ready', base: live, after: target, changes: describeChanges(live.document, target) };
+}
+
+/** A conflict that finds the restored settings already live is an earlier try whose answer was lost, not someone else's change. */
+export async function runRestore(ports: RestorePorts, version: number, target: CatalogDocument, expectedVersion: number): Promise<ChangeOutcome> {
+  try {
+    return writeOutcome(await ports.rollback({ version, expectedVersion }), expectedVersion);
+  } catch (error) {
+    const outcome = writeFailure(error);
+    if (outcome.kind !== 'conflict') return outcome;
+    const live = await ports.loadLive().catch(() => null);
+    return live && isSameValue(live.document, target) ? { kind: 'alreadyLive' } : outcome;
+  }
 }

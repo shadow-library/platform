@@ -8,6 +8,11 @@
   gap: 16px;
 }
 
+.lead {
+  margin: 0;
+  color: var(--sh-text-secondary);
+}
+
 .groupTitle {
   margin: 0 0 8px;
   font-size: var(--sh-text-body-sm);
@@ -51,18 +56,4 @@
 .after {
   color: var(--sh-text-primary);
   font-weight: 600;
-}
-
-.issues {
-  margin: 8px 0 0;
-  padding-left: 18px;
-}
-
-.technical {
-  margin-top: 8px;
-  font-size: var(--sh-text-body-sm);
-}
-
-.technical summary {
-  cursor: pointer;
 }

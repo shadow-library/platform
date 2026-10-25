@@ -119,6 +119,7 @@ const STAY = { keepEditing: true, issues: [] };
 export function saveFeedback(result: ChangeResult): SaveFeedback | null {
   switch (result.kind) {
     case 'applied':
+    case 'alreadyLive':
     case 'cancelled':
       return null;
     case 'invalid':

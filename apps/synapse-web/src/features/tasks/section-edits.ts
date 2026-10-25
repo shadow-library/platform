@@ -2,7 +2,7 @@ import { type CatalogDocument, type DocumentEdit } from '@/features/catalog/cata
 import { type TaskMeta, withTaskAliases, withTaskDataPolicy, withTaskFieldValue, withTaskMeta } from '@/features/catalog/catalog-edits';
 import { type DataPolicy } from '@/features/catalog/catalog-spec.types';
 import { isRecord, isSameValue, ownEntry } from '@/features/catalog/catalog-values';
-import { type CatalogEdit } from '@/features/catalog/catalog-change';
+import { type CatalogEdit, compareAndSet } from '@/features/catalog/catalog-change';
 
 import { type EffortForm, effortOf } from './effort-range';
 import { type AboutForm } from './feature-detail';
@@ -31,7 +31,7 @@ export function rawTaskFields(document: CatalogDocument, taskKey: string, fields
 
 /** A compare-and-set per section: each one replaces its fields whole, so it applies only while they still hold what the editor opened with. */
 export function guardedTaskEdit(taskKey: string, fields: readonly string[], opened: TaskFields, edit: CatalogEdit): CatalogEdit {
-  return document => (isSameValue(rawTaskFields(document, taskKey, fields), opened) ? edit(document) : { ok: false, reason: SECTION_CHANGED });
+  return compareAndSet(edit, document => isSameValue(rawTaskFields(document, taskKey, fields), opened), SECTION_CHANGED);
 }
 
 const keep = (document: CatalogDocument): DocumentEdit => ({ ok: true, document });

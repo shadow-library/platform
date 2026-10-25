@@ -2,12 +2,25 @@ import { useQuery } from '@tanstack/react-query';
 import { createContext, type PropsWithChildren, type ReactElement, useContext, useMemo, useRef, useState } from 'react';
 import { Alert, Button, Dialog } from '@shadow-library/ui';
 
-import { type CatalogChange, type CatalogEdit, changeErrorMessage, changeNote, type ChangePreview, useCatalogChange } from '@/features/catalog';
+import { type CatalogChange, type CatalogEdit, changeErrorMessage, changeNote, type ChangePreview, type RestorePreview, useCatalogChange } from '@/features/catalog';
 import { type IssueNotice, IssueNoticeAlert } from '@/features/shared';
-import { type CatalogIssueResponse, credentialsQueryOptions, isCatalogConflict, isForbidden, useCapabilities, useRollbackMutation } from '@/lib';
+import { type CatalogIssueResponse, credentialsQueryOptions, isCatalogConflict, isForbidden, useCapabilities, useRollbackMutation, type VersionOutcome } from '@/lib';
 
-import { appliedNotice, type ChangeResult, undoNotice, type UndoResult } from './change-notices';
-import { affectedApps, type ChangeLine, effectSentence, lockedSectionsSentence, summarizeChanges } from './change-summary';
+import {
+  ALREADY_LIVE_NOTICE,
+  appliedNotice,
+  CHANGE_COPY,
+  type ChangeResult,
+  failedApplyBody,
+  restoreCopy,
+  restoredTitle,
+  type RestoreTarget,
+  type ReviewCopy,
+  undoNotice,
+  type UndoResult,
+} from './change-notices';
+import { affectedApps, effectSentence, lockedSectionsSentence } from './change-summary';
+import { ChangeList } from './ChangeList';
 import styles from './Changes.module.css';
 import { credentialNamer, nameCredentialChanges } from './credential-names';
 
@@ -21,16 +34,31 @@ export interface ConfirmChangeOptions {
   warning?: ChangeWarning;
 }
 
+export type UndoAction = () => Promise<VersionOutcome>;
+
+export interface AnnouncedChange {
+  version: number;
+  previous: number;
+  changes: CatalogChange[];
+  /** Left out to undo by rolling back to `previous` */
+  undo?: UndoAction;
+}
+
 export interface ChangeFlow {
   confirmChange: (edit: CatalogEdit, options?: ConfirmChangeOptions) => Promise<ChangeResult>;
+  confirmRestore: (target: RestoreTarget) => Promise<ChangeResult>;
+  announce: (change: AnnouncedChange) => void;
   pending: boolean;
 }
 
 type Problem = { kind: 'invalid'; issues: CatalogIssueResponse[] } | { kind: 'failed'; message: string };
 
+type Commit = { kind: 'edit'; edit: CatalogEdit } | { kind: 'restore'; target: RestoreTarget };
+
 interface Review {
-  edit: CatalogEdit;
+  commit: Commit;
   preview: Extract<ChangePreview, { kind: 'ready' }>;
+  copy: ReviewCopy;
   warning?: ChangeWarning;
   applying: boolean;
   problem: Problem | null;
@@ -38,8 +66,9 @@ interface Review {
 
 interface AppliedChange {
   version: number;
-  previous: number | null;
+  title?: string;
   changes: CatalogChange[];
+  undo: UndoAction | null;
 }
 
 type Outlet = { kind: 'applied'; change: AppliedChange } | { kind: 'undoing' } | { kind: 'notice'; notice: IssueNotice };
@@ -59,49 +88,6 @@ export function useChangeFlow(): ChangeFlow {
   return flow;
 }
 
-function ChangeLineText({ line }: { line: ChangeLine }): ReactElement {
-  if (line.kind === 'text') return <>{line.text}</>;
-  return (
-    <>
-      {line.lead}: <span className={styles.before}>{line.before}</span>
-      <span className={styles.arrow} aria-hidden="true">
-        →
-      </span>
-      <span className="sr-only"> changes to </span>
-      <span className={styles.after}>{line.after}</span>
-      {line.suffix}
-    </>
-  );
-}
-
-function ChangeList({ changes }: { changes: readonly CatalogChange[] }): ReactElement {
-  const groups = summarizeChanges(changes);
-  if (groups.length === 0) return <p className={styles.itemLabel}>Technical settings that this console can&apos;t describe in words.</p>;
-  return (
-    <>
-      {groups.map(group => (
-        <section key={group.area} aria-label={group.title}>
-          <h4 className={styles.groupTitle}>{group.title}</h4>
-          <div className={styles.items}>
-            {group.items.map(item => (
-              <div key={item.key}>
-                <p className={styles.itemLabel}>{item.label}</p>
-                <ul className={styles.lines} aria-label={`Changes to ${item.label}`}>
-                  {item.lines.map((line, index) => (
-                    <li key={index}>
-                      <ChangeLineText line={line} />
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-        </section>
-      ))}
-    </>
-  );
-}
-
 interface ChangeDialogProps {
   review: Review;
   changes: readonly CatalogChange[];
@@ -111,14 +97,15 @@ interface ChangeDialogProps {
 }
 
 function ChangeDialog({ review, changes, locked, onApply, onCancel }: ChangeDialogProps): ReactElement {
-  const { preview, warning, applying, problem } = review;
+  const { preview, copy, warning, applying, problem } = review;
   const apps = affectedApps(preview.base.version === null ? null : preview.base.document, preview.after, changes);
   return (
     <Dialog open onOpenChange={open => open || onCancel()}>
       <Dialog.Content size="md">
-        <Dialog.Header title="Apply this change?" description={effectSentence(apps)} />
+        <Dialog.Header title={copy.title} description={effectSentence(apps)} />
         <Dialog.Body>
           <div className={styles.body}>
+            {copy.lead ? <p className={styles.lead}>{copy.lead}</p> : null}
             {warning ? (
               <Alert intent="warning" title={warning.title}>
                 {warning.body}
@@ -135,7 +122,7 @@ function ChangeDialog({ review, changes, locked, onApply, onCancel }: ChangeDial
             ) : null}
             {problem?.kind === 'failed' ? (
               <Alert intent="danger" title="The change may not have been applied">
-                {problem.message}
+                {failedApplyBody(problem.message)}
               </Alert>
             ) : null}
           </div>
@@ -145,7 +132,7 @@ function ChangeDialog({ review, changes, locked, onApply, onCancel }: ChangeDial
             Cancel
           </Button>
           <Button variant={warning ? 'danger' : 'primary'} onClick={onApply} loading={applying} disabled={locked !== null || problem?.kind === 'invalid'}>
-            Apply
+            {copy.applyLabel}
           </Button>
         </Dialog.Footer>
       </Dialog.Content>
@@ -172,6 +159,11 @@ export function ChangeFlowProvider({ children }: PropsWithChildren): ReactElemen
     return nameCredentialChanges(review.preview.changes, before, review.preview.after, nameOf);
   }, [review, nameOf]);
 
+  const rollbackTo =
+    (version: number, expectedVersion: number): UndoAction =>
+    () =>
+      rollback.mutateAsync({ version, expectedVersion });
+
   const finish = (result: ChangeResult): void => {
     resolver.current?.(result);
     resolver.current = null;
@@ -179,12 +171,13 @@ export function ChangeFlowProvider({ children }: PropsWithChildren): ReactElemen
     setReview(null);
   };
 
-  const confirmChange = async (edit: CatalogEdit, options: ConfirmChangeOptions = {}): Promise<ChangeResult> => {
+  /** Only one change is reviewed at a time; a second request while one is open is treated as cancelled. */
+  const startReview = async (load: () => Promise<ChangePreview | RestorePreview>, opened: Pick<Review, 'commit' | 'copy' | 'warning'>): Promise<ChangeResult> => {
     if (busy.current) return { kind: 'cancelled' };
     busy.current = true;
     setOutlet(null);
     setPreviewing(true);
-    const preview = await changer.preview(edit);
+    const preview = await load();
     setPreviewing(false);
     if (preview.kind !== 'ready') {
       busy.current = false;
@@ -192,32 +185,52 @@ export function ChangeFlowProvider({ children }: PropsWithChildren): ReactElemen
     }
     return new Promise<ChangeResult>(resolve => {
       resolver.current = resolve;
-      setReview({ edit, preview, ...(options.warning && { warning: options.warning }), applying: false, problem: null });
+      setReview({ ...opened, preview, applying: false, problem: null });
     });
   };
+
+  const confirmChange = (edit: CatalogEdit, options: ConfirmChangeOptions = {}): Promise<ChangeResult> =>
+    startReview(() => changer.preview(edit), { commit: { kind: 'edit', edit }, copy: CHANGE_COPY, ...(options.warning && { warning: options.warning }) });
+
+  const confirmRestore = (target: RestoreTarget): Promise<ChangeResult> =>
+    startReview(() => changer.previewRestore(target.version, target.expectedLive), { commit: { kind: 'restore', target }, copy: restoreCopy(target) });
+
+  const announce = ({ version, previous, changes: announced, undo }: AnnouncedChange): void =>
+    setOutlet({ kind: 'applied', change: { version, changes: announced, undo: undo ?? rollbackTo(previous, version) } });
 
   const cancel = (): void => {
     if (!review || applying.current) return;
     finish(review.problem ?? { kind: 'cancelled' });
   };
 
+  const commit = (current: Review): Promise<ChangeResult> => {
+    const { commit: target, preview } = current;
+    if (target.kind === 'edit') return changer.apply(target.edit, changeNote(preview.changes), preview.base);
+    return changer.restore(target.target.version, preview.after, target.target.expectedLive);
+  };
+
   const apply = async (): Promise<void> => {
     if (!review || applying.current) return;
     applying.current = true;
     setReview({ ...review, applying: true, problem: null });
-    const outcome = await changer.apply(review.edit, changeNote(review.preview.changes), review.preview.base);
+    const outcome = await commit(review);
     applying.current = false;
     if (outcome.kind === 'invalid' || outcome.kind === 'failed') return setReview({ ...review, applying: false, problem: outcome });
-    if (outcome.kind === 'applied') setOutlet({ kind: 'applied', change: { version: outcome.version, previous: outcome.previous, changes } });
+    if (outcome.kind === 'alreadyLive') setOutlet({ kind: 'notice', notice: ALREADY_LIVE_NOTICE });
+    if (outcome.kind === 'applied') {
+      const title = review.commit.kind === 'restore' ? restoredTitle(review.commit.target, outcome.version) : undefined;
+      const undo = outcome.previous === null ? null : rollbackTo(outcome.previous, outcome.version);
+      setOutlet({ kind: 'applied', change: { version: outcome.version, changes, undo, ...(title && { title }) } });
+    }
     finish(outcome);
   };
 
-  const undo = async ({ version, previous }: AppliedChange): Promise<void> => {
-    if (previous === null) return;
+  const undo = async ({ version, undo: run }: AppliedChange): Promise<void> => {
+    if (!run) return;
     setOutlet({ kind: 'undoing' });
     let result: UndoResult;
     try {
-      result = { kind: 'done', outcome: await rollback.mutateAsync({ version: previous, expectedVersion: version }), undone: version };
+      result = { kind: 'done', outcome: await run(), undone: version };
     } catch (error) {
       if (isCatalogConflict(error)) result = { kind: 'conflict' };
       else if (isForbidden(error)) result = { kind: 'forbidden' };
@@ -226,7 +239,7 @@ export function ChangeFlowProvider({ children }: PropsWithChildren): ReactElemen
     setOutlet({ kind: 'notice', notice: undoNotice(result) });
   };
 
-  const flow: ChangeFlow = { confirmChange, pending: previewing || (review?.applying ?? false) };
+  const flow: ChangeFlow = { confirmChange, confirmRestore, announce, pending: previewing || (review?.applying ?? false) };
 
   return (
     <ChangeFlowContext.Provider value={flow}>
@@ -248,12 +261,12 @@ function OutletNotice({ outlet, onUndo, onDismiss }: OutletNoticeProps): ReactEl
   if (outlet.kind === 'undoing') return <Alert intent="info" title="Undoing your change…" className={styles.notice} />;
   if (outlet.kind === 'notice') return <IssueNoticeAlert notice={outlet.notice} onDismiss={onDismiss} className={styles.notice} />;
   const { change } = outlet;
-  const notice = appliedNotice(change.version, change.changes);
+  const notice = appliedNotice(change.version, change.changes, change.title);
   return (
     <Alert
       intent={notice.intent}
       title={notice.title}
-      action={change.previous === null ? undefined : { label: 'Undo', onClick: () => onUndo(change) }}
+      action={change.undo ? { label: 'Undo', onClick: () => onUndo(change) } : undefined}
       onDismiss={onDismiss}
       className={styles.notice}
     >

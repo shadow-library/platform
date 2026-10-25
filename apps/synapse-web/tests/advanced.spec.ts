@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import { CATALOG_CHANGED, editorSourceOf, wholeDocumentEdit } from '../src/features/advanced/editor-source';
+import { previewChange } from '../src/features/catalog/catalog-change';
 import { EMPTY_CATALOG } from '../src/features/catalog/catalog-document';
 import { catalogFixture } from './catalog-fixture';
 
@@ -26,5 +27,10 @@ describe('wholeDocumentEdit', () => {
   it('should refuse once the live document has changed, rather than overwrite that change', () => {
     const source = editorSourceOf({ version: 3, document: catalogFixture() });
     expect(wholeDocumentEdit(source, next)({ ...catalogFixture(), aliases: {} })).toEqual({ ok: false, reason: CATALOG_CHANGED });
+  });
+
+  it('should change nothing once the live document already matches the text, as after a retry whose answer was lost', () => {
+    const source = editorSourceOf({ version: 3, document: catalogFixture() });
+    expect(previewChange({ version: 4, document: { ...next } }, wholeDocumentEdit(source, next))).toEqual({ kind: 'unchanged' });
   });
 });

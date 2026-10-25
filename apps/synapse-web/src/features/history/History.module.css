@@ -84,44 +84,11 @@
   border-top: 1px solid var(--sh-border-subtle);
 }
 
-.group {
+.changes {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
   margin-top: 16px;
-}
-
-.groupTitle {
-  margin: 0 0 8px;
-  font-size: var(--sh-text-body-sm);
-  font-weight: 600;
-  color: var(--sh-text-secondary);
-}
-
-.sentences {
-  margin: 0;
-  padding-left: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  color: var(--sh-text-primary);
-}
-
-.technical {
-  margin-top: 8px;
-  font-size: var(--sh-text-body-sm);
-  color: var(--sh-text-tertiary);
-}
-
-.issues {
-  margin: 12px 0 0;
-  padding-left: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.path {
-  display: block;
-  font-family: var(--sh-font-mono);
-  word-break: break-all;
 }
 
 .notice {

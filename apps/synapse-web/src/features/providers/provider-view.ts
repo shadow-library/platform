@@ -12,7 +12,7 @@ import {
 } from '@/features/catalog/catalog-spec.types';
 import { readProviders } from '@/features/catalog/catalog-readers';
 import { isRecord, text } from '@/features/catalog/catalog-values';
-import { type KeyStatus, keyStatusOf } from '@/features/credentials/credential-view';
+import { credentialsForUrl, type KeyStatus, keyStatusOf, originHost, originOfUrl } from '@/features/credentials/credential-view';
 import { providerName } from '@/features/shared/naming';
 import { type CredentialResponse, type ProviderResponse } from '@/lib/apis/api-types.gen';
 
@@ -38,6 +38,14 @@ export interface ProviderRowsInput {
 export interface ProviderUser {
   key: string;
   name: string;
+}
+
+export type StrandedFix =
+  { kind: 'use'; credential: Pick<CredentialResponse, 'id' | 'name'> } | { kind: 'pick' } | { kind: 'add'; origin: string } | { kind: 'ask' } | { kind: 'unlisted' };
+
+export interface StrandedProvider {
+  row: ProviderRow;
+  fix: StrandedFix;
 }
 
 const WARNING_ERROR_RATE = 0.01;
@@ -183,4 +191,43 @@ export function providerUsers(document: CatalogDocument, providerKey: string): P
 
 export function usersSentence(users: readonly ProviderUser[]): string {
   return users.length === 0 ? 'No model uses it' : `Used by ${users.map(user => user.name).join(', ')}`;
+}
+
+/** `credentials` is undefined while the stored keys are loading or couldn't be listed. */
+function strandedFix(row: ProviderRow, credentials: readonly CredentialResponse[] | undefined, canSwitch: boolean): StrandedFix {
+  if (!canSwitch) return { kind: 'ask' };
+  if (credentials === undefined) return { kind: 'unlisted' };
+  const [only, ...others] = credentialsForUrl(credentials, row.entry.url);
+  if (only && others.length === 0) return { kind: 'use', credential: only };
+  if (only) return { kind: 'pick' };
+  const origin = originOfUrl(row.entry.url);
+  return origin === null ? { kind: 'ask' } : { kind: 'add', origin };
+}
+
+/** `apiKeyConfigured` comes from the server, which alone can see whether the old environment key setting holds a key. */
+export function strandedProviders(rows: readonly ProviderRow[], credentials: readonly CredentialResponse[] | undefined, canSwitch: boolean): StrandedProvider[] {
+  return rows
+    .filter(row => row.entry.kind !== 'ollama' && row.entry.credential === undefined && row.entry.apiKeyConfig !== undefined && row.apiKeyConfigured === false)
+    .map(row => ({ row, fix: strandedFix(row, credentials, canSwitch) }));
+}
+
+function nextStep(fix: StrandedFix): string | null {
+  switch (fix.kind) {
+    case 'use':
+      return `“${fix.credential.name}” is stored for its address.`;
+    case 'pick':
+      return 'Pick one of the stored keys for its address in the API key column below.';
+    case 'add':
+      return `Add a key for ${originHost(fix.origin)} on the Credentials screen, then pick it here.`;
+    case 'ask':
+      return 'Ask a Synapse administrator to switch it to a stored key.';
+    case 'unlisted':
+      return null;
+  }
+}
+
+export function strandedNotice({ row, fix }: StrandedProvider): { title: string; body: string } {
+  const cause = 'It still uses the old environment key setting, which holds no key, so every call to it fails until it is switched to a stored key.';
+  const next = nextStep(fix);
+  return { title: `${row.name} can't make calls`, body: next ? `${cause} ${next}` : cause };
 }

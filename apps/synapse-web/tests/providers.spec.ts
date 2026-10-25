@@ -31,6 +31,8 @@ import {
   type ProviderRow,
   providerRows,
   providerUsers,
+  strandedNotice,
+  strandedProviders,
   unreadableProviderCount,
 } from '../src/features/providers/provider-view';
 import { type CredentialResponse, type ProviderResponse } from '../src/lib/apis/api-types.gen';
@@ -158,6 +160,54 @@ describe('providerKeyStatus', () => {
     expect(providerKeyStatus({ entry })).toEqual({ kind: 'legacy_setting' });
     expect(providerKeyStatus({ entry, apiKeyConfigured: false })).toEqual({ kind: 'missing' });
     expect(providerKeyStatus({ entry, apiKeyConfigured: true })).toEqual({ kind: 'configured' });
+  });
+});
+
+describe('strandedProviders', () => {
+  const ENV_KEY = 'synapse.provider.openrouter.api-key';
+
+  function rowsWith(apiKeyConfigured: boolean | undefined, credentialId?: string): ProviderRow[] {
+    const document = catalogFixture();
+    const openrouter = rawProvider(document, 'openrouter');
+    delete openrouter.credential;
+    openrouter.apiKeyConfig = ENV_KEY;
+    if (credentialId) openrouter.credential = credentialId;
+    return providerRows({ document, health: [liveOf('openrouter', apiKeyConfigured === undefined ? {} : { apiKeyConfigured })] });
+  }
+
+  it('should flag a provider on the old key setting the server says holds no key', () => {
+    expect(strandedProviders(rowsWith(false), [], true).map(item => item.row.key)).toEqual(['openrouter']);
+  });
+
+  it('should not flag one whose old key setting holds a key, is unknown, or that sends a stored key', () => {
+    expect(strandedProviders(rowsWith(true), [], true)).toEqual([]);
+    expect(strandedProviders(rowsWith(undefined), [], true)).toEqual([]);
+    expect(strandedProviders(rowsWith(false, CREDENTIAL_ID), [], true)).toEqual([]);
+  });
+
+  it('should offer the one stored key for its address, or ask to pick or add one', () => {
+    const key = credential(CREDENTIAL_ID, 'openrouter', 'https://openrouter.ai');
+    const other = credential(OTHER_CREDENTIAL, 'openrouter-2', 'https://openrouter.ai');
+    expect(strandedProviders(rowsWith(false), [key], true)[0]?.fix).toEqual({ kind: 'use', credential: key });
+    expect(strandedProviders(rowsWith(false), [key, other], true)[0]?.fix).toEqual({ kind: 'pick' });
+    expect(strandedProviders(rowsWith(false), [], true)[0]?.fix).toEqual({ kind: 'add', origin: 'https://openrouter.ai' });
+  });
+
+  it('should ask an administrator when the role cannot switch keys, and suggest nothing more while the keys are unlisted', () => {
+    const [asking] = strandedProviders(rowsWith(false), [], false);
+    expect(asking?.fix).toEqual({ kind: 'ask' });
+    expect(asking && strandedNotice(asking).body).toEndWith('Ask a Synapse administrator to switch it to a stored key.');
+    const [unlisted] = strandedProviders(rowsWith(false), undefined, true);
+    expect(unlisted && strandedNotice(unlisted).body).toEndWith('until it is switched to a stored key.');
+  });
+
+  it('should say plainly that its calls fail until it is switched to a stored key', () => {
+    const [stranded] = strandedProviders(rowsWith(false), [], true);
+    if (!stranded) throw new Error('expected a stranded provider');
+    expect(strandedNotice(stranded)).toEqual({
+      title: "OpenRouter can't make calls",
+      body: 'It still uses the old environment key setting, which holds no key, so every call to it fails until it is switched to a stored key. Add a key for openrouter.ai on the Credentials screen, then pick it here.',
+    });
   });
 });
 
@@ -358,6 +408,13 @@ describe('updateProviderEdit', () => {
     expect(updateEdit(fresh, 'openrouter', initial, { ...initial, url: 'https://openrouter.ai/api/v2' })).toEqual({ ok: false, reason: CONCURRENT_PROVIDER_CHANGE });
   });
 
+  it('should change nothing when the provider already holds the edited values, as after a retry whose answer was lost', () => {
+    const initial = formFor(catalogFixture(), 'openrouter');
+    const live = catalogFixture();
+    rawProvider(live, 'openrouter').url = 'https://openrouter.ai/api/v2';
+    expect(updateEdit(live, 'openrouter', initial, { ...initial, url: 'https://openrouter.ai/api/v2' })).toEqual({ ok: true, document: live });
+  });
+
   it('should refuse a flavor change when someone else changed the kind meanwhile', () => {
     const initial = formFor(catalogFixture(), 'openrouter');
     const fresh = catalogFixture();
@@ -420,6 +477,12 @@ describe('assignCredentialEdit', () => {
     const document = catalogFixture();
     rawProvider(document, 'openrouter').credential = OTHER_CREDENTIAL;
     expect(assignCredentialEdit('openrouter', { credential: CREDENTIAL_ID }, null)(document)).toEqual({ ok: false, reason: CONCURRENT_KEY_CHANGE });
+  });
+
+  it('should change nothing when the provider already sends the chosen key, as after a retry whose answer was lost', () => {
+    const document = catalogFixture();
+    rawProvider(document, 'openrouter').credential = OTHER_CREDENTIAL;
+    expect(previewChange({ version: 5, document }, assignCredentialEdit('openrouter', { credential: CREDENTIAL_ID }, OTHER_CREDENTIAL))).toEqual({ kind: 'unchanged' });
   });
 });
 

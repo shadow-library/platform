@@ -382,6 +382,13 @@ describe('updateModelEdit', () => {
     expect(updateEdit('opus-5.5', initial, { ...initial, input: 20 })(fresh)).toEqual({ ok: false, reason: CONCURRENT_MODEL_CHANGE });
   });
 
+  it('should change nothing when the model already holds the edited values, as after a retry whose answer was lost', () => {
+    const initial = formFor(catalogFixture(), 'opus-5.5');
+    const live = catalogFixture();
+    live.models['opus-5.5'].pricePerMTok.input = 20;
+    expect(previewChange({ version: 5, document: live }, updateEdit('opus-5.5', initial, { ...initial, input: 20 }))).toEqual({ kind: 'unchanged' });
+  });
+
   it('should refuse to edit a model the catalog lost meanwhile', () => {
     const initial = formFor(catalogFixture(), 'sonnet-5.5');
     const document = catalogFixture();

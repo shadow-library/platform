@@ -4,7 +4,7 @@ import { CATALOG_KEY_HINT, CATALOG_KEY_PATTERN } from '@/features/catalog/catalo
 import { readAliases, selectorValues } from '@/features/catalog/catalog-readers';
 import { type AliasEntry, type AliasSpec, type AliasState } from '@/features/catalog/catalog-spec.types';
 import { isRecord, isSameValue, ownEntry } from '@/features/catalog/catalog-values';
-import { type CatalogEdit } from '@/features/catalog/catalog-change';
+import { type CatalogEdit, compareAndSet } from '@/features/catalog/catalog-change';
 
 export const CONCURRENT_ALIAS_CHANGE = 'Someone else changed this model name while you were editing. Reopen it to see their change.';
 
@@ -189,26 +189,33 @@ function rawAliasOf(document: CatalogDocument, key: string): { aliases: Entry; r
 
 /** Re-applied on a conflict retry: untouched fields keep what is stored now, and an edited field someone else changed meanwhile is refused. */
 export function updateAliasEdit(key: string, initial: AliasForm, fields: readonly AliasField[], spec: AliasSpec): CatalogEdit {
-  return (document: CatalogDocument): DocumentEdit => {
+  const opened = (form: AliasForm, field: AliasField): unknown => (field === 'available' ? availableOfRules(form.rules) : projection(form, field));
+  const isAsOpened = (document: CatalogDocument): boolean => {
+    const stored = rawAliasOf(document, key);
+    const fresh = typeof stored === 'string' ? undefined : readAliases({ aliases: Object.fromEntries([[key, stored.raw]]) })[0];
+    const current = fresh ? aliasFormOf(fresh) : undefined;
+    return current !== undefined && fields.every(field => isSameValue(opened(current, field), opened(initial, field)));
+  };
+  const patch = (document: CatalogDocument): DocumentEdit => {
     const stored = rawAliasOf(document, key);
     if (typeof stored === 'string') return { ok: false, reason: stored };
     if (fields.length === 0) return { ok: true, document };
-    const fresh = readAliases({ aliases: Object.fromEntries([[key, stored.raw]]) })[0];
-    const current = fresh ? aliasFormOf(fresh) : undefined;
-    const opened = (form: AliasForm, field: AliasField): unknown => (field === 'available' ? availableOfRules(form.rules) : projection(form, field));
-    if (!current || fields.some(field => !isSameValue(opened(current, field), opened(initial, field)))) return { ok: false, reason: CONCURRENT_ALIAS_CHANGE };
     return { ok: true, document: { ...document, aliases: { ...stored.aliases, [key]: patchAlias(stored.raw, fields, spec) } } };
   };
+  return compareAndSet(patch, isAsOpened, CONCURRENT_ALIAS_CHANGE);
 }
 
 export function retargetAliasEdit(key: string, opened: string, model: string): CatalogEdit {
-  return (document: CatalogDocument): DocumentEdit => {
+  const retarget = (document: CatalogDocument): DocumentEdit => {
     const stored = rawAliasOf(document, key);
     if (typeof stored === 'string') return { ok: false, reason: stored };
-    if (stored.raw.model === model) return { ok: true, document };
-    if (stored.raw.model !== opened) return { ok: false, reason: CONCURRENT_ALIAS_CHANGE };
     return { ok: true, document: { ...document, aliases: { ...stored.aliases, [key]: { ...stored.raw, model } } } };
   };
+  const isAsOpened = (document: CatalogDocument): boolean => {
+    const stored = rawAliasOf(document, key);
+    return typeof stored !== 'string' && stored.raw.model === opened;
+  };
+  return compareAndSet(retarget, isAsOpened, CONCURRENT_ALIAS_CHANGE);
 }
 
 /** Checked again on the catalog it is applied to, since a key can never be reused once it exists, even retired. */

@@ -3,10 +3,26 @@ import { Link } from '@tanstack/react-router';
 import { type ReactElement, useState } from 'react';
 import { Alert, Badge, Button, Table, type TableColumn, Tag, useConfirm } from '@shadow-library/ui';
 
-import { Mono, Muted, type Notice, PageHeader, PermissionGate, providerName, RevokeIcon, RotateIcon, RowAction, RowActions, TestIcon } from '@/features/shared';
+import { useActiveCatalog } from '@/features/catalog';
+import { changeResultNotice, isSettled, useChangeFlow } from '@/features/changes';
+import {
+  type IssueNotice,
+  IssueNoticeAlert,
+  Mono,
+  Muted,
+  PageHeader,
+  PermissionGate,
+  providerName,
+  RevokeIcon,
+  RotateIcon,
+  RowAction,
+  RowActions,
+  TestIcon,
+} from '@/features/shared';
 import { credentialKeys, type CredentialResponse, credentialsQueryOptions, revokeCredential, testCredential, useCapabilities } from '@/lib';
 
 import { CreateCredentialDialog, RotateCredentialDialog } from './CredentialDialogs';
+import { type CredentialOffer, credentialOffers } from './credential-offers';
 import {
   credentialErrorMessage,
   describeTest,
@@ -25,7 +41,7 @@ import { useKeyDestinations } from './use-key-destinations';
 
 type DialogState = { kind: 'create' } | { kind: 'rotate'; credential: CredentialResponse } | null;
 
-type ScreenNotice = Notice & { providersLink?: boolean };
+type ScreenNotice = { kind: 'notice'; notice: IssueNotice; providersLink?: boolean } | { kind: 'created'; credential: CredentialResponse };
 
 type RowTest = { status: 'running' } | ({ status: 'done' } & TestReport);
 
@@ -44,16 +60,85 @@ function TestResult({ test }: { test?: RowTest }): ReactElement {
   return <span className={test.ok ? styles.testOk : styles.testFailed}>{test.message}</span>;
 }
 
+interface OfferButtonsProps {
+  offers: readonly CredentialOffer[];
+  using: string | null;
+  busy: boolean;
+  onUse: (offer: CredentialOffer) => void;
+}
+
+function OfferButtons({ offers, using, busy, onUse }: OfferButtonsProps): ReactElement {
+  return (
+    <span className={styles.offers}>
+      {offers.map(offer => (
+        <Button
+          key={offer.provider}
+          variant="secondary"
+          size="sm"
+          loading={busy && using === offer.provider}
+          disabled={busy && using !== offer.provider}
+          onClick={() => onUse(offer)}
+        >
+          Use for {offer.name}
+        </Button>
+      ))}
+    </span>
+  );
+}
+
+interface CreatedNoticeProps extends Omit<OfferButtonsProps, 'offers'> {
+  credential: CredentialResponse;
+  offers: readonly CredentialOffer[];
+  onDismiss: () => void;
+}
+
+function CreatedNotice({ credential, offers, using, busy, onUse, onDismiss }: CreatedNoticeProps): ReactElement {
+  return (
+    <Alert intent="success" title={`Created "${credential.name}"`} onDismiss={onDismiss} className={styles.notice}>
+      {offers.length > 0 ? (
+        <>
+          Use it for a provider now, or later on the <Link to="/providers">Providers</Link> screen.
+          <OfferButtons offers={offers} using={using} busy={busy} onUse={onUse} />
+        </>
+      ) : (
+        <>
+          Choose it for a provider on the Providers screen. <Link to="/providers">Open Providers</Link>
+        </>
+      )}
+    </Alert>
+  );
+}
+
 function CredentialsView(): ReactElement {
   const queryClient = useQueryClient();
   const confirm = useConfirm();
+  const flow = useChangeFlow();
+  const capabilities = useCapabilities();
   const credentials = useQuery(credentialsQueryOptions());
+  const active = useActiveCatalog(capabilities.readCatalog);
+  const document = active.status === 'ready' ? active.document : null;
   const destinations = useKeyDestinations();
   const keyDestinations = destinations.status === 'ready' ? destinations.items : undefined;
   const [dialog, setDialog] = useState<DialogState>(null);
   const [notice, setNotice] = useState<ScreenNotice | null>(null);
   const [tests, setTests] = useState<Record<string, RowTest>>({});
   const [revoking, setRevoking] = useState<readonly string[]>([]);
+  const [using, setUsing] = useState<string | null>(null);
+
+  const offersFor = (credential: CredentialResponse, moment: 'created' | 'listed'): CredentialOffer[] => credentialOffers(credential, document, moment, capabilities);
+
+  const createdOffers = notice?.kind === 'created' ? offersFor(notice.credential, 'created') : [];
+
+  const say = (next: IssueNotice, providersLink?: boolean): void => setNotice({ kind: 'notice', notice: next, ...(providersLink && { providersLink }) });
+
+  const applyOffer = async (offer: CredentialOffer, closesNotice: boolean): Promise<void> => {
+    setUsing(offer.provider);
+    const result = await flow.confirmChange(offer.edit);
+    setUsing(null);
+    const failure = changeResultNotice(result, offer.name, 'updated');
+    if (failure) return say(failure);
+    if (closesNotice && isSettled(result)) setNotice(null);
+  };
 
   const refresh = (): Promise<void> => queryClient.invalidateQueries({ queryKey: credentialKeys.all });
 
@@ -61,14 +146,14 @@ function CredentialsView(): ReactElement {
 
   const handleCreated = (credential: CredentialResponse): void => {
     setDialog(null);
-    setNotice({ intent: 'success', title: `Created "${credential.name}"`, body: 'Choose it for a provider on the Providers screen.', providersLink: true });
+    setNotice({ kind: 'created', credential });
     void refresh();
   };
 
   const handleRotated = (credential: CredentialResponse): void => {
     setDialog(null);
     forgetTest(credential.id);
-    setNotice({
+    say({
       intent: 'success',
       title: `Rotated "${credential.name}"`,
       body: `It is now version ${credential.version}, key ${hintLabel(credential.hint)}. Run a test to check the new key.`,
@@ -91,13 +176,13 @@ function CredentialsView(): ReactElement {
     setRevoking(current => [...current, credential.id]);
     try {
       const outcome = await revokeCredential(credential.id);
-      if (outcome.kind === 'in_use') setNotice({ intent: 'danger', title: `"${credential.name}" is still in use`, body: inUseMessage(outcome.referencedBy), providersLink: true });
+      if (outcome.kind === 'in_use') say({ intent: 'danger', title: `"${credential.name}" is still in use`, body: inUseMessage(outcome.referencedBy) }, true);
       else {
         forgetTest(credential.id);
-        setNotice({ intent: 'success', title: `Revoked "${credential.name}"` });
+        say({ intent: 'success', title: `Revoked "${credential.name}"` });
       }
     } catch (error) {
-      setNotice({ intent: 'danger', title: `"${credential.name}" was not revoked`, body: credentialErrorMessage(error) });
+      say({ intent: 'danger', title: `"${credential.name}" was not revoked`, body: credentialErrorMessage(error) });
     } finally {
       setRevoking(current => current.filter(id => id !== credential.id));
       await refresh();
@@ -167,18 +252,25 @@ function CredentialsView(): ReactElement {
     {
       id: 'referencedBy',
       header: 'Used by providers',
-      cell: row =>
-        row.referencedBy.length === 0 ? (
-          <Muted>None yet</Muted>
-        ) : (
-          <span className={styles.tags}>
-            {row.referencedBy.map(provider => (
-              <Tag key={provider} size="sm">
-                {providerName(provider)}
-              </Tag>
-            ))}
+      cell: row => {
+        if (row.referencedBy.length > 0)
+          return (
+            <span className={styles.tags}>
+              {row.referencedBy.map(provider => (
+                <Tag key={provider} size="sm">
+                  {providerName(provider)}
+                </Tag>
+              ))}
+            </span>
+          );
+        const offers = offersFor(row, 'listed');
+        return (
+          <span className={styles.cell}>
+            <Muted>None yet</Muted>
+            {offers.length > 0 ? <OfferButtons offers={offers} using={using} busy={flow.pending} onUse={offer => void applyOffer(offer, false)} /> : null}
           </span>
-        ),
+        );
+      },
     },
     {
       id: '_actions',
@@ -229,17 +321,22 @@ function CredentialsView(): ReactElement {
           </Button>
         }
       />
-      {notice ? (
-        <Alert intent={notice.intent} title={notice.title} onDismiss={() => setNotice(null)} className={styles.notice}>
-          {notice.body}
-          {notice.providersLink ? (
-            <>
-              {' '}
-              <Link to="/providers">Open Providers</Link>
-            </>
-          ) : null}
+      {notice?.kind === 'created' ? (
+        <CreatedNotice
+          credential={notice.credential}
+          offers={createdOffers}
+          using={using}
+          busy={flow.pending}
+          onUse={offer => void applyOffer(offer, createdOffers.length === 1)}
+          onDismiss={() => setNotice(null)}
+        />
+      ) : null}
+      {notice?.kind === 'notice' && notice.providersLink ? (
+        <Alert intent={notice.notice.intent} title={notice.notice.title} onDismiss={() => setNotice(null)} className={styles.notice}>
+          {notice.notice.body} <Link to="/providers">Open Providers</Link>
         </Alert>
       ) : null}
+      {notice?.kind === 'notice' && !notice.providersLink ? <IssueNoticeAlert notice={notice.notice} onDismiss={() => setNotice(null)} className={styles.notice} /> : null}
       {credentials.error ? (
         <Alert intent="danger" title="Couldn't load credentials" className={styles.notice}>
           {credentials.error.message}

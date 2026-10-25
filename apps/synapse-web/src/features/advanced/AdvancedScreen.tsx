@@ -3,7 +3,8 @@ import { Link, useBlocker } from '@tanstack/react-router';
 import { type ReactElement, useState } from 'react';
 import { Alert, Spinner, useConfirm } from '@shadow-library/ui';
 
-import { activeVersionOf, parseCatalog } from '@/features/catalog';
+import { activeVersionOf, type CatalogDocument, parseCatalog } from '@/features/catalog';
+import { isSameValue } from '@/features/catalog/catalog-values';
 import { changeResultNotice, useChangeFlow } from '@/features/changes';
 import { formatDateTime, type IssueNotice, IssueNoticeAlert, PageHeader, PermissionGate } from '@/features/shared';
 import controls from '@/features/shared/controls.module.css';
@@ -109,6 +110,12 @@ function CatalogEditor({ capabilities, initial, onNotice }: CatalogEditorProps):
     });
   };
 
+  /** The live catalog already matches the text, so the editor now starts from it and the text no longer counts as edits. */
+  const adopt = async (sentText: string, document: CatalogDocument): Promise<void> => {
+    const next = await fetchEditorSource(queryClient).catch(() => null);
+    if (next && isSameValue(next.document, document)) setSource({ ...next, text: sentText });
+  };
+
   const handleApply = async (): Promise<void> => {
     if (!parsed.ok) return;
     const sentText = text;
@@ -118,8 +125,12 @@ function CatalogEditor({ capabilities, initial, onNotice }: CatalogEditorProps):
     if (result.kind === 'cancelled') return;
     setIssues(result.kind === 'invalid' ? result.issues : null);
     if (result.kind === 'applied') return setSource({ text: sentText, version: result.version, document });
+    if (result.kind === 'alreadyLive') return adopt(sentText, document);
     if (result.kind === 'conflict' || (result.kind === 'refused' && result.reason === CATALOG_CHANGED)) return rebase();
-    if (result.kind === 'unchanged') return onNotice({ intent: 'info', title: 'Nothing to change', body: 'The text matches the live catalog.' });
+    if (result.kind === 'unchanged') {
+      onNotice({ intent: 'info', title: 'Nothing to change', body: 'The text matches the live catalog.' });
+      return adopt(sentText, document);
+    }
     onNotice(changeResultNotice(result, 'The catalog', 'updated'));
   };
 

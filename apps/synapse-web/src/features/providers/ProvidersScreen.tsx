@@ -40,6 +40,9 @@ import {
   type ProviderRow,
   providerRows,
   providerUsers,
+  strandedNotice,
+  type StrandedProvider,
+  strandedProviders,
   unreadableProviderCount,
   usersSentence,
 } from './provider-view';
@@ -187,6 +190,29 @@ function HealthCell({ row, column }: { row: ProviderRow; column: 'calls' | 'erro
   );
 }
 
+interface StrandedAlertProps {
+  stranded: StrandedProvider;
+  busy: boolean;
+  onSwitch: (credentialId: string) => void;
+}
+
+function StrandedAlert({ stranded, busy, onSwitch }: StrandedAlertProps): ReactElement {
+  const { title, body } = strandedNotice(stranded);
+  const { fix } = stranded;
+  const action = fix.kind === 'use' && !busy ? { label: `Switch to “${fix.credential.name}”`, onClick: () => onSwitch(fix.credential.id) } : undefined;
+  return (
+    <Alert intent="danger" title={title} action={action} className={styles.notice}>
+      {body}
+      {fix.kind === 'add' ? (
+        <>
+          {' '}
+          <Link to="/credentials">Open Credentials</Link>
+        </>
+      ) : null}
+    </Alert>
+  );
+}
+
 function healthSubtitle(health: ProvidersResponse | undefined): string | undefined {
   return health ? healthWindowSentence(health.windowHours, health.catalogVersion) : undefined;
 }
@@ -209,6 +235,7 @@ function ProviderTable({ document, capabilities, credentials, onEdit, onNotice }
   const readable = useMemo(() => readProviders(document), [document]);
   const rows = useMemo(() => providerRows({ document, health: health.data?.providers }), [document, health.data]);
   const unreadable = unreadableProviderCount(document, readable);
+  const stranded = strandedProviders(rows, listed, editable && capabilities.manageCredentials);
 
   const assign = async (row: ProviderRow, credentialId: string | null): Promise<void> => {
     onNotice(null);
@@ -261,7 +288,7 @@ function ProviderTable({ document, capabilities, credentials, onEdit, onNotice }
           disabled={flow.pending}
           onChange={id => void assign(row, id)}
         />
-        {status.kind === 'credential_revoked' || status.kind === 'credential_unknown' ? <KeyStatusText status={status} /> : null}
+        {status.kind === 'credential_revoked' || status.kind === 'credential_unknown' || status.kind === 'missing' ? <KeyStatusText status={status} /> : null}
       </span>
     );
   };
@@ -332,6 +359,9 @@ function ProviderTable({ document, capabilities, credentials, onEdit, onNotice }
           {health.error.message} The settings below are still accurate; calls and errors are missing.
         </Alert>
       ) : null}
+      {stranded.map(item => (
+        <StrandedAlert key={item.row.key} stranded={item} busy={flow.pending} onSwitch={credentialId => void assign(item.row, credentialId)} />
+      ))}
       <Table
         data={rows}
         columns={columns}

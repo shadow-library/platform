@@ -2,7 +2,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { type ReactElement, useEffect, useState } from 'react';
 import { Alert, Button, EmptyState, Spinner, useConfirm } from '@shadow-library/ui';
 
-import { type ActiveCatalogState, useActiveCatalog } from '@/features/catalog';
+import { type ActiveCatalogState, loadLiveCatalog, useActiveCatalog } from '@/features/catalog';
+import { ALREADY_LIVE_NOTICE, useChangeFlow } from '@/features/changes';
 import { type Notice, PageHeader, PermissionGate } from '@/features/shared';
 import controls from '@/features/shared/controls.module.css';
 import {
@@ -19,7 +20,7 @@ import {
 
 import { BudgetCard, type BudgetCardActions } from './BudgetCard';
 import { BudgetDrawer, type BudgetDrawerTarget, type BudgetSubmitOutcome, type PublishStage } from './BudgetDrawer';
-import { type BudgetBasis, budgetBasisOf, type BudgetChange, budgetNote, planBudgetPublish } from './budget-form';
+import { type BudgetBasis, budgetBasisOf, type BudgetChange, budgetNote, budgetsOf, budgetUndoInput, planBudgetPublish, sameBudgets } from './budget-form';
 import { BudgetIssues } from './BudgetIssues';
 import styles from './Budgets.module.css';
 import { budgetCards, type BudgetCardView } from './budget-view';
@@ -74,6 +75,7 @@ function ConfirmBody({ sentences }: { sentences: readonly string[] }): ReactElem
 function BudgetsView({ capabilities }: { capabilities: Capabilities }): ReactElement {
   const queryClient = useQueryClient();
   const confirm = useConfirm();
+  const flow = useChangeFlow();
   const status = useQuery({ ...budgetStatusQueryOptions(), refetchInterval: STATUS_REFRESH_MS });
   const active = useActiveCatalog(capabilities.readCatalog);
   const publish = usePublishBudgetsMutation();
@@ -116,13 +118,20 @@ function BudgetsView({ capabilities }: { capabilities: Capabilities }): ReactEle
     try {
       const outcome = await publish.mutateAsync({ budgets: plan.budgets, expectedVersion: plan.expectedVersion, note: budgetNote(plan.changes, typedNote) });
       if (outcome.kind === 'invalid') return { kind: 'invalid', issues: outcome.issues };
+      const version = outcome.value.version;
       setEditor(null);
-      setNotice({ intent: 'success', title: `Budgets updated — live as version ${outcome.value.version}`, body: 'Every app applies the new limits within a minute.' });
+      flow.announce({
+        version,
+        previous: from.version,
+        changes: plan.changes,
+        ...(!capabilities.writeCatalog && { undo: () => publish.mutateAsync(budgetUndoInput(from, version)) }),
+      });
       return { kind: 'done' };
     } catch (error) {
       if (!isCatalogConflict(error)) return { kind: 'failed', message: isApiError(error) ? error.message : 'The budgets couldn’t be changed.' };
       setEditor(null);
-      setNotice(CONFLICT_NOTICE);
+      const live = await loadLiveCatalog(queryClient).catch(() => null);
+      setNotice(live && sameBudgets(budgetsOf(live.document), plan.budgets) ? ALREADY_LIVE_NOTICE : CONFLICT_NOTICE);
       return { kind: 'done' };
     }
   };

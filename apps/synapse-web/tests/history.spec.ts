@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
-import { describeChanges } from '../src/features/catalog/catalog-changes';
 import { editorLabel } from '../src/features/shared/editor-label';
-import { groupChanges, listVersions, predecessorOf, rollbackDescription, rollbackIssueRows } from '../src/features/history/history-view';
-import { catalogFixture } from './catalog-fixture';
+import { listVersions, predecessorOf, restoreResultNotice, restoreTargetOf, versionNote } from '../src/features/history/history-view';
 
 type Summary = Parameters<typeof listVersions>[0][number];
 
@@ -52,40 +50,61 @@ describe('editorLabel', () => {
   });
 });
 
-describe('groupChanges', () => {
-  it('should group by area in a fixed order and skip empty areas', () => {
-    const before = catalogFixture();
-    const after = catalogFixture();
-    after.tasks['novel-forge.chat'].routes[1] = { model: 'sonnet-5.5' };
-    after.budgets[1] = { app: 'memoir', per: 'app', window: '30d', maxCalls: 5 };
-    const groups = groupChanges(describeChanges(before, after));
-    expect(groups.map(group => group.title)).toEqual(['Features', 'Budgets']);
-    expect(groups.every(group => group.changes.length > 0)).toBe(true);
+describe('versionNote', () => {
+  it('should read a rollback as the version it restored', () => {
+    expect(versionNote('Rollback to v12')).toBe('Restored version 12');
   });
 
-  it('should be empty when nothing changed', () => {
-    expect(groupChanges(describeChanges(catalogFixture(), catalogFixture()))).toEqual([]);
+  it('should keep every other note as written', () => {
+    expect(versionNote('Novel Forge · Chat — data policy changed')).toBe('Novel Forge · Chat — data policy changed');
+    expect(versionNote('Rollback to v12 and more')).toBe('Rollback to v12 and more');
+    expect(versionNote(undefined)).toBeUndefined();
   });
 });
 
-describe('rollbackIssueRows', () => {
+describe('restoreTargetOf', () => {
+  const access = { activeVersion: 7, predecessor: 5, canWrite: true };
+
+  it('should offer Undo on the live version, back to the one before it', () => {
+    expect(restoreTargetOf(7, access)).toEqual({ kind: 'undo', version: 5, expectedLive: 7 });
+  });
+
+  it('should offer to restore an older version against the live one', () => {
+    expect(restoreTargetOf(3, { ...access, predecessor: 1 })).toEqual({ kind: 'restore', version: 3, expectedLive: 7 });
+  });
+
+  it('should offer nothing for the first version while it is live', () => {
+    expect(restoreTargetOf(7, { ...access, predecessor: null })).toBeNull();
+  });
+
+  it('should offer nothing to a role that cannot change the catalog, or before the live version is known', () => {
+    expect(restoreTargetOf(3, { ...access, canWrite: false })).toBeNull();
+    expect(restoreTargetOf(3, { ...access, activeVersion: undefined })).toBeNull();
+  });
+});
+
+describe('restoreResultNotice', () => {
+  const undo = { kind: 'undo' as const, version: 5, expectedLive: 7 };
+  const restore = { kind: 'restore' as const, version: 3, expectedLive: 7 };
   const issue = { path: 'tasks.novel-forge.chat.routes[0].model', code: 'unknown_model', message: 'gone' };
 
-  it('should read the issue as a sentence and keep the path separate', () => {
-    const [row] = rollbackIssueRows([issue], null);
-    expect(row?.sentence).toBe("It names a model the catalog doesn't have");
-    expect(row?.path).toBe(issue.path);
-    expect(row?.owner).toBeUndefined();
+  it('should say nothing when the version went live or the person cancelled', () => {
+    expect(restoreResultNotice({ kind: 'applied', version: 8, previous: 7 }, undo)).toBeNull();
+    expect(restoreResultNotice({ kind: 'alreadyLive' }, undo)).toBeNull();
+    expect(restoreResultNotice({ kind: 'cancelled' }, restore)).toBeNull();
   });
 
-  it('should name the owning entity when the document is known', () => {
-    const [row] = rollbackIssueRows([issue], catalogFixture());
-    expect(row?.owner).toBe('novel-forge.chat');
+  it('should explain that someone else changed the catalog and nothing was changed', () => {
+    expect(restoreResultNotice({ kind: 'conflict' }, undo)).toMatchObject({ intent: 'warning', body: expect.stringContaining('Nothing was changed') });
   });
-});
 
-describe('rollbackDescription', () => {
-  it('should say the version becomes live again as a new version', () => {
-    expect(rollbackDescription(4)).toBe("Version 4's settings become live for every app as a new version. Every change since stays in History.");
+  it('should name what was not undone or restored, with the reason', () => {
+    expect(restoreResultNotice({ kind: 'invalid', issues: [issue] }, undo)).toMatchObject({ intent: 'danger', title: "Version 7 wasn't undone", issues: [issue] });
+    expect(restoreResultNotice({ kind: 'refused', reason: 'Not allowed' }, restore)).toEqual({ intent: 'danger', title: "Version 3 wasn't restored", body: 'Not allowed' });
+    expect(restoreResultNotice({ kind: 'failed', message: 'offline' }, restore)).toMatchObject({ body: 'offline' });
+  });
+
+  it('should say there is nothing to restore when the settings are already live', () => {
+    expect(restoreResultNotice({ kind: 'unchanged' }, restore)).toEqual({ intent: 'info', title: 'Nothing to restore', body: "Version 3's settings are already live." });
   });
 });

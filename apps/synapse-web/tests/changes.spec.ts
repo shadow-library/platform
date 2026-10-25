@@ -1,7 +1,18 @@
 import { describe, expect, it } from 'bun:test';
 
 import { type CatalogChange, describeChanges } from '../src/features/catalog/catalog-changes';
-import { appliedNotice, type ChangeResult, changeResultNotice, CONFLICT_NOTICE, isSettled, undoNotice } from '../src/features/changes/change-notices';
+import {
+  ALREADY_LIVE_NOTICE,
+  appliedNotice,
+  type ChangeResult,
+  changeResultNotice,
+  CONFLICT_NOTICE,
+  failedApplyBody,
+  isSettled,
+  restoreCopy,
+  restoredTitle,
+  undoNotice,
+} from '../src/features/changes/change-notices';
 import { affectedApps, changeLine, effectSentence, lockedSectionsSentence, summarizeChanges } from '../src/features/changes/change-summary';
 import { credentialNamer, nameCredentialChanges } from '../src/features/changes/credential-names';
 import { catalogFixture, CREDENTIAL_ID } from './catalog-fixture';
@@ -120,6 +131,7 @@ describe('lockedSectionsSentence', () => {
 describe('changeResultNotice', () => {
   it('should say nothing for a change that went live or was cancelled', () => {
     expect(changeResultNotice({ kind: 'applied', version: 5, previous: 4 }, 'Opus', 'updated')).toBeNull();
+    expect(changeResultNotice({ kind: 'alreadyLive' }, 'Opus', 'updated')).toBeNull();
     expect(changeResultNotice({ kind: 'cancelled' }, 'Opus', 'updated')).toBeNull();
   });
 
@@ -145,13 +157,14 @@ describe('changeResultNotice', () => {
       { kind: 'failed', message: 'm' },
     ];
     const text = kinds.map(result => JSON.stringify(changeResultNotice(result, 'Opus', 'updated'))).join(' ');
-    expect(text).not.toMatch(/draft|publish/i);
+    const restoring = [restoreCopy({ kind: 'undo', version: 4, expectedLive: 5 }), restoreCopy({ kind: 'restore', version: 2, expectedLive: 5 })];
+    expect([text, JSON.stringify(ALREADY_LIVE_NOTICE), failedApplyBody('offline'), JSON.stringify(restoring)].join(' ')).not.toMatch(/draft|publish/i);
   });
 });
 
 describe('isSettled', () => {
   it('should close the form only when the change went live or there was nothing to change', () => {
-    expect([isSettled({ kind: 'applied', version: 2, previous: 1 }), isSettled({ kind: 'unchanged' })]).toEqual([true, true]);
+    expect([isSettled({ kind: 'applied', version: 2, previous: 1 }), isSettled({ kind: 'alreadyLive' }), isSettled({ kind: 'unchanged' })]).toEqual([true, true, true]);
     expect([isSettled({ kind: 'cancelled' }), isSettled({ kind: 'invalid', issues: [] }), isSettled({ kind: 'conflict' })]).toEqual([false, false, false]);
   });
 });
@@ -165,6 +178,35 @@ describe('appliedNotice', () => {
     });
     expect(appliedNotice(12, [{ sentence: 'A' }, { sentence: 'B' }, { sentence: 'C' }]).body).toBe('A, and 2 more changes.');
     expect(appliedNotice(12, []).body).toBeUndefined();
+    expect(appliedNotice(12, [{ sentence: 'A' }], 'Version 9 restored, live now (version 12)').title).toBe('Version 9 restored, live now (version 12)');
+  });
+});
+
+describe('failedApplyBody', () => {
+  it('should end the reason as a sentence and say applying again is safe', () => {
+    expect(failedApplyBody('Synapse could not be reached')).toBe("Synapse could not be reached. Applying again is safe: a change that already went through isn't made twice.");
+    expect(failedApplyBody('Timed out.')).toStartWith('Timed out. Applying');
+  });
+});
+
+describe('restoreCopy', () => {
+  it('should ask to undo the live version and say what comes back', () => {
+    expect(restoreCopy({ kind: 'undo', version: 4, expectedLive: 5 })).toEqual({
+      title: 'Undo version 5?',
+      lead: "Version 4's settings come back as a new version. Version 5 stays in History.",
+      applyLabel: 'Undo',
+    });
+  });
+
+  it('should ask to restore an older version', () => {
+    expect(restoreCopy({ kind: 'restore', version: 2, expectedLive: 5 })).toMatchObject({ title: 'Restore version 2?', applyLabel: 'Restore' });
+  });
+});
+
+describe('restoredTitle', () => {
+  it('should say what was undone or restored and which version is live', () => {
+    expect(restoredTitle({ kind: 'undo', version: 4, expectedLive: 5 }, 6)).toBe('Version 5 undone, live now (version 6)');
+    expect(restoredTitle({ kind: 'restore', version: 2, expectedLive: 5 }, 6)).toBe('Version 2 restored, live now (version 6)');
   });
 });
 

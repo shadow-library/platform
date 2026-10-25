@@ -358,11 +358,11 @@ describe('section edits', () => {
     expect(rawTaskFields(document, 'app.missing', ['label'])).toEqual({ label: undefined });
   });
 
-  it('should refuse a save when someone else changed the section since it opened, whatever the edit', () => {
+  it('should refuse a save when someone else changed the section since it opened', () => {
     const document = catalogFixture();
     const opened = opening(document, 'dataPolicy');
-    tasksOf(document)[CHAT]!.dataPolicy = 'in_cluster_only';
-    expect(apply(document, 'dataPolicy', opened, dataPolicyEdit(CHAT, 'any', 'any'))).toEqual({ ok: false, reason: SECTION_CHANGED });
+    delete tasksOf(document)[CHAT]!.dataPolicy;
+    expect(apply(document, 'dataPolicy', opened, dataPolicyEdit(CHAT, 'any', 'in_cluster_only'))).toEqual({ ok: false, reason: SECTION_CHANGED });
     tasksOf(document)[CHAT]!.label = 'Talk';
     expect(
       apply(
@@ -375,6 +375,13 @@ describe('section edits', () => {
       ok: false,
       reason: SECTION_CHANGED,
     });
+  });
+
+  it('should change nothing when the section already holds what the save sets, as after a retry whose answer was lost', () => {
+    const document = catalogFixture();
+    const opened = opening(document, 'dataPolicy');
+    tasksOf(document)[CHAT]!.dataPolicy = 'in_cluster_only';
+    expect(apply(document, 'dataPolicy', opened, dataPolicyEdit(CHAT, 'any', 'in_cluster_only'))).toEqual({ ok: true, document });
   });
 
   it('should apply a section edit when only other sections changed', () => {
