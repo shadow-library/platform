@@ -7,7 +7,7 @@ import styles from './Fab.module.css';
 import { type FabProps } from './Fab.types';
 
 /**
- * Layered above shell chrome (z-shell) and below every overlay (z-dropdown and up). Icon-only needs `aria-label`.
+ * Layered above shell chrome (z-shell) and below every overlay (z-scrim and up). Icon-only needs `aria-label`.
  * Reserve its height from the scrollable content below via Shell's `--sh-shell-bottom-extra`; keep one per screen.
  */
 export const Fab = forwardRef<HTMLButtonElement, FabProps>(function Fab(

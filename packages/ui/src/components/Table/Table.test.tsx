@@ -94,4 +94,20 @@ describe('Table', () => {
     render(<Table data={[]} columns={columns} rowKey="id" emptyState="No services yet" aria-label="Services" />);
     expect(screen.getByText('No services yet')).toBeInTheDocument();
   });
+
+  it('should render the empty state outside the horizontal scroller and describe the table with it', () => {
+    render(<Table data={[]} columns={columns} rowKey="id" emptyState="No services yet" aria-label="Services" />);
+    const table = screen.getByRole('table', { name: 'Services' });
+    const empty = screen.getByText('No services yet');
+
+    expect(table).not.toContainElement(empty);
+    expect(table.parentElement).not.toContainElement(empty);
+    expect(table).toHaveAccessibleDescription('No services yet');
+  });
+
+  it('should not show the empty state while loading', () => {
+    render(<Table data={[]} columns={columns} rowKey="id" loading emptyState="No services yet" aria-label="Services" />);
+    expect(screen.queryByText('No services yet')).not.toBeInTheDocument();
+    expect(screen.getByRole('table')).not.toHaveAttribute('aria-describedby');
+  });
 });

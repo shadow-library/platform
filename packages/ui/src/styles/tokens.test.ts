@@ -163,3 +163,49 @@ describe('chart palette tokens', () => {
     expect(new Set(chartTokens.map(token => resolve(token, theme))).size).toBe(chartTokens.length);
   });
 });
+
+describe('z-index ladder', () => {
+  const layer = (name: string): number => Number(resolve(`sh-z-${name}`, rootBlock!));
+
+  it('should keep the ladder ascending from page chrome through modals, floating content, toasts and tooltips', () => {
+    const ladder = ['base', 'sticky', 'shell', 'modal', 'command-palette', 'popover', 'toast', 'tooltip', 'dev-overlay'].map(layer);
+    expect(ladder).toEqual([...ladder].sort((a, b) => a - b));
+    expect(new Set(ladder).size).toBe(ladder.length);
+  });
+
+  it('should put a scrim on its panel tier so a modal opened from another modal dims it', () => {
+    expect(layer('scrim')).toBe(layer('modal'));
+  });
+
+  it('should lift dropdown-type content onto the popover tier, above every modal surface', () => {
+    expect(layer('dropdown')).toBe(layer('popover'));
+    expect(layer('dropdown')).toBeGreaterThan(layer('modal'));
+    expect(layer('dropdown')).toBeGreaterThan(layer('command-palette'));
+  });
+
+  it('should keep toasts and tooltips above floating content', () => {
+    expect(layer('toast')).toBeGreaterThan(layer('dropdown'));
+    expect(layer('tooltip')).toBeGreaterThan(layer('toast'));
+  });
+
+  const floatingStylesheets = [
+    'Select/Select.module.css',
+    'MultiSelect/MultiSelect.module.css',
+    'Combobox/Combobox.module.css',
+    'DropdownMenu/DropdownMenu.module.css',
+    'Popover/Popover.module.css',
+    'DatePicker/DatePicker.module.css',
+    'DateRangePicker/DateRangePicker.module.css',
+    'ColorPicker/ColorPicker.module.css',
+    'TimePicker/TimePicker.module.css',
+    'HoverCard/HoverCard.module.css',
+    'Tooltip/Tooltip.module.css',
+  ];
+
+  it.each(floatingStylesheets)('should keep every floating surface in %s above the modal tier', stylesheet => {
+    const css = fs.readFileSync(path.join(import.meta.dirname, '../components', stylesheet), 'utf-8');
+    const tiers = [...css.matchAll(/z-index: var\(--sh-z-([\w-]+)\)/g)].map(match => match[1]!);
+    expect(tiers.length).toBeGreaterThan(0);
+    for (const tier of tiers) expect(layer(tier), tier).toBeGreaterThan(layer('modal'));
+  });
+});

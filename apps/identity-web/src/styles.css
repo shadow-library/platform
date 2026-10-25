@@ -1,12 +1,5 @@
 @import '@shadow-library/ui/styles.css';
 
-:root {
-  /* The DS z-scale places dropdown (1000) below scrim (1100) and modal (1200), so a Select/menu
-     opened inside a Dialog renders behind the dialog scrim and its options become unclickable. Lift
-     dropdowns to the popover layer (already above modals) so they work inside dialogs. */
-  --sh-z-dropdown: 1300;
-}
-
 * {
   box-sizing: border-box;
 }

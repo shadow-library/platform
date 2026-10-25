@@ -86,3 +86,11 @@ export const Loading: Story = {
 export const Empty: Story = {
   render: () => <Table data={[]} columns={columns} rowKey="id" aria-label="Services" emptyState="No services match your filters." />,
 };
+
+const wideColumns: TableColumn<Service>[] = [...columns, { id: 'owner', header: 'Owning team' }, { id: 'region', header: 'Primary region' }];
+
+export const EmptyNarrow: Story = {
+  name: 'Empty at 390px',
+  globals: { viewport: { value: '390-844' } },
+  render: () => <Table data={[]} columns={wideColumns} rowKey="id" aria-label="Services" emptyState="No calls in the last 30 days." />,
+};

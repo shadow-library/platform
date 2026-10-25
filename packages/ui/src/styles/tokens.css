@@ -241,10 +241,11 @@
   --sh-z-base: 0;
   --sh-z-sticky: 100;
   --sh-z-shell: 200;
-  --sh-z-dropdown: 1000;
-  --sh-z-scrim: 1100;
+  /* Equal values are deliberate: portal (open) order breaks the tie, so a modal opened from a modal dims it and a menu opened in a popover covers it. */
+  --sh-z-scrim: 1200;
   --sh-z-modal: 1200;
   --sh-z-command-palette: 1250;
+  --sh-z-dropdown: 1300;
   --sh-z-popover: 1300;
   --sh-z-toast: 1400;
   --sh-z-tooltip: 1500;

@@ -1,4 +1,4 @@
-import { type KeyboardEvent, type MouseEvent, type ReactElement } from 'react';
+import { type KeyboardEvent, type MouseEvent, type ReactElement, useId } from 'react';
 
 import { cn } from '@/lib';
 
@@ -43,7 +43,8 @@ export function Table<T>({
   const selectedCount = keys.filter(key => selectedSet.has(key)).length;
   const allSelected = data.length > 0 && selectedCount === data.length;
   const selectAll: boolean | 'indeterminate' = allSelected ? true : selectedCount > 0 ? 'indeterminate' : false;
-  const colSpan = columns.length + (selectable ? 1 : 0);
+  const empty = !loading && data.length === 0;
+  const emptyId = useId();
 
   function toggleAll(checked: boolean | 'indeterminate'): void {
     onSelectionChange?.(checked === true ? keys : []);
@@ -92,7 +93,7 @@ export function Table<T>({
       ) : null}
 
       <div className={styles.scroll}>
-        <table className={styles.table} data-density={density} aria-label={ariaLabel}>
+        <table className={styles.table} data-density={density} aria-label={ariaLabel} aria-describedby={empty ? emptyId : undefined}>
           {caption != null ? <caption className={styles.caption}>{caption}</caption> : null}
           <thead>
             <tr className={styles.headerRow}>
@@ -126,58 +127,55 @@ export function Table<T>({
             </tr>
           </thead>
           <tbody>
-            {loading ? (
-              Array.from({ length: loadingRows }, (_, index) => (
-                <tr key={`skeleton-${index}`} className={styles.row}>
-                  {selectable ? (
-                    <td className={cn(styles.td, styles.checkboxCell)}>
-                      <span className={styles.skeleton} />
-                    </td>
-                  ) : null}
-                  {columns.map(column => (
-                    <td key={column.id} className={styles.td} data-align={column.align ?? 'start'}>
-                      <span className={styles.skeleton} />
-                    </td>
-                  ))}
-                </tr>
-              ))
-            ) : data.length === 0 ? (
-              <tr>
-                <td className={styles.empty} colSpan={colSpan}>
-                  {emptyState ?? 'No records'}
-                </td>
-              </tr>
-            ) : (
-              data.map(row => {
-                const key = keyOf(row);
-                const selected = selectedSet.has(key);
-                return (
-                  <tr
-                    key={key}
-                    className={styles.row}
-                    data-selected={selected ? '' : undefined}
-                    data-clickable={onRowClick ? '' : undefined}
-                    onClick={onRowClick ? event => handleRowClick(event, row) : undefined}
-                    onKeyDown={onRowClick || selectable ? event => onRowKeyDown(event, row, key) : undefined}
-                    tabIndex={onRowClick ? 0 : undefined}
-                  >
+            {loading
+              ? Array.from({ length: loadingRows }, (_, index) => (
+                  <tr key={`skeleton-${index}`} className={styles.row}>
                     {selectable ? (
-                      <td className={cn(styles.td, styles.checkboxCell)} data-selection-cell="">
-                        <Checkbox checked={selected} onCheckedChange={checked => toggleRow(key, checked === true)} aria-label={`Select ${key}`} />
+                      <td className={cn(styles.td, styles.checkboxCell)}>
+                        <span className={styles.skeleton} />
                       </td>
                     ) : null}
                     {columns.map(column => (
-                      <td key={column.id} className={styles.td} data-align={column.align ?? 'start'} data-numeric={column.align === 'end' ? '' : undefined}>
-                        {renderCell(column, row)}
+                      <td key={column.id} className={styles.td} data-align={column.align ?? 'start'}>
+                        <span className={styles.skeleton} />
                       </td>
                     ))}
                   </tr>
-                );
-              })
-            )}
+                ))
+              : data.map(row => {
+                  const key = keyOf(row);
+                  const selected = selectedSet.has(key);
+                  return (
+                    <tr
+                      key={key}
+                      className={styles.row}
+                      data-selected={selected ? '' : undefined}
+                      data-clickable={onRowClick ? '' : undefined}
+                      onClick={onRowClick ? event => handleRowClick(event, row) : undefined}
+                      onKeyDown={onRowClick || selectable ? event => onRowKeyDown(event, row, key) : undefined}
+                      tabIndex={onRowClick ? 0 : undefined}
+                    >
+                      {selectable ? (
+                        <td className={cn(styles.td, styles.checkboxCell)} data-selection-cell="">
+                          <Checkbox checked={selected} onCheckedChange={checked => toggleRow(key, checked === true)} aria-label={`Select ${key}`} />
+                        </td>
+                      ) : null}
+                      {columns.map(column => (
+                        <td key={column.id} className={styles.td} data-align={column.align ?? 'start'} data-numeric={column.align === 'end' ? '' : undefined}>
+                          {renderCell(column, row)}
+                        </td>
+                      ))}
+                    </tr>
+                  );
+                })}
           </tbody>
         </table>
       </div>
+      {empty ? (
+        <div id={emptyId} className={styles.empty}>
+          {emptyState ?? 'No records'}
+        </div>
+      ) : null}
     </div>
   );
 }

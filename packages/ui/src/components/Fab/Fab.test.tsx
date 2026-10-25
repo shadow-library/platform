@@ -73,13 +73,12 @@ describe('Fab', () => {
     expect(zIndexOffset?.[1]).toBeDefined();
 
     const shellZ = tokenValue(tokensCss, '--sh-z-shell');
-    const dropdownZ = tokenValue(tokensCss, '--sh-z-dropdown');
+    const scrimZ = tokenValue(tokensCss, '--sh-z-scrim');
     const fabZ = shellZ + Number(zIndexOffset?.[1]);
 
-    // BottomNavigation is z-shell; Popover/Select/DropdownMenu/DatePicker/… start at z-dropdown. The FAB
-    // sits in the same bottom-right corner as either, so it must clear the first and stay under the second.
+    // BottomNavigation is z-shell and every overlay starts at z-scrim; the FAB must clear the first and stay under the second.
     expect(fabZ).toBeGreaterThan(shellZ);
-    expect(fabZ).toBeLessThan(dropdownZ);
+    expect(fabZ).toBeLessThan(scrimZ);
   });
 
   it('should honour a fixed Fab placement', () => {

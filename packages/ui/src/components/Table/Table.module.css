@@ -159,9 +159,11 @@
 }
 
 /* ── Empty / skeleton ────────────────────────────────────── */
+/* Outside the horizontal scroller, so a table wider than its card still centres the message in the visible width. */
 .empty {
   padding: 40px 16px;
   text-align: center;
+  font-size: var(--sh-text-body-sm);
   color: var(--sh-text-tertiary);
 }
 .skeleton {
