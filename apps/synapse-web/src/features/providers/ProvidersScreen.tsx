@@ -25,18 +25,16 @@ import cells from '@/features/shared/cells.module.css';
 import controls from '@/features/shared/controls.module.css';
 import { type Capabilities, credentialsQueryOptions, providersQueryOptions, type ProvidersResponse, useCapabilities } from '@/lib';
 
-import { type CredentialList, credentialListOf, CredentialPicker, LegacyKeyBadge, listedCredentials } from './CredentialPicker';
+import { type CredentialList, credentialListOf, CredentialPicker, KeyStatusText, LegacyKeyBadge, listedCredentials } from './CredentialPicker';
 import { ProviderEditor } from './ProviderEditor';
 import { assignCredentialEdit, emptyProviderForm, keySnapshotOf, type ProviderEditorMode, providerFormOf, removeProviderEdit } from './provider-form';
 import {
   errorRateIntent,
   featureName,
   healthWindowSentence,
-  legacyKeyLabel,
   providerFacts,
   providerKeysOf,
   providerKeyStatus,
-  type ProviderKeyStatus,
   type ProviderRow,
   providerRows,
   providerUsers,
@@ -47,6 +45,7 @@ import {
   usersSentence,
 } from './provider-view';
 import styles from './Providers.module.css';
+import { WebSearchSection } from './WebSearchSection';
 
 interface EditorState {
   mode: ProviderEditorMode;
@@ -80,7 +79,7 @@ function ProvidersView({ capabilities }: { capabilities: Capabilities }): ReactE
     <>
       <PageHeader
         title="Providers"
-        subtitle="The services that run our models, how they are holding up, and the API key each one uses."
+        subtitle="The services that run our models, how they are holding up, the API key each one uses, and the web search Synapse runs itself."
         action={
           canEdit && active.status !== 'loading' && active.status !== 'error' ? (
             <Button variant="primary" onClick={() => setEditor({ mode: { kind: 'add' } })}>
@@ -135,44 +134,12 @@ function CatalogBody({ active, capabilities, credentials, onEdit, onNotice }: Ca
         <>
           <LiveVersionHint version={active.version} canEdit={canEdit} readOnlyNote="Editing providers needs permission to change the catalog and its providers." />
           <ProviderTable document={active.document} capabilities={capabilities} credentials={credentials} onEdit={onEdit} onNotice={onNotice} />
+          <WebSearchSection document={active.document} editable={canEdit} credentials={credentials} onNotice={onNotice} />
           {credentials.status === 'not_allowed' ? (
             <p className={controls.hint}>Your role cannot list stored API keys, so only whether one is set is shown and none can be picked.</p>
           ) : null}
           {credentials.status === 'error' ? <p className={controls.hint}>Couldn&apos;t load the stored API keys: {credentials.message}</p> : null}
         </>
-      );
-  }
-}
-
-function KeyStatusText({ status }: { status: ProviderKeyStatus }): ReactElement {
-  switch (status.kind) {
-    case 'not_needed':
-      return <Muted>Not needed</Muted>;
-    case 'none':
-      return <Muted>No key</Muted>;
-    case 'legacy_setting':
-      return <>{legacyKeyLabel(false)}</>;
-    case 'configured':
-      return <>Set in the old environment key setting</>;
-    case 'missing':
-      return (
-        <Badge intent="danger" variant="soft">
-          The old environment key setting is empty
-        </Badge>
-      );
-    case 'credential':
-      return status.name ? <>{status.name}</> : <>Stored key</>;
-    case 'credential_revoked':
-      return (
-        <Badge intent="danger" variant="soft">
-          {status.name} is revoked
-        </Badge>
-      );
-    case 'credential_unknown':
-      return (
-        <Badge intent="danger" variant="soft">
-          Stored key not found
-        </Badge>
       );
   }
 }
@@ -280,7 +247,7 @@ function ProviderTable({ document, capabilities, credentials, onEdit, onNotice }
     return (
       <span className={styles.cell}>
         <CredentialPicker
-          providerName={row.name}
+          ownerName={row.name}
           url={entry.url}
           value={entry.credential ?? ''}
           {...(entry.apiKeyConfig !== undefined && { apiKeyConfig: entry.apiKeyConfig })}

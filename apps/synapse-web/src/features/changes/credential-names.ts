@@ -1,6 +1,6 @@
 import { type CatalogChange } from '@/features/catalog/catalog-changes';
 import { type CatalogDocument } from '@/features/catalog/catalog-document';
-import { readProviders } from '@/features/catalog/catalog-readers';
+import { readProviders, readWebSearch } from '@/features/catalog/catalog-readers';
 
 export type CredentialNamer = (id: string) => string | undefined;
 
@@ -12,17 +12,19 @@ export function credentialNamer(credentials: readonly { id: string; name: string
   return id => names.get(id);
 }
 
-function credentialOf(document: CatalogDocument | null, provider: string): string | undefined {
-  return document ? readProviders(document).find(entry => entry.key === provider)?.credential : undefined;
+function credentialOf(document: CatalogDocument | null, change: CatalogChange): string | undefined {
+  if (!document) return undefined;
+  if (change.area === 'tool') return readWebSearch(document)?.credential;
+  return readProviders(document).find(entry => entry.key === change.entityKey)?.credential;
 }
 
 /** Credential ids are opaque to `describeChanges`; names need the credentials permission, so without it the line reads "a stored key". */
 export function nameCredentialChanges(changes: readonly CatalogChange[], before: CatalogDocument | null, after: CatalogDocument, nameOf: CredentialNamer | null): CatalogChange[] {
   return changes.map(change => {
-    if (change.area !== 'provider' || change.field !== 'credential') return change;
+    if ((change.area !== 'provider' && change.area !== 'tool') || change.field !== 'credential') return change;
     const lead = `${change.entityLabel} — API key`;
-    const oldId = credentialOf(before, change.entityKey);
-    const newId = credentialOf(after, change.entityKey);
+    const oldId = credentialOf(before, change);
+    const newId = credentialOf(after, change);
     const oldName = oldId ? nameOf?.(oldId) : undefined;
     const newName = newId ? nameOf?.(newId) : undefined;
     const quoted = (name: string | undefined, fallback: string): string => (name ? `“${name}”` : fallback);

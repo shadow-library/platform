@@ -2,15 +2,20 @@ import { describe, expect, it } from 'bun:test';
 
 import { type CatalogDocument, type DocumentEdit } from '../src/features/catalog/catalog-document';
 import {
+  editWebSearch,
+  NO_WEB_SEARCH,
   withAlias,
   withModel,
   withoutModel,
   withoutProviderCredential,
+  withoutWebSearch,
   withProvider,
   withProviderCredential,
   withTaskAliases,
   withTaskDataPolicy,
   withTaskMeta,
+  withWebSearch,
+  withWebSearchCredential,
 } from '../src/features/catalog/catalog-edits';
 import { catalogFixture, CREDENTIAL_ID } from './catalog-fixture';
 
@@ -132,5 +137,48 @@ describe('provider edits', () => {
 
   it('should refuse a credential for a provider the catalog does not have', () => {
     expect(withProviderCredential(catalogFixture(), 'missing', CREDENTIAL_ID)).toEqual({ ok: false, reason: 'The catalog has no provider "missing"' });
+  });
+});
+
+describe('web search edits', () => {
+  const BRAVE = { kind: 'brave' as const, url: ' https://api.search.brave.com ', credential: CREDENTIAL_ID, maxSearches: 3, results: 5 };
+  const withSearch = (webSearch: Record<string, unknown>, tools: Record<string, unknown> = {}): CatalogDocument => ({ ...catalogFixture(), tools: { ...tools, webSearch } });
+
+  it('should write the whole tool, trimming the address and leaving out what is not set', () => {
+    expect(documentOf(withWebSearch(catalogFixture(), BRAVE)).tools).toEqual({
+      webSearch: { kind: 'brave', url: 'https://api.search.brave.com', credential: CREDENTIAL_ID, maxSearches: 3, results: 5 },
+    });
+    expect(
+      documentOf(withWebSearch(catalogFixture(), { kind: 'mock', url: 'http://search.mock', credential: ' ', maxSearches: 1, results: 1, pricePerSearchUsd: 0 })).tools,
+    ).toEqual({
+      webSearch: { kind: 'mock', url: 'http://search.mock', maxSearches: 1, results: 1, pricePerSearchUsd: 0 },
+    });
+  });
+
+  it('should refuse a tools section that is not an object', () => {
+    expect(withWebSearch({ ...catalogFixture(), tools: 'search' }, BRAVE)).toEqual({ ok: false, reason: "The catalog's tools section is not an object" });
+  });
+
+  it('should rewrite the stored tool so fields this console does not model survive', () => {
+    const document = documentOf(editWebSearch(withSearch({ ...BRAVE, region: 'eu' }), search => ({ ...search, results: 8 })));
+    expect(document.tools).toEqual({ webSearch: { ...BRAVE, region: 'eu', results: 8 } });
+    expect(editWebSearch(catalogFixture(), search => search)).toEqual({ ok: false, reason: NO_WEB_SEARCH });
+  });
+
+  it('should set or remove only the key', () => {
+    expect(documentOf(withWebSearchCredential(withSearch({ kind: 'brave', url: 'u', maxSearches: 1, results: 1 }), CREDENTIAL_ID)).tools).toEqual({
+      webSearch: { kind: 'brave', url: 'u', maxSearches: 1, results: 1, credential: CREDENTIAL_ID },
+    });
+    expect(documentOf(withWebSearchCredential(withSearch(BRAVE), null)).tools).toEqual({ webSearch: { kind: 'brave', url: BRAVE.url, maxSearches: 3, results: 5 } });
+  });
+
+  it('should turn web search off, dropping an emptied tools section and keeping other tools', () => {
+    expect(documentOf(withoutWebSearch(withSearch(BRAVE)))).not.toHaveProperty('tools');
+    expect(documentOf(withoutWebSearch(withSearch(BRAVE, { fetch: { kind: 'mock' } }))).tools).toEqual({ fetch: { kind: 'mock' } });
+  });
+
+  it('should change nothing when turning off a web search the catalog does not have', () => {
+    const document = { ...catalogFixture(), tools: {} };
+    expect(withoutWebSearch(document)).toEqual({ ok: true, document });
   });
 });

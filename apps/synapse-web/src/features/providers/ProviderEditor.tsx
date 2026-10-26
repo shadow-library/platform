@@ -16,7 +16,7 @@ import { changeResultNotice, isSettled, useChangeFlow } from '@/features/changes
 import { FormSection, type IssueNotice, IssueNoticeAlert, Mono, providerName } from '@/features/shared';
 import formStyles from '@/features/shared/form.module.css';
 
-import { type CredentialList, CredentialPicker, LegacyKeyBadge, listedCredentials } from './CredentialPicker';
+import { type CredentialList, CredentialPicker, LegacyKeyBadge, listedCredentials, unlistedReason } from './CredentialPicker';
 import {
   addProviderEdit,
   keyBindingWarning,
@@ -52,17 +52,6 @@ export interface ProviderEditorProps {
   onSaved: (notice: IssueNotice | null) => void;
 }
 
-function unlistedReason(list: Exclude<CredentialList, { status: 'ready' }>): string {
-  switch (list.status) {
-    case 'not_allowed':
-      return "Your role can't list stored keys, so it can't be changed here.";
-    case 'loading':
-      return 'Loading the stored keys…';
-    case 'error':
-      return `Couldn't load the stored keys, so it can't be changed right now: ${list.message}`;
-  }
-}
-
 interface KeyFieldProps {
   form: ProviderForm;
   credentials: CredentialList;
@@ -94,7 +83,7 @@ function KeyField({ form, credentials, onChange }: KeyFieldProps): ReactElement 
   return (
     <FormField label="Stored API key" optional helper="Only keys bound to this provider's address are offered. Add one on the Credentials screen.">
       <CredentialPicker
-        providerName={form.key || 'the new provider'}
+        ownerName={form.key || 'the new provider'}
         url={form.url}
         value={form.credential}
         apiKeyConfig={form.apiKeyConfig}

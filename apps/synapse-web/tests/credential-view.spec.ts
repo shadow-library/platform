@@ -21,6 +21,7 @@ import {
   suggestedName,
   validateCreateForm,
   validateSecret,
+  WEB_SEARCH_HOLDER,
 } from '../src/features/credentials/credential-view';
 import { type CredentialResponse } from '../src/lib/apis/api-types.gen';
 
@@ -175,13 +176,15 @@ describe('validateCreateForm with a provider', () => {
     expect(result).toEqual({ ok: true, body: { name: 'openrouter', allowedOrigin: 'https://openrouter.ai', secret: KEY } });
   });
 
-  it('should ask for a provider when none is chosen', () => {
+  it('should ask what the key is for when nothing is chosen', () => {
     const result = validateCreateForm({ name: 'openrouter', destination: { kind: 'provider', origin: null }, secret: KEY });
-    expect(result).toEqual({ ok: false, errors: { allowedOrigin: 'Choose the provider this key is for.' } });
+    expect(result).toEqual({ ok: false, errors: { allowedOrigin: 'Choose what this key is for.' } });
   });
 });
 
 describe('keyDestinations', () => {
+  const BRAVE = { origin: 'https://api.search.brave.com', holders: [WEB_SEARCH_HOLDER] };
+
   it('should group providers by the origin a key would be bound to', () => {
     const destinations = keyDestinations([
       { key: 'openrouter', kind: 'openai', url: 'https://openrouter.ai/api/v1' },
@@ -190,8 +193,9 @@ describe('keyDestinations', () => {
       { key: 'openrouter', kind: 'openai', url: 'https://openrouter.ai/api/v1' },
     ]);
     expect(destinations).toEqual([
-      { origin: 'http://host.k3d.internal:8090', providers: ['gateway'] },
-      { origin: 'https://openrouter.ai', providers: ['openrouter', 'openrouter-free'] },
+      { origin: 'http://host.k3d.internal:8090', holders: ['gateway'] },
+      { origin: 'https://openrouter.ai', holders: ['openrouter', 'openrouter-free'] },
+      BRAVE,
     ]);
   });
 
@@ -202,12 +206,25 @@ describe('keyDestinations', () => {
         { key: 'broken', kind: 'openai', url: 'not a url' },
         { key: 'ftp', kind: 'openai', url: 'ftp://example.com' },
       ]),
-    ).toEqual([]);
+    ).toEqual([BRAVE]);
+  });
+
+  it('should offer web search at the address of its search, or at Brave while none sends a key', () => {
+    expect(keyDestinations([], { kind: 'brave', url: 'https://search.example.com/brave' })).toEqual([{ origin: 'https://search.example.com', holders: [WEB_SEARCH_HOLDER] }]);
+    expect(keyDestinations([], { kind: 'mock', url: 'http://search.mock' })).toEqual([BRAVE]);
+    expect(keyDestinations([], { kind: 'brave', url: 'not a url' })).toEqual([]);
+  });
+
+  it('should share one destination between web search and a provider at the same address', () => {
+    expect(keyDestinations([{ key: 'search-proxy', kind: 'openai', url: 'https://api.search.brave.com/v1' }])).toEqual([
+      { origin: 'https://api.search.brave.com', holders: ['search-proxy', WEB_SEARCH_HOLDER] },
+    ]);
   });
 });
 
 describe('destination naming', () => {
-  const destination = { origin: 'https://openrouter.ai', providers: ['openrouter', 'openrouter-free'] };
+  const destination = { origin: 'https://openrouter.ai', holders: ['openrouter', 'openrouter-free'] };
+  const webSearch = { origin: 'https://api.search.brave.com', holders: [WEB_SEARCH_HOLDER] };
 
   it('should name every provider at the address', () => {
     expect(destinationName(destination)).toBe('OpenRouter, OpenRouter Free');
@@ -215,19 +232,26 @@ describe('destination naming', () => {
 
   it('should suggest the first provider key the name rule accepts', () => {
     expect(suggestedName(destination, new Set())).toBe('openrouter');
-    expect(suggestedName({ origin: 'https://x.ai', providers: ['X_AI'] }, new Set())).toBeUndefined();
+    expect(suggestedName({ origin: 'https://x.ai', holders: ['X_AI'] }, new Set())).toBeUndefined();
   });
 
   it('should suggest a name no stored credential holds', () => {
     expect(suggestedName(destination, new Set(['openrouter']))).toBe('openrouter-free');
     expect(suggestedName(destination, new Set(['openrouter', 'openrouter-free', 'openrouter-2']))).toBe('openrouter-3');
-    expect(suggestedName({ origin: 'https://x.ai', providers: ['a'.repeat(64)] }, new Set(['a'.repeat(64)]))).toBeUndefined();
+    expect(suggestedName({ origin: 'https://x.ai', holders: ['a'.repeat(64)] }, new Set(['a'.repeat(64)]))).toBeUndefined();
+  });
+
+  it('should name and suggest a name for a web search key', () => {
+    expect(destinationName(webSearch)).toBe('Web search');
+    expect(suggestedName(webSearch, new Set())).toBe('web-search');
+    expect(suggestedName(webSearch, new Set(['web-search']))).toBe('web-search-2');
   });
 
   it('should say which provider a stored key is for', () => {
     expect(destinationLabel('https://openrouter.ai', [destination])).toBe('For OpenRouter, OpenRouter Free, only sent to openrouter.ai');
     expect(destinationLabel('https://api.example.com', [destination])).toBe('Only sent to api.example.com');
     expect(destinationLabel('https://openrouter.ai')).toBe('Only sent to openrouter.ai');
+    expect(destinationLabel('https://api.search.brave.com', [destination, webSearch])).toBe('For Web search, only sent to api.search.brave.com');
   });
 });
 
@@ -290,6 +314,11 @@ describe('inUseMessage and revokeDescription', () => {
   it('should name the providers that still use the credential', () => {
     expect(inUseMessage(['openrouter', 'fallback'])).toContain('openrouter, fallback');
     expect(revokeDescription({ name: 'openrouter', referencedBy: ['openrouter'] })).toContain('still names it for openrouter');
+  });
+
+  it('should call the web search tool web search rather than by its catalog path', () => {
+    expect(inUseMessage(['openrouter', WEB_SEARCH_HOLDER])).toContain('still names it for openrouter, web search.');
+    expect(revokeDescription({ name: 'brave', referencedBy: [WEB_SEARCH_HOLDER] })).toContain('still names it for web search,');
   });
 
   it('should still explain a conflict that lists no provider', () => {

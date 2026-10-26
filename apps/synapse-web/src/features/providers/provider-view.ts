@@ -63,7 +63,7 @@ const LOCALITY_NAMES: Readonly<Record<ProviderLocality, string>> = { in_cluster:
 
 const COST_NAMES: Readonly<Record<ProviderCost, string>> = { zero: 'Free', metered: 'Metered' };
 
-const FEATURE_NAMES: Readonly<Record<ProviderFeature, string>> = { sessions: 'Sessions', native_web_search: 'Web search', image_input: 'Image input' };
+const FEATURE_NAMES: Readonly<Record<ProviderFeature, string>> = { sessions: 'Sessions', native_web_search: 'Own web search', image_input: 'Image input' };
 
 export const KIND_DESCRIPTIONS: Readonly<Record<ProviderKind, string>> = {
   openai: 'Speaks the OpenAI API: OpenRouter, the subscription gateway or another compatible service',

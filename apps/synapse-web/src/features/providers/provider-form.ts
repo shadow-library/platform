@@ -105,7 +105,7 @@ export function kindPatch(form: ProviderForm, kind: ProviderKind, initial: Provi
   return { kind, credential: form.kind === 'ollama' ? initial.credential : form.credential };
 }
 
-function urlError(input: string): string | undefined {
+export function urlError(input: string): string | undefined {
   const url = input.trim();
   if (url === '') return 'Enter the address';
   const parsed = URL.canParse(url) ? new URL(url) : undefined;
@@ -262,18 +262,22 @@ export function assignCredentialEdit(key: string, seen: KeySnapshot, credentialI
 }
 
 /** A key is only ever sent to the site it is bound to, so moving the URL elsewhere silently strands it until someone picks another. */
+export function storedKeyWarning(url: string, credential: string, initialUrl: string, credentials?: readonly CredentialResponse[]): string | undefined {
+  const origin = originOfUrl(url);
+  if (origin === null || credential === '') return undefined;
+  const bound = credentials?.find(candidate => candidate.id === credential);
+  if (bound && bound.allowedOrigin !== origin)
+    return `The API key "${bound.name}" is only ever sent to ${bound.allowedOrigin}, so it can't be used at this address. Pick a key for ${origin}, or keep the old address.`;
+  const moved = originOfUrl(initialUrl) !== null && originOfUrl(initialUrl) !== origin;
+  if (!bound && moved) return `The chosen API key is bound to the old address's site, so it can't be used at ${origin}. Pick a key for the new address.`;
+  return undefined;
+}
+
 export function keyBindingWarning(form: ProviderForm, initialUrl: string, credentials?: readonly CredentialResponse[]): string | undefined {
   if (form.kind === 'ollama') return undefined;
+  if (form.credential !== '') return storedKeyWarning(form.url, form.credential, initialUrl, credentials);
   const origin = originOfUrl(form.url);
-  if (origin === null) return undefined;
-  const moved = originOfUrl(initialUrl) !== null && originOfUrl(initialUrl) !== origin;
-  if (form.credential !== '') {
-    const bound = credentials?.find(credential => credential.id === form.credential);
-    if (bound && bound.allowedOrigin !== origin)
-      return `The API key "${bound.name}" is only ever sent to ${bound.allowedOrigin}, so it can't be used at this address. Pick a key for ${origin}, or keep the old address.`;
-    if (!bound && moved) return `The chosen API key is bound to the old address's site, so it can't be used at ${origin}. Pick a key for the new address.`;
-    return undefined;
-  }
+  const moved = origin !== null && originOfUrl(initialUrl) !== null && originOfUrl(initialUrl) !== origin;
   if (form.apiKeyConfig !== '' && moved) return `The old environment key setting only works with the provider's original site. Pick a stored API key for ${origin} instead.`;
   return undefined;
 }

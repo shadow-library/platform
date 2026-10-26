@@ -6,7 +6,7 @@ import { appName } from '@/features/shared/naming';
 
 const ARROW = '→';
 
-const AREA_ORDER: readonly ChangeArea[] = ['budget', 'task', 'alias', 'model', 'provider', 'other'];
+const AREA_ORDER: readonly ChangeArea[] = ['budget', 'task', 'alias', 'model', 'provider', 'tool', 'other'];
 
 const AREA_TITLES: Readonly<Record<ChangeArea, string>> = {
   budget: 'Budgets',
@@ -14,6 +14,7 @@ const AREA_TITLES: Readonly<Record<ChangeArea, string>> = {
   alias: 'Model names',
   model: 'Models',
   provider: 'Providers',
+  tool: 'Tools',
   other: 'Other',
 };
 
@@ -103,6 +104,8 @@ function appsOfChange(change: CatalogChange, document: CatalogDocument): string[
       const models = readModels(document).filter(model => model.deployments.some(deployment => deployment.provider === change.entityKey));
       return models.flatMap(model => appsOfTasks(tasks, usesModel(model.key)));
     }
+    case 'tool':
+      return appsOfTasks(tasks, task => task.kind === 'chat');
     case 'other':
       return tasks.map(task => task.app);
   }
@@ -123,9 +126,11 @@ export function effectSentence(apps: readonly string[]): string {
 /** Mirrors the server's section permissions, so a change it would refuse is explained before anyone presses Apply. */
 export function lockedSectionsSentence(changes: readonly CatalogChange[], access: SectionAccess): string | null {
   const touches = (area: ChangeArea): boolean => changes.some(change => change.area === area);
-  const locked = [!access.writeProviders && touches('provider') ? 'providers' : null, !access.setBudgets && touches('budget') ? 'budgets' : null].filter(
-    section => section !== null,
-  );
+  const locked = [
+    !access.writeProviders && touches('provider') ? 'providers' : null,
+    !access.writeProviders && touches('tool') ? 'web search' : null,
+    !access.setBudgets && touches('budget') ? 'budgets' : null,
+  ].filter(section => section !== null);
   if (locked.length === 0) return null;
-  return `This changes ${locked.join(' and ')}, which your role can't change. Ask a Synapse administrator if you need it.`;
+  return `This changes ${LIST.format(locked)}, which your role can't change. Ask a Synapse administrator if you need it.`;
 }

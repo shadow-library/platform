@@ -1,6 +1,6 @@
 import { isApiError } from '@shadow-library/web';
 
-import { type ProviderEntry } from '@/features/catalog/catalog-spec.types';
+import { type ProviderEntry, type WebSearchSpec } from '@/features/catalog/catalog-spec.types';
 import { ownEntry } from '@/features/catalog/catalog-values';
 import { formatDate } from '@/features/shared/format';
 import { providerName } from '@/features/shared/naming';
@@ -15,6 +15,11 @@ const WHITESPACE = /\s/;
 const HTTP_PROTOCOLS = ['http:', 'https:'];
 const HIDDEN_HINT = '…';
 
+/** How synapse-server's `referencedBy` names the web search tool, alongside provider keys. */
+export const WEB_SEARCH_HOLDER = 'tools.webSearch';
+
+const BRAVE_ORIGIN = 'https://api.search.brave.com';
+
 export type CreateField = keyof CreateCredentialBody;
 export type FieldErrors = Partial<Record<CreateField, string>>;
 
@@ -22,7 +27,8 @@ export type Destination = { kind: 'provider'; origin: string | null } | { kind: 
 
 export interface KeyDestination {
   origin: string;
-  providers: string[];
+  /** Provider keys, and `WEB_SEARCH_HOLDER` for the web search tool */
+  holders: string[];
 }
 
 export type CreateValidation = { ok: true; body: CreateCredentialBody } | { ok: false; errors: FieldErrors };
@@ -98,27 +104,42 @@ export function originHost(origin: string): string {
   return protocol === 'https:' ? host : `${protocol}//${host}`;
 }
 
-/** A key is bound to an origin rather than a provider, so providers sharing an address share one destination; ollama never sends a key. */
-export function keyDestinations(providers: readonly Pick<ProviderEntry, 'key' | 'kind' | 'url'>[]): KeyDestination[] {
+export function holderName(holder: string): string {
+  return holder === WEB_SEARCH_HOLDER ? 'Web search' : providerName(holder);
+}
+
+function referenceName(holder: string): string {
+  return holder === WEB_SEARCH_HOLDER ? 'web search' : holder;
+}
+
+function webSearchOrigin(search: Pick<WebSearchSpec, 'kind' | 'url'> | undefined): string | null {
+  return search && search.kind !== 'mock' ? originOfUrl(search.url) : BRAVE_ORIGIN;
+}
+
+/**
+ * A key is bound to an origin rather than a provider, so providers sharing an address share one destination; ollama never sends a key. Web search
+ * is a destination even before it is set up, at Brave's address, because its editor cannot save a Brave search until a key for it is stored.
+ */
+export function keyDestinations(providers: readonly Pick<ProviderEntry, 'key' | 'kind' | 'url'>[], webSearch?: Pick<WebSearchSpec, 'kind' | 'url'>): KeyDestination[] {
   const byOrigin = new Map<string, Set<string>>();
-  for (const provider of providers) {
-    const origin = originOfUrl(provider.url);
-    if (provider.kind === 'ollama' || origin === null) continue;
-    byOrigin.set(origin, (byOrigin.get(origin) ?? new Set()).add(provider.key));
-  }
+  const add = (origin: string | null, holder: string): void => {
+    if (origin !== null) byOrigin.set(origin, (byOrigin.get(origin) ?? new Set()).add(holder));
+  };
+  for (const provider of providers) if (provider.kind !== 'ollama') add(originOfUrl(provider.url), provider.key);
+  add(webSearchOrigin(webSearch), WEB_SEARCH_HOLDER);
   return [...byOrigin]
-    .map(([origin, keys]) => ({ origin, providers: [...keys].sort() }))
-    .sort((a, b) => a.providers.join().localeCompare(b.providers.join()) || a.origin.localeCompare(b.origin));
+    .map(([origin, holders]) => ({ origin, holders: [...holders].sort() }))
+    .sort((a, b) => a.holders.join().localeCompare(b.holders.join()) || a.origin.localeCompare(b.origin));
 }
 
 export function destinationName(destination: KeyDestination): string {
-  return destination.providers.map(providerName).join(', ');
+  return destination.holders.map(holderName).join(', ');
 }
 
 /** Revoked credentials keep their names, so `taken` holds every stored name, not just the active ones. */
 export function suggestedName(destination: KeyDestination, taken: ReadonlySet<string>): string | undefined {
-  const candidates = destination.providers.filter(provider => CREDENTIAL_NAME_PATTERN.test(provider));
-  const free = candidates.find(provider => !taken.has(provider));
+  const candidates = destination.holders.map(holder => (holder === WEB_SEARCH_HOLDER ? 'web-search' : holder)).filter(name => CREDENTIAL_NAME_PATTERN.test(name));
+  const free = candidates.find(name => !taken.has(name));
   if (free !== undefined || candidates[0] === undefined) return free;
   const base = candidates[0];
   for (let suffix = 2; ; suffix++) {
@@ -169,7 +190,7 @@ export function validateCreateForm(values: { name: string; destination: Destinat
   if (!CREDENTIAL_NAME_PATTERN.test(name)) errors.name = 'Use 1 to 64 lowercase letters, digits, dots, underscores or hyphens, starting with a letter or digit.';
   if (allowedOrigin === null)
     errors.allowedOrigin =
-      destination.kind === 'provider' ? 'Choose the provider this key is for.' : 'Enter an address like https://openrouter.ai: scheme, host and optional port, with no path.';
+      destination.kind === 'provider' ? 'Choose what this key is for.' : 'Enter an address like https://openrouter.ai: scheme, host and optional port, with no path.';
   if (!secret.ok) errors.secret = secret.error;
   if (errors.name || errors.allowedOrigin || !secret.ok || allowedOrigin === null) return { ok: false, errors };
   return { ok: true, body: { name, allowedOrigin, secret: secret.secret } };
@@ -187,15 +208,14 @@ export function credentialErrorMessage(error: unknown): string {
 }
 
 export function inUseMessage(referencedBy: readonly string[]): string {
-  const repoint = 'Switch those providers to another key on the Providers screen, then revoke it.';
-  if (referencedBy.length === 0) return `The live catalog still names it. ${repoint}`;
-  return `The live catalog still names it for ${referencedBy.join(', ')}. ${repoint}`;
+  if (referencedBy.length === 0) return 'The live catalog still names it. Switch those providers to another key on the Providers screen, then revoke it.';
+  return `The live catalog still names it for ${referencedBy.map(referenceName).join(', ')}. Switch them to another key on the Providers screen, then revoke it.`;
 }
 
 export function revokeDescription(credential: Pick<CredentialResponse, 'name' | 'referencedBy'>): string {
-  const consequence = `No provider can send "${credential.name}" again, and its name stays reserved. This cannot be undone.`;
+  const consequence = `Synapse can never send "${credential.name}" again, and its name stays reserved. This cannot be undone.`;
   if (credential.referencedBy.length === 0) return consequence;
-  return `${consequence} The live catalog still names it for ${credential.referencedBy.join(', ')}, so the server will refuse until those providers use another key.`;
+  return `${consequence} The live catalog still names it for ${credential.referencedBy.map(referenceName).join(', ')}, so the server will refuse until they use another key.`;
 }
 
 export function keyStatusOf(provider: Pick<ProviderResponse, 'credential' | 'apiKeyConfigured'>, credentials?: readonly CredentialResponse[]): KeyStatus {

@@ -52,8 +52,8 @@ function destinationOf(destinations: KeyDestinationList, choice: string, address
 }
 
 function providerHelper(destination: Destination): string {
-  if (destination.kind === 'provider' && destination.origin !== null) return `Synapse only ever sends this key to ${originHost(destination.origin)}, the provider's address.`;
-  return "Synapse only ever sends the key to the chosen provider's address.";
+  if (destination.kind === 'provider' && destination.origin !== null) return `Synapse only ever sends this key to ${originHost(destination.origin)}.`;
+  return "Synapse only ever sends the key to the chosen provider's or web search's address.";
 }
 
 interface ProviderFieldProps {
@@ -68,14 +68,14 @@ function ProviderField({ destinations, choice, destination, error, onChoose }: P
   if (destinations.status === 'unavailable' || (destinations.status === 'ready' && destinations.items.length === 0)) return null;
   const items = destinations.status === 'ready' ? destinations.items : [];
   return (
-    <FormField label="Provider" required error={destination.kind === 'provider' ? error : undefined} helper={providerHelper(destination)}>
+    <FormField label="Used for" required error={destination.kind === 'provider' ? error : undefined} helper={providerHelper(destination)}>
       <Select
         value={choice || undefined}
         onValueChange={onChoose}
-        placeholder={destinations.status === 'loading' ? 'Loading providers…' : 'Choose the provider this key is for'}
+        placeholder={destinations.status === 'loading' ? 'Loading providers…' : 'Choose what this key is for'}
         loading={destinations.status === 'loading'}
         disabled={destinations.status === 'loading'}
-        aria-label="Provider"
+        aria-label="Used for"
       >
         {items.map(item => (
           <Select.Item key={item.origin} value={item.origin} description={originHost(item.origin)}>

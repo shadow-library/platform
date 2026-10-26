@@ -22,6 +22,8 @@ import {
   type TaskEffort,
   type TaskEntry,
   type TaskRoute,
+  WEB_SEARCH_KINDS,
+  type WebSearchSpec,
 } from './catalog-spec.types';
 import { finite, isOneOf, isRecord, ownEntry, strings, text } from './catalog-values';
 
@@ -192,6 +194,27 @@ export function readProviders(document: CatalogDocument): ProviderEntry[] {
       ...(maxInflightPerReplica !== undefined && { maxInflightPerReplica }),
     };
   });
+}
+
+export function rawWebSearch(document: CatalogDocument): unknown {
+  return isRecord(document.tools) ? ownEntry(document.tools, 'webSearch') : undefined;
+}
+
+export function readWebSearch(document: CatalogDocument): WebSearchSpec | undefined {
+  const value = rawWebSearch(document);
+  if (!isRecord(value)) return undefined;
+  const credential = text(value.credential);
+  const maxSearches = finite(value.maxSearches);
+  const results = finite(value.results);
+  const pricePerSearchUsd = finite(value.pricePerSearchUsd);
+  return {
+    ...(isOneOf(WEB_SEARCH_KINDS, value.kind) && { kind: value.kind }),
+    url: text(value.url) ?? '',
+    ...(credential !== undefined && { credential }),
+    ...(maxSearches !== undefined && { maxSearches }),
+    ...(results !== undefined && { results }),
+    ...(pricePerSearchUsd !== undefined && { pricePerSearchUsd }),
+  };
 }
 
 export function readBudgets(document: CatalogDocument): BudgetEntry[] {

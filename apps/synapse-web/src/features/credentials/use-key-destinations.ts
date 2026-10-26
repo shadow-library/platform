@@ -1,4 +1,4 @@
-import { readProviders } from '@/features/catalog/catalog-readers';
+import { readProviders, readWebSearch } from '@/features/catalog/catalog-readers';
 import { useActiveCatalog } from '@/features/catalog/use-active-catalog';
 import { useCapabilities } from '@/lib';
 
@@ -11,5 +11,6 @@ export function useKeyDestinations(): KeyDestinationList {
   const active = useActiveCatalog(readCatalog);
   if (!readCatalog || active.status === 'error') return { status: 'unavailable' };
   if (active.status === 'loading') return { status: 'loading' };
-  return { status: 'ready', items: keyDestinations(active.status === 'ready' ? readProviders(active.document) : []) };
+  if (active.status !== 'ready') return { status: 'ready', items: keyDestinations([]) };
+  return { status: 'ready', items: keyDestinations(readProviders(active.document), readWebSearch(active.document)) };
 }

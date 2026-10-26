@@ -1,5 +1,6 @@
 import { type CatalogDocument, type DocumentEdit } from './catalog-document';
-import { type AliasSpec, type DataPolicy, type ModelSpec, type ProviderSpec } from './catalog-spec.types';
+import { rawWebSearch } from './catalog-readers';
+import { type AliasSpec, type DataPolicy, type ModelSpec, type ProviderSpec, type WebSearchSpec } from './catalog-spec.types';
 import { isRecord, ownEntry } from './catalog-values';
 
 type Entry = Record<string, unknown>;
@@ -120,4 +121,47 @@ export function withProviderCredential(document: CatalogDocument, providerKey: s
 
 export function withoutProviderCredential(document: CatalogDocument, providerKey: string): DocumentEdit {
   return editEntry(document, 'providers', providerKey, ({ credential: _dropped, ...provider }) => provider);
+}
+
+export const NO_WEB_SEARCH = 'The catalog no longer sets up web search; someone may have turned it off';
+
+/** An emptied `tools` section is dropped, which the server reads the same as an empty one. */
+function editTools(document: CatalogDocument, edit: (tools: Entry) => Entry): DocumentEdit {
+  const tools = document.tools ?? {};
+  if (!isRecord(tools)) return { ok: false, reason: "The catalog's tools section is not an object" };
+  const next = edit(tools);
+  if (Object.keys(next).length > 0) return { ok: true, document: { ...document, tools: next } };
+  const { tools: _removed, ...rest } = document;
+  return { ok: true, document: rest };
+}
+
+export function withWebSearch(document: CatalogDocument, search: WebSearchSpec): DocumentEdit {
+  const credential = nonBlank(search.credential);
+  return editTools(document, tools => ({
+    ...tools,
+    webSearch: {
+      ...(search.kind && { kind: search.kind }),
+      url: search.url.trim(),
+      ...(credential && { credential }),
+      ...(search.maxSearches !== undefined && { maxSearches: search.maxSearches }),
+      ...(search.results !== undefined && { results: search.results }),
+      ...(search.pricePerSearchUsd !== undefined && { pricePerSearchUsd: search.pricePerSearchUsd }),
+    },
+  }));
+}
+
+/** Rewrites the stored entry rather than a fresh one, so fields this console does not model survive. */
+export function editWebSearch(document: CatalogDocument, edit: (search: Entry) => Entry): DocumentEdit {
+  const search = rawWebSearch(document);
+  if (!isRecord(search)) return { ok: false, reason: NO_WEB_SEARCH };
+  return editTools(document, tools => ({ ...tools, webSearch: edit(search) }));
+}
+
+export function withWebSearchCredential(document: CatalogDocument, credentialId: string | null): DocumentEdit {
+  return editWebSearch(document, search => withField(search, 'credential', credentialId ?? undefined));
+}
+
+export function withoutWebSearch(document: CatalogDocument): DocumentEdit {
+  if (!isRecord(document.tools) || !Object.hasOwn(document.tools, 'webSearch')) return { ok: true, document };
+  return editTools(document, ({ webSearch: _removed, ...tools }) => tools);
 }

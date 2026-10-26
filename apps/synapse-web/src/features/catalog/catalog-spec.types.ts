@@ -11,6 +11,7 @@ export const PROVIDER_FEATURES = ['sessions', 'native_web_search', 'image_input'
 export const BUDGET_SCOPES = ['subject', 'app'] as const;
 export const BUDGET_WINDOWS = ['1h', '1d', '30d'] as const;
 export const REASONING_MODES = ['none', 'optional', 'mandatory'] as const;
+export const WEB_SEARCH_KINDS = ['brave', 'mock'] as const;
 
 export type KeyedSection = 'tasks' | 'aliases' | 'models' | 'providers';
 
@@ -21,6 +22,8 @@ export const ENTRY_FIELDS: Readonly<Record<KeyedSection, readonly string[]>> = {
   models: ['label', 'version', 'capabilities', 'pricePerMTok', 'deployments'],
   providers: ['kind', 'flavor', 'url', 'credential', 'apiKeyConfig', 'locality', 'cost', 'features', 'maxInflightPerReplica'],
 };
+
+export const WEB_SEARCH_FIELDS: readonly string[] = ['kind', 'url', 'credential', 'maxSearches', 'results', 'pricePerSearchUsd'];
 
 export type Effort = (typeof EFFORTS)[number];
 export type Capability = (typeof CAPABILITIES)[number];
@@ -35,6 +38,7 @@ export type ProviderFeature = (typeof PROVIDER_FEATURES)[number];
 export type BudgetScope = (typeof BUDGET_SCOPES)[number];
 export type BudgetWindow = (typeof BUDGET_WINDOWS)[number];
 export type ReasoningMode = (typeof REASONING_MODES)[number];
+export type WebSearchKind = (typeof WEB_SEARCH_KINDS)[number];
 
 export type Selectors = Record<string, string>;
 
@@ -144,4 +148,14 @@ export interface BudgetSpec {
 export interface BudgetEntry extends BudgetSpec {
   /** Position in the document's `budgets` array, counting the malformed entries the reader skipped */
   index: number;
+}
+
+/** `tools.webSearch`: the search Synapse runs itself for a chat served without a provider's own. Fields a hand-edited catalog may hold invalid read as "not set". */
+export interface WebSearchSpec {
+  kind?: WebSearchKind;
+  url: string;
+  credential?: string;
+  maxSearches?: number;
+  results?: number;
+  pricePerSearchUsd?: number;
 }

@@ -5,20 +5,7 @@ import { Alert, Badge, Button, Table, type TableColumn, Tag, useConfirm } from '
 
 import { useActiveCatalog } from '@/features/catalog';
 import { changeResultNotice, isSettled, useChangeFlow } from '@/features/changes';
-import {
-  type IssueNotice,
-  IssueNoticeAlert,
-  Mono,
-  Muted,
-  PageHeader,
-  PermissionGate,
-  providerName,
-  RevokeIcon,
-  RotateIcon,
-  RowAction,
-  RowActions,
-  TestIcon,
-} from '@/features/shared';
+import { type IssueNotice, IssueNoticeAlert, Mono, Muted, PageHeader, PermissionGate, RevokeIcon, RotateIcon, RowAction, RowActions, TestIcon } from '@/features/shared';
 import { credentialKeys, type CredentialResponse, credentialsQueryOptions, revokeCredential, testCredential, useCapabilities } from '@/lib';
 
 import { CreateCredentialDialog, RotateCredentialDialog } from './CredentialDialogs';
@@ -28,6 +15,7 @@ import {
   describeTest,
   destinationLabel,
   hintLabel,
+  holderName,
   inUseMessage,
   isRevoked,
   keyVersionLabel,
@@ -71,14 +59,7 @@ function OfferButtons({ offers, using, busy, onUse }: OfferButtonsProps): ReactE
   return (
     <span className={styles.offers}>
       {offers.map(offer => (
-        <Button
-          key={offer.provider}
-          variant="secondary"
-          size="sm"
-          loading={busy && using === offer.provider}
-          disabled={busy && using !== offer.provider}
-          onClick={() => onUse(offer)}
-        >
+        <Button key={offer.holder} variant="secondary" size="sm" loading={busy && using === offer.holder} disabled={busy && using !== offer.holder} onClick={() => onUse(offer)}>
           Use for {offer.name}
         </Button>
       ))}
@@ -97,12 +78,12 @@ function CreatedNotice({ credential, offers, using, busy, onUse, onDismiss }: Cr
     <Alert intent="success" title={`Created "${credential.name}"`} onDismiss={onDismiss} className={styles.notice}>
       {offers.length > 0 ? (
         <>
-          Use it for a provider now, or later on the <Link to="/providers">Providers</Link> screen.
+          Use it now, or later on the <Link to="/providers">Providers</Link> screen.
           <OfferButtons offers={offers} using={using} busy={busy} onUse={onUse} />
         </>
       ) : (
         <>
-          Choose it for a provider on the Providers screen. <Link to="/providers">Open Providers</Link>
+          Choose it for a provider or web search on the Providers screen. <Link to="/providers">Open Providers</Link>
         </>
       )}
     </Alert>
@@ -132,7 +113,7 @@ function CredentialsView(): ReactElement {
   const say = (next: IssueNotice, providersLink?: boolean): void => setNotice({ kind: 'notice', notice: next, ...(providersLink && { providersLink }) });
 
   const applyOffer = async (offer: CredentialOffer, closesNotice: boolean): Promise<void> => {
-    setUsing(offer.provider);
+    setUsing(offer.holder);
     const result = await flow.confirmChange(offer.edit);
     setUsing(null);
     const failure = changeResultNotice(result, offer.name, 'updated');
@@ -251,14 +232,14 @@ function CredentialsView(): ReactElement {
     },
     {
       id: 'referencedBy',
-      header: 'Used by providers',
+      header: 'Used by',
       cell: row => {
         if (row.referencedBy.length > 0)
           return (
             <span className={styles.tags}>
-              {row.referencedBy.map(provider => (
-                <Tag key={provider} size="sm">
-                  {providerName(provider)}
+              {row.referencedBy.map(holder => (
+                <Tag key={holder} size="sm">
+                  {holderName(holder)}
                 </Tag>
               ))}
             </span>

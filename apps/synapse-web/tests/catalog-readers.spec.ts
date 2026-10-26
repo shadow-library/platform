@@ -1,6 +1,17 @@
 import { describe, expect, it } from 'bun:test';
 
-import { readAliases, readBudgets, readModels, readProviders, readTasks, selectorValues, selectorVocabulary, splitTaskKey } from '../src/features/catalog/catalog-readers';
+import {
+  rawWebSearch,
+  readAliases,
+  readBudgets,
+  readModels,
+  readProviders,
+  readTasks,
+  readWebSearch,
+  selectorValues,
+  selectorVocabulary,
+  splitTaskKey,
+} from '../src/features/catalog/catalog-readers';
 import { catalogFixture, CREDENTIAL_ID } from './catalog-fixture';
 
 describe('splitTaskKey', () => {
@@ -203,5 +214,23 @@ describe('selectorValues', () => {
     });
     expect(selectorValues(vocabulary, '__proto__')).toEqual(['x']);
     expect(selectorValues(vocabulary, 'constructor')).toEqual([]);
+  });
+});
+
+describe('readWebSearch', () => {
+  it('should read every field of the web search tool', () => {
+    const webSearch = { kind: 'brave', url: 'https://api.search.brave.com', credential: CREDENTIAL_ID, maxSearches: 3, results: 5, pricePerSearchUsd: 0.005 };
+    expect(readWebSearch({ ...catalogFixture(), tools: { webSearch } })).toEqual(webSearch);
+  });
+
+  it('should read invalid values as not set rather than hide the tool', () => {
+    expect(readWebSearch({ tools: { webSearch: { kind: 'google', maxSearches: 'three', results: 5 } } })).toEqual({ url: '', results: 5 });
+  });
+
+  it('should read no web search when the catalog has none or it is not an object', () => {
+    expect(readWebSearch(catalogFixture())).toBeUndefined();
+    expect(readWebSearch({ tools: [] })).toBeUndefined();
+    expect(readWebSearch({ tools: { webSearch: 'brave' } })).toBeUndefined();
+    expect(rawWebSearch({ tools: { webSearch: 'brave' } })).toBe('brave');
   });
 });

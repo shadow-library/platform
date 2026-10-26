@@ -15,6 +15,8 @@ const SECTION_AREAS: Record<KeyedSection, IssueOwner['area']> = { tasks: 'task',
 
 const BUDGET_PATH = /^budgets\[(\d+)\]/;
 
+const TOOL_PATH = /^tools\.([^.[]+)/;
+
 /** Codes whose server message says what was wrong with the value, which the plain sentence alone would lose. */
 const DETAILED_CODES: readonly string[] = ['invalid_type', 'invalid_value', 'invalid_key', 'unknown_field'];
 
@@ -64,6 +66,8 @@ export function issueOwner(path: string, document: CatalogDocument): IssueOwner 
     const entry = budgets.find(candidate => candidate.index === index);
     return { area: 'budget', entityKey: entry ? budgetKeyOf(budgets, entry) : `budgets[${index}]` };
   }
+  const tool = TOOL_PATH.exec(path)?.[1];
+  if (tool) return { area: 'tool', entityKey: tool };
   const section = (Object.keys(SECTION_AREAS) as KeyedSection[]).find(candidate => path.startsWith(`${candidate}.`));
   if (!section) return null;
   const rest = path.slice(section.length + 1);

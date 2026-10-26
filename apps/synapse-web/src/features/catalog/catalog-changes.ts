@@ -18,11 +18,22 @@ import {
 } from '@/features/shared/naming';
 
 import { type CatalogDocument } from './catalog-document';
-import { readAliases, readBudgets, readModels, readProviders, readTasks, splitTaskKey } from './catalog-readers';
-import { type AliasEntry, type BudgetEntry, ENTRY_FIELDS, type KeyedSection, type ModelEntry, type ProviderEntry, type TaskEntry, type TaskRoute } from './catalog-spec.types';
+import { rawWebSearch, readAliases, readBudgets, readModels, readProviders, readTasks, readWebSearch, splitTaskKey } from './catalog-readers';
+import {
+  type AliasEntry,
+  type BudgetEntry,
+  ENTRY_FIELDS,
+  type KeyedSection,
+  type ModelEntry,
+  type ProviderEntry,
+  type TaskEntry,
+  type TaskRoute,
+  WEB_SEARCH_FIELDS,
+  type WebSearchSpec,
+} from './catalog-spec.types';
 import { isRecord, isSameValue, ownEntry } from './catalog-values';
 
-export type ChangeArea = 'budget' | 'task' | 'alias' | 'model' | 'provider' | 'other';
+export type ChangeArea = 'budget' | 'task' | 'alias' | 'model' | 'provider' | 'tool' | 'other';
 
 export type ChangeKind = 'added' | 'removed' | 'changed';
 
@@ -55,12 +66,15 @@ const NOT_SET = 'not set';
 const NO_LIMIT = 'no limit';
 const ARROW = '→';
 
-const SECTIONS: readonly string[] = ['providers', 'models', 'aliases', 'tasks', 'budgets'];
+const SECTIONS: readonly string[] = ['providers', 'models', 'aliases', 'tasks', 'budgets', 'tools'];
+
+const WEB_SEARCH_KEY = 'webSearch';
 
 const PROVIDER_KIND_NAMES: Readonly<Record<string, string>> = { openai: 'OpenAI-compatible', ollama: 'Ollama', mock: 'Mock' };
 const LOCALITY_NAMES: Readonly<Record<string, string>> = { in_cluster: 'In our cluster', host: 'On the host', third_party: 'Third party' };
 const COST_NAMES: Readonly<Record<string, string>> = { zero: 'Free', metered: 'Metered' };
 const REASONING_NAMES: Readonly<Record<string, string>> = { none: 'None', optional: 'Optional', mandatory: 'Always on' };
+const SEARCH_ENGINE_NAMES: Readonly<Record<string, string>> = { brave: 'Brave Search', mock: 'Test stand-in' };
 
 const yesNo = (value: boolean | undefined): string => (value ? 'Yes' : 'No');
 const named = (names: Readonly<Record<string, string>>, value: string | undefined): string => (value === undefined ? NOT_SET : (ownEntry(names, value) ?? sentenceCase(value)));
@@ -300,16 +314,16 @@ function diffSection<T>(before: CatalogDocument | null, after: CatalogDocument, 
     const rawRight = ownEntry(rawAfter, key);
     if (isSameValue(rawLeft, rawRight)) return [];
     const known = left && right ? plan.fields(entity, left, right) : [];
-    const unknown = unknownFieldChanges(entity, plan.section, rawLeft, rawRight);
+    const unknown = unknownFieldChanges(entity, ENTRY_FIELDS[plan.section], rawLeft, rawRight);
     if (known.length + unknown.length > 0) return [...known, ...unknown];
     return [{ area: plan.area, entityKey: key, entityLabel: entity.label, kind: 'changed', field: 'other', sentence: `${entity.label} — other settings changed` }];
   });
 }
 
-function unknownFieldChanges(entity: Entity, section: KeyedSection, before: unknown, after: unknown): CatalogChange[] {
+function unknownFieldChanges(entity: Entity, knownFields: readonly string[], before: unknown, after: unknown): CatalogChange[] {
   const left = isRecord(before) ? before : {};
   const right = isRecord(after) ? after : {};
-  const fields = [...new Set([...Object.keys(right), ...Object.keys(left)])].filter(field => !ENTRY_FIELDS[section].includes(field));
+  const fields = [...new Set([...Object.keys(right), ...Object.keys(left)])].filter(field => !knownFields.includes(field));
   return fields
     .filter(field => !isSameValue(ownEntry(left, field), ownEntry(right, field)))
     .map(field => ({ area: entity.area, entityKey: entity.key, entityLabel: entity.label, kind: 'changed' as const, field, sentence: `${entity.label} — ${field} changed` }));
@@ -372,6 +386,43 @@ function diffBudgets(before: CatalogDocument | null, after: CatalogDocument): Ca
   return changes;
 }
 
+function webSearchFieldChanges(entity: Entity, before: WebSearchSpec, after: WebSearchSpec): CatalogChange[] {
+  const count = (value: number | undefined): string => (value === undefined ? NOT_SET : formatNumber(value));
+  return [
+    ...compare(entity, 'kind', 'search engine', named(SEARCH_ENGINE_NAMES, before.kind), named(SEARCH_ENGINE_NAMES, after.kind)),
+    ...compare(entity, 'url', 'address', before.url || NOT_SET, after.url || NOT_SET),
+    ...credentialChange(entity, before.credential, after.credential),
+    ...compare(entity, 'maxSearches', 'searches per answer', count(before.maxSearches), count(after.maxSearches)),
+    ...compare(entity, 'results', 'results per search', count(before.results), count(after.results)),
+    ...comparePrice(entity, 'pricePerSearchUsd', 'price per search', before.pricePerSearchUsd, after.pricePerSearchUsd, ''),
+  ];
+}
+
+function diffWebSearch(before: CatalogDocument | null, after: CatalogDocument): CatalogChange[] {
+  const entity: Entity = { area: 'tool', key: WEB_SEARCH_KEY, label: 'Web search' };
+  const left = before ? readWebSearch(before) : undefined;
+  const right = readWebSearch(after);
+  const rawLeft = before ? rawWebSearch(before) : undefined;
+  const rawRight = rawWebSearch(after);
+  if (rawRight === undefined) return [wholeChange(entity, 'removed')];
+  if (rawLeft === undefined) return [wholeChange(entity, 'added', right ? `, using ${named(SEARCH_ENGINE_NAMES, right.kind)}` : '')];
+  const changes = [...(left && right ? webSearchFieldChanges(entity, left, right) : []), ...unknownFieldChanges(entity, WEB_SEARCH_FIELDS, rawLeft, rawRight)];
+  if (changes.length > 0) return changes;
+  return [{ area: 'tool', entityKey: entity.key, entityLabel: entity.label, kind: 'changed', field: 'other', sentence: `${entity.label} — other settings changed` }];
+}
+
+/** Each tool is one entity; web search is the only one synapse-server knows, so any other reads as a bare change. */
+function diffTools(before: CatalogDocument | null, after: CatalogDocument): CatalogChange[] {
+  const left = isRecord(before?.tools) ? before.tools : {};
+  const right = isRecord(after.tools) ? after.tools : {};
+  const keys = [...new Set([...Object.keys(right), ...Object.keys(left)])].filter(key => !isSameValue(ownEntry(left, key), ownEntry(right, key)));
+  return keys.flatMap((key): CatalogChange[] =>
+    key === WEB_SEARCH_KEY
+      ? diffWebSearch(before, after)
+      : [{ area: 'tool', entityKey: key, entityLabel: 'Tools', kind: 'changed', field: key, sentence: `Tools — ${key} changed` }],
+  );
+}
+
 function diffOther(before: CatalogDocument | null, after: CatalogDocument): CatalogChange[] {
   const keys = [...new Set([...Object.keys(after), ...Object.keys(before ?? {})])].filter(key => !SECTIONS.includes(key));
   return keys
@@ -416,6 +467,7 @@ export function describeChanges(before: CatalogDocument | null, after: CatalogDo
       label: key => `Provider ${providerName(key)}`,
       fields: providerFieldChanges,
     }),
+    ...diffTools(before, after),
     ...diffOther(before, after),
   ];
   if (changes.length > 0 || isSameValue(before, after)) return changes;
