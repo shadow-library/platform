@@ -104,6 +104,21 @@ export function toHostedPromptSchema(Class: SchemaClass): Record<string, unknown
 
 type JsonSchema = Record<string, unknown>;
 
+// Claude's structured outputs refuse a conditional outright ("property 'if' is not supported"), so the grammar carries none and the AJV pass
+// and its repair request still enforce the cross-field rule.
+const CONDITIONAL_KEYWORDS = new Set(['if', 'then', 'else']);
+
+function withoutConditionals(node: unknown): unknown {
+  if (Array.isArray(node)) return node.map(withoutConditionals);
+  if (!node || typeof node !== 'object') return node;
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(node)) {
+    if (key === 'properties') out[key] = Object.fromEntries(Object.entries(value as JsonSchema).map(([name, child]) => [name, withoutConditionals(child)]));
+    else if (!CONDITIONAL_KEYWORDS.has(key)) out[key] = withoutConditionals(value);
+  }
+  return out;
+}
+
 /**
  * The hosted schema with each override merged over the property its path addresses, for a grammar-constrained `response_format`. A path
  * starts at the root: `name` is a top-level property and `[]` steps into an array's items, as in `contradictions[].changeSet` or
@@ -111,7 +126,7 @@ type JsonSchema = Record<string, unknown>;
  * only narrow what the AJV pass accepts, so every constrained reply still validates.
  */
 export function toConstrainedSchema(Class: SchemaClass, overrides: Readonly<Record<string, JsonSchema>> = {}): JsonSchema {
-  const schema = toHostedPromptSchema(Class);
+  const schema = withoutConditionals(toHostedPromptSchema(Class)) as JsonSchema;
   for (const [path, override] of Object.entries(overrides)) {
     const segments = path.split('.');
     const name = segments.pop() as string;

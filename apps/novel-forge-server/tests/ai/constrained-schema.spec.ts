@@ -2,6 +2,8 @@ import { describe, expect, it } from 'bun:test';
 
 import { buildChatRefinePrompt, PROMPT_REGISTRY } from '@modules/ai/prompts';
 import { BibleContradictionSchema } from '@modules/ai/schemas/bible-contradiction.schema';
+import { FixSchema } from '@modules/ai/schemas/fix.schema';
+import { JudgeSchema } from '@modules/ai/schemas/judge.schema';
 import { toConstrainedSchema, toHostedPromptSchema } from '@modules/ai/schemas/validate';
 
 type Json = Record<string, unknown>;
@@ -21,6 +23,15 @@ describe('toConstrainedSchema', () => {
   it('should refuse a top-level path for a field that exists only nested, so a name match never reaches it by accident', () => {
     expect(() => toConstrainedSchema(BibleContradictionSchema, { changeSet: override })).toThrow();
     expect(() => toConstrainedSchema(BibleContradictionSchema, { 'contradictions[].missing': override })).toThrow();
+  });
+
+  it('should drop the conditionals Claude refuses from the grammar while the hosted schema keeps them for the AJV pass', () => {
+    const conditionals = (schema: Json): string[] => ['if', 'then', 'else'].filter(key => key in schema);
+
+    expect(conditionals(toHostedPromptSchema(FixSchema))).toEqual(['if', 'then', 'else']);
+    expect(conditionals(toConstrainedSchema(FixSchema))).toEqual([]);
+    expect(conditionals(toConstrainedSchema(JudgeSchema))).toEqual([]);
+    expect(toConstrainedSchema(JudgeSchema)['properties']).toEqual(toHostedPromptSchema(JudgeSchema)['properties']);
   });
 
   it('should keep every constrained schema free of the regex escapes an Ollama grammar cannot compile, since it would drop the schema silently', () => {
