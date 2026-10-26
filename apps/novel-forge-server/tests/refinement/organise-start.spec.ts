@@ -216,6 +216,18 @@ describe('ChatService.turn — organising the notes', () => {
     expect(result.assistantMessage.content).toBe('Shall I organise them?');
   });
 
+  it('should stage no organise card the notes themselves refuse, and say why in the reply instead', async () => {
+    for (const refusal of [AppErrorCode.NTS_003.create({ words: '600' }), AppErrorCode.NTS_004.create()]) {
+      const run = chat({ mode: 'auto', output: { reply: 'Shall I organise them?', changeSet: [organise] }, refusal });
+
+      const result = await run.turn('I added a few lines about the salt mine to my notes.');
+
+      expect(run.created).toEqual([]);
+      expect(result.proposal).toBeNull();
+      expect(result.assistantMessage.content).toBe(`Shall I organise them?\n\n${refusal.message}`);
+    }
+  });
+
   it('should never start a one-way door: an organise request stages the organise action alone, and finalize elsewhere stays a card', async () => {
     const request = chat({ mode: 'auto', output: { reply: 'Done.', changeSet: [finalize] } });
     await request.turn(OPENER);

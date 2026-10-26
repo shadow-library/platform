@@ -1,21 +1,25 @@
 import { eq } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
-import { Logger } from '@shadow-library/common';
+import { type AppError, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
+import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, type Refinement, schema } from '@server/database';
 
 import { HUB_ALLOWED_OPS } from '../ai/prompts';
 import { type ChatRefineOutput } from '../ai/schemas';
 import { ActionExecutorRegistry } from './action-registry';
-import { type ChangeOp, parseOptionalChangeSet } from './change-set';
+import { type ActionOp, type ChangeOp, parseOptionalChangeSet } from './change-set';
 import { loadRejectedIdeas } from './idea-rejections';
 import { ORGANISE_NOTES_OP, type OrganiseRouting } from './later-plans-guard';
 import { anchorPassageRewrites, droppedRewritesNote } from './passage-rewrite';
 import { ProposalApplyService } from './proposal-apply.service';
 import { ProposalService } from './proposal.service';
 import { IDEAS_DROPPED_NOTE, splitTurnChangeSet, stageTurnChangeSet, startNotesOrganise, turnHold, type TurnProposalPort, type TurnStaging } from './turn-proposals';
+
+// Refusals the notes themselves cause: no card could apply until the author writes more or settles the earlier round, unlike a busy novel.
+const STANDING_ORGANISE_REFUSALS: ReadonlySet<string> = new Set([AppErrorCode.NTS_003.code, AppErrorCode.NTS_004.code]);
 
 export interface StagingContext {
   justDiscussing: boolean;
@@ -51,14 +55,24 @@ export class ChatTurnStagingService {
   ): Promise<TurnStaging & { replyNote?: string }> {
     const proposed = parseOptionalChangeSet(output.changeSet, HUB_ALLOWED_OPS);
     if (proposed.length === 0) return { appliedProposal: null, cardProposal: null };
-    const { ops, dropped } = await anchorPassageRewrites(this.db, projectId, proposed, staging.contexts);
-    if (dropped.length > 0) this.logger.info('chat turn: left out passage rewrites it could not place', { projectId, runId, dropped });
+    const anchored = await anchorPassageRewrites(this.db, projectId, proposed, staging.contexts);
+    if (anchored.dropped.length > 0) this.logger.info('chat turn: left out passage rewrites it could not place', { projectId, runId, dropped: anchored.dropped });
+    const { ops, refusal } = await this.withoutRefusedOrganise(projectId, anchored.ops);
+    if (refusal) this.logger.info('chat turn: left out an organise action its notes refuse', { projectId, runId, code: refusal.code });
     const staged: TurnStaging & { replyNote?: string } =
       ops.length === 0
         ? { appliedProposal: null, cardProposal: null }
         : await this.stageAnchored(projectId, session, message, authorMessage, output, ops, runId, warnings, staging);
-    const replyNote = [staged.replyNote, droppedRewritesNote(dropped)].filter(Boolean).join('\n\n');
+    const replyNote = [staged.replyNote, droppedRewritesNote(anchored.dropped), refusal?.message].filter(Boolean).join('\n\n');
     return { ...staged, ...(replyNote ? { replyNote } : {}) };
+  }
+
+  private async withoutRefusedOrganise(projectId: bigint, ops: ChangeOp[]): Promise<{ ops: ChangeOp[]; refusal?: AppError }> {
+    const organise = ops.find(op => op.op === ORGANISE_NOTES_OP);
+    if (!organise) return { ops };
+    const refusal = await this.actionRegistry.refusal(projectId, organise as ActionOp);
+    if (!refusal || !STANDING_ORGANISE_REFUSALS.has(refusal.code)) return { ops };
+    return { ops: ops.filter(op => op !== organise), refusal };
   }
 
   /** Splits the change-set by the write policy and stages it as at most two proposals: what applies in the turn, and the rest as cards. */
