@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { credentialContext, isUsableSecret, referencingProviders, secretHint } from '@modules/credentials/credential.utils';
+import { credentialContext, isUsableSecret, referencingHolders, secretHint } from '@modules/credentials/credential.utils';
 
 describe('secretHint', () => {
   it('should show the first six and last four characters of a long key', () => {
@@ -38,14 +38,25 @@ describe('credentialContext', () => {
   });
 });
 
-describe('referencingProviders', () => {
+describe('referencingHolders', () => {
   it('should find every provider naming the credential, even in a document that would not parse', () => {
     const document = { providers: { a: { credential: 'c-1', kind: 42 }, b: { credential: 'c-2' }, c: { credential: 'c-1' }, d: null } };
-    expect(referencingProviders(document, 'c-1')).toEqual(['a', 'c']);
+    expect(referencingHolders(document, 'c-1')).toEqual(['a', 'c']);
   });
 
   it('should find nothing in a document without providers', () => {
-    expect(referencingProviders(null, 'c-1')).toEqual([]);
-    expect(referencingProviders({ providers: [] }, 'c-1')).toEqual([]);
+    expect(referencingHolders(null, 'c-1')).toEqual([]);
+    expect(referencingHolders({ providers: [] }, 'c-1')).toEqual([]);
+  });
+
+  it('should name the providers and the web search that send the key, so a revocation refuses while either does', () => {
+    const document = {
+      providers: { openrouter: { credential: 'c-1' }, local: {} },
+      tools: { webSearch: { kind: 'brave', url: 'https://api.search.brave.com', credential: 'c-1' } },
+    };
+
+    expect(referencingHolders(document, 'c-1')).toEqual(['openrouter', 'tools.webSearch']);
+    expect(referencingHolders({ tools: { webSearch: { credential: 'c-1' } } }, 'c-1')).toEqual(['tools.webSearch']);
+    expect(referencingHolders({ providers: 'not a record', tools: null }, 'c-1')).toEqual([]);
   });
 });

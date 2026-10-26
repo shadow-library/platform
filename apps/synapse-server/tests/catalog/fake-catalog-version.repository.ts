@@ -3,7 +3,7 @@ import { type Catalog } from '@server/database';
 
 import { type CatalogVersionRepository, type CatalogVersionStore, type CatalogVersionSummary, NO_VERSION, type PublishedValues } from '@modules/catalog/catalog-version.repository';
 import { type CredentialState } from '@modules/catalog/catalog.types';
-import { referencingProviders } from '@modules/credentials/credential.utils';
+import { referencingHolders } from '@modules/credentials/credential.utils';
 
 type Row = Catalog.Version;
 
@@ -36,7 +36,7 @@ class InMemoryCatalogStore implements CatalogVersionStore {
   }
 
   async referencesCredential(id: string): Promise<boolean> {
-    return this.repository.rows.some(row => row.state !== 'DRAFT' && referencingProviders(row.document, id).length > 0);
+    return this.repository.rows.some(row => row.state !== 'DRAFT' && referencingHolders(row.document, id).length > 0);
   }
 
   private insert(values: Omit<Row, 'id' | 'createdAt'>): Row {

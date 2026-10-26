@@ -27,6 +27,13 @@ const SEARCH_TIMEOUT_MS = 10_000;
 const MAX_QUERY_LENGTH = 400;
 const BRAVE_PATH = '/res/v1/web/search';
 
+export const BRAVE_SEARCH_ORIGIN = 'https://api.search.brave.com';
+
+/** Brave reads its key from its own header, never `authorization` */
+export function braveSearchRequest(baseUrl: string, apiKey: string, params: Record<string, string>): { url: string; headers: Record<string, string> } {
+  return { url: `${baseUrl.replace(/\/+$/, '')}${BRAVE_PATH}?${new URLSearchParams(params)}`, headers: { accept: 'application/json', 'x-subscription-token': apiKey } };
+}
+
 const BRAVE_FAILURES: Readonly<Record<number, string>> = {
   401: 'the search key was refused',
   403: 'the search key is not allowed this search',
@@ -87,14 +94,13 @@ export class WebSearchClient {
   }
 
   private async brave(spec: WebSearchToolSpec, apiKey: string, query: string, signal: AbortSignal | undefined): Promise<WebSearchResult[]> {
-    const params = new URLSearchParams({ q: query, count: String(spec.results), safesearch: 'moderate', text_decorations: 'false' });
-    const url = `${spec.url.replace(/\/+$/, '')}${BRAVE_PATH}?${params}`;
+    const { url, headers } = braveSearchRequest(spec.url, apiKey, { q: query, count: String(spec.results), safesearch: 'moderate', text_decorations: 'false' });
     const timeout = AbortSignal.timeout(SEARCH_TIMEOUT_MS);
     let response: Response;
     try {
       response = await this.fetcher(url, {
         method: 'GET',
-        headers: { accept: 'application/json', 'x-subscription-token': apiKey },
+        headers,
         redirect: 'manual',
         signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
       });

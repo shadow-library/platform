@@ -1,3 +1,4 @@
+import { WEB_SEARCH_PATH } from '@modules/catalog/catalog-credentials';
 import { isRecord } from '@modules/catalog/catalog.utils';
 import { VISIBLE_ASCII } from '@modules/providers/chat-translation.util';
 
@@ -27,10 +28,12 @@ export function isUsableSecret(secret: string): boolean {
 }
 
 /** Lenient on purpose: a revocation must find every reference even in a published document this code can no longer parse. */
-export function referencingProviders(document: unknown, credentialId: string): string[] {
-  const providers = isRecord(document) ? document['providers'] : undefined;
-  if (!isRecord(providers)) return [];
-  return Object.entries(providers)
+export function referencingHolders(document: unknown, credentialId: string): string[] {
+  const root = isRecord(document) ? document : {};
+  const providers = isRecord(root['providers']) ? root['providers'] : {};
+  const holders = Object.entries(providers)
     .filter(([, provider]) => isRecord(provider) && provider['credential'] === credentialId)
     .map(([providerKey]) => providerKey);
+  const search = isRecord(root['tools']) ? root['tools']['webSearch'] : undefined;
+  return isRecord(search) && search['credential'] === credentialId ? [...holders, WEB_SEARCH_PATH] : holders;
 }

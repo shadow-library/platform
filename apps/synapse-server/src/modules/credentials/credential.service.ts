@@ -10,13 +10,14 @@ import { type Credential } from '@server/database';
 
 import { ActiveCatalogCache } from '@modules/catalog/active-catalog.cache';
 import { credentialReferences, normaliseOrigin, urlOrigin } from '@modules/catalog/catalog-credentials';
-import { type ProviderSpec } from '@modules/catalog/catalog.types';
+import { type ProviderSpec, type WebSearchToolSpec } from '@modules/catalog/catalog.types';
+import { BRAVE_SEARCH_ORIGIN, braveSearchRequest } from '@modules/providers/web-search.client';
 
 import { CREDENTIAL_BOX, CREDENTIAL_KEYRING } from './credential.constants';
-import { CredentialProber, type CredentialTestResult } from './credential-prober';
+import { CredentialProber, type CredentialTestResult, type ProbeRequest } from './credential-prober';
 import { CredentialRepository } from './credential.repository';
 import { CredentialResolver } from './credential-resolver.service';
-import { credentialContext, isUsableSecret, referencingProviders, secretHint } from './credential.utils';
+import { credentialContext, isUsableSecret, referencingHolders, secretHint } from './credential.utils';
 
 export interface CredentialView {
   id: string;
@@ -56,12 +57,18 @@ function invalid(param: string, reason: string): never {
   throw AppErrorCode.SYN_INVALID_REQUEST.create({ param, reason });
 }
 
-/** Never leaves the credential's origin: a provider is used only when its URL shares it, else the OpenAI-compatible default */
-export function probeUrl(allowedOrigin: string, providers: readonly ProviderSpec[]): string {
-  if (allowedOrigin === OPENROUTER_ORIGIN) return OPENROUTER_KEY_ENDPOINT;
+/**
+ * Never leaves the credential's origin: the web search when its URL shares it, then a provider whose URL does, else the OpenAI-compatible
+ * default. A Brave key is checked with one single-result search, the cheapest call its API has.
+ */
+export function probeRequest(allowedOrigin: string, apiKey: string, providers: readonly ProviderSpec[], search: WebSearchToolSpec | undefined): ProbeRequest {
+  const bearer = { authorization: `Bearer ${apiKey}` };
+  const searchUrl = search?.kind === 'brave' && urlOrigin(search.url) === allowedOrigin ? search.url : allowedOrigin === BRAVE_SEARCH_ORIGIN ? BRAVE_SEARCH_ORIGIN : undefined;
+  if (searchUrl) return braveSearchRequest(searchUrl, apiKey, { q: 'test', count: '1' });
+  if (allowedOrigin === OPENROUTER_ORIGIN) return { url: OPENROUTER_KEY_ENDPOINT, headers: bearer };
   const provider = providers.find(candidate => urlOrigin(candidate.url) === allowedOrigin);
-  if (provider) return `${provider.url.replace(/\/+$/, '')}/models`;
-  return `${allowedOrigin}/v1/models`;
+  if (provider) return { url: `${provider.url.replace(/\/+$/, '')}/models`, headers: bearer };
+  return { url: `${allowedOrigin}/v1/models`, headers: bearer };
 }
 
 @Injectable()
@@ -111,7 +118,7 @@ export class CredentialService {
   }
 
   async revoke(id: string, actor: string): Promise<CredentialView> {
-    const outcome = await this.repository.revoke(id, actor, document => referencingProviders(document, id));
+    const outcome = await this.repository.revoke(id, actor, document => referencingHolders(document, id));
     if (outcome.status === 'not_found') throw AppErrorCode.S009.create();
     if (outcome.status === 'in_use') throw AppErrorCode.CRED_IN_USE.create({ referencedBy: outcome.referencedBy });
     this.resolver.forget(id);
@@ -135,8 +142,9 @@ export class CredentialService {
     }
     if (!isUsableSecret(apiKey)) return { ok: false, code: 'invalid_api_key' };
 
-    const providers = Object.values(this.cache.current()?.document.providers ?? {}).filter(provider => provider.credential === id);
-    const result = await this.prober.probe(probeUrl(row.allowedOrigin, providers), apiKey);
+    const document = this.cache.current()?.document;
+    const providers = Object.values(document?.providers ?? {}).filter(provider => provider.credential === id);
+    const result = await this.prober.probe(probeRequest(row.allowedOrigin, apiKey, providers, document?.tools?.webSearch));
     this.logger.info('Tested a provider credential', { credential: id, ok: result.ok, ...(!result.ok && { code: result.code }) });
     return result;
   }

@@ -7,23 +7,18 @@ import { AppErrorCode } from '@server/classes';
 
 import { type ActiveCatalogCache } from '@modules/catalog/active-catalog.cache';
 import { type ActiveCatalog, type ProviderSpec } from '@modules/catalog/catalog.types';
-import { type CredentialProber, type CredentialTestResult } from '@modules/credentials/credential-prober';
+import { type CredentialProber, type CredentialTestResult, type ProbeRequest } from '@modules/credentials/credential-prober';
 import { CredentialResolver } from '@modules/credentials/credential-resolver.service';
-import { CredentialService, probeUrl } from '@modules/credentials/credential.service';
+import { CredentialService, probeRequest } from '@modules/credentials/credential.service';
 import { credentialContext } from '@modules/credentials/credential.utils';
 
 import { catalogDocument } from '../catalog/catalog.fixtures';
 import { box, credentialId, FakeCredentialRepository, K1, K2, keyring, ManualTimers, OPENROUTER_SECRET } from './credential.fixtures';
 
-interface Probe {
-  url: string;
-  apiKey: string;
-}
-
 let restoreLogger: RestoreLogger;
 let repository: FakeCredentialRepository;
 let active: ActiveCatalog | null;
-let probes: Probe[];
+let probes: ProbeRequest[];
 let probeResult: CredentialTestResult;
 let service: CredentialService;
 
@@ -32,7 +27,7 @@ afterAll(() => restoreLogger());
 
 function serviceWith(keys: string = K1): CredentialService {
   const cache = { current: () => active } as unknown as ActiveCatalogCache;
-  const prober = { probe: async (url: string, apiKey: string) => (probes.push({ url, apiKey }), probeResult) } as unknown as CredentialProber;
+  const prober = { probe: async (request: ProbeRequest) => (probes.push(request), probeResult) } as unknown as CredentialProber;
   const resolver = new CredentialResolver(repository.asRepository(), box(keys), new ManualTimers());
   return new CredentialService(repository.asRepository(), resolver, prober, cache, box(keys), keyring(keys));
 }
@@ -147,7 +142,7 @@ describe('CredentialService.test', () => {
     const created = await service.create(INPUT, 'admin-1');
     probeResult = { ok: false, code: 'unauthorized' };
     expect(await service.test(created.id)).toEqual({ ok: false, code: 'unauthorized' });
-    expect(probes).toEqual([{ url: 'https://openrouter.ai/api/v1/key', apiKey: OPENROUTER_SECRET }]);
+    expect(probes).toEqual([{ url: 'https://openrouter.ai/api/v1/key', headers: { authorization: `Bearer ${OPENROUTER_SECRET}` } }]);
   });
 
   it('should answer a revoked or unreadable credential without calling the provider', async () => {
@@ -159,15 +154,25 @@ describe('CredentialService.test', () => {
   });
 });
 
-describe('probeUrl', () => {
+describe('probeRequest', () => {
   const provider = (url: string): ProviderSpec => ({ kind: 'openai', flavor: 'openai-compatible', url, locality: 'third_party', cost: 'metered' });
+  const bearer = { authorization: 'Bearer sk-key' };
 
   it("should use a referencing provider's models endpoint when it shares the origin", () => {
-    expect(probeUrl('https://llm.test', [provider('https://llm.test/v1/')])).toBe('https://llm.test/v1/models');
+    expect(probeRequest('https://llm.test', 'sk-key', [provider('https://llm.test/v1/')], undefined)).toEqual({ url: 'https://llm.test/v1/models', headers: bearer });
   });
 
   it('should never follow a provider to another origin, falling back to the OpenAI-compatible default', () => {
-    expect(probeUrl('https://llm.test', [provider('https://collector.example/v1')])).toBe('https://llm.test/v1/models');
+    expect(probeRequest('https://llm.test', 'sk-key', [provider('https://collector.example/v1')], undefined)).toEqual({ url: 'https://llm.test/v1/models', headers: bearer });
+  });
+
+  it("should check a Brave key with one single-result search in Brave's own header, whether or not web search is set up yet", () => {
+    const search = { kind: 'brave' as const, url: 'https://api.search.brave.com', maxSearches: 3, results: 5 };
+    for (const configured of [search, undefined]) {
+      const request = probeRequest('https://api.search.brave.com', 'sk-key', [], configured);
+      expect(request.url).toBe('https://api.search.brave.com/res/v1/web/search?q=test&count=1');
+      expect(request.headers).toEqual({ accept: 'application/json', 'x-subscription-token': 'sk-key' });
+    }
   });
 });
 
