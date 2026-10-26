@@ -125,7 +125,7 @@ export class ForgeJobTimeoutError extends Error {
 /** A whole model-backed flow: the dev gateway serialises AI work at concurrency 1 with a 5-minute ceiling per call. */
 export const MODEL_FLOW_TIMEOUT_MS = 30 * 60_000;
 
-const MODEL_CALL_TIMEOUT_MS = 10 * 60_000;
+export const MODEL_CALL_TIMEOUT_MS = 10 * 60_000;
 
 /**
  * A chat pin is a Synapse alias, sent as the `synapse` option from `GET /ai/models` with its key as the model. Haiku is offered to standard chats only, so an unrestricted chat

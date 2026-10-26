@@ -14,6 +14,7 @@ import {
   type Draft,
   expectStatus,
   finalizeThroughReview,
+  MODEL_CALL_TIMEOUT_MS,
   MODEL_FLOW_TIMEOUT_MS,
   MODEL_TAG,
   NOVEL_NOTES,
@@ -52,10 +53,12 @@ async function applyProposal(ctx: APIRequestContext, projectId: string, proposal
   expect((await readProposalRow(proposalId))?.status, `proposal ${proposalId} was applied`).toBe('applied');
 }
 
-/** Every text model call a project made ran on an Economy-tier model; read before the fixture deletes the project and its calls. */
+/** Every text model call a project made ran on the model its group routes to on the Economy tier; read before the fixture deletes the project and its calls. */
 async function expectEconomyRouting(ctx: APIRequestContext, projectId: string): Promise<void> {
-  const catalog = (await (await ctx.get('/api/v1/ai/models')).json()) as { tiers: { costTier: string; contentMode: string; provider: string; model: string }[] };
-  const economy = new Set(catalog.tiers.filter(tier => tier.costTier === 'economy' && tier.contentMode === 'standard').map(tier => `${tier.provider}::${tier.model}`));
+  const routes = (await (await ctx.get(`/api/v1/projects/${projectId}/ai/models?costTier=economy&contentMode=standard`)).json()) as {
+    models: { group: string; provider: string; model: string }[];
+  };
+  const economy = new Set(routes.models.map(route => `${route.provider}::${route.model}`));
   const rows = await novelForgeDb()<{ role: string; provider: string; model: string }[]>`
     SELECT DISTINCT role, provider, model FROM model_calls WHERE project_id = ${projectId}::bigint AND model NOT ILIKE '%embed%'
   `;
@@ -75,6 +78,7 @@ test.describe('novel-forge AI authoring', { tag: MODEL_TAG }, () => {
   let available = false;
 
   test.beforeAll(async () => {
+    test.setTimeout(MODEL_CALL_TIMEOUT_MS);
     available = await aiAvailable('user1');
   });
 

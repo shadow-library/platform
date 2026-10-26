@@ -12,6 +12,7 @@ import {
   createNovel,
   errorCode,
   finalizeThroughReview,
+  MODEL_CALL_TIMEOUT_MS,
   MODEL_FLOW_TIMEOUT_MS,
   MODEL_TAG,
   pasteChapter,
@@ -110,6 +111,7 @@ forgeTest.describe('novel-forge isolated chapter bridge (model)', { tag: MODEL_T
   let available = false;
 
   forgeTest.beforeAll(async () => {
+    forgeTest.setTimeout(MODEL_CALL_TIMEOUT_MS);
     available = await aiAvailable('user1');
   });
 
