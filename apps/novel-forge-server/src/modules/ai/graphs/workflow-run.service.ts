@@ -1,5 +1,5 @@
 import { PostgresSaver } from '@langchain/langgraph-checkpoint-postgres';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
@@ -224,7 +224,26 @@ export class WorkflowRunService {
       .set({ status: 'failed', error: error as never, endedAt: new Date() })
       .where(and(eq(schema.workflowRuns.id, runId), eq(schema.workflowRuns.status, 'running')))
       .returning({ projectId: schema.workflowRuns.projectId, graph: schema.workflowRuns.graph, target: schema.workflowRuns.target });
-    if (run) this.events.publish(run.projectId, { type: 'run', runId, graph: run.graph, target: run.target, status: 'failed' });
+    if (!run) return;
+    await this.releaseUnjudgedDraft(run.projectId, runId);
+    this.events.publish(run.projectId, { type: 'run', runId, graph: run.graph, target: run.target, status: 'failed' });
+  }
+
+  // A run that stops after persisting its draft and before judging it would leave that draft `generating`, which refuses every later save (DRF_019).
+  // Only a draft whose current revision this run wrote is released, so a newer run on the same chapter keeps its own.
+  private async releaseUnjudgedDraft(projectId: bigint, runId: string): Promise<void> {
+    const { drafts, draftRevisions } = schema;
+    const written = this.db
+      .select({ id: drafts.id })
+      .from(drafts)
+      .innerJoin(draftRevisions, and(eq(draftRevisions.draftId, drafts.id), eq(draftRevisions.revision, drafts.revision)))
+      .where(and(eq(drafts.projectId, projectId), eq(drafts.reviewStatus, 'generating'), eq(draftRevisions.runId, runId)));
+    const released = await this.db
+      .update(drafts)
+      .set({ reviewStatus: 'needs_review', updatedAt: new Date() })
+      .where(and(inArray(drafts.id, written), eq(drafts.reviewStatus, 'generating')))
+      .returning({ chapter: drafts.chapter });
+    if (released.length > 0) this.logger.warn('released a draft its run left unjudged', { runId, chapters: released.map(draft => draft.chapter) });
   }
 
   /** Settles the runs a job opened that are still running after the job itself settled — a run opened for a job that never reached it. */
@@ -249,6 +268,7 @@ export class WorkflowRunService {
       .where(and(eq(schema.workflowRuns.id, runId), eq(schema.workflowRuns.status, 'running')))
       .returning({ projectId: schema.workflowRuns.projectId, graph: schema.workflowRuns.graph, target: schema.workflowRuns.target });
     if (!run) return false;
+    await this.releaseUnjudgedDraft(run.projectId, runId);
     this.events.publish(run.projectId, { type: 'run', runId, graph: run.graph, target: run.target, status: 'cancelled' });
     return true;
   }

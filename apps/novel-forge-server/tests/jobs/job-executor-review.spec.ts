@@ -1,6 +1,6 @@
 import { describe, expect, it, mock } from 'bun:test';
 import { type SQL } from 'drizzle-orm';
-import { PgDialect } from 'drizzle-orm/pg-core';
+import { PgDialect, QueryBuilder } from 'drizzle-orm/pg-core';
 
 import { WorkflowRunService } from '@modules/ai/graphs/workflow-run.service';
 import { JobExecutor } from '@modules/jobs/job.executor';
@@ -130,12 +130,13 @@ describe('JobService.cancel — runs opened for a pending job', () => {
 
 describe('WorkflowRunService.settleJobRuns', () => {
   it('should settle every run the job left running, so none stays running', async () => {
-    const written: { values: Record<string, unknown>; where: SQL }[] = [];
+    const written: { table: unknown; values: Record<string, unknown>; where: SQL }[] = [];
     const db = {
-      select: () => ({ from: () => ({ where: async () => [{ id: 'run-a' }, { id: 'run-b' }] }) }),
-      update: () => ({
+      select: (fields: { id: unknown }) =>
+        fields.id === schema.workflowRuns.id ? { from: () => ({ where: async () => [{ id: 'run-a' }, { id: 'run-b' }] }) } : new QueryBuilder().select(fields as never),
+      update: (table: unknown) => ({
         set: (values: Record<string, unknown>) => ({
-          where: (where: SQL) => ({ returning: async () => (written.push({ values, where }), [{ projectId: 1n, graph: 'chapter-review', target: 'chapter-4' }]) }),
+          where: (where: SQL) => ({ returning: async () => (written.push({ table, values, where }), [{ projectId: 1n, graph: 'chapter-review', target: 'chapter-4' }]) }),
         }),
       }),
     };
@@ -156,8 +157,10 @@ describe('WorkflowRunService.settleJobRuns', () => {
 
     await service.settleJobRuns('job-r', 'failed', new Error('refused'));
 
-    expect(written.map(write => write.values['status'])).toEqual(['failed', 'failed']);
-    expect(written.map(write => dialect.sqlToQuery(write.where).params)).toEqual([
+    const runs = written.filter(write => write.table === schema.workflowRuns);
+    expect(runs.map(write => write.values['status'])).toEqual(['failed', 'failed']);
+    expect(written.filter(write => write.table === schema.drafts).map(write => write.values['reviewStatus'])).toEqual(['needs_review', 'needs_review']);
+    expect(runs.map(write => dialect.sqlToQuery(write.where).params)).toEqual([
       ['run-a', 'running'],
       ['run-b', 'running'],
     ]);
