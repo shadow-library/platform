@@ -33,6 +33,7 @@ import {
   receiptLine,
   receiptTitle,
   storyBibleReceipt,
+  storyBibleUpdatesLabel,
   storyBibleWritten,
   toggledAutoKeep,
 } from '../src/lib/finalize-review';
@@ -317,6 +318,21 @@ describe('storyBibleWritten', () => {
     expect(storyBibleWritten(review({ status: 'ready' }))).toBe(false);
     expect(storyBibleWritten(review({ status: 'applied', bridgeOnly: true }))).toBe(false);
     expect(storyBibleWritten(undefined)).toBe(false);
+  });
+});
+
+describe('storyBibleUpdatesLabel', () => {
+  it("should keep an unrestricted chapter's bridge reachable after its review wrote the Story Bible, and drop a standard chapter's button then", () => {
+    expect(storyBibleUpdatesLabel(review({ status: 'applied' }), true)).toBe('Bridge');
+    expect(storyBibleUpdatesLabel(review({ status: 'applied' }), false)).toBeNull();
+  });
+
+  it('should offer the review while it still needs the author, and the bridge alone where nothing else is asked', () => {
+    expect(storyBibleUpdatesLabel(review({ status: 'ready' }), false)).toBe('Story Bible updates');
+    expect(storyBibleUpdatesLabel(review({ status: 'ready' }), true)).toBe('Story Bible updates');
+    expect(storyBibleUpdatesLabel(review({ status: 'ready', bridgeOnly: true }), true)).toBe('Bridge');
+    expect(storyBibleUpdatesLabel(undefined, true)).toBe('Bridge');
+    expect(storyBibleUpdatesLabel(undefined, false)).toBeNull();
   });
 });
 

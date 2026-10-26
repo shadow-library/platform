@@ -414,6 +414,13 @@ export function storyBibleWritten(review: Pick<FinalizeReviewResponse, 'status' 
   return review?.status === 'applied' && !review.bridgeOnly;
 }
 
+/** An unrestricted chapter's bridge stays reachable for as long as the chapter exists; a standard chapter's review only while it still needs the author. */
+export function storyBibleUpdatesLabel(review: Pick<FinalizeReviewResponse, 'status' | 'bridgeOnly'> | undefined, isolated: boolean): 'Story Bible updates' | 'Bridge' | null {
+  const written = storyBibleWritten(review);
+  if (isolated) return review && !review.bridgeOnly && !written ? 'Story Bible updates' : 'Bridge';
+  return review && !written ? 'Story Bible updates' : null;
+}
+
 /** The updates the chat's decisions card asks about one by one: the unsure and the conflicting, open or already answered. */
 export function askedItems(review: Pick<FinalizeReviewResponse, 'consequential'>): FinalizeReviewItemResponse[] {
   return review.consequential.filter(item => !item.autoKept);
