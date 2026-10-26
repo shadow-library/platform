@@ -102,11 +102,11 @@ test.describe('novel-forge chat turn stream', () => {
     const [first, second] = await Promise.all(subscribers.map(stream => stream.ended()));
     expectQuotaRefusedTurn(first ?? []);
     expect(second, 'both subscribers saw the same frames').toEqual(first);
-    expectRefusedStream(await sse.open(owner.ctx, turnPath(chat.projectId, runId)), 404, 'CHT_007', 'the finished run once its last stream closed');
+    expectQuotaRefusedTurn(await watchToTheEnd(sse, owner, chat.projectId, runId));
     expect(await listDispatchedModelCalls(chat.projectId)).toEqual([]);
   });
 
-  test('should replay a finished turn once to its owner, and never to another project or a stranger', async ({ forge, sse }) => {
+  test('should replay a finished turn to its owner until its frames expire, and never to another project or a stranger', async ({ forge, sse }) => {
     const owner = await forge.actor({ label: 'turn-replay' });
     const stranger = await forge.actor({ label: 'turn-stranger' });
     const chat = await quotaRefusedChat(forge, owner, 'turn-replay');
@@ -130,8 +130,9 @@ test.describe('novel-forge chat turn stream', () => {
     expectRefusedStream(await sse.open(stranger.ctx, turnPath(chat.projectId, runId)), 404, 'PRJ_001', 'a stranger on the run');
     expectRefusedStream(await sse.open(await forge.anonymous(), turnPath(chat.projectId, runId)), 401, 'IAM_001', 'an anonymous caller on the run');
 
-    expectQuotaRefusedTurn(await watchToTheEnd(sse, owner, chat.projectId, runId));
-    expectRefusedStream(await sse.open(owner.ctx, turnPath(chat.projectId, runId)), 404, 'CHT_007', 'the run after its replay was watched to the end');
+    const replayed = await watchToTheEnd(sse, owner, chat.projectId, runId);
+    expectQuotaRefusedTurn(replayed);
+    expect(await watchToTheEnd(sse, owner, chat.projectId, runId), 'the stored frames replay again from any replica').toEqual(replayed);
     expect(await listDispatchedModelCalls(chat.projectId)).toEqual([]);
   });
 });

@@ -116,12 +116,12 @@ test.describe('novel-forge model type and cost tier (UI)', () => {
     }).toPass({ timeout: 15_000 });
   });
 
-  test('should switch the next turn’s tier and model type from the chat composer', async ({ page }) => {
+  test('should switch the chat’s tier and model type from the chat composer', async ({ page }) => {
     const novel = await createNovel(ctx, { title: `E2E Tier Chat ${uniqueSuffix()}` });
     created.push(novel.projectId);
     await page.goto(`${requireProductUrl('novelForge')}/novels/${novel.projectId}/chat?session=${novel.sessionId}`);
 
-    const panel = page.getByRole('dialog', { name: 'Model and cost for this turn' });
+    const panel = page.getByRole('dialog', { name: 'Model and cost for this chat' });
     await expect(async () => {
       await page.getByRole('button', { name: 'Model and cost: Standard · Balanced, project default' }).click();
       await expect(panel).toBeVisible({ timeout: 2_000 });
@@ -131,15 +131,15 @@ test.describe('novel-forge model type and cost tier (UI)', () => {
     await panel.getByRole('radiogroup', { name: 'Model' }).getByRole('radio', { name: 'Unrestricted' }).click();
     await panel.getByRole('button', { name: 'Done' }).click();
 
-    const trigger = page.getByRole('button', { name: 'Model and cost: Unrestricted · Economy, this turn only' });
+    const trigger = page.getByRole('button', { name: 'Model and cost: Unrestricted · Economy, this chat' });
     await expect(trigger).toBeVisible();
 
     await trigger.click();
-    await panel.getByRole('button', { name: 'Use the default' }).click();
+    await panel.getByRole('button', { name: 'Use the project default' }).click();
     await panel.getByRole('button', { name: 'Done' }).click();
     await expect(page.getByRole('button', { name: 'Model and cost: Standard · Balanced, project default' })).toBeVisible();
 
     const project = (await (await ctx.get(`/api/v1/projects/${novel.projectId}`)).json()) as { costTier: CostTier; contentMode: ContentMode };
-    expect(project, 'a turn override never changes the project default').toMatchObject({ costTier: 'balanced', contentMode: 'standard' });
+    expect(project, 'a chat’s own setting never changes the project default').toMatchObject({ costTier: 'balanced', contentMode: 'standard' });
   });
 });

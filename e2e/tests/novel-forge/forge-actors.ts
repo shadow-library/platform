@@ -255,11 +255,12 @@ export const test = base.extend<{ forge: ForgeHarness }>({
 
     await runAll([
       ...contexts.map(ctx => () => ctx.dispose()),
-      () => releaseBudgetPins(projects),
       () => deleteForgeProjects(projects),
       ...bots.map(created => () => deleteForgeProjectsOwnedBy({ kind: 'bot', id: created.botId })),
       ...bots.map(created => () => deleteOrganisationBotRecord(created)),
       ...users.map(user => () => deleteForgeProjectsOwnedBy({ kind: 'user', id: user.userId })),
+      // A job still running on a project can reach Synapse until the project is gone, so the quota pin holds until then.
+      () => releaseBudgetPins(projects),
       ...users.map(user => () => deleteAccountSettings({ kind: 'user', id: user.userId })),
       ...users.map(user => () => deleteRoleAssignmentsFor({ type: 'USER', id: user.userId })),
       ...policies.map(organisationId => () => clearAccessTokenTtl(organisationId)),
