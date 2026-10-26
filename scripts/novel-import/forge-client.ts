@@ -10,6 +10,7 @@ export interface ForgeDraft {
   saveSeq: number;
   status: string;
   reviewStatus: string;
+  staleReason?: string | null;
 }
 
 export interface ForgeDraftSummary {
@@ -125,8 +126,15 @@ export class ForgeClient {
     return this.request('POST', `${API}/projects/${projectId}/drafts/${chapter}/import`, { ...(input.title ? { title: input.title } : {}), prose: input.prose, ...base });
   }
 
-  approve(projectId: string, chapter: number, revision: number): Promise<ForgeDraft> {
-    return this.request('POST', `${API}/projects/${projectId}/drafts/${chapter}/approve`, { revision });
+  /** A stale draft is approved as written, naming the stale reason it was read with, so one that went stale again since is refused (DRF_013). */
+  approve(projectId: string, draft: ForgeDraft): Promise<ForgeDraft> {
+    const asWritten = draft.staleReason ? { keepStale: true, staleReason: draft.staleReason } : {};
+    return this.request('POST', `${API}/projects/${projectId}/drafts/${draft.chapter}/approve`, {
+      draftId: draft.id,
+      revision: draft.revision,
+      saveSeq: draft.saveSeq,
+      ...asWritten,
+    });
   }
 
   private async request<T>(method: Method, route: string, body?: unknown): Promise<T> {

@@ -16,6 +16,7 @@ interface FakeDraft {
   saveSeq: number;
   status: string;
   reviewStatus: string;
+  staleReason?: string | null;
 }
 
 const BASE_URL = 'https://forge.test';
@@ -77,7 +78,10 @@ class FakeForge {
       return json(200, this.save(current, body));
     }
     if (method === 'POST' && match?.[2] === '/approve' && current) {
-      if (body['revision'] !== current.revision) return json(409, { code: 'DRF_013' });
+      if (typeof body['draftId'] !== 'string' || typeof body['saveSeq'] !== 'number') return json(422, { code: 'VALIDATION_ERROR' });
+      if (body['draftId'] !== current.id || body['revision'] !== current.revision || body['saveSeq'] !== current.saveSeq) return json(409, { code: 'DRF_013' });
+      if (current.staleReason && (body['keepStale'] !== true || body['staleReason'] !== current.staleReason)) return json(400, { code: 'DRF_007' });
+      current.staleReason = null;
       current.reviewStatus = 'approved';
       return json(200, current);
     }
@@ -221,6 +225,18 @@ describe('NovelImporter', () => {
 
     expect(first.approved).toEqual([1, 2]);
     expect(second.approved).toEqual([]);
+  });
+
+  it('should approve a draft gone stale as written, naming the stale reason it read', async () => {
+    fs.writeFileSync(path.join(dir, STATE_FILE), JSON.stringify({ projects: { [BASE_URL]: { projectId: '42' } } }));
+    forge.seed(1, 'One.');
+    forge.seed(2, 'Two.', { staleReason: 'chapter 1 changed' });
+    writeFolder({ '001-a.md': 'One.', '002-b.md': 'Two.' });
+
+    const report = await importer({ approve: true }).run(readManuscript(dir));
+
+    expect(report.approved).toEqual([1, 2]);
+    expect(forge.drafts.get(2)).toMatchObject({ reviewStatus: 'approved', staleReason: null });
   });
 
   it('should upload the cover once, and carry on with a warning when the bot may not set covers', async () => {

@@ -159,7 +159,7 @@ export class NovelImporter {
 
   private async approve(projectId: string, draft: ForgeDraft, report: ImportReport): Promise<void> {
     if (!this.options.approve || draft.reviewStatus === APPROVED || draft.status === 'final') return;
-    await this.client.approve(projectId, draft.chapter, draft.revision);
+    await this.client.approve(projectId, draft);
     report.approved.push(draft.chapter);
   }
 }
