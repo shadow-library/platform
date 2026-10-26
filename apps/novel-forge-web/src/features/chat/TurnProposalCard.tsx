@@ -62,6 +62,7 @@ export function TurnProposalCard({ novelId, proposal, onApplied }: TurnProposalC
   const skipped = useAuditSkippedOps(novelId, proposal);
   const isDeclined = (index: number): boolean => declined.has(index) || skipped.has(index);
   const declinedCount = proposal.changeSet.filter((_, index) => isDeclined(index)).length;
+  const selectedCount = proposal.changeSet.length - declinedCount;
 
   // The selection is keyed to one proposal's op indexes, so a different proposal in the same slot resets
   // it during render rather than in an effect — an effect would paint one frame of the old selection.
@@ -85,7 +86,6 @@ export function TurnProposalCard({ novelId, proposal, onApplied }: TurnProposalC
 
   const doApply = (): void => {
     const selected = proposal.changeSet.map((_, i) => i).filter(i => !isDeclined(i));
-    if (selected.length === 0) return void toast.danger('Select at least one operation to apply');
     setFinalizeRefusal(undefined);
     // Explicit but for an audit card: a blanket apply (no `opIndexes`) is refused outright when the change-set holds a
     // one-way door, so naming the indexes is what makes finalize reachable at all; an audit card holds none.
@@ -177,8 +177,8 @@ export function TurnProposalCard({ novelId, proposal, onApplied }: TurnProposalC
         <div className={styles.cardActions}>
           {isPending && (
             <>
-              <Button size="sm" variant="primary" loading={apply.isPending} onClick={doApply}>
-                {declinedCount > 0 ? `Apply ${proposal.changeSet.length - declinedCount} selected` : 'Apply'}
+              <Button size="sm" variant="primary" loading={apply.isPending} disabled={selectedCount === 0} onClick={doApply}>
+                {declinedCount > 0 ? `Apply ${selectedCount} selected` : 'Apply'}
               </Button>
               <Button
                 size="sm"

@@ -73,6 +73,28 @@ describe('opSubject', () => {
     expect(opSubject({ op: 'action.apply_continuity', chapter: 3 })).toBe('Add chapter 3 to the Story Bible');
   });
 
+  it('should title every action the server can stage in words, never by its op name', () => {
+    const actions = [
+      { op: 'action.generate_chapter', chapter: 1 },
+      { op: 'action.plan_chapter' },
+      { op: 'action.revise_draft', chapter: 2, note: 'tighten' },
+      { op: 'action.judge_draft', chapter: 2 },
+      { op: 'action.approve_draft', chapter: 2 },
+      { op: 'action.finalize', upTo: 4 },
+      { op: 'action.finalize' },
+      { op: 'action.apply_continuity', chapter: 2 },
+      { op: 'action.validate', scope: 'novel' },
+      { op: 'action.validate', scope: 'chapter', chapter: 2 },
+      { op: 'action.organise_notes' },
+      { op: 'action.audit_bible' },
+      { op: 'action.enhance_premise' },
+      { op: 'action.advance_volume', volumeKey: 'v1' },
+    ];
+
+    expect(actions.map(opSubject).filter(subject => subject.includes('action.') || subject.includes('undefined'))).toEqual([]);
+    expect(opSubject({ op: 'action.generate_chapter', chapter: 1 })).toBe('Write chapter 1');
+  });
+
   it.each([
     ['its paragraph and label', { label: 'the wrist injury', anchor: { paragraph: 2 } }, '¶2 · the wrist injury'],
     ['its paragraph and chapter when it has no label', { anchor: { paragraph: 2 } }, '¶2 of chapter 3'],

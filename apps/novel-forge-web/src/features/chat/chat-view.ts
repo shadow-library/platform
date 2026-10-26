@@ -81,10 +81,40 @@ export function opSubject(op: ChangeOp): string {
   if (type.startsWith('promise.')) return text(op.label) ?? String(op.key ?? op.op);
   if (type === 'brief.update') return text(op.title) ?? `Chapter ${String(op.chapter)}`;
   if (type === 'bible_document.upsert') return text(isRecord(op.frontmatter) ? op.frontmatter.title : undefined) ?? String(op.slug).replace(/[-_]/g, ' ');
-  if (type === 'action.plan_chapter') return 'Plan the next chapter';
-  if (type === 'action.organise_notes') return 'Organise your notes';
-  if (type === 'action.apply_continuity') return `Add chapter ${String(op.chapter)} to the Story Bible`;
+  if (type.startsWith('action.')) return actionSubject(op);
   return text(op.name) ?? String(op.entityKey ?? op.factKey ?? op.op);
+}
+
+function actionSubject(op: ChangeOp): string {
+  const chapter = `chapter ${String(op.chapter)}`;
+  switch (String(op.op)) {
+    case 'action.generate_chapter':
+      return `Write ${chapter}`;
+    case 'action.plan_chapter':
+      return 'Plan the next chapter';
+    case 'action.revise_draft':
+      return `Revise ${chapter}`;
+    case 'action.judge_draft':
+      return `Check ${chapter} against the Story Bible`;
+    case 'action.approve_draft':
+      return `Approve ${chapter}`;
+    case 'action.finalize':
+      return typeof op.upTo === 'number' ? `Finalize chapters up to ${op.upTo}` : 'Finalize the approved chapters';
+    case 'action.apply_continuity':
+      return `Add ${chapter} to the Story Bible`;
+    case 'action.validate':
+      return typeof op.chapter === 'number' ? `Check ${chapter} for continuity` : 'Check the novel for continuity';
+    case 'action.organise_notes':
+      return 'Organise your notes';
+    case 'action.audit_bible':
+      return 'Audit the Story Bible';
+    case 'action.enhance_premise':
+      return 'Strengthen the premise';
+    case 'action.advance_volume':
+      return 'Mark this volume’s goal met and start the next';
+    default:
+      return 'Run an action';
+  }
 }
 
 /** The field the op actually writes, shown beside its quote: a quote proves the author said the words, not that the value is faithful to them. */
