@@ -67,6 +67,8 @@ export interface TranslatedRequest {
   body: JsonObject;
   /** Set only when the envelope asked for web search: whether this deployment will run it */
   webSearch?: boolean;
+  /** Synapse runs the search itself: the body offers its tool, and dispatch answers each call before asking again */
+  hostedSearch?: boolean;
 }
 
 export interface NormalizedUsage {

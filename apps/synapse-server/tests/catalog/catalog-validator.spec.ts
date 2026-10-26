@@ -37,6 +37,18 @@ describe('validateCatalog', () => {
     });
   });
 
+  describe('tools', () => {
+    it('should require a credential on a brave web search and refuse one on a mock', () => {
+      const brave = catalogDocument(draft => (draft.tools = { webSearch: { kind: 'brave', url: 'https://api.search.brave.com', maxSearches: 3, results: 5 } }));
+      const mock = catalogDocument(
+        draft => (draft.tools = { webSearch: { kind: 'mock', url: 'http://search.mock', credential: '00000000-0000-4000-8000-000000000001', maxSearches: 3, results: 5 } }),
+      );
+
+      expect(issues(brave)).toEqual([{ path: 'tools.webSearch.credential', code: 'missing_field' }]);
+      expect(issues(mock)).toEqual([{ path: 'tools.webSearch.credential', code: 'invalid_value' }]);
+    });
+  });
+
   describe('references', () => {
     it('should reject a deployment naming an unknown provider', () => {
       const document = catalogDocument(draft => (draft.models['grok-4.6']!.deployments[0]!.provider = 'xai'));

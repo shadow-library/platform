@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'bun:test';
 
 import { type ChatTranslationInput, translateChatRequest, translateEmbeddingRequest, translateImageRequest } from '@modules/providers/chat-translation.util';
-import { type ModelCapabilities, type ProviderSpec } from '@modules/catalog/catalog.types';
+import { type ModelCapabilities } from '@modules/catalog/catalog.types';
+import { WEB_SEARCH_TOOL } from '@modules/providers/hosted-search.util';
 import { type ChatRequestBody } from '@modules/providers/provider.types';
 
 import { chatBody, ENVELOPE, GATEWAY, MOCK, modelSpec, OLLAMA, OPENAI_COMPATIBLE, OPENROUTER } from './provider-fixtures';
@@ -165,27 +166,39 @@ describe('translateChatRequest', () => {
     });
   });
 
-  describe('OpenRouter web search', () => {
-    it('should add the web plugin for a metered OpenRouter provider', () => {
-      const translated = translate({ envelope: { ...ENVELOPE, web_search: true } });
+  describe('hosted web search', () => {
+    it("should offer Synapse's own search tool, never the web plugin, where the catalog configures one", () => {
+      const translated = translate({ envelope: { ...ENVELOPE, web_search: true }, hostedSearch: true });
 
-      expect(translated.body['plugins']).toEqual([{ id: 'web' }]);
-      expect(translated.webSearch).toBe(true);
+      expect(translated.body['tools']).toEqual([WEB_SEARCH_TOOL]);
+      expect(translated.body['tool_choice']).toBe('auto');
+      expect(translated.body).not.toHaveProperty('plugins');
+      expect(translated).toMatchObject({ webSearch: true, hostedSearch: true });
     });
 
-    it('should ignore web search and report it unapplied where neither a native feature nor a metered OpenRouter can run it', () => {
-      const unmetered: ProviderSpec = { ...OPENROUTER, cost: 'zero' };
-      for (const provider of [unmetered, OLLAMA]) {
-        const translated = translate({ provider, envelope: { ...ENVELOPE, web_search: true } });
-        expect(translated.body).not.toHaveProperty('plugins');
+    it('should report web search unapplied where nothing can run it: no tool configured, a model without tools, or a request with tools of its own', () => {
+      const unconfigured = translate({ envelope: { ...ENVELOPE, web_search: true } });
+      const toolless = translate({ envelope: { ...ENVELOPE, web_search: true }, hostedSearch: true, capabilities: { tools: false } });
+      const ownTools = translate({ body: chatBody({ tools: [{ type: 'function' }] }), envelope: { ...ENVELOPE, web_search: true }, hostedSearch: true });
+
+      for (const translated of [unconfigured, toolless, ownTools]) {
+        expect(translated.body).not.toContainAnyKeys(['plugins', 'tool_choice']);
         expect(translated.webSearch).toBe(false);
+        expect(translated).not.toHaveProperty('hostedSearch');
       }
     });
 
-    it('should report nothing about web search when it was not requested', () => {
-      const translated = translate();
+    it('should leave a gateway with its own search to its CLI rather than host one', () => {
+      const translated = translate({ provider: GATEWAY, envelope: { ...ENVELOPE, web_search: true }, hostedSearch: true });
 
-      expect(translated.body).not.toHaveProperty('plugins');
+      expect(translated.headers['x-gateway-web-tools']).toBe('on');
+      expect(translated).not.toHaveProperty('hostedSearch');
+    });
+
+    it('should report nothing about web search when it was not requested', () => {
+      const translated = translate({ hostedSearch: true });
+
+      expect(translated.body).not.toContainAnyKeys(['plugins', 'tools']);
       expect(translated).not.toHaveProperty('webSearch');
     });
   });

@@ -10,6 +10,7 @@ import {
   type CatalogDocument,
   type CatalogIssue,
   type CatalogIssueCode,
+  type CatalogTools,
   type DataPolicy,
   EFFORTS,
   type ModelCapabilities,
@@ -26,6 +27,8 @@ import {
   type TaskKind,
   type TaskRoute,
   type TaskSpec,
+  type WebSearchKind,
+  type WebSearchToolSpec,
 } from './catalog.types';
 import { childPath, isRecord, itemPath } from './catalog.utils';
 
@@ -36,9 +39,12 @@ type Reader<T> = (value: unknown, path: string) => T;
 interface NumberRule {
   integer?: boolean;
   min: number;
+  max?: number;
 }
 
 const TASK_LABEL_MAX = 60;
+const MAX_SEARCHES = 10;
+const MAX_SEARCH_RESULTS = 20;
 const TASK_DESCRIPTION_MAX = 280;
 const KEY_PATTERN = /^[A-Za-z0-9][\w.:/@-]*$/;
 const TASK_KEY_PATTERN = /^[a-z0-9][a-z0-9-]*\.[a-z0-9][a-z0-9._-]*$/;
@@ -65,7 +71,10 @@ const DATA_POLICIES = keysOf<DataPolicy>({ any: true, in_cluster_only: true });
 const BUDGET_SCOPES = keysOf<BudgetScope>({ subject: true, app: true });
 const BUDGET_WINDOWS = keysOf<BudgetWindow>({ '1h': true, '1d': true, '30d': true });
 
-const DOCUMENT_FIELDS = keysOf<keyof CatalogDocument>({ providers: true, models: true, aliases: true, tasks: true, budgets: true });
+const DOCUMENT_FIELDS = keysOf<keyof CatalogDocument>({ providers: true, models: true, aliases: true, tasks: true, budgets: true, tools: true });
+const TOOLS_FIELDS = keysOf<keyof CatalogTools>({ webSearch: true });
+const WEB_SEARCH_KINDS = keysOf<WebSearchKind>({ brave: true, mock: true });
+const WEB_SEARCH_FIELDS = keysOf<keyof WebSearchToolSpec>({ kind: true, url: true, credential: true, maxSearches: true, results: true, pricePerSearchUsd: true });
 const PROVIDER_FIELDS = keysOf<keyof ProviderSpec>({
   kind: true,
   flavor: true,
@@ -150,8 +159,21 @@ class CatalogParser {
       aliases: fields.required('aliases', this.record(KEY_PATTERN, this.alias)),
       tasks: fields.required('tasks', this.record(TASK_KEY_PATTERN, this.task)),
       budgets: fields.required('budgets', this.array(this.budget)),
+      tools: fields.optional('tools', this.tools),
     }));
   }
+
+  private readonly tools: Reader<CatalogTools> = (value, path) => this.object(value, path, TOOLS_FIELDS, fields => ({ webSearch: fields.optional('webSearch', this.webSearch) }));
+
+  private readonly webSearch: Reader<WebSearchToolSpec> = (value, path) =>
+    this.object(value, path, WEB_SEARCH_FIELDS, fields => ({
+      kind: fields.required('kind', this.literal(WEB_SEARCH_KINDS)),
+      url: fields.required('url', this.url),
+      credential: fields.optional('credential', this.credentialId),
+      maxSearches: fields.required('maxSearches', this.number({ integer: true, min: 1, max: MAX_SEARCHES })),
+      results: fields.required('results', this.number({ integer: true, min: 1, max: MAX_SEARCH_RESULTS })),
+      pricePerSearchUsd: fields.optional('pricePerSearchUsd', this.number({ min: 0 })),
+    }));
 
   private readonly provider: Reader<ProviderSpec> = (value, path) =>
     this.object(value, path, PROVIDER_FIELDS, fields => ({
@@ -295,6 +317,7 @@ class CatalogParser {
       if (typeof value !== 'number' || !Number.isFinite(value)) return this.mismatch(value, path, 'a finite number', rule.min);
       if (rule.integer && !Number.isInteger(value)) this.report(path, 'invalid_value', 'Expected an integer');
       if (value < rule.min) this.report(path, 'invalid_value', `Expected at least ${rule.min}`);
+      if (rule.max !== undefined && value > rule.max) this.report(path, 'invalid_value', `Expected at most ${rule.max}`);
       return value;
     };
   }

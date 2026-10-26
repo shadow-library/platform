@@ -80,7 +80,7 @@ describe('chatScopeInstructions — web research', () => {
   it('should say nothing about the web while it is off, and how to research in each mode', () => {
     expect(chatScopeInstructions([])).not.toContain('Web research');
     expect(chatScopeInstructions([], 'brave')).toContain('search_web, then read the most promising results in full with fetch_page');
-    expect(chatScopeInstructions([], 'native')).toContain('your own built-in web search and page-fetch tools');
+    expect(chatScopeInstructions([], 'native')).toContain('the web search you have been given');
     expect(chatScopeInstructions([], 'native')).toContain('never copy its passages into the book');
   });
 });

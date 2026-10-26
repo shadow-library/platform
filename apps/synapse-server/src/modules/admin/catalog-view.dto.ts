@@ -102,8 +102,11 @@ export class CatalogAliasView {
   @Field(() => String, { enum: ['active', 'hidden', 'retired'] })
   state: 'active' | 'hidden' | 'retired';
 
-  @Field({ description: "Whether the first eligible deployment of the alias's model is served by a provider with native web search" })
-  native_web_search: boolean;
+  @Field({
+    description:
+      "Whether a chat on the alias's model can search the web: its first eligible deployment searches by itself, or Synapse runs its own search for a request that brings no tools",
+  })
+  web_search: boolean;
 }
 
 @Schema()
@@ -114,8 +117,11 @@ export class CatalogTaskView {
   @Field(() => [CatalogAliasView], { description: 'Only the active aliases the task accepts and the selectors allow' })
   aliases: CatalogAliasView[];
 
-  @Field({ description: 'Whether the first eligible deployment of the default model is served by a provider with native web search' })
-  native_web_search: boolean;
+  @Field({
+    description:
+      'Whether a chat on the default model can search the web: its first eligible deployment searches by itself, or Synapse runs its own search for a request that brings no tools',
+  })
+  web_search: boolean;
 }
 
 @Schema({ description: 'One task when `task` is given (`task` and the task view at the top level), else every task of the calling app under `tasks`' })
@@ -133,7 +139,7 @@ export class CatalogResponseDto {
   aliases?: CatalogAliasView[];
 
   @Field({ optional: true })
-  native_web_search?: boolean;
+  web_search?: boolean;
 
   @Field({ optional: true, additionalProperties: true, description: 'Task views keyed by task key, each shaped as CatalogTaskView' })
   tasks?: Record<string, CatalogTaskView>;

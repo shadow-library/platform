@@ -4,10 +4,10 @@ import { type AIMessageChunk, HumanMessage } from '@langchain/core/messages';
 import { concat } from '@langchain/core/utils/stream';
 import { AppError, ErrorCode } from '@shadow-library/common';
 import { SynapseClient, SynapseError } from '@shadow-library/synapse';
-import { SynapseChatModel, type SynapseChatModelFields, type SynapseRequestHook } from '@shadow-library/synapse/langchain';
+import { isSynapseReset, SynapseChatModel, type SynapseChatModelFields, type SynapseRequestHook } from '@shadow-library/synapse/langchain';
 
 import { FakeAuthClient, FakeSynapse, json, sse } from './fakes';
-import { CHAT_COMPLETION, FINAL_FRAME, STREAM_CHUNKS, SYNAPSE_BLOCK } from './fixtures/synapse-responses';
+import { CHAT_COMPLETION, FINAL_FRAME, RESET_FRAME, SEARCH_PREAMBLE, STREAM_CHUNKS, SYNAPSE_BLOCK } from './fixtures/synapse-responses';
 
 const ENVELOPE = { subject: { type: 'owner' as const, id: '7' }, selectors: { tier: 'balanced' }, alias: 'opus' };
 
@@ -154,6 +154,28 @@ describe('SynapseChatModel', () => {
     const aggregated = await aggregate(await model().stream('Hi'));
 
     expect(aggregated.response_metadata.synapse).toEqual(SYNAPSE_BLOCK);
+  });
+
+  it('should hand a reset on as an empty chunk between the text it voids and the text that follows', async () => {
+    synapse.reply(sse([SEARCH_PREAMBLE, RESET_FRAME, ...STREAM_CHUNKS, FINAL_FRAME, '[DONE]']));
+    const chunks: AIMessageChunk[] = [];
+    for await (const chunk of await model().stream('Hi')) chunks.push(chunk);
+    const reset = chunks.findIndex(chunk => isSynapseReset(chunk));
+
+    expect(chunks.filter(chunk => isSynapseReset(chunk))).toHaveLength(1);
+    expect(
+      chunks
+        .slice(0, reset)
+        .map(chunk => chunk.content)
+        .join(''),
+    ).toBe('Let me look that up.');
+    expect(
+      chunks
+        .slice(reset + 1)
+        .map(chunk => chunk.content)
+        .join(''),
+    ).toBe('Hello world');
+    expect(chunks[reset]?.content).toBe('');
   });
 
   it('should keep concurrent streams on one instance apart', async () => {

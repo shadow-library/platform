@@ -109,6 +109,26 @@ export interface BudgetSpec {
   maxListCostUsd?: number;
 }
 
+export type WebSearchKind = 'brave' | 'mock';
+
+/** The search Synapse runs itself for a chat that asks for web search and is served without a provider's own */
+export interface WebSearchToolSpec {
+  kind: WebSearchKind;
+  url: string;
+  /** Id of a stored credential, bound to the origin of `url` */
+  credential?: string;
+  /** Searches one call may run before the model must answer */
+  maxSearches: number;
+  /** Results each search hands the model */
+  results: number;
+  /** Added to the call's list price for each search run */
+  pricePerSearchUsd?: number;
+}
+
+export interface CatalogTools {
+  webSearch?: WebSearchToolSpec;
+}
+
 export interface CatalogDocument {
   providers: Record<string, ProviderSpec>;
   models: Record<string, ModelSpec>;
@@ -116,6 +136,7 @@ export interface CatalogDocument {
   /** Keyed `<app>.<name>` */
   tasks: Record<string, TaskSpec>;
   budgets: BudgetSpec[];
+  tools?: CatalogTools;
 }
 
 export type CatalogSection = keyof CatalogDocument;
@@ -164,7 +185,7 @@ export interface ActiveCatalog {
   document: CatalogDocument;
 }
 
-export const CATALOG_SECTIONS: readonly CatalogSection[] = ['providers', 'models', 'aliases', 'tasks', 'budgets'];
+export const CATALOG_SECTIONS: readonly CatalogSection[] = ['providers', 'models', 'aliases', 'tasks', 'budgets', 'tools'];
 
 export const EFFORTS: readonly Effort[] = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
 

@@ -124,6 +124,17 @@ describe('parseCatalogDocument', () => {
     }
   });
 
+  it('should accept a web search tool and bound how many searches and results it runs', () => {
+    const search = { kind: 'brave', url: 'https://api.search.brave.com', credential: '00000000-0000-4000-8000-000000000001', maxSearches: 3, results: 5 };
+    expect(issuesOf(parseWith(document => (document.tools = { webSearch: search })))).toEqual([]);
+    expect(issuesOf(parseWith(document => (document.tools = { webSearch: { ...search, maxSearches: 0, results: 21, kind: 'google' } })))).toEqual([
+      { path: 'tools.webSearch.kind', code: 'invalid_value' },
+      { path: 'tools.webSearch.maxSearches', code: 'invalid_value' },
+      { path: 'tools.webSearch.results', code: 'invalid_value' },
+    ]);
+    expect(issuesOf(parseWith(document => (document.tools = { webFetch: {} })))).toEqual([{ path: 'tools.webFetch', code: expect.any(String) }]);
+  });
+
   it('should accept a credential named by its id and reject anything else', () => {
     const named = parseWith(document => {
       delete document.providers.openrouter.apiKeyConfig;

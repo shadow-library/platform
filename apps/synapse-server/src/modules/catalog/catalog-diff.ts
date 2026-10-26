@@ -3,7 +3,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { CATALOG_SECTIONS, type CatalogSection } from './catalog.types';
 import { isRecord } from './catalog.utils';
 
-const EMPTY_SECTIONS: Record<CatalogSection, unknown> = { providers: {}, models: {}, aliases: {}, tasks: {}, budgets: [] };
+const EMPTY_SECTIONS: Record<CatalogSection, unknown> = { providers: {}, models: {}, aliases: {}, tasks: {}, budgets: [], tools: {} };
 
 function section(document: unknown, name: CatalogSection): unknown {
   const value = isRecord(document) ? document[name] : undefined;

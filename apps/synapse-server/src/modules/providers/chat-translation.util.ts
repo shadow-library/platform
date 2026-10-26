@@ -2,6 +2,7 @@ import { type SynapseEnvelope } from '@shadow-library/synapse';
 
 import { type Effort, type ModelSpec, type ProviderFlavor, type ProviderSpec } from '@modules/catalog';
 
+import { WEB_SEARCH_TOOL } from './hosted-search.util';
 import { ProviderCallError } from './provider-call.error';
 import { optionalPropertyCount } from './schema-complexity.util';
 import {
@@ -27,6 +28,8 @@ export interface ChatTranslationInput {
   envelope: SynapseEnvelope;
   /** Resolved by the credential resolver; absent sends no authorization */
   apiKey?: string;
+  /** The catalog configures a search Synapse runs itself, offered to a deployment that cannot search on its own */
+  hostedSearch?: boolean;
 }
 
 export interface EmbeddingTranslationInput {
@@ -111,15 +114,15 @@ function promptsSchema({ capabilities }: ModelSpec, schema: unknown): boolean {
   return capabilities.maxOptionalProperties !== undefined && optionalPropertyCount(schema) > capabilities.maxOptionalProperties;
 }
 
-type WebSearchRoute = 'not_requested' | 'gateway_tools' | 'openrouter_plugin' | 'unavailable';
+type WebSearchRoute = 'not_requested' | 'gateway_tools' | 'hosted' | 'unavailable';
 
-function webSearchRoute({ body, provider, envelope }: ChatTranslationInput, dialect: ProviderDialect): WebSearchRoute {
+// OpenRouter's own web plugin is never used: on a Claude model it runs the vendor's search with no cap on rounds, each re-reading the whole context.
+function webSearchRoute({ body, model, provider, envelope, hostedSearch }: ChatTranslationInput, dialect: ProviderDialect): WebSearchRoute {
   if (envelope.web_search !== true) return 'not_requested';
-  // The gateway grants a CLI's web tools only to a request that brings no tools of its own.
-  const bringsTools = (body.tools?.length ?? 0) > 0;
-  if (dialect === 'subscription-gateway' && hasFeature(provider, 'native_web_search')) return bringsTools ? 'unavailable' : 'gateway_tools';
-  if (dialect === 'openrouter' && provider.cost === 'metered') return 'openrouter_plugin';
-  return 'unavailable';
+  // Neither the gateway's web tools nor Synapse's own search can share a turn with tools the caller runs itself.
+  if ((body.tools?.length ?? 0) > 0) return 'unavailable';
+  if (dialect === 'subscription-gateway' && hasFeature(provider, 'native_web_search')) return 'gateway_tools';
+  return hostedSearch && model.capabilities.tools ? 'hosted' : 'unavailable';
 }
 
 export function translateChatRequest(input: ChatTranslationInput): TranslatedRequest {
@@ -146,9 +149,18 @@ export function translateChatRequest(input: ChatTranslationInput): TranslatedReq
   if (dialect === 'subscription-gateway' && hasFeature(provider, 'sessions') && envelope.session) headers[GATEWAY_SESSION_HEADER] = sessionHeader(envelope.session);
   const webSearch = webSearchRoute(input, dialect);
   if (webSearch === 'gateway_tools') headers[GATEWAY_WEB_TOOLS_HEADER] = 'on';
-  if (webSearch === 'openrouter_plugin') translated['plugins'] = [{ id: 'web' }];
+  if (webSearch === 'hosted') {
+    translated['tools'] = [WEB_SEARCH_TOOL];
+    translated['tool_choice'] = 'auto';
+  }
 
-  return { url: endpoint(provider, 'chat/completions'), headers, body: translated, ...(webSearch === 'not_requested' ? {} : { webSearch: webSearch !== 'unavailable' }) };
+  return {
+    url: endpoint(provider, 'chat/completions'),
+    headers,
+    body: translated,
+    ...(webSearch === 'not_requested' ? {} : { webSearch: webSearch !== 'unavailable' }),
+    ...(webSearch === 'hosted' ? { hostedSearch: true } : {}),
+  };
 }
 
 export function translateEmbeddingRequest({ body, provider, providerKey, deploymentId, apiKey }: EmbeddingTranslationInput): TranslatedRequest {

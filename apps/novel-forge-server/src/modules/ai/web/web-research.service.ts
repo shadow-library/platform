@@ -11,8 +11,8 @@ import { fetchPage, type WebPage } from './page-fetch';
 import { type AddressLookup, type Fetcher, resolveAddresses } from './web-address';
 
 /**
- * How one chat turn reaches the web: `native` when Synapse's catalog says the turn's model is served with its own web search, `brave` through
- * this server's Brave lookups otherwise, `off` when neither is available.
+ * How one chat turn reaches the web: `native` when Synapse's catalog says the turn's model can search, by its provider's own search or by the
+ * search Synapse runs itself, `brave` through this server's Brave lookups otherwise, `off` when neither is available.
  */
 export type WebMode = 'native' | 'brave' | 'off';
 
@@ -63,22 +63,22 @@ export class WebResearchService {
   constructor(private readonly synapse: SynapseClient) {}
 
   /**
-   * Asks Synapse whether the chat searches the web itself, since only it knows where a model runs. It answers for the chat task and the turn's
+   * Asks Synapse whether the chat can search the web, since only it knows where a model runs and what it searches with. It answers for the chat task and the turn's
    * `selectors` from its catalog, which its client caches by version: for the pinned `alias` when the catalog offers it, else for the task's
    * default. Any failure to answer means no.
    */
   async modeFor(selectors: Record<string, string> = {}, alias?: string): Promise<WebMode> {
-    if (await this.isCatalogNative(selectors, alias)) return 'native';
+    if (await this.catalogSearches(selectors, alias)) return 'native';
     return Config.get('ai.web-search.brave.api.key') ? 'brave' : 'off';
   }
 
-  private async isCatalogNative(selectors: Record<string, string>, alias?: string): Promise<boolean> {
+  private async catalogSearches(selectors: Record<string, string>, alias?: string): Promise<boolean> {
     try {
       const view = await this.synapse.catalog({ task: SYNAPSE_CHAT_TASK, selectors });
       const pinned = alias === undefined ? undefined : view.aliases.find(entry => entry.key === alias);
-      return (pinned ?? view).native_web_search === true;
+      return (pinned ?? view).web_search === true;
     } catch (err) {
-      this.logger.warn('Synapse catalog unreadable, so the chat gets no native web search', { selectors, err });
+      this.logger.warn('Synapse catalog unreadable, so the chat gets no web search from Synapse', { selectors, err });
       return false;
     }
   }

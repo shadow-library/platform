@@ -1,12 +1,16 @@
 import { describe, expect, it } from 'bun:test';
+import { SYNAPSE_RESET_METADATA } from '@shadow-library/synapse/langchain';
 
 import { ModelRouterService, type ReplyStreamHandlers } from '@modules/ai/model-router.service';
 import { type ChatRefineOutput, ChatRefineSchema } from '@modules/ai/schemas/chat-refine.schema';
 
 type StreamEvent = { type: 'delta'; text: string } | { type: 'reset' };
 
+/** The empty chunk Synapse's LangChain model yields when a round of its own web search voids the text already sent */
+const RESET = { content: '', response_metadata: { [SYNAPSE_RESET_METADATA]: true } };
+
 interface StreamScript {
-  chunks: string[];
+  chunks: (string | typeof RESET)[];
 }
 
 const CTX = { projectId: BigInt(1), promptKey: 'judge', promptVersion: '1.0.0', role: 'judge' };
@@ -49,7 +53,7 @@ function fakeClient(streams: StreamScript[], invokeResponses: string[] = []) {
     stream: async () => {
       const script = streams[streamCalls++] ?? { chunks: [] };
       return (async function* () {
-        for (const chunk of script.chunks) yield { content: chunk };
+        for (const chunk of script.chunks) yield typeof chunk === 'string' ? { content: chunk } : chunk;
       })();
     },
     invoke: async () => ({ content: invokeResponses[invokeCalls++] ?? '' }),
@@ -99,6 +103,20 @@ describe('ModelRouterService.streamStructured', () => {
     expect(events.some(event => event.type === 'reset')).toBe(false);
     expect(streamed).toEqual(invoked);
     expect(streamed.reply).toBe('Hello, world — the tide is out.');
+  });
+
+  it("should drop the text Synapse's web search voided and keep only the answer that followed it", async () => {
+    const preamble = JSON.stringify({ reply: 'Let me look that up.', changeSet: [] }).slice(0, 25);
+    const payload = JSON.stringify({ reply: 'Tamsin keeps the lighthouse.', changeSet: [] });
+    const { router } = makeRouter(fakeClient([{ chunks: [...split(preamble, 6), RESET, ...split(payload, 7)] }]));
+    const { handlers, events } = recorder();
+
+    const result = await router.streamStructured<ChatRefineOutput>(chatPrompt, {}, CHAT_CTX, handlers);
+    const afterReset = events.slice(events.findIndex(event => event.type === 'reset') + 1);
+
+    expect(events.filter(event => event.type === 'reset')).toHaveLength(1);
+    expect(deltaText(afterReset)).toBe('Tamsin keeps the lighthouse.');
+    expect(result.reply).toBe('Tamsin keeps the lighthouse.');
   });
 
   it('should emit deltas even when the model emits changeSet before reply', async () => {

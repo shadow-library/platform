@@ -77,6 +77,24 @@ describe('credentialIssues', () => {
   });
 });
 
+describe('the web search tool credential', () => {
+  const live = { id: CREDENTIAL, allowedOrigin: 'https://api.search.brave.com', revoked: false };
+  const withSearch = (url: string) => (draft: CatalogDocument) => {
+    draft.tools = { webSearch: { kind: 'brave', url, credential: CREDENTIAL, maxSearches: 3, results: 5 } };
+  };
+
+  it('should count the tool among the holders of its credential', () => {
+    expect(credentialReferences(catalogDocument(withSearch('https://api.search.brave.com')))).toEqual(new Map([[CREDENTIAL, ['tools.webSearch']]]));
+  });
+
+  it('should refuse to publish the key to an origin other than the one it is bound to', () => {
+    expect(credentialIssues(catalogDocument(withSearch('https://api.search.brave.com')), [live])).toEqual([]);
+    expect(credentialIssues(catalogDocument(withSearch('https://search.evil.test')), [live]).map(issue => `${issue.path}:${issue.code}`)).toEqual([
+      'tools.webSearch.url:credential_origin_mismatch',
+    ]);
+  });
+});
+
 describe('credentialIssues for the deprecated apiKeyConfig', () => {
   it("should accept the env key at OpenRouter's origin, as the seeded catalog names it", () => {
     expect(credentialIssues(catalogDocument(), [])).toEqual([]);

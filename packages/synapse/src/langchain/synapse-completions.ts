@@ -21,12 +21,24 @@ export type SynapseRequestHook = <T extends SynapseCompletionRequest>(request: T
 
 interface SynapseBox {
   synapse?: SynapseResponseBlock;
+  resets: number;
+}
+
+/** Set on the `response_metadata` of an empty chunk standing for a reset: every content chunk before it is void */
+export const SYNAPSE_RESET_METADATA = 'synapse_reset';
+
+export function isSynapseReset(message: { response_metadata?: Record<string, unknown> }): boolean {
+  return message.response_metadata?.[SYNAPSE_RESET_METADATA] === true;
+}
+
+function resetChunk(): ChatGenerationChunk {
+  return new ChatGenerationChunk({ text: '', message: new AIMessageChunk({ content: '', response_metadata: { [SYNAPSE_RESET_METADATA]: true } }) });
 }
 
 const SYNAPSE_BOX = Symbol('synapseBox');
 
 function attachBox(options: object): SynapseBox {
-  const box: SynapseBox = {};
+  const box: SynapseBox = { resets: 0 };
   (options as Record<symbol, SynapseBox>)[SYNAPSE_BOX] = box;
   return box;
 }
@@ -36,6 +48,11 @@ const boxOf = (requestOptions: OpenAIClient.RequestOptions | undefined): Synapse
 function synapseOf(frame: object): SynapseResponseBlock | undefined {
   const synapse = (frame as { synapse?: unknown }).synapse;
   return isRecord(synapse) ? (synapse as unknown as SynapseResponseBlock) : undefined;
+}
+
+function isResetFrame(frame: object): boolean {
+  const event = (frame as { synapse_event?: unknown }).synapse_event;
+  return isRecord(event) && event['type'] === 'reset';
 }
 
 function withFreshRequestId<T extends SynapseCompletionRequest>(request: T): T {
@@ -63,6 +80,7 @@ async function* tapSynapseFrames(frames: AsyncIterable<ChatCompletionChunk>, box
     for await (const frame of frames) {
       const synapse = synapseOf(frame);
       if (box && synapse) box.synapse = synapse;
+      if (box && isResetFrame(frame)) box.resets++;
       yield frame;
     }
   } catch (error) {
@@ -140,11 +158,14 @@ export class SynapseCompletions extends ChatOpenAICompletions {
   /**
    * After its loop the base emits exactly one more chunk, the only one carrying `usage_metadata`, built from the same choice-less frame the
    * `synapse` block arrived on; stamping that chunk lands the block once. A stream that reported no usage gets a chunk of its own instead.
+   * The base drops a reset frame too, having no choice in it, so a reset is yielded as an empty chunk before whatever the stream sends next.
    */
   override async *_streamResponseChunks(messages: BaseMessage[], options: this['ParsedCallOptions'], runManager?: CallbackManagerForLLMRun): AsyncGenerator<ChatGenerationChunk> {
     const box = attachBox(options);
     let stamped = false;
+    let resets = 0;
     for await (const chunk of super._streamResponseChunks(messages, options, runManager)) {
+      for (; resets < box.resets; resets++) yield resetChunk();
       if (box.synapse && (chunk.message as AIMessageChunk).usage_metadata) {
         stampSynapse(chunk, box.synapse);
         stamped = true;

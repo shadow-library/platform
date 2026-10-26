@@ -33,9 +33,11 @@ function requireModel(document: CatalogDocument, modelKey: string): ModelSpec {
   return model;
 }
 
-function searchesNatively(document: CatalogDocument, task: TaskSpec, model: ModelSpec): boolean {
+/** The first eligible deployment searches by itself; otherwise Synapse runs the catalog's search for a model that can call it */
+function searchesWeb(document: CatalogDocument, task: TaskSpec, model: ModelSpec): boolean {
   const [first] = eligibleDeployments(document, task, model);
-  return first?.provider.features?.includes('native_web_search') ?? false;
+  if (first?.provider.features?.includes('native_web_search')) return true;
+  return document.tools?.webSearch !== undefined && model.capabilities.tools;
 }
 
 /** The app prefix is checked before the task is looked up, so a caller cannot probe which tasks of another app exist. */
@@ -64,7 +66,7 @@ export class CatalogViewService {
     return {
       default: { model: route.model, label: labelFor(undefined, model), ...priceOf(model) },
       aliases: this.aliasViews(document, task, selectors),
-      native_web_search: searchesNatively(document, task, model),
+      web_search: searchesWeb(document, task, model),
     };
   }
 
@@ -81,7 +83,7 @@ export class CatalogViewService {
         model: alias.model,
         ...priceOf(model),
         state: alias.state,
-        native_web_search: searchesNatively(document, task, model),
+        web_search: searchesWeb(document, task, model),
       });
     }
     return views;

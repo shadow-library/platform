@@ -31,6 +31,11 @@ describe('changeAuthorizer', () => {
     expect(authorize([catalogWrite, providersWrite], ['providers'])).toBeUndefined();
   });
 
+  it('should require providers write when the tools changed, since they name where a stored key is sent', () => {
+    expect(AppError.is(authorize([catalogWrite], ['tools']), AuthGuardErrorCode.IAM_002)).toBe(true);
+    expect(authorize([catalogWrite, providersWrite], ['tools'])).toBeUndefined();
+  });
+
   it('should require budgets write when budgets changed', () => {
     expect(AppError.is(authorize([catalogWrite], ['budgets']), AuthGuardErrorCode.IAM_002)).toBe(true);
     expect(authorize([catalogWrite, budgetsWrite], ['budgets'])).toBeUndefined();

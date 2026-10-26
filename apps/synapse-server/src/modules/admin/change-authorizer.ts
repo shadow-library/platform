@@ -12,9 +12,11 @@ export const CHANGE_PERMISSIONS = [SYNAPSE_PERMISSIONS.catalogWrite] as const;
 
 export const CHANGE_SENSITIVE_PERMISSIONS = [SYNAPSE_PERMISSIONS.providersWrite, SYNAPSE_PERMISSIONS.budgetsWrite] as const;
 
+// The tools section names where a stored key is sent, as the providers section does.
 const SECTION_PERMISSIONS: Partial<Record<CatalogSection, string>> = {
   providers: SYNAPSE_PERMISSIONS.providersWrite,
   budgets: SYNAPSE_PERMISSIONS.budgetsWrite,
+  tools: SYNAPSE_PERMISSIONS.providersWrite,
 };
 
 export function changeAuthorizer(granted: ReadonlySet<string>): ChangeAuthorizer {

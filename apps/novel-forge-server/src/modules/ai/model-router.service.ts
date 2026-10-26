@@ -16,7 +16,7 @@ import {
   type SynapseResponseBlock,
   type SynapseSubject,
 } from '@shadow-library/synapse';
-import { SynapseChatModel } from '@shadow-library/synapse/langchain';
+import { isSynapseReset, SynapseChatModel } from '@shadow-library/synapse/langchain';
 
 import { AppErrorCode } from '@server/classes';
 import { type OwnerFields } from '@server/common';
@@ -59,6 +59,11 @@ import {
 } from './synapse-request';
 import { type AnsweredHook, failureDetail, failureStatus, synapseBilling, type TelemetryContext, TelemetryHandler } from './telemetry.handler';
 import { modelCallFailed, ModelCallTimeoutError } from './transient-model-error';
+
+interface StreamSink {
+  chunk: (text: string) => void;
+  reset: () => void;
+}
 
 /** `chatAlias` is never read from a row: a chat turn sets it on its own copy, so a stored project cannot pin any role. */
 export type ProjectConfig = OwnerFields & {
@@ -817,7 +822,8 @@ export class ModelRouterService {
     onAnswered?: AnsweredHook,
   ): Promise<string> {
     relay.restart();
-    return this.callSynapse(role, runSignal, signal => this.consumeStream(llm, messages, config, signal, chunk => relay.push(chunk), onAnswered));
+    const sink: StreamSink = { chunk: text => relay.push(text), reset: () => relay.restart() };
+    return this.callSynapse(role, runSignal, signal => this.consumeStream(llm, messages, config, signal, sink, onAnswered));
   }
 
   // Synapse fails over between deployments and the client retries a refused connection once, so a call here is made exactly once. The deadline
@@ -841,23 +847,22 @@ export class ModelRouterService {
   }
 
   // The `aborted` check is what makes abandonment provider-independent: it drops the chunk before the sink
-  // sees it, and breaking the `for await` closes the iterator even where the signal was ignored.
-  private async consumeStream(
-    llm: BaseChatModel,
-    messages: BaseMessage[],
-    config: object,
-    signal: AbortSignal,
-    onChunk: (text: string) => void,
-    onAnswered?: AnsweredHook,
-  ): Promise<string> {
+  // sees it, and breaking the `for await` closes the iterator even where the signal was ignored. A reset is Synapse
+  // searching the web after text it already sent: that text was never the answer.
+  private async consumeStream(llm: BaseChatModel, messages: BaseMessage[], config: object, signal: AbortSignal, sink: StreamSink, onAnswered?: AnsweredHook): Promise<string> {
     let accumulated = '';
     for await (const chunk of await llm.stream(messages, { ...config, signal })) {
       if (signal.aborted) break;
       reportAnswer(chunk.response_metadata, onAnswered);
+      if (isSynapseReset(chunk)) {
+        accumulated = '';
+        sink.reset();
+        continue;
+      }
       const text = streamChunkText(chunk.content);
       if (!text) continue;
       accumulated += text;
-      onChunk(text);
+      sink.chunk(text);
     }
     return accumulated;
   }

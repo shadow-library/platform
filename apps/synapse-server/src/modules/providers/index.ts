@@ -1,4 +1,5 @@
 export * from './chat-translation.util';
+export * from './hosted-search.util';
 export * from './mock.provider';
 export * from './provider-call.error';
 export * from './provider-client.service';
@@ -6,3 +7,4 @@ export * from './provider.types';
 export * from './providers.module';
 export * from './sse.util';
 export * from './usage.util';
+export * from './web-search.client';

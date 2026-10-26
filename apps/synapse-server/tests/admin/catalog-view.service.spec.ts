@@ -6,6 +6,7 @@ import { AppErrorCode } from '@server/classes';
 
 import { parseSelectors } from '@modules/admin/catalog-selectors';
 import { CatalogViewService } from '@modules/admin/catalog-view.service';
+import { type CatalogDocument } from '@modules/catalog';
 
 import { catalogDocument } from '../catalog/catalog.fixtures';
 import { expectFailure, fakeCache } from './admin.fixtures';
@@ -56,16 +57,16 @@ describe('CatalogViewService', () => {
   });
 
   it('should report native web search from the first eligible deployment provider', () => {
-    expect(taskView('novel-forge.chat').native_web_search).toBe(true);
-    expect(taskView('novel-forge.chat', 'tier:economy').native_web_search).toBe(false);
+    expect(taskView('novel-forge.chat').web_search).toBe(true);
+    expect(taskView('novel-forge.chat', 'tier:economy').web_search).toBe(false);
   });
 
   it("should report each alias's target model and native web search from its own model's first eligible deployment", () => {
     const aliases = taskView('novel-forge.chat', 'tier:economy,content_mode:standard').aliases;
 
-    expect(aliases.map(({ key, model, native_web_search }) => ({ key, model, native_web_search }))).toEqual([
-      { key: 'opus', model: 'claude-opus-5.5', native_web_search: true },
-      { key: 'grok', model: 'grok-4.6', native_web_search: false },
+    expect(aliases.map(({ key, model, web_search }) => ({ key, model, web_search }))).toEqual([
+      { key: 'opus', model: 'claude-opus-5.5', web_search: true },
+      { key: 'grok', model: 'grok-4.6', web_search: false },
     ]);
   });
 
@@ -80,7 +81,7 @@ describe('CatalogViewService', () => {
 
     const view = new CatalogViewService(fakeCache(document)).view('novel-forge', 'novel-forge.chat', {}).body as CatalogTaskResponse;
 
-    expect(view.aliases[0]).toMatchObject({ key: 'opus', native_web_search: false });
+    expect(view.aliases[0]).toMatchObject({ key: 'opus', web_search: false });
   });
 
   it('should skip a deployment the data policy rules out when judging native web search', () => {
@@ -94,7 +95,23 @@ describe('CatalogViewService', () => {
 
     const view = new CatalogViewService(fakeCache(document)).view('novel-forge', 'novel-forge.chat', {}).body as CatalogTaskResponse;
 
-    expect(view.native_web_search).toBe(false);
+    expect(view.web_search).toBe(false);
+  });
+
+  it('should report web search Synapse runs itself once the catalog configures it, for a model that can call tools', () => {
+    const economyModel = taskView('novel-forge.chat', 'tier:economy').default.model;
+    const searching = catalogDocument(draft => {
+      draft.tools = { webSearch: { kind: 'mock', url: 'http://search.mock', maxSearches: 2, results: 3 } };
+    });
+    const toolless = catalogDocument(draft => {
+      draft.tools = { webSearch: { kind: 'mock', url: 'http://search.mock', maxSearches: 2, results: 3 } };
+      draft.models[economyModel]!.capabilities.tools = false;
+    });
+    const viewOf = (document: CatalogDocument): CatalogTaskResponse =>
+      new CatalogViewService(fakeCache(document)).view('novel-forge', 'novel-forge.chat', { tier: 'economy' }).body as CatalogTaskResponse;
+
+    expect(viewOf(searching).web_search).toBe(true);
+    expect(viewOf(toolless).web_search).toBe(false);
   });
 
   it('should answer every task of the calling app, and only those, when no task is given', () => {

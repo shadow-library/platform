@@ -52,7 +52,7 @@ const WEB_RESEARCH =
 
 const WEB_TOOLS_USE: Readonly<Record<Exclude<WebMode, 'off'>, string>> = {
   brave: 'Search with search_web, then read the most promising results in full with fetch_page.',
-  native: 'Use your own built-in web search and page-fetch tools for it before you answer; your answer is still the one JSON object this prompt asks for.',
+  native: 'Use the web search you have been given for it before you answer; your answer is still the one JSON object this prompt asks for.',
 };
 
 /** The playbook with the lookup half: names, argument shapes and purposes of the read-only tools, and how to research on the web when it is on. */

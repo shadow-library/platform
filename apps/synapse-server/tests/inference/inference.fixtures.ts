@@ -10,6 +10,7 @@ import { type ChatStreamSink, type SseWriteResult } from '@modules/inference/sse
 import { MeteringService } from '@modules/metering/metering.service';
 import { ProviderClient } from '@modules/providers/provider-client.service';
 import { type ProviderFetch } from '@modules/providers/provider.types';
+import { WebSearchClient } from '@modules/providers/web-search.client';
 import { AppErrorCode } from '@server/classes';
 
 import { box, FakeCredentialRepository } from '../credentials/credential.fixtures';
@@ -214,7 +215,7 @@ export function harness(document: CatalogDocument | null = catalogDocument(), ve
   const providers = new ProviderClient(fetcher.fetch);
   const credentials = new FakeCredentialRepository();
   const resolver = new CredentialResolver(credentials.asRepository(), box(), timers);
-  const service = new InferenceService(cache, providers, new MeteringService(repository.asRepository()), inflight, resolver);
+  const service = new InferenceService(cache, providers, new MeteringService(repository.asRepository()), inflight, resolver, new WebSearchClient(fetcher.fetch));
   return { service, providers, repository, fetcher, credentials, inflight, timers, begin: () => inflight.begin() };
 }
 

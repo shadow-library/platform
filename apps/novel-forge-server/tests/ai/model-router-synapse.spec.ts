@@ -40,7 +40,7 @@ interface Harness {
   cacheReads: number;
 }
 
-const catalogAt = (version: number) => json({ catalog_version: version, task: 'novel-forge.review', default: SYNAPSE_BLOCK, aliases: [], native_web_search: false });
+const catalogAt = (version: number) => json({ catalog_version: version, task: 'novel-forge.review', default: SYNAPSE_BLOCK, aliases: [], web_search: false });
 
 function harness(owner?: { ownerKind: string; ownerId: bigint | null }, catalog = catalogAt(3)): Harness {
   const rows: Row[] = [];

@@ -35,6 +35,17 @@ const chunk = (delta: Record<string, unknown>, finishReason: string | null = nul
 
 export const STREAM_CHUNKS = [chunk({ role: 'assistant', content: 'Hello' }), chunk({ content: ' world' }), chunk({}, 'stop')];
 
+export const RESET_FRAME = {
+  id: 'chatcmpl-1',
+  object: 'chat.completion.chunk',
+  created: 1_760_000_000,
+  model: 'novel-forge.chat',
+  choices: [],
+  synapse_event: { type: 'reset', reason: 'web_search' },
+};
+
+export const SEARCH_PREAMBLE = chunk({ role: 'assistant', content: 'Let me look that up.' });
+
 export const FINAL_FRAME = {
   id: 'chatcmpl-1',
   object: 'chat.completion.chunk',

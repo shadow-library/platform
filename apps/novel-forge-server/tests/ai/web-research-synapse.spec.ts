@@ -15,7 +15,7 @@ const alias = (key: string, nativeWebSearch: boolean): Record<string, unknown> =
   price: { input: 1, output: 1 },
   capabilities: {},
   state: 'active',
-  native_web_search: nativeWebSearch,
+  web_search: nativeWebSearch,
 });
 
 const catalog = (nativeWebSearch: boolean, aliases: Record<string, unknown>[] = []): Record<string, unknown> => ({
@@ -23,7 +23,7 @@ const catalog = (nativeWebSearch: boolean, aliases: Record<string, unknown>[] = 
   task: 'novel-forge.chat',
   default: { model: 'claude-opus-5.5', label: 'Opus', price: { input: 5, output: 25 }, capabilities: {} },
   aliases,
-  native_web_search: nativeWebSearch,
+  web_search: nativeWebSearch,
 });
 
 function service(synapse: FakeSynapse): WebResearchService {

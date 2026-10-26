@@ -120,9 +120,9 @@
 - Detail comes through declared lookups (never native tool binding): Story Bible pages, entities, canon facts, threads and promises, chapter summaries, a plan, a draft, a
   character timeline, a volume, lore and prose search, the author's notes, usage and a chapter's reviews. A turn that reads the notes or a planner-only page holds for review
   every change the chapter writer or a reader can see; only planner-side records (milestones) still apply (see the write policy).
-- **Web research** needs no switch. Each turn reads `native_web_search` from `GET /api/v1/catalog` for the chat task and selectors, from the pinned alias when a pin applies
+- **Web research** needs no switch. Each turn reads `web_search` from `GET /api/v1/catalog` for the chat task and selectors, from the pinned alias when a pin applies
   and from the task's default otherwise; if true the chat call asks
-  for it, and otherwise the chat gets two more lookups through Brave Search (titles, URLs and snippets, and a page read as plain text), or no web at all
+  for it and Synapse searches, by the provider's own search or its own, resetting the live reply when a search follows text it already showed; otherwise the chat gets two more lookups through Brave Search (titles, URLs and snippets, and a page read as plain text), or no web at all
   without a Brave key. It is for real-world facts and research, never the author's story. Web text reaches the model
   marked untrusted, never justifies a change on its own and is never copied into the book; the reply names its sources. Through Brave a page may be read only if
   this turn's search returned it or the author wrote its link, so a planted instruction cannot send the novel to an address it composed, and only from a public

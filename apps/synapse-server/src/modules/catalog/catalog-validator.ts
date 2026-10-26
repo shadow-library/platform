@@ -1,6 +1,6 @@
 import { isDeepStrictEqual } from 'node:util';
 
-import { credentialIssues, credentialReferences } from './catalog-credentials';
+import { credentialIssues, credentialReferences, WEB_SEARCH_PATH } from './catalog-credentials';
 import { parseCatalogDocument } from './catalog-parser';
 import {
   type CatalogDocument,
@@ -42,8 +42,17 @@ class CatalogValidator {
     this.validateAliases();
     for (const [taskKey, task] of Object.entries(this.document.tasks)) this.validateTask(childPath('tasks', taskKey), taskKey, task);
     this.validateBudgets();
+    this.validateTools();
     this.validateHistory();
     return this.issues;
+  }
+
+  private validateTools(): void {
+    const search = this.document.tools?.webSearch;
+    if (!search) return;
+    const credentialPath = childPath(WEB_SEARCH_PATH, 'credential');
+    if (search.kind === 'brave' && !search.credential) this.report(credentialPath, 'missing_field', 'A brave web search sends its API key, so it must name a credential');
+    if (search.kind === 'mock' && search.credential) this.report(credentialPath, 'invalid_value', 'A mock web search never leaves the process, so it sends no credential');
   }
 
   private validateProviders(): void {

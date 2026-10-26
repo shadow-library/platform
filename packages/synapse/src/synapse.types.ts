@@ -52,6 +52,12 @@ export interface SynapseCost {
 }
 
 /** The `synapse` member of every inference response, and of the final choice-less frame of a stream */
+/** A frame of a chat stream that carries no content: `reset` voids every content delta already sent, because a round of Synapse's own web search followed it */
+export interface SynapseStreamEvent {
+  type: 'reset';
+  reason: 'web_search';
+}
+
 export interface SynapseResponseBlock {
   request_id: string;
   task: string;
@@ -67,6 +73,8 @@ export interface SynapseResponseBlock {
   cost: SynapseCost;
   /** `false` when web search was requested but the serving deployment could not run it */
   web_search?: boolean;
+  /** Searches Synapse ran itself for this call; present only when it hosted the search */
+  web_searches?: number;
   /** Embeddings only */
   dimensions?: number;
 }
@@ -118,8 +126,8 @@ export interface CatalogAliasView {
   price: CatalogPrice;
   capabilities: CatalogCapabilities;
   state: SynapseAliasState;
-  /** Whether the first eligible deployment of the alias's model is served by a provider with native web search */
-  native_web_search: boolean;
+  /** Whether a chat on the alias's model can search the web: its provider searches by itself, or Synapse runs its own search for a request that brings no tools */
+  web_search: boolean;
 }
 
 export interface CatalogTaskView {
@@ -127,7 +135,8 @@ export interface CatalogTaskView {
   default: CatalogModelView;
   /** Only the active aliases available for the requested selectors */
   aliases: CatalogAliasView[];
-  native_web_search: boolean;
+  /** As `CatalogAliasView.web_search`, for the default model */
+  web_search: boolean;
 }
 
 export interface CatalogTaskResponse extends CatalogTaskView {

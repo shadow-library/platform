@@ -21,11 +21,25 @@ export function normaliseOrigin(input: string): string | undefined {
   return parsed.origin;
 }
 
+export const WEB_SEARCH_PATH = 'tools.webSearch';
+
+/** Every place the catalog sends a stored key: each provider by its key, and the web search tool by its path */
+function keyHolders(document: CatalogDocument): { holder: string; path: string; url: string; credential?: string }[] {
+  const providers = Object.entries(document.providers).map(([providerKey, provider]) => ({
+    holder: providerKey,
+    path: childPath('providers', providerKey),
+    url: provider.url,
+    ...(provider.credential ? { credential: provider.credential } : {}),
+  }));
+  const search = document.tools?.webSearch;
+  return search ? [...providers, { holder: WEB_SEARCH_PATH, path: WEB_SEARCH_PATH, url: search.url, ...(search.credential ? { credential: search.credential } : {}) }] : providers;
+}
+
 export function credentialReferences(document: CatalogDocument): Map<string, string[]> {
   const references = new Map<string, string[]>();
-  for (const [providerKey, provider] of Object.entries(document.providers)) {
-    if (!provider.credential) continue;
-    references.set(provider.credential, [...(references.get(provider.credential) ?? []), providerKey]);
+  for (const { holder, credential } of keyHolders(document)) {
+    if (!credential) continue;
+    references.set(credential, [...(references.get(credential) ?? []), holder]);
   }
   return references;
 }
@@ -48,11 +62,13 @@ export function credentialIssues(document: CatalogDocument, states: readonly Cre
         message: `'${provider.apiKeyConfig}' is bound to ${configOrigin}, not to this URL's origin`,
       });
     }
-    if (!provider.credential) continue;
-    const state = byId.get(provider.credential);
-    if (!state) issues.push({ path: childPath(path, 'credential'), code: 'unknown_credential', message: `Unknown credential '${provider.credential}'` });
-    else if (state.revoked) issues.push({ path: childPath(path, 'credential'), code: 'credential_revoked', message: `Credential '${provider.credential}' is revoked` });
-    else if (urlOrigin(provider.url) !== state.allowedOrigin) {
+  }
+  for (const { path, url, credential } of keyHolders(document)) {
+    if (!credential) continue;
+    const state = byId.get(credential);
+    if (!state) issues.push({ path: childPath(path, 'credential'), code: 'unknown_credential', message: `Unknown credential '${credential}'` });
+    else if (state.revoked) issues.push({ path: childPath(path, 'credential'), code: 'credential_revoked', message: `Credential '${credential}' is revoked` });
+    else if (urlOrigin(url) !== state.allowedOrigin) {
       issues.push({ path: childPath(path, 'url'), code: 'credential_origin_mismatch', message: `The credential is bound to ${state.allowedOrigin}, not to this URL's origin` });
     }
   }

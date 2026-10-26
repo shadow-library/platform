@@ -668,7 +668,7 @@ export interface components {
       task?: string;
       default?: components['schemas']['CatalogModelView'];
       aliases?: components['schemas']['CatalogAliasView'][];
-      native_web_search?: boolean;
+      web_search?: boolean;
       /** @description Task views keyed by task key, each shaped as CatalogTaskView */
       tasks?: {
         [key: string]: unknown;
@@ -721,8 +721,8 @@ export interface components {
       capabilities: components['schemas']['CatalogCapabilitiesView'];
       /** @enum {string} */
       state: 'active' | 'hidden' | 'retired';
-      /** @description Whether the first eligible deployment of the alias's model is served by a provider with native web search */
-      native_web_search: boolean;
+      /** @description Whether a chat on the alias's model can search the web: its first eligible deployment searches by itself, or Synapse runs its own search for a request that brings no tools */
+      web_search: boolean;
     };
     CatalogVersionListResponse: {
       /** @description Published and archived versions, newest first */

@@ -22,10 +22,10 @@ const alias = (key: string, label: string, target: string, nativeWebSearch = fal
   price: { input: 4, output: 20 },
   capabilities: CAPABILITIES,
   state: 'active',
-  native_web_search: nativeWebSearch,
+  web_search: nativeWebSearch,
 });
 
-const task = (defaultModel: CatalogModelView, aliases: CatalogAliasView[] = []): CatalogTaskView => ({ default: defaultModel, aliases, native_web_search: false });
+const task = (defaultModel: CatalogModelView, aliases: CatalogAliasView[] = []): CatalogTaskView => ({ default: defaultModel, aliases, web_search: false });
 
 const OPUS = alias('opus', 'Opus', 'claude-opus-5.5', true);
 const GROK = alias('grok', 'Grok', 'grok-4.6');
@@ -170,7 +170,7 @@ describe('NovelForgeCatalogService', () => {
 
   describe('chat aliases', () => {
     it('should return an alias the catalog offers for the selection', async () => {
-      expect(await service().requireChatAlias('opus', { contentMode: 'standard', costTier: 'economy' })).toMatchObject({ key: 'opus', native_web_search: true });
+      expect(await service().requireChatAlias('opus', { contentMode: 'standard', costTier: 'economy' })).toMatchObject({ key: 'opus', web_search: true });
     });
 
     it('should refuse an unknown alias, or one not offered for the selection, as AI_022', async () => {

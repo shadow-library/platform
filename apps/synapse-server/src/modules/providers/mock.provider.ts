@@ -1,4 +1,5 @@
 import { JSON_SCHEMA_INSTRUCTION } from './chat-translation.util';
+import { WEB_SEARCH_TOOL_NAME } from './hosted-search.util';
 import { type JsonObject, type ProviderFetch, type ProviderTarget } from './provider.types';
 import { asRecord, parseJson } from './upstream-payload.util';
 
@@ -111,23 +112,33 @@ function splitInto(text: string, parts: number): string[] {
   return Array.from({ length: parts }, (_, index) => text.slice(index * size, (index + 1) * size));
 }
 
+/** Synapse's own search tool, offered to a mock that has not searched yet: the mock searches once, for the user's last words, before answering */
+function mockSearch(body: JsonObject): { id: string; type: 'function'; function: { name: string; arguments: string } } | undefined {
+  const offered = Array.isArray(body['tools']) && body['tools'].some(tool => asRecord(asRecord(tool)?.['function'])?.['name'] === WEB_SEARCH_TOOL_NAME);
+  const messages = Array.isArray(body['messages']) ? body['messages'].map(asRecord) : [];
+  if (!offered || body['tool_choice'] === 'none' || messages.some(message => message?.['role'] === 'tool')) return undefined;
+  const asked = [...messages].reverse().find(message => message?.['role'] === 'user')?.['content'];
+  const query = typeof asked === 'string' && asked.trim() ? asked.trim().slice(0, 100) : 'mock search';
+  return { id: 'call_mock_search', type: 'function', function: { name: WEB_SEARCH_TOOL_NAME, arguments: JSON.stringify({ query }) } };
+}
+
 function mockCompletion(body: JsonObject): JsonObject {
-  return {
-    id: 'chatcmpl-mock',
-    object: 'chat.completion',
-    created: 0,
-    model: body['model'],
-    choices: [{ index: 0, message: { role: 'assistant', content: mockAnswer(body) }, finish_reason: 'stop' }],
-    usage: MOCK_USAGE,
-  };
+  const search = mockSearch(body);
+  const choice = search
+    ? { index: 0, message: { role: 'assistant', content: null, tool_calls: [search] }, finish_reason: 'tool_calls' }
+    : { index: 0, message: { role: 'assistant', content: mockAnswer(body) }, finish_reason: 'stop' };
+  return { id: 'chatcmpl-mock', object: 'chat.completion', created: 0, model: body['model'], choices: [choice], usage: MOCK_USAGE };
 }
 
 function mockStream(body: JsonObject): string {
   const base = { id: 'chatcmpl-mock', object: 'chat.completion.chunk', created: 0, model: body['model'] };
-  const frames: JsonObject[] = splitInto(mockAnswer(body), STREAM_CHUNKS).map((content, index) => ({
-    ...base,
-    choices: [{ index: 0, delta: index === 0 ? { role: 'assistant', content } : { content }, finish_reason: index === STREAM_CHUNKS - 1 ? 'stop' : null }],
-  }));
+  const search = mockSearch(body);
+  const frames: JsonObject[] = search
+    ? [{ ...base, choices: [{ index: 0, delta: { role: 'assistant', tool_calls: [{ index: 0, ...search }] }, finish_reason: 'tool_calls' }] }]
+    : splitInto(mockAnswer(body), STREAM_CHUNKS).map((content, index) => ({
+        ...base,
+        choices: [{ index: 0, delta: index === 0 ? { role: 'assistant', content } : { content }, finish_reason: index === STREAM_CHUNKS - 1 ? 'stop' : null }],
+      }));
   frames.push({ ...base, choices: [], usage: MOCK_USAGE });
   return [...frames.map(frame => `data: ${JSON.stringify(frame)}\n\n`), 'data: [DONE]\n\n'].join('');
 }

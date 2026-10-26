@@ -1,4 +1,4 @@
-import { type SynapseEnvelope, type SynapseResponseBlock } from './synapse.types';
+import { type SynapseEnvelope, type SynapseResponseBlock, type SynapseStreamEvent } from './synapse.types';
 
 export type SynapseEnvelopeInput = Omit<SynapseEnvelope, 'request_id'> & { request_id?: string };
 
@@ -110,6 +110,8 @@ export interface SynapseChatChunk {
   model: string;
   choices: SynapseChunkChoice[];
   usage?: SynapseUsage | null;
+  /** Set on a choice-less frame that tells the caller something about the stream rather than adding to it */
+  synapse_event?: SynapseStreamEvent;
 }
 
 export interface SynapseStreamFinal {

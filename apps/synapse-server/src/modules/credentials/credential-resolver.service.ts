@@ -84,9 +84,14 @@ export class CredentialResolver implements OnModuleInit, OnApplicationReady, OnA
   /** `undefined` sends no authorization; a credential that cannot be used is refused, never retried on another deployment. */
   async resolve(provider: ProviderSpec, providerKey: string): Promise<string | undefined> {
     if (provider.kind === 'ollama') return undefined;
-    if (provider.credential) return this.fromCredential(provider, providerKey, provider.credential);
+    if (provider.credential) return this.fromCredential(provider.url, providerKey, provider.credential);
     if (provider.apiKeyConfig) return fromConfig(provider, providerKey, provider.apiKeyConfig);
     return undefined;
+  }
+
+  /** The key a catalog entry other than a provider sends, such as the web search tool; `holder` names it in errors and logs. */
+  resolveFor(target: { url: string; credential?: string }, holder: string): Promise<string | undefined> {
+    return target.credential ? this.fromCredential(target.url, holder, target.credential) : Promise.resolve(undefined);
   }
 
   refresh(): Promise<void> {
@@ -100,10 +105,10 @@ export class CredentialResolver implements OnModuleInit, OnApplicationReady, OnA
     for (const key of this.secrets.keys()) if (key.startsWith(`${id}:`)) this.secrets.delete(key);
   }
 
-  private async fromCredential(provider: ProviderSpec, providerKey: string, id: string): Promise<string> {
+  private async fromCredential(url: string, providerKey: string, id: string): Promise<string> {
     if (this.states.get(id)?.revoked) throw this.revoked(providerKey, id);
     const secret = await this.load(id);
-    if (urlOrigin(provider.url) !== secret.allowedOrigin) {
+    if (urlOrigin(url) !== secret.allowedOrigin) {
       this.logger.warn('Refused a credential for a provider outside its origin', { provider: providerKey, credential: id });
       throw refused('credential_origin_mismatch', `Provider '${providerKey}' is not at the origin its credential is bound to`);
     }
