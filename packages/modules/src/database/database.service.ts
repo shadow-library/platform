@@ -6,7 +6,7 @@ import { AppError, Config, Logger } from '@shadow-library/common';
 
 import { DATABASE_MODULE_OPTIONS, DEFAULT_CONFIGS, LOGGER_NAMESPACE } from './database.constants';
 import { type DatabaseModuleOptions, MemcacheConfig, PostgresClient, PostgresConnectionConfig, PostgresError, RedisConfig } from './database.types';
-import { renderPostgresQuery } from './database.utils';
+import { closeSettledTransactions, renderPostgresQuery, type TransactionalClient } from './database.utils';
 
 type ConfigKey = 'database.postgres.url' | 'database.redis.url' | 'database.memcache.hosts';
 
@@ -63,6 +63,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       this.postgresClient = await postgres.factory(drizzleConfig, connectionConfig);
       if (!this.postgresClient) throw AppError.internal('Postgres client is in an impossible state: undefined after initialization');
       await this.assertPrepareHonoured(this.postgresClient, connectionConfig.prepare);
+      this.guardSettledTransactions(this.postgresClient);
 
       const isLazyConnection = postgres.lazyConnection ?? Config.register('database.postgres.lazy-connection', DEFAULT_CONFIGS['database.postgres.lazy-connection']);
       if (isLazyConnection) this.logger.info('Postgres client initialized with lazy connection');
@@ -136,6 +137,12 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     const message = 'Bun SQL 1.3.14 stalls pipelined queries on named prepared statements, leaving connections idle in transaction; set database.postgres.prepare to false';
     if (Config.isProductionDeployment()) throw AppError.internal(message);
     this.logger.warn(message);
+  }
+
+  private guardSettledTransactions(postgresClient: PostgresClient): void {
+    const client = (postgresClient as unknown as { $client?: Partial<TransactionalClient> }).$client;
+    if (Config.getRuntime() !== 'bun' || typeof client?.begin !== 'function') return;
+    closeSettledTransactions(client as TransactionalClient);
   }
 
   /** Bun SQL and postgres.js both expose their resolved options on the client Drizzle keeps as `$client`; other drivers are not checked. */
