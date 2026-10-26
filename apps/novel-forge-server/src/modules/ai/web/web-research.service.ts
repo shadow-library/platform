@@ -52,6 +52,16 @@ export function linksIn(text: string): string[] {
   return [...text.matchAll(LINK)].map(match => match[0].replace(/[.,;:!?)\]}]+$/, ''));
 }
 
+const RESEARCH_ASK = /\?|\b(look(?:ing)? (?:it |this |that |them )?up|look into|search|research|google|find out|fact[- ]?check|sources?|citations?)\b/i;
+
+/**
+ * Whether a turn may search the web: the author asks a question, gives a link or asks for research. A turn that only instructs (plan, organise,
+ * write, change) never needs it, and every search re-reads the whole conversation.
+ */
+export function mayResearch(message: string): boolean {
+  return RESEARCH_ASK.test(message) || linksIn(message).length > 0;
+}
+
 @Injectable()
 export class WebResearchService {
   private readonly logger = Logger.getLogger(APP_NAME, WebResearchService.name);

@@ -347,6 +347,26 @@ describe('ChatService.turn — web lookups', () => {
   });
 });
 
+describe('ChatService.turn — when a turn may search', () => {
+  it('should ask for web search only on a turn that asks, links or asks for research, never one that only instructs', async () => {
+    const turns = [
+      'Plan chapter 1: Tamsin measures the street.',
+      'Organise my notes',
+      'What did lamplighters earn in 1890?',
+      'Look up how tides work',
+      'See https://example.com/tides',
+    ];
+    const asked: boolean[] = [];
+    for (const content of turns) {
+      const run = chat({ outputs: [{ reply: 'Done.' }], tools: [], webResearch: { modeFor: async () => 'native', forTurn: () => undefined } });
+      await run.service.turn(1n, 'session-1', content);
+      asked.push(run.contexts[0]?.webTools === true);
+    }
+
+    expect(asked).toEqual([false, false, true, true, true]);
+  });
+});
+
 describe('serialiseMessage — trace', () => {
   const message = { id: 1n, sessionId: 'session-1', ordinal: 2, role: 'assistant', content: 'Done.', createdAt: new Date(0) };
 

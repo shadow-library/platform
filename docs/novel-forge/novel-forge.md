@@ -122,7 +122,9 @@
   every change the chapter writer or a reader can see; only planner-side records (milestones) still apply (see the write policy).
 - **Web research** needs no switch. Each turn reads `web_search` from `GET /api/v1/catalog` for the chat task and selectors, from the pinned alias when a pin applies
   and from the task's default otherwise; if true the chat call asks
-  for it and Synapse searches, by the provider's own search or its own, resetting the live reply when a search follows text it already showed; otherwise the chat gets two more lookups through Brave Search (titles, URLs and snippets, and a page read as plain text), or no web at all
+  for it on a turn that asks a question, gives a link or asks for research (never on one that only instructs, since every search re-reads the
+  whole conversation), and Synapse searches, by the provider's own search or its own, resetting the live reply when a search follows text it
+  already showed; otherwise the chat gets two more lookups through Brave Search (titles, URLs and snippets, and a page read as plain text), or no web at all
   without a Brave key. It is for real-world facts and research, never the author's story. Web text reaches the model
   marked untrusted, never justifies a change on its own and is never copied into the book; the reply names its sources. Through Brave a page may be read only if
   this turn's search returned it or the author wrote its link, so a planted instruction cannot send the novel to an address it composed, and only from a public

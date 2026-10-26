@@ -22,7 +22,7 @@ import { type ChatRefineOutput } from '../ai/schemas';
 import { NovelForgeCatalogService } from '../ai/novel-forge-catalog.service';
 import { gatewaySessionKey, SYNAPSE_CHAT_TASK, SYNAPSE_PROVIDER, synapseAlias, synapseSelectors } from '../ai/synapse-request';
 import { resolveUnrestrictedRoute } from '../ai/unrestricted-route';
-import { WebResearchService } from '../ai/web';
+import { mayResearch, WebResearchService } from '../ai/web';
 import { countWords } from '../eval/deterministic-metrics';
 import { ProjectEventService } from '../events/project-event.service';
 import { NotesStoreService } from '../notes/notes-store.service';
@@ -341,7 +341,7 @@ export class ChatService {
         promptKey: prompt.key,
         promptVersion: prompt.version,
         role: 'chat',
-        webTools: webMode === 'native',
+        webTools: webMode === 'native' && mayResearch(content),
         onAnswered: (model: ResolvedModel) => void (answered = model),
         ...(gatewaySession ? { gatewaySession, onRepair: (reply: string, request: string) => void rounds.push(new AIMessage(reply), new HumanMessage(request)) } : {}),
       };
