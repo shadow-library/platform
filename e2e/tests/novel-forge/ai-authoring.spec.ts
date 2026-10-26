@@ -1,6 +1,7 @@
-import { type APIRequestContext, expect, test } from '@playwright/test';
+import { type APIRequestContext } from '@playwright/test';
 
-import { apiContext, mutate, novelForgeDb } from '../../lib';
+import { mutate, novelForgeDb } from '../../lib';
+import { expect, test } from './forge-actors';
 import { readProposalRow } from './forge-bible';
 import {
   aiAvailable,
@@ -10,13 +11,13 @@ import {
   chatTurn,
   type CreatedNovel,
   createNovel,
-  deleteProjectQuietly,
   type Draft,
   expectStatus,
   finalizeThroughReview,
   MODEL_FLOW_TIMEOUT_MS,
   MODEL_TAG,
   NOVEL_NOTES,
+  ORGANISABLE_NOTES,
   pollJobStatus,
   readDraft,
   saveChapter,
@@ -51,6 +52,17 @@ async function applyProposal(ctx: APIRequestContext, projectId: string, proposal
   expect((await readProposalRow(proposalId))?.status, `proposal ${proposalId} was applied`).toBe('applied');
 }
 
+/** Every text model call a project made ran on an Economy-tier model; read before the fixture deletes the project and its calls. */
+async function expectEconomyRouting(ctx: APIRequestContext, projectId: string): Promise<void> {
+  const catalog = (await (await ctx.get('/api/v1/ai/models')).json()) as { tiers: { costTier: string; contentMode: string; provider: string; model: string }[] };
+  const economy = new Set(catalog.tiers.filter(tier => tier.costTier === 'economy' && tier.contentMode === 'standard').map(tier => `${tier.provider}::${tier.model}`));
+  const rows = await novelForgeDb()<{ role: string; provider: string; model: string }[]>`
+    SELECT DISTINCT role, provider, model FROM model_calls WHERE project_id = ${projectId}::bigint AND model NOT ILIKE '%embed%'
+  `;
+  expect(rows.length, 'expected at least one recorded model call').toBeGreaterThan(0);
+  for (const row of rows) expect(economy.has(`${row.provider}::${row.model}`), `role ${row.role} ran on ${row.model}`).toBe(true);
+}
+
 /** Finalize refuses a standard chapter without a summary, and a generated draft may not carry one; a hand save adds it before approval. */
 async function withSummary(ctx: APIRequestContext, projectId: string, draft: Draft): Promise<Draft> {
   if (draft.summary?.trim()) return draft;
@@ -61,17 +73,9 @@ test.describe('novel-forge AI authoring', { tag: MODEL_TAG }, () => {
   test.describe.configure({ mode: 'serial' });
 
   let available = false;
-  let ctx: APIRequestContext;
-  const created: string[] = [];
 
   test.beforeAll(async () => {
     available = await aiAvailable('user1');
-    ctx = await apiContext('novelForge', 'user1');
-  });
-
-  test.afterAll(async () => {
-    for (const projectId of created) await deleteProjectQuietly(ctx, projectId);
-    await ctx.dispose();
   });
 
   test.beforeEach(() => {
@@ -79,9 +83,9 @@ test.describe('novel-forge AI authoring', { tag: MODEL_TAG }, () => {
     test.setTimeout(MODEL_FLOW_TIMEOUT_MS);
   });
 
-  test('should take a new novel from notes through chat, organise, plan and write to a final chapter', async () => {
-    const novel: CreatedNovel = await createNovel(ctx, { title: `E2E AI Novel ${uniqueSuffix()}`, notes: NOVEL_NOTES });
-    created.push(novel.projectId);
+  test('should take a new novel from notes through chat, organise, plan and write to a final chapter', async ({ forge }) => {
+    const { ctx } = await forge.actor({ label: 'ai-novel' });
+    const novel: CreatedNovel = await createNovel(ctx, { title: `E2E AI Novel ${uniqueSuffix()}`, notes: ORGANISABLE_NOTES });
     await useEconomyTier(ctx, novel.projectId);
 
     await test.step('organise the notes from the chat opener', async () => {
@@ -100,7 +104,9 @@ test.describe('novel-forge AI authoring', { tag: MODEL_TAG }, () => {
     });
 
     await test.step('plan chapter 1 and apply the plan card', async () => {
-      await chatTurn(ctx, novel, `Plan chapter 1: ${CHAPTER_ONE_INTENT}`);
+      const turn = await chatTurn(ctx, novel, `Plan chapter 1: ${CHAPTER_ONE_INTENT}`);
+      const planAction = turn.messages.filter(message => message.role === 'assistant').at(-1)?.proposalId;
+      if (planAction) await applyProposal(ctx, novel.projectId, planAction);
       const plan = await settledChatJob(ctx, novel, 'plan');
       expect(plan?.status, plan?.lastError ?? '').toBe('done');
       const proposalId = plan?.progress?.proposalId ?? '';
@@ -134,11 +140,13 @@ test.describe('novel-forge AI authoring', { tag: MODEL_TAG }, () => {
       expect((await readDraft(ctx, novel.projectId, 1)).status).toBe('final');
       expect((await startNextChapter(ctx, novel.projectId)).chapter).toBe(2);
     });
+
+    await test.step('route every text model call to an Economy-tier model', () => expectEconomyRouting(ctx, novel.projectId));
   });
 
-  test('should review a hand-written chapter with AI and finalize it', async () => {
+  test('should review a hand-written chapter with AI and finalize it', async ({ forge }) => {
+    const { ctx } = await forge.actor({ label: 'ai-review' });
     const { projectId } = await createNovel(ctx, { title: `E2E AI Review ${uniqueSuffix()}`, notes: NOVEL_NOTES });
-    created.push(projectId);
     await useEconomyTier(ctx, projectId);
     const draft = await writeChapterByHand(ctx, projectId, CHAPTER_ONE);
 
@@ -164,16 +172,7 @@ test.describe('novel-forge AI authoring', { tag: MODEL_TAG }, () => {
       expect(review.status).toBe('applied');
       expect((await readDraft(ctx, projectId, 1)).status).toBe('final');
     });
-  });
 
-  test('should have routed every text model call of these runs to an Economy-tier model', async () => {
-    expect(created.length, 'the authoring tests above must have run').toBeGreaterThan(0);
-    const catalog = (await (await ctx.get('/api/v1/ai/models')).json()) as { tiers: { costTier: string; contentMode: string; provider: string; model: string }[] };
-    const economy = new Set(catalog.tiers.filter(tier => tier.costTier === 'economy' && tier.contentMode === 'standard').map(tier => `${tier.provider}::${tier.model}`));
-    const rows = await novelForgeDb()<{ role: string; provider: string; model: string }[]>`
-      SELECT DISTINCT role, provider, model FROM model_calls WHERE project_id = ANY(${created}::bigint[]) AND model NOT ILIKE '%embed%'
-    `;
-    expect(rows.length, 'expected at least one recorded model call').toBeGreaterThan(0);
-    for (const row of rows) expect(economy.has(`${row.provider}::${row.model}`), `role ${row.role} ran on ${row.model}`).toBe(true);
+    await test.step('route every text model call to an Economy-tier model', () => expectEconomyRouting(ctx, projectId));
   });
 });

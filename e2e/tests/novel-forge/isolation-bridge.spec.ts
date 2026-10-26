@@ -1,6 +1,6 @@
-import { type APIRequestContext, expect, test } from '@playwright/test';
+import { expect } from '@playwright/test';
 
-import { apiContext, mutate, requireProductUrl, storageStateFor } from '../../lib';
+import { mutate, requireProductUrl } from '../../lib';
 import { type ForgeActor, type ForgeHarness, test as forgeTest } from './forge-actors';
 import { assertSpendGuarded, listDispatchedModelCalls } from './forge-db';
 import {
@@ -10,13 +10,13 @@ import {
   CHAPTER_ONE,
   CHAPTER_TWO,
   createNovel,
-  deleteProjectQuietly,
   errorCode,
   finalizeThroughReview,
   MODEL_FLOW_TIMEOUT_MS,
   MODEL_TAG,
   pasteChapter,
   readDraft,
+  saveChapter,
   uniqueSuffix,
   useEconomyTier,
   writeChapterByHand,
@@ -106,52 +106,51 @@ forgeTest.describe('novel-forge isolated chapter bridge', () => {
   });
 });
 
-test.describe('novel-forge isolated chapter bridge (model)', { tag: MODEL_TAG }, () => {
-  test.use({ storageState: storageStateFor('user1') });
-  test.describe.configure({ mode: 'serial' });
-
-  let ctx: APIRequestContext;
-  let projectId = '';
+forgeTest.describe('novel-forge isolated chapter bridge (model)', { tag: MODEL_TAG }, () => {
   let available = false;
 
-  test.beforeAll(async () => {
+  forgeTest.beforeAll(async () => {
     available = await aiAvailable('user1');
-    ctx = await apiContext('novelForge', 'user1');
-    if (!available) return;
-    projectId = (await createNovel(ctx, { title: `E2E Bridge Model ${uniqueSuffix()}` })).projectId;
-    await useEconomyTier(ctx, projectId);
   });
 
-  test.afterAll(async () => {
-    if (projectId) await deleteProjectQuietly(ctx, projectId);
-    await ctx.dispose();
+  forgeTest.beforeEach(() => {
+    forgeTest.skip(!available, aiSkipReason());
+    forgeTest.setTimeout(MODEL_FLOW_TIMEOUT_MS);
   });
 
-  test.beforeEach(() => {
-    test.skip(!available, aiSkipReason());
-    test.setTimeout(MODEL_FLOW_TIMEOUT_MS);
-  });
+  forgeTest('should finalize an isolated chapter through its review, carry only the approved bridge, and show what crosses', async ({ forge, browser }) => {
+    const owner = await forge.actor({ label: 'bridge-model' });
+    const { projectId } = await createNovel(owner.ctx, { title: `E2E Bridge Model ${uniqueSuffix()}` });
+    await useEconomyTier(owner.ctx, projectId);
 
-  test('should finalize an isolated chapter through its review and carry only the approved bridge', async () => {
-    const isolated = await pasteChapter(ctx, projectId, ISOLATED_CHAPTER, { isolated: true });
-    const approved = await approveChapter(ctx, projectId, isolated);
-    expect(approved.status(), await approved.text()).toBe(200);
+    await forgeTest.step('finalize the isolated chapter and read the bridge that crossed', async () => {
+      const pasted = await pasteChapter(owner.ctx, projectId, ISOLATED_CHAPTER, { isolated: true });
+      const isolated = await saveChapter(owner.ctx, projectId, pasted, { ...ISOLATED_CHAPTER, state: { handoff: 'Tamsin at the wall at noon.' } });
+      const approved = await approveChapter(owner.ctx, projectId, isolated);
+      expect(approved.status(), await approved.text()).toBe(200);
 
-    const review = await finalizeThroughReview(ctx, projectId, 1);
-    expect(review).toMatchObject({ isolated: true, status: 'applied' });
-    expect((await readDraft(ctx, projectId, 1)).status).toBe('final');
+      const review = await finalizeThroughReview(owner.ctx, projectId, 1);
+      expect(review).toMatchObject({ isolated: true, status: 'applied' });
+      expect((await readDraft(owner.ctx, projectId, 1)).status).toBe('final');
 
-    const bridge = (await (await ctx.get(`/api/v1/projects/${projectId}/drafts/1/bridge`)).json()) as Bridge;
-    expect(bridge.approved, 'keeping the summary item approves the bridge against the final revision').toBe(true);
-    expect(bridge.summary?.trim().length ?? 0).toBeGreaterThan(0);
-    expect(bridge.summary ?? '').not.toContain(ISOLATED_CHAPTER.body);
-  });
+      const bridge = (await (await owner.ctx.get(`/api/v1/projects/${projectId}/drafts/1/bridge`)).json()) as Bridge;
+      expect(bridge.approved, 'keeping the summary item approves the bridge against the final revision').toBe(true);
+      expect(bridge.summary?.trim().length ?? 0).toBeGreaterThan(0);
+      expect(bridge.summary ?? '').not.toContain(ISOLATED_CHAPTER.body);
+    });
 
-  test('should show what crosses in the final chapter’s Story Bible updates', async ({ page }) => {
-    await page.goto(`${requireProductUrl('novelForge')}/novels/${projectId}/chapters?chapter=1`);
-    await page.getByRole('button', { name: /^(Story Bible updates|Bridge)$/ }).click();
-    const bridge = page.getByRole('dialog').getByRole('region', { name: 'Bridge to later chapters' });
-    await expect(bridge).toBeVisible({ timeout: 15_000 });
-    await expect(bridge.getByText('Standard chapters never read this chapter’s prose — only what you approved here.')).toBeVisible();
+    await forgeTest.step('show what crosses in the final chapter’s Story Bible updates', async () => {
+      const context = await browser.newContext({ storageState: await owner.ctx.storageState(), ignoreHTTPSErrors: true });
+      try {
+        const page = await context.newPage();
+        await page.goto(`${requireProductUrl('novelForge')}/novels/${projectId}/chapters?chapter=1`);
+        await page.getByRole('button', { name: /^(Story Bible updates|Bridge)$/ }).click();
+        const bridge = page.getByRole('dialog').getByRole('region', { name: 'Bridge to later chapters' });
+        await expect(bridge).toBeVisible({ timeout: 15_000 });
+        await expect(bridge.getByText('Standard chapters never read this chapter’s prose — only what you approved here.')).toBeVisible();
+      } finally {
+        await context.close();
+      }
+    });
   });
 });

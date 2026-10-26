@@ -50,12 +50,14 @@ export interface ChapterText {
   title?: string;
   body: string;
   summary?: string;
+  state?: Record<string, unknown>;
 }
 
 export interface ChatMessage {
   id: string;
   role: string;
   content: string;
+  proposalId?: string | null;
   costTier?: CostTier | null;
   contentMode?: ContentMode | null;
 }
@@ -137,6 +139,21 @@ export const NOVEL_NOTES = [
   'Her rival is Odo Kessling, a guild assessor who wants the district sealed before it is mapped.',
   'The district moves one street east every night, and only people who have never lied can find it.',
   'Tone: quiet mystery with warmth. The ending is a choice between publishing the map and burning it.',
+].join('\n\n');
+
+/** Past the server's organise minimum (600 words), so an organise request starts its job rather than staging nothing. */
+export const ORGANISABLE_NOTES = [
+  'Working idea: a cartographer in a river city is hired to map a district that is not on any chart. The city is Lowmere, built where three rivers braid into one before the sea, and every building stands on old timber piles that the tide has been eating for three hundred years.',
+  "The protagonist is Tamsin Vale, a careful surveyor who distrusts anything she cannot measure. She is thirty-one, works alone from a rented room above a ropemaker's shop, and keeps a ledger of every measurement she has ever taken. She lost her licence once, after a map she drew sent a barge onto a sandbar that should not have been there, and she has never forgiven herself or the river for it.",
+  'Her rival is Odo Kessling, a guild assessor who wants the district sealed before it is mapped. Odo is older, patient and polite, and he genuinely believes that some places are safer unwritten. He is not a villain: he lost a brother to the district twenty years ago and has spent his career keeping its edges closed with paperwork, fences and quiet bribes.',
+  'The district moves one street east every night, and only people who have never lied can find it. Children wander into it by accident and come back with stories nobody believes. Tamsin, who prides herself on honesty, finds it on her first try, which frightens her more than anything else in the book.',
+  'Inside the district the streets are named after things the city has forgotten: Ferry Lane for a ferry that sank, Tallow Row for a trade that died out, the Weir Steps for a dam that was never built. The people living there do not age the way others do, and they keep a single great map painted on the inside of a bell tower that nobody is allowed to copy.',
+  "The magic, such as it is, has firm rules. The district moves at the turn of the tide after midnight. A lie spoken inside it makes the speaker lose their way back out until the next tide. Anything written about the district fades within a day unless it is written in the hand of someone who has never lied, which is why Tamsin's maps are suddenly worth a fortune.",
+  "Supporting cast: Pell, a twelve-year-old lamplighter's apprentice who guides Tamsin the first night and asks to be paid in maps instead of coins; Marguerite Ash, the elderly keeper of the bell tower, who remembers Odo's brother; and Captain Rhys Dunmore, a smuggler who wants the district charted so he can move cargo through streets the customs house cannot find.",
+  'Themes: honesty as a cost rather than a virtue, the difference between knowing a place and owning it, grief that hides inside bureaucracy, and whether a map is a gift or a theft. I want the book to ask what we owe the places we leave unwritten.',
+  'Structure: three acts across roughly thirty chapters. Act one ends when Tamsin finishes the first true street and Odo learns she can do it. Act two ends when Pell tells a lie to protect her and is lost inside the district. Act three is about getting him back, which means Tamsin has to decide what she is willing to publish.',
+  'Tone: quiet mystery with warmth. Short chapters, plain language, small kindnesses, wet stone and lamplight. No battles; the danger is getting lost, being forgotten, or being believed by the wrong people. The ending is a choice between publishing the map and burning it, and I have not decided which she chooses yet.',
+  'Open questions I keep circling: does Odo know the honesty rule, or does he only suspect it? Should Marguerite be the one who painted the bell tower map, or her mother before her? And is the district alive in any real sense, or just very old and very stubborn? I lean towards stubborn, because a city that refuses to be forgotten feels truer to me than a monster.',
 ].join('\n\n');
 
 export const CHAPTER_ONE: ChapterText = {
@@ -388,8 +405,8 @@ async function probeGateway(ctx: APIRequestContext): Promise<boolean> {
     if (!projectId) return false;
     const economy = await useEconomyTier(ctx, projectId);
     if (!economy.ok()) return false;
-    const response = await mutate(ctx, 'post', `/api/v1/projects/${projectId}/premise/enhance`, {
-      data: { overview: 'A lighthouse keeper discovers the light summons sea spirits.' },
+    const response = await slowPost(ctx, `/api/v1/projects/${projectId}/premise/enhance`, {
+      overview: 'A lighthouse keeper discovers the light summons sea spirits.',
     }).catch(() => undefined);
     return !!response && response.ok();
   } catch {
