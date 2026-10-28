@@ -332,13 +332,13 @@ export class ChatMessageResponse {
   @Field({ optional: true, nullable: true })
   runId?: string | null;
 
-  @Field({ optional: true, nullable: true, description: 'Who served the reply; null on user messages.' })
+  @Field({ optional: true, nullable: true, description: 'Admin-only, omitted for everyone else: who served the reply; null on user messages.' })
   modelProvider?: string | null;
 
   @Field({
     optional: true,
     nullable: true,
-    description: 'The model that wrote the reply: its catalog model, named by `GET /ai/models` `modelLabels`; null on user messages.',
+    description: 'Admin-only, omitted for everyone else: the catalog model that wrote the reply, named by `GET /ai/models/admin` `modelLabels`; null on user messages.',
   })
   modelId?: string | null;
 

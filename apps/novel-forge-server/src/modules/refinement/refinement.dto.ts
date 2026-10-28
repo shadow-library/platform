@@ -248,9 +248,6 @@ export class ProposalResponse {
   opResults?: Record<string, unknown>[] | null;
 
   @Field({ optional: true, nullable: true })
-  model?: string | null;
-
-  @Field({ optional: true, nullable: true })
   runId?: string | null;
 
   @Field(() => String, { format: 'date-time', optional: true, nullable: true })

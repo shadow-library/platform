@@ -14,7 +14,7 @@ export class AiModelOption {
   @Field({ description: '`synapse` for a Synapse alias.' })
   provider: string;
 
-  @Field({ description: 'The name to show an author — a product name on its own, never a gateway or a slug.' })
+  @Field({ description: 'The product name an admin sees — a product name on its own, never a gateway or a slug; never shown to an author.' })
   label: string;
 
   @Field(() => String, { enum: ['llm', 'embedding', 'image'] })
@@ -56,7 +56,7 @@ export class AiModelLabel {
   @Field({ description: 'A model key as calls, replies and reviews record it: a Synapse catalog model, or a registry slug on rows written before Synapse.' })
   model: string;
 
-  @Field({ description: 'The name to show an author.' })
+  @Field({ description: 'The product name an admin sees; never shown to an author.' })
   label: string;
 
   @Field(() => Number, { optional: true, description: 'USD per million input tokens, for estimating an old call that recorded no cost; absent for image models.' })
@@ -83,7 +83,7 @@ export class AiTierModel {
   @Field()
   model: string;
 
-  @Field({ description: 'The product name to show an author.' })
+  @Field({ description: 'The product name an admin sees; never shown to an author.' })
   label: string;
 
   @Field(() => Number, { optional: true, description: 'USD per million input tokens; absent for image models.' })
@@ -93,16 +93,22 @@ export class AiTierModel {
   outputPricePerMToken?: number;
 }
 
-@Schema()
+@Schema({ description: 'What an author chooses between: the paces and whether Unrestricted is on offer. Which model serves each is admin-only (`GET /ai/models/admin`).' })
 export class AiModelsResponse {
-  @Field({ description: "The active server profile. Roles without an override inherit this profile's defaults." })
-  profile: string;
+  @Field(() => [CostTier], { description: 'Every pace by its wire key, fastest first: economy (Swift), balanced (Steady), performant (Meticulous).' })
+  paces: Project.CostTier[];
 
   @Field({
     description:
       'Whether an author may choose Unrestricted for a novel, a chapter plan or a reply: true only while the catalog routes unrestricted writing for every task at every pace.',
   })
   unrestrictedAvailable: boolean;
+}
+
+@Schema({ description: 'The models, labels and prices behind every pace and content mode; admin-only.' })
+export class AiModelsAdminResponse extends AiModelsResponse {
+  @Field({ description: "The active server profile. Roles without an override inherit this profile's defaults." })
+  profile: string;
 
   @Field(() => [AiModelOption], { description: 'The aliases the catalog lists for the chat task under any model type and cost tier; nothing pins or selects one.' })
   models: AiModelOption[];
@@ -152,7 +158,7 @@ export class ProjectModelRoute {
   @Field()
   model: string;
 
-  @Field({ description: 'The product name to show an author.' })
+  @Field({ description: 'The product name an admin sees; never shown to an author.' })
   label: string;
 
   @Field(() => Number, { optional: true, description: 'USD per million input tokens; absent for image models.' })
@@ -162,7 +168,7 @@ export class ProjectModelRoute {
   outputPricePerMToken?: number;
 }
 
-@Schema({ description: 'What each group of AI work on this novel runs on under one model type and cost tier.' })
+@Schema({ description: 'What each group of AI work on this novel runs on under one model type and cost tier; admin-only.' })
 export class ProjectModelsResponse {
   @Field(() => ContentMode)
   contentMode: Project.ContentMode;

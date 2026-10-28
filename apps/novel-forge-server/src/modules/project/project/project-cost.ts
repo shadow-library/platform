@@ -144,3 +144,7 @@ export function summarizeCost(rows: readonly CostUsageRow[], labels: ReadonlyMap
     byContentMode: bySpend(contentModes),
   };
 }
+
+export function withoutModelBreakdown<T extends CostResponse>(cost: T): T {
+  return { ...cost, byModel: [] };
+}

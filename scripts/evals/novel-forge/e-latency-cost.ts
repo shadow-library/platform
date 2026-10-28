@@ -242,7 +242,7 @@ function summary(input: {
     '',
     table(
       ['model', 'calls', 'p50', 'p95'],
-      [...groupBy(flatCalls, call => call.model)].map(([model, rows]) => {
+      [...groupBy(flatCalls, call => call.model ?? 'hidden (caller is not a novel-forge admin)')].map(([model, rows]) => {
         const stats = distribution(rows.flatMap(row => (typeof row.latencyMs === 'number' ? [row.latencyMs] : [])));
         return [model, rows.length, formatMs(stats.p50), formatMs(stats.p95)];
       }),

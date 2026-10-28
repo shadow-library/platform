@@ -153,9 +153,14 @@ test.describe('novel-forge run inspection', () => {
     expect(usage.status(), `and reads a run's usage — body ${await usage.text()}`).toBe(200);
     const usageText = await usage.text();
     expect(usageText, "the author's usage projection carries no raw output").not.toContain(RAW_OUTPUT);
-    const totals = (JSON.parse(usageText) as { totals: RunDetail['totals']; calls: unknown[] }).totals;
+    const { totals, calls } = JSON.parse(usageText) as { totals: RunDetail['totals']; calls: Record<string, unknown>[] };
     expect(totals).toMatchObject({ calls: 2, inputTokens: 1_300, outputTokens: 550 });
     expect(totals.costUsd).toBeCloseTo(0.3, 6);
+    for (const call of calls) for (const field of ['model', 'provider']) expect(call, `a call's ${field} is admin-only`).not.toHaveProperty(field);
+    expect(
+      calls.reduce((sum, call) => sum + Number(call['chargeUsd']), 0),
+      'each call still carries its charge',
+    ).toBeCloseTo(0.3, 6);
   });
 
   test('should list only author-facing runs and refuse an inverted date range', async ({ forge }) => {

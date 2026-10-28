@@ -79,9 +79,13 @@
   image) at every tier; otherwise choosing it is refused (`AI_024`), and an unreadable catalog counts as not routing it. A novel or plan already unrestricted keeps
   its mode when that stops holding and is never silently downgraded: every unrestricted call is strict on `content_mode`, so Synapse refuses it rather than
   sending it to a task's default route, and the call fails loudly (`AI_024`). There is no local chat-model path.
-- **Model names**: every model list, label and price comes from Synapse's `GET /api/v1/catalog`; Synapse is the only path to a model. The models
-  novel-forge called directly before Synapse keep their names and list prices (`historical-models.ts`) only to label and estimate the rows they wrote. Records keep catalog model keys (a call, a chat reply and a review record the model that
-  answered, never the router's slug), and every name shown is the catalog's label for that key, the key itself when the catalog no longer names it.
+- **Model names**: model identity is admin-only. An author sees paces, never which model or provider served them: every response a non-admin reads omits model
+  ids, provider ids, model labels and per-token prices (a per-model cost breakdown comes back empty), while spend in USD stays visible to everyone, priced per call
+  on the server. The admin check is the one `GET /api/v1/access` answers, and a PDP that cannot answer hides model identity rather than failing the request. Admins
+  read the catalog (`GET /ai/models/admin`), a novel's routes and run inspection. Every model list, label and price comes from Synapse's `GET /api/v1/catalog`;
+  Synapse is the only path to a model. The models novel-forge called directly before Synapse keep their names and list prices (`historical-models.ts`) only to
+  label and estimate the rows they wrote. Records keep catalog model keys (a call, a chat reply and a review record the model that answered, never the router's
+  slug), and every name an admin is shown is the catalog's label for that key, the key itself when the catalog no longer names it.
 - **Usage and cost**: every model call records the model that answered, its tokens, its chapter when it has exactly one, and a cost frozen when written: the response's
   `synapse.cost.list_usd`, with its source read from `billed_usd`: `provider` (a metered provider billed it), `gateway` (nothing was billed, as on the CLI gateway, so the
   figure is the list price) or `estimate` (no list price; older rows estimated from historical list prices). Every source is shown as the real charge.
@@ -96,7 +100,7 @@
   re-embed lore), never mixing. An embedding that fails, a budget refusal included, leaves its text stored unembedded for the next backfill and the search empty; vectors whose
   width is not the columns' are never stored. Realtime: SSE; a dropped client never aborts a chat turn.
 - The web never renders a containment badge from `generator` (it reads `isolated`; `generator` only drives a provenance chip). `novel-forge:admin` (role `NovelForgeAdmin`, never
-  default or bot-grantable) gates run inspection; it is an RBAC permission evaluated per organisation, so the web reads it from `GET /api/v1/access`, never the session, and each
+  default or bot-grantable) gates run inspection and model identity; it is an RBAC permission evaluated per organisation, so the web reads it from `GET /api/v1/access`, never the session, and each
   admin route gates itself in `beforeLoad`. Bots reach almost every project route but cannot publish.
 - **Stale tabs**: a tab whose server now runs a different web build (`GET /build-id`, the commit `gitops build` passes as `APP_VERSION`) shows a dismissible "Reload to
   update" bar and never reloads itself, since the author may be mid-sentence. A built deploy only; the dev server reloads on its own.

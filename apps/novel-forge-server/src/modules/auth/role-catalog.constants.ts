@@ -28,7 +28,7 @@ export const NOVEL_FORGE_ROLE_CATALOG: RoleCatalogManifest = {
     { name: ILLUSTRATIONS_WRITE_PERMISSION, description: 'Upload, attach and manage project illustrations' },
     { name: GENERATION_RUN_PERMISSION, description: 'Run AI generation — chat, drafting, reviews and image generation — which incurs model spend' },
     { name: CURATE_PERMISSION, description: "Reach projects shared with the organisation and publish a novel under its original author's name" },
-    { name: ADMIN_PERMISSION, description: 'Inspect workflow runs: prompt anatomy, context packs, per-call latency and raw model output' },
+    { name: ADMIN_PERMISSION, description: 'Inspect workflow runs (prompt anatomy, context packs, per-call latency, raw model output) and see which models serve each call' },
   ],
   roles: [
     {
@@ -68,7 +68,7 @@ export const NOVEL_FORGE_ROLE_CATALOG: RoleCatalogManifest = {
     },
     {
       name: 'NovelForgeAdmin',
-      description: 'Platform operator who inspects workflow runs, their prompts and raw model output',
+      description: 'Platform operator who inspects workflow runs, their prompts and raw model output, and sees which models serve each call',
       permissions: [ADMIN_PERMISSION],
     },
   ],

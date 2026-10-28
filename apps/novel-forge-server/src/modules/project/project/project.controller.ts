@@ -3,6 +3,8 @@ import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, Que
 
 import { ILLUSTRATIONS_WRITE_PERMISSION, PROJECTS_READ_PERMISSION, PROJECTS_WRITE_PERMISSION } from '@server/constants';
 
+import { AdminAccessService } from '@modules/actor';
+
 import {
   CloneProjectBody,
   CostResponse,
@@ -18,13 +20,17 @@ import {
   UpdateProjectBody,
   UploadImageBody,
 } from './project.dto';
+import { withoutModelBreakdown } from './project-cost';
 import { ProjectService } from './project.service';
 
 @BotPermission(PROJECTS_READ_PERMISSION)
 @Authenticated()
 @HttpController('/api/v1/projects')
 export class ProjectController {
-  constructor(private readonly projectService: ProjectService) {}
+  constructor(
+    private readonly projectService: ProjectService,
+    private readonly adminAccess: AdminAccessService,
+  ) {}
 
   @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Post()
@@ -81,8 +87,9 @@ export class ProjectController {
 
   @Get('/:projectId/cost')
   @RespondFor(200, CostResponse)
-  getProjectCost(@Params() params: ProjectParams): Promise<CostResponse> {
-    return this.projectService.cost(params.projectId);
+  async getProjectCost(@Params() params: ProjectParams): Promise<CostResponse> {
+    const [cost, showModels] = await Promise.all([this.projectService.cost(params.projectId), this.adminAccess.canSeeModels()]);
+    return showModels ? cost : withoutModelBreakdown(cost);
   }
 
   @BotPermission(ILLUSTRATIONS_WRITE_PERMISSION)

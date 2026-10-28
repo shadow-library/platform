@@ -125,7 +125,7 @@ test.describe('novel-forge AI quota', () => {
 
 test.describe('novel-forge cost figures', () => {
   test('should group, bucket and price a project’s calls and keep another project’s out', async ({ forge }) => {
-    const author = await forge.actor({ label: 'cost' });
+    const author = await forge.actor({ label: 'cost', roles: ['NovelForgeAdmin'] });
     const project = await createProject(author);
     const other = await createProject(author);
     const model = HISTORICAL_MODEL;
@@ -239,6 +239,20 @@ test.describe('novel-forge cost figures', () => {
     expect(byProject[1]?.costUsd).toBeCloseTo(cost.totalCostUsd, 6);
     expect(account.totalCostUsd).toBeCloseTo(cost.totalCostUsd + 100, 6);
     expect(account.calls).toBe(6);
+  });
+
+  test('should show an author the spend but not which model it went to', async ({ forge }) => {
+    const author = await forge.actor({ label: 'cost-author' });
+    const project = await createProject(author);
+    await insertModelCalls([
+      { projectId: project.id, role: 'generation', model: HISTORICAL_MODEL.id, costUsd: 0.5, costSource: 'provider', tier: 'economy', contentMode: 'standard', ageMs: DAY_MS },
+    ]);
+
+    const cost = await readCost(author.ctx, `/api/v1/projects/${project.id}/cost`);
+    expect(cost.totalCostUsd).toBeCloseTo(0.5, 6);
+    expect(item(cost.byGroup, 'writing')?.costUsd).toBeCloseTo(0.5, 6);
+    expect(cost.byModel, 'model identity is admin-only').toEqual([]);
+    expect((await readCost(author.ctx, '/api/v1/ai/usage')).byModel).toEqual([]);
   });
 
   test('should report a project with no calls as all zero', async ({ forge }) => {

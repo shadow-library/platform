@@ -43,7 +43,7 @@ class RunModelCallResponse {
   @Field()
   provider: string;
 
-  @Field({ description: 'The model that answered, as recorded: a catalog model, or its task when no model answered. Named by `GET /ai/models` `modelLabels`.' })
+  @Field({ description: 'The model that answered, as recorded: a catalog model, or its task when no model answered. Named by `GET /ai/models/admin` `modelLabels`.' })
   model: string;
 
   @Field()
@@ -338,13 +338,31 @@ export class ListRunsQuery extends OmitType(PaginationQuery(SortByTime, { limit:
   to?: Date;
 }
 
+@Schema({ description: "One model call as its run's usage shows it: its tokens and spend for everyone; the model, provider and reasoning effort for an admin only." })
+class RunUsageCallResponse extends OmitType(RunModelCallResponse, ['provider', 'model', 'reasoningEffort'] as const) {
+  @Field({ optional: true, description: 'Admin-only; omitted for everyone else.' })
+  provider?: string;
+
+  @Field({ optional: true, description: 'Admin-only; omitted for everyone else. The model that answered, as recorded, named by `GET /ai/models/admin` `modelLabels`.' })
+  model?: string;
+
+  @Field(() => String, { optional: true, nullable: true, description: 'Admin-only, since it hints at the model; omitted for everyone else. Null when the call sent none.' })
+  reasoningEffort?: string | null;
+
+  @Field({ description: 'Recorded cost plus the list-price estimate when the call recorded none.' })
+  chargeUsd: number;
+
+  @Field({ description: 'The part of chargeUsd estimated from list prices because the call recorded no cost.' })
+  estimatedChargeUsd: number;
+}
+
 @Schema({ description: "A workflow run's model calls, without prompt, context or raw output — that detail stays admin-only." })
 export class RunUsageDetailResponse extends WorkflowRunSummaryResponse {
   @Field(() => RunUsageResponse)
   totals: RunUsageResponse;
 
-  @Field(() => [RunModelCallResponse])
-  calls: RunModelCallResponse[];
+  @Field(() => [RunUsageCallResponse])
+  calls: RunUsageCallResponse[];
 }
 
 @Schema({ description: "Spend under one internal call role ('generation', 'judge', 'review', 'revision', 'continuity', 'chapter-extract', 'chapter-summarize', …)." })

@@ -53,7 +53,7 @@ async function applyProposal(ctx: APIRequestContext, projectId: string, proposal
   expect((await readProposalRow(proposalId))?.status, `proposal ${proposalId} was applied`).toBe('applied');
 }
 
-/** Every text model call a project made ran on the model its group routes to on the Economy tier; read before the fixture deletes the project and its calls. */
+/** Every text model call a project made ran on the model its group routes to on the Economy tier; read before the fixture deletes the project and its calls. The routes are admin-only. */
 async function expectEconomyRouting(ctx: APIRequestContext, projectId: string): Promise<void> {
   const routes = (await (await ctx.get(`/api/v1/projects/${projectId}/ai/models?costTier=economy&contentMode=standard`)).json()) as {
     models: { group: string; provider: string; model: string }[];
@@ -88,7 +88,7 @@ test.describe('novel-forge AI authoring', { tag: MODEL_TAG }, () => {
   });
 
   test('should take a new novel from notes through chat, organise, plan and write to a final chapter', async ({ forge }) => {
-    const { ctx } = await forge.actor({ label: 'ai-novel' });
+    const { ctx } = await forge.actor({ label: 'ai-novel', roles: ['NovelForgeAdmin'] });
     const novel: CreatedNovel = await createNovel(ctx, { title: `E2E AI Novel ${uniqueSuffix()}`, notes: ORGANISABLE_NOTES });
     await useEconomyTier(ctx, novel.projectId);
 
@@ -149,7 +149,7 @@ test.describe('novel-forge AI authoring', { tag: MODEL_TAG }, () => {
   });
 
   test('should review a hand-written chapter with AI and finalize it', async ({ forge }) => {
-    const { ctx } = await forge.actor({ label: 'ai-review' });
+    const { ctx } = await forge.actor({ label: 'ai-review', roles: ['NovelForgeAdmin'] });
     const { projectId } = await createNovel(ctx, { title: `E2E AI Review ${uniqueSuffix()}`, notes: NOVEL_NOTES });
     await useEconomyTier(ctx, projectId);
     const draft = await writeChapterByHand(ctx, projectId, CHAPTER_ONE);

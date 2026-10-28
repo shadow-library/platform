@@ -348,7 +348,7 @@ export class CostResponse {
   @Field(() => [CostBreakdownItem], { description: 'By internal call role, highest spend first.' })
   byRole: CostBreakdownItem[];
 
-  @Field(() => [CostBreakdownItem], { description: 'By model, highest spend first.' })
+  @Field(() => [CostBreakdownItem], { description: 'By model, highest spend first; empty unless the caller holds `novel-forge:admin`.' })
   byModel: CostBreakdownItem[];
 
   @Field(() => [CostBreakdownItem], { description: "By how the cost was priced — 'provider', 'gateway', or 'estimate' — highest spend first." })

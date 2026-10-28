@@ -1,3 +1,5 @@
+import { utils } from '@shadow-library/common';
+
 import { type Project, type Refinement } from '@server/database';
 
 import { type CallUsageTotals } from '../ai/usage/call-usage';
@@ -75,7 +77,6 @@ export function serialiseProposal(proposal: Refinement.Proposal): ProposalRespon
     autoApplied: proposal.autoApplied,
     revertible: proposal.status === 'applied' && (inverseOps?.length ?? 0) > 0,
     opResults: (proposal.opResults ?? null) as Record<string, unknown>[] | null,
-    model: proposal.model,
     runId: proposal.runId,
     appliedAt: proposal.appliedAt,
     revertedAt: proposal.revertedAt,
@@ -104,6 +105,14 @@ export function serialiseTurn(result: ChatTurnResult, offersNotes: NotesOffer = 
     held: result.held,
     runId: result.runId,
   };
+}
+
+export function messageWithoutModel(message: ChatMessageResponse): ChatMessageResponse {
+  return utils.object.omitKeys(message, ['modelProvider', 'modelId']);
+}
+
+export function turnWithoutModel(turn: ChatTurnResponse): ChatTurnResponse {
+  return { ...turn, userMessage: messageWithoutModel(turn.userMessage), assistantMessage: messageWithoutModel(turn.assistantMessage) };
 }
 
 /** Folds a `TurnCostService` figure onto an already-serialised message; a message with no figure (a user message, or a reply that made no run-linked call) is returned unchanged. */

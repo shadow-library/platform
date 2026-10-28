@@ -147,6 +147,7 @@ test.describe('novel-forge bot permission matrix', () => {
 
     const closed: [Method, string, unknown?][] = [
       ['get', '/api/v1/ai/models'],
+      ['get', '/api/v1/ai/models/admin'],
       ['get', '/api/v1/ai/usage'],
       ['get', '/api/v1/ai/quota'],
       ['get', '/api/v1/access'],

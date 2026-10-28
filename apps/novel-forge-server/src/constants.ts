@@ -8,7 +8,7 @@ export const PROJECTS_WRITE_PERMISSION = 'novel-forge:projects:write';
 export const ILLUSTRATIONS_WRITE_PERMISSION = 'novel-forge:illustrations:write';
 export const GENERATION_RUN_PERMISSION = 'novel-forge:generation:run';
 
-/** Gates the run-inspection API — prompt anatomy, token shares, per-call latency, raw model output — behind an explicit admin grant. */
+/** Gates run inspection (prompt anatomy, token shares, per-call latency, raw model output) and model identity (which model and provider served a call) behind an explicit admin grant. */
 export const ADMIN_PERMISSION = 'novel-forge:admin';
 
 /** Scope identity itself presents when it reconciles or transfers what an organisation's bot owns here. */

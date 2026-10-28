@@ -215,8 +215,10 @@ export interface WriterSnapshot extends WriterSnapshotSummary {
 
 export interface ModelCall {
   role: string;
-  provider: string;
-  model: string;
+  /** Sent to an admin only. */
+  provider?: string;
+  /** Sent to an admin only. */
+  model?: string;
   status: string;
   latencyMs?: number | null;
   attempt: number;

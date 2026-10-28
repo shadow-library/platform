@@ -4,6 +4,8 @@ import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, Put
 import { RevealRuleErrorResponse } from '@server/common';
 import { ADMIN_PERMISSION, GENERATION_RUN_PERMISSION, PROJECTS_READ_PERMISSION, PROJECTS_WRITE_PERMISSION } from '@server/constants';
 
+import { AdminAccessService } from '@modules/actor';
+
 import { ProposalResponse } from '../refinement/refinement.dto';
 import { serialiseProposal } from '../refinement/serialise';
 import { BriefService } from './brief.service';
@@ -60,7 +62,7 @@ import {
   RunUsageDetailResponse,
   WorkflowRunDetailResponse,
 } from './run-inspection.dto';
-import { RunInspectionService } from './run-inspection.service';
+import { RunInspectionService, withoutCallModels } from './run-inspection.service';
 
 @BotPermission(PROJECTS_READ_PERMISSION)
 @Authenticated()
@@ -70,6 +72,7 @@ export class GenerationController {
     private readonly generationService: GenerationService,
     private readonly briefs: BriefService,
     private readonly runs: RunInspectionService,
+    private readonly adminAccess: AdminAccessService,
   ) {}
 
   @BotPermission(PROJECTS_WRITE_PERMISSION)
@@ -342,8 +345,9 @@ export class GenerationController {
 
   @Get('/runs/:runId/usage')
   @RespondFor(200, RunUsageDetailResponse)
-  getRunUsage(@Params() params: RunParams): Promise<RunUsageDetailResponse> {
-    return this.runs.getRunUsage(params.projectId, params.runId);
+  async getRunUsage(@Params() params: RunParams): Promise<RunUsageDetailResponse> {
+    const [usage, showModels] = await Promise.all([this.runs.getRunUsage(params.projectId, params.runId), this.adminAccess.canSeeModels()]);
+    return showModels ? usage : withoutCallModels(usage);
   }
 
   @Get('/chapters/:n/cost')

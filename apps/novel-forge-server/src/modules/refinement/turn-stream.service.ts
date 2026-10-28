@@ -6,18 +6,37 @@ import { APP_NAME } from '@server/constants';
 
 import { ChatService, type ChatTurnOptions } from './chat.service';
 import { type ChatTurnEmitter } from './chat-turn-emitter';
-import { serialiseMessage, serialiseTurn, withTurnCost } from './serialise';
+import { type ChatMessageResponse, type ChatTurnResponse } from './chat.dto';
+import { type ProposalResponse } from './refinement.dto';
+import { messageWithoutModel, serialiseMessage, serialiseTurn, turnWithoutModel, withTurnCost } from './serialise';
 import { TurnCostService } from './turn-cost.service';
 import { TurnEventFollower } from './turn-event-follower';
 import { TurnEventLog } from './turn-event-log';
 import { TurnEventRepository } from './turn-event.repository';
-import { type TurnStreamListener } from './turn-stream.types';
+import { type TurnStreamFrame, type TurnStreamListener } from './turn-stream.types';
 
 const CURSOR = /^[0-9]{1,9}$/;
 
 /** A `Last-Event-ID` this stream did not send is read as none: replaying from the start behind a `reset` is always safe for the client. */
 export function resumeCursorOf(lastEventId: unknown): number | null {
   return typeof lastEventId === 'string' && CURSOR.test(lastEventId) ? Number(lastEventId) : null;
+}
+
+type StoredProposal = ProposalResponse & { model?: unknown };
+
+// A `done` frame stored before proposals stopped carrying `model` is replayed for as long as its run's frames are kept.
+function proposalWithoutModel(proposal: StoredProposal | null | undefined): ProposalResponse | undefined {
+  if (!proposal) return undefined;
+  const { model: _model, ...rest } = proposal;
+  return rest;
+}
+
+/** Frames are stored once per run and replayed to every follower, so model identity is dropped per follower as a frame goes out, not when it is written. */
+export function frameWithoutModel(frame: TurnStreamFrame): TurnStreamFrame {
+  if (frame.event === 'user') return { ...frame, data: JSON.stringify(messageWithoutModel(JSON.parse(frame.data) as ChatMessageResponse)) };
+  if (frame.event !== 'done') return frame;
+  const turn = turnWithoutModel(JSON.parse(frame.data) as ChatTurnResponse);
+  return { ...frame, data: JSON.stringify({ ...turn, proposal: proposalWithoutModel(turn.proposal), appliedProposal: proposalWithoutModel(turn.appliedProposal) }) };
 }
 
 /**

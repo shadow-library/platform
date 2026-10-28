@@ -3,15 +3,20 @@ import { Body, EventStream, Get, Headers, HttpController, type HttpResponse, Htt
 
 import { GENERATION_RUN_PERMISSION, PROJECTS_READ_PERMISSION, PROJECTS_WRITE_PERMISSION } from '@server/constants';
 
+import { AdminAccessService } from '@modules/actor';
+
 import { ChatSessionParams, ChatTurnBody, ChatTurnStreamResponse, TurnStreamParams } from './chat.dto';
-import { resumeCursorOf, TurnStreamService } from './turn-stream.service';
+import { frameWithoutModel, resumeCursorOf, TurnStreamService } from './turn-stream.service';
 import { TERMINAL_TURN_EVENTS } from './turn-stream.types';
 
 @BotPermission(PROJECTS_READ_PERMISSION)
 @Authenticated()
 @HttpController('/api/v1/projects/:projectId')
 export class TurnStreamController {
-  constructor(private readonly turnStreams: TurnStreamService) {}
+  constructor(
+    private readonly turnStreams: TurnStreamService,
+    private readonly adminAccess: AdminAccessService,
+  ) {}
 
   /** The turn is owned by the service, not by this request, so it completes and persists whether or not a client ever watches it. */
   @BotPermission(PROJECTS_WRITE_PERMISSION)
@@ -33,12 +38,12 @@ export class TurnStreamController {
   /** Any replica serves it; each `seq` is the SSE id so a reconnect resumes after `Last-Event-ID`, else the turn replays behind a `reset`. Unknown runs 404 before hijack. */
   @Get('/turns/:runId/stream')
   async streamTurn(@Params() params: TurnStreamParams, @Headers() headers: Record<string, unknown>, @Res() response: HttpResponse): Promise<void> {
-    await this.turnStreams.assertRun(params.projectId, params.runId);
+    const [, showModels] = await Promise.all([this.turnStreams.assertRun(params.projectId, params.runId), this.adminAccess.canSeeModels()]);
 
     const stream = EventStream.open(response);
     stream.send({ event: 'ready', data: {} });
     const stop = this.turnStreams.follow(params.projectId, params.runId, resumeCursorOf(headers['last-event-id']), frame => {
-      const delivered = stream.send(frame);
+      const delivered = stream.send(showModels ? frame : frameWithoutModel(frame));
       if (TERMINAL_TURN_EVENTS.has(frame.event)) stream.close();
       return delivered;
     });

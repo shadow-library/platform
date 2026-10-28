@@ -3,6 +3,8 @@ import { Body, Delete, Get, HttpController, Params, Patch, Post, Query, RespondF
 
 import { GENERATION_RUN_PERMISSION, PROJECTS_READ_PERMISSION, PROJECTS_WRITE_PERMISSION } from '@server/constants';
 
+import { AdminAccessService } from '@modules/actor';
+
 import { notesOffer } from '../notes/notes-message';
 import {
   ChatProjectParams,
@@ -20,7 +22,7 @@ import {
 } from './chat.dto';
 import { ChatSessionService } from './chat-session.service';
 import { ChatService } from './chat.service';
-import { serialiseMessage, serialiseTurn, withTurnCost } from './serialise';
+import { messageWithoutModel, serialiseMessage, serialiseTurn, turnWithoutModel, withTurnCost } from './serialise';
 import { TurnCostService } from './turn-cost.service';
 
 @BotPermission(PROJECTS_READ_PERMISSION)
@@ -31,6 +33,7 @@ export class ChatController {
     private readonly chatService: ChatService,
     private readonly chatSessions: ChatSessionService,
     private readonly turnCost: TurnCostService,
+    private readonly adminAccess: AdminAccessService,
   ) {}
 
   @BotPermission(PROJECTS_WRITE_PERMISSION)
@@ -55,14 +58,16 @@ export class ChatController {
   @Get('/:sessionId/messages')
   @RespondFor(200, ListChatMessagesResponse)
   async listMessages(@Params() params: ChatSessionParams, @Query() query: ListChatMessagesQuery): Promise<ListChatMessagesResponse> {
-    const [messages, { pendingTurn, failedTurn }, notes] = await Promise.all([
+    const [messages, { pendingTurn, failedTurn }, notes, showModels] = await Promise.all([
       this.chatSessions.listMessages(params.projectId, params.sessionId, query),
       this.chatService.turnStatus(params.projectId, params.sessionId),
       this.chatService.authorNotes(params.projectId),
+      this.adminAccess.canSeeModels(),
     ]);
     const cost = await this.turnCost.forMessages(params.projectId, messages);
     const offersNotes = notesOffer(notes);
-    return { messages: messages.map(m => withTurnCost(serialiseMessage(m, offersNotes), cost.get(m.id))), pendingTurn, failedTurn };
+    const serialised = messages.map(m => withTurnCost(serialiseMessage(m, offersNotes), cost.get(m.id)));
+    return { messages: showModels ? serialised : serialised.map(messageWithoutModel), pendingTurn, failedTurn };
   }
 
   /** What a client polls while a turn runs: whether it is still running and how far the transcript has got, without the transcript. */
@@ -84,9 +89,14 @@ export class ChatController {
       costTier: body.costTier,
       contexts: body.contexts,
     });
-    const turn = serialiseTurn(result, notesOffer(await this.chatService.authorNotes(params.projectId)));
-    const cost = await this.turnCost.forMessages(params.projectId, [result.assistantMessage]);
-    return { ...turn, assistantMessage: withTurnCost(turn.assistantMessage, cost.get(result.assistantMessage.id)) };
+    const [notes, cost, showModels] = await Promise.all([
+      this.chatService.authorNotes(params.projectId),
+      this.turnCost.forMessages(params.projectId, [result.assistantMessage]),
+      this.adminAccess.canSeeModels(),
+    ]);
+    const turn = serialiseTurn(result, notesOffer(notes));
+    const costed = { ...turn, assistantMessage: withTurnCost(turn.assistantMessage, cost.get(result.assistantMessage.id)) };
+    return showModels ? costed : turnWithoutModel(costed);
   }
 
   @BotPermission(PROJECTS_WRITE_PERMISSION)

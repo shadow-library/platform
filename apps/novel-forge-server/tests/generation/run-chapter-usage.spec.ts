@@ -138,6 +138,40 @@ describe('RunInspectionService.getRunUsage', () => {
     expect(result.totals.calls).toBe(1);
     expect(result.calls).toHaveLength(1);
   });
+
+  it("should price each call on the server, so a reader who never sees the call's model still sees its spend", async () => {
+    const run = {
+      id: 'run-1',
+      projectId: 1n,
+      jobId: null,
+      graph: 'chat-turn',
+      target: 's1',
+      status: 'completed',
+      outcome: 'completed',
+      nodeTrace: [],
+      startedAt: new Date(),
+      endedAt: null,
+    };
+    const recorded = {
+      model: 'anthropic/claude-sonnet-5',
+      status: 'ok',
+      costSource: 'gateway',
+      costUsd: '0.02',
+      inputTokens: 40,
+      cachedInputTokens: 0,
+      outputTokens: 20,
+      latencyMs: 200,
+    };
+    const legacy = { ...recorded, costSource: null, costUsd: null };
+
+    const result = await makeService(fakeDb({ workflowRunFindFirst: run, modelCalls: [recorded, legacy] })).getRunUsage(1n, 'run-1');
+
+    const [priced, estimated] = result.calls;
+    expect(priced).toMatchObject({ chargeUsd: 0.02, estimatedChargeUsd: 0 });
+    expect(estimated?.estimatedChargeUsd).toBeGreaterThan(0);
+    expect(estimated?.chargeUsd).toBe(estimated?.estimatedChargeUsd ?? -1);
+    expect(result.calls.reduce((sum, call) => sum + call.chargeUsd, 0)).toBeCloseTo(result.totals.costUsd);
+  });
 });
 
 describe('RunInspectionService.listRuns', () => {

@@ -5,7 +5,7 @@ import { type APIRequestContext } from '@playwright/test';
 import { mutate, pollUntil } from '../../lib';
 import { type ForgeActor } from './forge-actors';
 import { expectCode, guardedProject, newChatSession, newProject, quotaRefusedChat, SHORT_TURN, startTurn, unrestrictedAvailable } from './forge-arrange';
-import { listDispatchedModelCalls } from './forge-db';
+import { insertTurnEvents, insertWorkflowRun, listDispatchedModelCalls } from './forge-db';
 import { type ChatTranscript } from './forge-helpers';
 import { holdNextChatMessage, listWorkflowRuns } from './forge-rows';
 import { expect, expectRefusedStream, framesOf, type SseClient, type SseFrame, type SseStream, test } from './forge-sse';
@@ -77,6 +77,30 @@ test.describe('novel-forge chat turn stream', () => {
     expect(session.status(), await session.text()).toBe(200);
     const body = (await session.json()) as Record<string, unknown>;
     for (const field of ['costTier', 'contentMode', 'modelProvider', 'modelId']) expect(body, `a chat holds no ${field} of its own`).not.toHaveProperty(field);
+  });
+
+  test("should keep a reply's model out of a stored done frame for an author and send it to an admin", async ({ forge, sse }) => {
+    const model = 'e2e/seeded-model';
+    const author = await forge.actor({ label: 'turn-model-author' });
+    const admin = await forge.actor({ label: 'turn-model-admin', roles: ['NovelForgeAdmin'] });
+
+    for (const [owner, isAdmin] of [
+      [author, false],
+      [admin, true],
+    ] as const) {
+      const projectId = await newProject(owner, `turn-model-${isAdmin ? 'admin' : 'author'}`);
+      const runId = await insertWorkflowRun({ projectId, graph: 'chat-turn', status: 'completed', startedAgoMs: 2_000, endedAgoMs: 1_000 });
+      const user = { id: '1', role: 'user', content: SHORT_TURN, modelProvider: null, modelId: null };
+      const reply = { id: '2', role: 'assistant', content: 'Noted.', modelProvider: 'synapse', modelId: model };
+      await insertTurnEvents(projectId, runId, [
+        { event: 'user', data: user },
+        { event: 'done', data: { userMessage: user, assistantMessage: reply, proposal: { id: '5', status: 'pending', model }, runId } },
+      ]);
+
+      const [done] = framesOf<{ assistantMessage: Record<string, unknown>; proposal: Record<string, unknown> }>(await watchToTheEnd(sse, owner, projectId, runId), 'done');
+      expect(done?.assistantMessage['modelId'], isAdmin ? 'an admin sees the model' : 'an author never does').toBe(isAdmin ? model : undefined);
+      if (!isAdmin) expect(done?.proposal, 'nor on a proposal stored before proposals dropped it').not.toHaveProperty('model');
+    }
   });
 
   test('should refuse a one-shot unrestricted turn before its run exists where unrestricted writing is not set up', async ({ forge }) => {

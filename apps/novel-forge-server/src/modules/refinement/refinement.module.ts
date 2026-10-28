@@ -1,6 +1,8 @@
 import { Module } from '@shadow-library/app';
 import { DatabaseModule } from '@shadow-library/modules';
 
+import { ActorModule } from '@modules/actor';
+
 import { AiModule } from '../ai/ai.module';
 import { EventsModule } from '../events/events.module';
 import { LedgerModule } from '../ledger/ledger.module';
@@ -32,7 +34,7 @@ import { TurnStreamService } from './turn-stream.service';
 import { WriterPreviewService } from './writer-preview.service';
 
 @Module({
-  imports: [ActionRegistryModule, DatabaseModule, AiModule, EventsModule, LedgerModule, NotesStoreModule, PluginsModule],
+  imports: [ActionRegistryModule, ActorModule, DatabaseModule, AiModule, EventsModule, LedgerModule, NotesStoreModule, PluginsModule],
   controllers: [ProposalController, ChangeHistoryController, ChatController, TurnStreamController, RefineController, BibleTidyController],
   providers: [
     ProposalService,

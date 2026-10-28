@@ -1,7 +1,10 @@
 import { Authenticated, BotPermission } from '@shadow-library/auth/module';
+import { utils } from '@shadow-library/common';
 import { Body, Delete, Get, HttpController, type HttpResponse, Params, Post, Res, RespondFor } from '@shadow-library/fastify';
 
 import { GENERATION_RUN_PERMISSION, PROJECTS_READ_PERMISSION, PROJECTS_WRITE_PERMISSION } from '@server/constants';
+
+import { AdminAccessService } from '@modules/actor';
 
 import { ChapterParams, ChapterReviewResponse, JudgeResponse } from '../generation/generation.dto';
 import {
@@ -15,22 +18,30 @@ import {
 } from './chapter-review.dto';
 import { ChapterReviewService } from './chapter-review.service';
 
+function withoutModel(review: ChapterReviewRecordResponse): ChapterReviewRecordResponse {
+  return utils.object.omitKeys(review, ['modelProvider', 'model']);
+}
+
 @BotPermission(PROJECTS_READ_PERMISSION)
 @Authenticated()
 @HttpController('/api/v1/projects/:projectId')
 export class ChapterReviewController {
-  constructor(private readonly reviewService: ChapterReviewService) {}
+  constructor(
+    private readonly reviewService: ChapterReviewService,
+    private readonly adminAccess: AdminAccessService,
+  ) {}
 
   @Get('/chapters/:n/reviews')
   @RespondFor(200, ListChapterReviewsResponse)
-  listReviews(@Params() params: ChapterParams): Promise<ListChapterReviewsResponse> {
-    return this.reviewService.list(params.projectId, params.n);
+  async listReviews(@Params() params: ChapterParams): Promise<ListChapterReviewsResponse> {
+    const [reviews, showModels] = await Promise.all([this.reviewService.list(params.projectId, params.n), this.adminAccess.canSeeModels()]);
+    return showModels ? reviews : { ...reviews, latest: reviews.latest.map(withoutModel), history: reviews.history.map(withoutModel) };
   }
 
   @Get('/chapters/:n/reviews/:reviewId')
   @RespondFor(200, ChapterReviewRecordResponse)
   getReview(@Params() params: ReviewIdParams): Promise<ChapterReviewRecordResponse> {
-    return this.reviewService.get(params.projectId, params.n, params.reviewId);
+    return this.forViewer(this.reviewService.get(params.projectId, params.n, params.reviewId));
   }
 
   @BotPermission(PROJECTS_WRITE_PERMISSION)
@@ -45,21 +56,21 @@ export class ChapterReviewController {
   ): Promise<ChapterReviewRecordResponse | ChapterReviewJobResponse> {
     const started = await this.reviewService.start(params.projectId, params.n, body);
     response.status(started.queued ? 202 : 201);
-    return started.queued ? started.job : started.review;
+    return started.queued ? started.job : this.forViewer(started.review);
   }
 
   @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Post('/chapters/:n/reviews/:reviewId/findings/:findingId/remedy')
   @RespondFor(200, ChapterReviewRecordResponse)
   remedyFinding(@Params() params: ReviewFindingParams, @Body() body: ReviewRemedyBody): Promise<ChapterReviewRecordResponse> {
-    return this.reviewService.remedy(params.projectId, params.n, params.reviewId, params.findingId, body);
+    return this.forViewer(this.reviewService.remedy(params.projectId, params.n, params.reviewId, params.findingId, body));
   }
 
   @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Delete('/chapters/:n/reviews/:reviewId/findings/:findingId/remedy')
   @RespondFor(200, ChapterReviewRecordResponse)
   clearRemedy(@Params() params: ReviewFindingParams): Promise<ChapterReviewRecordResponse> {
-    return this.reviewService.clearRemedy(params.projectId, params.n, params.reviewId, params.findingId);
+    return this.forViewer(this.reviewService.clearRemedy(params.projectId, params.n, params.reviewId, params.findingId));
   }
 
   @BotPermission(PROJECTS_WRITE_PERMISSION)
@@ -80,5 +91,10 @@ export class ChapterReviewController {
     const review = await this.reviewService.run(params.projectId, params.n, { kind: 'editorial' });
     const findings = review.findings.map(finding => ({ severity: finding.severity === 'blocking' ? 'blocking' : 'suggestion', text: finding.text }));
     return { disposition: review.verdict ?? 'revision_requested', note: review.note, findings };
+  }
+
+  private async forViewer(review: ChapterReviewRecordResponse | Promise<ChapterReviewRecordResponse>): Promise<ChapterReviewRecordResponse> {
+    const [record, showModels] = await Promise.all([review, this.adminAccess.canSeeModels()]);
+    return showModels ? record : withoutModel(record);
   }
 }

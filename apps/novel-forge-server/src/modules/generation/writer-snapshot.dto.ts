@@ -41,8 +41,8 @@ class WriterSnapshotSummaryResponse {
   @Field()
   promptVersion: string;
 
-  @Field(() => Object, { additionalProperties: true })
-  modelRoute: { provider: string; model: string };
+  @Field(() => Object, { optional: true, additionalProperties: true, description: 'The provider and model the attempt was routed to; admin-only, omitted for everyone else.' })
+  modelRoute?: { provider: string; model: string };
 
   @Field()
   isolated: boolean;

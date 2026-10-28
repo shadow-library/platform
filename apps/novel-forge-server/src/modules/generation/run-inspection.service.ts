@@ -1,5 +1,6 @@
 import { and, asc, desc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
+import { utils } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
@@ -104,7 +105,7 @@ export class RunInspectionService {
     return { ...presentRun(run), modelCalls, toolCalls, totals, ...(contextPack ? { contextPack } : {}) };
   }
 
-  /** The non-admin projection of a run: totals and calls' role/model/tier/mode/tokens/cost — `columns` selection, not schema stripping, is what keeps `rawOutput`/`error`/`input` out of the returned object. */
+  /** A run's usage: totals and each call's role/model/tier/mode/tokens/cost and charge (`GenerationController` drops model, provider and reasoning effort for a non-admin) — `columns` selection, not schema stripping, is what keeps `rawOutput`/`error`/`input` out of the returned object. */
   async getRunUsage(projectId: bigint, runId: string): Promise<RunUsageDetailResponse> {
     const run = await this.db.query.workflowRuns.findFirst({
       where: and(eq(schema.workflowRuns.projectId, projectId), eq(schema.workflowRuns.id, runId)),
@@ -137,7 +138,11 @@ export class RunInspectionService {
       },
     });
     const { nodeTrace: _nodeTrace, ...runSummary } = { ...run, ...splitRunTrace(run.nodeTrace) };
-    return { ...runSummary, totals: toRunUsageResponse(summarizeCallUsage(modelCalls), run), calls: modelCalls };
+    const calls = modelCalls.map(call => {
+      const { costUsd: chargeUsd, estimatedCostUsd: estimatedChargeUsd } = summarizeCallUsage([call]);
+      return { ...call, chargeUsd, estimatedChargeUsd };
+    });
+    return { ...runSummary, totals: toRunUsageResponse(summarizeCallUsage(modelCalls), run), calls };
   }
 
   /** Every model call any action has made against chapter N (generation, finalization, judge, review, revision, continuity, extraction, summarize) — tagged directly on `model_calls.chapter`. */
@@ -233,4 +238,8 @@ export class RunInspectionService {
     const pack = await this.db.query.contextPacks.findFirst({ where: eq(schema.contextPacks.id, BigInt(summary.id)) });
     return { ...summary, rendered: pack?.rendered ?? '' };
   }
+}
+
+export function withoutCallModels(usage: RunUsageDetailResponse): RunUsageDetailResponse {
+  return { ...usage, calls: usage.calls.map(call => utils.object.omitKeys(call, ['provider', 'model', 'reasoningEffort'])) };
 }

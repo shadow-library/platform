@@ -750,9 +750,6 @@ export class ContinuityProposalResponse {
   @Field(() => Object, { additionalProperties: true })
   proposal: ContinuityOutput;
 
-  @Field({ optional: true, nullable: true })
-  model?: string | null;
-
   @Field(() => String, { optional: true, nullable: true, format: 'date-time' })
   appliedAt?: Date | null;
 

@@ -6,7 +6,7 @@ import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type Project } from '@server/database';
 
-import { type AiModelLabel, type AiModelOption, type AiModelsResponse, type AiRoleDefault } from './ai.dto';
+import { type AiModelLabel, type AiModelOption, type AiModelsAdminResponse, type AiRoleDefault } from './ai.dto';
 import { CONTENT_MODES, COST_TIERS, DEFAULT_COST_TIER, type ModelGroup, SELECTABLE_MODEL_GROUPS, type SelectableModelGroup } from './defaults';
 import { HISTORICAL_MODELS } from './historical-models';
 import { fromSynapseFailure } from './synapse-failure';
@@ -104,7 +104,7 @@ export function catalogModelLabels(views: readonly CatalogAppResponse[]): AiMode
   return [...labels.values()];
 }
 
-export function catalogModelsResponse(views: readonly SelectionView[]): AiModelsResponse {
+export function catalogModelsResponse(views: readonly SelectionView[]): AiModelsAdminResponse {
   const options = new Map<string, AiModelOption>();
   for (const { view } of views) for (const alias of chatAliasesOf(view)) if (!options.has(alias.key)) options.set(alias.key, aliasOption(alias));
   const unrestricted = new Set(views.filter(({ contentMode }) => contentMode === 'unrestricted').flatMap(({ view }) => chatAliasesOf(view).map(alias => alias.key)));
@@ -114,6 +114,7 @@ export function catalogModelsResponse(views: readonly SelectionView[]): AiModels
   };
   const unrestrictedViews = views.filter(({ contentMode }) => contentMode === 'unrestricted').map(({ view }) => view);
   return {
+    paces: [...COST_TIERS],
     profile: 'production',
     unrestrictedAvailable: routesUnrestricted(unrestrictedViews),
     models: [...options.values()],
@@ -150,7 +151,7 @@ export class NovelForgeCatalogService implements UnrestrictedAvailability {
     }
   }
 
-  async modelsResponse(): Promise<AiModelsResponse> {
+  async modelsResponse(): Promise<AiModelsAdminResponse> {
     const views = await Promise.all(CATALOG_SELECTIONS.map(async selection => ({ ...selection, view: await this.appView(selection) })));
     return catalogModelsResponse(views);
   }

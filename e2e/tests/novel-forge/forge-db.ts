@@ -416,6 +416,19 @@ export async function insertToolCall(seed: ToolCallSeed): Promise<string> {
   return row.id;
 }
 
+export interface TurnEventSeed {
+  event: string;
+  data: unknown;
+}
+
+/** Stores a turn's stream frames as the run's replica would, numbered from 1, so a follower replays them. */
+export async function insertTurnEvents(projectId: string, runId: string, events: readonly TurnEventSeed[]): Promise<void> {
+  const sql = novelForgeDb();
+  for (const [index, { event, data }] of events.entries()) {
+    await sql`INSERT INTO turn_events (run_id, project_id, seq, event, data) VALUES (${runId}, ${projectId}, ${index + 1}, ${event}, ${sql.json(data as never)})`;
+  }
+}
+
 export async function insertContextPack(seed: ContextPackSeed): Promise<string> {
   const sql = novelForgeDb();
   const hash = `e2e-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;

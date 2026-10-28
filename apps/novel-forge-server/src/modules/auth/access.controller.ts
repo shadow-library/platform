@@ -1,8 +1,7 @@
-import { AuthClient } from '@shadow-library/auth';
 import { Authenticated } from '@shadow-library/auth/module';
-import { ContextService, Get, HttpController, RespondFor } from '@shadow-library/fastify';
+import { Get, HttpController, RespondFor } from '@shadow-library/fastify';
 
-import { ADMIN_PERMISSION } from '@server/constants';
+import { AdminAccessService } from '@modules/actor';
 
 import { AccessResponse } from './access.dto';
 
@@ -14,18 +13,11 @@ import { AccessResponse } from './access.dto';
 @Authenticated()
 @HttpController('/api/v1/access')
 export class AccessController {
-  constructor(
-    private readonly authClient: AuthClient,
-    private readonly context: ContextService,
-  ) {}
+  constructor(private readonly adminAccess: AdminAccessService) {}
 
   @Get()
   @RespondFor(200, AccessResponse)
   async getAccess(): Promise<AccessResponse> {
-    const principal = this.context.getAuthPrincipal();
-    if (!principal.org) return { admin: false };
-
-    const admin = await this.authClient.check({ action: ADMIN_PERMISSION, organisationId: principal.org, principal }, { highRisk: true });
-    return { admin };
+    return { admin: await this.adminAccess.isAdmin() };
   }
 }

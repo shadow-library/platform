@@ -1,6 +1,7 @@
-import { type APIRequestContext, expect, test } from '@playwright/test';
+import { type APIRequestContext } from '@playwright/test';
 
 import { apiContext, mutate, requireProductUrl, storageStateFor } from '../../lib';
+import { expect, test } from './forge-actors';
 import { unrestrictedAvailable } from './forge-arrange';
 import { type ContentMode, type CostTier, type CreatedNovel, createNovel, deleteProjectQuietly, errorCode, uniqueSuffix } from './forge-helpers';
 
@@ -32,8 +33,19 @@ test.describe('novel-forge model type and cost tier (API)', () => {
     await ctx.dispose();
   });
 
-  test('should publish a platform model for every tier and model type', async () => {
-    const catalog = (await (await ctx.get('/api/v1/ai/models')).json()) as { tiers: { costTier: CostTier; contentMode: ContentMode; group: string }[] };
+  test('should offer an author the paces and never the models behind them', async () => {
+    const options = (await (await ctx.get('/api/v1/ai/models')).json()) as Record<string, unknown>;
+    expect(options['paces']).toEqual(TIERS);
+    expect(typeof options['unrestrictedAvailable']).toBe('boolean');
+    for (const field of ['profile', 'models', 'defaults', 'tiers', 'modelLabels']) expect(options, `${field} is admin-only`).not.toHaveProperty(field);
+    expect((await ctx.get('/api/v1/ai/models/admin')).status(), 'the full catalog is admin-only').toBe(403);
+  });
+
+  test('should publish a platform model for every tier and model type to an admin', async ({ forge }) => {
+    const admin = await forge.actor({ label: 'tiers-admin', roles: ['NovelForgeAdmin'] });
+    const response = await admin.ctx.get('/api/v1/ai/models/admin');
+    expect(response.status(), await response.text()).toBe(200);
+    const catalog = (await response.json()) as { tiers: { costTier: CostTier; contentMode: ContentMode; group: string }[] };
     for (const costTier of TIERS) {
       for (const contentMode of MODES) {
         expect(
@@ -64,9 +76,13 @@ test.describe('novel-forge model type and cost tier (API)', () => {
     expect(((await (await ctx.get(`/api/v1/projects/${novel.projectId}`)).json()) as { contentMode: ContentMode }).contentMode).toBe('standard');
   });
 
-  test('should resolve a chat model for every tier the author can pick', async () => {
+  test('should resolve a chat model for every tier to an admin, and refuse the routes to an author', async ({ forge }) => {
+    expect((await ctx.get(`/api/v1/projects/${novel.projectId}/ai/models`)).status(), "a novel's model routes are admin-only").toBe(403);
+
+    const admin = await forge.actor({ label: 'tiers-routes', roles: ['NovelForgeAdmin'] });
+    const own = await createNovel(admin.ctx, { title: `E2E Tier Routes ${uniqueSuffix()}` });
     for (const costTier of TIERS) {
-      const routes = (await (await ctx.get(`/api/v1/projects/${novel.projectId}/ai/models?costTier=${costTier}&contentMode=standard`)).json()) as ProjectModels;
+      const routes = (await (await admin.ctx.get(`/api/v1/projects/${own.projectId}/ai/models?costTier=${costTier}&contentMode=standard`)).json()) as ProjectModels;
       expect(routes).toMatchObject({ costTier, contentMode: 'standard' });
       expect(routes.models.find(route => route.group === 'chat')?.label, `${costTier} chat route`).toBeTruthy();
     }

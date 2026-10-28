@@ -1,6 +1,8 @@
 import { Module } from '@shadow-library/app';
 import { DatabaseModule, StorageModule } from '@shadow-library/modules';
 
+import { ActorModule } from '@modules/actor';
+
 import { AiModule } from '../ai/ai.module';
 import { AuthoringClaimModule } from '../jobs/authoring-claim.module';
 import { JobsModule } from '../jobs/jobs.module';
@@ -24,7 +26,7 @@ import { RunInspectionService } from './run-inspection.service';
 import { WriterSnapshotController } from './writer-snapshot.controller';
 
 @Module({
-  imports: [DatabaseModule, AiModule, AuthoringClaimModule, JobsModule, PluginsModule, PluginProposalModule, RefinementModule, StorageModule],
+  imports: [ActorModule, DatabaseModule, AiModule, AuthoringClaimModule, JobsModule, PluginsModule, PluginProposalModule, RefinementModule, StorageModule],
   controllers: [
     GenerationController,
     ChapterImageController,

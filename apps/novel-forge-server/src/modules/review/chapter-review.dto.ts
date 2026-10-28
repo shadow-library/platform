@@ -178,13 +178,14 @@ export class ChapterReviewRecordResponse {
   @Field(() => ContentMode, { optional: true, nullable: true })
   contentMode?: Project.ContentMode | null;
 
-  @Field({ optional: true, nullable: true })
+  @Field({ optional: true, nullable: true, description: 'Admin-only; omitted for everyone else.' })
   modelProvider?: string | null;
 
   @Field({
     optional: true,
     nullable: true,
-    description: 'The model that read the chapter, as its call recorded it; named by `GET /ai/models` `modelLabels`. Null when no model ran or the review came from cache.',
+    description:
+      'Admin-only; omitted for everyone else. The model that read the chapter, as its call recorded it; named by `GET /ai/models/admin` `modelLabels`. Null when no model ran or the review came from cache.',
   })
   model?: string | null;
 

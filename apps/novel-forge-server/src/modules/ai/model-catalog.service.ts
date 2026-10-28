@@ -5,7 +5,8 @@ import { DatabaseService } from '@shadow-library/modules';
 import { AppErrorCode } from '@server/classes';
 import { type PrimaryDatabase, type Project, schema } from '@server/database';
 
-import { type AiModelsResponse } from './ai.dto';
+import { type AiModelsAdminResponse, type AiModelsResponse } from './ai.dto';
+import { COST_TIERS } from './defaults';
 import { type CatalogSelectionModels, NovelForgeCatalogService } from './novel-forge-catalog.service';
 
 export interface ProjectModels extends CatalogSelectionModels {
@@ -29,7 +30,11 @@ export class ModelCatalogService {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
 
-  models(): Promise<AiModelsResponse> {
+  async authorOptions(): Promise<AiModelsResponse> {
+    return { paces: [...COST_TIERS], unrestrictedAvailable: await this.catalog.unrestrictedAvailable() };
+  }
+
+  adminModels(): Promise<AiModelsAdminResponse> {
     return this.catalog.modelsResponse();
   }
 

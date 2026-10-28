@@ -2,6 +2,8 @@ import { forwardRef, type Import, Module } from '@shadow-library/app';
 import { AuthModule } from '@shadow-library/auth/module';
 import { FastifyModule } from '@shadow-library/fastify';
 
+import { ActorModule } from '@modules/actor';
+
 import { AccessController } from './access.controller';
 import { NOVEL_FORGE_ROLE_CATALOG } from './role-catalog.constants';
 
@@ -9,7 +11,7 @@ import { NOVEL_FORGE_ROLE_CATALOG } from './role-catalog.constants';
 const IdentityAuthModule = AuthModule.forRoot({ roles: NOVEL_FORGE_ROLE_CATALOG, routes: { basePath: '/api/auth' } });
 
 @Module({
-  imports: [forwardRef(() => IdentityAuthModule) as unknown as Import, FastifyModule],
+  imports: [forwardRef(() => IdentityAuthModule) as unknown as Import, ActorModule, FastifyModule],
   controllers: [AccessController],
 })
 export class AppAuthModule {}
