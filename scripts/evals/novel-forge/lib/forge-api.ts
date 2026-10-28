@@ -275,7 +275,7 @@ export class HttpForgeApi implements ForgeApi {
   }
 
   generate(projectId: string): Promise<{ jobId: string }> {
-    return this.request('POST', `${API}/projects/${projectId}/generate`, { limit: 1 });
+    return this.request('POST', `${API}/projects/${projectId}/generate`, { limit: 1, autoFix: true });
   }
 
   getDraft(projectId: string, chapter: number): Promise<Draft | null> {
