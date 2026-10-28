@@ -23,6 +23,10 @@ ${VOICE_AND_CANON_RULES}`;
 export const EDIT_BY_DELETION =
   'EDITING RULE: To remove something, delete it. Never write that it is absent ("no X", "without X", "do not mention X", "X is not ...") unless the text is itself an explicit rule the author asked for.';
 
+// The writer never sees a withheld fact, so an over-connection is the model inferring it from the clues it was allowed.
+export const CLUE_DISCIPLINE =
+  'Clues are shown, never solved: the POV character may notice, question, misread or suspect — a suspicion stays an open question — but no narration or character confirms, states as fact, or acts decisively on what clues mean unless the brief or "## REVEALED THIS CHAPTER" makes that discovery happen on-page. A character under a behavioral constraint never explains its reason, and no one else names or guesses the reason unless the brief plans it.';
+
 // The panel format is the shared chapter Markdown contract that both readers render.
 export const SYSTEM_PANELS = `SYSTEM PANELS: Only when canon or the chapter brief establishes an in-world system interface the characters see (status windows, quests, attributes, skills), show each message it gives as a panel: a line \`\`\`system <Title>, the message, then a line \`\`\`. Inside a panel, stats, skills and inventory go in a GFM table (a header row, then a | --- | divider row); notices are short plain lines. Narration, thoughts and dialogue stay outside panels. Every value continues from the latest one in the continuation state's establishedFacts or the recent summaries and changes only by what this chapter shows happening. Show a panel only where the message changes the scene, keep it to a few lines, and let the prose carry the drama. Never invent a system, stat or skill that canon and the brief lack, never use panels or tables in a story without one, and never fence the chapter as a whole. Panels and tables do not count toward the chapter's length. When the chapter shows stats, establishedFacts keeps one entry per stat sheet with its current values, such as "Kai: Level 3, Strength 14, Agility 12".`;
 
@@ -33,7 +37,8 @@ export const AUTHORING_STYLE_REPAIR = `AUTHORING GUIDELINES:
 ${VOICE_AND_CANON_RULES}`;
 
 // The house chapter-writing style. It always reaches the writer; a project's `instructions` are additions layered
-// after it (see `writing-instructions.ts`). The "Avoid" list is mirrored by `ORNATE_PATTERNS` in the readability check.
+// after it (see `writing-instructions.ts`). The "Avoid" list is mirrored by `ORNATE_PATTERNS` in the readability check, its comparison-frame line by
+// `SIMILE_FRAMES` in the mechanical check.
 export const DEFAULT_WRITING_INSTRUCTIONS = `DEFAULT WEB-NOVEL ENGLISH
 
 Write plain, modern English that reads fast on a phone. A reader should never need to reread a sentence to see what happened.
@@ -67,7 +72,7 @@ Description
 
 Emotion
 - Use decisions, mistakes, silence, movement, and dialogue.
-- Brief direct emotional statements are allowed.
+- Carry feeling in action and choices. Name it rarely and plainly, never as a weight sitting in the chest.
 - Avoid rotating through stock body-language reactions.
 - Do not explain the emotion again after it has been shown clearly.
 
@@ -85,14 +90,14 @@ Exposition
 - Give backstory in small doses: a line or two where it matters, never a page of memory.
 - Break explanations with questions, objections, consequences, or action.
 - Do not repeat lore merely because several chapters have passed.
-- Trust readers to remember major recent developments.
+- Never recap earlier chapters; the reader just read them.
 
 Pacing and endings
 - Every chapter should deliver a meaningful development.
 - Not every chapter needs danger or a cliffhanger.
 - Valid endings include earned closure with a new direction, a decision,
   revelation, reversal, promise, danger, or continuing action.
-- Once the ending lands, stop. Do not add a summary or extra ominous line.
+- Once the ending lands, stop. Never close a scene or the chapter on a reflection that sums it up, or on an extra ominous line.
 
 Write like this
 - Not: The silence in the kitchen had a weight to it, the kind that settles over a house after an argument nobody won.
@@ -116,6 +121,9 @@ Avoid
 - Narrator cleverness: wry labels, "the universe's idea of a joke", knowing asides about the scene.
 - An elaborate metaphor for a voice, a room, or a silence.
 - Long passages of the POV character reflecting on the past or on their feelings.
+- Leaning on one comparison frame ("like a…", "the way…", "the kind of…"): use few similes, and no frame more than twice a chapter.
+- Echoing a distinctive word or phrase within a page.
+- Runs of long sentences built the same way, such as a clause trailed by "-ing" phrases.
 
 Originality
 - Do not imitate any named novel, author, character, terminology, or scene.

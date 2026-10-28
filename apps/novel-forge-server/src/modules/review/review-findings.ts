@@ -304,6 +304,7 @@ export function mechanicsOutcome(body: string, priorBodies: string[], target: Re
       'repeated paragraphs',
       ...(priorBodies.length > 0 ? ['the opening against the previous chapter', `phrases reused from the previous ${priorBodies.length} chapter(s)`] : []),
       'stock phrases',
+      'simile frames',
       'dialogue tags',
     ],
     briefCompliance: null,

@@ -40,7 +40,7 @@ import { type ToolRegistryService } from '../tools/tool-registry.service';
 import { type ToolContext } from '../tools/types';
 import { type CallRoute, type UnrestrictedRouteDeps } from '../unrestricted-route';
 import { expandShortDraft } from './draft-expansion';
-import { checkDraftMechanics } from './mechanical-check';
+import { checkDraftMechanics, MECHANICAL_PREFIX } from './mechanical-check';
 import { assessReadability, READABILITY_PREFIX, readabilityNote, renderReadabilityEvidence } from './readability-check';
 import { bibleHashOf, keptBackOf } from './writer-snapshot-capture';
 import { type WriterSnapshotService } from '../writer-snapshot.service';
@@ -264,13 +264,16 @@ export function routeAfterJudge(
   if (state.verdict === 'evaluation_failed') return 'awaitReview';
   const otherwiseCompliant = state.verdict === 'consistent' && endingCompliant && knowledgeCompliant && mechanicallyCompliant && briefCompliant;
   if (otherwiseCompliant && readabilityCompliant) return 'accept';
+  // A soft mechanical measurement survives most patches verbatim, so it must never read as a repair making no progress.
+  const withoutSoftMechanical = (findings: JudgeFinding[]): JudgeFinding[] =>
+    findings.filter(finding => finding.severity !== 'soft' || !finding.text.startsWith(MECHANICAL_PREFIX));
   if (otherwiseCompliant) {
-    const readabilityBudgetSpent = state.attempt >= state.maxFixes || sameFinding(state.findings, state.previousFindings);
+    const readabilityBudgetSpent = state.attempt >= state.maxFixes || sameFinding(withoutSoftMechanical(state.findings), withoutSoftMechanical(state.previousFindings));
     return state.autoFix && !readabilityBudgetSpent ? 'repairPatch' : 'accept';
   }
   // A readability quote the repair left alone must not end a repair loop that is still fixing a contradiction.
-  const withoutReadability = (findings: JudgeFinding[]): JudgeFinding[] => findings.filter(finding => !finding.text.startsWith(READABILITY_PREFIX));
-  const budgetSpent = state.attempt >= state.maxFixes || sameFinding(withoutReadability(state.findings), withoutReadability(state.previousFindings));
+  const progressSignals = (findings: JudgeFinding[]): JudgeFinding[] => withoutSoftMechanical(findings).filter(finding => !finding.text.startsWith(READABILITY_PREFIX));
+  const budgetSpent = state.attempt >= state.maxFixes || sameFinding(progressSignals(state.findings), progressSignals(state.previousFindings));
   if (!state.autoFix) return 'awaitReview';
   if (budgetSpent) return 'acceptAsIs';
   return 'repairPatch';

@@ -1,6 +1,7 @@
 import { ChatPromptTemplate } from '@langchain/core/prompts';
 
 import { type ChapterExpandOutput, ChapterExpandSchema } from '../schemas/chapter-expand.schema';
+import { CLUE_DISCIPLINE } from './authoring-preamble';
 import { type PromptModule } from './types';
 
 const system = `You are expanding a chapter draft that came in under its length target. You receive the context pack (the author's writing instructions plus established canon), the chapter brief, its ending contract, and the current draft with its word count, plus any guidance the draft was written under. Return the complete chapter, lengthened to the requested size by deepening what is already there: dramatize moments the draft summarizes as on-page scene, let conversations run their full course, give the POV character's perceptions, reactions, and decisions room, and stage the physical movement between beats. Follow the author's writing instructions for how the prose reads, and keep the draft's point of view and tense.
@@ -9,6 +10,7 @@ Hard constraints:
 - Keep every event, its order, and the outcome of each scene exactly as drafted. Add no new plot events, characters, reveals, or resolutions, and resolve nothing the draft leaves open.
 - Keep the opening beat and the final beat. The chapter ends on the same moment, line, or decision as the draft and never continues past it — when the brief marks "[CONTINUES INTO NEXT CHAPTER]" or an ending contract is present, the cut stays exactly where it is.
 - Stay inside the context pack's canon and knowledge boundaries ("## KNOWN FACTS (POV CAST)", "## REVEALED THIS CHAPTER", "## BEHAVIORAL CONSTRAINTS"): expansion never lets a character know more than the draft allowed.
+- ${CLUE_DISCIPLINE}
 - Canon always wins over dramatic convenience.
 - Keep the draft's strongest lines; rewrite a sentence only where the added material needs a seam.
 - Word counts are prose only: system panels (\`\`\`system blocks) and tables do not count. Keep every panel and table exactly as drafted, and never add or lengthen one to reach the length.
@@ -16,7 +18,7 @@ Hard constraints:
 
 export const chapterExpandPrompt: PromptModule<ChapterExpandOutput> = {
   key: 'chapter-expand',
-  version: '1.2.0',
+  version: '1.3.0',
   kind: 'authoring',
   role: 'generation',
   cacheStrategy: { stableVars: ['stableContext'] },

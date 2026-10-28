@@ -11,6 +11,8 @@ import {
 } from '../../eval/deterministic-metrics';
 import { type JudgeFinding } from '../schemas';
 
+export const MECHANICAL_PREFIX = 'mechanical: ';
+
 // Slack either side of the target band: past these the draft is a truncation or a runaway, not a
 // chapter that ran long or short. Applied to the *resolved* (possibly project-overridden) band, so a
 // project with a wider target also gets a wider hard wall.
@@ -46,6 +48,53 @@ const DIALOGUE_TAG_RATE_MIN_SAMPLE = 10;
 
 // "Said" should carry most attributions; a majority of exotic alternatives is the classic said-bookism tell.
 const SAID_ALTERNATIVE_RATE_MAX = 0.5;
+
+// Narration only, so a character's "I'd like a word" never counts. A frame is flagged once it passes both: the rate
+// alone would flag a short draft on three hits, the count alone a long one on a normal spread of similes.
+const SIMILE_FRAME_PER_1000_MAX = 2;
+const SIMILE_FRAME_MIN_COUNT = 5;
+
+export interface SimileFrame {
+  label: string;
+  pattern: RegExp;
+}
+
+export const SIMILE_FRAMES: SimileFrame[] = [
+  { label: 'like a', pattern: /(?<!\b(?:i|you|we|they|would|do|does|did|to|might|may|could|should|will|\w+n['’]t)\s)(?<!['’]d\s)\blike an?\b/gi },
+  { label: 'like she was', pattern: /\blike (?:he|she|they|it)(?:['’]d)? (?:was|were|had|could|would|might)\b/gi },
+  { label: 'the way a', pattern: /(?<!\b(?:on|by)\s)\bthe way (?:a|an|one|someone|somebody|people|you)\b/gi },
+  { label: 'the kind of', pattern: /\bthe (?:kind|sort) of\b/gi },
+];
+
+// ‘ opens a quote only at a word start and ’ closes one only before a non-letter, so "don’t" and "’em" stay narration.
+const DIALOGUE = /“[^”]*”|"[^"]*"|(?<=^|\s)‘.*?’(?!\p{L})/gu;
+const OPEN_QUOTE = /[“"]|(?<=^|\s)‘/u;
+
+function withoutDialogue(paragraph: string): string {
+  const unquoted = paragraph.replace(DIALOGUE, ' ');
+  const openQuote = unquoted.search(OPEN_QUOTE);
+  return openQuote === -1 ? unquoted : unquoted.slice(0, openQuote);
+}
+
+export interface SimileFrameOveruse {
+  label: string;
+  count: number;
+  per1000Words: number;
+}
+
+/** Comparison frames the narration leans on, measured against all prose words. */
+export function findSimileFrameOveruse(body: string): SimileFrameOveruse[] {
+  const words = countWords(body);
+  if (words === 0) return [];
+  const narration = body
+    .split(/\n\s*\n/)
+    .map(withoutDialogue)
+    .join('\n\n');
+  return SIMILE_FRAMES.map(frame => {
+    const count = narration.match(frame.pattern)?.length ?? 0;
+    return { label: frame.label, count, per1000Words: (count / words) * 1000 };
+  }).filter(frame => frame.count >= SIMILE_FRAME_MIN_COUNT && frame.per1000Words > SIMILE_FRAME_PER_1000_MAX);
+}
 
 // How much of the opening/closing to compare for a boundary echo, and how long a shared run has to be
 // before it's unambiguously the same sentence rather than incidental phrase reuse (e.g. a character's
@@ -98,22 +147,23 @@ export function checkDraftMechanics(markdown: string, priorMarkdown: string[] = 
   const words = countWords(body);
   const { min: hardMin, max: hardMax } = resolveWordCountHardBounds(target);
 
-  if (words < hardMin) findings.push({ severity: 'hard', text: `mechanical: draft has ${words} words of prose, below the ${hardMin}-word floor` });
-  else if (words > hardMax) findings.push({ severity: 'hard', text: `mechanical: draft has ${words} words of prose, above the ${hardMax}-word ceiling` });
-  else if (words < target.min) findings.push({ severity: 'soft', text: `mechanical: draft has ${words} words of prose, under the ${target.min}–${target.max} target band` });
-  else if (words > target.max) findings.push({ severity: 'soft', text: `mechanical: draft has ${words} words of prose, over the ${target.min}–${target.max} target band` });
+  if (words < hardMin) findings.push({ severity: 'hard', text: `${MECHANICAL_PREFIX}draft has ${words} words of prose, below the ${hardMin}-word floor` });
+  else if (words > hardMax) findings.push({ severity: 'hard', text: `${MECHANICAL_PREFIX}draft has ${words} words of prose, above the ${hardMax}-word ceiling` });
+  else if (words < target.min)
+    findings.push({ severity: 'soft', text: `${MECHANICAL_PREFIX}draft has ${words} words of prose, under the ${target.min}–${target.max} target band` });
+  else if (words > target.max) findings.push({ severity: 'soft', text: `${MECHANICAL_PREFIX}draft has ${words} words of prose, over the ${target.min}–${target.max} target band` });
 
   if (unclosedFence) {
-    findings.push({ severity: 'hard', text: `mechanical: the fence opened by "${excerpt(unclosedFence)}" is never closed, so the rest of the chapter renders inside it` });
+    findings.push({ severity: 'hard', text: `${MECHANICAL_PREFIX}the fence opened by "${excerpt(unclosedFence)}" is never closed, so the rest of the chapter renders inside it` });
   }
 
   for (const paragraph of findDuplicatedParagraphs(body)) {
-    findings.push({ severity: 'hard', text: `mechanical: a paragraph is repeated verbatim — "${excerpt(paragraph)}"` });
+    findings.push({ severity: 'hard', text: `${MECHANICAL_PREFIX}a paragraph is repeated verbatim — "${excerpt(paragraph)}"` });
   }
 
   const boundaryEcho = findBoundaryEcho(body, priorBodies[0]);
   if (boundaryEcho) {
-    findings.push({ severity: 'hard', text: `mechanical: chapter opens by repeating the previous chapter's ending verbatim — "${excerpt(boundaryEcho)}"` });
+    findings.push({ severity: 'hard', text: `${MECHANICAL_PREFIX}chapter opens by repeating the previous chapter's ending verbatim — "${excerpt(boundaryEcho)}"` });
   }
 
   if (priorBodies.length > 0) {
@@ -121,7 +171,7 @@ export function checkDraftMechanics(markdown: string, priorMarkdown: string[] = 
     if (ngramRate > CROSS_CHAPTER_NGRAM_RATE_MAX) {
       findings.push({
         severity: 'soft',
-        text: `mechanical: ${(ngramRate * 100).toFixed(1)}% of 5–8-word phrases also appear in the previous ${priorBodies.length} chapter(s)`,
+        text: `${MECHANICAL_PREFIX}${(ngramRate * 100).toFixed(1)}% of 5–8-word phrases also appear in the previous ${priorBodies.length} chapter(s)`,
       });
     }
   }
@@ -134,15 +184,22 @@ export function checkDraftMechanics(markdown: string, priorMarkdown: string[] = 
       .slice(0, 3)
       .map(h => `${h.label} ×${h.count}`)
       .join(', ');
-    findings.push({ severity: 'soft', text: `mechanical: ${stockPhrases.total} stock phrases (${worst})` });
+    findings.push({ severity: 'soft', text: `${MECHANICAL_PREFIX}${stockPhrases.total} stock phrases (${worst})` });
+  }
+
+  for (const frame of findSimileFrameOveruse(body)) {
+    findings.push({
+      severity: 'soft',
+      text: `${MECHANICAL_PREFIX}the comparison frame "${frame.label}…" appears ${frame.count} times (${frame.per1000Words.toFixed(1)} per 1,000 words) — keep two at most and vary or cut the rest`,
+    });
   }
 
   const tags = computeDialogueTagMetrics(body);
   if (tags.tagsPer1000Words > DIALOGUE_TAGS_PER_1000_MAX) {
-    findings.push({ severity: 'soft', text: `mechanical: ${tags.tagsPer1000Words.toFixed(1)} dialogue tags per 1,000 words` });
+    findings.push({ severity: 'soft', text: `${MECHANICAL_PREFIX}${tags.tagsPer1000Words.toFixed(1)} dialogue tags per 1,000 words` });
   }
   if (tags.totalTags >= DIALOGUE_TAG_RATE_MIN_SAMPLE && tags.saidAlternativeRate > SAID_ALTERNATIVE_RATE_MAX) {
-    findings.push({ severity: 'soft', text: `mechanical: ${(tags.saidAlternativeRate * 100).toFixed(0)}% of dialogue tags avoid "said"/"asked"` });
+    findings.push({ severity: 'soft', text: `${MECHANICAL_PREFIX}${(tags.saidAlternativeRate * 100).toFixed(0)}% of dialogue tags avoid "said"/"asked"` });
   }
 
   return findings;

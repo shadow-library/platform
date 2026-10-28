@@ -81,6 +81,47 @@ describe('routeAfterJudge', () => {
     expect(result).toBe('acceptAsIs');
   });
 
+  it('should keep repairing a contradiction or leak when only a soft mechanical finding repeats', () => {
+    const simile = {
+      severity: 'soft' as const,
+      text: 'mechanical: the comparison frame "like a…" appears 8 times (3.1 per 1,000 words) — keep two at most and vary or cut the rest',
+    };
+    const contradiction = routeAfterJudge({
+      verdict: 'contradiction',
+      autoFix: true,
+      attempt: 1,
+      maxFixes: 3,
+      findings: [{ severity: 'hard', text: 'Mara is in the cellar, but chapter 4 left her on the roof' }, simile],
+      previousFindings: [{ severity: 'hard', text: 'Mara carries the lamp she lost in chapter 3' }, simile],
+    });
+    const leak = routeAfterJudge({
+      verdict: 'consistent',
+      autoFix: true,
+      attempt: 1,
+      maxFixes: 3,
+      knowledgeCompliant: false,
+      findings: [{ severity: 'soft', text: 'knowledge leak: over-connection: [motive_debt] Amara names the motive' }, simile],
+      previousFindings: [{ severity: 'soft', text: 'knowledge leak: [motive_debt] Amara acts on the debt' }, simile],
+    });
+    const readability = routeAfterJudge({
+      verdict: 'consistent',
+      autoFix: true,
+      attempt: 1,
+      maxFixes: 3,
+      readabilityCompliant: false,
+      findings: [{ severity: 'soft', text: 'readability: "The hall held its breath." — say it plainly' }, simile],
+      previousFindings: [{ severity: 'soft', text: 'readability: "Her hope was a candle." — say it plainly' }, simile],
+    });
+    expect([contradiction, leak, readability]).toEqual(['repairPatch', 'repairPatch', 'repairPatch']);
+  });
+
+  it('should still stop on a repeated hard mechanical finding', () => {
+    const floor = { severity: 'hard' as const, text: 'mechanical: draft has 900 words of prose, below the 1200-word floor' };
+    expect(routeAfterJudge({ verdict: 'consistent', autoFix: true, attempt: 1, maxFixes: 3, mechanicallyCompliant: false, findings: [floor], previousFindings: [floor] })).toBe(
+      'acceptAsIs',
+    );
+  });
+
   it('routes to repairPatch on first contradiction with autoFix', () => {
     const result = routeAfterJudge({
       verdict: 'contradiction',
@@ -238,6 +279,21 @@ describe('mergeKnowledgeCompliance', () => {
     const rendered = result.writerFindings.map(f => f.text).join('\n');
     for (const secret of ['motive_debt', 'ledger_forgery', 'ruinous debt', 'The ledger is forged.', 'The debt is the motive.', 'Protects the forgery.'])
       expect(rendered).not.toContain(secret);
+  });
+
+  it('should tell the writer to leave clues unexplained for an over-connection, without naming the fact', () => {
+    const forbidden = [{ factKey: 'motive_debt', text: 'Marlow owed Elias a ruinous debt.', constraintNote: null, writerNote: 'Elias flinches when money comes up.' }];
+    const result = mergeKnowledgeCompliance(
+      { compliant: false, issues: ['over-connection: [motive_debt] Amara links the torn IOU to Marlow and confronts him', 'Over-connection: the narration names the motive'] },
+      [],
+      forbidden,
+    );
+    expect(result.knowledgeCompliant).toBe(false);
+    expect(result.writerFindings.map(f => f.text)).toEqual([
+      'knowledge leak: leave the clues unexplained: cut the narration, dialogue or action that links them to a conclusion the POV cast has not discovered on-page — Elias flinches when money comes up.',
+      'knowledge leak: leave the clues unexplained: cut the narration, dialogue or action that links them to a conclusion the POV cast has not discovered on-page',
+    ]);
+    expect(result.writerFindings.map(f => f.text).join('\n')).not.toContain('motive_debt');
   });
 });
 

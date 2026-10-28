@@ -40,7 +40,7 @@ describe('writingInstructionAdditions', () => {
   });
 
   it('should strip the default lines of a lightly edited legacy copy and keep only the author’s own', () => {
-    const [legacy = ''] = LEGACY_DEFAULT_WRITING_INSTRUCTIONS.slice(-1);
+    const legacy = LEGACY_DEFAULT_WRITING_INSTRUCTIONS.find(text => text.includes('- Keep action and dialogue paragraphs short.')) ?? '';
     const edited = legacy
       .replace('- Keep action and dialogue paragraphs short.', '- Keep  action and dialogue paragraphs VERY short.')
       .replace('- Use common, modern vocabulary.', '-   Use common,   modern vocabulary.   ')

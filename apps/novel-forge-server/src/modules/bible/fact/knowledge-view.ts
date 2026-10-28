@@ -296,7 +296,9 @@ export function renderForbiddenFacts(facts: FactLike[]): string {
 }
 
 export const KNOWLEDGE_LEAK_PREFIX = 'knowledge leak: ';
+export const OVER_CONNECTION_MARKER = 'over-connection:';
 const UNKNOWABLE_REVEAL = 'cut anything that states or implies what the POV cast cannot know yet';
+const SOLVED_CLUE = 'leave the clues unexplained: cut the narration, dialogue or action that links them to a conclusion the POV cast has not discovered on-page';
 
 function withWriterNote(line: string, fact: FactLike | undefined): string {
   const note = fact?.writerNote?.trim();
@@ -311,9 +313,10 @@ export function writerSafeLeakLines(prescan: Pick<KnowledgeLeakIssue, 'factKey' 
   const factByKey = new Map(forbidden.map(fact => [fact.factKey, fact]));
   const lines = prescan.map(leak => withWriterNote(`remove or avoid "${leak.term}"`, factByKey.get(leak.factKey)));
   for (const issue of judgeIssues) {
+    const remedy = issue.trimStart().toLowerCase().startsWith(OVER_CONNECTION_MARKER) ? SOLVED_CLUE : UNKNOWABLE_REVEAL;
     const cited = forbidden.filter(fact => issue.includes(fact.factKey));
-    if (cited.length === 0) lines.push(UNKNOWABLE_REVEAL);
-    for (const fact of cited) lines.push(withWriterNote(UNKNOWABLE_REVEAL, fact));
+    if (cited.length === 0) lines.push(remedy);
+    for (const fact of cited) lines.push(withWriterNote(remedy, fact));
   }
   return [...new Set(lines)].map(line => `${KNOWLEDGE_LEAK_PREFIX}${line}`);
 }

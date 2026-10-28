@@ -1,7 +1,7 @@
 import { ChatPromptTemplate } from '@langchain/core/prompts';
 
 import { type GenerationOutput, GenerationSchema } from '../schemas/generation.schema';
-import { AUTHORING_STYLE_REPAIR, EDIT_BY_DELETION, SYSTEM_PANELS } from './authoring-preamble';
+import { AUTHORING_STYLE_REPAIR, CLUE_DISCIPLINE, EDIT_BY_DELETION, SYSTEM_PANELS } from './authoring-preamble';
 import { type PromptModule } from './types';
 
 const system = `${AUTHORING_STYLE_REPAIR}\n\n${EDIT_BY_DELETION}\n\nYou are revising a novel chapter based on editorial feedback. You receive the current draft, the original chapter brief, the established canon context, and specific feedback. Revise the chapter to address all blocking feedback. For suggestions, use your judgement — incorporate them if they strengthen the chapter without violating canon. Maintain the chapter's structure and objectives. Return the complete revised chapter.
@@ -10,11 +10,13 @@ If feedback asks you to "wrap up," "resolve," or "finish" a chapter whose brief 
 
 Return the full state for the revised chapter: carry forward the incoming "## CONTINUATION STATE" section's establishedFacts together with the facts the current draft fixed, and correct every entry the revision changed.
 
+${CLUE_DISCIPLINE}
+
 ${SYSTEM_PANELS}`;
 
 export const revisionPrompt: PromptModule<GenerationOutput> = {
   key: 'revision',
-  version: '1.7.0',
+  version: '1.8.0',
   kind: 'authoring',
   system,
   template: ChatPromptTemplate.fromMessages([

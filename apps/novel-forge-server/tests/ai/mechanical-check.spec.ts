@@ -5,6 +5,7 @@ import {
   DUPLICATE_PARAGRAPH_MIN_WORDS,
   findBoundaryEcho,
   findDuplicatedParagraphs,
+  findSimileFrameOveruse,
   WORD_COUNT_HARD_MAX,
   WORD_COUNT_HARD_MIN,
 } from '@modules/ai/graphs/mechanical-check';
@@ -153,6 +154,82 @@ describe('checkDraftMechanics', () => {
     const body = `Mira crossed the square without looking back. ${otherBodyOfWords(WORD_TARGET_MIN)}`;
     const findings = checkDraftMechanics(body, [prevBody]);
     expect(findings.some(f => f.text.includes("repeating the previous chapter's ending"))).toBe(false);
+  });
+});
+
+const LEANING_ON_LIKE_A = [
+  'Rain hit the shutters like a fistful of gravel.',
+  'The lamp swung like a hanged man in the draught.',
+  'Ilka moved through the market like a knife through cloth.',
+  'Her coat hung on her like a borrowed flag.',
+  'The bells started up like a quarrel in the next street.',
+  'Smoke sat over the roofs like a lid on a pot.',
+  'The guard watched her like a dog watches a door.',
+  'The letter lay in her pocket like a stone.',
+].join(' ');
+
+const LITERARY_PARAGRAPH = [
+  'Ilka reached the ferry before the bell. The river was high and brown, carrying branches down from the hills, and the ferryman stood in the stern with his pole',
+  'across his knees. He held out his hand the way a man does when he expects to be cheated. She paid him in copper and sat on the bench by the rail.',
+  'Halfway across, the boat lurched. Water slapped over the side and soaked her boots. The ferryman swore, leaned on the pole and brought the bow round. On the far',
+  'bank a woman in a grey shawl was waiting with a basket of eggs, the kind of patience that came from long practice. Ilka climbed out, nodded to her and started up',
+  'the path. The mill wheel turned like a slow clock. Behind her the ferryman was already pushing off.',
+].join(' ');
+
+describe('findSimileFrameOveruse', () => {
+  it('should name a frame the narration leans on, with its count and rate', () => {
+    expect(findSimileFrameOveruse(`${bodyOfWords(1000)}\n\n${LEANING_ON_LIKE_A}`)).toEqual([{ label: 'like a', count: 8, per1000Words: expect.closeTo(7.4, 1) }]);
+  });
+
+  it('should leave a literary paragraph with one of each frame alone', () => {
+    expect(findSimileFrameOveruse(LITERARY_PARAGRAPH)).toEqual([]);
+    expect(findSimileFrameOveruse(`${bodyOfWords(WORD_TARGET_MIN)}\n\n${LITERARY_PARAGRAPH}\n\n${LITERARY_PARAGRAPH.replace('Ilka', 'Mara')}`)).toEqual([]);
+  });
+
+  it('should not flag a chapter-length draft whose similes are spread at a normal rate', () => {
+    expect(findSimileFrameOveruse(`${bodyOfWords(4000)}\n\n${LEANING_ON_LIKE_A}`)).toEqual([]);
+  });
+
+  it('should count narration only, never dialogue or a wish', () => {
+    const talk = Array.from({ length: 8 }, (_, i) => `"I'd like a drink," Mara said. “It looked like a trap,” Elin said. She would like a bath before supper ${i}.`).join('\n\n');
+    expect(findSimileFrameOveruse(`${bodyOfWords(600)}\n\n${talk}`)).toEqual([]);
+  });
+
+  it('should treat single-quoted speech as dialogue, but not the apostrophes inside or around it', () => {
+    const speech = Array.from({ length: 8 }, () => '‘It won’t hold like a proper wall,’ Mara said. ‘We’d need the kind of stone they don’t sell here.’').join('\n\n');
+    expect(findSimileFrameOveruse(`${bodyOfWords(600)}\n\n${speech}`)).toEqual([]);
+    const narration = Array.from({ length: 8 }, () => 'The guards’ boots rang like a bell on the stones, and Mara’s lamp swung.').join(' ');
+    expect(findSimileFrameOveruse(`${bodyOfWords(600)}\n\n${narration}`).map(frame => [frame.label, frame.count])).toEqual([['like a', 8]]);
+  });
+
+  it('should treat a quotation left open across paragraphs as dialogue', () => {
+    const speech = Array.from({ length: 8 }, () => '“It came down like a wall of water, and the sea ran like a river through the town.').join('\n\n');
+    expect(findSimileFrameOveruse(`${bodyOfWords(600)}\n\n${speech}”`)).toEqual([]);
+  });
+
+  it('should report each overused frame on its own', () => {
+    const frames = Array.from({ length: 6 }, () => 'She folded the map the way a clerk folds a verdict. It was the kind of quiet that waits.').join(' ');
+    expect(findSimileFrameOveruse(`${bodyOfWords(600)}\n\n${frames}`).map(frame => [frame.label, frame.count])).toEqual([
+      ['the way a', 6],
+      ['the kind of', 6],
+    ]);
+  });
+
+  it('should not read a journey as a simile', () => {
+    const journeys = Array.from({ length: 8 }, () => 'On the way a cart passed them, and by the way someone waved they knew the road was clear.').join(' ');
+    expect(findSimileFrameOveruse(`${bodyOfWords(600)}\n\n${journeys}`)).toEqual([]);
+  });
+});
+
+describe('checkDraftMechanics simile frames', () => {
+  it('should raise a soft finding naming the frame and its count so repair can vary it', () => {
+    const findings = checkDraftMechanics(`${CLEAN_BODY}\n\n${LEANING_ON_LIKE_A}`, []);
+    expect(findings).toEqual([{ severity: 'soft', text: expect.stringContaining('mechanical: the comparison frame "like a…" appears 8 times') }]);
+  });
+
+  it('should not count similes inside a system panel', () => {
+    const panel = `\`\`\`system Notice\n${LEANING_ON_LIKE_A}\n\`\`\``;
+    expect(checkDraftMechanics(`${CLEAN_BODY}\n\n${panel}`, [])).toEqual([]);
   });
 });
 

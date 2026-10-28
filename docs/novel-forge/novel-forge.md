@@ -359,6 +359,8 @@
   wherever copied — previous prose, summaries, continuation state, entity sheets, pages, cited refs, style, writer lines, the plan, feedback and findings. It is lexical: it
   catches copies, not paraphrase, and a passage of one word, of two words under twelve characters, or under six characters in a script without spaces is caught only by give-away
   terms. A revision is told which locked terms the draft uses and is held as a contradiction if it keeps one. Planner and chat packs are not scrubbed.
+- **Clue discipline**: chapter writing, revision, repair and expansion show clues and never solve them — a character may suspect, but nothing confirms or acts
+  decisively on what clues mean unless the plan makes that discovery on-page — and the judge reports such an over-connection as a knowledge leak, which routes repair.
 - Plugin system messages reach the writer beside the pack rather than in it, and pass the same scrub at every writer call.
 - Reader-facing art (a cover, a chapter's subject, an entity drawn as of a chapter) reads under the art disclosure policy of the chapter it is drawn as of — the latest final
   chapter for a cover — which is that chapter's writer policy with the ending and the ending question always withheld. Reference labels, notes and names and the vision
@@ -427,6 +429,7 @@
   produced.
 - **Readability** is decided by the judge alone, against the default style as amended by the project's additions. Deterministic measurements reach it as evidence and never
   trigger repair themselves; a readability-only miss never marks a contradiction, halts a batch or blocks the next chapter.
+- The mechanical check's simile-frame finding counts a few comparison frames in narration only, against a per-1,000-prose-word rate and a minimum count, and is always soft.
 - **Chapter format**: prose is Markdown (GFM). In-world system content (status windows, quests, attributes, skills) is a ` ```system <Title> ` fenced panel, with
   stats in GFM tables, written only when canon or the chapter's plan establishes a system. Word targets, short-draft expansion and the mechanical and readability
   measurements count prose only, without panels and tables; displayed word counts keep the whole text, and the hard line, isolation and secret checks read all of it.

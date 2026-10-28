@@ -12,7 +12,7 @@ import {
   PROMPT_REGISTRY,
   renderTurnRules,
 } from '@modules/ai/prompts';
-import { AUTHORING_STYLE, AUTHORING_STYLE_REPAIR, EDIT_BY_DELETION } from '@modules/ai/prompts/authoring-preamble';
+import { AUTHORING_STYLE, AUTHORING_STYLE_REPAIR, CLUE_DISCIPLINE, DEFAULT_WRITING_INSTRUCTIONS, EDIT_BY_DELETION } from '@modules/ai/prompts/authoring-preamble';
 import { generationWordTargetVars } from '@modules/ai/prompts/generation.prompt';
 import {
   AppearanceDescribeSchema,
@@ -29,6 +29,7 @@ import {
   validateOutlineCoverage,
 } from '@modules/ai/schemas';
 import { parseSchema } from '@modules/ai/schemas/validate';
+import { OVER_CONNECTION_MARKER } from '@modules/bible/fact/knowledge-view';
 import { resolveWordTarget, WORD_TARGET_AIM, WORD_TARGET_MAX, WORD_TARGET_MIN } from '@modules/eval/deterministic-metrics';
 
 const SCENE = { goal: 'g', obstacle: 'o', turn: 't', beats: ['b1', 'b2'], estimatedWords: 700 };
@@ -683,6 +684,43 @@ describe('Prompt modules', () => {
     it('outline schema accepts optional repetitionRisks', () => {
       const brief = { ...baseBrief, chapterPurpose: 'p', readerValue: ['world_state_change'], repetitionRisks: ['another tavern negotiation'] };
       expect(parseSchema(PROMPT_REGISTRY.outline.schema, [brief]).success).toBe(true);
+    });
+  });
+
+  describe('clue discipline (generation v2.11, revision v1.8, fix v1.7, chapter-expand v1.3, judge v2.6)', () => {
+    it('should give every prompt that writes or rewrites prose the clue rule', () => {
+      for (const key of ['generation', 'revision', 'fix', 'chapter-expand'] as const) expect(PROMPT_REGISTRY[key].system).toContain(CLUE_DISCIPLINE);
+    });
+
+    it('should give generation the clue rule as its own paragraph after the knowledge rules, so it holds without a knowledge contract', () => {
+      expect(PROMPT_REGISTRY.generation.system).toContain(`none adds an event the brief did not plan.\n\n${CLUE_DISCIPLINE}\n\n`);
+    });
+
+    it('should have the judge mark an over-connection with the marker the writer-safe remedy reads', () => {
+      expect(PROMPT_REGISTRY.judge.system).toContain(`start such an issue with "${OVER_CONNECTION_MARKER}"`);
+      const answers = (PROMPT_REGISTRY.judge.fewShots ?? []).filter(message => message.getType() === 'ai').map(message => JSON.parse(String(message.content)));
+      const overConnection = answers.find(answer => answer.knowledgeCompliance?.issues?.some((issue: string) => issue.startsWith(OVER_CONNECTION_MARKER)));
+      expect(overConnection).toMatchObject({ verdict: 'consistent', knowledgeCompliance: { compliant: false } });
+      expect(parseSchema(JudgeSchema, overConnection).success).toBe(true);
+    });
+
+    it('should contrast the over-connection with a filed-away clue and a wrong suspicion the judge passes', () => {
+      const shots = PROMPT_REGISTRY.judge.fewShots ?? [];
+      const index = shots.findIndex(message => message.getType() === 'human' && String(message.content).includes('wonders whether the cook'));
+      expect(String(shots[index]?.content)).toContain('[steward_poisoned_well]');
+      const answer = JSON.parse(String(shots[index + 1]?.content));
+      expect(answer).toMatchObject({ verdict: 'consistent', knowledgeCompliance: { compliant: true, issues: [] } });
+      expect(parseSchema(JudgeSchema, answer).success).toBe(true);
+    });
+
+    it('should cap comparison frames, recaps and summing-up endings in the default writing style', () => {
+      for (const rule of [
+        'no frame more than twice a chapter',
+        'Never recap earlier chapters',
+        'on a reflection that sums it up',
+        'Echoing a distinctive word or phrase within a page',
+      ])
+        expect(DEFAULT_WRITING_INSTRUCTIONS).toContain(rule);
     });
   });
 
