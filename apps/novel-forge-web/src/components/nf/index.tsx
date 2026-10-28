@@ -14,7 +14,7 @@ export { GenerationStatus } from './GenerationStatus';
 export { ItemPager, type ItemPagerJump } from './ItemPager';
 export { RegenerateAppliedBriefs, RegenerateChapterButton } from './RegenerateChapter';
 export { SidePanel } from './SidePanel';
-export { Markdown } from './Markdown';
+export { ChapterMarkdown, Markdown } from './Markdown';
 export { PageSkeleton } from './PageSkeleton';
 export { RouteNotFound } from './NotFound';
 export { TurnStatus } from './TurnStatus';

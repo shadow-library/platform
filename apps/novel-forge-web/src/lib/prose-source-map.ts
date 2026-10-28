@@ -1,4 +1,6 @@
-import { marked } from 'marked';
+import { renderChapterMarkdown } from '@shadow-library/sdk';
+
+import { isSystemPanel, lexChapter } from './chapter-markup';
 
 /** Stands in for a named entity the browser decodes to one character this map cannot know. */
 const ANY_CHAR = '￿';
@@ -6,6 +8,10 @@ const ANY_CHAR = '￿';
 const NAMED_ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' };
 
 const ENTITY = /^&(#[0-9]+|#x[0-9a-f]+|[a-z][a-z0-9]*);/i;
+
+const HTML_ENTITY = /&(#[0-9]+|#x[0-9a-f]+|[a-z][a-z0-9]*);/gi;
+
+const HTML_TAG = /<[^>]*>/g;
 
 /**
  * How a selection may meet a piece of Markdown syntax. `emphasis` is widened to take the whole token in; `atomic` (links, code spans, autolinks,
@@ -50,6 +56,7 @@ export interface ProseSourceMap {
 
 interface LexToken {
   type: string;
+  lang?: string;
   raw?: string;
   text?: string;
   tokens?: LexToken[];
@@ -83,8 +90,7 @@ class MapBuilder {
     while (at < raw.length) {
       const entity = raw.charAt(at) === '&' ? ENTITY.exec(raw.slice(at)) : null;
       if (entity) {
-        const name = entity[1] ?? '';
-        const decoded = name.startsWith('#') ? decodeNumeric(name) : (NAMED_ENTITIES[name.toLowerCase()] ?? ANY_CHAR);
+        const decoded = decodeEntity(entity[1] ?? '');
         for (const unit of decoded.split('')) this.emit(unit, base + at, base + at + entity[0].length);
         at += entity[0].length;
         continue;
@@ -94,8 +100,16 @@ class MapBuilder {
     }
   }
 
+  /** A system panel renders its body as Markdown under a title, so every unit it shows stands for the whole fence and a selection touching it takes it whole. */
+  panel(raw: string, base: number): void {
+    const start = base + raw.length - raw.trimStart().length;
+    const end = base + raw.trimEnd().length;
+    for (const unit of renderedText(renderChapterMarkdown(raw)).split('')) this.emit(unit, start, end);
+  }
+
   walk(token: LexToken, base: number): void {
     const raw = token.raw ?? token.text ?? '';
+    if (isSystemPanel(token)) return this.panel(raw, base);
     const children = childrenOf(token);
     const kind = SYNTAX_KINDS[token.type];
     if (children) {
@@ -152,6 +166,14 @@ class MapBuilder {
   }
 }
 
+function decodeEntity(name: string): string {
+  return name.startsWith('#') ? decodeNumeric(name) : (NAMED_ENTITIES[name.toLowerCase()] ?? ANY_CHAR);
+}
+
+function renderedText(html: string): string {
+  return html.replace(HTML_TAG, '').replace(HTML_ENTITY, (_entity, name: string) => decodeEntity(name));
+}
+
 function decodeNumeric(name: string): string {
   const code = name.startsWith('#x') || name.startsWith('#X') ? Number.parseInt(name.slice(2), 16) : Number.parseInt(name.slice(1), 10);
   try {
@@ -172,7 +194,7 @@ export function proseSourceMap(markdown: string): ProseSourceMap | undefined {
   if (markdown.includes('\r')) return undefined;
   const builder = new MapBuilder();
   let cursor = 0;
-  for (const token of marked.lexer(markdown, { gfm: true, breaks: true }) as unknown as LexToken[]) {
+  for (const token of lexChapter(markdown) as unknown as LexToken[]) {
     const raw = token.raw ?? '';
     const at = markdown.indexOf(raw, cursor);
     builder.walk(token, at === -1 ? Number.NaN : at);

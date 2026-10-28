@@ -1,13 +1,13 @@
-import { marked, type Token } from 'marked';
+import { type Token } from 'marked';
 import { paragraphNumberAt, type ProseParagraph, proseParagraphs } from '@shadow-library/sdk';
 
 import { type ProposalResponse } from '@/lib/apis';
 
+import { containsTable, lexChapter, renderChapterTokens } from './chapter-markup';
 import { isRecord } from './is-record';
 import { selectionOf, type SelectionRefusal, type SelectionResult } from './passage-selection';
 import { alignRendered, proseSourceMap, sourceRangeOf } from './prose-source-map';
 
-const MARKED_OPTIONS = { gfm: true, breaks: true } as const;
 const LINE_MARKERS = /^[ \t]*(?:#{1,6}[ \t]+|>[ \t]?|(?:[-+*]|\d{1,9}[.)])[ \t]+)*/;
 const CODE_LINE = /^(?: {4}|\t)|^ {0,3}(?:`{3,}|~{3,})/m;
 
@@ -49,11 +49,11 @@ function inlineReplacement(text: string): string {
     .replace(/[ \t]*\n[ \t]*/g, '<br>');
 }
 
-function touchesCode(body: string, paragraphs: readonly ProseParagraph[], passage: ProposedPassage): boolean {
+function touchesCodeOrTable(body: string, paragraphs: readonly ProseParagraph[], passage: ProposedPassage): boolean {
   return paragraphs.some(paragraph => {
     if (paragraph.end <= passage.start || paragraph.start >= passage.end) return false;
-    const lineStart = body.lastIndexOf('\n', paragraph.start - 1) + 1;
-    return CODE_LINE.test(body.slice(lineStart, paragraph.end));
+    const block = body.slice(body.lastIndexOf('\n', paragraph.start - 1) + 1, paragraph.end);
+    return CODE_LINE.test(block) || containsTable(block);
   });
 }
 
@@ -82,8 +82,8 @@ function markPassage(body: string, passage: ProposedPassage): { at: number; text
 }
 
 /**
- * The body with each pending rewrite marked in place. A rewrite that overlaps one before it or touches code is left out, and a CRLF body is shown as
- * it is: its offsets would not survive the lexer's line-ending rewrite.
+ * The body with each pending rewrite marked in place. A rewrite that overlaps one before it or touches code (a system panel among it) or a table is
+ * left out, and a CRLF body is shown as it is: its offsets would not survive the lexer's line-ending rewrite.
  */
 export function readerSource(body: string, proposed: readonly ProposedPassage[]): ReaderSource {
   if (proposed.length === 0 || body.includes('\r')) return { body, source: body, insertions: [] };
@@ -91,7 +91,7 @@ export function readerSource(body: string, proposed: readonly ProposedPassage[])
   const marks: { at: number; text: string }[] = [];
   let reached = 0;
   for (const passage of [...proposed].sort((a, b) => a.start - b.start)) {
-    if (passage.start < reached || passage.end > body.length || touchesCode(body, paragraphs, passage)) continue;
+    if (passage.start < reached || passage.end > body.length || touchesCodeOrTable(body, paragraphs, passage)) continue;
     marks.push(...markPassage(body, passage));
     reached = passage.end;
   }
@@ -149,13 +149,13 @@ function withParagraph(html: string, paragraph: number): string {
 export function numberedHtml(view: ReaderSource, paragraphs: readonly ProseParagraph[], shown: Set<number>): string {
   const toSource = normalizedToSource(view.source);
   const normalized = view.source.replace(/\r\n?/g, '\n');
-  const tokens = marked.lexer(normalized, MARKED_OPTIONS);
+  const tokens = lexChapter(normalized);
   let cursor = 0;
   return tokens
     .map((token: Token) => {
       const at = normalized.indexOf(token.raw, cursor);
       if (at !== -1) cursor = at + token.raw.length;
-      const html = marked.parser([token], MARKED_OPTIONS);
+      const html = renderChapterTokens([token]);
       if (at === -1 || token.type === 'hr' || token.type === 'space') return html;
       const offset = bodyOffset(view, toSource(at + token.raw.length - token.raw.trimStart().length));
       if (offset === undefined) return html;

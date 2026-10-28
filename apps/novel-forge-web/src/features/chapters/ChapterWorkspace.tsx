@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Alert, Button, ChevronDownIcon, ChevronRightIcon, DropdownMenu, IconButton, Input, toast, Tooltip } from '@shadow-library/ui';
 
 import { ChevronLeftIcon, DocIcon, EditIcon, SparkIcon } from '@/components/icons';
-import { type ChipIntent, GenerationStatus, Markdown, RegenerateChapterButton, StopButton } from '@/components/nf';
+import { ChapterMarkdown, type ChipIntent, GenerationStatus, RegenerateChapterButton, StopButton } from '@/components/nf';
 import { ForgeBar } from '@/components/nf/ForgeBar';
 import { ImageGallery } from '@/components/nf/ImageGallery';
 import {
@@ -392,7 +392,7 @@ export function ChapterWorkspace({ novelId, draft, deleted, openReviewOnLoad, on
                     />
                   </>
                 ) : (
-                  <Markdown content={body} className={styles.preview} />
+                  <ChapterMarkdown content={body} className={styles.preview} />
                 )}
               </div>
             </div>
@@ -437,7 +437,7 @@ export function ChapterWorkspace({ novelId, draft, deleted, openReviewOnLoad, on
                 )}
                 {draft.title && <div className={styles.chapterEyebrow}>Chapter {chapter}</div>}
                 {draft.body?.trim() ? (
-                  <Markdown content={draft.body} />
+                  <ChapterMarkdown content={draft.body} />
                 ) : (
                   <p className={styles.emptyProse}>
                     {draft.status === 'final' ? 'This chapter has no prose.' : 'This chapter has no prose yet. Use “Edit prose” to write it, or generate a draft from its brief.'}

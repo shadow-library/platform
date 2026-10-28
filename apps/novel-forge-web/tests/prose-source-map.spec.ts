@@ -31,6 +31,16 @@ describe('proseSourceMap', () => {
     expect([map?.starts[6], map?.ends[6]]).toEqual([7, 12]);
   });
 
+  it('should render a system panel as its title and Markdown body, every unit standing for the whole fence', () => {
+    const fence = '```system Quest & Log\n**Find** the <key>\n```';
+    const markdown = `Intro.\n\n${fence}\n`;
+    const map = proseSourceMap(markdown);
+    const at = markdown.indexOf(fence);
+    expect(map?.text.trimEnd()).toBe('Intro.Quest & LogFind the <key>');
+    const unit = map?.text.indexOf('Find') ?? -1;
+    expect([map?.starts[unit], map?.ends[unit]]).toEqual([at, at + fence.length]);
+  });
+
   it('should refuse CRLF text, which the lexer rewrites', () => {
     expect(proseSourceMap('one\r\ntwo')).toBeUndefined();
   });
@@ -81,6 +91,10 @@ describe('reader selections', () => {
   it('should refuse a span that crosses list items, so no list marker is pulled in', () => {
     expect(select('- alpha\n- beta gamma\n- delta', 'gamma\ndelta')).toEqual({ kind: 'cuts-markup' });
     expect(select('- alpha\n- beta gamma\n- delta', 'gamma')).toBe('gamma');
+  });
+
+  it('should anchor a selection inside a table cell to the cell’s words', () => {
+    expect(select('| Skill | Level |\n| --- | --- |\n| Basic Mechanics | 1 |', 'Mechanics')).toBe('Mechanics');
   });
 
   it('should anchor a decoded entity to the whole entity', () => {

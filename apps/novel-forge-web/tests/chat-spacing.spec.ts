@@ -382,6 +382,11 @@ const CHAPTER_PANEL: Expected[] = [
   { selector: '.scroll', values: { 'min-height': '0' }, source: 'as chat .scroll' },
   { selector: '.reader', values: { padding: '28px 56px 28px 64px' }, source: 'design: reading view padding 28px 56px 28px 64px' },
   { selector: '.reader :global(.nf-md) > [data-paragraph]::before', values: { width: '32px' }, source: 'design: paragraph-number gutter: 32 wide, 16 short of the prose' },
+  {
+    selector: '.reader :global(.nf-md) > :global(.chapter-table)[data-paragraph]::before',
+    values: { 'margin-left': '-48px' },
+    source: 'the paragraph number’s left -48, taken from a table’s static place since its scroll box would clip it',
+  },
   { selector: '.note', values: { margin: '0 0 16px' }, source: 'the judge’s note above the prose; ProgressPanel .section 16' },
   { selector: '.empty', values: { margin: '0' }, source: 'paragraph reset' },
   { selector: '.state', values: { gap: '12px', padding: '28px 56px 0 64px' }, source: 'the reading view’s padding (.reader), 12 between a status and its line as chat .receipt' },
@@ -426,6 +431,7 @@ const CHAPTER_PANEL_AT: Record<string, Expected[]> = {
       source: 'the phone gutter (16, --nf-page-pad-inline) at the right, 44 at the left for the numbers',
     },
     { selector: '.reader :global(.nf-md) > [data-paragraph]::before', values: { width: '24px' }, source: 'the gutter narrowed with its padding' },
+    { selector: '.reader :global(.nf-md) > :global(.chapter-table)[data-paragraph]::before', values: { 'margin-left': '-36px' }, source: 'the phone number’s left -36' },
     { selector: '.state', values: { padding: '20px 16px 0' }, source: 'the phone gutter' },
   ],
 };

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { marked } from 'marked';
-import { proseParagraphs } from '@shadow-library/sdk';
+import { proseParagraphs, renderChapterMarkdown } from '@shadow-library/sdk';
 
 import { type ProposalResponse } from '../src/lib/apis';
 import { bodyOffset, locateRewrite, numberedHtml, proposedPassages, readerSelection, readerSource, renderedSpans, sourceOffset } from '../src/lib/chapter-reader';
@@ -12,6 +12,11 @@ function domTextOf(markdown: string): string {
   return html.replace(/<[^>]+>/g, '').replace(/&(#?[a-z0-9]+);/gi, (entity, name: string) => ENTITIES[name] ?? entity);
 }
 
+function readerDomText(view: ReturnType<typeof readerSource>): string {
+  const html = numberedHtml(view, proseParagraphs(view.body), new Set());
+  return html.replace(/<[^>]+>/g, '').replace(/&(#?[a-z0-9]+);/gi, (entity, name: string) => ENTITIES[name] ?? entity);
+}
+
 function numbers(body: string): string[] {
   return [...numberedHtml(readerSource(body, []), proseParagraphs(body), new Set()).matchAll(/<([a-z0-9]+) data-paragraph="(\d+)"/g)].map(match => `${match[1]}:${match[2]}`);
 }
@@ -19,6 +24,10 @@ function numbers(body: string): string[] {
 const BODY = 'The keeper counts the ships.\n\nThe tide turns late tonight. The ferry waits.\n\nGulls cry.';
 const PASSAGE = 'The tide turns late tonight.';
 const START = BODY.indexOf(PASSAGE);
+
+const PANEL = '```system Character Attributes\n| Attribute | Value |\n| --- | --- |\n| Strength | 14 |\n\n**New skill:** Basic Mechanics\n```';
+const TABLE = '| Item | Count |\n| --- | --- |\n| Rope | 2 |';
+const SYSTEM_BODY = `The screen flickered.\n\n${PANEL}\n\nShe read it twice.\n\n${TABLE}\n\nThen she closed it.`;
 
 describe('numberedHtml', () => {
   it('should number each block as the shared splitter does, never a scene break', () => {
@@ -43,6 +52,33 @@ describe('numberedHtml', () => {
     const again = numberedHtml(readerSource(body.slice(0, 16), []), paragraphs, shown);
     expect(first).toContain('data-paragraph="1"');
     expect(again).not.toContain('data-paragraph');
+  });
+
+  it('should render system panels and tables as the shared chapter renderer does, each numbered as one block', () => {
+    const html = numberedHtml(readerSource(SYSTEM_BODY, []), proseParagraphs(SYSTEM_BODY), new Set());
+    expect(html.replace(/ data-paragraph="\d+"/g, '')).toBe(renderChapterMarkdown(SYSTEM_BODY));
+    expect(numbers(SYSTEM_BODY)).toEqual(['p:1', 'aside:2', 'p:3', 'div:4', 'p:5']);
+    expect(html).toContain('<aside data-paragraph="2" class="chapter-system" aria-label="Character Attributes">');
+  });
+
+  it('should take a system fence in any case, and leave other fences as code', () => {
+    expect(numberedHtml(readerSource('```SYSTEM\nLevel up\n```', []), [], new Set())).toContain('<div class="chapter-system__title">System</div>');
+    expect(numberedHtml(readerSource('```systemic\nx\n```', []), [], new Set())).toContain('<code class="language-systemic">');
+  });
+
+  it('should run an unclosed system fence to the end as one panel', () => {
+    expect(numbers('Before.\n\n```system Open\nStill open\n\nAnd more')).toEqual(['p:1', 'aside:2']);
+  });
+
+  it('should number a table that follows a paragraph line as part of that paragraph, as the shared splitter counts it', () => {
+    const body = `Her pack held:\n${TABLE}\n\nAfter.`;
+    expect(proseParagraphs(body)).toHaveLength(2);
+    expect(numbers(body)).toEqual(['p:1', 'p:2']);
+    expect(numberedHtml(readerSource(body, []), proseParagraphs(body), new Set())).toContain('<div class="chapter-table"><table>');
+  });
+
+  it('should number a CRLF body with a panel by its own offsets', () => {
+    expect(numbers(SYSTEM_BODY.replace(/\n/g, '\r\n'))).toEqual(['p:1', 'aside:2', 'p:3', 'div:4', 'p:5']);
   });
 
   it('should keep the HTML the reader rendered before, only tagged', () => {
@@ -76,6 +112,18 @@ describe('readerSource', () => {
     expect(readerSource('A.\r\n\r\nB.', [{ start: 0, end: 2, replacement: 'x' }]).insertions).toEqual([]);
   });
 
+  it('should leave out a rewrite that touches a system panel or a table, and keep one beside them', () => {
+    const at = (text: string): { start: number; end: number; replacement: string } => ({
+      start: SYSTEM_BODY.indexOf(text),
+      end: SYSTEM_BODY.indexOf(text) + text.length,
+      replacement: 'x',
+    });
+    expect(readerSource(SYSTEM_BODY, [at('Strength')]).source).toBe(SYSTEM_BODY);
+    expect(readerSource(SYSTEM_BODY, [at('Rope')]).source).toBe(SYSTEM_BODY);
+    expect(readerSource(SYSTEM_BODY, [at('flickered.\n\n```system')]).source).toBe(SYSTEM_BODY);
+    expect(readerSource(SYSTEM_BODY, [at('read it twice')]).source).toContain('She <del data-proposed>read it twice</del><ins data-proposed>x</ins>.');
+  });
+
   it('should keep the numbering of the body under a preview', () => {
     const view = readerSource(BODY, [{ start: START, end: START + PASSAGE.length, replacement: 'Late.' }]);
     const html = numberedHtml(view, proseParagraphs(BODY), new Set());
@@ -100,6 +148,32 @@ describe('readerSelection', () => {
     expect(readerSelection(view, dom, proposed, proposed + 7, 2000)).toEqual({ kind: 'in-preview' });
   });
 
+  it('should take a system panel whole for a selection inside it or running into it', () => {
+    const view = readerSource(SYSTEM_BODY, []);
+    const dom = readerDomText(view);
+    const inside = dom.indexOf('Strength');
+    expect(readerSelection(view, dom, inside, inside + 8, 2000)).toMatchObject({ kind: 'ok', selection: { text: PANEL } });
+    const title = dom.indexOf('Character Attributes');
+    expect(readerSelection(view, dom, title, title + 9, 2000)).toMatchObject({ kind: 'ok', selection: { text: PANEL } });
+    const from = dom.indexOf('flickered');
+    expect(readerSelection(view, dom, from, dom.indexOf('Attribute'), 2000)).toMatchObject({
+      kind: 'ok',
+      selection: { start: SYSTEM_BODY.indexOf('flickered'), end: SYSTEM_BODY.indexOf(PANEL) + PANEL.length },
+    });
+    const after = dom.indexOf('read it');
+    expect(readerSelection(view, dom, after, after + 7, 2000)).toMatchObject({ kind: 'ok', selection: { text: 'read it' } });
+  });
+
+  it('should map a selection inside a table cell to that cell', () => {
+    const view = readerSource(SYSTEM_BODY, []);
+    const dom = readerDomText(view);
+    const rope = dom.indexOf('Rope');
+    expect(readerSelection(view, dom, rope, rope + 4, 2000)).toEqual({
+      kind: 'ok',
+      selection: { start: SYSTEM_BODY.indexOf('Rope'), end: SYSTEM_BODY.indexOf('Rope') + 4, text: 'Rope' },
+    });
+  });
+
   it('should refuse a selection over the comment limit and any selection in a CRLF body', () => {
     const view = readerSource(BODY, []);
     const dom = domTextOf(BODY);
@@ -119,6 +193,24 @@ describe('renderedSpans', () => {
     ]);
     expect(span && dom.slice(span.start, span.end)).toBe('Gulls');
     expect(hidden).toBeUndefined();
+  });
+});
+
+describe('renderedSpans around system panels', () => {
+  it('should mark every unit of a panel for a span over the whole fence, and none for a span inside it', () => {
+    const view = readerSource(SYSTEM_BODY, []);
+    const dom = readerDomText(view);
+    const panel = SYSTEM_BODY.indexOf(PANEL);
+    const strength = SYSTEM_BODY.indexOf('Strength');
+    const [whole, part, prose] = renderedSpans(view, dom, [
+      { start: panel, end: panel + PANEL.length },
+      { start: strength, end: strength + 8 },
+      { start: SYSTEM_BODY.indexOf('She read'), end: SYSTEM_BODY.indexOf('She read') + 8 },
+    ]);
+    expect(whole && dom.slice(whole.start, whole.end)).toStartWith('Character Attributes');
+    expect(whole && dom.slice(whole.start, whole.end).trimEnd()).toEndWith('Basic Mechanics');
+    expect(part).toBeUndefined();
+    expect(prose && dom.slice(prose.start, prose.end)).toBe('She read');
   });
 });
 

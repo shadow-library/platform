@@ -113,6 +113,17 @@
   pointer-events: none;
 }
 
+/* A table scrolls sideways, and its overflow would clip a number placed against it: the number sits at its static place, held by an ancestor instead. */
+.reader :global(.nf-md) > :global(.chapter-table)[data-paragraph] {
+  position: static;
+}
+
+.reader :global(.nf-md) > :global(.chapter-table)[data-paragraph]::before {
+  top: auto;
+  left: auto;
+  margin-left: -48px;
+}
+
 .note {
   margin: 0 0 16px;
   font-size: 12px;
@@ -365,6 +376,10 @@
   .reader :global(.nf-md) > [data-paragraph]::before {
     left: -36px;
     width: 24px;
+  }
+
+  .reader :global(.nf-md) > :global(.chapter-table)[data-paragraph]::before {
+    margin-left: -36px;
   }
 
   .state {

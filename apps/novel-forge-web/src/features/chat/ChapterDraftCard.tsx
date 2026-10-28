@@ -1,7 +1,7 @@
 import { Link } from '@tanstack/react-router';
 import { Button, Tooltip } from '@shadow-library/ui';
 
-import { Markdown, StatusChip } from '@/components/nf';
+import { ChapterMarkdown, StatusChip } from '@/components/nf';
 import { useDraftApproval } from '@/features/chapter-workspace';
 import { type DraftResponse } from '@/lib/apis';
 import { chapterTitle, wordCount } from '@/lib/chapter-editor';
@@ -46,7 +46,7 @@ export function ChapterDraftCard({ novelId, draft, beside, onOpen, onAskForChang
         <span className={`${styles.caption} ${styles.pushEnd}`}>{wordCount(body).toLocaleString()} words</span>
       </div>
       <div className={styles.draftBody}>
-        <Markdown content={body} />
+        <ChapterMarkdown content={body} />
       </div>
       <div className={styles.draftFoot}>
         {draft.judgeNote && <p className={styles.caption}>{draft.judgeNote}</p>}

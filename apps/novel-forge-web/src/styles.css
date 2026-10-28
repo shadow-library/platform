@@ -411,3 +411,49 @@ a:hover {
   background: var(--sh-surface-well);
   font-weight: 700;
 }
+.nf-md .chapter-table {
+  max-width: 100%;
+  margin: 0 0 1.2em;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+.nf-md .chapter-table table {
+  margin: 0;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+.nf-md .chapter-table th {
+  white-space: nowrap;
+}
+.nf-md .chapter-table [align='right'] {
+  text-align: right;
+}
+.nf-md .chapter-table [align='center'] {
+  text-align: center;
+}
+.nf-md .chapter-system {
+  margin: 0 0 1.2em;
+  border: var(--sh-border-width) solid var(--sh-border-default);
+  border-left: 3px solid var(--sh-accent);
+  border-radius: var(--sh-radius-md);
+  background: var(--sh-surface-card);
+  font-size: 0.95em;
+}
+.nf-md .chapter-system__title {
+  padding: 0.45em 1em;
+  border-bottom: var(--sh-border-width) solid var(--sh-border-default);
+  font-weight: 700;
+  font-variant-caps: all-small-caps;
+  letter-spacing: 0.06em;
+}
+.nf-md .chapter-system__title::before {
+  content: '[ ' / '';
+}
+.nf-md .chapter-system__title::after {
+  content: ' ]' / '';
+}
+.nf-md .chapter-system__body {
+  padding: 0.75em 1em;
+}
+.nf-md .chapter-system__body > :last-child {
+  margin-bottom: 0;
+}
