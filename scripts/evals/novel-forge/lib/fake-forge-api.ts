@@ -586,6 +586,7 @@ export class FakeForgeApi implements ForgeApi {
       messages: [
         { role: 'system', content: 'You write the next chapter.' },
         ...(state.project.instructions ? [{ role: 'user', content: this.stableCanon(state) }] : []),
+        ...(brief.knowledgeContract ? [{ role: 'user', content: `## KNOWN FACTS (POV CAST)\n${brief.knowledgeContract.pov.join(', ')}` }] : []),
         { role: 'user', content: `${context.join('\n')}\n\nPlan: ${brief.body}` },
       ],
     };

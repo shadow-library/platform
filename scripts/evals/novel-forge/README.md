@@ -15,6 +15,8 @@ Run everything from the repo root.
 | Output      | `--out <dir>` or `NF_EVAL_OUT_DIR`; default `<os tmpdir>/novel-forge-evals`. A path inside the repo is refused unless git ignores it.                                                                       |
 | Tier        | `--tier economy\|balanced\|performant` sets the project's cost tier and every turn's; omitted, the project default applies                                                                                  |
 
+Eval briefs carry the planner's knowledge contract (`pov` is the brief's POV entity, `learns` the secrets its chapter's milestone unlocks), so writer and judge run with the same epistemic bounds as real use.
+
 Every suite deletes the projects it creates; `--keep-projects` leaves them for inspection. `--runs <n>` repeats on a fresh project. `--dry-run` runs the whole suite against an in-process fake Forge (no network, no cost); add `--fake-faults` and the fake breaks every gated rule, so c1, c2 and c4 must report FAIL and c3 and c5 must flag chapters.
 
 Exit codes: 0 pass or advisory, 1 a gate failed, 2 setup or run error.

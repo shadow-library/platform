@@ -153,7 +153,7 @@ async function run(context: SuiteContext): Promise<SuiteVerdict> {
       await seedStoryBible(context, imported.projectId, story, { revealedThrough: baseline.length });
       const session = await context.api.createSession(imported.projectId, 'auto');
       for (const chapter of continuation) {
-        const record = await writeStoryChapter(author, imported.projectId, chapter, { sessionId: session.id, planViaChat: planVia === 'chat' });
+        const record = await writeStoryChapter(author, imported.projectId, chapter, { story, sessionId: session.id, planViaChat: planVia === 'chat' });
         if (record.draft) context.sink.writeArtifact(`chapters/run-${run}-ch-${chapter.n}.md`, `# ${record.draft.title ?? chapter.title}\n\n${record.draft.body}\n`);
         hits.push(...contradictions(run, record, checks));
         outcomes.push({

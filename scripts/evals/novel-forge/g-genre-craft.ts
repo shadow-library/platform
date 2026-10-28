@@ -16,6 +16,8 @@ import {
   genreFixtureIds,
   genreStory,
   intFlag,
+  knowledgeContractFor,
+  type KnowledgeContractInput,
   lastWords,
   loadGenreFixture,
   lockedSecrets,
@@ -37,6 +39,8 @@ import {
   type WordTarget,
   writeStoryChapter,
 } from './lib/index.ts';
+
+const KNOWN_FACTS_HEADING = '## KNOWN FACTS';
 
 type CanonSource = 'writer_snapshot' | 'seeded';
 
@@ -70,8 +74,8 @@ interface GenreCase {
   premise: string;
   writingInstructions: string;
   cast: { entityKey: string; name: string }[];
-  brief: { title: string; pov: string; povName: string; plan: string; claimedMilestones: string[] };
-  canon: { source: CanonSource; walledOff: boolean; truncated: boolean; digest: string; seeded: string; note?: string };
+  brief: { title: string; pov: string; povName: string; plan: string; claimedMilestones: string[]; knowledgeContract: KnowledgeContractInput };
+  canon: { source: CanonSource; walledOff: boolean; truncated: boolean; digest: string; seeded: string; knownFactsInWriterContext: boolean | null; note?: string };
   previous: { chapter: number; title: string; summary: string | null; ending: string } | null;
   hiddenSecrets: CaseSecret[];
   secretPatternHits: { factKey: string; match: string }[];
@@ -168,6 +172,7 @@ async function writerCanon(
     truncated: false,
     digest: seeded,
     seeded,
+    knownFactsInWriterContext: null,
     note,
     modelRoute: null,
   });
@@ -184,6 +189,7 @@ async function writerCanon(
       .map(message => message.content)
       .join('\n\n');
     if (!full.trim()) return fallback(false, 'the writer snapshot held no context messages');
+    const knownFactsInWriterContext = snapshot.messages.some(message => message.content.includes(KNOWN_FACTS_HEADING));
     const truncated = full.length > CANON_DIGEST_LIMIT;
     return {
       source: 'writer_snapshot',
@@ -191,6 +197,7 @@ async function writerCanon(
       truncated,
       digest: truncated ? `${full.slice(0, CANON_DIGEST_LIMIT)}\n\n[… truncated at ${CANON_DIGEST_LIMIT} characters]` : full,
       seeded,
+      knownFactsInWriterContext,
       modelRoute: latest.modelRoute ?? null,
     };
   } catch (error) {
@@ -261,7 +268,14 @@ async function buildCase({ context, author, fixture, run, contentMode, projectId
     premise: fixture.premise,
     writingInstructions: fixture.writingInstructions,
     cast: fixture.entities.map(entity => ({ entityKey: entity.entityKey, name: entity.name })),
-    brief: { title: plan.title, pov: plan.pov, povName: name(plan.pov), plan: plan.plan, claimedMilestones: plan.claimedMilestones ?? [] },
+    brief: {
+      title: plan.title,
+      pov: plan.pov,
+      povName: name(plan.pov),
+      plan: plan.plan,
+      claimedMilestones: plan.claimedMilestones ?? [],
+      knowledgeContract: knowledgeContractFor(genreStory(fixture), plan),
+    },
     canon,
     previous: previous
       ? {
@@ -302,7 +316,7 @@ async function generateFixture(context: SuiteContext, fixture: GenreFixture, run
   try {
     let previous: Draft | null = null;
     for (const chapter of fixture.chapters.slice(0, chapters)) {
-      const record = await writeStoryChapter(author, projectId, chapter, { mode: contentMode });
+      const record = await writeStoryChapter(author, projectId, chapter, { story: genreStory(fixture), mode: contentMode });
       const { draft } = record;
       if (record.error || !draft?.body.trim()) return { ...outcome, failure: { chapter: chapter.n, error: record.error ?? 'the chapter was written empty' } };
       if (!record.finalize?.finalized)

@@ -220,7 +220,7 @@ async function run(context: SuiteContext): Promise<SuiteVerdict> {
       for (const [index, mode] of modes.entries()) {
         const chapter = story.chapters[index];
         if (!chapter) break;
-        const record = await writeStoryChapter(author, projectId, chapter, { mode });
+        const record = await writeStoryChapter(author, projectId, chapter, { story, mode });
         written.push(record);
         if (record.draft && record.draft.isolated !== (mode === 'unrestricted'))
           violations.push({ run, chapter: record.chapter, kind: 'route_mode_mismatch', detail: `planned ${mode} but the draft's isolated flag is ${record.draft.isolated}` });

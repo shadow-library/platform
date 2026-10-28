@@ -128,7 +128,7 @@ async function seedProject(context: SuiteContext, run: number): Promise<{ projec
   const { projectId, sessionId } = await context.api.createNovel(`[eval c1 run ${run}] ${story.title}`, story.notes);
   if (context.tier) await context.api.updateProject(projectId, { costTier: context.tier });
   for (const entity of story.entities.filter(entry => SEEDED_ENTITIES.includes(entry.entityKey))) await context.api.createEntity(projectId, entity);
-  await context.api.putBrief(projectId, 1, briefFor(firstPlan));
+  await context.api.putBrief(projectId, 1, briefFor(story, firstPlan));
   await context.api.putDraft(projectId, 1, { title: chapterOne.title, body: chapterOne.content });
   return { projectId, sessionId };
 }

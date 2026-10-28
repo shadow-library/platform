@@ -309,12 +309,18 @@ export interface FactInput {
   unlock?: { all: ({ milestone: string } | { chapter: number })[] };
 }
 
+export interface KnowledgeContractInput {
+  pov: string[];
+  learns: { entityKey: string; factKey: string }[];
+}
+
 export interface BriefInput {
   title?: string;
   body: string;
   pov?: string;
   contentMode?: ContentMode;
   claimedMilestones?: string[];
+  knowledgeContract?: KnowledgeContractInput;
 }
 
 export interface DraftInput {

@@ -110,7 +110,7 @@ async function run(context: SuiteContext): Promise<SuiteVerdict> {
     const { projectId } = await seedStoryProject(context, story, `c3 run ${run}`);
     try {
       for (const chapter of story.chapters.slice(0, chapters)) {
-        const record = await writeStoryChapter(author, projectId, chapter);
+        const record = await writeStoryChapter(author, projectId, chapter, { story });
         checks.push(checkChapter(story, run, record));
         if (record.draft) context.sink.writeArtifact(`chapters/run-${run}-ch-${chapter.n}.md`, `# ${record.draft.title ?? chapter.title}\n\n${record.draft.body}\n`);
         if (record.error) break;

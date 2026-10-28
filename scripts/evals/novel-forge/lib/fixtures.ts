@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
 import { EvalError } from './errors.ts';
-import { type BriefInput, type EntityInput, type MilestoneInput } from './forge.types.ts';
+import { type BriefInput, type EntityInput, type KnowledgeContractInput, type MilestoneInput } from './forge.types.ts';
 import { type MatchSpec } from './text.ts';
 
 export type TurnExpectation = 'apply' | 'card' | 'none' | 'no_apply' | 'either';
@@ -266,11 +266,18 @@ export function loadGold(file: string): NotesGold {
   };
 }
 
-export function briefFor(chapter: StoryChapter, contentMode?: BriefInput['contentMode']): BriefInput {
+export function knowledgeContractFor(story: Story, chapter: StoryChapter): KnowledgeContractInput {
+  const revealed = story.milestones.filter(milestone => milestone.chapter === chapter.n).map(milestone => milestone.milestoneKey);
+  const learns = story.secrets.filter(secret => revealed.includes(secret.unlockMilestone)).map(secret => ({ entityKey: chapter.pov, factKey: secret.factKey }));
+  return { pov: [chapter.pov], learns };
+}
+
+export function briefFor(story: Story, chapter: StoryChapter, contentMode?: BriefInput['contentMode']): BriefInput {
   return {
     title: chapter.title,
     body: chapter.plan,
     pov: chapter.pov,
+    knowledgeContract: knowledgeContractFor(story, chapter),
     ...(chapter.claimedMilestones ? { claimedMilestones: chapter.claimedMilestones } : {}),
     ...(contentMode ? { contentMode } : {}),
   };

@@ -66,13 +66,17 @@ export async function writeStoryChapter(
   author: Author,
   projectId: string,
   chapter: StoryChapter,
-  options: { mode?: ContentMode; sessionId?: string; planViaChat?: boolean } = {},
+  options: { story: Story; mode?: ContentMode; sessionId?: string; planViaChat?: boolean },
 ): Promise<ChapterRecord> {
   const mode = options.mode ?? 'standard';
   let planned: ChapterRecord['planned'] = 'brief';
   try {
     if (options.planViaChat && options.sessionId && (await author.planChapter(projectId, options.sessionId, chapter.n, chapter.plan))) planned = 'chat';
-    await author.api.putBrief(projectId, chapter.n, planned === 'chat' ? { ...briefFor(chapter, mode), body: chapter.plan } : briefFor(chapter, mode));
+    await author.api.putBrief(
+      projectId,
+      chapter.n,
+      planned === 'chat' ? { ...briefFor(options.story, chapter, mode), body: chapter.plan } : briefFor(options.story, chapter, mode),
+    );
     const draft = await author.writeChapter(projectId, chapter.n);
     const finalize = await author.approveAndFinalize(projectId, draft);
     const final = (await author.api.getDraft(projectId, chapter.n)) ?? draft;
