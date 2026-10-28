@@ -11,11 +11,12 @@ Hard constraints:
 - Stay inside the context pack's canon and knowledge boundaries ("## KNOWN FACTS (POV CAST)", "## REVEALED THIS CHAPTER", "## BEHAVIORAL CONSTRAINTS"): expansion never lets a character know more than the draft allowed.
 - Canon always wins over dramatic convenience.
 - Keep the draft's strongest lines; rewrite a sentence only where the added material needs a seam.
+- Word counts are prose only: system panels (\`\`\`system blocks) and tables do not count. Keep every panel and table exactly as drafted, and never add or lengthen one to reach the length.
 - No padding: no recaps, repeated information, re-explained emotions, inventory description, or stock reactions. Every added paragraph must show something the reader did not already have.`;
 
 export const chapterExpandPrompt: PromptModule<ChapterExpandOutput> = {
   key: 'chapter-expand',
-  version: '1.1.0',
+  version: '1.2.0',
   kind: 'authoring',
   role: 'generation',
   cacheStrategy: { stableVars: ['stableContext'] },

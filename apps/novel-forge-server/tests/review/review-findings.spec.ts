@@ -169,7 +169,7 @@ describe('graphJudgeOutcome', () => {
         { severity: 'soft', text: 'brief: the bribe happens off-page' },
         { severity: 'soft', text: 'knowledge leak: "heir" exposes [lamp_heir] — …counted the lanterns…' },
         { severity: 'soft', text: 'readability: "His hope was a candle." — say it plainly' },
-        { severity: 'hard', text: 'mechanical: draft is 16 words, below the 1200-word floor' },
+        { severity: 'hard', text: 'mechanical: draft has 16 words of prose, below the 1200-word floor' },
       ],
     });
 
@@ -177,7 +177,7 @@ describe('graphJudgeOutcome', () => {
       ['brief', 'warning', 'the bribe ha'],
       ['knowledge', 'blocking', '"heir" expos'],
       ['readability', 'warning', '"His hope wa'],
-      ['mechanics', 'warning', 'draft is 16 '],
+      ['mechanics', 'warning', 'draft has 16'],
     ]);
     expect(result).toMatchObject({ disposition: 'blocking', briefCompliance: { compliant: false, issues: ['the bribe happens off-page'] } });
   });
@@ -254,8 +254,8 @@ describe('deterministic outcomes', () => {
   it('should report mechanics without the internal prefix and say what was measured', () => {
     const result = mechanicsOutcome(BODY, [], resolveWordTarget({ wordTargetMin: 2400, wordTargetMax: 3200 }));
 
-    expect(result.findings[0]?.text).toMatch(/^draft is \d+ words/);
-    expect(result.checked[0]).toBe('length against the 2400–3200-word target');
+    expect(result.findings[0]?.text).toMatch(/^draft has \d+ words of prose/);
+    expect(result.checked[0]).toBe('prose length, without system panels and tables, against the 2400–3200-word target');
     expect(result.metrics).toEqual({ words: 16 });
   });
 

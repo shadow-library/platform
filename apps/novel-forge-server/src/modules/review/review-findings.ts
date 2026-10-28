@@ -8,7 +8,7 @@ import { type JudgeOutput } from '../ai/schemas/judge.schema';
 import { type ProofreadKindValue } from '../ai/schemas/enums';
 import { type ProofreadFinding, type ReviewOutput } from '../ai/schemas/review.schema';
 import { type FactLike, KNOWLEDGE_LEAK_PREFIX, type KnowledgeLeakIssue } from '../bible/fact/knowledge-view';
-import { countWords, type ResolvedWordTarget } from '../eval/deterministic-metrics';
+import { countProseWords, type ResolvedWordTarget } from '../eval/deterministic-metrics';
 
 export interface DraftFinding {
   severity: ReviewFindingSeverity;
@@ -299,7 +299,8 @@ export function mechanicsOutcome(body: string, priorBodies: string[], target: Re
     verdict: null,
     note: null,
     checked: [
-      `length against the ${target.min}–${target.max}-word target`,
+      `prose length, without system panels and tables, against the ${target.min}–${target.max}-word target`,
+      'unclosed fences',
       'repeated paragraphs',
       ...(priorBodies.length > 0 ? ['the opening against the previous chapter', `phrases reused from the previous ${priorBodies.length} chapter(s)`] : []),
       'stock phrases',
@@ -309,7 +310,7 @@ export function mechanicsOutcome(body: string, priorBodies: string[], target: Re
     readabilityCompliance: null,
     endingCompliance: null,
     knowledgeCompliance: null,
-    metrics: { words: countWords(body) },
+    metrics: { words: countProseWords(body) },
   };
   return outcome('mechanics', body, base, drafts);
 }

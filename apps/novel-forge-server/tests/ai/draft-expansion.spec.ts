@@ -156,6 +156,18 @@ describe('expandShortDraft', () => {
     expect(result.passes).toBe(2);
   });
 
+  it('should expand a draft whose prose is short even when its system panels reach the floor', async () => {
+    const short = bodyOfWords(1400);
+    const panel = `\`\`\`system Status\n${'Strength rises by one point after the training. '.repeat(100)}\n\`\`\``;
+    const expanded = `${bodyOfWords(2100)}\n\n${panel}`;
+    const { calls, modelRouter } = routerReturning({ body: expanded });
+
+    const result = await expandShortDraft(modelRouter, input(`${short}\n\n${panel}`), CTX);
+
+    expect(calls[0]?.vars).toMatchObject({ draftWords: countWords(short) });
+    expect(result).toMatchObject({ body: expanded, passes: 1, initialWords: countWords(short), finalWords: countWords(bodyOfWords(2100)) });
+  });
+
   it('should tolerate a response without a body', async () => {
     const short = bodyOfWords(1400);
     const { modelRouter } = routerReturning({ title: 'not an expansion' });

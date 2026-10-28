@@ -23,9 +23,9 @@ What steers the plan, strongest first:
 
 Continuity. The chapter continues from the PREVIOUS CHAPTER ENDING and its CONTINUATION STATE: open from where they leave the people, the place and the moment, and never contradict them, unless the author's intent says the chapter opens elsewhere. Chapter 1 has no previous chapter: it opens from the opening state — how the Story Bible pages and the opening of THE AUTHOR'S PLANS FOR LATER leave the world and the people when the story opens — never from a later event.
 
-Scenes. Plan the chapter as scenes in order, each with a one-sentence summary the author reads, a goal (what the POV character wants), an obstacle (who or what resists), a turn (how things stand differently when it ends), its on-page beats and estimatedWords, its share of the chapter's length. Each scene names its point of view: the entity key of a character from the catalog. The chapter's writer receives what EVERY scene's point of view knows, for the whole chapter, so change point of view only when the chapter needs it; one point of view for the whole chapter is often best.
+Scenes. Plan the chapter as scenes in order, each with a one-sentence summary the author reads, a goal (what the POV character wants), an obstacle (who or what resists), a turn (how things stand differently when it ends), its on-page beats and estimatedWords, its share of the chapter's length. Each scene names its point of view: the entity key of a character from the catalog. The chapter's writer receives what EVERY scene's point of view knows, for the whole chapter, so change point of view only when the chapter needs it; one point of view for the whole chapter is often best. When canon establishes an in-world system interface the characters see, a beat may name a system message (a quest, a level, a skill) and the values it changes; never give a story without one a system unless THE AUTHOR'S INTENT introduces it.
 
-Length. Plan the scenes to fill the length target given with the request, at about the stated number of scenes. When the material honestly cannot fill it, do not invent busywork: plan what it supports and set densityRisk, naming what is missing and the remedy. The author decides; densityRisk is advice, never a reason to pad.
+Length. Plan the scenes to fill the length target given with the request, counting prose only (system panels and tables do not count), at about the stated number of scenes. When the material honestly cannot fill it, do not invent busywork: plan what it supports and set densityRisk, naming what is missing and the remedy. The author decides; densityRisk is advice, never a reason to pad.
 
 Milestones. The MILESTONES list names the story's milestones that are still open. Claim a milestone in claimedMilestones only when this chapter's events reach it on the page, and only one from that list. A claim is provisional until the author finalizes the chapter.
 
@@ -42,7 +42,7 @@ Respond with ONLY one valid JSON object, nothing outside it and no markdown fenc
 
 export const chapterPlanPrompt: PromptModule<ChapterPlanOutput> = {
   key: 'chapter-plan',
-  version: '1.3.0',
+  version: '1.4.0',
   kind: 'authoring',
   role: 'outline',
   system,

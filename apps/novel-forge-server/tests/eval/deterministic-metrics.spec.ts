@@ -247,6 +247,14 @@ describe('computeChapterMetrics', () => {
     expect(report.hookType).toBe('turn');
     expect(report.words).toBe(countWords(body));
   });
+
+  it('should measure the prose only, leaving system panels and tables out', () => {
+    const prose = 'This sentence has exactly eight simple words here.';
+    const body = `${prose}\n\n\`\`\`system Status\n| Stat | Value |\n| --- | --- |\n| Strength | 14 |\n\`\`\`\n\n| Quest | Reward |\n| --- | --- |\n| Pump | 40 XP |`;
+    const report = computeChapterMetrics({ chapter: 5, body }, []);
+    expect(report.words).toBe(8);
+    expect(report.readability).toEqual(computeReadabilityMetrics(prose));
+  });
 });
 
 describe('computeDeterministicMetricsReport', () => {
@@ -276,6 +284,12 @@ describe('countSyllables', () => {
 });
 
 describe('computeReadabilityMetrics', () => {
+  it('should leave system panels and tables out of every measurement', () => {
+    const prose = '"Stop." She turned around.\n\n"Why?" he asked.';
+    const panel = '```system Skill Gained\n| Skill | Level | Note |\n| --- | --- | --- |\n| Mechanics | 1 | Repairs simple machines without tools of any kind at all |\n```';
+    expect(computeReadabilityMetrics(`${prose}\n\n${panel}\n\n| A | B |\n| --- | --- |\n| 1 | 2 |`)).toEqual(computeReadabilityMetrics(prose));
+  });
+
   it('should end a sentence at a closing quote so dialogue is not glued to the narration after it', () => {
     const metrics = computeReadabilityMetrics('"Stop." She turned around.\n\n"Why?" he asked.');
     expect(metrics.sentenceCount).toBe(4);

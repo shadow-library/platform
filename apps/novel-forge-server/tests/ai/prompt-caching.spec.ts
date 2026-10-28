@@ -108,7 +108,7 @@ describe('generation path caching', () => {
   };
   const draft = { title: 'Ascent', body: 'the rope bit into his palms and the ledge came no closer. '.repeat(4), summary: 'they climbed' };
 
-  it('breakpoints the stable pack and leaves the per-chapter tail uncached', async () => {
+  it('breakpoints the static system prompt and the stable pack and leaves the per-chapter tail uncached', async () => {
     const fakeLlm = { invoke: mock(async () => ({ content: JSON.stringify(draft) })) };
     const router = makeRouter(fakeLlm);
     await router.structured(generationPrompt, input, ctx, { ...OWNED, costTier: 'balanced' });
@@ -116,10 +116,8 @@ describe('generation path caching', () => {
     // The JSON-schema reminder is appended after cache injection, so it never displaces a breakpoint.
     const [messages] = fakeLlm.invoke.mock.calls[0] as unknown as [{ content: unknown; getType(): string }[]];
     expect(messages).toHaveLength(4);
-    // The generation system prompt is ~700 tokens — below the cacheable minimum — so the stable pack
-    // is the only breakpoint, and the per-chapter tail must stay outside it.
-    expect(countTokens(generationPrompt.system)).toBeLessThan(MIN_CACHEABLE_TOKENS);
-    expect(typeof messages[0]?.content).toBe('string');
+    expect(countTokens(generationPrompt.system)).toBeGreaterThanOrEqual(MIN_CACHEABLE_TOKENS);
+    expect(cacheControlOf(messages[0]?.content)).toEqual({ type: 'ephemeral' });
     expect(cacheControlOf(messages[1]?.content)).toEqual({ type: 'ephemeral' });
     expect(typeof messages[2]?.content).toBe('string');
     expect(String(messages[2]?.content)).toContain(smallText);

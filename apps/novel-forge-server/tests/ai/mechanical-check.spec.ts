@@ -83,6 +83,25 @@ describe('checkDraftMechanics', () => {
     expect(overHardCeiling[0]?.text).toContain('above');
   });
 
+  it('should count prose only, so system panels and tables cannot carry a short draft past the floor', () => {
+    const table = `| Item | Count |\n| --- | --- |\n${'| Rope and a long iron hook | 1 |\n'.repeat(400)}`;
+    const findings = checkDraftMechanics(`${bodyOfWords(WORD_COUNT_HARD_MIN - 200)}\n\n\`\`\`system Inventory\n${table}\`\`\`\n\n${table}`, []);
+    expect(findings).toHaveLength(1);
+    expect(findings[0]?.severity).toBe('hard');
+    expect(findings[0]?.text).toContain('words of prose, below');
+  });
+
+  it('should report a hard finding when a fence is never closed', () => {
+    const findings = checkDraftMechanics(`${CLEAN_BODY}\n\n\`\`\`system Quest\nFind the well.`, []);
+    expect(findings).toEqual([{ severity: 'hard', text: 'mechanical: the fence opened by "```system Quest" is never closed, so the rest of the chapter renders inside it' }]);
+  });
+
+  it('should not count a stat table repeated from the prior chapters as recycled phrasing', () => {
+    const sheet = `\`\`\`system Status\n| Attribute | Value |\n| --- | --- |\n${'| Strength of the left arm | 14 |\n'.repeat(40)}\`\`\``;
+    const findings = checkDraftMechanics(`${sheet}\n\n${CLEAN_BODY}`, [`${otherBodyOfWords(WORD_TARGET_MIN)}\n\n${sheet}`]);
+    expect(findings).toEqual([]);
+  });
+
   it('should report a hard finding when a paragraph is repeated verbatim', () => {
     const paragraph = bodyOfWords(DUPLICATE_PARAGRAPH_MIN_WORDS + 10);
     const findings = checkDraftMechanics(`${CLEAN_BODY}\n\n${paragraph}\n\n${paragraph}`, []);

@@ -2,7 +2,7 @@ import { Logger } from '@shadow-library/common';
 
 import { APP_NAME } from '@server/constants';
 
-import { countWords, resolveWordTarget } from '../../eval/deterministic-metrics';
+import { countProseWords, resolveWordTarget } from '../../eval/deterministic-metrics';
 import { type ForgeCallPolicy } from '../../plugins/plugin-policy.service';
 import { type ModelRouterService, type ProjectConfig } from '../model-router.service';
 import { PROMPT_REGISTRY } from '../prompts';
@@ -43,7 +43,7 @@ export async function expandShortDraft(
   const prompt = PROMPT_REGISTRY['chapter-expand'];
   const target = resolveWordTarget(project);
   const { max: hardMax } = resolveWordCountHardBounds(target);
-  const initialWords = countWords(input.body);
+  const initialWords = countProseWords(input.body);
   let body = input.body;
   let words = initialWords;
   let passes = 0;
@@ -57,7 +57,7 @@ export async function expandShortDraft(
       return null;
     });
 
-    const expandedWords = typeof expanded?.body === 'string' ? countWords(expanded.body) : 0;
+    const expandedWords = typeof expanded?.body === 'string' ? countProseWords(expanded.body) : 0;
     logger.info('draft expansion pass', { runId: ctx.runId, node: ctx.node, pass: passes, words, expandedWords });
     if (!expanded || expandedWords <= words || expandedWords > hardMax) break;
     body = expanded.body;

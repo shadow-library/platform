@@ -418,6 +418,9 @@
   produced.
 - **Readability** is decided by the judge alone, against the default style as amended by the project's additions. Deterministic measurements reach it as evidence and never
   trigger repair themselves; a readability-only miss never marks a contradiction, halts a batch or blocks the next chapter.
+- **Chapter format**: prose is Markdown (GFM). In-world system content (status windows, quests, attributes, skills) is a ` ```system <Title> ` fenced panel, with
+  stats in GFM tables, written only when canon or the chapter's plan establishes a system. Word targets, short-draft expansion and the mechanical and readability
+  measurements count prose only, without panels and tables; displayed word counts keep the whole text, and the hard line, isolation and secret checks read all of it.
 - **Regenerate from plan**: after a plan edit, the author regenerates through the normal generation job with generate's gates, replacing the prose in place. Whatever the draft
   held stays in its revision history; later drafts are marked stale only when the new draft lands.
 - **Writing by hand**: "Write it myself" asks the server to start the next writable chapter and never while a generate job targets it; an existing draft stays editable wherever

@@ -1,8 +1,11 @@
+import { proseOnly } from './chapter-prose';
+
 // Deterministic prose metrics — pure functions over already-fetched chapter/draft text; no DB, no LLM.
 //
 // Definitions:
 // - Word count: whitespace-split tokens, matches the target band the generation prompt was given —
 //   the application default (1,800–2,600) unless the project overrides it (see `resolveWordTarget`).
+//   Chapter measurements read prose only: system panels and tables are dropped first (`chapter-prose.ts`).
 // - Sentence-length band: 6–22 words per sentence, the band named in `authoring-preamble.ts`'s
 //   `DEFAULT_WRITING_INSTRUCTIONS` ("Keep most sentences between roughly 6 and 22 words").
 // - "Longest-run monotony": the longest run of consecutive sentences that all fall OUTSIDE the 6–22
@@ -167,6 +170,10 @@ export function countWords(text: string): number {
   return trimmed.split(/\s+/).length;
 }
 
+export function countProseWords(markdown: string): number {
+  return countWords(proseOnly(markdown));
+}
+
 interface WordCountReport {
   chapter: number;
   words: number;
@@ -186,7 +193,7 @@ export interface WordCountSummary {
 
 export function computeWordCountDistribution(chapters: { chapter: number; body: string }[], target: ResolvedWordTarget = resolveWordTarget()): WordCountSummary {
   const reports = chapters.map(c => {
-    const words = countWords(c.body);
+    const words = countProseWords(c.body);
     return { chapter: c.chapter, words, inTarget: words >= target.min && words <= target.max };
   });
   const counts = reports.map(r => r.words).sort((a, b) => a - b);
@@ -345,7 +352,8 @@ function byWordsDescending(a: string, b: string): number {
 }
 
 export function computeReadabilityMetrics(body: string, patterns: OrnatePattern[] = ORNATE_PATTERNS): ReadabilityMetrics {
-  const paragraphs = splitProseParagraphs(body);
+  const prose = proseOnly(body);
+  const paragraphs = splitProseParagraphs(prose);
   const sentences = paragraphs.flatMap(proseSentences);
   const sentenceWords = sentences.map(sentence => countWords(sentence));
   const words = sentenceWords.reduce((sum, count) => sum + count, 0);
@@ -364,7 +372,7 @@ export function computeReadabilityMetrics(body: string, patterns: OrnatePattern[
     averageSentenceWords: sentences.length === 0 ? 0 : words / sentences.length,
     longSentenceShare: sentences.length === 0 ? 0 : longSentences.length / sentences.length,
     longSentences: longSentences.sort(byWordsDescending),
-    averageParagraphWords: paragraphs.length === 0 ? 0 : countWords(body) / paragraphs.length,
+    averageParagraphWords: paragraphs.length === 0 ? 0 : countWords(prose) / paragraphs.length,
     longParagraphs: paragraphs.filter(paragraph => countWords(paragraph) > LONG_PARAGRAPH_WORDS).sort(byWordsDescending),
     readingGrade: sentences.length === 0 || letterWords.length === 0 ? 0 : 0.39 * (words / sentences.length) + 11.8 * (syllables / letterWords.length) - 15.59,
     ornateHits,
@@ -549,18 +557,19 @@ export interface ChapterMetricsReport {
 
 /** Computes every per-chapter metric for one chapter, given the prior-chapters window for cross-chapter n-gram comparison. */
 export function computeChapterMetrics(input: ChapterMetricsInput, priorBodies: string[], target: ResolvedWordTarget = resolveWordTarget()): ChapterMetricsReport {
-  const words = countWords(input.body);
+  const prose = proseOnly(input.body);
+  const words = countWords(prose);
   return {
     chapter: input.chapter,
     words,
     inWordTarget: words >= target.min && words <= target.max,
-    sentence: computeSentenceLengthMetrics(input.body),
-    withinChapterNgrams: computeWithinChapterRepeatedNgrams(input.body),
-    crossChapterNgrams: computeCrossChapterRepeatedNgrams(input.body, priorBodies),
-    stockPhrases: computeStockPhraseCounts(input.body),
-    dialogueTags: computeDialogueTagMetrics(input.body),
-    contractionRate: computeDialogueContractionRate(input.body),
-    readability: computeReadabilityMetrics(input.body),
+    sentence: computeSentenceLengthMetrics(prose),
+    withinChapterNgrams: computeWithinChapterRepeatedNgrams(prose),
+    crossChapterNgrams: computeCrossChapterRepeatedNgrams(prose, priorBodies.map(proseOnly)),
+    stockPhrases: computeStockPhraseCounts(prose),
+    dialogueTags: computeDialogueTagMetrics(prose),
+    contractionRate: computeDialogueContractionRate(prose),
+    readability: computeReadabilityMetrics(prose),
     hookType: input.hookType ?? null,
   };
 }

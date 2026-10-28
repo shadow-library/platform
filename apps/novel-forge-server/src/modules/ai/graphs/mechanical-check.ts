@@ -1,3 +1,4 @@
+import { proseOnly, splitChapterProse } from '../../eval/chapter-prose';
 import {
   computeCrossChapterRepeatedNgrams,
   computeDialogueTagMetrics,
@@ -88,17 +89,23 @@ function excerpt(text: string, length = 80): string {
 
 /**
  * Deterministic checks over a finished draft: hard findings ride the repair ladder, soft ones surface at review. `priorBodies` is the last ~10 finished chapters, newest
- * first; `target` defaults to the application band.
+ * first; `target` defaults to the application band. Everything but the fence check reads prose only, without system panels and tables.
  */
-export function checkDraftMechanics(body: string, priorBodies: string[] = [], target: ResolvedWordTarget = resolveWordTarget()): JudgeFinding[] {
+export function checkDraftMechanics(markdown: string, priorMarkdown: string[] = [], target: ResolvedWordTarget = resolveWordTarget()): JudgeFinding[] {
   const findings: JudgeFinding[] = [];
+  const { prose: body, unclosedFence } = splitChapterProse(markdown);
+  const priorBodies = priorMarkdown.map(proseOnly);
   const words = countWords(body);
   const { min: hardMin, max: hardMax } = resolveWordCountHardBounds(target);
 
-  if (words < hardMin) findings.push({ severity: 'hard', text: `mechanical: draft is ${words} words, below the ${hardMin}-word floor` });
-  else if (words > hardMax) findings.push({ severity: 'hard', text: `mechanical: draft is ${words} words, above the ${hardMax}-word ceiling` });
-  else if (words < target.min) findings.push({ severity: 'soft', text: `mechanical: draft is ${words} words, under the ${target.min}–${target.max} target band` });
-  else if (words > target.max) findings.push({ severity: 'soft', text: `mechanical: draft is ${words} words, over the ${target.min}–${target.max} target band` });
+  if (words < hardMin) findings.push({ severity: 'hard', text: `mechanical: draft has ${words} words of prose, below the ${hardMin}-word floor` });
+  else if (words > hardMax) findings.push({ severity: 'hard', text: `mechanical: draft has ${words} words of prose, above the ${hardMax}-word ceiling` });
+  else if (words < target.min) findings.push({ severity: 'soft', text: `mechanical: draft has ${words} words of prose, under the ${target.min}–${target.max} target band` });
+  else if (words > target.max) findings.push({ severity: 'soft', text: `mechanical: draft has ${words} words of prose, over the ${target.min}–${target.max} target band` });
+
+  if (unclosedFence) {
+    findings.push({ severity: 'hard', text: `mechanical: the fence opened by "${excerpt(unclosedFence)}" is never closed, so the rest of the chapter renders inside it` });
+  }
 
   for (const paragraph of findDuplicatedParagraphs(body)) {
     findings.push({ severity: 'hard', text: `mechanical: a paragraph is repeated verbatim — "${excerpt(paragraph)}"` });

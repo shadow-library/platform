@@ -711,10 +711,10 @@ describe('Prompt modules', () => {
     });
   });
 
-  describe('proofreading (review v1.2)', () => {
+  describe('proofreading (review v1.3)', () => {
     it('should ask the editor for every kind of slip, quoted verbatim with a fix, and leave voice and canon contradictions alone', () => {
       const system = PROMPT_REGISTRY.review.system;
-      expect(PROMPT_REGISTRY.review.version).toBe('1.2.0');
+      expect(PROMPT_REGISTRY.review.version).toBe('1.3.0');
       for (const kind of ['grammar', 'spelling', 'punctuation', 'tense', 'pov', 'name', 'reference']) expect(system).toContain(kind);
       expect(system).toContain('copy the exact offending span verbatim from the draft into quote');
       expect(system).toContain('write the same span corrected in fix, changing only the slip');

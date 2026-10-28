@@ -23,6 +23,9 @@ ${VOICE_AND_CANON_RULES}`;
 export const EDIT_BY_DELETION =
   'EDITING RULE: To remove something, delete it. Never write that it is absent ("no X", "without X", "do not mention X", "X is not ...") unless the text is itself an explicit rule the author asked for.';
 
+// The panel format is the shared chapter Markdown contract that both readers render.
+export const SYSTEM_PANELS = `SYSTEM PANELS: Only when canon or the chapter brief establishes an in-world system interface the characters see (status windows, quests, attributes, skills), show each message it gives as a panel: a line \`\`\`system <Title>, the message, then a line \`\`\`. Inside a panel, stats, skills and inventory go in a GFM table (a header row, then a | --- | divider row); notices are short plain lines. Narration, thoughts and dialogue stay outside panels. Every value continues from the latest one in the continuation state's establishedFacts or the recent summaries and changes only by what this chapter shows happening. Show a panel only where the message changes the scene, keep it to a few lines, and let the prose carry the drama. Never invent a system, stat or skill that canon and the brief lack, never use panels or tables in a story without one, and never fence the chapter as a whole. Panels and tables do not count toward the chapter's length. When the chapter shows stats, establishedFacts keeps one entry per stat sheet with its current values, such as "Kai: Level 3, Strength 14, Agility 12".`;
+
 // For fix and revision, which rewrite prose under the pack's `writing_style`: point of view and tense are only
 // a default there, because a project's writing-style additions may set their own.
 export const AUTHORING_STYLE_REPAIR = `AUTHORING GUIDELINES:
