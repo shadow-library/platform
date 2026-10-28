@@ -148,6 +148,11 @@ export class Author {
     await this.api.approveDraft(projectId, draft);
     const review = await this.awaitReview(projectId, draft.chapter);
     const flags = [...review.consequential, ...review.routine].flatMap(item => (item.flag ? [item.flag] : []));
+    if (review.status === 'applied') {
+      this.timing('finalize', 0, true, { projectId, chapter: draft.chapter });
+      const applied = await this.api.getDraft(projectId, draft.chapter);
+      return { review, flags, finalized: applied?.status === 'final' };
+    }
     const current = review.routine.some(item => !item.decision) ? await this.api.keepRoutine(projectId, draft.chapter) : review;
     for (const item of current.consequential.filter(entry => !entry.decision)) await this.api.decideReviewItem(projectId, draft.chapter, item.id, 'kept');
     const started = performance.now();
@@ -218,7 +223,7 @@ export class Author {
     let retried = false;
     for (;;) {
       const review = await this.api.getFinalizeReview(projectId, chapter);
-      if (review.status === 'ready') {
+      if (review.status === 'ready' || review.status === 'applied') {
         this.timing('finalize_review', performance.now() - started, true, { projectId, chapter });
         return review;
       }
