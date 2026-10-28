@@ -63,6 +63,11 @@ describe('splitChapterProse', () => {
     expect(words(proseOnly('| A | B |\n| --- | --- |\n| 1 | 2 |\n# Next\nText.'))).toEqual(['#', 'Next', 'Text.']);
   });
 
+  it('should end a table at a scene break or a bullet list', () => {
+    expect(words(proseOnly('A | B\n- | -\n1 | 2\n* * *\nMorning.'))).toEqual(['*', '*', '*', 'Morning.']);
+    expect(words(proseOnly('A | B\n--- | ---\n1 | 2\n- item'))).toEqual(['-', 'item']);
+  });
+
   it('should keep a pipe in ordinary prose that has no divider row under it', () => {
     const text = 'He wrote A | B on the board.\nNobody answered.';
 

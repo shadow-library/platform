@@ -219,10 +219,12 @@
 }
 
 .prose :global(.chapter-system__title)::before {
+  content: '[ ';
   content: '[ ' / '';
 }
 
 .prose :global(.chapter-system__title)::after {
+  content: ' ]';
   content: ' ]' / '';
 }
 

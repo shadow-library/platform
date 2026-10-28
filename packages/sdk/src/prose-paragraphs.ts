@@ -20,6 +20,7 @@ const FENCE = /^ {0,3}(`{3,}(?=[^`]*$)|~{3,})/;
 const QUOTE = /^ {0,3}>/;
 const LIST_ITEM = /^ {0,3}(?:[-+*]|\d{1,9}[.)])(?:[ \t]|$)/;
 const LIST_AFTER_TEXT = /^ {0,3}(?:[-+*]|1[.)])[ \t]+\S/;
+const DELIMITER_CELL = /^[ \t]*:?-+:?[ \t]*$/;
 
 function linesOf(text: string): Line[] {
   const lines: Line[] = [];
@@ -49,6 +50,31 @@ function isBlank(line: Line | undefined): boolean {
 
 function startsBlock(text: string): boolean {
   return SCENE_BREAK.test(text) || HEADING.test(text) || FENCE.test(text) || QUOTE.test(text);
+}
+
+function tableCells(row: string): string[] {
+  let text = row.trim();
+  if (text.startsWith('|')) text = text.slice(1);
+  if (text.endsWith('|') && !text.endsWith('\\|')) text = text.slice(0, -1);
+  return text.split(/(?<!\\)\|/);
+}
+
+function startsTable(lines: readonly Line[], index: number): boolean {
+  const header = lines[index]?.text ?? '';
+  const delimiter = lines[index + 1]?.text ?? '';
+  if (!header.includes('|') || !delimiter.includes('|') || indentOf(header) >= 4 || indentOf(delimiter) >= 4) return false;
+  const delimiterCells = tableCells(delimiter);
+  return delimiterCells.every(cell => DELIMITER_CELL.test(cell)) && delimiterCells.length === tableCells(header).length;
+}
+
+function tableEnd(lines: readonly Line[], from: number): number {
+  let last = from + 1;
+  while (!isBlank(lines[last + 1])) {
+    const text = (lines[last + 1] as Line).text;
+    if (startsBlock(text) || LIST_AFTER_TEXT.test(text) || indentOf(text) >= 4) break;
+    last++;
+  }
+  return last;
 }
 
 function fenceEnd(lines: readonly Line[], from: number, marker: string): number {
@@ -98,7 +124,7 @@ function paragraphEnd(lines: readonly Line[], from: number): number {
   while (!isBlank(lines[last + 1])) {
     const text = (lines[last + 1] as Line).text;
     if (SETEXT_UNDERLINE.test(text)) return last + 1;
-    if (startsBlock(text) || LIST_AFTER_TEXT.test(text)) break;
+    if (startsBlock(text) || LIST_AFTER_TEXT.test(text) || startsTable(lines, last + 1)) break;
     last++;
   }
   return last;
@@ -112,6 +138,7 @@ function blockEnd(lines: readonly Line[], from: number): number {
   if (indentOf(text) >= 4) return indentedCodeEnd(lines, from);
   if (QUOTE.test(text)) return quoteEnd(lines, from);
   if (LIST_ITEM.test(text)) return listEnd(lines, from);
+  if (startsTable(lines, from)) return tableEnd(lines, from);
   return paragraphEnd(lines, from);
 }
 

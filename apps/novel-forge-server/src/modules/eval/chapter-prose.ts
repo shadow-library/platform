@@ -1,6 +1,7 @@
 const FENCE = /^ {0,3}(`{3,}(?=[^`]*$)|~{3,})(.*)$/;
 const SYSTEM_PANEL_INFO = /^system(?:\s|$)/i;
 const BLOCK_START = /^ {0,3}(?:#{1,6}(?:[ \t]|$)|>|`{3,}|~{3,})/;
+const TABLE_END = /^ {0,3}(?:(?:\*[ \t]*){3,}|(?:-[ \t]*){3,}|(?:_[ \t]*){3,})$|^ {0,3}(?:[-+*]|1[.)])[ \t]+\S|^(?: {4,}|\t)/;
 const DELIMITER_CELL = /^\s*:?-+:?\s*$/;
 
 export interface ChapterProse {
@@ -32,7 +33,7 @@ function startsTable(lines: readonly string[], index: number): boolean {
 
 function tableEnd(lines: readonly string[], from: number): number {
   let last = from + 1;
-  while (last + 1 < lines.length && lines[last + 1]?.trim() && !BLOCK_START.test(lines[last + 1] ?? '')) last++;
+  while (last + 1 < lines.length && lines[last + 1]?.trim() && !BLOCK_START.test(lines[last + 1] ?? '') && !TABLE_END.test(lines[last + 1] ?? '')) last++;
   return last;
 }
 

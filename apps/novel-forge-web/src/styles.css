@@ -446,9 +446,11 @@ a:hover {
   letter-spacing: 0.06em;
 }
 .nf-md .chapter-system__title::before {
+  content: '[ ';
   content: '[ ' / '';
 }
 .nf-md .chapter-system__title::after {
+  content: ' ]';
   content: ' ]' / '';
 }
 .nf-md .chapter-system__body {

@@ -40,6 +40,26 @@ describe('proseParagraphs', () => {
   });
 });
 
+describe('proseParagraphs tables', () => {
+  it.each([
+    ['a leading-pipe table', '| A | B |\n| - | - |\n| 1 | 2 |\n\nAfter.', ['| A | B |\n| - | - |\n| 1 | 2 |', 'After.']],
+    ['a table without leading pipes and a --- | --- divider', 'Attribute | Value\n--- | ---\nSTR | 12\n\nAfter.', ['Attribute | Value\n--- | ---\nSTR | 12', 'After.']],
+    ['a table without leading pipes and a - | - divider', 'Attribute | Value\n- | -\nSTR | 12\nDEX | 9', ['Attribute | Value\n- | -\nSTR | 12\nDEX | 9']],
+    ['a table with alignment colons', 'A | B | C\n:-- | :-: | --:\n1 | 2 | 3', ['A | B | C\n:-- | :-: | --:\n1 | 2 | 3']],
+    ['a table directly after a paragraph line', 'Status:\nA | B\n--- | ---\n1 | 2', ['Status:', 'A | B\n--- | ---\n1 | 2']],
+    ['a table cut off by a heading', 'A | B\n--- | ---\n1 | 2\n# Next', ['A | B\n--- | ---\n1 | 2', '# Next']],
+    ['a table cut off by a scene break', 'A | B\n--- | ---\n1 | 2\n* * *\nMorning.', ['A | B\n--- | ---\n1 | 2', 'Morning.']],
+    ['a table cut off by a bullet list', 'A | B\n--- | ---\n1 | 2\n- item', ['A | B\n--- | ---\n1 | 2', '- item']],
+    ['a table cut off by a fence', 'A | B\n--- | ---\n1 | 2\n```\ncode\n```', ['A | B\n--- | ---\n1 | 2', '```\ncode\n```']],
+    ['a table that is only a header and divider', 'A | B\n--- | ---', ['A | B\n--- | ---']],
+    ['a pipe in prose that is not a table', 'He wrote A | B on the board.\nNobody answered.', ['He wrote A | B on the board.\nNobody answered.']],
+    ['a header and divider with different cell counts', 'A | B | C\n--- | ---\n1 | 2', ['A | B | C\n--- | ---\n1 | 2']],
+    ['a setext underline under a pipe line', 'A | B\n---\nBody.', ['A | B\n---', 'Body.']],
+  ])('should read %s as a reader does', (_, text, expected) => {
+    expect(blocks(text)).toEqual(expected);
+  });
+});
+
 describe('paragraphAt', () => {
   const text = '# Chapter 3\nShe ran.\n* * *\nMorning came.';
 

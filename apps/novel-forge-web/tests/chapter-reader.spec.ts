@@ -70,11 +70,11 @@ describe('numberedHtml', () => {
     expect(numbers('Before.\n\n```system Open\nStill open\n\nAnd more')).toEqual(['p:1', 'aside:2']);
   });
 
-  it('should number a table that follows a paragraph line as part of that paragraph, as the shared splitter counts it', () => {
+  it('should number a table that follows a paragraph line as a block of its own, as the lexer and the shared splitter both count it', () => {
     const body = `Her pack held:\n${TABLE}\n\nAfter.`;
-    expect(proseParagraphs(body)).toHaveLength(2);
-    expect(numbers(body)).toEqual(['p:1', 'p:2']);
-    expect(numberedHtml(readerSource(body, []), proseParagraphs(body), new Set())).toContain('<div class="chapter-table"><table>');
+    expect(proseParagraphs(body)).toHaveLength(3);
+    expect(numbers(body)).toEqual(['p:1', 'div:2', 'p:3']);
+    expect(numberedHtml(readerSource(body, []), proseParagraphs(body), new Set())).toContain('<div data-paragraph="2" class="chapter-table"><table>');
   });
 
   it('should number a CRLF body with a panel by its own offsets', () => {
