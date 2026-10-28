@@ -52,6 +52,8 @@ export const GATEWAY_SESSION_HEADER = 'x-gateway-session';
 export const GATEWAY_WEB_TOOLS_HEADER = 'x-gateway-web-tools';
 export const JSON_SCHEMA_INSTRUCTION = 'Respond with only a JSON object that matches this JSON Schema: ';
 
+export const JSON_OBJECT_INSTRUCTION = 'Respond with only a valid JSON object.';
+
 export const VISIBLE_ASCII = /^[\x21-\x7e]+$/;
 const MAX_SESSION_LENGTH = 256;
 const SAMPLING_FIELDS = ['temperature', 'top_p', 'top_k', 'min_p', 'seed', 'stop', 'frequency_penalty', 'presence_penalty', 'repetition_penalty'];
@@ -109,9 +111,21 @@ function reasoningFor({ effort, model }: ChatTranslationInput, dialect: Provider
   return dialect === 'subscription-gateway' && effort !== 'none' ? { effort } : undefined;
 }
 
-function promptsSchema({ capabilities }: ModelSpec, schema: unknown): boolean {
+function promptsSchema({ capabilities }: ModelSpec, schema: unknown, dialect: ProviderDialect): boolean {
+  if (dialect === 'subscription-gateway') return true;
   if (capabilities.structuredOutput === 'prompt') return true;
   return capabilities.maxOptionalProperties !== undefined && optionalPropertyCount(schema) > capabilities.maxOptionalProperties;
+}
+
+/** A CLI refuses `tool_choice: none` beside tools and `parallel_tool_calls: false`; `required` and forced choices stay so the refusal fails over to a deployment that can honour them */
+function adaptToolControls(translated: JsonObject): void {
+  const hasTools = Array.isArray(translated['tools']) && translated['tools'].length > 0;
+  if (hasTools && translated['parallel_tool_calls'] === false) delete translated['parallel_tool_calls'];
+  if (hasTools && translated['tool_choice'] === 'none') {
+    delete translated['tools'];
+    delete translated['tool_choice'];
+    delete translated['parallel_tool_calls'];
+  }
 }
 
 type WebSearchRoute = 'not_requested' | 'gateway_tools' | 'hosted' | 'unavailable';
@@ -134,14 +148,20 @@ export function translateChatRequest(input: ChatTranslationInput): TranslatedReq
 
   let messages = model.capabilities.promptCache === 'anthropic' ? body.messages : body.messages.map(stripCacheControl);
   const responseFormat = body.response_format;
-  if (responseFormat?.type === 'json_schema' && promptsSchema(model, responseFormat.json_schema.schema)) {
+  if (responseFormat?.type === 'json_schema' && promptsSchema(model, responseFormat.json_schema.schema, dialect)) {
     delete translated['response_format'];
     messages = [...messages, { role: 'system', content: `${JSON_SCHEMA_INSTRUCTION}${JSON.stringify(responseFormat.json_schema.schema ?? {})}` }];
     if (dialect === 'ollama') translated['response_format'] = { type: 'json_object' };
   }
+  if (responseFormat?.type === 'json_object' && dialect === 'subscription-gateway') {
+    delete translated['response_format'];
+    messages = [...messages, { role: 'system', content: JSON_OBJECT_INSTRUCTION }];
+  }
   translated['messages'] = messages;
 
   if (body.stream === true) translated['stream_options'] = { ...body.stream_options, include_usage: true };
+
+  if (dialect === 'subscription-gateway') adaptToolControls(translated);
 
   const reasoning = reasoningFor(input, dialect);
   if (reasoning) translated['reasoning'] = reasoning;

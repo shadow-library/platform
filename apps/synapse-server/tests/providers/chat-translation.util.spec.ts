@@ -166,6 +166,35 @@ describe('translateChatRequest', () => {
     });
   });
 
+  describe('gateway tool controls', () => {
+    const tools = [{ type: 'function', function: { name: 'lookup' } }];
+    const withControls = (controls: Record<string, unknown>): ChatRequestBody => ({ ...chatBody({ tools }), ...controls }) as ChatRequestBody;
+
+    it('should drop parallel_tool_calls=false for the gateway only', () => {
+      const body = withControls({ parallel_tool_calls: false });
+
+      expect(translate({ provider: GATEWAY, body }).body).not.toHaveProperty('parallel_tool_calls');
+      expect(translate({ provider: OPENROUTER, body }).body['parallel_tool_calls']).toBe(false);
+    });
+
+    it('should keep parallel_tool_calls=true and tool_choice auto for the gateway', () => {
+      const { body } = translate({ provider: GATEWAY, body: withControls({ parallel_tool_calls: true, tool_choice: 'auto' }) });
+
+      expect(body['parallel_tool_calls']).toBe(true);
+      expect(body['tool_choice']).toBe('auto');
+    });
+
+    it('should turn tool_choice none beside tools into a request without tools for the gateway', () => {
+      const { body } = translate({ provider: GATEWAY, body: withControls({ tool_choice: 'none', parallel_tool_calls: false }) });
+
+      expect(body).not.toContainAnyKeys(['tools', 'tool_choice', 'parallel_tool_calls']);
+    });
+
+    it('should leave tool_choice required to the gateway to refuse so the call fails over', () => {
+      expect(translate({ provider: GATEWAY, body: withControls({ tool_choice: 'required' }) }).body['tool_choice']).toBe('required');
+    });
+  });
+
   describe('hosted web search', () => {
     it("should offer Synapse's own search tool, never the web plugin, where the catalog configures one", () => {
       const translated = translate({ envelope: { ...ENVELOPE, web_search: true }, hostedSearch: true });
@@ -241,6 +270,27 @@ describe('translateChatRequest', () => {
       expect(body['response_format']).toEqual({ type: 'json_object' });
       expect(body).not.toHaveProperty('format');
       expect((body['messages'] as { content: string }[]).at(-1)?.content).toContain(JSON.stringify(SCHEMA));
+    });
+
+    it('should send a gateway deployment the schema in the prompt and no response_format even for a native model', () => {
+      const { body } = translate({ provider: GATEWAY, body: chatBody({ response_format: JSON_SCHEMA_FORMAT }), capabilities: { structuredOutput: 'native' } });
+
+      expect(body).not.toHaveProperty('response_format');
+      expect((body['messages'] as { content: string }[]).at(-1)?.content).toContain(JSON.stringify(SCHEMA));
+    });
+
+    it('should still send the same native model its response_format on OpenRouter after a failover', () => {
+      const request = { body: chatBody({ response_format: JSON_SCHEMA_FORMAT }), capabilities: { structuredOutput: 'native' } } as const;
+
+      expect(translate({ ...request, provider: GATEWAY }).body).not.toHaveProperty('response_format');
+      expect(translate({ ...request, provider: OPENROUTER }).body['response_format']).toEqual(JSON_SCHEMA_FORMAT);
+    });
+
+    it('should replace a json_object response format with an instruction for the gateway', () => {
+      const { body } = translate({ provider: GATEWAY, body: chatBody({ response_format: { type: 'json_object' } }) });
+
+      expect(body).not.toHaveProperty('response_format');
+      expect((body['messages'] as { content: string }[]).at(-1)?.content).toBe('Respond with only a valid JSON object.');
     });
 
     it('should leave a json_object response format alone', () => {
