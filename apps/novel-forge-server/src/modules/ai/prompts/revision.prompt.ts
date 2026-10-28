@@ -16,7 +16,7 @@ ${SYSTEM_PANELS}`;
 
 export const revisionPrompt: PromptModule<GenerationOutput> = {
   key: 'revision',
-  version: '1.8.0',
+  version: '1.9.0',
   kind: 'authoring',
   system,
   template: ChatPromptTemplate.fromMessages([

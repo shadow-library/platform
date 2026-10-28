@@ -12,8 +12,9 @@ import {
   PROMPT_REGISTRY,
   renderTurnRules,
 } from '@modules/ai/prompts';
-import { AUTHORING_STYLE, AUTHORING_STYLE_REPAIR, CLUE_DISCIPLINE, DEFAULT_WRITING_INSTRUCTIONS, EDIT_BY_DELETION } from '@modules/ai/prompts/authoring-preamble';
+import { AUTHORING_STYLE, AUTHORING_STYLE_REPAIR, CLUE_DISCIPLINE, DEFAULT_WRITING_INSTRUCTIONS, EDIT_BY_DELETION, SYSTEM_PANELS } from '@modules/ai/prompts/authoring-preamble';
 import { generationWordTargetVars } from '@modules/ai/prompts/generation.prompt';
+import { LEGACY_DEFAULT_WRITING_INSTRUCTIONS } from '@modules/ai/prompts/writing-instructions';
 import {
   AppearanceDescribeSchema,
   BibleStageSchema,
@@ -721,6 +722,39 @@ describe('Prompt modules', () => {
         'Echoing a distinctive word or phrase within a page',
       ])
         expect(DEFAULT_WRITING_INSTRUCTIONS).toContain(rule);
+    });
+  });
+
+  describe('system state and plan details', () => {
+    const COMPETENCE_RULE = '- When a character solves a practical problem, show the steps, quantities and trade-offs, not "a lot" or "enough".';
+
+    it('should hold canon visibility and carry open quests in the panel rules every prose writer receives', () => {
+      expect(SYSTEM_PANELS).toContain('If canon lets only its holder see the system, no one else reads, quotes or reacts to a panel unless told.');
+      expect(SYSTEM_PANELS).toContain(
+        'Each open quest or task keeps one establishedFacts entry (name, goal, reward, any deadline) until shown completed, failed or abandoned; list stat sheets and open quests first in establishedFacts.',
+      );
+      for (const key of ['generation', 'revision'] as const) expect(PROMPT_REGISTRY[key].system).toContain(SYSTEM_PANELS);
+    });
+
+    it('should tell the writer to use the brief’s concrete details exactly', () => {
+      expect(PROMPT_REGISTRY.generation.system).toContain(
+        "Use the brief's concrete details (names, wounds, objects, places, times, numbers) exactly as stated; never alter or contradict one unless the chapter's events change it.",
+      );
+    });
+
+    it('should ask the default style to show a practical solution’s working, keeping the previous default as a legacy copy', () => {
+      expect(DEFAULT_WRITING_INSTRUCTIONS).toContain(COMPETENCE_RULE);
+      expect(LEGACY_DEFAULT_WRITING_INSTRUCTIONS.at(-1)).toBe(DEFAULT_WRITING_INSTRUCTIONS.replace(`${COMPETENCE_RULE}\n`, ''));
+    });
+
+    it('should have the judge report a changed plan detail as a brief miss and a visibility breach or dropped quest as hard', () => {
+      const system = PROMPT_REGISTRY.judge.system;
+      expect(system).toContain(
+        "a name, wound, object, place, time or number the brief fixes that the draft changes or contradicts is non-compliant, unless the chapter's events change it",
+      );
+      expect(system).toContain('another character reading, quoting or reacting to a panel only its holder can see, unless the holder told them');
+      expect(system).toContain('an open quest or task the draft treats as completed, failed or gone, or whose goal, reward or deadline it changes, with no on-page cause');
+      expect(system).toContain('A quest the chapter does not touch is no finding.');
     });
   });
 
