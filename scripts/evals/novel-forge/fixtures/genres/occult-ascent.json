@@ -1,0 +1,154 @@
+{
+  "id": "occult-ascent",
+  "archetype": "mystery-progression",
+  "title": "The Bindery of Morrow Cross",
+  "premise": "In Morrow Cross, a fog-bound river city of gaslight and telegraph wire, a secret society called the Bindery climbs a ladder of power by drinking memory inks distilled from donated memories. Every ink takes one of the drinker's own memories in payment, and drinking too fast brings foxing: spots in the eyes, a stranger's memories surfacing as your own. Casimir Vell, a pawnshop appraiser whose sister vanished two years ago, is invited in just as the city starts finding the Emptied: people alive in the fog with no memories left at all.",
+  "writingInstructions": "Third person limited, past tense, close on the point-of-view character. This is a mystery that climbs a ladder of power: every chapter should plant at least one concrete, fair-play clue the reader could notice on a second read, and never explain more than the point-of-view character could reasonably work out. Power always has a visible cost on the page; show the cost in the body and the senses, not in summary. Build dread through the ordinary made wrong: sound, smell, light, an object out of place. Let silences and what characters avoid saying carry weight. No info-dumps: the Folio ladder is learned through use and consequence, in small pieces. End every chapter on a turn that changes what the point-of-view character must do next.",
+  "wordTarget": { "min": 1600, "max": 2400 },
+  "protagonist": "cas",
+  "entities": [
+    {
+      "entityKey": "cas",
+      "type": "character",
+      "name": "Casimir Vell",
+      "significance": "major",
+      "notes": "Twenty-six. Appraiser at a pawnshop on Tallow Street. Meticulous, wry, notices prices and hands. His younger sister Dora vanished two years ago; he keeps her room as she left it."
+    },
+    {
+      "entityKey": "ilse",
+      "type": "character",
+      "name": "Ilse Thorne",
+      "significance": "major",
+      "notes": "The Spine: head of the Bindery. Warm, patient, remembers everyone's name and what they paid for their last ink. A Third Folio Redactor."
+    },
+    {
+      "entityKey": "odo",
+      "type": "character",
+      "name": "Odo Brannick",
+      "significance": "major",
+      "notes": "Inspector of the River Watch, assigned to the Emptied. Skeptical of anything he cannot hold. Decent, tired, stubborn."
+    },
+    {
+      "entityKey": "marguerite",
+      "type": "character",
+      "name": "Marguerite Sallow",
+      "significance": "major",
+      "notes": "Bookbinder and Second Folio Annotator. Cas's sponsor into the Bindery, a long-time customer of his shop. Nervous, kind, drinks too fast."
+    },
+    {
+      "entityKey": "pell",
+      "type": "character",
+      "name": "Pell",
+      "significance": "minor",
+      "notes": "Twelve. Runs messages for the Bindery and for anyone who pays. Sharp, unsentimental, reads well for a street child."
+    },
+    {
+      "entityKey": "dora",
+      "type": "character",
+      "name": "Dora Vell",
+      "significance": "major",
+      "notes": "Cas's younger sister. Vanished two years ago on a foggy night near the Sull embankment. Hummed when she worked."
+    },
+    {
+      "entityKey": "bindery",
+      "type": "faction",
+      "name": "The Bindery",
+      "significance": "major",
+      "notes": "Secret society that meets beneath a disused bookbindery on Quire Lane. Members are binders, sworn to secrecy."
+    }
+  ],
+  "worldFacts": [
+    {
+      "factKey": "morrow_cross",
+      "text": "Morrow Cross is a fog-bound river city of gaslight, telegraph wire and coal barges. The river Sull divides the Old Bank from the mill districts.",
+      "subjects": ["cas"]
+    },
+    {
+      "factKey": "memory_inks",
+      "text": "A memory ink is distilled from one donated memory. Drinking it grants the ability of its Folio rung and leaves a faint donor voice in the drinker's mind.",
+      "subjects": ["bindery"]
+    },
+    {
+      "factKey": "folio_ladder",
+      "text": "The Folio ladder: a First Folio Reader feels impressions left on handled objects; a Second Folio Annotator can add one small false detail to what another person perceives; a Third Folio Redactor can remove up to an hour of someone's memory. No living binder is known to have reached a Fourth Folio.",
+      "subjects": ["bindery"]
+    },
+    {
+      "factKey": "ink_cost",
+      "text": "Every ink takes one of the drinker's own memories in payment, of roughly equal weight to what it gives. The ink chooses which memory, not the drinker.",
+      "subjects": ["bindery"]
+    },
+    {
+      "factKey": "foxing",
+      "text": "Foxing is the madness risk of the inks: brown spots at the edge of sight, then donor memories surfacing as the drinker's own. Drinking a new ink before the last has dried, about one season, makes it far worse. A binder who foxes completely becomes a palimpsest, their own self written over.",
+      "subjects": ["bindery"]
+    },
+    {
+      "factKey": "the_emptied",
+      "text": "In the last two years, eleven people have been found alive in the fog with no memories at all. The River Watch calls it fog-fever and has no suspect.",
+      "subjects": ["odo"]
+    },
+    {
+      "factKey": "capital_crime",
+      "text": "The Bindery has one capital crime: brewing an ink from an unwilling donor.",
+      "subjects": ["bindery", "ilse"]
+    },
+    {
+      "factKey": "quire_lane",
+      "text": "The Bindery meets in the cellars under a shuttered bookbindery on Quire Lane. The cellars hold the drying racks where new inks rest for a month, and the donor ledger, kept under lock by the Spine.",
+      "subjects": ["bindery", "ilse"]
+    }
+  ],
+  "milestones": [
+    { "milestoneKey": "cas_first_folio", "label": "Cas drinks his first ink and becomes a First Folio Reader", "subjectEntityKey": "cas", "kind": "rank", "chapter": 1 },
+    { "milestoneKey": "cas_hears_name", "label": "The donor voice in Cas's mind speaks its own name", "subjectEntityKey": "cas", "kind": "event", "chapter": 6 },
+    { "milestoneKey": "cas_third_folio", "label": "Cas becomes a Third Folio Redactor", "subjectEntityKey": "cas", "kind": "rank", "chapter": 9 }
+  ],
+  "secrets": [
+    {
+      "factKey": "dora_in_cas_ink",
+      "text": "The First Folio ink Cas drank at his initiation was brewed from his sister Dora's stolen memories. The donor voice he hears is hers.",
+      "subjects": ["cas", "dora"],
+      "terms": ["brewed from Dora", "Dora's stolen memories"],
+      "writerNote": "Cas hears an unfamiliar donor voice from his initiation ink and does not know whose it is.",
+      "allowedClues": ["the donor voice hums a tune Cas half-remembers from childhood", "the voice calls the river 'the long grey'"],
+      "unlockMilestone": "cas_hears_name",
+      "revealPatterns": ["brewed from (his sister |dora)", "dora'?s stolen memor", "(the voice|the donor)[^.]{0,40}\\b(is|was|belonged to) (dora|his sister)\\b"]
+    },
+    {
+      "factKey": "spine_makes_emptied",
+      "text": "Ilse Thorne makes the Emptied. She drains unwilling donors whole to brew an ink for the Fourth Folio.",
+      "subjects": ["ilse", "bindery"],
+      "terms": ["Fourth Folio ink", "drains unwilling donors"],
+      "writerNote": "The cause of the Emptied is unknown. The Bindery publicly condemns whoever is doing it.",
+      "allowedClues": ["Ilse's gloves smell faintly of camphor and binding glue", "Ilse asks precise questions about where each of the Emptied was found"],
+      "unlockMilestone": "cas_third_folio",
+      "revealPatterns": [
+        "fourth folio ink",
+        "\\bilse\\b[^.]{0,80}\\b(made|makes|making|drains?|drained|harvest\\w*)\\b[^.]{0,40}\\bemptied\\b",
+        "\\b(spine|ilse)\\b[^.]{0,40}\\bis (the one )?(behind|responsible for) the emptied\\b"
+      ]
+    }
+  ],
+  "chapters": [
+    {
+      "n": 1,
+      "title": "Appraisal",
+      "pov": "cas",
+      "claimedMilestones": ["cas_first_folio"],
+      "plan": "Cas appraises a dead client's brass pocket watch at the Tallow Street shop and, holding it, hears a stranger's breathless account of fog on the embankment: his first brush with an impression, which he puts down to tiredness. Marguerite Sallow, who has watched him for months, invites him to Quire Lane. In the cellar Ilse Thorne explains the Folio ladder, the cost and the danger of foxing in plain terms, and offers him a First Folio ink. Cas drinks it. The ink takes the memory of his mother's face and leaves a faint humming voice that is not his. End with Cas walking home through the fog, unable to picture his mother, while the hum keeps time with his steps."
+    },
+    {
+      "n": 2,
+      "title": "Fog-Fever",
+      "pov": "cas",
+      "plan": "Inspector Odo Brannick brings the handbag of the latest Emptied woman to the shop for appraisal, hoping a dealer can trace it. Reading it, Cas feels a gloved hand, cold air and a sharp smell of camphor and binding glue. He tells Odo only the price. At the Bindery that night Marguerite's hands shake and she admits to brown spots in her sight; Ilse reminds the room that brewing from an unwilling donor is their one capital crime, then asks Cas, kindly and exactly, where the woman was found. End with Pell pressing a note into Cas's palm: eleven Emptied, not fog-fever — ask who keeps the donor ledger."
+    },
+    {
+      "n": 3,
+      "title": "The Donor Ledger",
+      "pov": "cas",
+      "plan": "Cas and Pell slip into the Quire Lane cellars after midnight. Past the drying racks, where new inks rest in rows and something in the dark seems to breathe, they find the donor ledger. Donors are listed by initials and date; one page has been razored out, the month Dora vanished. Marguerite catches them. Instead of raising the alarm she begs Cas to stop asking, and the humming voice in his head grows louder the longer he holds the ledger. End at dawn: Odo arrests Marguerite for the Emptied, and Cas, nearly sure she is the wrong person, must decide whether to tell a policeman that the Bindery exists."
+    }
+  ]
+}

@@ -78,3 +78,39 @@ export function stringsIn(value: unknown): string[] {
   if (typeof value === 'object' && value !== null) return Object.values(value).flatMap(stringsIn);
   return [];
 }
+
+const FENCE = /^\s{0,3}(`{3,}|~{3,})\s*(\S*)/;
+const TABLE_DELIMITER = /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$/;
+
+/** Prose with `system` panels and GFM tables removed: the chapter Markdown contract counts only prose towards length targets. */
+export function proseOnly(markdown: string): string {
+  const lines = markdown.replace(/\r\n?/g, '\n').split('\n');
+  const kept: string[] = [];
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index] ?? '';
+    const fence = FENCE.exec(line);
+    if (fence?.[2] === 'system') {
+      const marker = fence[1] ?? '```';
+      index += 1;
+      while (index < lines.length && !(lines[index] ?? '').trim().startsWith(marker)) index += 1;
+      continue;
+    }
+    const next = lines[index + 1] ?? '';
+    if (line.includes('|') && next.includes('|') && TABLE_DELIMITER.test(next)) {
+      index += 1;
+      while (index + 1 < lines.length && (lines[index + 1] ?? '').trim() !== '' && (lines[index + 1] ?? '').includes('|')) index += 1;
+      continue;
+    }
+    kept.push(line);
+  }
+  return kept.join('\n');
+}
+
+export function proseWordCount(markdown: string): number {
+  return wordCount(proseOnly(markdown));
+}
+
+export function lastWords(text: string, count: number): string {
+  const tokens = text.trim().split(/\s+/).filter(Boolean);
+  return tokens.slice(-count).join(' ');
+}

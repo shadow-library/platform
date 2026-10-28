@@ -79,6 +79,13 @@ export interface Project {
   readerPromise?: string | null;
   opposition?: string | null;
   protagonistKey?: string | null;
+  instructions?: string | null;
+  wordTarget?: WordTarget | null;
+}
+
+export interface WordTarget {
+  min: number;
+  max: number;
 }
 
 export interface Job {
@@ -136,6 +143,7 @@ export interface Fact {
   terms?: string[] | null;
   writerNote?: string | null;
   allowedClues?: string[] | null;
+  revealChapter?: number | null;
 }
 
 export interface Volume {
@@ -197,6 +205,8 @@ export interface WriterSnapshotSummary {
   attempt: number;
   role: string;
   isolated: boolean;
+  promptVersion?: string;
+  modelRoute?: { provider: string; model: string };
 }
 
 export interface WriterSnapshot extends WriterSnapshotSummary {
@@ -293,6 +303,7 @@ export interface FactInput {
   terms?: string[];
   writerNote?: string;
   allowedClues?: string[];
+  revealChapter?: number;
   unlock?: { all: ({ milestone: string } | { chapter: number })[] };
 }
 

@@ -1,0 +1,151 @@
+{
+  "id": "crown-and-forge",
+  "archetype": "kingdom-building",
+  "title": "Forty Days at Fenwick Ford",
+  "premise": "Teo Halvorsen, a civil engineer from our world, wakes in the body of Aurel Brannoch, a disgraced nineteen-year-old lordling sent to govern Fenwick Ford, a palisaded market town at the last river crossing before the northern moors. A raiding host is forty days away, the wells are poisoning the lower town, the coin is clipped and the reeve keeps the only ledger. Teo has no sword arm and no army: only arithmetic, hydraulics and the stubbornness to build one thing at a time.",
+  "writingInstructions": "Third person limited, past tense; the point of view may change between scenes, marked by a scene break, and each point-of-view character must sound distinct. Every improvement Teo makes must be plausible with the town's materials, tools and labor: show the constraint, the arithmetic or test, at least one failure or trade-off, and the cost in coin, grain, labor or goodwill. Never skip from idea to finished invention. Competence is shown through decisions under pressure, not through other characters praising him. Politics matter: every change creates a winner and a loser in the town, and the losers act. Keep anachronisms out of everyone's mouth except Teo's thoughts. End each chapter on a new problem that the last solution created or uncovered.",
+  "wordTarget": { "min": 1600, "max": 2400 },
+  "protagonist": "teo",
+  "entities": [
+    {
+      "entityKey": "teo",
+      "type": "character",
+      "name": "Aurel Brannoch",
+      "significance": "major",
+      "notes": "Lord of Fenwick Ford. Inside is Teo Halvorsen, thirty-four, a civil engineer from modern Earth who woke in Aurel's nineteen-year-old body. Knows hydraulics, structures and basic chemistry; has no smithing skill and only fragments of Aurel's memories. Nobody knows about the transmigration."
+    },
+    {
+      "entityKey": "maren",
+      "type": "character",
+      "name": "Maren Dell",
+      "significance": "major",
+      "notes": "Captain of the garrison's twenty men-at-arms. Forty, scarred, blunt. Served the old lord and despises Aurel's reputation."
+    },
+    {
+      "entityKey": "osric",
+      "type": "character",
+      "name": "Osric Pale",
+      "significance": "major",
+      "notes": "Reeve of Fenwick Ford. Keeps the granary, the tithe tallies and the only written ledger in town. Courteous, quick with numbers, always a step ahead of questions."
+    },
+    {
+      "entityKey": "hild",
+      "type": "character",
+      "name": "Hild Ashby",
+      "significance": "major",
+      "notes": "Master of the millwrights' guild and owner of the town's one watermill. A widow in her fifties; practical, proud, hates waste and young lords."
+    },
+    {
+      "entityKey": "sabine",
+      "type": "character",
+      "name": "Lady Sabine Corvel",
+      "significance": "major",
+      "notes": "Envoy and auditor of the Duchess of Valmere. Precise, courteous, impossible to read. Arrives in the town during the preparations."
+    },
+    {
+      "entityKey": "anselm",
+      "type": "character",
+      "name": "Brother Anselm",
+      "significance": "minor",
+      "notes": "Healer-priest of the town chapel. Literate, gentle, trusts what he has seen with his own eyes over what he is told."
+    },
+    {
+      "entityKey": "carrow",
+      "type": "faction",
+      "name": "The Carrow Hosts",
+      "significance": "major",
+      "notes": "Mounted clans of the northern moors who raid the river towns after harvest."
+    }
+  ],
+  "worldFacts": [
+    {
+      "factKey": "fenwick_ford",
+      "text": "Fenwick Ford is a market town of about 1,400 people on the river Ammer, the last crossing before the northern moors. It has one watermill, one smithy, a timber palisade and an outer ditch half filled with silt.",
+      "subjects": ["teo"]
+    },
+    {
+      "factKey": "crown_of_esk",
+      "text": "The town lies in the Crown of Esk, a feudal kingdom. The Duchy of Valmere holds the northern march, and Fenwick Ford is a minor lordship usually granted to younger sons.",
+      "subjects": ["teo", "sabine"]
+    },
+    {
+      "factKey": "technology",
+      "text": "Technology is late medieval: water mills, bloomery iron, crossbows and longbows, lime mortar. There is no gunpowder and no printing, and glass is rare and costly.",
+      "subjects": ["teo"]
+    },
+    {
+      "factKey": "money",
+      "text": "Silver pennies in the north are clipped and debased. Most trade runs on barter and notched tally sticks. The grain tithe is stored in the reeve's granary and recorded only in the reeve's ledger.",
+      "subjects": ["osric"]
+    },
+    {
+      "factKey": "carrow_raid",
+      "text": "Scouts report a Carrow host of about six hundred riders that will reach the ford before first snow, roughly forty days from the story's opening.",
+      "subjects": ["carrow", "maren"]
+    },
+    {
+      "factKey": "garrison",
+      "text": "The garrison is twenty men-at-arms and about sixty militia with spears and hunting bows. The armory holds five crossbows and a cart of rusted pikes.",
+      "subjects": ["maren"]
+    },
+    {
+      "factKey": "flux",
+      "text": "Every autumn a bloody flux sickens the lower town. Its wells sit downhill of the tanneries and the latrine pits.",
+      "subjects": ["anselm"]
+    },
+    {
+      "factKey": "aurel_reputation",
+      "text": "The real Aurel was a gambler sent north in disgrace after killing a cousin's friend in a duel. The town expects nothing of him and the garrison expects worse.",
+      "subjects": ["teo", "maren"]
+    }
+  ],
+  "milestones": [
+    { "milestoneKey": "osric_unmasked", "label": "The town learns what Osric has done", "subjectEntityKey": "osric", "kind": "event", "chapter": 8 },
+    { "milestoneKey": "sabine_choice", "label": "Sabine decides what she will report to the Duchess", "subjectEntityKey": "sabine", "kind": "event", "chapter": 10 }
+  ],
+  "secrets": [
+    {
+      "factKey": "osric_sells_to_carrow",
+      "text": "Reeve Osric Pale has been selling the granary's surplus and the ford's watch rota to the Carrow Hosts. The raid is timed to his information.",
+      "subjects": ["osric", "carrow"],
+      "terms": ["Osric's betrayal", "sold the watch rota"],
+      "writerNote": "Osric skims the grain tithe. How far his dishonesty goes is not yet known.",
+      "allowedClues": ["the granary's tallies always come out a little short", "Osric knows the moor roads better than a townsman should"],
+      "unlockMilestone": "osric_unmasked",
+      "revealPatterns": [
+        "\\bosric\\b[^.]{0,80}\\b(sells?|sold|selling|traitor|betray\\w*|in league with)\\b[^.]{0,60}\\b(carrow|raiders?|hosts?|moor clans?)\\b",
+        "(sold|sells|selling) (the )?watch rota"
+      ]
+    },
+    {
+      "factKey": "sabine_orders",
+      "text": "Lady Sabine carries sealed orders from the Duchess: if Aurel fails, she is to see that he does not survive the siege, so the ford can be granted to the Duchess's nephew.",
+      "subjects": ["sabine"],
+      "terms": ["the Duchess's nephew", "does not survive the siege"],
+      "writerNote": "Sabine says she is an auditor. Whatever else she was sent to do is her own business.",
+      "allowedClues": ["Sabine carries a sealed second letter that she never opens in company"],
+      "unlockMilestone": "sabine_choice",
+      "revealPatterns": ["duchess'?s nephew", "\\bsabine\\b[^.]{0,80}\\b(orders?|sent|instructed) to (kill|remove|dispose of|be rid of)\\b"]
+    }
+  ],
+  "chapters": [
+    {
+      "n": 1,
+      "title": "Forty Days",
+      "pov": "teo",
+      "plan": "Teo wakes in Aurel's body in the lord's hall with a hangover and splinters of a stranger's memory. Captain Maren Dell reports, without respect, that Carrow scouts were seen: a host before first snow. Teo walks the town and counts what he has: a silted ditch, wells downhill of the tanneries, the flux in the lower town, and a granary whose tallies Reeve Osric reads aloud a little too fast. He decides the first enemy is the water, not the raiders. He orders the lower wells capped, water drawn above the tannery outflow and boiled, and new latrine trenches dug downhill, and he wins Brother Anselm over by showing him two cups of water left overnight rather than explaining. End with Teo writing a list by candlelight — water, food, labor, walls — and realizing he cannot pay for any of it."
+    },
+    {
+      "n": 2,
+      "title": "Chits and Cams",
+      "pov": "teo",
+      "plan": "Teo needs hands to clear the ditch and has no silver. He proposes paying diggers in grain chits redeemable at the granary after the siege, backed by the tithe, which sets him across the table from Reeve Osric. Hild Ashby refuses to stop her mill for his idea; Teo wins her by working through what the mill earns standing idle at night against a trip-hammer driven by cams on the wheel's axle, forging nails and arrowheads while the town sleeps. The first trial fails when a cam of green oak splits; the second, cut from seasoned ash and greased with tallow, works. End with Osric arriving at the mill to say, regretfully, that the granary holds less grain than the chits already promise."
+    },
+    {
+      "n": 3,
+      "title": "The Auditor",
+      "pov": "maren",
+      "plan": "From Maren's point of view, the militia dig the ditch for chits and grumble, and she watches the lord she despised stand in the mud beside them, measuring the slope with a cord and a bowl of water. Lady Sabine Corvel rides in with six riders and an auditor's writ and finds a grain debt the town cannot cover. In a scene from Sabine's point of view, she weighs Aurel's chits as either clever or a crime, lets Osric court her favor over supper, and counts the arrowheads stacked in the smithy. End with Sabine telling Aurel, in front of Maren, that the Duchess will send no relief: the ford must hold alone or be surrendered."
+    }
+  ]
+}

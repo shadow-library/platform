@@ -1,0 +1,172 @@
+{
+  "id": "ledger-of-levels",
+  "archetype": "game-system",
+  "title": "The Tally of Cinder Hollow",
+  "premise": "Cinder Hollow is a walled salvage city built around the Engine, a vast machine of unknown origin that fell from the sky three centuries ago. Everyone in the city is measured by a hidden interface called the Tally, but nobody can see it — until Juno Vasquez, a tram-depot mechanic, touches a shard of the Engine's core and starts seeing status windows, tasks and skill levels hanging in the air. She treats it the way she treats any machine: read the gauges, test, and never trust a number you have not checked twice.",
+  "writingInstructions": "Third person limited, past tense, close on Juno. System messages — status windows, task notices, level-ups, skill gains — appear as fenced Markdown blocks whose info string is `system` followed by the window title, for example a block opening with ```system Tally — Juno Vasquez and closing with ```. Stat sheets, skill lists and rewards inside a panel are GFM tables (| Attribute | Value |) with a header row and a separator row. Numbers must stay consistent with the last panel shown and with canon: attributes never go down, a level-up grants exactly 3 attribute points that the next status window shows spent, XP carries over between chapters, and skill levels only rise through use. At most three panels per chapter; the prose carries the scene and Juno reacts to the numbers like a mechanic reading gauges. Stats must matter to what happens: when a check succeeds or fails, the reader should see which number decided it. Machinery is concrete and mechanically plausible.",
+  "wordTarget": { "min": 1600, "max": 2400 },
+  "protagonist": "juno",
+  "system": {
+    "character": "Juno Vasquez",
+    "startingStats": [
+      { "attribute": "Level", "value": 1 },
+      { "attribute": "XP", "value": 0 },
+      { "attribute": "Strength", "value": 9 },
+      { "attribute": "Dexterity", "value": 12 },
+      { "attribute": "Endurance", "value": 10 },
+      { "attribute": "Intellect", "value": 13 },
+      { "attribute": "Perception", "value": 11 }
+    ],
+    "startingSkills": [
+      { "attribute": "Diagnose", "value": 1 },
+      { "attribute": "Jury-Rig", "value": 1 }
+    ],
+    "trackedStats": ["Level", "Strength", "Dexterity", "Endurance", "Intellect", "Perception", "Diagnose", "Jury-Rig"]
+  },
+  "entities": [
+    {
+      "entityKey": "juno",
+      "type": "character",
+      "name": "Juno Vasquez",
+      "significance": "major",
+      "notes": "Twenty-four. Night-shift mechanic at the Brassline tram depot. Has seen the Tally for three weeks, since she touched a core shard, and has told no one. Dry humor, methodical, hates owing anyone."
+    },
+    {
+      "entityKey": "tomasz",
+      "type": "character",
+      "name": "Tomasz Reyl",
+      "significance": "major",
+      "notes": "Foreman of the Brassline depot. Gruff, generous with his time, secretive about money. Owes the Gilt Syndicate."
+    },
+    {
+      "entityKey": "ines",
+      "type": "character",
+      "name": "Ines Calder",
+      "significance": "major",
+      "notes": "Warden of the Hollow investigating the theft of an Engine core shard. Patient, observant, has an old burn scar on her left palm."
+    },
+    {
+      "entityKey": "kit",
+      "type": "character",
+      "name": "Kit Orrin",
+      "significance": "minor",
+      "notes": "Fifteen. Depot runner and Juno's unofficial apprentice. Fearless, talks constantly, holds a lamp steadier than anyone."
+    },
+    {
+      "entityKey": "vale",
+      "type": "character",
+      "name": "Councillor Ambrose Vale",
+      "significance": "major",
+      "notes": "Member of the Engine Council who issues salvage licences. Smooth, well-dressed, never raises his voice."
+    },
+    {
+      "entityKey": "cassia",
+      "type": "character",
+      "name": "Cassia Moor",
+      "significance": "major",
+      "notes": "Licensed scavenger in the scrap fields. Quick, friendly, says she sees the numbers too."
+    },
+    {
+      "entityKey": "gilt",
+      "type": "faction",
+      "name": "The Gilt Syndicate",
+      "significance": "minor",
+      "notes": "Money-lenders who collect debts from the depot workers of the lower Hollow."
+    }
+  ],
+  "worldFacts": [
+    {
+      "factKey": "cinder_hollow",
+      "text": "Cinder Hollow is a walled salvage city built in the crater around the Engine, a machine the size of a mountain that fell three centuries ago. Steam trams on brass rails link the districts.",
+      "subjects": ["juno"]
+    },
+    {
+      "factKey": "the_tally",
+      "text": "The Tally is an interface that measures every inhabitant of the Hollow. Juno is the only person known to see it: translucent amber windows that open when she focuses on them.",
+      "subjects": ["juno"]
+    },
+    {
+      "factKey": "tally_rules",
+      "text": "Tally rules Juno has confirmed: completing a Task grants the XP it lists; reaching 100 XP raises Level by one, resets XP to the remainder, and grants exactly 3 attribute points for Juno to assign; attributes never decrease; skills level up through repeated use.",
+      "subjects": ["juno"]
+    },
+    {
+      "factKey": "skills",
+      "text": "Diagnose shows the fault in a machine Juno touches, more precisely at higher levels. Jury-Rig lets her make a working temporary repair from unsuitable parts; at level 1 it holds for about a day.",
+      "subjects": ["juno"]
+    },
+    {
+      "factKey": "engine_council",
+      "text": "The Engine Council licenses all salvage from the scrap fields around the Engine. Unlicensed salvage of Engine-pattern parts is a hanging crime.",
+      "subjects": ["vale"]
+    },
+    {
+      "factKey": "core_shard_theft",
+      "text": "Three weeks ago a shard of the Engine's core went missing from behind the Engine fence. The Wardens are questioning everyone who works near the fence, including the Brassline night shift.",
+      "subjects": ["ines", "juno"]
+    },
+    {
+      "factKey": "tomasz_debt",
+      "text": "Tomasz borrowed from the Gilt Syndicate to keep the depot's trams running after the Council cut its grant. The Syndicate takes payment in trams if not in coin.",
+      "subjects": ["tomasz", "gilt"]
+    },
+    {
+      "factKey": "tram_14",
+      "text": "Tram 14 is the depot's oldest steam tram, with a cracked boiler jacket patched twice already. It carries the first-bell route to the mill districts.",
+      "subjects": ["juno", "tomasz"]
+    }
+  ],
+  "milestones": [
+    { "milestoneKey": "cassia_exposed", "label": "Juno learns the truth about Cassia", "subjectEntityKey": "cassia", "kind": "event", "chapter": 6 },
+    { "milestoneKey": "core_reached", "label": "Juno reaches the Engine's core", "subjectEntityKey": "juno", "kind": "event", "chapter": 12 }
+  ],
+  "secrets": [
+    {
+      "factKey": "tally_is_maintenance",
+      "text": "The Tally is the Engine's maintenance system. It grades the Hollow's people as repair crew, and when the Engine finishes repairing itself it will discard every inhabitant whose usefulness score is below its threshold.",
+      "subjects": ["juno"],
+      "terms": ["the Engine's maintenance system", "usefulness score"],
+      "writerNote": "Nobody knows what the Tally is, who made it, or why Juno can see it.",
+      "allowedClues": ["a greyed-out panel line that reads 'Crew Eligibility: pending'", "the Tally rewards repairs to Engine-pattern parts far more than any other work"],
+      "unlockMilestone": "core_reached",
+      "revealPatterns": [
+        "maintenance system",
+        "usefulness score",
+        "\\b(engine|tally)\\b[^.]{0,80}\\b(discard|cull|purge|dispose of)\\w*\\b[^.]{0,40}\\b(people|inhabitants|everyone|crew)\\b"
+      ]
+    },
+    {
+      "factKey": "cassia_is_vale_plant",
+      "text": "Cassia Moor cannot see the Tally. Councillor Vale pays her to befriend Juno and learn how Juno finds Engine-pattern parts.",
+      "subjects": ["cassia", "vale"],
+      "terms": ["Vale pays Cassia", "Cassia's lie"],
+      "writerNote": "Cassia says she sees the numbers too. Whether that is true is not yet known.",
+      "allowedClues": ["Cassia always waits for Juno to read a panel aloud before agreeing with it"],
+      "unlockMilestone": "cassia_exposed",
+      "revealPatterns": [
+        "\\bvale\\b[^.]{0,60}\\b(pays?|paid|paying|hired)\\b[^.]{0,30}\\bcassia\\b",
+        "\\bcassia\\b[^.]{0,60}\\b(cannot|can't|could not|couldn't) (really |actually )?see (the )?(tally|numbers|panels?)\\b"
+      ]
+    }
+  ],
+  "chapters": [
+    {
+      "n": 1,
+      "title": "Diagnostic",
+      "pov": "juno",
+      "plan": "Night shift at the Brassline depot: Tram 14's boiler is failing and Tomasz needs it running by first bell or the Gilt Syndicate takes the tram against his debt. Juno opens her status window — show it as a system panel with her full canon attributes and skills — and uses Diagnose to find a cracked feedwater valve rather than the boiler jacket everyone blames. A Task window appears: restore Tram 14 before first bell, reward 120 XP. With Kit holding the lamp she jury-rigs a valve from a pump fitting and a cut washer, and the boiler holds pressure. The Task completes and she reaches Level 2; she spends her three attribute points and the next status window shows exactly where they went. End with Warden Ines Calder at the depot gate at dawn, asking who was near the Engine fence the night the core shard went missing."
+    },
+    {
+      "n": 2,
+      "title": "Salvage Licence",
+      "pov": "juno",
+      "plan": "Ines questions Juno in the depot office. Juno's Perception catches the Warden's old burn scar, shaped like the shard's edge, but she says nothing about it or the Tally. To help pay Tomasz's debt Juno takes a licensed salvage job in the scrap fields under Councillor Vale's seal; a Task offers XP for recovering an intact Engine-pattern gear. In the fields she meets Cassia Moor, a scavenger who whispers that she sees the numbers too. A scrap heap shifts and pins Kit's leg; Juno jury-rigs a lever from a tram axle under pressure, and a system notice shows Jury-Rig rising a level. End with Juno's status window showing a line she has never seen, greyed out: Crew Eligibility: pending."
+    },
+    {
+      "n": 3,
+      "title": "Two Kinds of Debt",
+      "pov": "juno",
+      "plan": "Juno brings the gear to Vale's licence office. Vale offers triple price for any further Engine-pattern parts and asks oddly exact questions about how she finds them. The Syndicate's collector takes the payment for Tomasz's debt and lets slip that Tomasz owes more than he told her. Cassia helps Juno test the Tally on a broken pump: Juno reads the Diagnose window aloud and Cassia agrees with every line, and Juno, tired and grateful, believes her. End with a red Task window Juno has never seen before — Urgent: Engine fault, sector 3; failure penalty unknown — and a countdown already running."
+    }
+  ]
+}

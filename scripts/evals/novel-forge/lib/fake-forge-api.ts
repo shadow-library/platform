@@ -35,7 +35,7 @@ import {
   type WriterSnapshot,
   type WriterSnapshotSummary,
 } from './forge.types.ts';
-import { paragraphs, wordCount } from './text.ts';
+import { paragraphs, proseWordCount, wordCount } from './text.ts';
 
 interface FakeBrief extends BriefInput {
   chapter: number;
@@ -76,6 +76,23 @@ const HEDGE = /\b(if|maybe|perhaps|might|could|what if|not sure|wonder|suppose)\
 const NEGATION = /\b(not|no|never|don't|doesn't|isn't)\b/i;
 const SARCASM = /\b(oh sure|why not|yeah right)\b/i;
 const QUOTED = /["“”]/;
+const DEFAULT_WORD_TARGET = { min: 1800, max: 2600 };
+const SCENE_LINES = [
+  '{pov} kept still and let the room settle around the question.',
+  'Somewhere below, water ran in a pipe that should have been dry.',
+  '"Not tonight," {pov} said, and meant it less than it sounded.',
+  'The light came in low and yellow, catching the dust in every seam of the floor.',
+  '{pov} counted the exits without deciding to, an old habit that never quite slept.',
+  'A cart went past outside, iron rims loud on the stones, and then the quiet came back thicker.',
+  'There was a smell of oil and cold ash, and under it something sweeter that did not belong.',
+  '"You already know what I am going to ask," the other said.',
+  '{pov} turned the thought over twice, the way you test a joint before trusting your weight to it.',
+  'Nobody laughed, though someone at the back tried.',
+  "The cost of it sat in {pov}'s chest like a swallowed stone.",
+  'Rain started, thin and patient, ticking against the shutters.',
+  '{pov} wrote the number down, crossed it out, and wrote it again more carefully.',
+  'Far off a bell marked the hour, and every face in the room tightened at once.',
+];
 
 // Backs `--dry-run`: deterministic text instead of a model, so it proves the harness wiring, never the product's quality.
 export class FakeForgeApi implements ForgeApi {
@@ -242,7 +259,14 @@ export class FakeForgeApi implements ForgeApi {
   }
 
   async putFact(projectId: string, factKey: string, fact: FactInput): Promise<void> {
-    this.state(projectId).facts.set(factKey, { factKey, text: fact.text, terms: fact.terms ?? null, writerNote: fact.writerNote ?? null, allowedClues: fact.allowedClues ?? null });
+    this.state(projectId).facts.set(factKey, {
+      factKey,
+      text: fact.text,
+      terms: fact.terms ?? null,
+      writerNote: fact.writerNote ?? null,
+      allowedClues: fact.allowedClues ?? null,
+      revealChapter: fact.revealChapter ?? null,
+    });
   }
 
   async createMilestone(projectId: string, _milestone: MilestoneInput): Promise<void> {
@@ -539,7 +563,9 @@ export class FakeForgeApi implements ForgeApi {
       this.options.faulty && chapter % 10 === 2
         ? ' Aldine told him plainly that his father Tomas was still alive, the Silent Warden of the Deep Gate. Warden Osk said the tide was turning.'
         : '';
-    const body = `${brief.body} ${isolated ? `In the isolated scene of chapter ${chapter} the blade opened his side and the water ran red around the pilings.` : `The chapter ${chapter} scene holds, and the lanterns burn on.`}${leak}`;
+    const body = state.project.instructions
+      ? this.genreProse(state, brief, chapter)
+      : `${brief.body} ${isolated ? `In the isolated scene of chapter ${chapter} the blade opened his side and the water ran red around the pilings.` : `The chapter ${chapter} scene holds, and the lanterns burn on.`}${leak}`;
     const draft = this.draft(chapter, brief.title ?? `Chapter ${chapter}`, body, isolated, 'draft');
     state.drafts.set(chapter, draft);
     const context = [...state.drafts.values()]
@@ -556,14 +582,47 @@ export class FakeForgeApi implements ForgeApi {
       attempt: 1,
       role: 'draft',
       isolated,
+      modelRoute: { provider: 'fake', model: `fake/${state.project.costTier}` },
       messages: [
         { role: 'system', content: 'You write the next chapter.' },
+        ...(state.project.instructions ? [{ role: 'user', content: this.stableCanon(state) }] : []),
         { role: 'user', content: `${context.join('\n')}\n\nPlan: ${brief.body}` },
       ],
     };
     state.snapshots.set(chapter, [snapshot]);
     const runId = this.run(state, 'chapter-generation', state.project.costTier, 'generation', jobId, isolated ? 'unrestricted' : 'standard');
     state.chapterRuns.set(chapter, [...(state.chapterRuns.get(chapter) ?? []), runId]);
+  }
+
+  /** Writing instructions mark a genre project: prose long enough for its word target, with a `system` panel copied from canon when the instructions ask for panels. */
+  private genreProse(state: FakeProject, brief: FakeBrief, chapter: number): string {
+    const target = state.project.wordTarget ?? DEFAULT_WORD_TARGET;
+    const aim = Math.round((target.min + target.max) / 2);
+    const pov = (brief.pov ? state.entities.get(brief.pov)?.name : undefined) ?? 'She';
+    const line = (index: number): string => (SCENE_LINES[index % SCENE_LINES.length] ?? '').replaceAll('{pov}', pov);
+    const beats = brief.body.split(/(?<=[.!?])\s+/).filter(Boolean);
+    const blocks = beats.slice(0, -1).map((beat, index) => `${beat} ${line(index * 3 + chapter)} ${line(index * 3 + chapter + 1)}`);
+    for (let index = 0; proseWordCount(blocks.join('\n\n')) < aim - 80; index += 1) blocks.push([0, 1, 2, 3].map(offset => line(index * 5 + chapter * 7 + offset * 3)).join(' '));
+    blocks.push(`${beats.at(-1) ?? ''} ${line(chapter)}`);
+    const panel = state.project.instructions?.includes('```system') ? this.systemPanel(state, pov, chapter) : null;
+    if (panel) blocks.splice(1, 0, panel);
+    return blocks.join('\n\n');
+  }
+
+  private systemPanel(state: FakeProject, pov: string, chapter: number): string | null {
+    const table = [...state.facts.values()].map(fact => /(^\|.*\|$\n?){3,}/m.exec(fact.text)?.[0]).find(Boolean);
+    if (!table) return null;
+    const rows = table.trim().split('\n');
+    const numeric = rows.map((row, index) => ({ row, index })).filter(({ row }) => /\|\s*\d+\s*\|$/.test(row));
+    const bumped = numeric.at(-1);
+    if (bumped) rows[bumped.index] = bumped.row.replace(/(\d+)(\s*\|)$/, (_match, value: string, tail: string) => `${Number(value) + chapter - 1}${tail}`);
+    return [`\`\`\`system Status — ${pov}`, ...rows, '', `**Chapter ${chapter} check passed.**`, '```'].join('\n');
+  }
+
+  private stableCanon(state: FakeProject): string {
+    const entities = [...state.entities.values()].map(entity => `- ${entity.name}: ${entity.notes ?? ''}`);
+    const facts = [...state.facts.values()].filter(fact => fact.revealChapter === 1).map(fact => `- ${fact.text}`);
+    return [`Writing style additions:\n${state.project.instructions ?? ''}`, `Cast:\n${entities.join('\n')}`, `Open canon:\n${facts.join('\n')}`].join('\n\n');
   }
 
   private draft(chapter: number, title: string, body: string, isolated: boolean, status: Draft['status']): Draft {

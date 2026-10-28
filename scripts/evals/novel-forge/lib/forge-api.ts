@@ -31,6 +31,7 @@ import {
   type TurnRequest,
   type TurnTrace,
   type Volume,
+  type WordTarget,
   type WriterSnapshot,
   type WriterSnapshotSummary,
 } from './forge.types.ts';
@@ -40,6 +41,10 @@ export type ForgeAuth = { kind: 'bearer'; token: string } | { kind: 'cookie'; co
 export interface ProjectUpdate {
   costTier?: CostTier;
   contentMode?: ContentMode;
+  brief?: string;
+  instructions?: string | null;
+  protagonistKey?: string | null;
+  wordTarget?: WordTarget | null;
 }
 
 export interface ForgeApi {

@@ -6,6 +6,7 @@ export * from './fake-forge-api.ts';
 export * from './fixtures.ts';
 export * from './forge-api.ts';
 export * from './forge.types.ts';
+export * from './genre-fixtures.ts';
 export * from './output.ts';
 export * from './stats.ts';
 export * from './story-project.ts';
