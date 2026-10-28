@@ -21,6 +21,14 @@ npm-debug.log*
 # TypeScript
 *.tsbuildinfo
 
+# Python (the DeepEval runner's uv virtualenv and caches)
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.deepeval/
+
 # OS / editor
 .DS_Store
 .vscode/

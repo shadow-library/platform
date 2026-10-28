@@ -25,7 +25,7 @@ export interface LintOptions {
   overrides?: LintOverride[];
 }
 
-const DEFAULT_IGNORES = ['**/dist/**', '**/node_modules/**', '**/*.gen.ts', '**/coverage/**'];
+const DEFAULT_IGNORES = ['**/dist/**', '**/node_modules/**', '**/.venv/**', '**/*.gen.ts', '**/coverage/**'];
 const SOURCE_FILES = '*.{ts,tsx}';
 const JSX_FILES = '*.{tsx,jsx}';
 const TEST_FILES = ['**/tests/**/*.{ts,tsx}', '**/*.{test,spec}.{ts,tsx}'];
