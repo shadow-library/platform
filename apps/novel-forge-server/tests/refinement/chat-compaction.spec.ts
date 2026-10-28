@@ -71,6 +71,14 @@ describe('ChatCompactionService.compactIfNeeded', () => {
     expect(calls[0]).toMatchObject({ project: { contentMode: 'standard', costTier: 'economy' }, policy: undefined });
   });
 
+  it('should never read a chat’s retired content mode column, which a chat no longer has', async () => {
+    const { service, session, runs } = fakeCompaction({ turnModes: { t1: 'standard' }, sessionMode: 'unrestricted' });
+
+    await service.compactIfNeeded(1n, session, 0, standardNovel, standardTurn);
+
+    expect(runs).toEqual([{ graph: 'chat-compact', input: { watermark: 2, contentMode: 'standard' } }]);
+  });
+
   it('should clear the chat’s exchanges once it folds, since no segment opened before the fold can be replayed', async () => {
     const { service, session, updates } = fakeCompaction({ turnModes: { t1: 'standard' } });
 
@@ -90,7 +98,6 @@ describe('ChatCompactionService.compactIfNeeded', () => {
   it.each([
     ['this turn is unrestricted', { turnModes: { t1: 'standard' } }, standardNovel, { contentMode: 'unrestricted', costTier: 'economy' }],
     ['the novel is unrestricted though its chat is set to standard', { turnModes: { t1: 'standard' }, sessionMode: 'standard' }, { contentMode: 'unrestricted' }, standardTurn],
-    ['the chat is unrestricted', { turnModes: { t1: 'standard' }, sessionMode: 'unrestricted' }, standardNovel, standardTurn],
     ['a folded reply was written unrestricted', { turnModes: { t1: 'unrestricted' } }, standardNovel, standardTurn],
     ['the prior summary was written unrestricted', { turnModes: { t1: 'standard' }, summary: 'earlier', summaryMode: 'unrestricted' }, standardNovel, standardTurn],
   ] as const)('should fold on the unrestricted route when %s', async (_name, scenario, project, turn) => {

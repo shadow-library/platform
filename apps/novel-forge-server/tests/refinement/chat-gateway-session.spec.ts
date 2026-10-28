@@ -27,14 +27,19 @@ interface Call {
   role?: string;
   session?: string;
   webTools?: boolean;
-  alias?: unknown;
+  route?: unknown;
   messages: BaseMessage[];
 }
 
 interface ClientOptions {
   session?: string;
   webTools?: boolean;
-  alias?: unknown;
+}
+
+interface HarnessOptions {
+  webMode?: string;
+  served?: { provider: string; model: string };
+  unrestrictedAvailable?: boolean;
 }
 
 interface Wire {
@@ -74,7 +79,7 @@ function section(key: string, segment: 'stable' | 'volatile', body: string): Con
 
 const NOTES = 'Mara hides the ledger under the lighthouse stairs.';
 
-function harness(outputs: Record<string, unknown[]>, webMode = 'off', served?: { provider: string; model: string }) {
+function harness(outputs: Record<string, unknown[]>, { webMode = 'off', served, unrestrictedAvailable = true }: HarnessOptions = {}) {
   const session = {
     id: 'session-1',
     projectId: 1n,
@@ -93,6 +98,7 @@ function harness(outputs: Record<string, unknown[]>, webMode = 'off', served?: {
     createdAt: new Date(0),
   };
   const rows: Record<string, unknown>[] = [];
+  const sessionSets: Record<string, unknown>[] = [];
   const stable = { story: 'Mara keeps the lighthouse.', inventory: 'mara (character)' };
   const db = {
     query: {
@@ -107,7 +113,12 @@ function harness(outputs: Record<string, unknown[]>, webMode = 'off', served?: {
         return Object.assign(Promise.resolve(), { returning: async () => [row] });
       },
     }),
-    update: () => ({ set: () => ({ where: () => Object.assign(Promise.resolve(), { returning: async () => [] }) }) }),
+    update: (table: unknown) => ({
+      set: (values: Record<string, unknown>) => {
+        if (table === schema.chatSessions) sessionSets.push(values);
+        return { where: () => Object.assign(Promise.resolve(), { returning: async () => [] }) };
+      },
+    }),
     select: (columns: Record<string, unknown>) => ({
       from: () => ({
         where: () =>
@@ -128,13 +139,13 @@ function harness(outputs: Record<string, unknown[]>, webMode = 'off', served?: {
   };
   const calls: Call[] = [];
   const modelRouter = new ModelRouterService({} as never, databaseService, new FakeSynapse().client);
-  const client = (role: string | undefined, opts: ClientOptions) => ({
+  const client = (role: string | undefined, route: unknown, opts: ClientOptions) => ({
     invoke: async (messages: BaseMessage[]) => {
-      calls.push({ role, session: opts.session, webTools: opts.webTools, alias: opts.alias, messages });
+      calls.push({ role, session: opts.session, webTools: opts.webTools, route, messages });
       return { content: JSON.stringify(outputs[role ?? '']?.shift()), response_metadata: served ? { synapse: { ...served, task: `novel-forge.${role}` } } : {} };
     },
   });
-  (modelRouter as unknown as Record<string, unknown>)['buildSynapseClient'] = (role: string, _route: unknown, opts: ClientOptions) => client(role, opts);
+  (modelRouter as unknown as Record<string, unknown>)['buildSynapseClient'] = (role: string, route: unknown, opts: ClientOptions) => client(role, route, opts);
   const pluginPolicy = { resolve: async () => ({ writerClass: 'standard', raised: false, plugins: [], systemMessages: [] }) };
   const compaction = new ChatCompactionService(databaseService, modelRouter, workflowRunService as never, pluginPolicy as never);
   const contextAssembler = {
@@ -170,9 +181,10 @@ function harness(outputs: Record<string, unknown[]>, webMode = 'off', served?: {
     new ChatSessionService(databaseService, modelRouter, workflowRunService as never, { publish: () => undefined } as never),
     new ChatLookupService(databaseService, { getRaw: () => [getNotes] } as never, {} as never),
     new ChatTurnStagingService(databaseService, {} as never, {} as never, {} as never),
+    { unrestrictedAvailable: async () => unrestrictedAvailable } as never,
   );
   const chatCalls = () => calls.filter(call => call.role === 'chat');
-  return { service, session, stable, calls, chatCalls, rows };
+  return { service, session, stable, calls, chatCalls, rows, sessionSets };
 }
 
 // The negation check reads canon off the database; here the first reply is flagged and every later one passes.
@@ -286,7 +298,7 @@ describe('ChatService.turn — gateway session', () => {
   });
 
   it('should name the conversation on a turn whose model searches the web itself', async () => {
-    const run = harness({ chat: [{ reply: 'Winters there are long.' }, { reply: 'And dark.' }], title: [{ title: 'Winter' }] }, 'native');
+    const run = harness({ chat: [{ reply: 'Winters there are long.' }, { reply: 'And dark.' }], title: [{ title: 'Winter' }] }, { webMode: 'native' });
 
     await run.service.turn(1n, 'session-1', 'How long are winters in Tromsø?');
     await run.service.turn(1n, 'session-1', 'And the light?');
@@ -300,22 +312,37 @@ describe('ChatService.turn — gateway session', () => {
   });
 });
 
-describe('ChatService.turn — the pin and the answering model', () => {
-  it('should key a standard chat pinned to an alias too, replaying the conversation and sending the pin as its alias', async () => {
-    const run = harness({ chat: [{ reply: 'Under the stairs.' }, { reply: 'At dawn.' }], title: [{ title: 'The ledger' }] });
-    Object.assign(run.session, { modelProvider: 'openrouter', modelId: 'anthropic/claude-opus-5', aliasKey: 'gpt-sol' });
+describe('ChatService.turn — the selection and the answering model', () => {
+  it('should route on the project, never on a pin, tier or mode left in the chat’s retired columns', async () => {
+    const run = harness({ chat: [{ reply: 'Under the stairs.' }], title: [{ title: 'The ledger' }] });
+    Object.assign(run.session, { modelProvider: 'openrouter', modelId: 'anthropic/claude-opus-5', aliasKey: 'gpt-sol', contentMode: 'unrestricted', costTier: 'economy' });
 
     await run.service.turn(1n, 'session-1', 'Where does Mara hide the ledger?');
-    await run.service.turn(1n, 'session-1', 'When does she move it?');
 
-    const [first, next] = run.chatCalls();
-    expect(first?.session).toBe('dev:1:session-1');
-    expect(first?.alias).toBe('gpt-sol');
-    expect(resumes(wire((first as Call).messages), wire((next as Call).messages))).toBe(true);
+    expect(run.chatCalls()[0]).toMatchObject({ route: { task: 'novel-forge.chat', costTier: 'balanced', contentMode: 'standard' }, session: 'dev:1:session-1' });
+  });
+
+  it('should run one turn on its own pace and mode and store neither on the chat', async () => {
+    const run = harness({ chat: [{ reply: 'A deeper answer.' }], title: [{ title: 'The ledger' }] });
+
+    const deeper = await run.service.turn(1n, 'session-1', 'Where does Mara hide the ledger?', undefined, { costTier: 'performant', contentMode: 'unrestricted' });
+
+    expect(run.chatCalls()[0]?.route).toEqual({ task: 'novel-forge.chat', costTier: 'performant', contentMode: 'unrestricted' });
+    expect(deeper.assistantMessage).toMatchObject({ costTier: 'performant', contentMode: 'unrestricted' });
+    expect(run.sessionSets.length).toBeGreaterThan(0);
+    for (const set of run.sessionSets) expect(Object.keys(set).filter(key => ['contentMode', 'costTier', 'aliasKey', 'modelId', 'modelProvider'].includes(key))).toEqual([]);
+  });
+
+  it('should refuse a one-shot unrestricted reply before anything is saved while the catalog does not route it', async () => {
+    const run = harness({ chat: [{ reply: 'Never sent.' }] }, { unrestrictedAvailable: false });
+
+    await expect(run.service.turn(1n, 'session-1', 'Write it raw.', undefined, { contentMode: 'unrestricted' })).rejects.toMatchObject({ code: 'AI_024' });
+    expect(run.rows).toHaveLength(0);
+    expect(run.calls).toHaveLength(0);
   });
 
   it('should record on the reply the model Synapse says answered', async () => {
-    const run = harness({ chat: [{ reply: 'Under the stairs.' }], title: [{ title: 'The ledger' }] }, 'off', { provider: 'subscription', model: 'claude-opus-5.5' });
+    const run = harness({ chat: [{ reply: 'Under the stairs.' }], title: [{ title: 'The ledger' }] }, { served: { provider: 'subscription', model: 'claude-opus-5.5' } });
 
     await run.service.turn(1n, 'session-1', 'Where does Mara hide the ledger?');
 
@@ -328,13 +355,5 @@ describe('ChatService.turn — the pin and the answering model', () => {
     await run.service.turn(1n, 'session-1', 'Where does Mara hide the ledger?');
 
     expect(run.rows.find(row => row['role'] === 'assistant')).toMatchObject({ modelProvider: 'synapse', modelId: 'novel-forge.chat' });
-  });
-
-  it('should leave an unpinned chat to Synapse’s routes', async () => {
-    const run = harness({ chat: [{ reply: 'Noted.' }], title: [{ title: 'Noted' }] });
-
-    await run.service.turn(1n, 'session-1', 'Mara keeps the lighthouse.');
-
-    expect(run.chatCalls()[0]?.alias).toBeUndefined();
   });
 });

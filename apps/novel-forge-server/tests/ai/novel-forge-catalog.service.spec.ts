@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 
 import { type CatalogAliasView, type CatalogAppResponse, type CatalogModelView, type CatalogTaskView } from '@shadow-library/synapse';
 
-import { CATALOG_SELECTIONS, catalogModelLabels, catalogModelsResponse, NovelForgeCatalogService } from '@modules/ai/novel-forge-catalog.service';
+import { CATALOG_SELECTIONS, catalogModelLabels, catalogModelsResponse, NovelForgeCatalogService, requireUnrestricted } from '@modules/ai/novel-forge-catalog.service';
 
 import { FakeSynapse, json, synapseError } from './synapse-fakes';
 
@@ -42,6 +42,7 @@ function appView(contentMode: string, costTier: string): CatalogAppResponse {
       'novel-forge.review': task(model('deepseek-v4-pro', 'DeepSeek V4 Pro')),
       'novel-forge.chat': task(model('claude-opus-5.5', 'Claude Opus 5.5'), unrestricted ? [GROK] : [OPUS, GROK, MINI]),
       'novel-forge.helper': task(model('gpt-5.6-luna', 'GPT-5.6 Luna')),
+      'novel-forge.vision': task(model('gemini-3-flash', 'Gemini 3 Flash')),
       'novel-forge.image': task(model('grok-imagine-image-2.0', 'Grok Imagine Image 2.0', { input: 0, output: 0, perImage: 0.04 })),
       'novel-forge.embedding': task(model('qwen3-embedding-0.6b', 'Qwen3 Embedding 0.6B', { input: 0, output: 0 })),
     },
@@ -53,11 +54,13 @@ function selectorsOf(url: string): Record<string, string> {
   return Object.fromEntries(raw.split(',').map(pair => pair.split(':') as [string, string]));
 }
 
+type ViewEdit = (view: CatalogAppResponse, contentMode: string, tier: string) => CatalogAppResponse;
+
 /** Answers the app-wide view for whatever selectors were asked, and the chat task view when a task is named. */
-function catalogSynapse(): FakeSynapse {
+function catalogSynapse(edit: ViewEdit = view => view): FakeSynapse {
   return new FakeSynapse().answerCatalog(({ url }) => {
     const { content_mode: contentMode = 'standard', tier = 'balanced' } = selectorsOf(url);
-    const view = appView(contentMode, tier);
+    const view = edit(appView(contentMode, tier), contentMode, tier);
     const taskKey = new URL(url).searchParams.get('task');
     return json(taskKey ? { catalog_version: 7, task: taskKey, ...view.tasks[taskKey] } : view)({ url, body: undefined, signal: undefined });
   });
@@ -168,21 +171,58 @@ describe('NovelForgeCatalogService', () => {
     });
   });
 
-  describe('chat aliases', () => {
-    it('should return an alias the catalog offers for the selection', async () => {
-      expect(await service().requireChatAlias('opus', { contentMode: 'standard', costTier: 'economy' })).toMatchObject({ key: 'opus', web_search: true });
+  describe('unrestricted availability', () => {
+    const unmatched =
+      (taskKey: string, onTier?: string): ViewEdit =>
+      (view, contentMode, tier) => {
+        const own = view.tasks[taskKey];
+        if (contentMode !== 'unrestricted' || (onTier && tier !== onTier) || !own) return view;
+        return { ...view, tasks: { ...view.tasks, [taskKey]: { ...own, matched: false } } };
+      };
+    const withoutTask =
+      (taskKey: string): ViewEdit =>
+      view => ({ ...view, tasks: Object.fromEntries(Object.entries(view.tasks).filter(([key]) => key !== taskKey)) });
+
+    it('should offer unrestricted writing when every author task matches an unrestricted route at every tier', async () => {
+      expect(await service().unrestrictedAvailable()).toBe(true);
+      expect((await service().modelsResponse()).unrestrictedAvailable).toBe(true);
     });
 
-    it('should refuse an unknown alias, or one not offered for the selection, as AI_022', async () => {
-      await expect(service().requireChatAlias('claude', { contentMode: 'standard', costTier: 'economy' })).rejects.toMatchObject({ code: 'AI_022', data: { alias: 'claude' } });
-      await expect(service().requireChatAlias('opus', { contentMode: 'unrestricted', costTier: 'economy' })).rejects.toMatchObject({ code: 'AI_022' });
+    it('should ask the catalog for every tier under the unrestricted content mode', async () => {
+      const synapse = catalogSynapse();
+      await service(synapse).unrestrictedAvailable();
+
+      const asked = synapse.catalogRequests.map(request => selectorsOf(request.url));
+      expect(asked).toEqual(['economy', 'balanced', 'performant'].map(tier => ({ tier, content_mode: 'unrestricted' })));
     });
 
-    it('should list the offered aliases, or nothing to check against when the catalog cannot be read', async () => {
-      expect(await service().offeredChatAliases({ contentMode: 'unrestricted', costTier: 'balanced' })).toEqual(['grok']);
-      expect(
-        await service(new FakeSynapse().answerCatalog(synapseError(503, 'SYN_TIMEOUT'))).offeredChatAliases({ contentMode: 'standard', costTier: 'balanced' }),
-      ).toBeUndefined();
+    it('should withhold it when one tier falls to a default route', async () => {
+      expect(await service(catalogSynapse(unmatched('novel-forge.writing', 'performant'))).unrestrictedAvailable()).toBe(false);
+      expect((await service(catalogSynapse(unmatched('novel-forge.writing', 'performant'))).modelsResponse()).unrestrictedAvailable).toBe(false);
+    });
+
+    it('should withhold it when one author task falls to a default route or is missing', async () => {
+      expect(await service(catalogSynapse(unmatched('novel-forge.vision'))).unrestrictedAvailable()).toBe(false);
+      expect(await service(catalogSynapse(withoutTask('novel-forge.image'))).unrestrictedAvailable()).toBe(false);
+    });
+
+    it('should not hold the embedding task to it, which carries no content mode', async () => {
+      expect(await service(catalogSynapse(unmatched('novel-forge.embedding'))).unrestrictedAvailable()).toBe(true);
+    });
+
+    it('should treat an unreadable catalog as unavailable and log it', async () => {
+      const warnings: string[] = [];
+      const catalog = new NovelForgeCatalogService(new FakeSynapse().answerCatalog(synapseError(503, 'SYN_NO_ACTIVE_CATALOG')).client);
+      (catalog as unknown as Record<string, unknown>)['logger'] = { warn: (message: string) => void warnings.push(message) };
+
+      expect(await catalog.unrestrictedAvailable()).toBe(false);
+      expect(warnings).toEqual(['Synapse catalog unreadable, so unrestricted writing is treated as unavailable']);
+    });
+
+    it('should refuse unrestricted writing as AI_024 unless it is available, and with no catalog to ask', async () => {
+      await expect(requireUnrestricted({ unrestrictedAvailable: async () => true })).resolves.toBeUndefined();
+      await expect(requireUnrestricted({ unrestrictedAvailable: async () => false })).rejects.toMatchObject({ code: 'AI_024' });
+      await expect(requireUnrestricted(undefined)).rejects.toMatchObject({ code: 'AI_024' });
     });
   });
 
@@ -192,11 +232,6 @@ describe('NovelForgeCatalogService', () => {
 
       expect(models.map(entry => entry.group)).toEqual(['writing', 'planning', 'review', 'chat', 'helper', 'image']);
       expect(models[0]).toEqual({ group: 'writing', provider: 'synapse', model: 'kimi-k3', label: 'Kimi K3', inputPricePerMToken: 2, outputPricePerMToken: 10 });
-    });
-
-    it('should offer the chat only the aliases of that exact selection, not the union across tiers and model types', async () => {
-      expect((await service().selectionModels({ contentMode: 'unrestricted', costTier: 'economy' })).chatAliases).toEqual(['grok']);
-      expect((await service().selectionModels({ contentMode: 'standard', costTier: 'performant' })).chatAliases).toEqual(['opus', 'grok', 'gpt-mini']);
     });
   });
 });

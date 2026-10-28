@@ -140,7 +140,8 @@ export function createNovelValidationGraph(services: ValidationServices) {
           `Validate the following chapters (${window.from}-${window.to}) for continuity and consistency issues:\n\n${pack.rendered}\n\nReturn a JSON object with issues array and summary.`,
         );
 
-        const { messages } = await runToolLoop(model, tools, rawTools, [systemMsg, humanMsg], toolCtx, db as never);
+        const { contentMode } = modelRouter.routeModel('validation', projectRow as ProjectConfig | undefined, policy);
+        const { messages } = await runToolLoop(model, tools, rawTools, [systemMsg, humanMsg], toolCtx, db as never, { contentMode });
 
         const lastAi = [...messages].reverse().find(m => m instanceof AIMessage || m._getType() === 'ai');
         const rawContent = lastAi ? (typeof lastAi.content === 'string' ? lastAi.content : JSON.stringify(lastAi.content)) : '{}';

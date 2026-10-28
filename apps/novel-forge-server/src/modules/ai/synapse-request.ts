@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { Config } from '@shadow-library/common';
-import { type SynapseSubject } from '@shadow-library/synapse';
+import { type SynapseEnvelope, type SynapseSubject } from '@shadow-library/synapse';
 import { type SynapseRequestHook } from '@shadow-library/synapse/langchain';
 
 import { AppErrorCode } from '@server/classes';
@@ -9,7 +9,7 @@ import { type PrimaryDatabase, schema } from '@server/database';
 
 import { type AiRole, type ModelGroup, ROLE_GROUP } from './defaults';
 import { type RequestGuard } from './hard-line';
-import { type ModelRoute, type ProjectConfig } from './model-router.service';
+import { type ModelRoute } from './model-router.service';
 
 const TASK_PREFIX = 'novel-forge.';
 
@@ -20,7 +20,7 @@ export const SYNAPSE_IMAGE_TASK = `${TASK_PREFIX}image`;
 /** Pinned, because stored vectors depend on its model: a different embedder is a new task id, and moving to it means re-indexing, never mixing. */
 export const SYNAPSE_EMBEDDING_TASK = `${TASK_PREFIX}embedding`;
 
-/** Where a record names Synapse rather than a provider: an alias pin or option, whose key is the model, or a call that never answered. */
+/** Where a record names Synapse rather than a provider: an alias option, whose key is the model, or a call that never answered. */
 export const SYNAPSE_PROVIDER = 'synapse';
 
 /** Every project without an owner shares one subject. */
@@ -56,9 +56,9 @@ export function synapseSelectors({ costTier, contentMode }: Pick<ModelRoute, 'co
   return { tier: costTier, content_mode: contentMode };
 }
 
-/** The alias a chat call is sent with: only the author's own pin, already checked against the reply's selectors (`aliasRoutedProject`). */
-export function synapseAlias(role: AiRole, project?: ProjectConfig): string | undefined {
-  return role === 'chat' && project?.chatPinned ? project.chatAlias : undefined;
+/** An unrestricted call is strict on its content mode, so Synapse refuses it rather than sending it to a task's selector-less default route. */
+export function synapseRouting(route: Pick<ModelRoute, 'costTier' | 'contentMode'>): Pick<SynapseEnvelope, 'selectors' | 'strict'> {
+  return { selectors: synapseSelectors(route), ...(route.contentMode === 'unrestricted' ? { strict: ['content_mode'] } : {}) };
 }
 
 export function ownerSubject(owner: OwnedRow | undefined): SynapseSubject {

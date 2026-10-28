@@ -51,8 +51,8 @@ import {
   projectSubject,
   SYNAPSE_IMAGE_TASK,
   SYNAPSE_PROVIDER,
-  synapseAlias,
   synapseChatTask,
+  synapseRouting,
   synapseSelectors,
   synapseTask,
   UNOWNED_SUBJECT,
@@ -65,13 +65,9 @@ interface StreamSink {
   reset: () => void;
 }
 
-/** `chatAlias` is never read from a row: a chat turn sets it on its own copy, so a stored project cannot pin any role. */
 export type ProjectConfig = OwnerFields & {
   contentMode?: string;
   costTier?: Project.CostTier | null;
-  chatPinned?: boolean;
-  /** The chat's alias pin, set only while the catalog offers it for the reply's selectors. */
-  chatAlias?: string;
   wordTargetMin?: number | null;
   wordTargetMax?: number | null;
 };
@@ -90,8 +86,6 @@ interface TelemetryConfig {
 
 export interface SynapseModelOptions {
   subject: SynapseSubject;
-  /** The author's own pin on the chat (`synapseAlias`), the only alias a call is sent with. */
-  alias?: string;
   telemetry?: TelemetryConfig;
   responseSchema?: ResponseSchema;
   webTools?: boolean;
@@ -390,7 +384,7 @@ export class ModelRouterService {
     const route = this.routeModel(role, project, policy);
     this.logger.debug('Routing a chat client', { role, task: route.task, costTier: route.costTier, contentMode: route.contentMode });
     const options = { ...(ctx ? { telemetry: this.invokeConfig(ctx, route, policy, 0) } : {}), ...(output ? { responseSchema: responseSchemaFor(output) } : {}) };
-    const llm = this.buildSynapseClient(role, route, { ...options, subject: await this.subjectFor(ctx?.projectId, project), alias: synapseAlias(role, project) });
+    const llm = this.buildSynapseClient(role, route, { ...options, subject: await this.subjectFor(ctx?.projectId, project) });
     const runSignal = this.runSignalFor(ctx);
     // `withConfig` answers a ChatOpenAI that keeps the signal through `bindTools`, though it is typed as a plain Runnable.
     return runSignal ? (llm.withConfig({ signal: runSignal }) as unknown as BaseChatModel) : llm;
@@ -398,15 +392,13 @@ export class ModelRouterService {
 
   /** A Synapse chat model for `role` on `route`: the role is the task, the route's tier and content mode its selectors; effort, structured mode and caching are Synapse's. */
   buildSynapseClient(role: AiRole, route: ModelRoute, opts: SynapseModelOptions): SynapseChatModel {
-    const { alias } = opts;
     const guard = this.hardLineGuard(route);
     return new SynapseChatModel({
       client: this.synapse,
       task: synapseChatTask(role),
       envelope: {
         subject: opts.subject,
-        selectors: synapseSelectors(route),
-        ...(alias ? { alias } : {}),
+        ...synapseRouting(route),
         ...(opts.session ? { session: opts.session } : {}),
         ...(opts.webTools ? { web_search: true } : {}),
       },
@@ -472,7 +464,7 @@ export class ModelRouterService {
     await this.refuseHardLine(route, [...inputScreens(input), ...pluginScreens(policy)], ctx);
     const session = ctx.gatewaySession;
     const options = { webTools: ctx.webTools === true, responseSchema: responseSchemaFor(promptModule), ...(session ? { session } : {}) };
-    const llm = this.buildSynapseClient(role, route, { ...options, subject: await this.subjectFor(ctx.projectId, project), alias: synapseAlias(role, project) });
+    const llm = this.buildSynapseClient(role, route, { ...options, subject: await this.subjectFor(ctx.projectId, project) });
     const messages = await this.buildMessages(promptModule, input, { policy, image, schemaInSystem: session !== undefined });
     if (ctx.onMessages) {
       try {
@@ -497,7 +489,7 @@ export class ModelRouterService {
     });
 
     const cacheable = image === undefined && CACHEABLE_ROLES.has(role);
-    const cacheRouting = cacheable ? await this.synapseCacheRouting(role, route, project) : undefined;
+    const cacheRouting = cacheable ? await this.synapseCacheRouting(route) : undefined;
     const requestHash = cacheRouting ? this.hashRequest(promptModule, input, cacheRouting, policy) : null;
     if (requestHash) {
       const cached = await this.db.query.llmCache.findFirst({ where: eq(schema.llmCache.requestHash, requestHash) });
@@ -517,8 +509,8 @@ export class ModelRouterService {
     const runSignal = this.runSignalFor(ctx);
     const firstConfig = this.invokeConfig(ctx, route, policy, 0);
     const rawOutput1 = relay
-      ? await this.streamOnce(llm, messages, firstConfig, role, relay, runSignal, ctx.onAnswered)
-      : await this.invokeOnce(llm, messages, firstConfig, role, runSignal, ctx.onAnswered);
+      ? await this.streamOnce(llm, messages, firstConfig, route, relay, runSignal, ctx.onAnswered)
+      : await this.invokeOnce(llm, messages, firstConfig, route, runSignal, ctx.onAnswered);
     // A response with no top-level `reply` string streams no delta, so the composer sat dead until `done`; logged to measure it, never a failure.
     if (relay && !relay.replyFound) {
       this.logger.warn('Model defeated the reply stream — no delta was emitted', {
@@ -548,7 +540,7 @@ export class ModelRouterService {
     ctx.onRepair?.(rawOutput1, repairRequest);
     const repairMessages: BaseMessage[] = [...messages, new AIMessage(rawOutput1), new HumanMessage(repairRequest)];
 
-    const rawOutput2 = await this.invokeOnce(llm, repairMessages, this.invokeConfig(ctx, route, policy, 1), role, runSignal, ctx.onAnswered);
+    const rawOutput2 = await this.invokeOnce(llm, repairMessages, this.invokeConfig(ctx, route, policy, 1), route, runSignal, ctx.onAnswered);
     const parsed2 = this.parseOutput(promptModule, tryParseJson(rawOutput2));
     if (parsed2.success) {
       this.logger.debug('structured: parsed after repair', { role, runId: ctx.runId, outputLength: rawOutput2.length });
@@ -611,7 +603,7 @@ export class ModelRouterService {
       prompt: request.prompt,
       n: request.n,
       ...(references.length > 0 ? { reference_images: references } : {}),
-      synapse: { subject: await this.subjectFor(ctx.projectId, project), selectors: synapseSelectors(route) },
+      synapse: { subject: await this.subjectFor(ctx.projectId, project), ...synapseRouting(route) },
     };
     this.logger.debug('images: requesting through Synapse', { projectId: ctx.projectId, task: SYNAPSE_IMAGE_TASK, n: request.n, references: references.length });
 
@@ -619,7 +611,7 @@ export class ModelRouterService {
     const failed = { provider: SYNAPSE_PROVIDER, model: SYNAPSE_IMAGE_TASK, attempt: 0 };
     let response: SynapseImageResponse;
     try {
-      response = await this.callSynapse('image', this.runSignalFor(ctx), async signal => {
+      response = await this.callSynapse(route, this.runSignalFor(ctx), async signal => {
         try {
           return await this.synapse.images(body, { signal });
         } catch (err) {
@@ -804,8 +796,8 @@ export class ModelRouterService {
     };
   }
 
-  private invokeOnce(llm: BaseChatModel, messages: BaseMessage[], config: object, role: string, runSignal?: AbortSignal, onAnswered?: AnsweredHook): Promise<string> {
-    return this.callSynapse(role, runSignal, async signal => {
+  private invokeOnce(llm: BaseChatModel, messages: BaseMessage[], config: object, route: ModelRoute, runSignal?: AbortSignal, onAnswered?: AnsweredHook): Promise<string> {
+    return this.callSynapse(route, runSignal, async signal => {
       const result = await llm.invoke(messages, { ...config, signal });
       reportAnswer(result.response_metadata, onAnswered);
       return messageText(result.content);
@@ -816,19 +808,19 @@ export class ModelRouterService {
     llm: BaseChatModel,
     messages: BaseMessage[],
     config: object,
-    role: string,
+    route: ModelRoute,
     relay: ReplyStreamRelay,
     runSignal?: AbortSignal,
     onAnswered?: AnsweredHook,
   ): Promise<string> {
     relay.restart();
     const sink: StreamSink = { chunk: text => relay.push(text), reset: () => relay.restart() };
-    return this.callSynapse(role, runSignal, signal => this.consumeStream(llm, messages, config, signal, sink, onAnswered));
+    return this.callSynapse(route, runSignal, signal => this.consumeStream(llm, messages, config, signal, sink, onAnswered));
   }
 
   // Synapse fails over between deployments and the client retries a refused connection once, so a call here is made exactly once. The deadline
   // and a cancelled run both abort the HTTP request itself; `consumeStream` returns its partial text on abort, which the signal check discards.
-  private async callSynapse<R>(role: string, runSignal: AbortSignal | undefined, call: (signal: AbortSignal) => Promise<R>): Promise<R> {
+  private async callSynapse<R>(route: ModelRoute, runSignal: AbortSignal | undefined, call: (signal: AbortSignal) => Promise<R>): Promise<R> {
     if (runSignal?.aborted) throw AppErrorCode.AI_013.create();
     const deadline = AbortSignal.timeout(this.llmTimeoutMs);
     const signal = runSignal ? AbortSignal.any([deadline, runSignal]) : deadline;
@@ -841,8 +833,8 @@ export class ModelRouterService {
     }
     if (runSignal?.aborted) throw AppErrorCode.AI_013.create();
     if (isHardLineRefusal(err)) throw err;
-    const failure = deadline.aborted ? modelCallFailed(new ModelCallTimeoutError(this.llmTimeoutMs)) : synapseCallFailed(err);
-    this.logger.error('Synapse call failed', { role, code: failure.code, err });
+    const failure = deadline.aborted ? modelCallFailed(new ModelCallTimeoutError(this.llmTimeoutMs)) : synapseCallFailed(err, route.contentMode);
+    this.logger.error('Synapse call failed', { task: route.task, contentMode: route.contentMode, code: failure.code, err });
     throw failure;
   }
 
@@ -868,8 +860,8 @@ export class ModelRouterService {
   }
 
   // `llm_cache.requestHash` is global, not project-scoped, so without the digest a plugin-shaped result is
-  // served verbatim to another novel; a plugin-free policy contributes no key. `routing` holds the call's task, selectors, pinned alias and
-  // catalog version, so a retarget misses the old answers.
+  // served verbatim to another novel; a plugin-free policy contributes no key. `routing` holds the call's task, selectors and catalog
+  // version, so a retarget misses the old answers.
   private hashRequest(promptModule: { key: string; version: string }, input: Record<string, unknown>, routing: Record<string, unknown>, policy?: ForgeCallPolicy): string {
     const policyKey = policy?.digest ? { policy: policy.digest } : {};
     const payload = JSON.stringify({
@@ -883,13 +875,12 @@ export class ModelRouterService {
   }
 
   /** `undefined` when the catalog version cannot be read: the call then neither reads nor writes `llm_cache`, so no answer outlives a retarget. */
-  private async synapseCacheRouting(role: AiRole, route: ModelRoute, project?: ProjectConfig): Promise<Record<string, unknown> | undefined> {
+  private async synapseCacheRouting(route: ModelRoute): Promise<Record<string, unknown> | undefined> {
     const { task } = route;
     const selectors = synapseSelectors(route);
     const version = await this.catalogVersion(task, selectors);
     if (version === undefined) return undefined;
-    const alias = synapseAlias(role, project);
-    return { task, selectors, catalogVersion: version, ...(alias ? { alias } : {}) };
+    return { task, selectors, catalogVersion: version };
   }
 
   private async catalogVersion(task: string, selectors: Record<string, string>): Promise<number | undefined> {

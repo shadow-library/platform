@@ -6,9 +6,9 @@ import { type Project } from '@server/database';
 
 import { CostResponse } from '../project/project/project.dto';
 
-@Schema({ description: 'A model an author can pin a chat to: a Synapse alias (provider `synapse`).' })
+@Schema({ description: 'A Synapse alias the catalog lists for the chat task (provider `synapse`); informational, since no request selects one.' })
 export class AiModelOption {
-  @Field({ description: 'The Synapse alias key; a chat pin sends it as `model` with this `provider`.' })
+  @Field({ description: 'The Synapse alias key.' })
   id: string;
 
   @Field({ description: '`synapse` for a Synapse alias.' })
@@ -98,7 +98,13 @@ export class AiModelsResponse {
   @Field({ description: "The active server profile. Roles without an override inherit this profile's defaults." })
   profile: string;
 
-  @Field(() => [AiModelOption], { description: 'Every model a chat can be pinned to under any model type and cost tier.' })
+  @Field({
+    description:
+      'Whether an author may choose Unrestricted for a novel, a chapter plan or a reply: true only while the catalog routes unrestricted writing for every task at every pace.',
+  })
+  unrestrictedAvailable: boolean;
+
+  @Field(() => [AiModelOption], { description: 'The aliases the catalog lists for the chat task under any model type and cost tier; nothing pins or selects one.' })
   models: AiModelOption[];
 
   @Field(() => [AiRoleDefault])
@@ -107,7 +113,7 @@ export class AiModelsResponse {
   @Field(() => [AiRoleDefault], { description: 'Group defaults used when a project is in Unrestricted content mode.' })
   unrestrictedDefaults: AiRoleDefault[];
 
-  @Field(() => [String], { description: 'Option ids that Unrestricted projects may select. Others are coerced to the Unrestricted group default.' })
+  @Field(() => [String], { description: 'The `models` ids the catalog lists for the chat task under the unrestricted content mode.' })
   unrestrictedAllowlist: string[];
 
   @Field(() => [AiTierModel], {
@@ -156,7 +162,7 @@ export class ProjectModelRoute {
   outputPricePerMToken?: number;
 }
 
-@Schema({ description: 'What each group of AI work on this novel runs on under one model type and cost tier — a chat pin is not included.' })
+@Schema({ description: 'What each group of AI work on this novel runs on under one model type and cost tier.' })
 export class ProjectModelsResponse {
   @Field(() => ContentMode)
   contentMode: Project.ContentMode;
@@ -166,23 +172,6 @@ export class ProjectModelsResponse {
 
   @Field(() => [ProjectModelRoute])
   models: ProjectModelRoute[];
-
-  @Field(() => [String], {
-    description: 'The `GET /ai/models` option ids a chat may pin under exactly this model type and cost tier: Synapse alias keys.',
-  })
-  chatAliases: string[];
-}
-
-@Schema({ description: 'The signed-in author’s own settings.' })
-export class AccountSettingsResponse {
-  @Field(() => CostTier, { description: 'The cost tier a new project starts on when its creation request names none.' })
-  defaultCostTier: Project.CostTier;
-}
-
-@Schema({ description: 'Replaces the signed-in author’s settings.' })
-export class UpdateAccountSettingsBody {
-  @Field(() => CostTier, { description: 'The cost tier a new project starts on when its creation request names none.' })
-  defaultCostTier: Project.CostTier;
 }
 
 @Schema({ description: "Spend on one of the signed-in author's novels." })

@@ -20,6 +20,7 @@ import {
 import { type Generation, type PrimaryDatabase, schema } from '@server/database';
 
 import { defaultChapterMode } from '../ai/chapter-route';
+import { NovelForgeCatalogService, requireUnrestricted } from '../ai/novel-forge-catalog.service';
 import { type EndingContractSchema } from '../ai/schemas/ending-contract.schema';
 import { type UpdateBriefBody } from './generation.dto';
 
@@ -37,7 +38,10 @@ function handEditedEndingContract(contract: EndingContractSchema): EndingContrac
 export class BriefService {
   private readonly db: PrimaryDatabase;
 
-  constructor(databaseService: DatabaseService) {
+  constructor(
+    databaseService: DatabaseService,
+    private readonly catalog?: NovelForgeCatalogService,
+  ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
 
@@ -73,6 +77,7 @@ export class BriefService {
     if (scenes !== undefined) edits.scenes = scenes;
     if (body.claimedMilestones !== undefined) edits.claimedMilestones = body.claimedMilestones && normalizeStringList(body.claimedMilestones);
     if (body.isEnding !== undefined) edits.isEnding = body.isEnding;
+    if (body.contentMode === 'unrestricted') await this.requireRaisedToUnrestricted(projectId, chapter);
 
     const result = await this.db.transaction(async tx => {
       await lockProjectPlan(tx, projectId);
@@ -101,5 +106,14 @@ export class BriefService {
     });
     if (!result) throw AppErrorCode.DRF_001.create();
     return withParsedContract(result);
+  }
+
+  /** Read before the plan lock is taken, so the catalog is never asked while it is held; a plan already unrestricted is never refused for keeping its mode. */
+  private async requireRaisedToUnrestricted(projectId: bigint, chapter: number): Promise<void> {
+    const existing = await this.db.query.briefs.findFirst({
+      where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, chapter)),
+      columns: { contentMode: true },
+    });
+    if (existing?.contentMode !== 'unrestricted') await requireUnrestricted(this.catalog);
   }
 }

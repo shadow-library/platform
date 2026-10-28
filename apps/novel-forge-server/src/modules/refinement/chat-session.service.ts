@@ -5,32 +5,17 @@ import { DatabaseService } from '@shadow-library/modules';
 
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
-import { type PrimaryDatabase, type PrimaryTransaction, type Project, type Refinement, schema } from '@server/database';
+import { type PrimaryDatabase, type PrimaryTransaction, type Refinement, schema } from '@server/database';
 
 import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { ModelRouterService, type ProjectConfig } from '../ai/model-router.service';
-import { NovelForgeCatalogService } from '../ai/novel-forge-catalog.service';
 import { PROMPT_REGISTRY } from '../ai/prompts';
 import { type ChatTitleOutput } from '../ai/schemas';
-import { SYNAPSE_PROVIDER } from '../ai/synapse-request';
 import { ProjectEventService } from '../events/project-event.service';
-import { type ChatSelection, chatSelection, loadTurnSelections } from './chat-selection';
+import { type ChatSelection, loadTurnSelections } from './chat-selection';
 
 export interface CreateSessionInput {
   mode?: Refinement.ChatMode;
-}
-
-/** `null` clears a field back to the project default; an omitted one is left alone. */
-export interface SessionModelUpdate {
-  provider?: string | null;
-  model?: string | null;
-  contentMode?: Project.ContentMode | null;
-  costTier?: Project.CostTier | null;
-}
-
-interface SessionPin {
-  provider: string | null;
-  model: string | null;
 }
 
 /** The selection is absent on user messages and on turns older than selections. */
@@ -59,7 +44,6 @@ export class ChatSessionService {
     private readonly modelRouter: ModelRouterService,
     private readonly workflowRunService: WorkflowRunService,
     private readonly events: ProjectEventService,
-    private readonly catalog?: NovelForgeCatalogService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
@@ -121,30 +105,6 @@ export class ChatSessionService {
     const session = await this.getSession(projectId, sessionId);
     await this.db.delete(schema.chatSessions).where(eq(schema.chatSessions.id, session.id));
     return session;
-  }
-
-  async updateSessionModel(projectId: bigint, sessionId: string, update: SessionModelUpdate): Promise<Refinement.ChatSession> {
-    const session = await this.getSession(projectId, sessionId);
-    const set: Partial<typeof schema.chatSessions.$inferInsert> = { updatedAt: new Date() };
-    if (update.contentMode !== undefined) set.contentMode = update.contentMode;
-    if (update.costTier !== undefined) set.costTier = update.costTier;
-    if (update.provider !== undefined || update.model !== undefined) {
-      const pin = { provider: update.provider ?? null, model: update.model ?? null };
-      // The registry slug columns are cleared on every pin change, so the alias backfill cannot bring an old slug back.
-      const aliasKey = pin.provider === null && pin.model === null ? null : await this.offeredAlias(projectId, { ...session, ...set }, pin);
-      Object.assign(set, { modelProvider: null, modelId: null, aliasKey });
-    }
-    const [updated] = await this.db.update(schema.chatSessions).set(set).where(eq(schema.chatSessions.id, session.id)).returning();
-    if (!updated) throw AppErrorCode.CHT_001.create();
-    return updated;
-  }
-
-  /** An alias pin must be one the catalog offers this chat's chat task under the model type and cost tier the chat will have after this update. */
-  private async offeredAlias(projectId: bigint, session: Pick<Refinement.ChatSession, 'contentMode' | 'costTier'>, pin: SessionPin): Promise<string> {
-    if (pin.provider !== SYNAPSE_PROVIDER || !pin.model) throw AppErrorCode.AI_002.create();
-    if (!this.catalog) throw AppErrorCode.AI_007.create({ transient: true });
-    const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId), columns: { contentMode: true, costTier: true } });
-    return (await this.catalog.requireChatAlias(pin.model, chatSelection({}, session, project))).key;
   }
 
   async listMessages(projectId: bigint, sessionId: string, opts: { before?: number; limit?: number }): Promise<ChatMessageView[]> {

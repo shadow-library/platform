@@ -50,10 +50,10 @@ export class CreateProjectBody {
   })
   instructions?: string;
 
-  @Field(() => ContentMode, { optional: true })
+  @Field(() => ContentMode, { optional: true, description: 'unrestricted is refused (`AI_024`) while `GET /ai/models` reports `unrestrictedAvailable: false`.' })
   contentMode?: Project.ContentMode;
 
-  @Field(() => CostTier, { optional: true, description: 'The cost tier AI work on the new project runs at; omitted uses your default cost tier for new projects.' })
+  @Field(() => CostTier, { optional: true, description: 'The cost tier AI work on the new project runs at; omitted starts it on balanced.' })
   costTier?: Project.CostTier;
 
   @Field(() => ProjectWordTarget, { optional: true, description: 'Chapter scene-prose word-count target; omitted uses the application default (1,800–2,600 words).' })
@@ -184,7 +184,7 @@ export class UpdateProjectBody {
   @Field({ optional: true, maxLength: 500, description: 'The working title. Trimmed; a blank title clears it.' })
   title?: string;
 
-  @Field(() => ContentMode, { optional: true })
+  @Field(() => ContentMode, { optional: true, description: 'unrestricted is refused (`AI_024`) while `GET /ai/models` reports `unrestrictedAvailable: false`.' })
   contentMode?: Project.ContentMode;
 
   @Field(() => CostTier, { optional: true })
@@ -228,7 +228,7 @@ export class CloneProjectBody {
   @Field()
   name: string;
 
-  @Field(() => ContentMode, { optional: true })
+  @Field(() => ContentMode, { optional: true, description: 'unrestricted is refused (`AI_024`) while `GET /ai/models` reports `unrestrictedAvailable: false`.' })
   contentMode?: Project.ContentMode;
 
   @Field(() => ProjectWordTarget, { optional: true, description: 'Chapter word-count target; omitted inherits the source project’s target (or the application default).' })

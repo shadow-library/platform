@@ -63,6 +63,16 @@ describe('ModelRouterService.images', () => {
     });
   });
 
+  it('should hold an unrestricted image strict on its content mode, and a standard one not', async () => {
+    const h = harness();
+    h.synapse.reply(generated(), generated());
+    await h.router.images({ prompt: 'a lone tower', n: 1 }, CTX, { ...OWNED, contentMode: 'unrestricted' });
+    await h.router.images({ prompt: 'a lone tower', n: 1 }, CTX, OWNED);
+
+    expect(h.synapse.requests[0]?.body).toMatchObject({ synapse: { selectors: { content_mode: 'unrestricted' }, strict: ['content_mode'] } });
+    expect((h.synapse.requests[1]?.body?.synapse as Record<string, unknown>)['strict']).toBeUndefined();
+  });
+
   it('should send no reference images when the request has none', async () => {
     const h = harness();
     h.synapse.reply(generated());

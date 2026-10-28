@@ -1,36 +1,22 @@
 import { Authenticated } from '@shadow-library/auth/module';
-import { Body, Get, HttpController, Put, RespondFor } from '@shadow-library/fastify';
+import { Get, HttpController, RespondFor } from '@shadow-library/fastify';
 
 import { ActorService } from '@modules/actor';
 
 import { AiQuotaService } from './ai-quota.service';
 import { AiUsageService } from './ai-usage.service';
-import { AccountSettingsService } from './account-settings.service';
-import { AccountSettingsResponse, AccountUsageResponse, AiModelsResponse, AiQuotaResponse, UpdateAccountSettingsBody } from './ai.dto';
+import { AccountUsageResponse, AiModelsResponse, AiQuotaResponse } from './ai.dto';
 import { ModelCatalogService } from './model-catalog.service';
 
 @Authenticated()
 @HttpController('/api/v1/ai')
 export class AiController {
   constructor(
-    private readonly accountSettings: AccountSettingsService,
     private readonly actorService: ActorService,
     private readonly aiUsage: AiUsageService,
     private readonly aiQuota: AiQuotaService,
     private readonly modelCatalog: ModelCatalogService,
   ) {}
-
-  @Get('/settings')
-  @RespondFor(200, AccountSettingsResponse)
-  getSettings(): Promise<AccountSettingsResponse> {
-    return this.accountSettings.get();
-  }
-
-  @Put('/settings')
-  @RespondFor(200, AccountSettingsResponse)
-  updateSettings(@Body() body: UpdateAccountSettingsBody): Promise<AccountSettingsResponse> {
-    return this.accountSettings.update(body);
-  }
 
   @Get('/models')
   @RespondFor(200, AiModelsResponse)

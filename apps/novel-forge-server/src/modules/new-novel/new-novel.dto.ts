@@ -33,10 +33,10 @@ export class CreateNovelWithNotesBody {
   @Field({ optional: true, maxLength: NOTES_MAX_CHARS, description: NOTES_DESCRIPTION })
   notes?: string;
 
-  @Field(() => ContentMode, { optional: true })
+  @Field(() => ContentMode, { optional: true, description: 'unrestricted is refused (`AI_024`) while `GET /ai/models` reports `unrestrictedAvailable: false`.' })
   contentMode?: Project.ContentMode;
 
-  @Field(() => CostTier, { optional: true, description: 'The cost tier AI work on the new project runs at; omitted uses your default cost tier for new projects.' })
+  @Field(() => CostTier, { optional: true, description: 'The cost tier AI work on the new project runs at; omitted starts it on balanced.' })
   costTier?: Project.CostTier;
 }
 

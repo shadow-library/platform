@@ -69,13 +69,19 @@
   rows every second while it has any, heartbeats them, and aborts each whose row was cancelled, settled elsewhere or deleted; a graph also stops at its next node boundary,
   and a run that finishes with a cancel on record settles as cancelled.
   `stopping` means the cancel is recorded and a live replica holds the run; `not_delivered` means it is recorded but the run's replica has stopped heartbeating.
-- **Model routing**: roles map to groups. A model type (standard or unrestricted) and a cost tier (economy, balanced,
-  performant) select a platform model per group: the server sends both as the `tier` and `content_mode` selectors and Synapse's routes, which encode tier by content mode per task, pick the model; a project never pins a model to a role. A chat reply takes its type and tier from the turn, then the
-  chat, then the project; a chat's own model pin, which stores a Synapse alias key, outranks the tier map for that chat's replies alone. A pin is accepted only for an alias the catalog offers the chat task under the chat's model type and cost tier (`AI_022` otherwise), and a reply takes it only while the catalog still offers it for that reply's selectors, so an unrestricted reply takes it only when the alias's `available.content_mode` includes `unrestricted`; otherwise the reply falls to the routes. A pin stored as a registry slug is reconciled with its `LEGACY_SLUG_ALIAS` alias on every migrate, and a slug the map lacks leaves the chat unpinned; a pin an older pod cleared during a rollout keeps its alias. The composer's pick is the chat's own setting and holds until the author changes it. There is no local chat-model path. There are no account-level model defaults: an author's only account setting is the
-  default cost tier a new project starts on when its creation request names none (Balanced until set; a bot holds no settings and always gets Balanced), and a clone keeps its source's tier.
-- **Model names**: every model list, label, price and pinnable alias comes from Synapse's `GET /api/v1/catalog`; Synapse is the only path to a model. The models
+- **Model routing**: roles map to groups, each one Synapse task. A novel's **Pace** is its cost tier under an author-facing label — Swift (`economy`), Steady (`balanced`,
+  the default) and Meticulous (`performant`); wire keys, enums and selectors keep the tier keys. The server sends the tier and the content mode (standard or
+  unrestricted) as the `tier` and `content_mode` selectors, and Synapse's routes pick the model; an author never picks or pins a model.
+  A chat follows its novel: it holds no pin, pace or content mode of its own. A turn may carry one-shot options for that reply alone — Think deeper (`performant`)
+  and Unrestricted — which are never stored and never outlive the turn; the actions it starts run at its tier. There are no account-level defaults: a project
+  starts on Steady unless its creation request names a pace (a bot's too), and a clone keeps its source's. Unrestricted is offered — for a novel, a chapter plan or
+  a reply — only while the catalog routes `content_mode: unrestricted` (`matched`) for every author-facing task (writing, planning, review, chat, helper, vision,
+  image) at every tier; otherwise choosing it is refused (`AI_024`), and an unreadable catalog counts as not routing it. A novel or plan already unrestricted keeps
+  its mode when that stops holding and is never silently downgraded: every unrestricted call is strict on `content_mode`, so Synapse refuses it rather than
+  sending it to a task's default route, and the call fails loudly (`AI_024`). There is no local chat-model path.
+- **Model names**: every model list, label and price comes from Synapse's `GET /api/v1/catalog`; Synapse is the only path to a model. The models
   novel-forge called directly before Synapse keep their names and list prices (`historical-models.ts`) only to label and estimate the rows they wrote. Records keep catalog model keys (a call, a chat reply and a review record the model that
-  answered, never the router's slug), and every name an author sees is the catalog's label for that key, the key itself when the catalog no longer names it.
+  answered, never the router's slug), and every name shown is the catalog's label for that key, the key itself when the catalog no longer names it.
 - **Usage and cost**: every model call records the model that answered, its tokens, its chapter when it has exactly one, and a cost frozen when written: the response's
   `synapse.cost.list_usd`, with its source read from `billed_usd`: `provider` (a metered provider billed it), `gateway` (nothing was billed, as on the CLI gateway, so the
   figure is the list price) or `estimate` (no list price; older rows estimated from historical list prices). Every source is shown as the real charge.
@@ -120,8 +126,7 @@
 - Detail comes through declared lookups (never native tool binding): Story Bible pages, entities, canon facts, threads and promises, chapter summaries, a plan, a draft, a
   character timeline, a volume, lore and prose search, the author's notes, usage and a chapter's reviews. A turn that reads the notes or a planner-only page holds for review
   every change the chapter writer or a reader can see; only planner-side records (milestones) still apply (see the write policy).
-- **Web research** needs no switch. Each turn reads `web_search` from `GET /api/v1/catalog` for the chat task and selectors, from the pinned alias when a pin applies
-  and from the task's default otherwise; if true the chat call asks
+- **Web research** needs no switch. Each turn reads `web_search` from `GET /api/v1/catalog` for the chat task's default under the turn's selectors; if true the chat call asks
   for it on a turn that asks a question, gives a link or asks for research (never on one that only instructs, since every search re-reads the
   whole conversation), and Synapse searches, by the provider's own search or its own, resetting the live reply when a search follows text it
   already showed; otherwise the chat gets two more lookups through Brave Search (titles, URLs and snippets, and a page read as plain text), or no web at all
@@ -218,7 +223,7 @@
 - A chat turn MUST NEVER propose a whole-record overwrite for a record it did not fetch in the same turn; every turn is a fresh run, and state lives in chat tables.
 - A chat turn's model type applies to its reply only; the actions it starts inherit its tier and NEVER its model type. A turn's selection NEVER outlives the turn. A standard turn
   NEVER receives replies or a summary an unrestricted model wrote (placeholders stand in; the author's own messages stay verbatim), and compaction's model type only rises: it
-  runs unrestricted when the novel, the chat, the turn, the prior summary or any folded reply is unrestricted.
+  runs unrestricted when the novel, the turn, the prior summary or any folded reply is unrestricted.
 
 ### Write policy and the quote rule
 
@@ -504,9 +509,9 @@
 - A chapter's content mode is its plan's, copied from the project's when the plan is created (a plan with none routes standard; an isolated draft counts as unrestricted), so
   changing the project's mode never re-routes an existing chapter. It MUST route every call on that chapter's prose — draft, title, judge, repair, revise, review, summary,
   continuity, extraction — through the one role table in `chapter-route.ts`. An unrestricted chapter runs the normal writer -> judge -> repair graph on the unrestricted route, is
-  written isolated, and NEVER falls back to a standard model. Synapse sends a call no route's selectors match to the task's default route, so this holds only
-  while its catalog routes `content_mode: unrestricted` for every tier of every task; a resolution Synapse refuses (`SYN_ALIAS_UNAVAILABLE` or `SYN_NO_ELIGIBLE_MODEL`,
-  mapped to `AI_003`) fails the call.
+  written isolated, and NEVER falls back to a standard model: every unrestricted call is strict on `content_mode`, so Synapse refuses one no unrestricted route serves
+  (`SYN_NO_ELIGIBLE_MODEL`, mapped to `AI_024`) rather than sending it to a task's default route, and the call fails. Writing an unrestricted chapter therefore works only while
+  the catalog routes `content_mode: unrestricted` for every tier.
 - Containment MUST key on `isolated`, NEVER on `generator` or `contentMode`. A call whose writer class a plugin raised (or an unrestricted fill) writes `generator: unrestricted`
   and `isolated: true`, sticky for the run. Draft and isolated content MUST NEVER be indexed, retrieved or searched.
 - **Read policy**: raw isolated prose is readable only by the author, the unrestricted route and the Amend editor. Author HTTP routes (the draft, its versions and compare) read it raw; every model-bound, chat, plugin, publish and search read goes through `isolation-read-policy.ts` and sees only what the author approved in the
@@ -553,7 +558,7 @@
 - Context MUST be assembled once per run, token-budgeted, tier-labelled and persisted as a pack; graph state holds the pack id, NEVER canon text. The stable segment MUST stay
   byte-identical while canon is unchanged; chapter prose travels as a template variable, NEVER inside the pack.
 - Prompt text MUST live in versioned code and the version MUST bump on any wording change; every call logs `promptKey@promptVersion`. The plugin policy digest MUST be in any
-  `llm_cache` key, and on Synapse so are the task, selectors, pinned alias and active catalog version, so a retarget misses old answers; a call that cannot
+  `llm_cache` key, and on Synapse so are the task, selectors and active catalog version, so a retarget misses old answers; a call that cannot
   read the catalog version neither reads nor writes the cache. The version is read through the client's 60-second catalog cache, so for up to
   60 seconds after a publish the `llm_cache` may still serve answers keyed to the previous version. Only deterministic roles are cacheable. `runId` MUST correlate runs, model calls, tool calls, packs and messages. Prefer deterministic code over AI wherever
   code can decide.

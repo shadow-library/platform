@@ -73,20 +73,18 @@ export class WebResearchService {
   constructor(private readonly synapse: SynapseClient) {}
 
   /**
-   * Asks Synapse whether the chat can search the web, since only it knows where a model runs and what it searches with. It answers for the chat task and the turn's
-   * `selectors` from its catalog, which its client caches by version: for the pinned `alias` when the catalog offers it, else for the task's
-   * default. Any failure to answer means no.
+   * Asks Synapse whether the chat can search the web, since only it knows where a model runs and what it searches with. It answers for the chat task's
+   * default under the turn's `selectors` from its catalog, which its client caches by version. Any failure to answer means no.
    */
-  async modeFor(selectors: Record<string, string> = {}, alias?: string): Promise<WebMode> {
-    if (await this.catalogSearches(selectors, alias)) return 'native';
+  async modeFor(selectors: Record<string, string> = {}): Promise<WebMode> {
+    if (await this.catalogSearches(selectors)) return 'native';
     return Config.get('ai.web-search.brave.api.key') ? 'brave' : 'off';
   }
 
-  private async catalogSearches(selectors: Record<string, string>, alias?: string): Promise<boolean> {
+  private async catalogSearches(selectors: Record<string, string>): Promise<boolean> {
     try {
       const view = await this.synapse.catalog({ task: SYNAPSE_CHAT_TASK, selectors });
-      const pinned = alias === undefined ? undefined : view.aliases.find(entry => entry.key === alias);
-      return (pinned ?? view).web_search === true;
+      return view.web_search === true;
     } catch (err) {
       this.logger.warn('Synapse catalog unreadable, so the chat gets no web search from Synapse', { selectors, err });
       return false;

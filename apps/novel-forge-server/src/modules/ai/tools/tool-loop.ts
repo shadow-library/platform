@@ -6,7 +6,7 @@ import { type DynamicStructuredTool } from '@langchain/core/tools';
 import { Logger } from '@shadow-library/common';
 
 import { APP_NAME } from '@server/constants';
-import { type PrimaryDatabase } from '@server/database';
+import { type PrimaryDatabase, type Project } from '@server/database';
 import * as schema from '@server/database/schemas';
 
 import { fromSynapseFailure } from '../synapse-failure';
@@ -14,6 +14,8 @@ import { type RegisteredTool, type ToolContext } from './types';
 
 export interface ToolLoopOptions {
   maxRounds?: number;
+  /** The route's content mode, so a strict unrestricted call Synapse cannot route fails as `AI_024`. */
+  contentMode?: Project.ContentMode;
 }
 
 export interface ToolLoopResult {
@@ -25,10 +27,6 @@ type ToolCapableModel = BaseChatModel & Required<Pick<BaseChatModel, 'bindTools'
 
 const logger = Logger.getLogger(APP_NAME, 'runToolLoop');
 
-const rethrowModelFailure = (err: unknown): never => {
-  throw fromSynapseFailure(err);
-};
-
 export async function runToolLoop(
   model: BaseChatModel,
   tools: DynamicStructuredTool[],
@@ -39,6 +37,9 @@ export async function runToolLoop(
   opts?: ToolLoopOptions,
 ): Promise<ToolLoopResult> {
   const maxRounds = opts?.maxRounds ?? 6;
+  const rethrowModelFailure = (err: unknown): never => {
+    throw fromSynapseFailure(err, opts?.contentMode);
+  };
 
   // `bindTools` is optional on BaseChatModel; a model without native tool-calling stays usable, answering from the context already in the prompt.
   if (typeof model.bindTools !== 'function') {

@@ -148,22 +148,41 @@ describe('ModelRouterService through Synapse', () => {
     });
   });
 
-  describe('the chat pin', () => {
-    async function aliasFor(project: ProjectConfig, role: AiRole = 'chat'): Promise<unknown> {
+  describe('strict content mode', () => {
+    async function envelopeFor(project: ProjectConfig, role: AiRole = 'chat'): Promise<Record<string, unknown>> {
       const h = harness();
       h.synapse.reply(json(completion(ANSWER)));
       await h.router.structured(titlePrompt(role), {}, { ...CTX, role }, project);
-      return envelopeOf(h).alias;
+      return envelopeOf(h);
     }
 
-    it("should send the chat's alias pin as it is", async () => {
-      expect(await aliasFor({ ...OWNED, chatAlias: 'gpt-mini', chatPinned: true })).toBe('gpt-mini');
-      expect(await aliasFor({ ...UNRESTRICTED, chatAlias: 'grok', chatPinned: true })).toBe('grok');
+    it('should hold an unrestricted call strict on its content mode, and send no alias', async () => {
+      const envelope = await envelopeFor(UNRESTRICTED);
+
+      expect(envelope).toMatchObject({ selectors: { tier: 'balanced', content_mode: 'unrestricted' }, strict: ['content_mode'] });
+      expect(envelope['alias']).toBeUndefined();
     });
 
-    it('should send no alias that is not the author pin, nor an alias pin on another role', async () => {
-      expect(await aliasFor({ ...OWNED, chatAlias: 'opus' })).toBeUndefined();
-      expect(await aliasFor({ ...OWNED, chatAlias: 'opus', chatPinned: true }, 'plan')).toBeUndefined();
+    it('should send a standard call with no strict selectors', async () => {
+      expect((await envelopeFor(OWNED))['strict']).toBeUndefined();
+      expect((await envelopeFor(OWNED, 'plan'))['strict']).toBeUndefined();
+    });
+
+    it('should hold a streamed unrestricted call strict as well', async () => {
+      const h = harness();
+      h.synapse.reply(stream([ANSWER]));
+      await h.router.streamStructured(titlePrompt('chat'), {}, { ...CTX, role: 'chat' }, { onDelta: () => undefined }, UNRESTRICTED);
+
+      expect(envelopeOf(h)['strict']).toEqual(['content_mode']);
+    });
+
+    it('should hold a tool-loop client strict when its route is unrestricted', async () => {
+      const h = harness();
+      h.synapse.reply(json(completion('{}')));
+      const llm = await h.router.chatFor('judge', CTX, UNRESTRICTED);
+      await llm.invoke([new HumanMessage('The draft.')]);
+
+      expect(envelopeOf(h)['strict']).toEqual(['content_mode']);
     });
   });
 
@@ -336,6 +355,21 @@ describe('ModelRouterService through Synapse', () => {
 
       await expect(h.router.structured(titlePrompt(), {}, CTX, OWNED)).rejects.toMatchObject({ code: 'AI_007', data: { transient: true } });
       expect(h.synapse.requests).toHaveLength(2);
+    });
+
+    it("should tell the author unrestricted writing isn't set up when Synapse finds no route for a strict unrestricted call", async () => {
+      const h = harness();
+      h.synapse.reply(synapseError(422, 'SYN_NO_ELIGIBLE_MODEL'));
+
+      await expect(h.router.structured(titlePrompt(), {}, CTX, UNRESTRICTED)).rejects.toMatchObject({ code: 'AI_024' });
+      expect(h.synapse.requests).toHaveLength(1);
+    });
+
+    it('should keep a standard call that Synapse finds no model for on AI_003', async () => {
+      const h = harness();
+      h.synapse.reply(synapseError(422, 'SYN_NO_ELIGIBLE_MODEL'));
+
+      await expect(h.router.structured(titlePrompt(), {}, CTX, OWNED)).rejects.toMatchObject({ code: 'AI_003' });
     });
 
     it('should surface a Synapse budget as the spend limit the author already knows', async () => {

@@ -33,7 +33,7 @@ import {
   runAll,
   type TeamOrganisation,
 } from '../../lib';
-import { budgetPin, deleteAccountSettings, deleteForgeProjects, deleteForgeProjectsOwnedBy, type ForgeOwner, releaseBudgetPins } from './forge-db';
+import { budgetPin, deleteForgeProjects, deleteForgeProjectsOwnedBy, type ForgeOwner, releaseBudgetPins } from './forge-db';
 
 export type ForgeRole = 'NovelForgeCurator' | 'NovelForgeAdmin';
 
@@ -261,7 +261,6 @@ export const test = base.extend<{ forge: ForgeHarness }>({
       ...users.map(user => () => deleteForgeProjectsOwnedBy({ kind: 'user', id: user.userId })),
       // A job still running on a project can reach Synapse until the project is gone, so the quota pin holds until then.
       () => releaseBudgetPins(projects),
-      ...users.map(user => () => deleteAccountSettings({ kind: 'user', id: user.userId })),
       ...users.map(user => () => deleteRoleAssignmentsFor({ type: 'USER', id: user.userId })),
       ...policies.map(organisationId => () => clearAccessTokenTtl(organisationId)),
       ...teams.map(organisationId => () => deleteOrganisation(organisationId)),

@@ -113,7 +113,7 @@ export class ImportNovelBody {
   @Field(() => NovelBundle)
   bundle: NovelBundle;
 
-  @Field(() => CostTier, { optional: true, description: 'The cost tier AI work on the new project runs at; omitted uses your default cost tier for new projects.' })
+  @Field(() => CostTier, { optional: true, description: 'The cost tier AI work on the new project runs at; omitted starts it on balanced.' })
   costTier?: Project.CostTier;
 }
 

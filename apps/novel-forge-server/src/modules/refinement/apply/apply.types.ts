@@ -3,6 +3,7 @@ import { type PrimaryTransaction } from '@server/database';
 import { type ArtifactState } from '../artifact-state';
 import { type ContentOp } from '../change-set';
 import { type OpSource } from '../write-policy';
+import { type UnrestrictedRaise } from './unrestricted-raise';
 
 export interface AppliedArtifact {
   artifactRef: string;
@@ -28,6 +29,8 @@ export interface ApplyContext {
   projectId: bigint;
   applied: AppliedArtifact[];
   staleMarked: string[];
+  /** Set on an apply or a redo, never on an undo or revert: restoring a plan's earlier unrestricted mode is not choosing it. */
+  unrestrictedRaise?: UnrestrictedRaise;
 }
 
 export interface BaselineMismatch {

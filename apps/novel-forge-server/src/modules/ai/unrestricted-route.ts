@@ -15,7 +15,7 @@ export interface UnrestrictedRouteDeps {
   pluginPolicy: Pick<PluginPolicyService, 'resolve'>;
 }
 
-/** Isolation holds only while Synapse's catalog defines a `content_mode: unrestricted` route for every tier: one it lacks falls to the task's default. */
+/** The router holds every unrestricted call strict on `content_mode`, so Synapse refuses one no unrestricted route serves rather than sending it to a task's default. */
 export async function resolveUnrestrictedRoute(deps: UnrestrictedRouteDeps, projectId: bigint, call: RoutedCall, project: ProjectConfig | undefined): Promise<CallRoute> {
   const policy = await deps.pluginPolicy.resolve(projectId, call, { contentMode: 'unrestricted' });
   return { policy, project: { ...project, contentMode: 'unrestricted' } };

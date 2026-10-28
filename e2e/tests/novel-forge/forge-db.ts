@@ -273,18 +273,6 @@ export async function deleteForgeProjectsOwnedBy(owner: ForgeOwner): Promise<voi
   await deleteForgeProjects(await listProjectIdsOwnedBy(owner));
 }
 
-/** An owner's saved settings outlive the identity account, since nothing cascades across the two databases. */
-export async function deleteAccountSettings(owner: ForgeOwner): Promise<void> {
-  await novelForgeDb()`DELETE FROM account_settings WHERE owner_kind = ${owner.kind}::owner_kind AND owner_id = ${owner.id}`;
-}
-
-export async function readAccountDefaultCostTier(owner: ForgeOwner): Promise<ForgeCostTier | undefined> {
-  const [row] = await novelForgeDb()<{ tier: ForgeCostTier }[]>`
-    SELECT default_cost_tier AS tier FROM account_settings WHERE owner_kind = ${owner.kind}::owner_kind AND owner_id = ${owner.id}
-  `;
-  return row?.tier;
-}
-
 export async function insertModelCalls(seeds: readonly ModelCallSeed[]): Promise<string[]> {
   const ids: string[] = [];
   for (const seed of seeds) {

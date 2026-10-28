@@ -634,7 +634,8 @@ export function createChapterGenerationNodes(services: Omit<GraphServices, 'chec
     const judgeMessages = [...(PROMPT_REGISTRY.judge.fewShots ?? []), systemMsg, humanMsg];
 
     async function runJudgeModel(): Promise<JudgeOutput | null> {
-      const { messages } = await runToolLoop(model, tools, rawTools, judgeMessages, toolCtx, db as never);
+      const { contentMode } = modelRouter.routeModel('judge', judgeProject, judgePolicy);
+      const { messages } = await runToolLoop(model, tools, rawTools, judgeMessages, toolCtx, db as never, { contentMode });
       const lastAi = [...messages].reverse().find(m => m instanceof AIMessage || m._getType() === 'ai');
       const rawContent = lastAi ? (typeof lastAi.content === 'string' ? lastAi.content : JSON.stringify(lastAi.content)) : '{}';
       return parseJudgeOutput(rawContent);

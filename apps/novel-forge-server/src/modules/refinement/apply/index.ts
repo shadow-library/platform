@@ -9,4 +9,5 @@ export * from './fact.handler';
 export * from './milestone.handler';
 export * from './premise.handler';
 export * from './promise.handler';
+export * from './unrestricted-raise';
 export * from './volume.handler';

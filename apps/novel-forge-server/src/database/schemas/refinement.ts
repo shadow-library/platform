@@ -169,8 +169,7 @@ export const chatSessions = pgTable(
     // rest as cards; 'manual' stages everything as cards. ChatSessionService.createSession sets 'auto' for a new chat — this column default
     // stays 'manual' only so no migration is needed. Provenance lives on each proposal (autoApplied).
     mode: chatMode('mode').notNull().default('manual'),
-    // Per-session model pin (null → the cost tier's model): `alias_key`, a Synapse alias. `model_*` holds a pre-Synapse registry pin, read only by
-    // the alias backfill and cleared whenever the pin changes; new sessions start unpinned.
+    // Nulled and never read: a chat follows its project. Kept until a later migration drops them, since a rolling deploy's older pods still select them.
     modelProvider: varchar('model_provider'),
     modelId: varchar('model_id'),
     aliasKey: varchar('alias_key'),

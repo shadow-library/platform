@@ -1,4 +1,4 @@
-import { type APIResponse } from '@playwright/test';
+import { type APIRequestContext, type APIResponse } from '@playwright/test';
 
 import { mutate } from '../../lib';
 import { expect, type ForgeActor, type ForgeHarness } from './forge-actors';
@@ -44,7 +44,15 @@ export async function quotaRefusedChat(forge: ForgeHarness, owner: ForgeActor, l
   return { projectId, sessionId: await newChatSession(owner, projectId) };
 }
 
-export async function startTurn(owner: ForgeActor, projectId: string, sessionId: string): Promise<APIResponse> {
+/** `options` are the turn's one-shot reply options, `costTier` and `contentMode`, which the chat never stores. */
+export async function startTurn(owner: ForgeActor, projectId: string, sessionId: string, options: Record<string, unknown> = {}): Promise<APIResponse> {
   await assertSpendGuarded(projectId);
-  return mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/chats/${sessionId}/turn/stream`, { data: { content: SHORT_TURN } });
+  return mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/chats/${sessionId}/turn/stream`, { data: { content: SHORT_TURN, ...options } });
+}
+
+/** Whether the target's catalog routes unrestricted writing for every task and tier; refusal cases run only where it does not. */
+export async function unrestrictedAvailable(ctx: APIRequestContext): Promise<boolean> {
+  const response = await ctx.get('/api/v1/ai/models');
+  expect(response.status(), await response.text()).toBe(200);
+  return ((await response.json()) as { unrestrictedAvailable: boolean }).unrestrictedAvailable;
 }

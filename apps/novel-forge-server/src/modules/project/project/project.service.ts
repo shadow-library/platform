@@ -12,15 +12,15 @@ import { type Bible, type Knowledge, type Plan, type PrimaryDatabase, type Prima
 
 import { type Actor, ActorService, projectOwnerColumns } from '@modules/actor';
 
+import { DEFAULT_COST_TIER } from '../../ai/defaults';
 import { WorkflowRunService } from '../../ai/graphs/workflow-run.service';
-import { NovelForgeCatalogService } from '../../ai/novel-forge-catalog.service';
+import { NovelForgeCatalogService, requireUnrestricted } from '../../ai/novel-forge-catalog.service';
 import { DEFAULT_WRITING_INSTRUCTIONS } from '../../ai/prompts/authoring-preamble';
 import { resolveWritingInstructions, writingInstructionAdditions } from '../../ai/prompts/writing-instructions';
 import { setProjectCover } from '../../illustration/uploaded-cover';
 import { AuthoringClaimService } from '../../jobs/authoring-claim.service';
 import { clearLedgerBriefLinks } from '../../ledger/ledger-entries';
 import { type CostWindow, summarizeByDay, summarizeCost } from './project-cost';
-import { ownerDefaultCostTier } from './project-defaults';
 import { assertUnderProjectCap } from './project-limits';
 import {
   type CloneProjectBody,
@@ -103,6 +103,7 @@ export class ProjectService {
   async create(body: CreateProjectBody, tx?: PrimaryTransaction): Promise<Project.Presented> {
     this.logger.debug('create project', { name: body.name, kind: body.kind, contentMode: body.contentMode });
     this.assertWordTargetValid(body.wordTarget);
+    if (body.contentMode === 'unrestricted') await requireUnrestricted(this.catalog);
     const actor = this.actor();
     await assertUnderProjectCap(this.db, actor);
     const executor = tx ?? this.db;
@@ -116,7 +117,7 @@ export class ProjectService {
         title: body.title,
         instructions: writingInstructionAdditions(body.instructions),
         contentMode: body.contentMode,
-        costTier: body.costTier ?? (await ownerDefaultCostTier(executor, actor)),
+        costTier: body.costTier ?? DEFAULT_COST_TIER,
         wordTargetMin: body.wordTarget?.min,
         wordTargetMax: body.wordTarget?.max,
       })
@@ -202,6 +203,7 @@ export class ProjectService {
 
   async update(id: bigint, body: UpdateProjectBody): Promise<Project.Presented> {
     this.assertWordTargetValid(body.wordTarget);
+    if (body.contentMode === 'unrestricted') await this.requireRaisedToUnrestricted(id);
     const set: Record<string, unknown> = { ...body, updatedAt: new Date() };
     if (body.title !== undefined) set.title = body.title.trim() || null;
     if (body.instructions !== undefined) set.instructions = writingInstructionAdditions(body.instructions);
@@ -228,14 +230,21 @@ export class ProjectService {
     return this.present(result);
   }
 
+  /** A novel already unrestricted keeps its mode when the catalog stops routing it, so resending it with other settings is never refused; its calls fail instead. */
+  private async requireRaisedToUnrestricted(id: bigint): Promise<void> {
+    const current = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, id), columns: { contentMode: true } });
+    if (!current) throw AppErrorCode.PRJ_001.create();
+    if (current.contentMode !== 'unrestricted') await requireUnrestricted(this.catalog);
+  }
+
   async clone(id: bigint, body: CloneProjectBody): Promise<Project.Presented> {
     this.assertWordTargetValid(body.wordTarget);
     const actor = this.actor();
     await assertUnderProjectCap(this.db, actor);
+    const source = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, id) });
+    if (!source) throw AppErrorCode.PRJ_001.create();
+    if ((body.contentMode ?? source.contentMode) === 'unrestricted') await requireUnrestricted(this.catalog);
     return this.db.transaction(async tx => {
-      const source = await tx.query.projects.findFirst({ where: eq(schema.projects.id, id) });
-      if (!source) throw AppErrorCode.PRJ_001.create();
-
       if (body.resetDerived === false) {
         this.logger.warn(`clone resetDerived=false for project ${id}: full child-table copy is not yet implemented`);
       }

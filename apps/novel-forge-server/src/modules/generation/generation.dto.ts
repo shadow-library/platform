@@ -124,7 +124,12 @@ export class UpdateBriefBody {
   @Field({ optional: true, nullable: true, description: 'The agreed direction for the chapter. Omit to leave unchanged; null or blank clears it.' })
   direction?: string | null;
 
-  @Field(() => ContentMode, { optional: true, nullable: true, description: "How the chapter is written. Omit to leave unchanged; null follows the project's content mode." })
+  @Field(() => ContentMode, {
+    optional: true,
+    nullable: true,
+    description:
+      "How the chapter is written. Omit to leave unchanged; null follows the project's content mode. Raising it to unrestricted is refused (`AI_024`) while `GET /ai/models` reports `unrestrictedAvailable: false`.",
+  })
   contentMode?: Project.ContentMode | null;
 
   @Field(() => [BriefSceneSchema], { optional: true, nullable: true, description: 'Replacement scene list. Omit to leave unchanged; null clears it.' })

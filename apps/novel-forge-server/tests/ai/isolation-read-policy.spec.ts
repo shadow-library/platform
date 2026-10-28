@@ -107,6 +107,7 @@ function recordingRouter(calls: RecordedCall[], extracted?: unknown) {
       calls.push({ node: prompt.key, contentMode: project?.contentMode ?? 'standard', payload: JSON.stringify(vars) });
       return answer(prompt.key);
     },
+    routeModel: (role: string, project?: { contentMode?: string }) => ({ task: `novel-forge.${role}`, costTier: 'balanced', contentMode: project?.contentMode ?? 'standard' }),
     chatFor: async (role: string, _ctx: unknown, project?: { contentMode?: string }) => ({
       invoke: async (messages: BaseMessage[]) => {
         calls.push({ node: role, contentMode: project?.contentMode ?? 'standard', payload: JSON.stringify(messages.map(message => message.content)) });

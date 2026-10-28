@@ -9,7 +9,6 @@ import { ActorModule } from '@modules/actor';
 
 import { EventsModule } from '../events/events.module';
 import { PluginsModule } from '../plugins/plugins.module';
-import { AccountSettingsService } from './account-settings.service';
 import { AppearanceDescriberService } from './appearance-describer.service';
 import { AiController } from './ai.controller';
 import { AiQuotaService } from './ai-quota.service';
@@ -37,7 +36,6 @@ import { WriterSnapshotService } from './writer-snapshot.service';
   providers: [
     { token: AuthClient, useFactory: () => new AuthClient(resolveAuthClientConfig()) },
     { token: SynapseClient, useFactory: (authClient: AuthClient) => new SynapseClient({ authClient }), inject: [AuthClient] },
-    AccountSettingsService,
     TelemetryHandler,
     ModelRouterService,
     ModelCatalogService,
@@ -58,7 +56,6 @@ import { WriterSnapshotService } from './writer-snapshot.service';
     WriterSnapshotService,
   ],
   exports: [
-    AccountSettingsService,
     ModelRouterService,
     NovelForgeCatalogService,
     AiQuotaService,

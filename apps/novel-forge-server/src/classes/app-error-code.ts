@@ -100,13 +100,12 @@ export class AppErrorCode extends ServerErrorCode {
     'This request was declined before it reached a model: {source} appears to involve sexual content with a minor, which Novel Forge never writes in any mode',
     422,
   );
-  static readonly AI_016 = AppErrorCode.forbidden('AI_016', 'A bot has no account settings; its projects start on the Balanced cost tier');
   // The web lookups' refusals: the chat model reads their message as the lookup's result, so each says what to do instead.
   static readonly AI_019 = new AppErrorCode('AI_019', 'Web search is not configured — set AI_WEB_SEARCH_BRAVE_API_KEY', 500);
   static readonly AI_020 = new AppErrorCode('AI_020', 'Web search failed: {reason}', 502);
   static readonly AI_021 = AppErrorCode.badRequest('AI_021', 'That page was not fetched: {reason}');
-  static readonly AI_022 = AppErrorCode.badRequest('AI_022', "Model '{alias}' is not offered for this chat's model type and cost tier");
   static readonly AI_023 = new AppErrorCode('AI_023', 'Embeddings of {dimensions} dimensions do not fit the {expected}-dimension vector columns', 500);
+  static readonly AI_024 = AppErrorCode.badRequest('AI_024', "Unrestricted writing isn't set up on this server");
 
   static readonly ILL_001 = AppErrorCode.notFound('ILL_001', 'Illustration not found');
   static readonly ILL_002 = AppErrorCode.badRequest('ILL_002', 'Illustration is no longer active — start a new one to keep iterating');

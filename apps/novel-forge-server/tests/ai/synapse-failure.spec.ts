@@ -53,6 +53,15 @@ describe('fromSynapseFailure', () => {
     expect(fromSynapseFailure(plain)).toBe(plain);
   });
 
+  it("should tell the author unrestricted writing isn't set up when a strict unrestricted call finds no eligible model, and only then", () => {
+    const source = refusal('SYN_NO_ELIGIBLE_MODEL', 422);
+
+    expect(fromSynapseFailure(source, 'unrestricted')).toMatchObject({ code: 'AI_024', cause: source });
+    expect(synapseCallFailed(source, 'unrestricted')).toMatchObject({ code: 'AI_024' });
+    expect(fromSynapseFailure(source, 'standard')).toMatchObject({ code: 'AI_003' });
+    expect(fromSynapseFailure(refusal('SYN_POLICY_DENIED', 403), 'unrestricted')).toMatchObject({ code: 'AI_003' });
+  });
+
   it('should still give up with AI_007 on a failure that did not come from Synapse', () => {
     expect(synapseCallFailed(new Error('boom'))).toMatchObject({ code: 'AI_007', data: { transient: false } });
     expect(synapseCallFailed(refusal('SYN_BUDGET_CALLS', 429))).toMatchObject({ code: 'AI_008' });
@@ -77,6 +86,13 @@ describe('runToolLoop', () => {
     const db = { insert: () => ({ values: () => Promise.resolve() }) } as never;
 
     await expect(runToolLoop(model, [], [], [], ctx, db, { maxRounds: 1 })).rejects.toMatchObject({ code: 'AI_009' });
+  });
+
+  it("should surface a strict refusal of an unrestricted tool round as unrestricted writing that isn't set up", async () => {
+    const model = { bindTools: () => ({ invoke: async () => Promise.reject(refusal('SYN_NO_ELIGIBLE_MODEL', 422)) }) } as never;
+
+    await expect(runToolLoop(model, [], [], [], ctx, {} as never, { contentMode: 'unrestricted' })).rejects.toMatchObject({ code: 'AI_024' });
+    await expect(runToolLoop(model, [], [], [], ctx, {} as never, { contentMode: 'standard' })).rejects.toMatchObject({ code: 'AI_003' });
   });
 
   it('should pass any other failure through as it came', async () => {

@@ -5,11 +5,6 @@ import { type APIRequestContext, type APIResponse, expect } from '@playwright/te
 
 import { apiContext, AUTH_DIR, csrfHeaders, type LoginPersona, mutate, novelForgeDb, pollUntil } from '../../lib';
 
-export interface ModelRef {
-  readonly provider: string;
-  readonly model: string;
-}
-
 export type EntityType = 'character' | 'faction' | 'location' | 'power_rule' | 'item' | 'concept';
 
 export interface EntitySeed {
@@ -126,12 +121,6 @@ export class ForgeJobTimeoutError extends Error {
 export const MODEL_FLOW_TIMEOUT_MS = 30 * 60_000;
 
 export const MODEL_CALL_TIMEOUT_MS = 10 * 60_000;
-
-/**
- * A chat pin is a Synapse alias, sent as the `synapse` option from `GET /ai/models` with its key as the model. Haiku is offered to standard chats only, so an unrestricted chat
- * cannot pin it.
- */
-export const HAIKU_ALIAS: ModelRef = { provider: 'synapse', model: 'haiku' };
 
 export const NOVEL_NOTES = [
   'Working idea: a cartographer in a river city is hired to map a district that is not on any chart.',

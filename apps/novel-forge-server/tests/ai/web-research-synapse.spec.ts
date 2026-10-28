@@ -55,14 +55,8 @@ describe('WebResearchService.modeFor', () => {
     expect(await service(new FakeSynapse().reply(json(catalog(false)))).modeFor(SELECTORS)).toBe('off');
   });
 
-  it("should judge a pinned chat by its alias's own native web search, whatever the task default says", async () => {
-    const aliases = [alias('opus', true), alias('kimi', false)];
-
-    expect(await service(new FakeSynapse().reply(json(catalog(false, aliases)))).modeFor(SELECTORS, 'opus')).toBe('native');
-    expect(await service(new FakeSynapse().reply(json(catalog(true, aliases)))).modeFor(SELECTORS, 'kimi')).toBe('brave');
-  });
-
-  it("should fall back to the task default's answer for a pin the catalog does not offer", async () => {
-    expect(await service(new FakeSynapse().reply(json(catalog(true, [alias('kimi', false)])))).modeFor(SELECTORS, 'retired')).toBe('native');
+  it("should judge by the task default's own web search, whatever an alias it lists says", async () => {
+    expect(await service(new FakeSynapse().reply(json(catalog(true, [alias('kimi', false)])))).modeFor(SELECTORS)).toBe('native');
+    expect(await service(new FakeSynapse().reply(json(catalog(false, [alias('opus', true)])))).modeFor(SELECTORS)).toBe('brave');
   });
 });

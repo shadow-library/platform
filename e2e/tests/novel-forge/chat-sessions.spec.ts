@@ -3,10 +3,8 @@ import { type APIRequestContext } from '@playwright/test';
 import { mutate } from '../../lib';
 import { expect, test } from './forge-actors';
 import { expectCode, guardedProject, newChatSession, newProject } from './forge-arrange';
-import { assertSpendGuarded, insertWorkflowRun, listDispatchedModelCalls } from './forge-db';
+import { assertSpendGuarded, insertWorkflowRun } from './forge-db';
 import { insertChatMessage, insertChatSession, settleWorkflowRun } from './forge-bible';
-import { listWorkflowRuns } from './forge-rows';
-import { HAIKU_ALIAS } from './forge-helpers';
 
 interface ChatSession {
   id: string;
@@ -14,9 +12,6 @@ interface ChatSession {
   mode: string;
   status: string;
   title: string | null;
-  modelProvider: string | null;
-  modelId: string | null;
-  contentMode: string | null;
 }
 
 interface ChatTurnStatus {
@@ -26,7 +21,7 @@ interface ChatTurnStatus {
 }
 
 /**
- * Chat sessions without a model: CRUD, model pin validation, archive/unarchive/delete, and the turn status a client polls (`pendingTurn`/`failedTurn`) derived from seeded
+ * Chat sessions without a model: CRUD, archive/unarchive/delete, and the turn status a client polls (`pendingTurn`/`failedTurn`) derived from seeded
  * `workflow_runs` rows. The model-capable routes (`turn/stream`, `premise/enhance`) are exercised only on pre-dispatch refusals, with every project quota-pinned first.
  */
 
@@ -86,31 +81,6 @@ test.describe('novel-forge chat sessions', () => {
     );
   });
 
-  test('should pin a chat to an alias, refuse a registry slug, and clear the pin back to the default with both fields null', async ({ forge }) => {
-    const owner = await forge.actor({ label: 'chat-model' });
-    const projectId = await newProject(owner, 'chat-model');
-    const sessionId = await newChatSession(owner, projectId);
-
-    await expectCode(
-      await mutate(owner.ctx, 'patch', `/api/v1/projects/${projectId}/chat/sessions/${sessionId}/model`, { data: { provider: 'openrouter', model: 'e2e/unregistered' } }),
-      400,
-      'AI_002',
-      'pinning a registry slug, which is not a Synapse alias',
-    );
-
-    const pinned = await mutate(owner.ctx, 'patch', `/api/v1/projects/${projectId}/chat/sessions/${sessionId}/model`, { data: HAIKU_ALIAS });
-    expect(pinned.status(), await pinned.text()).toBe(200);
-    const pinnedSession = (await pinned.json()) as ChatSession;
-    expect(pinnedSession.modelProvider).toBe('synapse');
-    expect(pinnedSession.modelId).toBe('haiku');
-
-    const cleared = await mutate(owner.ctx, 'patch', `/api/v1/projects/${projectId}/chat/sessions/${sessionId}/model`, { data: { provider: null, model: null } });
-    expect(cleared.status(), await cleared.text()).toBe(200);
-    const clearedSession = (await cleared.json()) as ChatSession;
-    expect(clearedSession.modelProvider).toBeNull();
-    expect(clearedSession.modelId).toBeNull();
-  });
-
   test('should derive pendingTurn and failedTurn from seeded workflow runs, hiding a cancelled run once a newer message exists', async ({ forge }) => {
     const owner = await forge.actor({ label: 'chat-turn-status' });
     const projectId = await newProject(owner, 'chat-turn-status');
@@ -151,25 +121,10 @@ test.describe('novel-forge chat sessions', () => {
     expect(afterNewerMessage.lastOrdinal).toBeGreaterThan(0);
   });
 
-  test('should refuse a pin to an alias the catalog does not offer, so no turn runs on it, and a premise enhancement before any model dispatch', async ({ forge }) => {
+  test('should refuse a premise enhancement before any model dispatch', async ({ forge }) => {
     const owner = await forge.actor({ label: 'chat-guard' });
     const projectId = await newProject(owner, 'chat-guard');
     await forge.quotaPin(projectId);
-    const sessionId = await newChatSession(owner, projectId);
-    const pinPath = `/api/v1/projects/${projectId}/chat/sessions/${sessionId}/model`;
-
-    await expectCode(await mutate(owner.ctx, 'patch', pinPath, { data: { provider: 'synapse', model: 'e2e-unoffered' } }), 400, 'AI_022', 'pinning an alias the catalog lacks');
-    await expectCode(
-      await mutate(owner.ctx, 'patch', pinPath, { data: { ...HAIKU_ALIAS, contentMode: 'unrestricted' } }),
-      400,
-      'AI_022',
-      'pinning a standard-only alias on a chat turned unrestricted in the same update',
-    );
-    const session = await owner.ctx.get(`/api/v1/projects/${projectId}/chat/sessions/${sessionId}`);
-    expect(session.status(), await session.text()).toBe(200);
-    expect((await session.json()) as ChatSession, 'a refused pin writes nothing, the model type included').toMatchObject({ modelProvider: null, modelId: null, contentMode: null });
-    expect(await listWorkflowRuns(projectId, 'chat-turn'), 'no turn was dispatched for the refused pin').toEqual([]);
-    expect(await listDispatchedModelCalls(projectId)).toEqual([]);
 
     await assertSpendGuarded(projectId);
     await expectCode(

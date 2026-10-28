@@ -4,9 +4,9 @@ import { type APIRequestContext } from '@playwright/test';
 
 import { mutate, pollUntil } from '../../lib';
 import { type ForgeActor } from './forge-actors';
-import { expectCode, guardedProject, newChatSession, newProject, quotaRefusedChat, SHORT_TURN, startTurn } from './forge-arrange';
+import { expectCode, guardedProject, newChatSession, newProject, quotaRefusedChat, SHORT_TURN, startTurn, unrestrictedAvailable } from './forge-arrange';
 import { listDispatchedModelCalls } from './forge-db';
-import { type ChatTranscript, HAIKU_ALIAS } from './forge-helpers';
+import { type ChatTranscript } from './forge-helpers';
 import { holdNextChatMessage, listWorkflowRuns } from './forge-rows';
 import { expect, expectRefusedStream, framesOf, type SseClient, type SseFrame, type SseStream, test } from './forge-sse';
 
@@ -47,15 +47,10 @@ function expectQuotaRefusedTurn(frames: readonly SseFrame[]): void {
 }
 
 test.describe('novel-forge chat turn stream', () => {
-  test('should refuse a turn before its run exists, and start one once the chat is pinned to an offered alias', async ({ forge, sse }) => {
+  test('should refuse a turn before its run exists, and start one on the project’s own pace', async ({ forge, sse }) => {
     const owner = await forge.actor({ label: 'turn-refused' });
     const projectId = await guardedProject(forge, owner, 'turn-refused');
     const sessionId = await newChatSession(owner, projectId);
-    const pinPath = `/api/v1/projects/${projectId}/chat/sessions/${sessionId}/model`;
-
-    await expectCode(await mutate(owner.ctx, 'patch', pinPath, { data: { provider: 'synapse', model: 'e2e-unoffered' } }), 400, 'AI_022', 'an alias the catalog lacks');
-    expect(await listWorkflowRuns(projectId, 'chat-turn'), 'the refused pin opened no run').toEqual([]);
-    expect((await transcript(owner.ctx, projectId, sessionId)).messages, 'and stored no message').toEqual([]);
 
     const archive = await mutate(owner.ctx, 'post', `/api/v1/projects/${projectId}/chat/sessions/${sessionId}/archive`);
     expect(archive.status(), await archive.text()).toBe(200);
@@ -64,11 +59,34 @@ test.describe('novel-forge chat turn stream', () => {
     expect(unarchive.status(), await unarchive.text()).toBe(200);
     await expectCode(await startTurn(owner, projectId, randomUUID()), 404, 'CHT_001', 'a chat that does not exist');
 
-    const pinned = await mutate(owner.ctx, 'patch', pinPath, { data: HAIKU_ALIAS });
-    expect(pinned.status(), await pinned.text()).toBe(200);
     const runId = await startedRun(owner, projectId, sessionId);
     expectQuotaRefusedTurn(await watchToTheEnd(sse, owner, projectId, runId));
-    expect(await listDispatchedModelCalls(projectId), "the chat's offered pin starts the turn, and the quota still refused it").toEqual([]);
+    expect(await listDispatchedModelCalls(projectId), 'the turn started, and the quota still refused it').toEqual([]);
+  });
+
+  test('should run a turn on its one-shot pace without storing it on the chat', async ({ forge, sse }) => {
+    const owner = await forge.actor({ label: 'turn-one-shot' });
+    const chat = await quotaRefusedChat(forge, owner, 'turn-one-shot');
+
+    const response = await startTurn(owner, chat.projectId, chat.sessionId, { costTier: 'performant', contentMode: 'standard' });
+    expect(response.status(), await response.text()).toBe(202);
+    const { runId } = (await response.json()) as { runId: string };
+    expectQuotaRefusedTurn(await watchToTheEnd(sse, owner, chat.projectId, runId));
+
+    const session = await owner.ctx.get(`/api/v1/projects/${chat.projectId}/chat/sessions/${chat.sessionId}`);
+    expect(session.status(), await session.text()).toBe(200);
+    const body = (await session.json()) as Record<string, unknown>;
+    for (const field of ['costTier', 'contentMode', 'modelProvider', 'modelId']) expect(body, `a chat holds no ${field} of its own`).not.toHaveProperty(field);
+  });
+
+  test('should refuse a one-shot unrestricted turn before its run exists where unrestricted writing is not set up', async ({ forge }) => {
+    const owner = await forge.actor({ label: 'turn-unrestricted' });
+    test.skip(await unrestrictedAvailable(owner.ctx), 'the target routes unrestricted writing, so nothing is refused');
+    const chat = await quotaRefusedChat(forge, owner, 'turn-unrestricted');
+
+    await expectCode(await startTurn(owner, chat.projectId, chat.sessionId, { contentMode: 'unrestricted' }), 400, 'AI_024', 'an unrestricted reply nothing routes');
+    expect(await listWorkflowRuns(chat.projectId, 'chat-turn'), 'the refused turn opened no run').toEqual([]);
+    expect((await transcript(owner.ctx, chat.projectId, chat.sessionId)).messages, 'and stored no message').toEqual([]);
   });
 
   test('should deliver the same live frames to every subscriber of a running turn', async ({ forge, sse }) => {

@@ -2,7 +2,7 @@ import { type APIRequestContext, type APIResponse } from '@playwright/test';
 
 import { mutate } from '../../lib';
 import { expect, type ForgeActor, test } from './forge-actors';
-import { assertSpendGuarded, insertModelCallBatch, insertModelCalls, listDispatchedModelCalls, readAccountDefaultCostTier } from './forge-db';
+import { assertSpendGuarded, insertModelCallBatch, insertModelCalls, listDispatchedModelCalls } from './forge-db';
 import { errorCode, uniqueSuffix } from './forge-helpers';
 
 interface Quota {
@@ -251,30 +251,16 @@ test.describe('novel-forge cost figures', () => {
   });
 });
 
-test.describe('novel-forge AI settings', () => {
-  test('should default a new account to Balanced and start new projects on the saved default tier', async ({ forge }) => {
-    const author = await forge.actor({ label: 'settings' });
+test.describe('novel-forge pace defaults', () => {
+  test('should start a new project on balanced, on the tier its request names, and a clone on its source’s tier', async ({ forge }) => {
+    const author = await forge.actor({ label: 'pace' });
 
-    const initial = await author.ctx.get('/api/v1/ai/settings');
-    expect(initial.status(), await initial.text()).toBe(200);
-    expect(await initial.json()).toEqual({ defaultCostTier: 'balanced' });
-
-    const invalid = await mutate(author.ctx, 'put', '/api/v1/ai/settings', { data: { defaultCostTier: 'luxury' } });
-    expect(invalid.status(), `an unknown tier — body ${await invalid.text()}`).toBe(422);
-    expect(await errorCode(invalid)).toBe('VALIDATION_ERROR');
-
-    const saved = await mutate(author.ctx, 'put', '/api/v1/ai/settings', { data: { defaultCostTier: 'economy' } });
-    expect(saved.status(), await saved.text()).toBe(200);
-    expect(await saved.json()).toEqual({ defaultCostTier: 'economy' });
-    expect(await (await author.ctx.get('/api/v1/ai/settings')).json()).toEqual({ defaultCostTier: 'economy' });
-    expect(await readAccountDefaultCostTier(author.owner)).toBe('economy');
-
-    expect((await createProject(author)).costTier, 'a project created without a tier takes the saved default').toBe('economy');
+    expect((await createProject(author)).costTier, 'a project created without a tier starts on balanced').toBe('balanced');
     const performant = await createProject(author, { costTier: 'performant' });
     expect(performant.costTier, 'a tier named on creation wins').toBe('performant');
 
     const clone = await mutate(author.ctx, 'post', `/api/v1/projects/${performant.id}/clone`, { data: { name: `e2e-forge-clone-${uniqueSuffix()}` } });
     expect(clone.status(), await clone.text()).toBe(201);
-    expect(((await clone.json()) as ProjectBody).costTier, "a clone keeps its source's tier over the account default").toBe('performant');
+    expect(((await clone.json()) as ProjectBody).costTier, "a clone keeps its source's tier").toBe('performant');
   });
 });

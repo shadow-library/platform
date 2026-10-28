@@ -105,7 +105,7 @@ export class ChatCompactionService {
   /**
    * Folds older messages into the rolling summary once the window exceeds `historyBudget` or MAX_VERBATIM_TURNS;
    * messages are never deleted, the watermark is a read-time window over the intact transcript. Advances the passed session in place.
-   * The fold runs unrestricted if the novel, chat, turn, prior summary or any folded reply is, and the summary is then recorded unrestricted so standard turns never read it.
+   * The fold runs unrestricted if the novel, turn, prior summary or any folded reply is, and the summary is then recorded unrestricted so standard turns never read it.
    * Returns the compaction run's id (undefined if nothing needed folding) so the caller can link it to the turn run once that run exists — compaction always runs before it.
    */
   async compactIfNeeded(
@@ -131,7 +131,7 @@ export class ChatCompactionService {
     const fallback = modeOf(project?.contentMode);
     const folded = await this.unrestrictedReplies(toFold, fallback);
     const priorMode = session.summary ? await this.summaryMode(session, fallback) : 'standard';
-    const raised = [fallback, session.contentMode, turn.contentMode, priorMode].includes('unrestricted') || folded.size > 0;
+    const raised = [fallback, turn.contentMode, priorMode].includes('unrestricted') || folded.size > 0;
     const contentMode: Project.ContentMode = raised ? 'unrestricted' : 'standard';
     const selected: ProjectConfig = { ...project, contentMode, costTier: turn.costTier };
 

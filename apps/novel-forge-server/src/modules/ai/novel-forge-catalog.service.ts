@@ -1,13 +1,13 @@
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
-import { type CatalogAliasView, type CatalogAppResponse, type CatalogModelView, type CatalogTaskResponse, type CatalogTaskView, SynapseClient } from '@shadow-library/synapse';
+import { type CatalogAliasView, type CatalogAppResponse, type CatalogModelView, type CatalogTaskView, SynapseClient } from '@shadow-library/synapse';
 
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type Project } from '@server/database';
 
 import { type AiModelLabel, type AiModelOption, type AiModelsResponse, type AiRoleDefault } from './ai.dto';
-import { CONTENT_MODES, COST_TIERS, DEFAULT_COST_TIER, SELECTABLE_MODEL_GROUPS, type SelectableModelGroup } from './defaults';
+import { CONTENT_MODES, COST_TIERS, DEFAULT_COST_TIER, type ModelGroup, SELECTABLE_MODEL_GROUPS, type SelectableModelGroup } from './defaults';
 import { HISTORICAL_MODELS } from './historical-models';
 import { fromSynapseFailure } from './synapse-failure';
 import { SYNAPSE_CHAT_TASK, SYNAPSE_PROVIDER, synapseGroupTask, synapseSelectors } from './synapse-request';
@@ -31,8 +31,10 @@ export interface CatalogGroupModel extends CatalogPricedModel {
 
 export interface CatalogSelectionModels {
   models: CatalogGroupModel[];
-  /** The chat aliases the catalog offers for exactly this selection, as option ids. */
-  chatAliases: string[];
+}
+
+export interface UnrestrictedAvailability {
+  unrestrictedAvailable(): Promise<boolean>;
 }
 
 interface SelectionView extends CatalogSelection {
@@ -40,6 +42,19 @@ interface SelectionView extends CatalogSelection {
 }
 
 export const CATALOG_SELECTIONS: readonly CatalogSelection[] = COST_TIERS.flatMap(costTier => CONTENT_MODES.map(contentMode => ({ costTier, contentMode })));
+
+/** Every group an author's work reaches; embedding carries no content mode. */
+export const UNRESTRICTED_GROUPS: readonly ModelGroup[] = ['writing', 'planning', 'review', 'chat', 'helper', 'vision', 'image'];
+
+/** A task the selectors did not match falls to its selector-less default route, which an unrestricted call never takes. */
+export function routesUnrestricted(views: readonly CatalogAppResponse[]): boolean {
+  return views.length > 0 && views.every(view => UNRESTRICTED_GROUPS.every(group => view.tasks[synapseGroupTask(group)]?.matched === true));
+}
+
+/** Refuses unrestricted writing unless the catalog routes it for every task and tier; no catalog to ask refuses too. */
+export async function requireUnrestricted(availability: UnrestrictedAvailability | undefined): Promise<void> {
+  if (!(await availability?.unrestrictedAvailable())) throw AppErrorCode.AI_024.create();
+}
 
 /** An image model is priced per image, so it carries no per-token price. */
 export function tokenPrices({ price }: Pick<CatalogModelView, 'price'>): Pick<CatalogPricedModel, 'inputPricePerMToken' | 'outputPricePerMToken'> {
@@ -97,8 +112,10 @@ export function catalogModelsResponse(views: readonly SelectionView[]): AiModels
     const entry = views.find(view => view.costTier === DEFAULT_COST_TIER && view.contentMode === contentMode);
     return entry ? catalogGroupModels(entry.view).map(({ group, provider, model }) => ({ role: group, provider, model })) : [];
   };
+  const unrestrictedViews = views.filter(({ contentMode }) => contentMode === 'unrestricted').map(({ view }) => view);
   return {
     profile: 'production',
+    unrestrictedAvailable: routesUnrestricted(unrestrictedViews),
     models: [...options.values()],
     defaults: defaultsFor('standard'),
     unrestrictedDefaults: defaultsFor('unrestricted'),
@@ -112,42 +129,30 @@ export function labelMap(labels: readonly AiModelLabel[]): ReadonlyMap<string, s
   return new Map(labels.map(entry => [entry.model, entry.label]));
 }
 
-/** What novel-forge reads from Synapse's catalog: every model list, label, price and pinnable alias. */
+/** What novel-forge reads from Synapse's catalog: every model list, label and price, and whether unrestricted writing is routed. */
 @Injectable()
-export class NovelForgeCatalogService {
+export class NovelForgeCatalogService implements UnrestrictedAvailability {
   private readonly logger = Logger.getLogger(APP_NAME, NovelForgeCatalogService.name);
 
   constructor(private readonly synapse: SynapseClient) {}
 
-  async chatTask(selection: CatalogSelection): Promise<CatalogTaskResponse> {
-    return this.read(client => client.catalog({ task: SYNAPSE_CHAT_TASK, selectors: synapseSelectors(selection) }));
+  async selectionModels(selection: CatalogSelection): Promise<CatalogSelectionModels> {
+    return { models: catalogGroupModels(await this.appView(selection)) };
   }
 
-  async selectionModels(selection: CatalogSelection): Promise<CatalogSelectionModels> {
-    const view = await this.appView(selection);
-    return { models: catalogGroupModels(view), chatAliases: chatAliasesOf(view).map(alias => alias.key) };
+  /** Never fails: a catalog that cannot be read offers no unrestricted writing. Each tier's view rides the client's version-checked catalog cache. */
+  async unrestrictedAvailable(): Promise<boolean> {
+    try {
+      return routesUnrestricted(await Promise.all(COST_TIERS.map(costTier => this.appView({ costTier, contentMode: 'unrestricted' }))));
+    } catch (err) {
+      this.logger.warn('Synapse catalog unreadable, so unrestricted writing is treated as unavailable', { err });
+      return false;
+    }
   }
 
   async modelsResponse(): Promise<AiModelsResponse> {
     const views = await Promise.all(CATALOG_SELECTIONS.map(async selection => ({ ...selection, view: await this.appView(selection) })));
     return catalogModelsResponse(views);
-  }
-
-  /** The alias as the catalog offers it for these selectors; anything it does not offer, hidden and retired aliases included, cannot be pinned. */
-  async requireChatAlias(alias: string, selection: CatalogSelection): Promise<CatalogAliasView> {
-    const offered = (await this.chatTask(selection)).aliases.find(entry => entry.key === alias);
-    if (!offered) throw AppErrorCode.AI_022.create({ alias });
-    return offered;
-  }
-
-  /** `undefined` when the catalog cannot be read, so the caller sends the pin as stored and lets Synapse decide. */
-  async offeredChatAliases(selection: CatalogSelection): Promise<string[] | undefined> {
-    try {
-      return (await this.chatTask(selection)).aliases.map(alias => alias.key);
-    } catch (err) {
-      this.logger.warn('Synapse catalog unreadable, so a chat pin is sent unchecked', { selection, err });
-      return undefined;
-    }
   }
 
   /** Never fails: a record whose model the catalog cannot name keeps its key, and an unreadable catalog leaves only the historical names. */

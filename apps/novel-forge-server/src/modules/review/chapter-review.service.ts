@@ -345,7 +345,8 @@ export class ChapterReviewService {
     const messages = [...(judge.fewShots ?? []), new SystemMessage(judge.system), new HumanMessage(task)];
 
     const ask = async () => {
-      const { messages: answered } = await runToolLoop(model, tools, rawTools, messages, toolContext, this.db, { maxRounds: JUDGE_TOOL_ROUNDS });
+      const { contentMode } = this.modelRouter.routeModel('judge', route.project, route.policy);
+      const { messages: answered } = await runToolLoop(model, tools, rawTools, messages, toolContext, this.db, { maxRounds: JUDGE_TOOL_ROUNDS, contentMode });
       const last = [...answered].reverse().find(message => message.getType() === 'ai');
       return parseJudgeOutput(last ? (typeof last.content === 'string' ? last.content : JSON.stringify(last.content)) : '{}');
     };

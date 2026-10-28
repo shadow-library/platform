@@ -17,9 +17,7 @@ import {
   ListChatSessionResponse,
   ListChatSessionsQuery,
   UpdateChatSessionBody,
-  UpdateSessionModelBody,
 } from './chat.dto';
-import { presentChatSession } from './chat-selection';
 import { ChatSessionService } from './chat-session.service';
 import { ChatService } from './chat.service';
 import { serialiseMessage, serialiseTurn, withTurnCost } from './serialise';
@@ -39,20 +37,19 @@ export class ChatController {
   @Post()
   @RespondFor(201, ChatSessionResponse)
   createSession(@Params() params: ChatProjectParams, @Body() body: CreateChatSessionBody): Promise<ChatSessionResponse> {
-    return this.chatSessions.createSession(params.projectId, body).then(presentChatSession);
+    return this.chatSessions.createSession(params.projectId, body);
   }
 
   @Get()
   @RespondFor(200, ListChatSessionResponse)
-  async listSessions(@Params() params: ChatProjectParams, @Query() query: ListChatSessionsQuery): Promise<ListChatSessionResponse> {
-    const page = await this.chatSessions.listSessions(params.projectId, query);
-    return { ...page, items: page.items.map(presentChatSession) };
+  listSessions(@Params() params: ChatProjectParams, @Query() query: ListChatSessionsQuery): Promise<ListChatSessionResponse> {
+    return this.chatSessions.listSessions(params.projectId, query);
   }
 
   @Get('/:sessionId')
   @RespondFor(200, ChatSessionResponse)
   getSession(@Params() params: ChatSessionParams): Promise<ChatSessionResponse> {
-    return this.chatSessions.getSession(params.projectId, params.sessionId).then(presentChatSession);
+    return this.chatSessions.getSession(params.projectId, params.sessionId);
   }
 
   @Get('/:sessionId/messages')
@@ -96,34 +93,27 @@ export class ChatController {
   @Patch('/:sessionId')
   @RespondFor(200, ChatSessionResponse)
   updateSession(@Params() params: ChatSessionParams, @Body() body: UpdateChatSessionBody): Promise<ChatSessionResponse> {
-    return this.chatSessions.updateSession(params.projectId, params.sessionId, body).then(presentChatSession);
-  }
-
-  @BotPermission(PROJECTS_WRITE_PERMISSION)
-  @Patch('/:sessionId/model')
-  @RespondFor(200, ChatSessionResponse)
-  updateSessionModel(@Params() params: ChatSessionParams, @Body() body: UpdateSessionModelBody): Promise<ChatSessionResponse> {
-    return this.chatSessions.updateSessionModel(params.projectId, params.sessionId, body).then(presentChatSession);
+    return this.chatSessions.updateSession(params.projectId, params.sessionId, body);
   }
 
   @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Delete('/:sessionId')
   @RespondFor(200, ChatSessionResponse)
   deleteSession(@Params() params: ChatSessionParams): Promise<ChatSessionResponse> {
-    return this.chatSessions.deleteSession(params.projectId, params.sessionId).then(presentChatSession);
+    return this.chatSessions.deleteSession(params.projectId, params.sessionId);
   }
 
   @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Post('/:sessionId/archive')
   @RespondFor(200, ChatSessionResponse)
   archiveSession(@Params() params: ChatSessionParams): Promise<ChatSessionResponse> {
-    return this.chatSessions.setSessionStatus(params.projectId, params.sessionId, 'archived').then(presentChatSession);
+    return this.chatSessions.setSessionStatus(params.projectId, params.sessionId, 'archived');
   }
 
   @BotPermission(PROJECTS_WRITE_PERMISSION)
   @Post('/:sessionId/unarchive')
   @RespondFor(200, ChatSessionResponse)
   unarchiveSession(@Params() params: ChatSessionParams): Promise<ChatSessionResponse> {
-    return this.chatSessions.setSessionStatus(params.projectId, params.sessionId, 'active').then(presentChatSession);
+    return this.chatSessions.setSessionStatus(params.projectId, params.sessionId, 'active');
   }
 }

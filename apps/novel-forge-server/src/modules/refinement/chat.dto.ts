@@ -52,29 +52,6 @@ export class UpdateChatSessionBody {
   title?: string;
 }
 
-@Schema({ minProperties: 1, description: 'Every field is optional: an omitted field is left as it is, `null` clears it back to the project default.' })
-export class UpdateSessionModelBody {
-  @Field({
-    optional: true,
-    nullable: true,
-    description: "The picked option's provider from `GET /ai/models`: `synapse` for a Synapse alias. Clear both pin fields to use the cost tier's model.",
-  })
-  provider?: string | null;
-
-  @Field({
-    optional: true,
-    nullable: true,
-    description: "The picked option's id: an alias key, which must be offered for the chat's model type and cost tier after this update (`AI_022` otherwise).",
-  })
-  model?: string | null;
-
-  @Field(() => ContentMode, { optional: true, nullable: true, description: "This chat's default model type for its replies; chapters keep their own content mode." })
-  contentMode?: Project.ContentMode | null;
-
-  @Field(() => CostTier, { optional: true, nullable: true, description: "This chat's default cost tier; actions a turn starts run at the turn's tier." })
-  costTier?: Project.CostTier | null;
-}
-
 @Schema()
 export class ListChatSessionsQuery extends PaginationQuery(SortByTime, { sortBy: 'updatedAt', sortOrder: 'desc' }) {
   @Field(() => ChatScope, { optional: true })
@@ -106,18 +83,6 @@ export class ChatSessionResponse {
 
   @Field(() => ChatMode)
   mode: Refinement.ChatMode;
-
-  @Field({ optional: true, nullable: true, description: "The pinned option's provider: `synapse` for an alias pin. Null when the chat is unpinned." })
-  modelProvider?: string | null;
-
-  @Field({ optional: true, nullable: true, description: "The pinned option's id: an alias key." })
-  modelId?: string | null;
-
-  @Field(() => ContentMode, { optional: true, nullable: true, description: "The chat's own model type; null follows the project's content mode." })
-  contentMode?: Project.ContentMode | null;
-
-  @Field(() => CostTier, { optional: true, nullable: true, description: "The chat's own cost tier; null follows the project's cost tier." })
-  costTier?: Project.CostTier | null;
 
   @Field({ optional: true, nullable: true })
   summary?: string | null;
@@ -530,13 +495,15 @@ export class ChatTurnBody {
 
   @Field(() => ContentMode, {
     optional: true,
-    description: "Model type for this turn's reply only; omitted follows the chat, then the project. Chapters keep their own content mode.",
+    description:
+      "Model type for this turn's reply only, never stored; omitted follows the project. Chapters keep their own content mode. unrestricted is refused (`AI_024`) while `GET /ai/models` reports `unrestrictedAvailable: false`.",
   })
   contentMode?: Project.ContentMode;
 
   @Field(() => CostTier, {
     optional: true,
-    description: 'Cost tier for this turn only; omitted follows the chat, then the project. Actions this turn starts (write, review, audit) run at it.',
+    description:
+      'Cost tier for this turn only, never stored (Think deeper sends performant); omitted follows the project. Actions this turn starts (write, review, audit) run at it.',
   })
   costTier?: Project.CostTier;
 }

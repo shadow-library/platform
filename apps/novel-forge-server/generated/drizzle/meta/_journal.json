@@ -127,6 +127,13 @@
       "when": 1792782886939,
       "tag": "0017_drop_dead_persistence",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1793218966532,
+      "tag": "0018_clear_chat_pins_and_account_tier",
+      "breakpoints": true
     }
   ]
 }

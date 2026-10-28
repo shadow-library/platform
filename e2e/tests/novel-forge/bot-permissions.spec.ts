@@ -146,8 +146,6 @@ test.describe('novel-forge bot permission matrix', () => {
     const base = `/api/v1/projects/${project.id}`;
 
     const closed: [Method, string, unknown?][] = [
-      ['get', '/api/v1/ai/settings'],
-      ['put', '/api/v1/ai/settings', { defaultCostTier: 'economy' }],
       ['get', '/api/v1/ai/models'],
       ['get', '/api/v1/ai/usage'],
       ['get', '/api/v1/ai/quota'],

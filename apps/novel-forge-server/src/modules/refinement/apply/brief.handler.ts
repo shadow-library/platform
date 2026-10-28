@@ -57,6 +57,7 @@ async function applyBriefUpdate(ctx: ApplyContext, op: BriefRestoreOp): Promise<
   // A missing brief is creatable — refinement is a first-class authoring path — but only with a body;
   // without one there is nothing for the chapter author to draft from.
   if (!existing && op.body === undefined) throw AppErrorCode.RFN_004.create();
+  if (op.contentMode === 'unrestricted' && existing?.contentMode !== 'unrestricted' && ctx.unrestrictedRaise === 'refused') throw AppErrorCode.AI_024.create();
 
   const creates = (field: unknown): boolean => !existing && field === undefined;
   const defaults = {

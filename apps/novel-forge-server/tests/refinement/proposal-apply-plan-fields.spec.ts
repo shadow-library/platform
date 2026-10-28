@@ -11,7 +11,7 @@ import { matchesWhere, queryRows } from '../sql-filter';
 
 type Row = Record<string, unknown>;
 
-async function fakeProject(changeSet: ChangeOp[], seed: { briefs?: Row[]; volumes?: Row[]; facts?: Row[]; milestones?: Row[] } = {}) {
+async function fakeProject(changeSet: ChangeOp[], seed: { briefs?: Row[]; volumes?: Row[]; facts?: Row[]; milestones?: Row[] } = {}, unrestrictedAvailable = true) {
   const seeded = (rows: Row[] = []) => rows.map((row, index) => ({ id: BigInt(index + 1), projectId: 7n, revision: 1, contentHash: null, ...row }));
   const tables = new Map<unknown, Row[]>([
     [schema.briefs, seeded(seed.briefs)],
@@ -64,11 +64,13 @@ async function fakeProject(changeSet: ChangeOp[], seed: { briefs?: Row[]; volume
   const proposal = { id: 300n, projectId: 7n, kind: 'chat', status: 'pending', changeSet, messageId: null, summary: null, baseline: {} as unknown, inverseOps: null as unknown };
   rows(schema.refinementProposals).push(proposal);
   proposal.baseline = await loadArtifactStates(tx as never, 7n, changeSetRefs(changeSet));
-  const db = { transaction: async (run: (handle: unknown) => Promise<unknown>) => run(tx) };
-  const service = new ProposalApplyService({ getPostgresClient: () => db } as never, { has: () => true, get: mock(() => undefined) } as never);
-  const reverter = new ProposalRevertService({ getPostgresClient: () => db } as never);
+  const db = { query: { refinementProposals: { findFirst: async () => proposal } }, transaction: async (run: (handle: unknown) => Promise<unknown>) => run(tx) };
+  const catalog = { unrestrictedAvailable: async () => unrestrictedAvailable };
+  const service = new ProposalApplyService({ getPostgresClient: () => db } as never, { has: () => true, get: mock(() => undefined) } as never, catalog as never);
+  const reverter = new ProposalRevertService({ getPostgresClient: () => db } as never, catalog as never);
   const inverse = () => JSON.parse(JSON.stringify(proposal.inverseOps, (_, value: unknown) => (typeof value === 'bigint' ? String(value) : value))) as Row[];
-  return { service, reverter, rows, inverse };
+  const states = () => loadArtifactStates(tx as never, 7n, changeSetRefs(changeSet));
+  return { service, reverter, rows, inverse, proposal, states };
 }
 
 const PLAIN_BRIEF: Row = {
@@ -133,6 +135,35 @@ describe('ProposalApplyService — chapter plan fields', () => {
     await reverter.revert(7n, 300n);
 
     expect(planFields(rows(schema.briefs)[0])).toEqual(planFields(PLAIN_BRIEF));
+  });
+
+  it('should refuse raising a plan to unrestricted while the catalog does not route it, leaving the plan as it was', async () => {
+    const { service, rows } = await fakeProject([{ op: 'brief.update', chapter: 3, contentMode: 'unrestricted' }], { briefs: [PLAIN_BRIEF] }, false);
+
+    await expect(service.apply(7n, 300n)).rejects.toMatchObject({ code: 'AI_024' });
+    expect(rows(schema.briefs)[0]?.['contentMode']).toBeNull();
+  });
+
+  it('should let a plan already unrestricted keep its mode, and a revert restore it, while unrestricted is unavailable', async () => {
+    const kept = await fakeProject([{ op: 'brief.update', chapter: 3, title: 'The Slip', contentMode: 'unrestricted' }], { briefs: [PLANNED_BRIEF] }, false);
+    await kept.service.apply(7n, 300n);
+    expect(kept.rows(schema.briefs)[0]?.['contentMode']).toBe('unrestricted');
+
+    const lowered = await fakeProject([{ op: 'brief.update', chapter: 3, contentMode: 'standard' }], { briefs: [PLANNED_BRIEF] }, false);
+    await lowered.service.apply(7n, 300n);
+    await lowered.reverter.revert(7n, 300n);
+    expect(lowered.rows(schema.briefs)[0]?.['contentMode']).toBe('unrestricted');
+  });
+
+  it('should refuse redoing a raise to unrestricted while unavailable', async () => {
+    const raise: ChangeOp = { op: 'brief.update', chapter: 3, contentMode: 'unrestricted' };
+    const { reverter, rows, proposal, states } = await fakeProject([raise], { briefs: [PLAIN_BRIEF] }, false);
+    const undoneState = await states();
+    const inverse = { op: 'brief.update', chapter: 3, contentMode: null };
+    Object.assign(proposal, { status: 'applied', opResults: [{ index: 0, status: 'reverted', source: 'quoted' }], opUndo: [{ inverse, beforeState: undoneState, undoneState }] });
+
+    await expect(reverter.redoOp(7n, 300n, 0)).rejects.toMatchObject({ code: 'AI_024' });
+    expect(rows(schema.briefs)[0]?.['contentMode']).toBeNull();
   });
 
   it('should keep every plan field an op leaves out', async () => {

@@ -19,8 +19,8 @@ import { hardLineError, screenTexts } from '../ai/hard-line';
 import { type ModelRoute, ModelRouterService, type ProjectConfig } from '../ai/model-router.service';
 import { buildChatRefinePrompt, chatPromptTokens, chatScopeInstructions, HUB_ALLOWED_OPS, renderTurnMessage, renderTurnRules } from '../ai/prompts';
 import { type ChatRefineOutput } from '../ai/schemas';
-import { NovelForgeCatalogService } from '../ai/novel-forge-catalog.service';
-import { gatewaySessionKey, SYNAPSE_CHAT_TASK, SYNAPSE_PROVIDER, synapseAlias, synapseSelectors } from '../ai/synapse-request';
+import { NovelForgeCatalogService, requireUnrestricted } from '../ai/novel-forge-catalog.service';
+import { gatewaySessionKey, SYNAPSE_CHAT_TASK, SYNAPSE_PROVIDER, synapseSelectors } from '../ai/synapse-request';
 import { resolveUnrestrictedRoute } from '../ai/unrestricted-route';
 import { mayResearch, WebResearchService } from '../ai/web';
 import { countWords } from '../eval/deterministic-metrics';
@@ -34,7 +34,7 @@ import { ChatLookupService } from './chat-lookup.service';
 import { contextUpdate, playbookDigest, toExchangeMessage } from './chat-exchange';
 import { type ChatTurnEmitter, EmitterRelay } from './chat-turn-emitter';
 import { TurnTraceCollector } from './chat-turn-trace';
-import { aliasRoutedProject, CHAT_TURN_GRAPH, type ChatSelection, chatSelection, type ChatSelectionOverride } from './chat-selection';
+import { CHAT_TURN_GRAPH, type ChatSelection, chatSelection, type ChatSelectionOverride } from './chat-selection';
 import { type ChatMessageView, ChatSessionService } from './chat-session.service';
 import { ChatTurnStagingService, type StagingContext } from './chat-turn-staging.service';
 import { sanitizeChatQuestion } from './chat-question';
@@ -46,7 +46,7 @@ import { findNegationEchoWarnings } from './proposal-warnings';
 import { proseWithheldNote, withoutProseEditOps } from './prose-intent';
 import { type TurnApplied, type TurnHoldReason } from './turn-proposals';
 
-/** `contentMode` and `costTier` apply to this turn's reply only; actions the turn starts inherit its tier, never its mode. */
+/** `contentMode` and `costTier` apply to this turn's reply only and are never stored; actions the turn starts inherit its tier, never its mode. */
 export interface ChatTurnOptions extends ChatSelectionOverride {
   /** The author's explicit per-turn permission to rewrite chapter prose; without it a prose op is withheld. */
   proseEdits?: boolean;
@@ -272,15 +272,16 @@ export class ChatService {
     await this.validateScopeRef(projectId, session.scopeType, session.scopeRef);
     const contexts = await resolvePassageContexts(this.db, projectId, options.contexts ?? []);
     if (!content.trim() && contexts.length === 0) throw AppErrorCode.CHT_012.create();
+    if (options.contentMode === 'unrestricted') await requireUnrestricted(this.catalog);
     this.logger.info('chat turn', { projectId, sessionId, scopeType: session.scopeType, mode: session.mode, contexts: contexts.length });
     this.logger.debug('chat turn user message', { projectId, sessionId, content });
 
     const project = (await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) })) as ProjectConfig | undefined;
-    const turnSelection = chatSelection(options, session, project);
+    const turnSelection = chatSelection(options, project);
     const message = renderTurnContent(content, contexts);
     const compactionRunId = await this.compaction.compactIfNeeded(projectId, session, CHAT_HISTORY_BUDGET, project, turnSelection);
 
-    const { policy, project: routed, route } = await this.routeChatReply(projectId, session, project, turnSelection);
+    const { policy, project: routed, route } = await this.routeChatReply(projectId, project, turnSelection);
     // Refused before it is saved: a stored message would ride every later turn's history and refuse the session with it.
     const refused = route.contentMode === 'unrestricted' ? screenTexts(turnScreens(content, contexts)) : null;
     if (refused) {
@@ -294,7 +295,7 @@ export class ChatService {
     const prompt = buildChatRefinePrompt(session.scopeType, { proseEdits, organiseNotes: organiseRequest });
     const guarded = (output: ChatRefineOutput): ChatRefineOutput => withLaterPlansRouted(withheldProse(output, proseEdits), organise);
     const turnRules = renderTurnRules({ proseEdits, justDiscussing, organiseNotes: organiseRequest, mode: session.mode });
-    const webMode = await this.webResearch.modeFor(synapseSelectors(route), synapseAlias('chat', routed));
+    const webMode = await this.webResearch.modeFor(synapseSelectors(route));
     const scopeInstructions = chatScopeInstructions(this.lookups.tools(webMode), webMode);
     const playbook = playbookDigest(scopeInstructions);
     const keyed = route.contentMode === 'standard';
@@ -410,9 +411,9 @@ export class ChatService {
   }
 
   /** An unrestricted reply reaches an unrestricted model only where the catalog routes `content_mode: unrestricted` for the tier. */
-  private async routeChatReply(projectId: bigint, session: Refinement.ChatSession, project: ProjectConfig | undefined, selection: ChatSelection): Promise<ChatReplyRoute> {
+  private async routeChatReply(projectId: bigint, project: ProjectConfig | undefined, selection: ChatSelection): Promise<ChatReplyRoute> {
     const call = { role: 'chat' as const };
-    const base = aliasRoutedProject(project, session, selection, await this.catalog?.offeredChatAliases(selection));
+    const base: ProjectConfig = { ...project, contentMode: selection.contentMode, costTier: selection.costTier };
     const { policy, project: routed } =
       selection.contentMode === 'unrestricted'
         ? await resolveUnrestrictedRoute({ pluginPolicy: this.pluginPolicy }, projectId, call, base)

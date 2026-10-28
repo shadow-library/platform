@@ -8,6 +8,7 @@ import { lockProjectPlan } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, type PrimaryTransaction, type Refinement, schema } from '@server/database';
 
+import { NovelForgeCatalogService } from '../ai/novel-forge-catalog.service';
 import { hasOrganiseUndo, revertOrganiseDecision } from '../notes/organise-record';
 import {
   type AppliedArtifact,
@@ -22,6 +23,7 @@ import {
   PLAN_STATE_OPS,
   removalsLast,
   sameContent,
+  unrestrictedRaiseFor,
 } from './apply';
 import { type ArtifactState, loadArtifactStates } from './artifact-state';
 import { type ChangeOp, changeSetRefs, type ContentOp } from './change-set';
@@ -71,7 +73,10 @@ export class ProposalRevertService {
   private readonly logger = Logger.getLogger(APP_NAME, ProposalRevertService.name);
   private readonly db: PrimaryDatabase;
 
-  constructor(private readonly databaseService: DatabaseService) {
+  constructor(
+    private readonly databaseService: DatabaseService,
+    private readonly catalog?: NovelForgeCatalogService,
+  ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
 
@@ -160,6 +165,7 @@ export class ProposalRevertService {
 
   /** Re-applies an undone change only while its turn stays applied (RFN_017), its dependencies are back (RFN_016) and its records are as the undo left them (RFN_003). */
   async redoOp<T = never>(projectId: bigint, proposalId: bigint, opIndex: number, onRedone?: OpToggleHook<T>): Promise<OpToggleResult<T>> {
+    const unrestrictedRaise = await unrestrictedRaiseFor(this.db, this.catalog, projectId, proposalId, [opIndex]);
     const result = await this.db.transaction(async (tx): Promise<OpToggleResult<T>> => {
       const turn = await this.lockTurnOp(tx, projectId, proposalId, opIndex);
       if (turn.proposal.status !== 'applied') throw AppErrorCode.RFN_017.create();
@@ -171,7 +177,7 @@ export class ProposalRevertService {
       const refs = changeSetRefs([turn.op]);
       if (!(await this.statesMatch(tx, projectId, refs, turn.record.undoneState))) throw AppErrorCode.RFN_003.create();
 
-      const ctx: ApplyContext = { tx, projectId, applied: [], staleMarked: [] };
+      const ctx: ApplyContext = { tx, projectId, applied: [], staleMarked: [], unrestrictedRaise };
       if (PLAN_STATE_OPS.has(turn.op.op)) await lockProjectPlan(tx, projectId);
       const beforeState = await loadArtifactStates(ctx.tx, projectId, refs);
       const inverse = await captureInverse(ctx, turn.op);

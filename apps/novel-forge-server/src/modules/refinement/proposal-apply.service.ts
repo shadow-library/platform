@@ -10,6 +10,7 @@ import { type DbExecutor, type PrimaryDatabase, type PrimaryTransaction, type Pr
 
 import { runWithCostTier } from '../ai/cost-tier-scope';
 import { isCostTier } from '../ai/defaults';
+import { NovelForgeCatalogService } from '../ai/novel-forge-catalog.service';
 import { recordOrganiseDecision, wholeOrganiseSelection } from '../notes/organise-record';
 import { type ActionExecutionResult, type ActionExecutor, ActionExecutorRegistry } from './action-registry';
 import {
@@ -23,6 +24,7 @@ import {
   PER_OP_UNDO_KINDS,
   PLAN_STATE_OPS,
   removalsLast,
+  unrestrictedRaiseFor,
 } from './apply';
 import { type ArtifactState, loadArtifactStates } from './artifact-state';
 import { CHAT_TURN_GRAPH } from './chat-selection';
@@ -94,6 +96,7 @@ export class ProposalApplyService {
   constructor(
     private readonly databaseService: DatabaseService,
     private readonly actionRegistry: ActionExecutorRegistry,
+    private readonly catalog?: NovelForgeCatalogService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
@@ -105,6 +108,7 @@ export class ProposalApplyService {
    */
   async apply(projectId: bigint, proposalId: bigint, options?: ApplyOptions): Promise<ApplyResult> {
     this.logger.debug('apply: starting', { projectId, proposalId, opIndexes: options?.opIndexes, autoApplied: options?.autoApplied });
+    const unrestrictedRaise = await unrestrictedRaiseFor(this.db, this.catalog, projectId, proposalId, options?.opIndexes);
     const applyInTransaction = async (tx: PrimaryTransaction): Promise<TxResult> => {
       const [proposal] = await tx
         .select()
@@ -157,7 +161,7 @@ export class ProposalApplyService {
 
       if (options?.opSources && options.opSources.length !== ops.length) throw AppError.internal('an automatic apply carries one source per op of its change-set');
 
-      const ctx: ApplyContext = { tx, projectId, applied: [], staleMarked: [] };
+      const ctx: ApplyContext = { tx, projectId, applied: [], staleMarked: [], unrestrictedRaise };
       const inverseOps: ContentOp[] = [];
       const perOpUndo = options?.autoApplied === true && PER_OP_UNDO_KINDS.has(proposal.kind);
       const opUndo: (OpUndoRecord | null)[] = ops.map(() => null);
