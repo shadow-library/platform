@@ -9,6 +9,7 @@ import {
   type CostTier,
   type ProjectModelRoute,
   type ProjectWordTarget,
+  useAiModelsQuery,
   useDeleteProjectMutation,
   useListPluginsQuery,
   useProjectModelsQuery,
@@ -16,7 +17,8 @@ import {
   useUpdateProjectMutation,
 } from '@/lib/apis';
 import { projectTitle } from '@/lib/format';
-import { contentModeLabel, groupLabel, tierLabel } from '@/lib/usage';
+import { useIsAdmin } from '@/lib/session';
+import { contentModeLabel, groupLabel, isPace, paceCopy, PACES, tierLabel } from '@/lib/usage';
 
 import styles from './settings.module.css';
 
@@ -69,15 +71,10 @@ function parseWordTargetInput(minInput: string, maxInput: string): WordTargetInp
 }
 
 const CONTENT_MODES: readonly ContentMode[] = ['standard', 'unrestricted'];
-const COST_TIERS: readonly CostTier[] = ['economy', 'balanced', 'performant'];
 const JOB_ORDER = ['writing', 'planning', 'review', 'chat', 'helper', 'image'];
 
 function isContentMode(value: string): value is ContentMode {
   return (CONTENT_MODES as readonly string[]).includes(value);
-}
-
-function isCostTier(value: string): value is CostTier {
-  return (COST_TIERS as readonly string[]).includes(value);
 }
 
 function routePrice(route: ProjectModelRoute): string {
@@ -85,67 +82,82 @@ function routePrice(route: ProjectModelRoute): string {
   return `$${route.inputPricePerMToken} in · $${route.outputPricePerMToken} out per 1M tokens`;
 }
 
-interface ModelCostDefaultsProps {
+interface PaceSettingsProps {
   novelId: string;
   contentMode: ContentMode;
   costTier: CostTier;
+  savedContentMode?: ContentMode;
+  unrestrictedAvailable?: boolean;
   onContentModeChange: (mode: ContentMode) => void;
   onCostTierChange: (tier: CostTier) => void;
 }
 
-function ModelCostDefaults({ novelId, contentMode, costTier, onContentModeChange, onCostTierChange }: ModelCostDefaultsProps): React.JSX.Element {
-  const routesQuery = useProjectModelsQuery(novelId, { contentMode, costTier });
+function PaceSettings({ novelId, contentMode, costTier, savedContentMode, unrestrictedAvailable, onContentModeChange, onCostTierChange }: PaceSettingsProps): React.JSX.Element {
+  const isAdmin = useIsAdmin();
+  const routesQuery = useProjectModelsQuery(novelId, { contentMode, costTier }, isAdmin);
   const routes = [...(routesQuery.data?.models ?? [])].sort((a, b) => JOB_ORDER.indexOf(a.group) - JOB_ORDER.indexOf(b.group));
+  const showContentMode = unrestrictedAvailable === true || savedContentMode === 'unrestricted';
 
   return (
-    <section className={styles.modelGroup} aria-labelledby="model-cost-defaults">
-      <div id="model-cost-defaults" className={styles.modelGroupHead}>
+    <section className={styles.modelGroup} aria-labelledby="pace-settings">
+      <div id="pace-settings" className={styles.modelGroupHead}>
         Defaults for this novel
       </div>
       <div className={`${styles.roleRow} ${styles.roleRowWrap}`}>
         <div className={styles.roleInfo}>
-          <div className={styles.roleLabel}>Model type</div>
-          <div className={styles.roleHint}>Standard uses Claude. Unrestricted uses models that allow dark content — for books that are dark throughout.</div>
-        </div>
-        <SegmentedControl size="sm" aria-label="Model type" value={contentMode} onValueChange={value => isContentMode(value) && onContentModeChange(value)}>
-          {CONTENT_MODES.map(mode => (
-            <SegmentedControl.Item key={mode} value={mode}>
-              {contentModeLabel(mode)}
-            </SegmentedControl.Item>
+          <div className={styles.roleLabel}>Pace</div>
+          {PACES.map(tier => (
+            <div key={tier} className={styles.roleHint}>
+              <strong>{tierLabel(tier)}</strong> · {paceCopy(tier)}
+            </div>
           ))}
-        </SegmentedControl>
-      </div>
-      <div className={`${styles.roleRow} ${styles.roleRowWrap}`}>
-        <div className={styles.roleInfo}>
-          <div className={styles.roleLabel}>Cost tier</div>
-          <div className={styles.roleHint}>How much quality you buy per call. New chats, chapters and reviews use it.</div>
         </div>
-        <SegmentedControl size="sm" aria-label="Cost tier" value={costTier} onValueChange={value => isCostTier(value) && onCostTierChange(value)}>
-          {COST_TIERS.map(tier => (
+        <SegmentedControl size="sm" aria-label="Pace" value={costTier} onValueChange={value => isPace(value) && onCostTierChange(value)}>
+          {PACES.map(tier => (
             <SegmentedControl.Item key={tier} value={tier}>
               {tierLabel(tier)}
             </SegmentedControl.Item>
           ))}
         </SegmentedControl>
       </div>
-      <div className={styles.roleRow}>
-        <div className={styles.roleInfo}>
-          <div className={styles.roleLabel}>What that means for each job</div>
-          {routesQuery.isLoading && <Spinner size="sm" label="Loading the models" />}
-          {routesQuery.error && <div className={styles.roleHint}>Couldn’t load the models: {routesQuery.error.message}</div>}
-          {routes.length > 0 && (
-            <dl className={styles.jobMap}>
-              {routes.map(route => (
-                <div key={route.group} className={styles.jobRow}>
-                  <dt>{groupLabel(route.group)}</dt>
-                  <dd>{route.label}</dd>
-                  <dd className={styles.jobPrice}>{routePrice(route)}</dd>
-                </div>
-              ))}
-            </dl>
-          )}
+      {showContentMode && (
+        <div className={`${styles.roleRow} ${styles.roleRowWrap}`}>
+          <div className={styles.roleInfo}>
+            <div className={styles.roleLabel}>Content mode</div>
+            <div className={styles.roleHint}>Standard suits most books. Unrestricted allows dark content — for books that are dark throughout.</div>
+            {unrestrictedAvailable === false && (
+              <div className={styles.roleHint}>Unrestricted writing isn’t available right now, so this novel’s AI work stops until it is. Switch to Standard to keep writing.</div>
+            )}
+          </div>
+          <SegmentedControl size="sm" aria-label="Content mode" value={contentMode} onValueChange={value => isContentMode(value) && onContentModeChange(value)}>
+            {CONTENT_MODES.map(mode => (
+              <SegmentedControl.Item key={mode} value={mode}>
+                {contentModeLabel(mode)}
+              </SegmentedControl.Item>
+            ))}
+          </SegmentedControl>
         </div>
-      </div>
+      )}
+      {isAdmin && (
+        <div className={styles.roleRow}>
+          <div className={styles.roleInfo}>
+            <div className={styles.roleLabel}>What that means for each job</div>
+            {routesQuery.isLoading && <Spinner size="sm" label="Loading the models" />}
+            {routesQuery.error && <div className={styles.roleHint}>Couldn’t load the models: {routesQuery.error.message}</div>}
+            {routes.length > 0 && (
+              <dl className={styles.jobMap}>
+                {routes.map(route => (
+                  <div key={route.group} className={styles.jobRow}>
+                    <dt>{groupLabel(route.group)}</dt>
+                    <dd>{route.label}</dd>
+                    <dd className={styles.jobPrice}>{routePrice(route)}</dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+          </div>
+        </div>
+      )}
     </section>
   );
 }
@@ -157,6 +169,7 @@ function SettingsScreen(): React.JSX.Element {
   const navigate = useNavigate();
   const projectQuery = useProjectQuery(novelId);
   const pluginsQuery = useListPluginsQuery();
+  const modelsQuery = useAiModelsQuery();
   const updateProject = useUpdateProjectMutation(novelId);
   const deleteProject = useDeleteProjectMutation();
 
@@ -200,8 +213,12 @@ function SettingsScreen(): React.JSX.Element {
     );
   };
 
+  const paceChanged = costTier !== project?.costTier;
+  const contentModeChanged = contentMode !== project?.contentMode;
+  // Only what changed goes up: re-sending an unrestricted mode the server can no longer route would be refused (AI_024) even though nothing changed.
   const saveModels = (): void => {
-    updateProject.mutate({ contentMode, costTier }, { onSuccess: () => toast.success('Model & cost settings saved'), onError: err => toast.danger(err.message) });
+    const body = { ...(paceChanged && { costTier }), ...(contentModeChanged && { contentMode }) };
+    updateProject.mutate(body, { onSuccess: () => toast.success('Settings saved'), onError: err => toast.danger(err.message) });
   };
 
   const doDelete = (): void => {
@@ -217,18 +234,17 @@ function SettingsScreen(): React.JSX.Element {
   // A deployment with no plugin directory answers `[]`, and the tab does not exist at all there.
   const hasPlugins = (pluginsQuery.data?.length ?? 0) > 0;
   const activeTab = tab === 'plugins' && !hasPlugins ? 'general' : tab;
-  const unrestricted = contentMode === 'unrestricted';
 
   return (
     <PageContainer>
       <QueryState isLoading={projectQuery.isLoading} error={projectQuery.error} isEmpty={!project} emptyTitle="Project not found">
         <>
-          <PageHeader title="Project settings" subtitle={project ? `${projectTitle(project)} · configure defaults, model type and cost tier.` : ''} />
+          <PageHeader title="Project settings" subtitle={project ? `${projectTitle(project)} · configure defaults and pace.` : ''} />
 
           <Tabs value={activeTab} onValueChange={value => isSettingsTab(value) && void goSearch({ search: { tab: value === 'general' ? undefined : value }, replace: true })}>
             <Tabs.List>
               <Tabs.Tab value="general">General</Tabs.Tab>
-              <Tabs.Tab value="models">Model &amp; cost</Tabs.Tab>
+              <Tabs.Tab value="models">Pace</Tabs.Tab>
               {hasPlugins && <Tabs.Tab value="plugins">Plugins</Tabs.Tab>}
               <Tabs.Tab value="danger">Danger zone</Tabs.Tab>
             </Tabs.List>
@@ -304,16 +320,24 @@ function SettingsScreen(): React.JSX.Element {
 
             <Tabs.Panel value="models" className={styles.tabPanel}>
               <div className={styles.alertWrap}>
-                <Alert intent="info" title="Model changes apply to new runs only">
-                  Every job uses the cost tier’s model{unrestricted ? ' on the Unrestricted map' : ''}; a chat can choose its own model type and cost tier in the composer.
-                  In-flight jobs keep the model they started with.
+                <Alert intent="info" title="Pace changes apply to new work only">
+                  Every chat reply, chapter and review uses the novel’s pace; Think deeper in the composer gives a single reply Meticulous thinking. Work already running keeps the
+                  pace it started with.
                 </Alert>
               </div>
 
-              <ModelCostDefaults novelId={novelId} contentMode={contentMode} costTier={costTier} onContentModeChange={setContentMode} onCostTierChange={setCostTier} />
+              <PaceSettings
+                novelId={novelId}
+                contentMode={contentMode}
+                costTier={costTier}
+                savedContentMode={project?.contentMode}
+                unrestrictedAvailable={modelsQuery.data?.unrestrictedAvailable}
+                onContentModeChange={setContentMode}
+                onCostTierChange={setCostTier}
+              />
               <div className={styles.saveRow}>
                 <div className={styles.spacer} />
-                <Button variant="primary" loading={updateProject.isPending} onClick={saveModels}>
+                <Button variant="primary" loading={updateProject.isPending} disabled={!paceChanged && !contentModeChanged} onClick={saveModels}>
                   Save changes
                 </Button>
               </div>

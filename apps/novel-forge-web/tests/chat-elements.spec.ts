@@ -2,13 +2,14 @@ import { describe, expect, it } from 'bun:test';
 import { createElement, type ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
-import { MessageModelTagView, TurnModelPanel, type TurnModelPanelProps } from '../src/components/nf/ChatModel';
+import { MessageModelTagView } from '../src/components/nf/ChatModel';
 import { ChatComposer, type ChatComposerProps } from '../src/features/chat/ChatComposer';
 import { checklistView } from '../src/features/chat/chat-view';
 import { ComposerModeMenu } from '../src/features/chat/ComposerModeMenu';
 import { JobProgress } from '../src/features/chat/JobProgress';
 import { QuestionCard, QuestionCardView, type QuestionCardViewProps } from '../src/features/chat/QuestionCard';
 import { ReadyChecklist, type ReadyChecklistProps } from '../src/features/chat/ReadyChecklist';
+import { ReplyOptionsMenu } from '../src/features/chat/ReplyOptionsMenu';
 import { StreamedTurn } from '../src/features/chat/StreamedTurn';
 import { UndoImpactBody } from '../src/features/chat/UndoImpactDialog';
 import { idleChatTurnStream } from '../src/lib/apis/refinement.api';
@@ -125,7 +126,7 @@ describe('QuestionCard', () => {
     const card = view();
     expect(card).toContain('Question 2 of 8 · Who opposes her');
     expect(card).toMatch(/aria-labelledby="[^"]+ [^"]+"/);
-    expect(card).toContain('Claude’s pick');
+    expect(card).toContain('Forge’s pick');
     expect(card).not.toContain('My pick');
     expect(card).toContain('Trade-off: waits for volume 2');
     expect(card.match(/Trade-off:/g)).toHaveLength(2);
@@ -171,7 +172,7 @@ describe('QuestionCard', () => {
     const four = view({ question: { question: 'Which?', options }, selected: 3 });
     expect(four.match(/aria-pressed=/g)).toHaveLength(4);
     expect(four).toContain('Answer: D');
-    expect(four).not.toContain('Claude’s pick');
+    expect(four).not.toContain('Forge’s pick');
     expect(four).not.toContain('Trade-off');
   });
 
@@ -329,24 +330,6 @@ describe('ChatComposer', () => {
   });
 });
 
-function panel(overrides: Partial<TurnModelPanelProps> = {}): string {
-  const project = { contentMode: 'standard' as const, costTier: 'balanced' as const };
-  return html(
-    createElement(TurnModelPanel, {
-      choice: project,
-      defaults: { choice: project, source: 'project' },
-      project,
-      resolved: { label: 'Claude Sonnet 5', inputPricePerMToken: 3, outputPricePerMToken: 15 },
-      resolving: false,
-      onChange: noop,
-      onReset: noop,
-      onDone: noop,
-      onClearPin: noop,
-      ...overrides,
-    }),
-  );
-}
-
 describe('ComposerModeMenu', () => {
   it('should name the current mode on its trigger and be disabled while a turn runs', () => {
     const pill = html(createElement(ComposerModeMenu, { value: 'just-discuss', onChange: noop }));
@@ -364,41 +347,37 @@ describe('ChatComposer notices', () => {
   });
 });
 
-describe('TurnModelPanel', () => {
-  it('should offer both model types and all three tiers as radio groups, and name the resolved model', () => {
-    const body = panel();
-    for (const label of ['Standard', 'Unrestricted', 'Economy', 'Balanced', 'Performant']) expect(body).toContain(label);
-    expect(body.match(/role="radiogroup"/g)).toHaveLength(2);
-    expect(body).toContain('Claude Sonnet 5');
-    expect(body).toContain('$3 in · $15 out per million tokens');
-    expect(body).toContain('This is the project default.');
-    const own = panel({ defaults: { choice: { contentMode: 'standard', costTier: 'balanced' }, source: 'chat' } });
-    expect(own).toContain('This chat keeps this setting until you change it.');
+describe('ReplyOptionsMenu', () => {
+  const offer = { thinkDeeper: true, unrestricted: true };
+  const menu = (props: Partial<Parameters<typeof ReplyOptionsMenu>[0]> = {}): string =>
+    html(createElement(ReplyOptionsMenu, { options: { thinkDeeper: false, unrestricted: false }, offer, onChange: noop, ...props }));
+
+  it('should name itself while nothing is on, with no prices, model names or scope', () => {
+    const pill = menu();
+    expect(pill).toContain('Reply options');
+    expect(pill).toContain('aria-label="Reply options: none"');
+    expect(pill).not.toContain('data-on');
+    expect(pill).not.toMatch(/\$|per million|this chat|project default|Done/);
   });
 
-  it('should keep a changed pick for the whole chat and offer the project default back', () => {
-    const body = panel({ choice: { contentMode: 'unrestricted', costTier: 'economy' } });
-    expect(body).toContain('This chat keeps this setting until you change it.');
-    expect(body).toContain('Project default: Standard · Balanced');
-    expect(body).not.toMatch(/disabled=""[^>]*><span[^>]*>Use the project default/);
-    expect(panel()).toMatch(/disabled=""[^>]*><span[^>]*>Use the project default/);
+  it('should show what is on for the next reply', () => {
+    const pill = menu({ options: { thinkDeeper: true, unrestricted: true } });
+    expect(pill).toContain('Think deeper · Unrestricted');
+    expect(pill).toContain('data-on="true"');
   });
 
-  it('should explain a legacy chat pin and offer to clear it', () => {
-    const body = panel({ pinnedModel: 'Claude Opus 5.5' });
-    expect(body).toContain('This chat is pinned to Claude Opus 5.5');
-    expect(body).toContain('Clear the pin');
-    expect(body).not.toContain('per million tokens');
+  it('should not render when the reply can take no option', () => {
+    expect(menu({ offer: { thinkDeeper: false, unrestricted: false } })).toBe('');
   });
 
-  it('should show while the model is being resolved', () => {
-    expect(panel({ resolved: undefined, resolving: true })).toContain('Checking the model…');
+  it('should be disabled while the chat is locked', () => {
+    expect(menu({ disabled: true })).toContain('disabled=""');
   });
 });
 
 describe('MessageModelTagView', () => {
-  it('should read model · tier · cost · time', () => {
-    const tag = html(createElement(MessageModelTagView, { parts: ['Claude Sonnet 5', 'Balanced', '$0.041'], createdAt: '2026-09-26T10:04:00.000Z' }));
-    expect(tag).toMatch(/Claude Sonnet 5 · Balanced · \$0\.041 · <time/);
+  it('should read pace · cost · time', () => {
+    const tag = html(createElement(MessageModelTagView, { parts: ['Meticulous', '$0.041'], createdAt: '2026-09-26T10:04:00.000Z' }));
+    expect(tag).toMatch(/Meticulous · \$0\.041 · <time/);
   });
 });

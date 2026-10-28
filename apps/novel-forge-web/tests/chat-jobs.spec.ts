@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 
 import { type ChatJobEventResponse, type ChatJobResponse } from '../src/lib/apis/api-types.gen';
 import { learnAnchors, mergeChatJobs, parseChatJobEvent, reduceChatJobs } from '../src/lib/apis/chat.api';
-import { chatChoiceUpdate, choiceLabel, choiceScope, modelTagParts, turnChoiceDefaults, turnOverride } from '../src/lib/chat-model';
+import { modelTagParts, NO_REPLY_OPTIONS, replyOptionOffer, replyOptionsBody, replyOptionsLabel, restoredReplyOptions, UNRESTRICTED_UNAVAILABLE } from '../src/lib/chat-model';
 
 function event(seq: number, type: ChatJobEventResponse['type'], data?: Record<string, unknown>): ChatJobEventResponse {
   return { seq, jobId: 'j1', kind: 'organise', type, data, createdAt: '2026-09-26T10:00:00.000Z' };
@@ -107,36 +107,58 @@ describe('mergeChatJobs', () => {
 });
 
 describe('modelTagParts', () => {
-  it('should read model · tier · cost, naming the content mode only when it is unrestricted', () => {
-    expect(modelTagParts({ model: 'Claude Sonnet 5', contentMode: 'standard', costTier: 'balanced', costUsd: 0.041 })).toEqual(['Claude Sonnet 5', 'Balanced', '$0.041']);
-    expect(modelTagParts({ model: 'GLM 5.2', contentMode: 'unrestricted', costTier: 'economy', costUsd: 0 })).toEqual(['GLM 5.2', 'Unrestricted', 'Economy', '$0.00']);
-    expect(modelTagParts({ model: 'Claude Haiku 4.5' })).toEqual(['Claude Haiku 4.5']);
+  it('should read pace · cost for an author, naming the content mode only when it is unrestricted', () => {
+    expect(modelTagParts({ contentMode: 'standard', costTier: 'balanced', costUsd: 0.041 })).toEqual(['Steady', '$0.041']);
+    expect(modelTagParts({ contentMode: 'unrestricted', costTier: 'economy', costUsd: 0 })).toEqual(['Swift', 'Unrestricted', '$0.00']);
+  });
+
+  it('should lead with the model only when the server named it', () => {
+    expect(modelTagParts({ model: 'Model A', contentMode: 'standard', costTier: 'balanced', costUsd: 0.041 })).toEqual(['Model A', 'Steady', '$0.041']);
+    expect(modelTagParts({ model: 'Model B' })).toEqual(['Model B']);
+  });
+
+  it('should name the pace the reply itself ran at, a Think deeper reply’s Meticulous included', () => {
+    expect(modelTagParts({ costTier: 'performant' })).toEqual(['Meticulous']);
   });
 });
 
-describe('turn choice', () => {
-  const project = { contentMode: 'standard' as const, costTier: 'balanced' as const };
+describe('reply options', () => {
+  const steady = { costTier: 'balanced' as const, contentMode: 'standard' as const, unrestrictedAvailable: true };
+  const both = { thinkDeeper: true, unrestricted: true };
 
-  it('should default to the chat’s own choice, then the project’s', () => {
-    expect(turnChoiceDefaults(undefined, project)).toEqual({ choice: project, source: 'project' });
-    expect(turnChoiceDefaults({ costTier: 'performant' }, project)).toEqual({ choice: { contentMode: 'standard', costTier: 'performant' }, source: 'chat' });
+  it('should offer nothing until the novel and the catalog are known', () => {
+    expect(replyOptionOffer(undefined)).toEqual({ thinkDeeper: false, unrestricted: false });
   });
 
-  it('should send a pick on the turn only when it differs from the default', () => {
-    expect(turnOverride(undefined, project)).toEqual({});
-    expect(turnOverride(project, project)).toEqual({});
-    expect(turnOverride({ contentMode: 'unrestricted', costTier: 'economy' }, project)).toEqual({ contentMode: 'unrestricted', costTier: 'economy' });
+  it('should hide Think deeper on a Meticulous novel and Unrestricted unless it is set up and the novel is standard', () => {
+    expect(replyOptionOffer(steady)).toEqual({ thinkDeeper: true, unrestricted: true });
+    expect(replyOptionOffer({ ...steady, costTier: 'performant' })).toEqual({ thinkDeeper: false, unrestricted: true });
+    expect(replyOptionOffer({ ...steady, unrestrictedAvailable: false })).toEqual({ thinkDeeper: true, unrestricted: false });
+    expect(replyOptionOffer({ ...steady, contentMode: 'unrestricted' })).toEqual({ thinkDeeper: true, unrestricted: false });
   });
 
-  it('should save only the fields of a pick that differ from the project', () => {
-    expect(chatChoiceUpdate({ contentMode: 'standard', costTier: 'performant' }, project)).toEqual({ contentMode: null, costTier: 'performant' });
-    expect(chatChoiceUpdate(project, project)).toEqual({ contentMode: null, costTier: null });
+  it('should send Think deeper as performant and Unrestricted as the content mode for this reply only', () => {
+    expect(replyOptionsBody(both, replyOptionOffer(steady))).toEqual({ costTier: 'performant', contentMode: 'unrestricted' });
+    expect(replyOptionsBody({ thinkDeeper: true, unrestricted: false }, replyOptionOffer(steady))).toEqual({ costTier: 'performant' });
+    expect(replyOptionsBody(NO_REPLY_OPTIONS, replyOptionOffer(steady))).toEqual({});
+    expect(replyOptionsBody(undefined, replyOptionOffer(steady))).toEqual({});
   });
 
-  it('should label the scope of the pick', () => {
-    const defaults = turnChoiceDefaults(undefined, project);
-    expect(choiceScope(undefined, defaults)).toBe('project default');
-    expect(choiceScope({ contentMode: 'standard', costTier: 'economy' }, defaults)).toBe('this chat');
-    expect(choiceLabel({ contentMode: 'unrestricted', costTier: 'performant' })).toBe('Unrestricted · Performant');
+  it('should drop an option that is no longer on offer when the reply is sent', () => {
+    expect(replyOptionsBody(both, replyOptionOffer({ ...steady, costTier: 'performant', unrestrictedAvailable: false }))).toEqual({});
+  });
+
+  it('should label the trigger by what is on, and by the control’s name when nothing is', () => {
+    const offer = replyOptionOffer(steady);
+    expect(replyOptionsLabel(NO_REPLY_OPTIONS, offer)).toBe('Reply options');
+    expect(replyOptionsLabel({ thinkDeeper: true, unrestricted: false }, offer)).toBe('Think deeper');
+    expect(replyOptionsLabel(both, offer)).toBe('Think deeper · Unrestricted');
+    expect(replyOptionsLabel(both, { thinkDeeper: false, unrestricted: true })).toBe('Unrestricted');
+  });
+
+  it('should hand a failed send its options back, without Unrestricted when the server refused it', () => {
+    expect(restoredReplyOptions(both, 'NET_001')).toEqual(both);
+    expect(restoredReplyOptions(both, UNRESTRICTED_UNAVAILABLE)).toEqual({ thinkDeeper: true, unrestricted: false });
+    expect(restoredReplyOptions(undefined, undefined)).toEqual(NO_REPLY_OPTIONS);
   });
 });

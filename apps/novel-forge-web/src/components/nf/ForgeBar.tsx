@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Button, IconButton, Textarea, toast } from '@shadow-library/ui';
 
 import { SparkIcon } from '@/components/icons';
-import { ChatModelMenu, MessageModelTag } from '@/components/nf/ChatModel';
+import { MessageModelTag } from '@/components/nf/ChatModel';
 import { ProseEditsToggle } from '@/components/nf/ProseEditsToggle';
 import { type ChatScope, type ChatSessionResponse, type ChatTurnResponse, useCreateChatSessionMutation, useForgeTurnMutation } from '@/lib/apis';
 
@@ -68,8 +68,6 @@ export function ForgeBar({ novelId, scope, placeholder }: { novelId: string; sco
   useEffect(() => {
     if (open) inputWrapRef.current?.querySelector('textarea')?.focus();
   }, [open, sessionId]);
-
-  const session = createdSession;
 
   const propose = (): void => {
     const message = text.trim();
@@ -141,7 +139,6 @@ export function ForgeBar({ novelId, scope, placeholder }: { novelId: string; sco
         <span className="nf-chip" data-intent="neutral">
           scope · {scope.title}
         </span>
-        <ChatModelMenu novelId={novelId} session={session} />
         <ProseEditsToggle checked={proseEdits} onCheckedChange={setProseEdits} message={text} disabled={turn.isPending} />
         <span className={styles.hint}>Produces a reviewable proposal — canon isn&apos;t edited directly.</span>
         <div className={styles.spacer} />

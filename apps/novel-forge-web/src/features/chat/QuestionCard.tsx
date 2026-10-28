@@ -35,7 +35,7 @@ export function QuestionCardView({ question, eyebrow, selected, settled, disable
           <button key={option.title} type="button" className={styles.option} aria-pressed={selected === index} disabled={locked} onClick={() => onSelect(index)}>
             <span className={styles.optionHead}>
               <span className={styles.optionTitle}>{option.title}</span>
-              {option.recommended && <span className={styles.badgeAccent}>Claude’s pick</span>}
+              {option.recommended && <span className={styles.badgeAccent}>Forge’s pick</span>}
             </span>
             {option.why && <span className={styles.optionWhy}>{option.why}</span>}
             {option.tradeOff && <span className={`${styles.caption} ${styles.optionTradeOff}`}>Trade-off: {option.tradeOff}</span>}

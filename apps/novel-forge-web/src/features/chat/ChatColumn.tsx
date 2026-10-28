@@ -5,7 +5,7 @@ import { Alert, Button, ChevronDownIcon, PlusIcon, toast, useMediaQuery } from '
 
 import { ClockIcon, CloseIcon, EditIcon, ProposalsIcon } from '@/components/icons';
 import { PaneError, PaneLoader, StatusChip, TurnStatus } from '@/components/nf';
-import { ChatModelMenu, MessageModelTag } from '@/components/nf/ChatModel';
+import { MessageModelTag } from '@/components/nf/ChatModel';
 import { Markdown } from '@/components/nf/Markdown';
 import { ChatPlanCard, PlanStart } from '@/features/plan-card';
 import {
@@ -17,6 +17,7 @@ import {
   type ChatSessionResponse,
   type ChatTurnResponse,
   draftQueryOptions,
+  invalidateAiModels,
   invalidateDraft,
   invalidateProgress,
   isTurnFailureRecorded,
@@ -28,6 +29,7 @@ import {
   transcriptTurnState,
   type TurnHoldReason,
   useAdoptProposalMutation,
+  useAiModelsQuery,
   useAuthorNotesQuery,
   useCancelChatJobMutation,
   useChatJobStream,
@@ -43,10 +45,9 @@ import {
   useProposalQuery,
   useStartNextDraftMutation,
   useUpdateChatSessionMutation,
-  useUpdateSessionModelMutation,
 } from '@/lib/apis';
 import { CHAPTER_SHEET_QUERY, type ChapterOpenMode, draftCardShape } from '@/lib/chapter-panel';
-import { chatChoiceUpdate, sameChoice, type TurnChoice, turnChoiceDefaults, turnOverride } from '@/lib/chat-model';
+import { NO_REPLY_OPTIONS, replyOptionOffer, type ReplyOptions, replyOptionsBody, restoredReplyOptions, UNRESTRICTED_UNAVAILABLE } from '@/lib/chat-model';
 import { chatColumnView, chatTitle } from '@/lib/chat-sessions';
 import { timelineOfTrace, turnTimeline } from '@/lib/chat-turn-timeline';
 import { messageTime, projectTitle } from '@/lib/format';
@@ -103,6 +104,7 @@ import { type DockState, dockState, jobProposals, organiseIdeas, type PanelPropo
 import { QuestionCard } from './QuestionCard';
 import { ReadyChecklist } from './ReadyChecklist';
 import { RenameInput } from './RenameInput';
+import { ReplyOptionsMenu } from './ReplyOptionsMenu';
 import { StoryBibleReceiptCard } from './StoryBibleReceiptCard';
 import { LiveStreamedTurn } from './StreamedTurn';
 import { useUnansweredCount } from './suggestion-store';
@@ -196,7 +198,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
   const cancelJobMutation = useCancelChatJobMutation(novelId, session?.id);
   const turn = useChatTurnStream(novelId, session?.id ?? '');
   const updateSession = useUpdateChatSessionMutation(novelId);
-  const saveChatChoice = useUpdateSessionModelMutation(novelId);
+  const modelsQuery = useAiModelsQuery();
   const generation = useGenerationActivity(novelId);
   const continuityQuery = useContinuityProposalsQuery(novelId);
   const finalizeReviewsQuery = useFinalizeReviewsQuery(novelId);
@@ -209,7 +211,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
   const [proseEdits, setProseEdits] = useState(false);
   const [justDiscussing, setJustDiscussing] = useState(false);
   const [draftMode, setDraftMode] = useState<SessionMode>('auto');
-  const [turnChoice, setTurnChoice] = useState<TurnChoice>();
+  const [replyOptions, setReplyOptions] = useState<ReplyOptions>(NO_REPLY_OPTIONS);
   const [renamingHeader, setRenamingHeader] = useState(false);
   const [checklistOpen, setChecklistOpen] = useState(false);
   const [planStartOpen, setPlanStartOpen] = useState(false);
@@ -253,32 +255,8 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
   const busy = pending || locked;
   const notesOpener = notesOpenerId(messages);
   const answeredUpTo = lastUserOrdinal(messages);
-  const projectChoice: TurnChoice = { contentMode: project?.contentMode ?? 'standard', costTier: project?.costTier ?? 'balanced' };
-  const defaults = turnChoiceDefaults(session, projectChoice);
-  // A model and cost pick is the chat's own setting. It is held here only until the chat exists and the save lands, and goes on each turn meanwhile.
-  if (turnChoice && sameChoice(turnChoice, defaults.choice)) setTurnChoice(undefined);
-  const saveChoice = (sessionId: string, choice: TurnChoice): void =>
-    saveChatChoice.mutate(
-      { sessionId, ...chatChoiceUpdate(choice, projectChoice) },
-      {
-        onError: err => {
-          setTurnChoice(undefined);
-          toast.danger(err.message);
-        },
-      },
-    );
-  const savedPickFor = useRef<string | undefined>(undefined);
-  const chooseModel = (choice: TurnChoice): void => {
-    setTurnChoice(choice);
-    if (!session) return;
-    savedPickFor.current = session.id;
-    saveChoice(session.id, choice);
-  };
-  useEffect(() => {
-    if (!session || !turnChoice || savedPickFor.current === session.id) return;
-    savedPickFor.current = session.id;
-    saveChoice(session.id, turnChoice);
-  });
+  const unrestrictedAvailable = modelsQuery.data?.unrestrictedAvailable;
+  const offer = replyOptionOffer(project && unrestrictedAvailable !== undefined ? { ...project, unrestrictedAvailable } : undefined);
 
   const finishedId = stream.status === 'done' ? stream.turn.assistantMessage.id : undefined;
   const finishedHeld = stream.status === 'done' ? stream.turn.held : undefined;
@@ -405,7 +383,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
     if (ended && !pending && panelFocus === undefined) setPanelFocus(ended.id);
   }
 
-  const currentSettings = (): TurnSettings => ({ proseEdits, justDiscussing, choice: turnChoice });
+  const currentSettings = (): TurnSettings => ({ proseEdits, justDiscussing, options: replyOptions });
 
   // A refusal names one chapter at most, so the chips are checked against their drafts as they stand now to tell which changed.
   const markChanged = async (chips: readonly PassageChip[]): Promise<void> => {
@@ -423,7 +401,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
   const sendTurn = (content: string, draft?: string, settings: TurnSettings = currentSettings(), requeue?: QueuedTurn, chips: readonly PassageChip[] = []): void => {
     if (!session || (!content && chips.length === 0) || pending) return;
     setAssistantWatermark(lastAssistantOrdinal(messages));
-    const override = turnOverride(settings.choice, defaults.choice);
+    const override = replyOptionsBody(settings.options, offer);
     const sent = new Set(chips.map(chip => chip.id));
     sent.forEach(id => inFlight.current.add(id));
     const passageOptions = chips.length > 0 ? { contexts: chipContexts(chips), shown: shownContexts(chips) } : {};
@@ -451,7 +429,11 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
           toast.danger(err.message);
           if (queue) setQueued(queue);
           if (back) passages.restore(back);
-          if (restored) setInput(current => (current.trim() ? `${restored}\n${current}` : restored));
+          if (err.code === UNRESTRICTED_UNAVAILABLE) invalidateAiModels(queryClient);
+          if (restored) {
+            setInput(current => (current.trim() ? `${restored}\n${current}` : restored));
+            setReplyOptions(restoredReplyOptions(settings.options, err.code));
+          }
           if (err.code === 'CHT_009') void markChanged(chips);
         },
       },
@@ -473,6 +455,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
     if (switching) return;
     if (pending) return enqueue(content, chips);
     setInput('');
+    setReplyOptions(NO_REPLY_OPTIONS);
     sendTurn(content, content, currentSettings(), undefined, chips);
   };
 
@@ -488,6 +471,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
     send: sendTurn,
     onEnqueued: chips => {
       setInput('');
+      setReplyOptions(NO_REPLY_OPTIONS);
       passages.drop(new Set(chips.map(chip => chip.id)));
     },
     onEdited: edited => {
@@ -495,6 +479,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
       setInput(edited.input);
       setProseEdits(edited.settings.proseEdits);
       setJustDiscussing(edited.settings.justDiscussing);
+      setReplyOptions(edited.settings.options ?? NO_REPLY_OPTIONS);
       inputRef.current?.focus();
     },
   });
@@ -507,6 +492,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
     empty: messages.length === 0,
     sendInitial: content => {
       setInput(current => (current.trim() === content ? '' : current));
+      setReplyOptions(NO_REPLY_OPTIONS);
       sendTurn(content, content, currentSettings(), undefined, passages.latest());
     },
     sendFirst: content => sendTurn(content, content),
@@ -1023,7 +1009,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
             passages={passages.chips.length > 0 && <ComposerPassages chips={passages.chips} onReveal={revealChip} onRemove={passages.remove} />}
             sendable={sendable}
             modeMenu={<ComposerModeMenu value={composerModeOf(shownMode, justDiscussing)} onChange={changeMode} disabled={locked || pending || switching} />}
-            modelMenu={<ChatModelMenu novelId={novelId} session={session} disabled={locked} turn={{ choice: turnChoice, onChange: chooseModel }} />}
+            modelMenu={<ReplyOptionsMenu options={replyOptions} offer={offer} onChange={setReplyOptions} disabled={locked} />}
             justDiscussing={justDiscussing}
             proseEdits={proseEdits}
             onProseEditsChange={setProseEdits}

@@ -84,15 +84,15 @@ describe('ChecksPanel', () => {
     const html = panel({ kind: 'mechanics' });
     expect(html).toContain('No mechanics check yet');
     expect(html).toContain('Run the mechanics check');
-    expect(html).not.toContain('Cost tier for this review');
+    expect(html).not.toContain('Pace for this review');
   });
 
   it('should say reviews work on hand-written chapters too', () => {
     expect(panel()).toContain('Works on chapters you wrote yourself too');
   });
 
-  it('should offer a cost tier only for the model reviews', () => {
-    expect(panel({ kind: 'editorial' })).toContain('Cost tier for this review');
+  it('should offer a pace only for the model reviews', () => {
+    expect(panel({ kind: 'editorial' })).toContain('Pace for this review');
   });
 
   it('should group findings by severity with their evidence', () => {
@@ -101,14 +101,14 @@ describe('ChecksPanel', () => {
     expect(html).toContain('Blocking · 1');
     expect(html).toContain('Warnings · 1');
     expect(html).toContain('Hollis wondered if she already knew');
-    expect(html).toContain('read by Claude Sonnet 5 · Balanced');
+    expect(html).toContain('read by Claude Sonnet 5 · Steady');
   });
 
   it("should name the review's recorded model by the label it is given, not its catalog key", () => {
     const list = { chapter: 4, currentRevision: 2, latest: [review({ model: 'claude-sonnet-5' })], history: [] };
     const html = panel({ list, modelName: model => (model === 'claude-sonnet-5' ? 'Claude Sonnet 5' : model) });
 
-    expect(html).toContain('read by Claude Sonnet 5 · Balanced');
+    expect(html).toContain('read by Claude Sonnet 5 · Steady');
     expect(html).not.toContain('claude-sonnet-5');
   });
 

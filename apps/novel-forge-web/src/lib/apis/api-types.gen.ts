@@ -237,24 +237,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/api/v1/ai/settings': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Get Settings */
-    get: operations['get_api_v1_ai_settings'];
-    /** Update Settings */
-    put: operations['put_api_v1_ai_settings'];
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   '/api/v1/ai/models': {
     parameters: {
       query?: never;
@@ -264,6 +246,23 @@ export interface paths {
     };
     /** List Models */
     get: operations['get_api_v1_ai_models'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/ai/models/admin': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Admin Models */
+    get: operations['get_api_v1_ai_models_admin'];
     put?: never;
     post?: never;
     delete?: never;
@@ -1573,23 +1572,6 @@ export interface paths {
     options?: never;
     head?: never;
     patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/chat/sessions/{sessionId}/model': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    /** Update Session Model */
-    patch: operations['patch_api_v1_projects_projectId_chat_sessions_sessionId_model'];
     trace?: never;
   };
   '/api/v1/projects/{projectId}/chat/sessions/{sessionId}/archive': {
@@ -2984,7 +2966,7 @@ export type webhooks = Record<string, never>;
 export interface components {
   schemas: {
     AccessResponse: {
-      /** @description Whether the caller holds `novel-forge:admin` in the organisation the session acts in, which opens run inspection. */
+      /** @description Whether the caller holds `novel-forge:admin` in the organisation the session acts in, which opens run inspection and shows which models serve each call. */
       admin: boolean;
     };
     DevErrorResponseDto: {
@@ -3110,40 +3092,42 @@ export interface components {
        */
       outcome: 'cancelled' | 'stopping' | 'already_settled';
     };
-    /** @description The signed-in author’s own settings. */
-    AccountSettingsResponse: {
-      /** @description The cost tier a new project starts on when its creation request names none. */
-      defaultCostTier: components['schemas']['CostTier'];
+    /** @description What an author chooses between: the paces and whether Unrestricted is on offer. Which model serves each is admin-only (`GET /ai/models/admin`). */
+    AiModelsResponse: {
+      /** @description Every pace by its wire key, fastest first: economy (Swift), balanced (Steady), performant (Meticulous). */
+      paces: components['schemas']['CostTier'][];
+      /** @description Whether an author may choose Unrestricted for a novel, a chapter plan or a reply: true only while the catalog routes unrestricted writing for every task at every pace. */
+      unrestrictedAvailable: boolean;
     };
     /** @enum {string} */
     CostTier: 'economy' | 'balanced' | 'performant';
-    /** @description Replaces the signed-in author’s settings. */
-    UpdateAccountSettingsBody: {
-      /** @description The cost tier a new project starts on when its creation request names none. */
-      defaultCostTier: components['schemas']['CostTier'];
-    };
-    AiModelsResponse: {
+    /** @description The models, labels and prices behind every pace and content mode; admin-only. */
+    AiModelsAdminResponse: {
+      /** @description Every pace by its wire key, fastest first: economy (Swift), balanced (Steady), performant (Meticulous). */
+      paces: components['schemas']['CostTier'][];
+      /** @description Whether an author may choose Unrestricted for a novel, a chapter plan or a reply: true only while the catalog routes unrestricted writing for every task at every pace. */
+      unrestrictedAvailable: boolean;
       /** @description The active server profile. Roles without an override inherit this profile's defaults. */
       profile: string;
-      /** @description Every model a chat can be pinned to under any model type and cost tier. */
+      /** @description The aliases the catalog lists for the chat task under any model type and cost tier; nothing pins or selects one. */
       models: components['schemas']['AiModelOption'][];
       defaults: components['schemas']['AiRoleDefault'][];
       /** @description Group defaults used when a project is in Unrestricted content mode. */
       unrestrictedDefaults: components['schemas']['AiRoleDefault'][];
-      /** @description Option ids that Unrestricted projects may select. Others are coerced to the Unrestricted group default. */
+      /** @description The `models` ids the catalog lists for the chat task under the unrestricted content mode. */
       unrestrictedAllowlist: string[];
       /** @description The platform model for every cost tier × model type × author-selectable group. Balanced equals `defaults` / `unrestrictedDefaults`. */
       tiers: components['schemas']['AiTierModel'][];
       /** @description Names for the model keys calls, replies and reviews record, which `models` does not list. */
       modelLabels: components['schemas']['AiModelLabel'][];
     };
-    /** @description A model an author can pin a chat to: a Synapse alias (provider `synapse`). */
+    /** @description A Synapse alias the catalog lists for the chat task (provider `synapse`); informational, since no request selects one. */
     AiModelOption: {
-      /** @description The Synapse alias key; a chat pin sends it as `model` with this `provider`. */
+      /** @description The Synapse alias key. */
       id: string;
       /** @description `synapse` for a Synapse alias. */
       provider: string;
-      /** @description The name to show an author — a product name on its own, never a gateway or a slug. */
+      /** @description The product name an admin sees — a product name on its own, never a gateway or a slug; never shown to an author. */
       label: string;
       /** @enum {string} */
       kind: 'llm' | 'embedding' | 'image';
@@ -3169,7 +3153,7 @@ export interface components {
       /** @description `synapse`, where `model` is the catalog model its routes pick. */
       provider: string;
       model: string;
-      /** @description The product name to show an author. */
+      /** @description The product name an admin sees; never shown to an author. */
       label: string;
       /** @description USD per million input tokens; absent for image models. */
       inputPricePerMToken?: number;
@@ -3181,7 +3165,7 @@ export interface components {
     AiModelLabel: {
       /** @description A model key as calls, replies and reviews record it: a Synapse catalog model, or a registry slug on rows written before Synapse. */
       model: string;
-      /** @description The name to show an author. */
+      /** @description The product name an admin sees; never shown to an author. */
       label: string;
       /** @description USD per million input tokens, for estimating an old call that recorded no cost; absent for image models. */
       inputPricePerMToken?: number;
@@ -3205,7 +3189,7 @@ export interface components {
       byGroup: components['schemas']['CostBreakdownItem'][];
       /** @description By internal call role, highest spend first. */
       byRole: components['schemas']['CostBreakdownItem'][];
-      /** @description By model, highest spend first. */
+      /** @description By model, highest spend first; empty unless the caller holds `novel-forge:admin`. */
       byModel: components['schemas']['CostBreakdownItem'][];
       /** @description By how the cost was priced — 'provider', 'gateway', or 'estimate' — highest spend first. */
       byCostSource: components['schemas']['CostBreakdownItem'][];
@@ -3262,13 +3246,11 @@ export interface components {
        */
       resetsAt?: string | null;
     };
-    /** @description What each group of AI work on this novel runs on under one model type and cost tier — a chat pin is not included. */
+    /** @description What each group of AI work on this novel runs on under one model type and cost tier; admin-only. */
     ProjectModelsResponse: {
       contentMode: components['schemas']['ContentMode'];
       costTier: components['schemas']['CostTier'];
       models: components['schemas']['ProjectModelRoute'][];
-      /** @description The `GET /ai/models` option ids a chat may pin under exactly this model type and cost tier: Synapse alias keys. */
-      chatAliases: string[];
     };
     ProjectModelRoute: {
       /** @description Model group: writing, planning, review, chat, helper or image. */
@@ -3276,7 +3258,7 @@ export interface components {
       /** @description `synapse`, where `model` is the catalog model its routes pick. */
       provider: string;
       model: string;
-      /** @description The product name to show an author. */
+      /** @description The product name an admin sees; never shown to an author. */
       label: string;
       /** @description USD per million input tokens; absent for image models. */
       inputPricePerMToken?: number;
@@ -3472,7 +3454,7 @@ export interface components {
       knowledgeContract?: components['schemas']['KnowledgeContractSchema'];
       /** @description The agreed direction for the chapter. Omit to leave unchanged; null or blank clears it. */
       direction?: string | null;
-      /** @description How the chapter is written. Omit to leave unchanged; null follows the project's content mode. */
+      /** @description How the chapter is written. Omit to leave unchanged; null follows the project's content mode. Raising it to unrestricted is refused (`AI_024`) while `GET /ai/models` reports `unrestrictedAvailable: false`. */
       contentMode?: components['schemas']['ContentMode'] | null;
       /** @description Replacement scene list. Omit to leave unchanged; null clears it. */
       scenes?: components['schemas']['BriefSceneSchema'][] | null;
@@ -3827,7 +3809,6 @@ export interface components {
       proposal: {
         [key: string]: unknown;
       };
-      model?: string | null;
       /** Format: date-time */
       appliedAt?: string | null;
       /** Format: date-time */
@@ -3856,7 +3837,6 @@ export interface components {
       revertible: boolean;
       /** @description Apply-time result for each operation. */
       opResults?: components['schemas']['OpResultItem'][] | null;
-      model?: string | null;
       runId?: string | null;
       /** Format: date-time */
       appliedAt?: string | null;
@@ -4047,7 +4027,7 @@ export interface components {
       node?: string | null;
       role: string;
       provider: string;
-      /** @description The model that answered, as recorded: a catalog model, or its task when no model answered. Named by `GET /ai/models` `modelLabels`. */
+      /** @description The model that answered, as recorded: a catalog model, or its task when no model answered. Named by `GET /ai/models/admin` `modelLabels`. */
       model: string;
       promptKey: string;
       promptVersion: string;
@@ -4116,7 +4096,40 @@ export interface components {
       /** Format: date-time */
       endedAt?: string | null;
       totals: components['schemas']['RunUsageResponse'];
-      calls: components['schemas']['RunModelCallResponse'][];
+      calls: components['schemas']['RunUsageCallResponse'][];
+    };
+    /** @description One model call as its run's usage shows it: its tokens and spend for everyone; the model, provider and reasoning effort for an admin only. */
+    RunUsageCallResponse: {
+      id: string;
+      node?: string | null;
+      role: string;
+      promptKey: string;
+      promptVersion: string;
+      status: string;
+      inputTokens?: number | null;
+      /** @description The share of inputTokens served from a provider cache; null when the provider reported no cache accounting. */
+      cachedInputTokens?: number | null;
+      outputTokens?: number | null;
+      latencyMs?: number | null;
+      costUsd?: string | null;
+      /** @description Where costUsd came from; null on a row written before cost_source existed. */
+      costSource?: components['schemas']['CostSource'] | null;
+      /** @description The cost tier this call ran under; null when the call predates tier tracking. */
+      tier?: components['schemas']['CostTier'] | null;
+      contentMode?: components['schemas']['ContentMode'] | null;
+      attempt: number;
+      /** Format: date-time */
+      createdAt: string;
+      /** @description Admin-only; omitted for everyone else. */
+      provider?: string;
+      /** @description Admin-only; omitted for everyone else. The model that answered, as recorded, named by `GET /ai/models/admin` `modelLabels`. */
+      model?: string;
+      /** @description Admin-only, since it hints at the model; omitted for everyone else. Null when the call sent none. */
+      reasoningEffort?: string | null;
+      /** @description Recorded cost plus the list-price estimate when the call recorded none. */
+      chargeUsd: number;
+      /** @description The part of chargeUsd estimated from list prices because the call recorded no cost. */
+      estimatedChargeUsd: number;
     };
     /** @description Every model call any action has made against one chapter — generation, judging, review, revision, continuity and extraction alike. */
     ChapterCostResponse: {
@@ -4156,7 +4169,7 @@ export interface components {
       node?: string | null;
       role: string;
       provider: string;
-      /** @description The model that answered, as recorded: a catalog model, or its task when no model answered. Named by `GET /ai/models` `modelLabels`. */
+      /** @description The model that answered, as recorded: a catalog model, or its task when no model answered. Named by `GET /ai/models/admin` `modelLabels`. */
       model: string;
       promptKey: string;
       promptVersion: string;
@@ -4335,7 +4348,8 @@ export interface components {
       role: components['schemas']['WriterAttemptRole'];
       promptKey: string;
       promptVersion: string;
-      modelRoute: {
+      /** @description The provider and model the attempt was routed to; admin-only, omitted for everyone else. */
+      modelRoute?: {
         [key: string]: unknown;
       };
       isolated: boolean;
@@ -4353,7 +4367,8 @@ export interface components {
       role: components['schemas']['WriterAttemptRole'];
       promptKey: string;
       promptVersion: string;
-      modelRoute: {
+      /** @description The provider and model the attempt was routed to; admin-only, omitted for everyone else. */
+      modelRoute?: {
         [key: string]: unknown;
       };
       isolated: boolean;
@@ -4713,14 +4728,6 @@ export interface components {
       title?: string | null;
       status: components['schemas']['ChatSessionStatus'];
       mode: components['schemas']['ChatMode'];
-      /** @description The pinned option's provider: `synapse` for an alias pin. Null when the chat is unpinned. */
-      modelProvider?: string | null;
-      /** @description The pinned option's id: an alias key. */
-      modelId?: string | null;
-      /** @description The chat's own model type; null follows the project's content mode. */
-      contentMode?: components['schemas']['ContentMode'] | null;
-      /** @description The chat's own cost tier; null follows the project's cost tier. */
-      costTier?: components['schemas']['CostTier'] | null;
       summary?: string | null;
       summaryThroughOrdinal: number;
       /** Format: date-time */
@@ -4756,9 +4763,9 @@ export interface components {
       /** @description The turn's changes taken from the author's own words, applied in the turn and undone by reverting this proposal. */
       appliedProposalId?: string | null;
       runId?: string | null;
-      /** @description Who served the reply; null on user messages. */
+      /** @description Admin-only, omitted for everyone else: who served the reply; null on user messages. */
       modelProvider?: string | null;
-      /** @description The model that wrote the reply: its catalog model, named by `GET /ai/models` `modelLabels`; null on user messages. */
+      /** @description Admin-only, omitted for everyone else: the catalog model that wrote the reply, named by `GET /ai/models/admin` `modelLabels`; null on user messages. */
       modelId?: string | null;
       /** @description The model type the reply was written under; null on user messages and on replies older than the selection. */
       contentMode?: components['schemas']['ContentMode'] | null;
@@ -4900,9 +4907,9 @@ export interface components {
       proseEdits?: boolean;
       /** @description Just discussing: nothing the turn proposes applies — every change becomes a suggestion card for the author to accept or decline. Off by default. */
       justDiscussing?: boolean;
-      /** @description Model type for this turn's reply only; omitted follows the chat, then the project. Chapters keep their own content mode. */
+      /** @description Model type for this turn's reply only, never stored; omitted follows the project. Chapters keep their own content mode. unrestricted is refused (`AI_024`) while `GET /ai/models` reports `unrestrictedAvailable: false`. */
       contentMode?: components['schemas']['ContentMode'];
-      /** @description Cost tier for this turn only; omitted follows the chat, then the project. Actions this turn starts (write, review, audit) run at it. */
+      /** @description Cost tier for this turn only, never stored (Think deeper sends performant); omitted follows the project. Actions this turn starts (write, review, audit) run at it. */
       costTier?: components['schemas']['CostTier'];
     };
     /** @description A passage of a chapter draft the author commented on, sent with their message. Offsets are UTF-16 code units into the draft body, the indices a browser selection uses. */
@@ -4968,17 +4975,6 @@ export interface components {
     UpdateChatSessionBody: {
       mode?: components['schemas']['ChatMode'];
       title?: string;
-    };
-    /** @description Every field is optional: an omitted field is left as it is, `null` clears it back to the project default. */
-    UpdateSessionModelBody: {
-      /** @description The picked option's provider from `GET /ai/models`: `synapse` for a Synapse alias. Clear both pin fields to use the cost tier's model. */
-      provider?: string | null;
-      /** @description The picked option's id: an alias key, which must be offered for the chat's model type and cost tier after this update (`AI_022` otherwise). */
-      model?: string | null;
-      /** @description This chat's default model type for its replies; chapters keep their own content mode. */
-      contentMode?: components['schemas']['ContentMode'] | null;
-      /** @description This chat's default cost tier; actions a turn starts run at the turn's tier. */
-      costTier?: components['schemas']['CostTier'] | null;
     };
     /** @description A turn accepted and now running. Open the run’s event stream to watch it; the turn completes and persists whether or not anyone does. */
     ChatTurnStreamResponse: {
@@ -5485,8 +5481,9 @@ export interface components {
       runId?: string | null;
       costTier?: components['schemas']['CostTier'] | null;
       contentMode?: components['schemas']['ContentMode'] | null;
+      /** @description Admin-only; omitted for everyone else. */
       modelProvider?: string | null;
-      /** @description The model that read the chapter, as its call recorded it; named by `GET /ai/models` `modelLabels`. Null when no model ran or the review came from cache. */
+      /** @description Admin-only; omitted for everyone else. The model that read the chapter, as its call recorded it; named by `GET /ai/models/admin` `modelLabels`. Null when no model ran or the review came from cache. */
       model?: string | null;
       /** Format: date-time */
       createdAt: string;
@@ -6140,8 +6137,9 @@ export interface components {
       title?: string;
       /** @description Project additions to the built-in chapter-writing style (point of view, tone, content limits); they take precedence where the two conflict. */
       instructions?: string;
+      /** @description unrestricted is refused (`AI_024`) while `GET /ai/models` reports `unrestrictedAvailable: false`. */
       contentMode?: components['schemas']['ContentMode'];
-      /** @description The cost tier AI work on the new project runs at; omitted uses your default cost tier for new projects. */
+      /** @description The cost tier AI work on the new project runs at; omitted starts it on balanced. */
       costTier?: components['schemas']['CostTier'];
       /** @description Chapter scene-prose word-count target; omitted uses the application default (1,800–2,600 words). */
       wordTarget?: components['schemas']['ProjectWordTarget'];
@@ -6257,6 +6255,7 @@ export interface components {
     UpdateProjectBody: {
       /** @description The working title. Trimmed; a blank title clears it. */
       title?: string;
+      /** @description unrestricted is refused (`AI_024`) while `GET /ai/models` reports `unrestrictedAvailable: false`. */
       contentMode?: components['schemas']['ContentMode'];
       costTier?: components['schemas']['CostTier'];
       brief?: string;
@@ -6279,6 +6278,7 @@ export interface components {
     };
     CloneProjectBody: {
       name: string;
+      /** @description unrestricted is refused (`AI_024`) while `GET /ai/models` reports `unrestrictedAvailable: false`. */
       contentMode?: components['schemas']['ContentMode'];
       /** @description Chapter word-count target; omitted inherits the source project’s target (or the application default). */
       wordTarget?: components['schemas']['ProjectWordTarget'];
@@ -6308,7 +6308,7 @@ export interface components {
       byGroup: components['schemas']['CostBreakdownItem'][];
       /** @description By internal call role, highest spend first. */
       byRole: components['schemas']['CostBreakdownItem'][];
-      /** @description By model, highest spend first. */
+      /** @description By model, highest spend first; empty unless the caller holds `novel-forge:admin`. */
       byModel: components['schemas']['CostBreakdownItem'][];
       /** @description By how the cost was priced — 'provider', 'gateway', or 'estimate' — highest spend first. */
       byCostSource: components['schemas']['CostBreakdownItem'][];
@@ -6330,8 +6330,9 @@ export interface components {
       title: string;
       /** @description The author's own words about the novel, kept verbatim and read by the chat as the author's notes. Up to 10,000 words. */
       notes?: string;
+      /** @description unrestricted is refused (`AI_024`) while `GET /ai/models` reports `unrestrictedAvailable: false`. */
       contentMode?: components['schemas']['ContentMode'];
-      /** @description The cost tier AI work on the new project runs at; omitted uses your default cost tier for new projects. */
+      /** @description The cost tier AI work on the new project runs at; omitted starts it on balanced. */
       costTier?: components['schemas']['CostTier'];
     };
     CreateNovelWithNotesResponse: {
@@ -6390,7 +6391,7 @@ export interface components {
     };
     ImportNovelBody: {
       bundle: components['schemas']['NovelBundle'];
-      /** @description The cost tier AI work on the new project runs at; omitted uses your default cost tier for new projects. */
+      /** @description The cost tier AI work on the new project runs at; omitted starts it on balanced. */
       costTier?: components['schemas']['CostTier'];
     };
     NovelBundle: {
@@ -7297,86 +7298,6 @@ export interface operations {
       };
     };
   };
-  get_api_v1_ai_settings: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['AccountSettingsResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  put_api_v1_ai_settings: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['UpdateAccountSettingsBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['AccountSettingsResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
   get_api_v1_ai_models: {
     parameters: {
       query?: never;
@@ -7393,6 +7314,44 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['AiModelsResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_ai_models_admin: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AiModelsAdminResponse'];
         };
       };
       /** @description Default Response */
@@ -11212,52 +11171,6 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ChatTurnStatusResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  patch_api_v1_projects_projectId_chat_sessions_sessionId_model: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        /** @description Chat session UUID. */
-        sessionId: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['UpdateSessionModelBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ChatSessionResponse'];
         };
       };
       /** @description Default Response */
@@ -15822,10 +15735,9 @@ export type ListChatJobEventsResponse = components['schemas']['ListChatJobEvents
 export type ChatJobEventResponse = components['schemas']['ChatJobEventResponse'];
 export type JobEventType = components['schemas']['JobEventType'];
 export type CancelJobResponse = components['schemas']['CancelJobResponse'];
-export type AccountSettingsResponse = components['schemas']['AccountSettingsResponse'];
-export type CostTier = components['schemas']['CostTier'];
-export type UpdateAccountSettingsBody = components['schemas']['UpdateAccountSettingsBody'];
 export type AiModelsResponse = components['schemas']['AiModelsResponse'];
+export type CostTier = components['schemas']['CostTier'];
+export type AiModelsAdminResponse = components['schemas']['AiModelsAdminResponse'];
 export type AiModelOption = components['schemas']['AiModelOption'];
 export type AiRoleDefault = components['schemas']['AiRoleDefault'];
 export type AiTierModel = components['schemas']['AiTierModel'];
@@ -15928,6 +15840,7 @@ export type RunToolCallResponse = components['schemas']['RunToolCallResponse'];
 export type RunContextPackResponse = components['schemas']['RunContextPackResponse'];
 export type RunContextSectionItem = components['schemas']['RunContextSectionItem'];
 export type RunUsageDetailResponse = components['schemas']['RunUsageDetailResponse'];
+export type RunUsageCallResponse = components['schemas']['RunUsageCallResponse'];
 export type ChapterCostResponse = components['schemas']['ChapterCostResponse'];
 export type ChapterCostBreakdownItem = components['schemas']['ChapterCostBreakdownItem'];
 export type CancelRunResponse = components['schemas']['CancelRunResponse'];
@@ -16025,7 +15938,6 @@ export type TurnAppliedResult = components['schemas']['TurnAppliedResult'];
 export type TurnOpResultItem = components['schemas']['TurnOpResultItem'];
 export type TurnHoldReason = components['schemas']['TurnHoldReason'];
 export type UpdateChatSessionBody = components['schemas']['UpdateChatSessionBody'];
-export type UpdateSessionModelBody = components['schemas']['UpdateSessionModelBody'];
 export type ChatTurnStreamResponse = components['schemas']['ChatTurnStreamResponse'];
 export type EnhancePremiseBody = components['schemas']['EnhancePremiseBody'];
 export type EnhancePremiseResponse = components['schemas']['EnhancePremiseResponse'];

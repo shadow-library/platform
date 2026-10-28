@@ -36,8 +36,7 @@ describe('resolveSkeletonVariant', () => {
     expect(resolveSkeletonVariant('/novels/abc123/settings')).toBe('form');
   });
 
-  it('should resolve top-level account settings and import routes to the form variant', () => {
-    expect(resolveSkeletonVariant('/settings')).toBe('form');
+  it('should resolve the top-level import route to the form variant', () => {
     expect(resolveSkeletonVariant('/import')).toBe('form');
   });
 

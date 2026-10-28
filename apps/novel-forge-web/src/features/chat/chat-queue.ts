@@ -1,5 +1,5 @@
 import { type ChatTurnStreamState } from '@/lib/apis';
-import { type TurnChoice } from '@/lib/chat-model';
+import { type ReplyOptions } from '@/lib/chat-model';
 import { type PassageChip } from '@/lib/passage-comments';
 
 type StreamStatus = ChatTurnStreamState['status'];
@@ -7,7 +7,7 @@ type StreamStatus = ChatTurnStreamState['status'];
 export interface TurnSettings {
   proseEdits: boolean;
   justDiscussing: boolean;
-  choice?: TurnChoice;
+  options?: ReplyOptions;
 }
 
 export interface QueuedTurn extends TurnSettings {
@@ -63,10 +63,10 @@ export function queuedView(queued: QueuedTurn | undefined, step: QueueStep, stre
   return { text: queuedText(queued), held, note: held ? queuedNote(queued.watching ? stream : 'idle') : undefined };
 }
 
-/** Releasing on its own keeps the settings the message was queued with; "Send now" sends what the composer shows. */
+/** Releasing on its own keeps the settings the message was queued with; "Send now" sends what the composer shows, but the reply options always stay the message's own. */
 export function releaseSettings(queued: QueuedTurn, current: TurnSettings, via: 'auto' | 'now'): TurnSettings {
-  if (via === 'now') return current;
-  return { proseEdits: queued.proseEdits, justDiscussing: queued.justDiscussing, choice: queued.choice };
+  if (via === 'now') return { ...current, options: queued.options };
+  return { proseEdits: queued.proseEdits, justDiscussing: queued.justDiscussing, options: queued.options };
 }
 
 export interface EditedQueue {
@@ -79,7 +79,7 @@ export function editQueued(queued: QueuedTurn, draft: string): EditedQueue {
   return {
     input: draft.trim() ? `${queued.content}\n${draft}` : queued.content,
     chips: queued.chips,
-    settings: { proseEdits: queued.proseEdits, justDiscussing: queued.justDiscussing, choice: queued.choice },
+    settings: { proseEdits: queued.proseEdits, justDiscussing: queued.justDiscussing, options: queued.options },
   };
 }
 

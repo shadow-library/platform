@@ -70,28 +70,11 @@ export interface RunLabelInput {
   target: string;
 }
 
-export interface CallChargeInput {
-  costUsd?: string | null;
-  costSource?: string | null;
-  inputTokens?: number | null;
-  outputTokens?: number | null;
-}
-
-export interface ListPrice {
-  inputPricePerMToken?: number;
-  outputPricePerMToken?: number;
-}
-
 export interface ChargeRowItem {
   key: string;
   label: string;
   pct: number;
   amount: string;
-  estimated: boolean;
-}
-
-export interface CallCharge {
-  usd: number | null;
   estimated: boolean;
 }
 
@@ -117,7 +100,15 @@ const GROUP_LABEL: Record<string, string> = {
   image: 'Illustrations',
 };
 
-const TIER_LABEL: Record<CostTier, string> = { economy: 'Economy', balanced: 'Balanced', performant: 'Performant' };
+export const PACES: readonly CostTier[] = ['economy', 'balanced', 'performant'];
+
+const TIER_LABEL: Record<CostTier, string> = { economy: 'Swift', balanced: 'Steady', performant: 'Meticulous' };
+
+const PACE_COPY: Record<CostTier, string> = {
+  economy: 'Quick replies and fast drafts, for exploring ideas or writing volume.',
+  balanced: 'Careful planning, natural prose. Right for most of the book.',
+  performant: 'The deepest thinking on every step. Slower, and uses more of your allowance.',
+};
 
 const CONTENT_MODE_LABEL: Record<ContentMode, string> = { standard: 'Standard', unrestricted: 'Unrestricted' };
 
@@ -223,6 +214,14 @@ export function tierLabel(key: string): string {
   return isKeyOf(TIER_LABEL, key) ? TIER_LABEL[key] : sentenceCase(key);
 }
 
+export function paceCopy(tier: CostTier): string {
+  return PACE_COPY[tier];
+}
+
+export function isPace(value: string): value is CostTier {
+  return isKeyOf(TIER_LABEL, value);
+}
+
 export function contentModeLabel(key: string): string {
   return isKeyOf(CONTENT_MODE_LABEL, key) ? CONTENT_MODE_LABEL[key] : sentenceCase(key);
 }
@@ -235,15 +234,6 @@ export function runLabel({ graph, target }: RunLabelInput): string {
   const label = GRAPH_LABEL[graph] ?? sentenceCase(graph);
   const chapter = /^chapter-(\d+)$/.exec(target);
   return chapter ? `${label} ${chapter[1]}` : label;
-}
-
-// Mirrors the server's `classifyRowCost`: a row that predates `cost_source` and recorded no cost is priced from list prices, full input price included.
-export function callCharge({ costUsd, costSource, inputTokens, outputTokens }: CallChargeInput, price?: ListPrice | null): CallCharge {
-  if (costUsd != null) return { usd: Number(costUsd), estimated: costSource === 'estimate' };
-  if (costSource != null || price === null) return { usd: 0, estimated: false };
-  if (!price) return { usd: null, estimated: true };
-  const usd = ((inputTokens ?? 0) / 1_000_000) * (price.inputPricePerMToken ?? 0) + ((outputTokens ?? 0) / 1_000_000) * (price.outputPricePerMToken ?? 0);
-  return { usd, estimated: usd > 0 };
 }
 
 export function quotaWindowLabel(windowMs: number): string {

@@ -51,7 +51,7 @@ export interface ChatTurnRequest {
   /** The author's Edit prose toggle: only with it may the turn rewrite chapter text. */
   proseEdits?: boolean;
   justDiscussing?: boolean;
-  /** This turn only; omitted follows the chat, then the project. */
+  /** This reply only, never stored; omitted follows the project. */
   contentMode?: ContentMode;
   costTier?: CostTier;
   /** Passages the author commented on; the server refuses the turn with `CHT_009` when one has changed since it was selected. */
@@ -70,14 +70,6 @@ export interface ChatTurnVariables extends ChatTurnRequest {
 interface SessionStatusVariables {
   sessionId: string;
   status: 'active' | 'archived';
-}
-
-interface SessionModelVariables {
-  sessionId: string;
-  provider?: string | null;
-  model?: string | null;
-  contentMode?: ContentMode | null;
-  costTier?: CostTier | null;
 }
 
 interface SessionUpdateVariables {
@@ -310,14 +302,6 @@ export function useDeleteChatSessionMutation(projectId: string): UseMutationResu
   const queryClient = useQueryClient();
   return useMutation<ChatSessionResponse, ApiError, string>({
     mutationFn: sessionId => APIRequest.delete(`/projects/${projectId}/chat/sessions/${sessionId}`).execute(),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: refinementKeys.sessions(projectId) }),
-  });
-}
-
-export function useUpdateSessionModelMutation(projectId: string): UseMutationResult<ChatSessionResponse, ApiError, SessionModelVariables> {
-  const queryClient = useQueryClient();
-  return useMutation<ChatSessionResponse, ApiError, SessionModelVariables>({
-    mutationFn: ({ sessionId, ...body }) => APIRequest.patch(`/projects/${projectId}/chat/sessions/${sessionId}/model`).body(body).execute(),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: refinementKeys.sessions(projectId) }),
   });
 }

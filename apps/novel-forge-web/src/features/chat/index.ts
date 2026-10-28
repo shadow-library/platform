@@ -8,6 +8,7 @@ export * from './chat-view';
 export * from './JobProgress';
 export * from './pending-reveal';
 export * from './ProgressPanel';
+export * from './ReplyOptionsMenu';
 export * from './progress-panel-view';
 export * from './QuestionCard';
 export * from './ReadyChecklist';

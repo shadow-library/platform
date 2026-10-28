@@ -4,7 +4,6 @@ import { type AiQuotaResponse, type CostBreakdownItem } from '../src/lib/apis/ap
 import {
   barPercent,
   breakdownRows,
-  callCharge,
   callRoleLabel,
   chargeRows,
   contentModeLabel,
@@ -14,7 +13,10 @@ import {
   formatCompactTokens,
   formatUsd,
   groupLabel,
+  isPace,
   isUsagePeriod,
+  paceCopy,
+  PACES,
   pageRange,
   periodCharge,
   periodFooter,
@@ -153,12 +155,24 @@ describe('estimateFooter', () => {
 });
 
 describe('labels', () => {
-  it('should name model groups, tiers and content modes for the author', () => {
+  it('should name model groups, paces and content modes for the author', () => {
     expect(groupLabel('helper')).toBe('Helpers');
     expect(groupLabel('bible:canon')).toBe('Canon');
-    expect(tierLabel('performant')).toBe('Performant');
+    expect(tierLabel('economy')).toBe('Swift');
+    expect(tierLabel('balanced')).toBe('Steady');
+    expect(tierLabel('performant')).toBe('Meticulous');
     expect(contentModeLabel('unrestricted')).toBe('Unrestricted');
     expect(tierLabel('custom-tier')).toBe('Custom tier');
+  });
+
+  it('should describe every pace in the author’s words', () => {
+    expect(PACES.map(paceCopy)).toEqual([
+      'Quick replies and fast drafts, for exploring ideas or writing volume.',
+      'Careful planning, natural prose. Right for most of the book.',
+      'The deepest thinking on every step. Slower, and uses more of your allowance.',
+    ]);
+    expect(PACES.filter(isPace)).toEqual(['economy', 'balanced', 'performant']);
+    expect(isPace('premium')).toBe(false);
   });
 
   it('should name call roles and fall back to the role itself', () => {
@@ -176,36 +190,6 @@ describe('runLabel', () => {
   it('should name other runs by what they did', () => {
     expect(runLabel({ graph: 'bible-audit', target: 'bible' })).toBe('Story Bible audit');
     expect(runLabel({ graph: 'future-graph', target: 'x' })).toBe('Future graph');
-  });
-});
-
-describe('callCharge', () => {
-  const price = { inputPricePerMToken: 3, outputPricePerMToken: 15 };
-
-  it('should treat provider and gateway costs as the real charge', () => {
-    expect(callCharge({ costUsd: '0.041', costSource: 'gateway' })).toEqual({ usd: 0.041, estimated: false });
-    expect(callCharge({ costUsd: '0.5', costSource: 'provider' })).toEqual({ usd: 0.5, estimated: false });
-  });
-
-  it('should flag only a list-price cost as an estimate', () => {
-    expect(callCharge({ costUsd: '0.02', costSource: 'estimate' })).toEqual({ usd: 0.02, estimated: true });
-  });
-
-  it('should charge nothing for a classified call that recorded no cost', () => {
-    expect(callCharge({ costUsd: null, costSource: 'provider', inputTokens: 1000 }, price)).toEqual({ usd: 0, estimated: false });
-  });
-
-  it('should price a legacy call from list prices so the lines add up to the run', () => {
-    expect(callCharge({ costUsd: null, costSource: null, inputTokens: 1_000_000, outputTokens: 100_000 }, price)).toEqual({ usd: 4.5, estimated: true });
-    expect(callCharge({ costUsd: null, costSource: null, inputTokens: 0, outputTokens: 0 }, price)).toEqual({ usd: 0, estimated: false });
-  });
-
-  it('should leave a legacy call unknown until the model registry loads', () => {
-    expect(callCharge({ costUsd: null, costSource: null, inputTokens: 10 })).toEqual({ usd: null, estimated: true });
-  });
-
-  it('should charge nothing for a legacy call on a model the registry does not price, as the server does', () => {
-    expect(callCharge({ costUsd: null, costSource: null, inputTokens: 10 }, null)).toEqual({ usd: 0, estimated: false });
   });
 });
 

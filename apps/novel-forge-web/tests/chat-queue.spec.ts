@@ -25,7 +25,7 @@ const queued: QueuedTurn = {
   chips: [],
   proseEdits: true,
   justDiscussing: false,
-  choice: { contentMode: 'standard', costTier: 'economy' },
+  options: { thinkDeeper: true, unrestricted: false },
   watching: true,
   after: 'r1',
 };
@@ -96,20 +96,20 @@ describe('queuedView', () => {
 });
 
 describe('releaseSettings', () => {
-  const current = { proseEdits: false, justDiscussing: true, choice: { contentMode: 'unrestricted' as const, costTier: 'performant' as const } };
+  const current = { proseEdits: false, justDiscussing: true, options: { thinkDeeper: false, unrestricted: true } };
 
   it('should keep the settings a message was queued with when it sends on its own', () => {
-    expect(releaseSettings(queued, current, 'auto')).toEqual({ proseEdits: true, justDiscussing: false, choice: queued.choice });
+    expect(releaseSettings(queued, current, 'auto')).toEqual({ proseEdits: true, justDiscussing: false, options: queued.options });
   });
 
-  it('should send with what the composer shows now when the author presses Send now', () => {
-    expect(releaseSettings(queued, current, 'now')).toEqual(current);
+  it('should send with what the composer shows now when the author presses Send now, keeping the message’s own reply options', () => {
+    expect(releaseSettings(queued, current, 'now')).toEqual({ proseEdits: false, justDiscussing: true, options: queued.options });
   });
 });
 
 describe('editQueued', () => {
   it('should restore the text and the settings it was queued with', () => {
-    expect(editQueued(queued, '')).toEqual({ input: 'Make it darker', chips: [], settings: { proseEdits: true, justDiscussing: false, choice: queued.choice } });
+    expect(editQueued(queued, '')).toEqual({ input: 'Make it darker', chips: [], settings: { proseEdits: true, justDiscussing: false, options: queued.options } });
   });
 
   it('should put the queued text above anything typed since', () => {

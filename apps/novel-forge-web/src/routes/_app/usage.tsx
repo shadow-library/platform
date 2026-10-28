@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { PageContainer, PageHeader, QueryState, SectionCard } from '@/components/nf';
 import { BreakdownTable, ChargeRows, EstimateNote, QuotaMeter, StatCard, StatGrid, StatNote, StatValue, UsageBars, UsageEmpty, UsageGrid, UsageSplit } from '@/features/usage';
 import { accountUsageQueryOptions, type AccountUsageResponse, useAccountUsageQuery } from '@/lib/apis';
+import { useIsAdmin } from '@/lib/session';
 import { type BreakdownRow, breakdownRows, chargeRows, contentModeLabel, dayBars, estimateFooter, formatCompactTokens, formatUsd, groupLabel, tierLabel } from '@/lib/usage';
 
 export const Route = createFileRoute('/_app/usage')({
@@ -30,6 +31,7 @@ interface AccountUsageBodyProps {
 }
 
 function AccountUsageBody({ usage }: AccountUsageBodyProps): React.JSX.Element {
+  const isAdmin = useIsAdmin();
   const days = useMemo(() => dayBars(usage.byDay, 30, new Date()), [usage.byDay]);
   const groups = chargeRows(usage.byGroup, groupLabel);
   const charged = days.some(day => day.pct > 0);
@@ -72,14 +74,14 @@ function AccountUsageBody({ usage }: AccountUsageBodyProps): React.JSX.Element {
         </SectionCard>
       </UsageGrid>
 
-      <SectionCard title="By model · all time">
-        {usage.byModel.length === 0 ? (
+      <SectionCard title={isAdmin ? 'By model · all time' : 'By pace · all time'}>
+        {usage.byTier.length === 0 ? (
           <UsageEmpty>No model calls yet.</UsageEmpty>
         ) : (
           <>
-            <BreakdownTable heading="Model" rows={breakdownRows(usage.byModel, item => item.label, true)} showTokens flush />
-            <BreakdownTable heading="Cost tier" rows={breakdownRows(usage.byTier, item => tierLabel(item.key))} />
-            <BreakdownTable heading="Model type" rows={breakdownRows(usage.byContentMode, item => contentModeLabel(item.key))} />
+            {isAdmin && <BreakdownTable heading="Model" rows={breakdownRows(usage.byModel, item => item.label, true)} showTokens flush />}
+            <BreakdownTable heading="Pace" rows={breakdownRows(usage.byTier, item => tierLabel(item.key))} flush={!isAdmin} />
+            <BreakdownTable heading="Content mode" rows={breakdownRows(usage.byContentMode, item => contentModeLabel(item.key))} />
           </>
         )}
         <EstimateNote estimatedCostUsd={usage.estimatedCostUsd} />
@@ -93,7 +95,7 @@ function AccountUsageScreen(): React.JSX.Element {
 
   return (
     <PageContainer>
-      <PageHeader title="Usage & charges" subtitle="Every novel you own · what each call cost, as charged — the Claude subscription and the other providers alike" />
+      <PageHeader title="Usage & charges" subtitle="Every novel you own · what each call cost, as charged" />
       <QueryState isLoading={usageQuery.isLoading} error={usageQuery.error} isEmpty={!usageQuery.data} emptyTitle="No usage to show">
         <>{usageQuery.data && <AccountUsageBody usage={usageQuery.data} />}</>
       </QueryState>

@@ -9,7 +9,7 @@ import { type JumpScope, type PaletteState, resolvePaletteView } from '@/lib/com
 import { type LifecyclePhase, lifecyclePhase, projectDotColor, projectKindTag, projectTitle, sharedOwnerTag } from '@/lib/format';
 import { useIsAdmin } from '@/lib/session';
 
-import { BookIcon, GridIcon, SettingsIcon, UsageIcon } from '../icons';
+import { BookIcon, GridIcon, UsageIcon } from '../icons';
 import styles from './AppShell.module.css';
 import { CommandScopeProvider } from './CommandScope';
 import { JobsTray } from './JobsTray';
@@ -120,10 +120,7 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
             items: projects.slice(0, 3).map(pinned => ({ to: '/novels/$novelId', params: { novelId: pinned.id }, label: projectTitle(pinned), icon: <BookIcon /> })),
           },
           {
-            items: [
-              { to: '/usage', label: 'Usage & charges', icon: <UsageIcon /> },
-              { to: '/settings', label: 'Settings', icon: <SettingsIcon /> },
-            ],
+            items: [{ to: '/usage', label: 'Usage & charges', icon: <UsageIcon /> }],
           },
         ],
       };
@@ -150,7 +147,6 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
       keywords: ['cost', 'charges', 'quota', 'limit'],
       onRun: () => navigate({ to: '/usage' }),
     });
-    items.push({ id: 'go-settings', group: 'Go to', label: 'Settings', icon: <SettingsIcon />, keywords: ['models', 'defaults'], onRun: () => navigate({ to: '/settings' }) });
     for (const candidate of projects) {
       items.push({
         id: `project-${candidate.id}`,
@@ -199,7 +195,6 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
           items: [
             { id: 'projects', label: 'All projects', icon: <GridIcon />, onSelect: () => void navigate({ to: '/' }) },
             { id: 'usage', label: 'Usage & charges', icon: <UsageIcon />, onSelect: () => void navigate({ to: '/usage' }) },
-            { id: 'settings', label: 'Settings', icon: <SettingsIcon />, onSelect: () => void navigate({ to: '/settings' }) },
           ],
           onSignOut: signOut,
         }}

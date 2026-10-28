@@ -10,6 +10,7 @@ import {
   ALWAYS_SENT,
   changeSetWith,
   claimableMilestones,
+  contentModeChoiceShown,
   endingProblem,
   everySceneFrom,
   findPlanOp,
@@ -61,6 +62,8 @@ export interface PlanCardProps {
   projectContentMode: ContentMode;
   /** The mode the chapter already has from an earlier plan; null follows the novel. */
   chapterContentMode?: ContentMode | null;
+  /** Whether the server routes unrestricted writing; unknown counts as not. */
+  unrestrictedAvailable?: boolean;
   saving?: boolean;
   saveError?: ApiError | null;
   onRetrySave?: () => void;
@@ -102,6 +105,8 @@ const MODE_TITLES: Record<ContentMode, string> = { standard: 'Standard', unrestr
 const UNRESTRICTED_NOTE =
   'Every step for this chapter — writing, repairs, revisions, its summary and checks — uses a model that allows dark content. The chapter is then walled off: not searched, quoted or read by the chat. The next chapter sees only a short summary and what changed (where people are, injuries, who learned what), which you check and edit before moving on.';
 
+const UNRESTRICTED_UNAVAILABLE_NOTE = 'Unrestricted writing isn’t available right now, so this chapter can’t be written until it is. Switch to Standard to write it now.';
+
 const ADD_SCENE = 'add';
 
 export function PlanCard(props: PlanCardProps): React.JSX.Element {
@@ -121,7 +126,7 @@ export function PlanCard(props: PlanCardProps): React.JSX.Element {
 type PlanCardBodyProps = PlanCardProps & { proposal: ProposalResponse; planRef: PlanOpRef };
 
 function PlanCardBody(props: PlanCardBodyProps): React.JSX.Element {
-  const { proposal, planRef, characters, milestones = [], pages = [], kept = [], projectContentMode, chapterContentMode = null } = props;
+  const { proposal, planRef, characters, milestones = [], pages = [], kept = [], projectContentMode, chapterContentMode = null, unrestrictedAvailable = false } = props;
   const { saving, saveError, onRetrySave, writing, applyError, onClearApplyError, writeFailure, onRetryWrite, discarding } = props;
   const { onChange, onWrite, onDiscard, onAskForChanges, onPlanAgain, onDirtyChange } = props;
   const baseId = useId();
@@ -462,25 +467,28 @@ function PlanCardBody(props: PlanCardBodyProps): React.JSX.Element {
           </span>
         </div>
 
-        <div className={styles.group}>
-          <span className={styles.label} id={id('mode')}>
-            Content for this chapter · your choice
-          </span>
-          <ModeRadios
-            labelledBy={id('mode')}
-            value={mode}
-            disabled={!editable}
-            onPick={picked => draftRef.current.contentMode !== picked && save({ ...draftRef.current, contentMode: picked })}
-          />
-          {resolvedMode === null ? (
-            <span className={styles.hint}>Following the novel’s setting until you pick one for this chapter.</span>
-          ) : (
-            <Button variant="ghost" size="sm" className={styles.alignStart} disabled={!editable} onClick={() => save({ ...draftRef.current, contentMode: null })}>
-              Follow the novel’s setting ({MODE_TITLES[projectContentMode]})
-            </Button>
-          )}
-          {mode === 'unrestricted' && <span className={styles.modeNote}>{UNRESTRICTED_NOTE}</span>}
-        </div>
+        {contentModeChoiceShown(unrestrictedAvailable, projectContentMode, resolvedMode) && (
+          <div className={styles.group}>
+            <span className={styles.label} id={id('mode')}>
+              Content for this chapter · your choice
+            </span>
+            <ModeRadios
+              labelledBy={id('mode')}
+              value={mode}
+              disabled={!editable}
+              unrestrictedOffered={unrestrictedAvailable}
+              onPick={picked => draftRef.current.contentMode !== picked && save({ ...draftRef.current, contentMode: picked })}
+            />
+            {resolvedMode === null ? (
+              <span className={styles.hint}>Following the novel’s setting until you pick one for this chapter.</span>
+            ) : (
+              <Button variant="ghost" size="sm" className={styles.alignStart} disabled={!editable} onClick={() => save({ ...draftRef.current, contentMode: null })}>
+                Follow the novel’s setting ({MODE_TITLES[projectContentMode]})
+              </Button>
+            )}
+            {mode === 'unrestricted' && <span className={styles.modeNote}>{unrestrictedAvailable ? UNRESTRICTED_NOTE : UNRESTRICTED_UNAVAILABLE_NOTE}</span>}
+          </div>
+        )}
 
         <section aria-labelledby={id('writer')} className={styles.writer}>
           <div className={styles.writerHead}>
@@ -566,17 +574,20 @@ interface ModeRadiosProps {
   labelledBy: string;
   value: ContentMode;
   disabled: boolean;
+  unrestrictedOffered: boolean;
   onPick: (mode: ContentMode) => void;
 }
 
-function ModeRadios({ labelledBy, value, disabled, onPick }: ModeRadiosProps): React.JSX.Element {
+function ModeRadios({ labelledBy, value, disabled, unrestrictedOffered, onPick }: ModeRadiosProps): React.JSX.Element {
   const buttons = useRef(new Map<ContentMode, HTMLButtonElement>());
+  const offered = (mode: ContentMode): boolean => mode !== 'unrestricted' || unrestrictedOffered || value === 'unrestricted';
 
   const move = (event: KeyboardEvent, index: number): void => {
     const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[event.key];
     if (step === undefined) return;
     event.preventDefault();
     const target = MODES[(index + step + MODES.length) % MODES.length]?.mode ?? value;
+    if (!offered(target)) return;
     onPick(target);
     buttons.current.get(target)?.focus();
   };
@@ -593,7 +604,7 @@ function ModeRadios({ labelledBy, value, disabled, onPick }: ModeRadiosProps): R
             role="radio"
             aria-checked={checked}
             tabIndex={checked ? 0 : -1}
-            disabled={disabled}
+            disabled={disabled || !offered(option.mode)}
             className={styles.mode}
             onClick={() => onPick(option.mode)}
             onKeyDown={event => move(event, index)}

@@ -9,7 +9,7 @@ import {
   type DraftResponse,
   type ListChapterReviewsResponse,
   remedyBody,
-  useAiModelsQuery,
+  useAdminModelsQuery,
   useClearRemedyMutation,
   useRegenerateChapterMutation,
   useRemedyMutation,
@@ -17,6 +17,7 @@ import {
 } from '@/lib/apis';
 import { buildRepairNote, type OpenFindingForm, repairSource, type ReviewJobState, versionLabel, visibleForm } from '@/lib/chapter-checks';
 import { modelLabel } from '@/lib/model-defaults';
+import { useIsAdmin } from '@/lib/session';
 
 import { ChecksPanel } from './ChecksPanel';
 import styles from './ChecksDrawer.module.css';
@@ -36,7 +37,7 @@ export interface ChecksDrawerProps {
 }
 
 export function ChecksDrawer({ open, onOpenChange, novelId, draft, reviews, ...panel }: ChecksDrawerProps): React.JSX.Element {
-  const models = useAiModelsQuery();
+  const models = useAdminModelsQuery(useIsAdmin());
   const remedy = useRemedyMutation(novelId, draft.chapter);
   const clear = useClearRemedyMutation(novelId, draft.chapter);
   const [form, setForm] = useState<OpenFindingForm | undefined>();

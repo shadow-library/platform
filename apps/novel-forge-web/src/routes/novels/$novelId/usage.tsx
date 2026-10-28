@@ -21,6 +21,7 @@ import {
 } from '@/features/usage';
 import { type CostResponse, projectCostQueryOptions, useProjectCostQuery, useProjectQuery } from '@/lib/apis';
 import { projectTitle } from '@/lib/format';
+import { useIsAdmin } from '@/lib/session';
 import {
   breakdownRows,
   chargeRows,
@@ -52,6 +53,7 @@ interface UsageBreakdownsProps {
 
 function UsageBreakdowns({ novelId, cost, period }: UsageBreakdownsProps): React.JSX.Element {
   const navigate = useNavigate();
+  const isAdmin = useIsAdmin();
   const days = useMemo(() => dayBars(cost.byDay, period === 'week' ? 7 : 30, new Date()), [cost.byDay, period]);
   const groups = chargeRows(cost.byGroup, groupLabel);
   const dayCount = period === 'week' ? 7 : 30;
@@ -67,20 +69,20 @@ function UsageBreakdowns({ novelId, cost, period }: UsageBreakdownsProps): React
       </SectionCard>
 
       <SectionCard
-        title="By model · all time"
+        title={isAdmin ? 'By model · all time' : 'By pace · all time'}
         action={
           <Button variant="text" size="sm" onClick={() => void navigate({ to: '/novels/$novelId/settings', params: { novelId }, search: { tab: 'models' } })}>
-            Defaults in Settings
+            Pace in Settings
           </Button>
         }
       >
-        {cost.byModel.length === 0 ? (
+        {cost.byTier.length === 0 ? (
           <UsageEmpty>No model calls yet.</UsageEmpty>
         ) : (
           <>
-            <BreakdownTable heading="Model" rows={breakdownRows(cost.byModel, item => item.label, true)} showTokens flush />
-            <BreakdownTable heading="Cost tier" rows={breakdownRows(cost.byTier, item => tierLabel(item.key))} />
-            <BreakdownTable heading="Model type" rows={breakdownRows(cost.byContentMode, item => contentModeLabel(item.key))} />
+            {isAdmin && <BreakdownTable heading="Model" rows={breakdownRows(cost.byModel, item => item.label, true)} showTokens flush />}
+            <BreakdownTable heading="Pace" rows={breakdownRows(cost.byTier, item => tierLabel(item.key))} flush={!isAdmin} />
+            <BreakdownTable heading="Content mode" rows={breakdownRows(cost.byContentMode, item => contentModeLabel(item.key))} />
           </>
         )}
         <EstimateNote estimatedCostUsd={cost.estimatedCostUsd} />
@@ -104,7 +106,7 @@ function UsageScreen(): React.JSX.Element {
     <PageContainer>
       <PageHeader
         title="Usage & charges"
-        subtitle={`${project ? `${projectTitle(project)} · ` : ''}what each call cost, as charged — the Claude subscription and the other providers alike`}
+        subtitle={`${project ? `${projectTitle(project)} · ` : ''}what each call cost, as charged`}
         extra={
           <SegmentedControl size="sm" aria-label="Period" value={period} onValueChange={value => isUsagePeriod(value) && setPeriod(value)}>
             {USAGE_PERIODS.map(option => (

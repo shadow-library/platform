@@ -3,12 +3,20 @@ import { type ReactElement, useState } from 'react';
 import { Alert, Button, Spinner } from '@shadow-library/ui';
 
 import { PaneError, PaneLoader, RunStatusChip } from '@/components/nf';
-import { type RunModelCallResponse, useAiModelsQuery, useRunChargesQuery, useRunUsageQuery, useSettledRunRefresh, type WorkflowRunListItemResponse } from '@/lib/apis';
+import {
+  type AiModelsAdminResponse,
+  type RunUsageCallResponse,
+  useAdminModelsQuery,
+  useRunChargesQuery,
+  useRunUsageQuery,
+  useSettledRunRefresh,
+  type WorkflowRunListItemResponse,
+} from '@/lib/apis';
 import { messageTime } from '@/lib/format';
-import { modelLabel, modelPrice } from '@/lib/model-defaults';
+import { modelLabel } from '@/lib/model-defaults';
 import { formatSeconds } from '@/lib/runs';
 import { useIsAdmin } from '@/lib/session';
-import { callCharge, callRoleLabel, formatCompactTokens, formatUsd, pageRange, runLabel } from '@/lib/usage';
+import { callRoleLabel, formatCompactTokens, formatUsd, pageRange, runLabel, tierLabel } from '@/lib/usage';
 
 import styles from './usage.module.css';
 import { EstimateMark, UsageEmpty } from './UsageParts';
@@ -16,12 +24,12 @@ import { EstimateMark, UsageEmpty } from './UsageParts';
 const PAGE_SIZE = 20;
 
 interface RunCallLineProps {
-  call: RunModelCallResponse;
+  call: RunUsageCallResponse;
+  catalog?: AiModelsAdminResponse;
 }
 
-function RunCallLine({ call }: RunCallLineProps): ReactElement {
-  const modelsQuery = useAiModelsQuery();
-  const charge = callCharge(call, modelPrice(modelsQuery.data, call.model));
+function RunCallLine({ call, catalog }: RunCallLineProps): ReactElement {
+  const servedBy = call.model ? modelLabel(catalog, call.model) : call.tier ? tierLabel(call.tier) : '';
   const tokens =
     call.inputTokens == null && call.outputTokens == null ? '—' : `${formatCompactTokens(call.inputTokens ?? 0)} in · ${formatCompactTokens(call.outputTokens ?? 0)} out`;
   return (
@@ -30,12 +38,12 @@ function RunCallLine({ call }: RunCallLineProps): ReactElement {
         {callRoleLabel(call.role)}
         {call.status !== 'ok' && <span className={styles.callMuted}> · {call.status}</span>}
       </span>
-      <span className={styles.callMuted}>{modelLabel(modelsQuery.data, call.model)}</span>
+      <span className={styles.callMuted}>{servedBy}</span>
       <span className={styles.callMuted}>{tokens}</span>
       <span className={styles.callMuted}>{formatSeconds(call.latencyMs)}</span>
       <span className={styles.callCost}>
-        {charge.usd == null ? '—' : formatUsd(charge.usd)}
-        {charge.estimated && <span className={styles.callMuted}> est.</span>}
+        {formatUsd(call.chargeUsd)}
+        {call.estimatedChargeUsd > 0 && <span className={styles.callMuted}> est.</span>}
       </span>
     </div>
   );
@@ -51,6 +59,7 @@ interface RunDrillDownProps {
 function RunDrillDown({ novelId, runId, id, live }: RunDrillDownProps): ReactElement {
   const isAdmin = useIsAdmin();
   const usageQuery = useRunUsageQuery(novelId, runId, live);
+  const catalog = useAdminModelsQuery(isAdmin);
   const calls = usageQuery.data?.calls ?? [];
 
   return (
@@ -63,7 +72,7 @@ function RunDrillDown({ novelId, runId, id, live }: RunDrillDownProps): ReactEle
       )}
       {usageQuery.data && calls.length === 0 && <span className={styles.callMuted}>This run made no model calls.</span>}
       {calls.map(call => (
-        <RunCallLine key={call.id} call={call} />
+        <RunCallLine key={call.id} call={call} catalog={catalog.data} />
       ))}
       {isAdmin && (
         <div className={styles.drillFoot}>

@@ -297,15 +297,10 @@ all map to **`planning`**. The models novel-forge called directly before Synapse
 
 How a model is picked:
 
-1. **Per chat, chat replies only** — `PATCH /api/v1/projects/:p/chat/sessions/:s/model` with
-   `{"provider":"synapse","model":"opus"}`: an option from `GET /ai/models` `models`, whose `provider` is `synapse` and whose
-   `id` is the alias key. It must be one the catalog offers the chat task for the chat's model type and cost tier after the
-   update — `GET /projects/:p/ai/models` `chatAliases` lists them — or the PATCH is `AI_022`; a registry slug or a half-named
-   pin is `AI_002`. The session then reads back `modelProvider: "synapse"`, `modelId: "opus"`.
-2. Otherwise the platform model for the cost tier and model type (Synapse's routes). A chat turn's tier
-   outranks the chat's, which outranks the project's. No project setting pins a model to a role, and there is no
-   per-account model default; `PUT /api/v1/ai/settings` `{"defaultCostTier":"economy"}` only sets the tier a new
-   project starts on.
+1. Always the platform model for the project's cost tier (its Pace) and content mode, through Synapse's routes. Nothing pins
+   a model: a chat holds no pin, tier or content mode, and there is no account default — a new project starts on `balanced`.
+2. A chat turn may carry one-shot `costTier` / `contentMode` (the composer's Reply options: Think deeper sends `performant`,
+   Unrestricted sends `unrestricted`), which outrank the project's for that reply only and are never stored.
 
 `GET /api/v1/ai/models` is built from the catalog: `models` holds every chat alias as a `synapse` option,
 `unrestrictedAllowlist` the alias keys offered to an unrestricted chat, `tiers` each tier × type × group's default model, label and
@@ -321,7 +316,7 @@ For the cheapest live runs, put the project on the Economy tier (`useEconomyTier
 
 `POST /api/v1/projects` — `src/modules/project/project/project.controller.ts:29` (201, `ProjectResponse`).
 
-Body (`CreateProjectBody`): required `name` and `kind`; optional `title`, `instructions`, `contentMode`, `costTier` (omitted → the owner's default cost tier).
+Body (`CreateProjectBody`): required `name` and `kind`; optional `title`, `instructions`, `contentMode`, `costTier` (omitted → `balanced`).
 
 - `kind` has one value, `new_novel` (`src/database/schemas/projects.ts`).
 - `contentMode`: `standard | unrestricted` (`projects.ts`).
@@ -1836,30 +1831,23 @@ export default function createPlugin() {
 
 ---
 
-### 4. Account settings and model routing
+### 4. Pace and model routing
 
-#### 4.1 Default cost tier, precedence and routing
+#### 4.1 Pace, reply options and routing
 
-- **Entry:** UI Settings (`/settings`: one "Default cost tier for new projects" control, Economy / Balanced / Performant; "Save changes"; info alert "How models are picked"). API `GET /ai/models`, `GET|PUT /ai/settings`, `POST /projects`, `POST /projects/new-novel`, `POST /import`, `POST /projects/:p/clone`, `PATCH /chat/sessions/:s/model`.
-- **Input:** `PUT /ai/settings {"defaultCostTier":"economy"}`.
+- **Entry:** UI project Settings → Pace tab (`/novels/:id/settings?tab=models`: a "Pace" segmented control Swift / Steady / Meticulous with the selected pace's copy as its hint; a "Content mode" control only while `GET /ai/models` `unrestrictedAvailable` is true or the novel is already unrestricted; the per-job model table for admins only), and the chat composer's "Reply options" menu (Think deeper, hidden on a Meticulous novel; Unrestricted, shown only when available and the novel is standard; both reset after a send). API `GET /ai/models`, `GET /ai/models/admin`, `GET /projects/:p/ai/models`, `POST /projects`, `POST /projects/new-novel`, `POST /import`, `POST /projects/:p/clone`, `PATCH /projects/:p`, `POST /chat/sessions/:s/messages`.
 - **Run:**
-  1. `GET /ai/settings` on a fresh account → `{"defaultCostTier":"balanced"}`.
-  2. PUT as above, then create a project through each creation path without a `costTier`, and once with `"costTier":"performant"`.
-  3. Clone a Performant project.
-  4. Hub turn on an Economy project (new chat), then check its `model_calls`.
-  5. Chat pin: `PATCH /projects/$P/chat/sessions/$S/model {"provider":"synapse","model":"gpt-luna"}`, turn, then clear it with `{"provider":null,"model":null}`. Then try `{"provider":"synapse","model":"e2e-unoffered"}`.
-  6. Pick Performant in the composer, send two turns, then pick "Use the project default" and send a third.
-  7. Pin a standard-only alias (e.g. `opus`), then set project `contentMode:'unrestricted'`, turn.
+  1. Create a project through each creation path without a `costTier`, and once with `"costTier":"performant"`. Clone the Performant one.
+  2. Hub turn on an Economy project, then check its `model_calls`.
+  3. In the composer, turn on Think deeper and send; send a second message without touching the menu.
+  4. As an author, `GET /ai/models`, `GET /ai/models/admin` and `GET /projects/$P/ai/models`; repeat as an admin.
 - **Verify:**
-  - Step 2: every project created without a tier is Economy; the one that named Performant is Performant. A bot-owned project starts on Balanced, and `PUT /ai/settings` as a bot is 403 `AI_016`.
-  - Step 3: the clone is Performant whatever the account default.
-  - Step 4: the chat call's `model` is the Economy chat model from `GET /ai/models` `tiers`, and `chat_messages.model_id` (assistant) matches: the catalog model Synapse reports, shown by its `modelLabels` label.
-  - Precedence exactly: the chat's pin > the turn's tier > the chat's tier > the project's tier. Step 5 uses the pin; step 6 uses the Performant chat model for both turns (the chat session's `costTier` is `performant`) and the third is back on Economy with the session's `costTier` null.
-  - Step 5: the pinned turn's envelope carries `alias: "gpt-luna"`; the unoffered alias is 400 `AI_022` and changes nothing.
-  - Step 7: an alias the catalog does not offer unrestricted chats is not sent (no `alias` in the envelope); the reply uses the unrestricted route for its tier. `GET /ai/models` `unrestrictedAllowlist` lists the alias keys offered there (`grok`, `deepseek`, `glm`, `kimi` in the seed).
-  - `GET /projects/:p/models` reports each group's tier model for the novel's (or the previewed) type and tier; a `PATCH /projects/:p` carrying `config` stores nothing.
-  - Group→role mapping: Illustrations compose runs on the helper group (not Planning); embedding and vision are not configurable.
-- **Fails when:** a project created without a tier ignores the account default, a PUT with a value outside economy/balanced/performant is accepted, a chat pin to an alias the catalog does not offer is not refused with 400 `AI_022`, or a registry slug pin is not refused with 400 `AI_002`.
+  - Step 1: every project created without a tier is Balanced (a bot's too); the one that named Performant is Performant, and so is its clone.
+  - Step 2: the chat call's `model` is the Economy chat route's model, and `chat_messages.model_id` (assistant) matches it.
+  - Step 3: the first turn's body carries `costTier: "performant"` and its reply tag reads "Meticulous"; the second carries no `costTier` and its tag reads the novel's pace. The session never gains a tier.
+  - Step 4: an author reads `{ paces, unrestrictedAvailable }` only, and both admin endpoints are 403; an admin reads the catalog and each group's route for the novel's (or the previewed) type and tier.
+  - Raising a project, a chapter plan or a turn to unrestricted while `unrestrictedAvailable` is false is 400 `AI_024`.
+- **Fails when:** a project created without a tier is not Balanced, a turn's one-shot option is stored on the chat, or an author's response names a model, provider or per-token price.
 
 ---
 

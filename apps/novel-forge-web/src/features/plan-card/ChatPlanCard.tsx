@@ -1,7 +1,16 @@
 import { useBlocker } from '@tanstack/react-router';
 import { useState } from 'react';
 
-import { type JobEnqueueResponse, useBriefQuery, useListBibleDocsQuery, useListBriefsQuery, useListEntitiesQuery, useListMilestonesQuery, useProjectQuery } from '@/lib/apis';
+import {
+  type JobEnqueueResponse,
+  useAiModelsQuery,
+  useBriefQuery,
+  useListBibleDocsQuery,
+  useListBriefsQuery,
+  useListEntitiesQuery,
+  useListMilestonesQuery,
+  useProjectQuery,
+} from '@/lib/apis';
 import { findPlanOp, isWriterExcludedDoc, keptBackStructure, type PlanPage } from '@/lib/plan-card';
 
 import { PlanCard } from './PlanCard';
@@ -24,6 +33,7 @@ export function ChatPlanCard({ projectId, proposalId, onAskForChanges, onPlanAga
   const docs = useListBibleDocsQuery(projectId);
   const milestones = useListMilestonesQuery(projectId);
   const project = useProjectQuery(projectId);
+  const models = useAiModelsQuery();
   const briefs = useListBriefsQuery(projectId);
   const op = card.proposal ? findPlanOp(card.proposal)?.op : undefined;
   const replanning = op !== undefined && (briefs.data?.items ?? []).some(brief => brief.chapter === op.chapter);
@@ -50,6 +60,7 @@ export function ChatPlanCard({ projectId, proposalId, onAskForChanges, onPlanAga
       kept={keptBackStructure(op?.isEnding === true || brief.data?.isEnding === true)}
       projectContentMode={project.data?.contentMode ?? 'standard'}
       chapterContentMode={brief.data?.contentMode ?? null}
+      unrestrictedAvailable={models.data?.unrestrictedAvailable === true}
       onDirtyChange={setDirty}
       onAskForChanges={onAskForChanges && (() => void card.settled().then(saved => saved && onAskForChanges()))}
       onPlanAgain={onPlanAgain}

@@ -383,6 +383,11 @@ export function resolvedContentMode(draft: Pick<PlanDraft, 'contentMode'>, chapt
   return draft.contentMode === undefined ? chapterMode : draft.contentMode;
 }
 
+/** Where Unrestricted is not set up the choice is shown only while Unrestricted is already in play, so the author can still step back to Standard. */
+export function contentModeChoiceShown(unrestrictedAvailable: boolean, projectMode: ContentMode, resolvedMode: ContentMode | null): boolean {
+  return unrestrictedAvailable || projectMode === 'unrestricted' || resolvedMode === 'unrestricted';
+}
+
 export function isBlankPlan(draft: PlanDraft): boolean {
   return !draft.title.trim() || savedScenes(draft.scenes).length === 0;
 }

@@ -61,6 +61,7 @@ function card(overrides: Partial<PlanCardProps> = {}): string {
     pages: [{ ref: 'entity:hollis', label: 'Hollis Vane' }],
     kept: ['how the book ends', 'later volumes and their goals'],
     projectContentMode: 'standard',
+    unrestrictedAvailable: true,
     onChange: noop,
     onWrite: noop,
     onDiscard: noop,
@@ -142,6 +143,20 @@ describe('PlanCard', () => {
     const html = card({ proposal: proposal({ changeSet: [{ ...OP, contentMode: 'standard' }] }), projectContentMode: 'unrestricted', chapterContentMode: 'unrestricted' });
     expect(html).toMatch(/aria-checked="true"[^>]*><span[^>]*>Standard/);
     expect(html).not.toContain('walled off');
+  });
+
+  it('should not offer a content mode where unrestricted writing is not set up and nothing is unrestricted', () => {
+    const html = card({ unrestrictedAvailable: false });
+    expect(html).not.toContain('Content for this chapter');
+    expect(html).not.toMatch(/role="radiogroup"/);
+  });
+
+  it('should keep an unrestricted chapter’s choice where unrestricted is not set up, with the way back to Standard', () => {
+    const html = card({ unrestrictedAvailable: false, chapterContentMode: 'unrestricted' });
+    expect(html).toContain('Content for this chapter');
+    expect(html).toContain('isn’t available right now');
+    expect(html).not.toContain('walled off');
+    expect(html).toMatch(/aria-checked="false" tabindex="-1"[^>]*><span[^>]*>Standard/);
   });
 
   it('should show what the writer gets and the fixed lines kept from it', () => {

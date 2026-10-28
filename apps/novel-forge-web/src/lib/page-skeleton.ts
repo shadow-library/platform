@@ -12,7 +12,7 @@ const VARIANT_RULES: VariantRule[] = [
   { pattern: /^\/novels\/[^/]+\/(story-bible|illustrations)\/?$/, variant: 'list' },
   { pattern: /^\/novels\/[^/]+\/(publish|settings)\/?$/, variant: 'form' },
   { pattern: /^\/$/, variant: 'list' },
-  { pattern: /^\/(settings|import)\/?$/, variant: 'form' },
+  { pattern: /^\/import\/?$/, variant: 'form' },
 ];
 
 export function resolveSkeletonVariant(pathname: string): SkeletonVariant {

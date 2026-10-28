@@ -143,7 +143,7 @@ const CHAT: Expected[] = [
   { selector: '.checklistStatus', values: { gap: '8px' }, source: 'gap ladder: 8 between controls (spinner → text)' },
   { selector: '.turnCard', values: { 'border-radius': 'var(--sh-radius-lg)' }, baseline: '.turnCard', source: 'chat.module.css .turnCard' },
   { selector: '.cardHead', values: { gap: '8px', padding: '10px 12px' }, baseline: '.turnCardHead', source: 'design: head; chat.module.css .turnCardHead' },
-  { selector: '.badgeAccent', values: { padding: '1px 6px', 'border-radius': 'var(--sh-radius-full)' }, source: 'design: "Claude’s pick" badge 1px 6px pill' },
+  { selector: '.badgeAccent', values: { padding: '1px 6px', 'border-radius': 'var(--sh-radius-full)' }, source: 'design: "Forge’s pick" badge 1px 6px pill' },
   { selector: '.cardActions', values: { gap: '8px', padding: '10px 12px' }, baseline: '.turnCardActions', source: 'design: actions; chat.module.css .turnCardActions' },
   { selector: '.draftBody', values: { padding: '12px 12px 0' }, source: 'the card head’s 12px inline padding; the foot’s border closes the bottom' },
   { selector: '.draftBody::after', values: { height: '64px' }, source: 'fade over the last three body lines (22px each)' },
@@ -286,13 +286,6 @@ const MODEL_MENU: Expected[] = [
     source: 'ChatModel.module.css .trigger on main; design',
   },
   { selector: '.messageTag', values: { 'margin-top': '4px' }, baseline: '.messageTag', source: 'ChatModel.module.css .messageTag on main' },
-  { selector: '.panel', values: { gap: '12px' }, source: 'design: popover gap 12' },
-  { selector: '.group', values: { gap: '6px' }, source: 'design: label → segmented gap 6' },
-  { selector: '.resolved', values: { gap: '8px', padding: '8px 10px', 'border-radius': 'var(--sh-radius-md)' }, source: 'design: resolved model strip' },
-  { selector: '.resolvedPrice', values: { 'margin-left': 'auto' }, source: 'design' },
-  { selector: '.linkButton', values: { padding: '0' }, source: 'design' },
-  { selector: '.actions', values: { gap: '8px' }, source: 'design' },
-  { selector: '.done', values: { 'margin-left': 'auto' }, source: 'design: Done margin-left auto' },
 ];
 
 // The Cowork-style progress panel and receipt.

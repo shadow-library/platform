@@ -15,6 +15,7 @@ function form(overrides: Partial<StartNovelFormProps> = {}): string {
     notes,
     notesWords: countNoteWords(notes),
     contentMode: 'standard',
+    unrestrictedAvailable: true,
     errors: {},
     pending: false,
     onTitleChange: noop,
@@ -81,6 +82,12 @@ describe('StartNovelForm', () => {
     expect(html).toMatch(/role="radiogroup"[^>]*aria-labelledby="start-content-mode"|aria-labelledby="start-content-mode"[^>]*role="radiogroup"/);
     expect(html).toContain('You can switch it per chapter on its plan.');
     expect(html).not.toContain('aria-expanded');
+  });
+
+  it('should not offer a content mode where unrestricted writing is not set up', () => {
+    const html = form({ unrestrictedAvailable: false });
+    expect(html).not.toContain('Content mode');
+    expect(html).not.toContain('Unrestricted');
   });
 
   it('should hold the fields while the novel is being created', () => {

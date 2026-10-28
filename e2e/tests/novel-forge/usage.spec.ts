@@ -53,7 +53,7 @@ test.describe('novel-forge usage and charges', () => {
     await page.goto(`${requireProductUrl('novelForge')}/novels/${projectId}/usage`);
 
     await expect(page.getByRole('heading', { name: 'Usage & charges', level: 1 })).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByRole('heading', { name: 'By model · all time' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'By pace · all time' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Runs' })).toBeVisible();
     await expect(page.getByText('No model calls yet.').first()).toBeVisible();
 
@@ -71,6 +71,6 @@ test.describe('novel-forge usage and charges', () => {
 
     await expect(page.getByRole('heading', { name: 'Usage & charges', level: 1 })).toBeVisible({ timeout: 15_000 });
     await expect(page.getByRole('heading', { name: 'By novel · all time' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'By model · all time' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'By pace · all time' })).toBeVisible();
   });
 });

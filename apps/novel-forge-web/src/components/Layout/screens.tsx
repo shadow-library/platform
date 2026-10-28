@@ -35,7 +35,7 @@ export const PROJECT_SCREENS: ProjectScreen[] = [
 
 export const SCREEN_LABEL = new Map(PROJECT_SCREENS.map(screen => [screen.segment, screen.label]));
 
-const ACCOUNT_CRUMBS: Record<string, string> = { '/settings': 'Settings', '/usage': 'Usage & charges' };
+const ACCOUNT_CRUMBS: Record<string, string> = { '/usage': 'Usage & charges' };
 
 export interface TopBarCrumbs {
   root: string;

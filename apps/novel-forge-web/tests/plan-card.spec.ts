@@ -5,6 +5,7 @@ import {
   addablePages,
   changeSetWith,
   claimableMilestones,
+  contentModeChoiceShown,
   createLatestQueue,
   createPlanFlow,
   endingProblem,
@@ -97,6 +98,14 @@ describe('plan card edits', () => {
     expect(resolvedContentMode({ contentMode: undefined }, 'unrestricted')).toBe('unrestricted');
     expect(resolvedContentMode({ contentMode: null }, 'unrestricted')).toBeNull();
     expect(resolvedContentMode({ contentMode: 'standard' }, null)).toBe('standard');
+  });
+
+  it('should show the content mode choice where unrestricted is set up, or while it is already in play', () => {
+    expect(contentModeChoiceShown(true, 'standard', null)).toBe(true);
+    expect(contentModeChoiceShown(false, 'standard', null)).toBe(false);
+    expect(contentModeChoiceShown(false, 'standard', 'standard')).toBe(false);
+    expect(contentModeChoiceShown(false, 'unrestricted', null)).toBe(true);
+    expect(contentModeChoiceShown(false, 'standard', 'unrestricted')).toBe(true);
   });
 
   it('should pool the writer’s knowledge over the scenes’ points of view, keeping what the chapter reveals', () => {

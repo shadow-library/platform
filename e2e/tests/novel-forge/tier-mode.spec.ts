@@ -110,17 +110,19 @@ test.describe('novel-forge model type and cost tier (UI)', () => {
     await ctx.dispose();
   });
 
-  test('should save a new project pace from the Model & cost tab', async ({ page }) => {
+  test('should save a new project pace from the Pace tab, offering a content mode only where unrestricted is set up', async ({ page }) => {
     const novel = await createNovel(ctx, { title: `E2E Tier Settings ${uniqueSuffix()}` });
     created.push(novel.projectId);
+    const available = await unrestrictedAvailable(ctx);
     await page.goto(`${requireProductUrl('novelForge')}/novels/${novel.projectId}/settings?tab=models`);
 
-    const tier = page.getByRole('radiogroup', { name: 'Cost tier' });
-    const mode = page.getByRole('radiogroup', { name: 'Model type' });
-    await expect(tier.getByRole('radio', { name: 'Balanced' })).toBeChecked({ timeout: 15_000 });
-    await expect(mode.getByRole('radio', { name: 'Standard' })).toBeChecked();
+    const pace = page.getByRole('radiogroup', { name: 'Pace' });
+    await expect(pace.getByRole('radio', { name: 'Steady' })).toBeChecked({ timeout: 15_000 });
+    await expect(page.getByText('Careful planning, natural prose. Right for most of the book.')).toBeVisible();
+    await expect(page.getByRole('radiogroup', { name: 'Content mode' })).toHaveCount(available ? 1 : 0);
+    await expect(page.getByText('What that means for each job'), 'the per-job models are admin-only').toHaveCount(0);
 
-    await tier.getByRole('radio', { name: 'Economy' }).click();
+    await pace.getByRole('radio', { name: 'Swift' }).click();
     await page.getByRole('button', { name: 'Save changes' }).click();
 
     await expect(async () => {

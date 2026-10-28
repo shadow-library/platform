@@ -158,8 +158,8 @@ function KindDetail(props: KindDetailProps): React.JSX.Element {
         {review ? 'Run a new review' : `Run the ${kindNoun(kind)}`}
       </Button>
       {isModelKind(kind) && (
-        <Select size="sm" value={tier} onValueChange={value => setTier(value as TierChoice)} aria-label="Cost tier for this review">
-          <Select.Item value={DEFAULT_TIER}>Novel’s tier</Select.Item>
+        <Select size="sm" value={tier} onValueChange={value => setTier(value as TierChoice)} aria-label="Pace for this review">
+          <Select.Item value={DEFAULT_TIER}>Novel’s pace</Select.Item>
           {COST_TIERS.map(option => (
             <Select.Item key={option} value={option}>
               {tierLabel(option)}

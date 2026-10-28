@@ -28,11 +28,12 @@ const PHASES: Record<string, Phase> = {
 // so a new server code reads as vague rather than wrong.
 const FAILURE_COPY: Record<string, FailureCopy> = {
   AI_001: { title: 'The model’s answer came back unreadable', reason: 'It replied, but not in a shape that could be used.' },
-  AI_002: { title: 'This model can’t be used here', reason: 'Pick a different model for this conversation, then try again.' },
-  AI_003: { title: 'No model can take this right now', reason: 'No model can serve this call under its model type and cost tier.' },
+  AI_002: { title: 'This reply couldn’t be routed', reason: 'Nothing is set up to serve it. Ask the admin.' },
+  AI_003: { title: 'No model can take this right now', reason: 'Nothing can serve this call at this novel’s pace right now.' },
   AI_007: { title: 'Couldn’t reach the model', reason: 'It didn’t respond. Try again shortly.' },
   AI_008: { title: 'Too many model calls right now', reason: 'Wait a moment, then try again.' },
   AI_009: { title: 'AI spending limit reached', reason: 'Model calls are paused for this account until the limit resets.' },
+  AI_024: { title: 'Unrestricted writing isn’t available right now', reason: 'Switch to Standard, or send without Unrestricted, to keep writing.' },
 };
 
 const UNKNOWN_FAILURE: FailureCopy = { title: 'That turn didn’t finish', reason: 'Something went wrong on the server.' };

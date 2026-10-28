@@ -69,7 +69,6 @@ describe('topBarCrumbs', () => {
   it('should fall back to the account crumb until the project loads, and outside a project', () => {
     expect(topBarCrumbs({ pathname: '/novels/288/chat', inProject: true })).toEqual({ root: 'Projects', leaf: 'Chat' });
     expect(topBarCrumbs({ pathname: '/usage', inProject: false })).toEqual({ root: 'Usage & charges' });
-    expect(topBarCrumbs({ pathname: '/settings', inProject: false })).toEqual({ root: 'Settings' });
     expect(topBarCrumbs({ pathname: '/', inProject: false })).toEqual({ root: 'Projects' });
   });
 });
