@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getRouteApi, Link, useNavigate, useRouter } from '@tanstack/react-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { renderChapterMarkdown } from '@shadow-library/sdk';
 import { Badge, Button, cn, Drawer, Input, Slider, toast, useMediaQuery } from '@shadow-library/ui';
 import { useOnlineStatus } from '@shadow-library/web/pwa';
 
@@ -27,9 +28,11 @@ import {
   READER_FONTS,
   READER_PALETTES,
   READER_WIDTHS,
+  type ReaderPalette,
   type ReaderSettings,
   type ReaderTheme,
   saveReaderSettings,
+  togglesReaderChrome,
 } from '@/lib/reader';
 
 import styles from './reader-screen.module.css';
@@ -44,6 +47,10 @@ const BRIGHTNESS_DEFAULT = 100;
 
 function loadBrightness(): number {
   return readLocal<number>(BRIGHTNESS_KEY, BRIGHTNESS_DEFAULT);
+}
+
+function readerPaletteVariables(palette: ReaderPalette): React.CSSProperties {
+  return { '--reader-hairline': palette.hairline, '--reader-muted': palette.muted } as React.CSSProperties;
 }
 
 export function ReaderScreen(): React.JSX.Element {
@@ -72,6 +79,7 @@ export function ReaderScreen(): React.JSX.Element {
   const { gateVisible, reveal } = useMatureGate(novel.data?.mature ?? false);
 
   const palette = READER_PALETTES[settings.theme];
+  const chapterHtml = useMemo(() => (chapter.data ? renderChapterMarkdown(chapter.data.content) : ''), [chapter.data]);
   const userId = session.data?.userId;
   const inLibrary = isInLibrary(library.data, slug);
 
@@ -217,7 +225,7 @@ export function ReaderScreen(): React.JSX.Element {
         // Gate on `novel.data` too: maturity lives on the novel, so the chapter body must wait until it is
         // known — otherwise a mature chapter could flash if its query wins the race against the novel's.
         // Redundant pointer affordance (the chrome buttons are the accessible path), hence presentational.
-        <div role="presentation" style={{ filter: `brightness(${brightness / 100})` }} onClick={() => setChrome(value => !value)}>
+        <div role="presentation" style={{ filter: `brightness(${brightness / 100})` }} onClick={event => togglesReaderChrome(event.target) && setChrome(value => !value)}>
           <article
             className={styles.article}
             style={{
@@ -226,17 +234,15 @@ export function ReaderScreen(): React.JSX.Element {
               fontSize: settings.fontSize,
               lineHeight: settings.lineHeight,
               textAlign: settings.align,
+              ...readerPaletteVariables(palette),
             }}
           >
             <header className={styles.chapterHead} style={{ borderBottom: `1px solid ${palette.hairline}` }}>
               <div className={styles.chapterKicker}>Chapter {ordinal.toLocaleString()}</div>
               <h1 className={styles.chapterTitle}>{chapter.data.title}</h1>
             </header>
-            {chapter.data.paragraphs.map((paragraph, index) => (
-              <p key={index} style={{ margin: `0 0 ${settings.fontSize}px` }}>
-                {paragraph}
-              </p>
-            ))}
+            {/* Safe without a DOM sanitizer: renderChapterMarkdown escapes raw HTML and allow-lists link targets. */}
+            <div className={styles.prose} dangerouslySetInnerHTML={{ __html: chapterHtml }} />
           </article>
 
           <div role="presentation" className={styles.footer} style={{ maxWidth: READER_WIDTHS[settings.width] }} onClick={event => event.stopPropagation()}>

@@ -18,7 +18,7 @@
 - `common` core (`AppError`, `Config`, `Logger`, HTTP client, `svc://` discovery); `class-schema` DTO classes yielding JSON Schema; `app` DI kernel; `fastify` decorator HTTP layer.
 - `modules` reusable modules (http-core, database, cache, storage, bootstrap); `auth` Identity consumer SDK, no business logic; `ui` React components and `--sh-*` tokens; `web`
   shared frontend wiring.
-- `sdk` novel vocabulary, the Novel Forge to Web Novel content-hash contract, and the one prose paragraph count Novel Forge's server and web app share.
+- `sdk` novel vocabulary, the Novel Forge to Web Novel content-hash contract, the one prose paragraph count Novel Forge's server and web app share, and the chapter Markdown renderer.
 - `synapse` Synapse client: wire types, typed calls, LangChain chat model (subpath `/langchain`); consumed by `novel-forge-server` and `memoir-server`.
 - `common`, `modules` and `auth` each also publish a `testing` subpath (`@shadow-library/<pkg>/testing`) of fakes and stand-ins for `apps/*`'s unit tests — e.g. `FakeDatabaseService`,
   `FakeStorageService`, `InMemoryRedis`, `withoutStartupHooks`, `createTestIdP`/`createOfflineAuth`. Apps reach for these instead of hand-rolling a fake or booting real infrastructure.
@@ -48,7 +48,9 @@
   unchanged content; new hashed fields must be additive and absent-by-default, or ship as a versioned hash.
 - The wiki-entry hash follows the same rule for Forge's republish vs no-op; the headline gate `imageVisibleFromOrdinal` is omitted unless an entry carries one, and a
   blank image caption is omitted. The wiki headline-gate capability header is part of the same contract.
-- The root entrypoint is browser-safe and dependency-free; only the `publishing` subpath uses `node:crypto`.
+- The root entrypoint is browser-safe and DOM-free, with `marked` its one dependency; only the `publishing` subpath uses `node:crypto`.
+- `renderChapterMarkdown` is the one chapter renderer, and its output is injected without a DOM sanitizer: raw HTML MUST stay escaped, links limited to http, https and mailto,
+  images unrendered. Its class names (`chapter-system`, `chapter-system__title`, `chapter-system__body`, `chapter-table`) are what every reader styles.
 - `proseParagraphs` is the paragraph count behind every "¶k" Novel Forge shows or stores, on the server and in the browser alike: a change to how it splits
   text renumbers both together, and must keep agreeing with how the Markdown reader sets blocks apart.
 

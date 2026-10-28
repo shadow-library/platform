@@ -28,6 +28,8 @@
 - Visibility tier: `PUBLIC`, `ORGANISATION` (one organisation's members), `RESTRICTED` (a grant set). `status` (live/retired) is separate; retired is still served.
 - Access has its own revision ladder, independent of the metadata revision. Revisions are forge-assigned, never generated here.
 - Gate: the reader's `furthestOrdinal` (0 if anonymous, which is possible only in public mode). Wiki entries, facets and images carry the ordinal they unlock at.
+- Chapter content is the publisher's GFM Markdown, stored and served verbatim; the reader renders it with the shared `renderChapterMarkdown` (`packages/sdk`), so
+  ` ```system <Title> ` fences show as system panels and tables as scrollable tables. Its escaping is the reader's XSS defense: raw HTML never renders.
 - Ratings: three dimensions per novel and, separately, per chapter. `NULL` means unrated, never `none`; catalog ceiling filters exclude unrated novels.
 
 ## Hard rules: publish

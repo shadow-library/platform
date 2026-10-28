@@ -4,7 +4,8 @@ import { createIDBPersister } from '@shadow-library/web/offline';
 export const queryPersister = createIDBPersister({ dbName: 'webnovel-query-cache' });
 
 export const PERSIST_MAX_AGE = 7 * 24 * 3_600_000;
-export const PERSIST_BUSTER = 'v1';
+/** Bump whenever a persisted query's data changes shape, so an old cache is dropped instead of restored into a newer reader. */
+export const PERSIST_BUSTER = 'v2';
 
 /** Query-key roots that carry per-user state and must never be written to the on-disk query cache. */
 const PERSIST_DENYLIST_ROOTS: ReadonlySet<unknown> = new Set(['auth', 'library', 'progress']);

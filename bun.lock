@@ -523,6 +523,9 @@
     "packages/sdk": {
       "name": "@shadow-library/sdk",
       "version": "0.1.0",
+      "dependencies": {
+        "marked": "^18.0.6",
+      },
       "devDependencies": {
         "@types/bun": "catalog:",
         "typescript": "catalog:",

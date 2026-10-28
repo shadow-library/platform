@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'bun:test';
 
 import { type NovelSummary as ServerNovelSummary } from '@/lib/apis/api-types.gen';
-import { type LibraryEntry, type LibraryListResponse, type ReadingProgress, toLibraryEntry, toReadingProgress, toSummary } from '@/lib/apis';
+import {
+  type ChapterContent,
+  fromDownloadedChapter,
+  type LibraryEntry,
+  type LibraryListResponse,
+  type ReadingProgress,
+  toLibraryEntry,
+  toReadingProgress,
+  toSummary,
+} from '@/lib/apis';
 
 const LIBRARY_RESPONSE: LibraryListResponse = {
   items: [
@@ -133,5 +142,33 @@ describe('toReadingProgress', () => {
   it('should drop unknown server fields so they never reach the localStorage mirror', () => {
     const item = { ...PROGRESS_RESPONSE.items[0]!, id: 'prg_01' };
     expect(Object.keys(toReadingProgress(item)).sort()).toEqual(['novelSlug', 'ordinal', 'position', 'updatedAt']);
+  });
+});
+
+describe('fromDownloadedChapter', () => {
+  const CHAPTER: ChapterContent = {
+    novelSlug: 'ledger',
+    novelTitle: 'Ledger',
+    ordinal: 3,
+    title: 'Status',
+    content: 'She *ran*.\n\n| a | b |\n| --- | --- |',
+    contentHash: 'r2',
+    nextOrdinal: 4,
+    totalChapters: 9,
+  };
+
+  it('should return a chapter downloaded with its Markdown content unchanged', () => {
+    expect(fromDownloadedChapter(CHAPTER)).toBe(CHAPTER);
+  });
+
+  it('should rebuild Markdown from an older download that kept only paragraph lines, rejoining consecutive table rows', () => {
+    const { content: _content, ...rest } = CHAPTER;
+    const legacy = { ...rest, paragraphs: ['She ran.', '| Attribute | Value |', '| --- | --- |', '| Strength | 14 |', 'The window faded.'] };
+    expect(fromDownloadedChapter(legacy)).toEqual({ ...rest, content: 'She ran.\n\n| Attribute | Value |\n| --- | --- |\n| Strength | 14 |\n\nThe window faded.' });
+  });
+
+  it('should give an older download with no paragraphs empty content', () => {
+    const { content: _content, ...rest } = CHAPTER;
+    expect(fromDownloadedChapter({ ...rest, paragraphs: [] }).content).toBe('');
   });
 });

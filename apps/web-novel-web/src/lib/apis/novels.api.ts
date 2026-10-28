@@ -87,6 +87,23 @@ function toDetail(item: NovelDetailResponse): NovelDetail {
   return { ...toSummary(item), alternativeTitles: [], language: 'English', mature: false };
 }
 
+/** Downloads made before chapters were rendered as Markdown kept only the trimmed non-blank lines. */
+export type LegacyChapterContent = Omit<ChapterContent, 'content'> & { paragraphs: string[] };
+
+const TABLE_ROW = /^\|.*\|$/;
+
+/** Each old line was its own paragraph; only consecutive table rows are rejoined so a downloaded table still renders as one. */
+export function fromDownloadedChapter(stored: ChapterContent | LegacyChapterContent): ChapterContent {
+  if (!('paragraphs' in stored)) return stored;
+  const { paragraphs, ...chapter } = stored;
+  const content = paragraphs.reduce((markdown, line, index) => {
+    if (index === 0) return line;
+    const separator = TABLE_ROW.test(line) && TABLE_ROW.test(paragraphs[index - 1] ?? '') ? '\n' : '\n\n';
+    return `${markdown}${separator}${line}`;
+  }, '');
+  return { ...chapter, content };
+}
+
 /** Nav derives from the published chapter list — ordinals may hold gaps after an unpublish */
 function toChapterContent(chapter: ChapterContentResponse, chapters: ChapterMetaItem[], novelTitle: string): ChapterContent {
   const ordinals = chapters.map(meta => meta.ordinal).sort((a, b) => a - b);
@@ -95,10 +112,7 @@ function toChapterContent(chapter: ChapterContentResponse, chapters: ChapterMeta
     novelTitle,
     ordinal: chapter.ordinal,
     title: chapter.title,
-    paragraphs: chapter.content
-      .split(/\n+/)
-      .map(paragraph => paragraph.trim())
-      .filter(Boolean),
+    content: chapter.content,
     contentHash: `r${chapter.revision}`,
     previousOrdinal: ordinals.filter(ordinal => ordinal < chapter.ordinal).at(-1),
     nextOrdinal: ordinals.find(ordinal => ordinal > chapter.ordinal),
@@ -168,12 +182,12 @@ export const chapterQueryOptions = (slug: string, ordinal: number) =>
     queryKey: novelKeys.chapter(slug, ordinal),
     staleTime: 60 * 60_000,
     queryFn: async ({ signal }) => {
-      const downloaded = () => offlineStore.get<ChapterContent>(chapterKey(slug, ordinal));
+      const downloaded = () => offlineStore.get<ChapterContent | LegacyChapterContent>(chapterKey(slug, ordinal));
       try {
         return await fetchLiveChapter(slug, ordinal, signal);
       } catch (error) {
         const stored = await downloaded();
-        if (stored) return stored;
+        if (stored) return fromDownloadedChapter(stored);
         throw error;
       }
     },

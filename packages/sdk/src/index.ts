@@ -1,3 +1,4 @@
+export * from './chapter-markdown';
 export * from './content-rating';
 export * from './errors';
 export * from './genres';

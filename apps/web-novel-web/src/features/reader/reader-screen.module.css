@@ -107,6 +107,178 @@
   line-height: 1.2;
 }
 
+/* renderChapterMarkdown output is global markup; em sizes follow the reader's font size. */
+.prose {
+  overflow-wrap: break-word;
+}
+
+.prose :global(p) {
+  margin: 0 0 1em;
+}
+
+.prose :global(:is(h1, h2, h3, h4, h5, h6)) {
+  margin: 1.6em 0 0.6em;
+  font-weight: 650;
+  line-height: 1.3;
+  text-align: start;
+}
+
+.prose :global(h1) {
+  font-size: 1.4em;
+}
+
+.prose :global(h2) {
+  font-size: 1.25em;
+}
+
+.prose :global(:is(h3, h4, h5, h6)) {
+  font-size: 1.1em;
+}
+
+.prose :global(blockquote) {
+  margin: 0 0 1em;
+  padding: 0 0 0 1em;
+  border-left: 3px solid var(--reader-hairline);
+  color: var(--reader-muted);
+}
+
+.prose :global(:is(ul, ol)) {
+  margin: 0 0 1em;
+  padding-left: 1.5em;
+}
+
+.prose :global(li + li) {
+  margin-top: 0.3em;
+}
+
+.prose :global(li > p) {
+  margin-bottom: 0.4em;
+}
+
+.prose :global(hr) {
+  height: auto;
+  margin: 2em 0;
+  border: 0;
+  text-align: center;
+  color: var(--reader-muted);
+}
+
+.prose :global(hr)::before {
+  content: '* * *';
+  letter-spacing: 0.6em;
+}
+
+.prose :global(a) {
+  color: inherit;
+  text-decoration-color: var(--sh-accent);
+  text-underline-offset: 0.15em;
+}
+
+.prose :global(code) {
+  padding: 0.1em 0.3em;
+  border-radius: 4px;
+  background: var(--reader-hairline);
+  font-family: var(--sh-font-mono);
+  font-size: 0.85em;
+}
+
+.prose :global(pre) {
+  margin: 0 0 1em;
+  padding: 0.75em 1em;
+  overflow-x: auto;
+  border-radius: 8px;
+  background: color-mix(in srgb, currentColor 5%, transparent);
+  text-align: start;
+}
+
+.prose :global(pre code) {
+  padding: 0;
+  background: none;
+  white-space: pre;
+}
+
+.prose :global(.chapter-system) {
+  margin: 1.5em 0;
+  overflow: hidden;
+  border: 1px solid var(--reader-hairline);
+  border-left: 3px solid var(--sh-accent);
+  border-radius: 10px;
+  background: color-mix(in srgb, currentColor 4%, transparent);
+  font-size: 0.95em;
+  text-align: start;
+}
+
+.prose :global(.chapter-system__title) {
+  padding: 0.45em 1em;
+  border-bottom: 1px solid var(--reader-hairline);
+  background: color-mix(in srgb, currentColor 5%, transparent);
+  font-weight: 700;
+  font-variant-caps: all-small-caps;
+  letter-spacing: 0.06em;
+  font-size: 1.05em;
+}
+
+.prose :global(.chapter-system__title)::before {
+  content: '[ ' / '';
+}
+
+.prose :global(.chapter-system__title)::after {
+  content: ' ]' / '';
+}
+
+.prose :global(.chapter-system__body) {
+  padding: 0.75em 1em;
+}
+
+.prose :global(.chapter-system__body > :last-child) {
+  margin-bottom: 0;
+}
+
+.prose :global(.chapter-system .chapter-table) {
+  background: color-mix(in srgb, currentColor 2%, transparent);
+}
+
+.prose :global(.chapter-table) {
+  max-width: 100%;
+  margin: 1.25em 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  border: 1px solid var(--reader-hairline);
+  border-radius: 8px;
+}
+
+.prose :global(.chapter-table table) {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875em;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+.prose :global(.chapter-table :is(th, td)) {
+  padding: 0.4em 0.8em;
+  text-align: start;
+  vertical-align: top;
+}
+
+.prose :global(.chapter-table th) {
+  border-bottom: 1px solid var(--reader-hairline);
+  background: var(--reader-hairline);
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.prose :global(.chapter-table tbody tr:nth-child(even)) {
+  background: color-mix(in srgb, currentColor 5%, transparent);
+}
+
+.prose :global(.chapter-table [align='right']) {
+  text-align: right;
+}
+
+.prose :global(.chapter-table [align='center']) {
+  text-align: center;
+}
+
 .endMark {
   text-align: center;
   padding: 24px 0;

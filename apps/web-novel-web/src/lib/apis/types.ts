@@ -105,7 +105,8 @@ export interface ChapterContent {
   novelTitle: string;
   ordinal: number;
   title: string;
-  paragraphs: string[];
+  /** The chapter body as the publisher wrote it: Markdown, rendered with `renderChapterMarkdown`. */
+  content: string;
   contentHash: string;
   previousOrdinal?: number;
   nextOrdinal?: number;
