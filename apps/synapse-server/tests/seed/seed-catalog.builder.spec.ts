@@ -45,9 +45,9 @@ describe('buildSeedCatalog', () => {
       expect(document.budgets).toEqual([{ app: 'novel-forge', per: 'subject', window: '1h', maxCalls: 1000, maxListCostUsd: 50 }]);
     });
 
-    it(`should retain every legacy alias and offer all twelve in chat in the ${profile} profile`, () => {
+    it(`should retain every legacy alias while no task accepts one in the ${profile} profile`, () => {
       expect(Object.keys(document.aliases).sort()).toEqual([...LEGACY_ALIAS_KEYS].sort());
-      expect(document.tasks['novel-forge.chat']!.aliases).toEqual(LEGACY_ALIAS_KEYS);
+      for (const task of Object.values(document.tasks)) expect(task.aliases ?? []).toEqual([]);
       for (const alias of Object.values(document.aliases)) expect(alias).toMatchObject({ state: 'active', showVersion: false });
     });
 

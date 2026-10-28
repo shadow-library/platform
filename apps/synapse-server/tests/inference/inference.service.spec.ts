@@ -267,6 +267,39 @@ describe('InferenceService.completeChat', () => {
     expect(repository.claimed.size).toBe(0);
   });
 
+  it('should refuse a strict key missing from the selectors as an invalid request, before claiming the request id', async () => {
+    const { service, fetcher, repository, begin } = harness();
+    const strict = envelope({ selectors: { tier: 'economy' }, strict: ['tier', 'content_mode'] });
+
+    const error = await failureOf(service.completeChat(APP, chatBody({ synapse: strict }), begin()));
+
+    expect(AppError.is(error, AppErrorCode.SYN_INVALID_REQUEST)).toBe(true);
+    expect((error as AppError).data).toMatchObject({ param: 'synapse.strict[1]' });
+    expect([repository.claimed.size, repository.admissions.length, fetcher.calls.length]).toEqual([0, 0, 0]);
+  });
+
+  it('should refuse a strict call its route cannot honour before claiming the request id or admitting a budget', async () => {
+    const { service, fetcher, repository, begin } = harness();
+    const strict = envelope({ selectors: { content_mode: 'unrestricted' }, strict: ['content_mode'] });
+
+    const chat = await failureOf(service.completeChat(APP, chatBody({ synapse: strict }), begin()));
+    const embedding = await failureOf(service.embed(APP, { model: 'novel-forge.embedding', input: 'text', synapse: strict }, begin()));
+
+    expect(AppError.is(chat, AppErrorCode.SYN_NO_ELIGIBLE_MODEL)).toBe(true);
+    expect(AppError.is(embedding, AppErrorCode.SYN_NO_ELIGIBLE_MODEL)).toBe(true);
+    expect([repository.claimed.size, repository.admissions.length, fetcher.calls.length]).toEqual([0, 0, 0]);
+  });
+
+  it('should serve a strict call on a route that carries the strict key', async () => {
+    const document = catalogDocument(draft => draft.tasks['novel-forge.chat']!.routes.unshift({ when: { content_mode: 'unrestricted' }, model: 'routed' }));
+    const { service, fetcher, begin } = harness(document);
+    fetcher.on('https://openrouter.ai', json(200, COMPLETION));
+
+    const response = await service.completeChat(APP, chatBody({ synapse: envelope({ selectors: { content_mode: 'unrestricted' }, strict: ['content_mode'] }) }), begin());
+
+    expect(response['synapse']).toMatchObject({ model: 'routed', alias: null });
+  });
+
   it("should refuse another app's task and answer SYN_NO_ACTIVE_CATALOG before any catalog is published", async () => {
     expect(AppError.is(await failureOf(harness().service.completeChat('memoir', chatBody(), harness().begin())), AppErrorCode.SYN_TASK_FORBIDDEN)).toBe(true);
     const empty = harness(null);

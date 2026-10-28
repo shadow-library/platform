@@ -40,6 +40,17 @@ describe('CatalogViewService', () => {
     expect(taskView('novel-forge.chat', 'tier:unknown').default.model).toBe('claude-opus-5.5');
   });
 
+  it('should report matched when the selectors chose a route that has selectors', () => {
+    expect(taskView('novel-forge.chat', 'tier:economy').matched).toBe(true);
+    expect(taskView('novel-forge.chat', 'tier:performant,content_mode:standard').matched).toBe(true);
+  });
+
+  it('should report not matched when the selectors fell to the default route', () => {
+    expect(taskView('novel-forge.chat').matched).toBe(false);
+    expect(taskView('novel-forge.chat', 'tier:performant').matched).toBe(false);
+    expect((service.view('novel-forge', undefined, { tier: 'economy' }).body as CatalogAppResponse).tasks['novel-forge.embedding']!.matched).toBe(false);
+  });
+
   it('should list only the active aliases the task accepts and the selectors allow', () => {
     expect(taskView('novel-forge.chat').aliases.map(alias => alias.key)).toEqual(['opus']);
     expect(taskView('novel-forge.chat', 'content_mode:standard').aliases.map(alias => alias.key)).toEqual(['opus', 'grok']);

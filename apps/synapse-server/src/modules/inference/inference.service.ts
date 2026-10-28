@@ -125,6 +125,14 @@ class CallProgress {
   firstChunkAt?: number;
 }
 
+/** Shape validation cannot tie `strict` to `selectors`, so this check runs before resolution */
+function requireStrictSelected(envelope: SynapseEnvelope): void {
+  const selectors = envelope.selectors ?? {};
+  envelope.strict?.forEach((key, index) => {
+    if (!Object.hasOwn(selectors, key)) throw AppErrorCode.SYN_INVALID_REQUEST.create({ param: `synapse.strict[${index}]`, reason: `'${key}' is not in synapse.selectors` });
+  });
+}
+
 function stringMember(payload: JsonObject | undefined, key: string): string | undefined {
   const value = payload?.[key];
   return typeof value === 'string' ? value : undefined;
@@ -254,9 +262,17 @@ export class InferenceService {
    */
   private async admit(app: string, kind: TaskKind, task: string, envelope: SynapseEnvelope, needs: ResolveNeeds, stream: boolean, abort: RequestAbort): Promise<Admission> {
     const progress = new CallProgress();
+    requireStrictSelected(envelope);
     const catalog = this.catalog.requireCurrent();
-    const { selectors, alias } = envelope;
-    const resolution = resolve(catalog.document, { app, task, needs, ...(selectors ? { selectors } : {}), ...(alias === undefined ? {} : { alias }) });
+    const { selectors, strict, alias } = envelope;
+    const resolution = resolve(catalog.document, {
+      app,
+      task,
+      needs,
+      ...(selectors ? { selectors } : {}),
+      ...(strict ? { strict } : {}),
+      ...(alias === undefined ? {} : { alias }),
+    });
     if (resolution.task.kind !== kind) throw AppErrorCode.SYN_INVALID_REQUEST.create({ param: 'model', task, kind: resolution.task.kind });
     const effort = kind === 'chat' ? clampEffort(resolution.task, resolution.model, envelope.effort) : undefined;
 

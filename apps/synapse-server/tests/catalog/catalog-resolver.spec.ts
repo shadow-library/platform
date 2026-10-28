@@ -113,6 +113,56 @@ describe('resolve', () => {
     });
   });
 
+  describe('strict selectors', () => {
+    const STANDARD = { tier: 'performant', content_mode: 'standard' };
+
+    it('should resolve a route that carries every strict key', () => {
+      expect(resolve(catalogDocument(), { ...CHAT, selectors: STANDARD, strict: ['content_mode'] }).modelKey).toBe('claude-opus-5.5');
+    });
+
+    it('should refuse rather than serve a chosen route that lacks a strict key', () => {
+      expectRefused(catalogDocument(), { ...CHAT, selectors: { tier: 'economy', content_mode: 'standard' }, strict: ['content_mode'] }, AppErrorCode.SYN_NO_ELIGIBLE_MODEL);
+      expect(resolve(catalogDocument(), { ...CHAT, selectors: { tier: 'economy', content_mode: 'standard' } }).modelKey).toBe('grok-4.6');
+    });
+
+    it('should refuse a strict call that falls to the default route', () => {
+      expectRefused(catalogDocument(), { ...CHAT, selectors: { content_mode: 'unrestricted' }, strict: ['content_mode'] }, AppErrorCode.SYN_NO_ELIGIBLE_MODEL);
+      expectRefused(catalogDocument(), { app: 'novel-forge', task: 'novel-forge.embedding', selectors: { tier: 'economy' }, strict: ['tier'] }, AppErrorCode.SYN_NO_ELIGIBLE_MODEL);
+    });
+
+    it('should refuse a strict key the selectors do not carry', () => {
+      expectRefused(catalogDocument(), { ...CHAT, selectors: STANDARD, strict: ['plan'] }, AppErrorCode.SYN_NO_ELIGIBLE_MODEL);
+    });
+
+    it('should treat an empty strict list as no constraint', () => {
+      expect(resolve(catalogDocument(), { ...CHAT, selectors: { content_mode: 'unrestricted' }, strict: [] }).modelKey).toBe('claude-opus-5.5');
+    });
+
+    it('should use an alias whose available rule names every strict value, whatever the routes would pick', () => {
+      const resolution = resolve(catalogDocument(), { ...CHAT, alias: 'grok', selectors: { content_mode: 'unrestricted' }, strict: ['content_mode'] });
+      expect({ alias: resolution.alias?.key, modelKey: resolution.modelKey }).toEqual({ alias: 'grok', modelKey: 'grok-4.6' });
+    });
+
+    it('should fall through to the routes for an alias with no available rule', () => {
+      const resolution = resolve(catalogDocument(), { ...CHAT, alias: 'opus', selectors: STANDARD, strict: ['content_mode'] });
+      expect({ alias: resolution.alias, modelKey: resolution.modelKey }).toEqual({ alias: undefined, modelKey: 'claude-opus-5.5' });
+      expectRefused(catalogDocument(), { ...CHAT, alias: 'opus', selectors: { content_mode: 'standard' }, strict: ['content_mode'] }, AppErrorCode.SYN_NO_ELIGIBLE_MODEL);
+    });
+
+    it('should fall through to the routes for an alias whose available rule lacks the strict value, instead of refusing the alias', () => {
+      const document = catalogDocument(draft => (draft.aliases.grok!.available = { content_mode: ['unrestricted'] }));
+      expectRefused(document, { ...CHAT, alias: 'grok', selectors: STANDARD }, AppErrorCode.SYN_ALIAS_UNAVAILABLE);
+      const resolution = resolve(document, { ...CHAT, alias: 'grok', selectors: STANDARD, strict: ['content_mode'] });
+      expect({ alias: resolution.alias, modelKey: resolution.modelKey }).toEqual({ alias: undefined, modelKey: 'claude-opus-5.5' });
+    });
+
+    it('should still refuse an unknown alias, and a strict-honouring one the task does not accept', () => {
+      expectRefused(catalogDocument(), { ...CHAT, alias: 'missing', selectors: STANDARD, strict: ['content_mode'] }, AppErrorCode.SYN_ALIAS_UNAVAILABLE);
+      const document = catalogDocument(draft => (draft.tasks['novel-forge.chat']!.aliases = []));
+      expectRefused(document, { ...CHAT, alias: 'grok', selectors: STANDARD, strict: ['content_mode'] }, AppErrorCode.SYN_ALIAS_UNAVAILABLE);
+    });
+  });
+
   describe('deployments', () => {
     it('should return every deployment in failover order when nothing filters them', () => {
       expect(deploymentIds(catalogDocument(), CHAT)).toEqual(['subscription:claude-opus-5.5', 'openrouter:anthropic/claude-opus-5.5']);

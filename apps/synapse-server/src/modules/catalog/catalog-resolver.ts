@@ -26,6 +26,7 @@ export interface ResolveRequest {
   app: string;
   task: string;
   selectors?: Selectors;
+  strict?: readonly string[];
   alias?: string;
   needs?: ResolveNeeds;
 }
@@ -55,6 +56,14 @@ export interface Resolution {
 export function isAliasAvailable(alias: AliasSpec, selectors: Selectors): boolean {
   if (!alias.available) return true;
   return Object.entries(alias.available).every(([key, values]) => Object.hasOwn(selectors, key) && values.includes(selectors[key] as string));
+}
+
+function aliasHonoursStrict(alias: AliasSpec, selectors: Selectors, strict: readonly string[]): boolean {
+  return strict.every(key => Object.hasOwn(selectors, key) && (ownEntry(alias.available ?? {}, key)?.includes(selectors[key] as string) ?? false));
+}
+
+function routeHonoursStrict(route: TaskRoute, strict: readonly string[]): boolean {
+  return strict.every(key => Object.hasOwn(route.when ?? {}, key));
 }
 
 /** The route matching the most selector keys wins, ties going to the earliest; the default route matches with zero keys. */
@@ -97,25 +106,36 @@ function modelMeetsNeeds(model: ModelSpec, needs: ResolveNeeds): boolean {
   return true;
 }
 
-/** A retired alias resolves to `undefined` so the routes answer instead; any other unusable alias is refused, never relaxed to the routes. */
-function resolveAlias(document: CatalogDocument, taskKey: string, task: TaskSpec, aliasKey: string, selectors: Selectors): ResolvedAlias | undefined {
+/**
+ * A retired alias, or one whose `available` rule does not name every strict value, resolves to `undefined` so the routes answer instead; any other
+ * unusable alias is refused, never relaxed to the routes.
+ */
+function resolveAlias(document: CatalogDocument, taskKey: string, task: TaskSpec, aliasKey: string, selectors: Selectors, strict: readonly string[]): ResolvedAlias | undefined {
   const alias = ownEntry(document.aliases, aliasKey);
   if (alias?.state === 'retired') return undefined;
+  if (alias && !aliasHonoursStrict(alias, selectors, strict)) return undefined;
   const listed = task.aliases?.includes(aliasKey) ?? false;
   if (!alias || !listed || !isAliasAvailable(alias, selectors)) throw AppErrorCode.SYN_ALIAS_UNAVAILABLE.create({ alias: aliasKey, task: taskKey });
   return { key: aliasKey, spec: alias };
 }
 
+/** Strict keys are checked on the route the selectors choose, never used to pick another one: a strict call that would fall short is refused. */
+function routeModel(taskKey: string, task: TaskSpec, selectors: Selectors, strict: readonly string[]): string {
+  const route = selectRoute(task, selectors);
+  if (!route) throw AppErrorCode.SYN_NO_ELIGIBLE_MODEL.create({ task: taskKey });
+  if (!routeHonoursStrict(route, strict)) throw AppErrorCode.SYN_NO_ELIGIBLE_MODEL.create({ task: taskKey, strict: [...strict] });
+  return route.model;
+}
+
 /** The prefix is checked before existence, so a caller cannot probe which of another app's tasks exist. */
 export function resolve(document: CatalogDocument, request: ResolveRequest): Resolution {
-  const { app, task: taskKey, selectors = {}, needs = {} } = request;
+  const { app, task: taskKey, selectors = {}, strict = [], needs = {} } = request;
   if (!taskKey.startsWith(`${app}.`)) throw AppErrorCode.SYN_TASK_FORBIDDEN.create({ task: taskKey });
   const task = ownEntry(document.tasks, taskKey);
   if (!task) throw AppErrorCode.SYN_UNKNOWN_TASK.create({ task: taskKey });
 
-  const alias = request.alias === undefined ? undefined : resolveAlias(document, taskKey, task, request.alias, selectors);
-  const modelKey = alias?.spec.model ?? selectRoute(task, selectors)?.model;
-  if (modelKey === undefined) throw AppErrorCode.SYN_NO_ELIGIBLE_MODEL.create({ task: taskKey });
+  const alias = request.alias === undefined ? undefined : resolveAlias(document, taskKey, task, request.alias, selectors, strict);
+  const modelKey = alias?.spec.model ?? routeModel(taskKey, task, selectors, strict);
   const model = ownEntry(document.models, modelKey);
   if (!model) throw AppError.internal(`Catalog task '${taskKey}' names unknown model '${modelKey}'`);
   if (!modelMeetsNeeds(model, needs)) throw AppErrorCode.SYN_NO_ELIGIBLE_MODEL.create({ task: taskKey, model: modelKey });

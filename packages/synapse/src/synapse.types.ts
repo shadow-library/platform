@@ -35,7 +35,9 @@ export interface SynapseEnvelope {
   subject: SynapseSubject;
   /** Values the task's routes and alias availability match on, e.g. `{ tier: 'balanced', content_mode: 'standard' }` */
   selectors?: Record<string, string>;
-  /** An alias listed by the task; a retired one silently falls back to the task's routes */
+  /** Selector keys the chosen route must match: each must also be in `selectors`, and a call that would fall to a route not carrying every one is refused */
+  strict?: string[];
+  /** An alias listed by the task; a retired one silently falls back to the task's routes, and so does one whose `available` rule does not name every `strict` value */
   alias?: string;
   /** Clamped to the task's range, then snapped to the nearest effort the model supports */
   effort?: SynapseEffort;
@@ -133,6 +135,8 @@ export interface CatalogAliasView {
 export interface CatalogTaskView {
   /** The model the task's routes pick for the requested selectors */
   default: CatalogModelView;
+  /** `true` when the selectors chose a route that has selectors, `false` when they fell to the task's selector-less default route */
+  matched: boolean;
   /** Only the active aliases available for the requested selectors */
   aliases: CatalogAliasView[];
   /** As `CatalogAliasView.web_search`, for the default model */

@@ -47,6 +47,14 @@ describe('SynapseChatModel', () => {
     expect(synapse.requests[0]?.body).toMatchObject({ model: 'novel-forge.chat', temperature: 0.4, messages: [{ role: 'user', content: 'Hi' }], synapse: ENVELOPE });
   });
 
+  it('should pass strict selector keys through in the envelope', async () => {
+    synapse.reply(json(CHAT_COMPLETION));
+    const envelope = { ...ENVELOPE, selectors: { content_mode: 'unrestricted' }, strict: ['content_mode'] };
+    await model({ envelope }).invoke('Hi');
+
+    expect(synapse.requests[0]?.body?.synapse).toMatchObject({ selectors: { content_mode: 'unrestricted' }, strict: ['content_mode'] });
+  });
+
   it('should send a fresh request_id per invocation of one instance, its bindTools copy included', async () => {
     synapse.reply(json(CHAT_COMPLETION), json(CHAT_COMPLETION), json(CHAT_COMPLETION));
     const llm = model();

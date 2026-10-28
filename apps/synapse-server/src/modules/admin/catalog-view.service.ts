@@ -9,6 +9,7 @@ import {
   type CatalogDocument,
   eligibleDeployments,
   isAliasAvailable,
+  isDefaultRoute,
   labelFor,
   type ModelSpec,
   type Selectors,
@@ -65,6 +66,7 @@ export class CatalogViewService {
     const model = requireModel(document, route.model);
     return {
       default: { model: route.model, label: labelFor(undefined, model), ...priceOf(model) },
+      matched: !isDefaultRoute(route),
       aliases: this.aliasViews(document, task, selectors),
       web_search: searchesWeb(document, task, model),
     };

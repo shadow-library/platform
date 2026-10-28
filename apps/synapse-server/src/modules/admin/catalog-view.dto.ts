@@ -114,6 +114,9 @@ export class CatalogTaskView {
   @Field(() => CatalogModelView, { description: 'The model the task routes to for the requested selectors' })
   default: CatalogModelView;
 
+  @Field({ description: "True when the selectors chose a route that has selectors, false when they fell to the task's selector-less default route" })
+  matched: boolean;
+
   @Field(() => [CatalogAliasView], { description: 'Only the active aliases the task accepts and the selectors allow' })
   aliases: CatalogAliasView[];
 
@@ -134,6 +137,9 @@ export class CatalogResponseDto {
 
   @Field(() => CatalogModelView, { optional: true })
   default?: CatalogModelView;
+
+  @Field({ optional: true })
+  matched?: boolean;
 
   @Field(() => [CatalogAliasView], { optional: true })
   aliases?: CatalogAliasView[];

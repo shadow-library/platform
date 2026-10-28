@@ -525,7 +525,9 @@ export interface components {
       subject: components['schemas']['SubjectBody'];
       /** @description Values the task's routes and alias availability match on */
       selectors?: components['schemas']['SelectorsBody'];
-      /** @description An alias the task accepts; a retired one falls back to the task's routes */
+      /** @description Selector keys, each also in `selectors`, that the chosen route must carry with the requested value; a call that would fall to a route without every one is refused with SYN_NO_ELIGIBLE_MODEL */
+      strict?: string[];
+      /** @description An alias the task accepts; a retired one falls back to the task's routes, and so does one whose `available` rule does not name every `strict` value */
       alias?: string;
       /**
        * @description Clamped to the task's range, then sent only where the model supports it
@@ -667,6 +669,7 @@ export interface components {
       catalog_version: number;
       task?: string;
       default?: components['schemas']['CatalogModelView'];
+      matched?: boolean;
       aliases?: components['schemas']['CatalogAliasView'][];
       web_search?: boolean;
       /** @description Task views keyed by task key, each shaped as CatalogTaskView */

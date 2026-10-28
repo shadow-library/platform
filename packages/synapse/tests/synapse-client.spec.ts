@@ -55,6 +55,16 @@ describe('SynapseClient', () => {
     });
   });
 
+  it('should send strict selector keys on chat, embedding and image calls', async () => {
+    synapse.reply(json(CHAT_COMPLETION), json({ object: 'list', data: [], model: 'novel-forge.embedding', synapse: {} }), json({ data: [], synapse: {} }));
+    const envelope = request({ selectors: { content_mode: 'unrestricted' }, strict: ['content_mode'] }).synapse;
+    await client.chat(request(envelope));
+    await client.embed({ model: 'novel-forge.embedding', input: 'a lighthouse', synapse: envelope });
+    await client.images({ model: 'novel-forge.image', prompt: 'a lighthouse', synapse: envelope });
+
+    for (const sent of synapse.requests) expect(sent.body?.synapse).toMatchObject({ selectors: { content_mode: 'unrestricted' }, strict: ['content_mode'] });
+  });
+
   it('should fill a fresh request_id on every call that omits one, and keep one the caller gave', async () => {
     synapse.reply(json(CHAT_COMPLETION), json(CHAT_COMPLETION), json(CHAT_COMPLETION));
     const body = request();

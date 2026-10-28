@@ -25,7 +25,7 @@ const alias = (key: string, label: string, target: string, nativeWebSearch = fal
   web_search: nativeWebSearch,
 });
 
-const task = (defaultModel: CatalogModelView, aliases: CatalogAliasView[] = []): CatalogTaskView => ({ default: defaultModel, aliases, web_search: false });
+const task = (defaultModel: CatalogModelView, aliases: CatalogAliasView[] = []): CatalogTaskView => ({ default: defaultModel, matched: true, aliases, web_search: false });
 
 const OPUS = alias('opus', 'Opus', 'claude-opus-5.5', true);
 const GROK = alias('grok', 'Grok', 'grok-4.6');

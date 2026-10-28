@@ -7,6 +7,7 @@ import { type ChatMessage, type ChatRequestBody, type EmbeddingRequestBody, type
 
 const SUBJECT_TYPES: SynapseSubjectType[] = ['owner', 'user', 'app'];
 const MAX_EMBEDDING_INPUTS = 2048;
+const MAX_SELECTORS = 32;
 
 /** class-schema cannot declare a primitive-or-array union, so the reflected `object` type is cleared and the `anyOf` alone decides */
 const STRING_OR_STRINGS = {
@@ -19,7 +20,7 @@ const STRING_OR_STRINGS = {
 @Schema({ additionalProperties: true })
 export class JsonObjectBody {}
 
-@Schema({ additionalProperties: String, maxProperties: 32 })
+@Schema({ additionalProperties: String, maxProperties: MAX_SELECTORS })
 export class SelectorsBody {}
 
 @Schema()
@@ -42,7 +43,21 @@ export class SynapseEnvelopeBody implements SynapseEnvelope {
   @Field(() => SelectorsBody, { optional: true, description: "Values the task's routes and alias availability match on" })
   selectors?: Record<string, string>;
 
-  @Field({ optional: true, minLength: 1, maxLength: 64, description: "An alias the task accepts; a retired one falls back to the task's routes" })
+  @Field(() => [String], {
+    optional: true,
+    maxItems: MAX_SELECTORS,
+    uniqueItems: true,
+    description:
+      'Selector keys, each also in `selectors`, that the chosen route must carry with the requested value; a call that would fall to a route without every one is refused with SYN_NO_ELIGIBLE_MODEL',
+  })
+  strict?: string[];
+
+  @Field({
+    optional: true,
+    minLength: 1,
+    maxLength: 64,
+    description: "An alias the task accepts; a retired one falls back to the task's routes, and so does one whose `available` rule does not name every `strict` value",
+  })
   alias?: string;
 
   @Field(() => String, { optional: true, enum: [...EFFORTS], description: "Clamped to the task's range, then sent only where the model supports it" })

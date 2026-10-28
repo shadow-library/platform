@@ -777,7 +777,6 @@ export const SEED_CATALOG_DATA = utils.object.deepFreeze<Omit<CatalogDocument, '
         min: 'low',
         max: 'high',
       },
-      aliases: ['opus', 'sonnet', 'haiku', 'grok', 'gpt-sol', 'gpt-luna', 'gpt', 'gpt-mini', 'kimi', 'glm', 'deepseek', 'gemini-flash'],
       routes: [
         {
           model: 'claude-opus-5.5',
