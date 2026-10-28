@@ -125,6 +125,22 @@ describe('writer attempt snapshots — capture at the chapter-generation graph',
     expect(captured[1]?.meta.attempt).toBe(1);
   });
 
+  it('should capture an attempt once when its node is resumed after a transient model failure', async () => {
+    let failed = false;
+    const { nodes, captured } = graph(writerTables('locked'), key => {
+      if (key !== 'generation' || failed) return draftReply(key);
+      failed = true;
+      throw new Error('Synapse answered http 503 without a readable error');
+    });
+    const state = { projectId: '7', chapter: 5, runId: 'run-1', guidance: '', attempt: 0, findings: [], knowledgeWriterFindings: [], mechanicalFindings: [] };
+    const assembled = await nodes.assembleContext(state as never);
+
+    await expect(nodes.draftChapter({ ...state, ...assembled } as never)).rejects.toThrow('503');
+    await nodes.draftChapter({ ...state, ...assembled } as never);
+
+    expect(captured.map(row => [row.meta.role, row.meta.attempt])).toEqual([['draft', 0]]);
+  });
+
   it("should mark an isolated chapter's attempt captured as isolated, so its Writer's view walls off later", async () => {
     const rows = writerTables('locked');
     rows.set(

@@ -53,7 +53,10 @@
   the notes starts its job through that same accept (see the write policy). A job started from a chat carries its origin (session, message, card, op) from the transaction that
   queues it. Organise and plan retry once on a transient model failure (timeout, rate limit, 5xx, lost connection
   after the router's own retries), never on a refusal the request caused, after a backoff kept under half the claim TTL; a cancel that lands first settles the job as cancelled. A
-  retry never stages a second card: one card per run is enforced by a unique index.
+  retry never stages a second card: one card per run is enforced by a unique index. Chapter generation retries once too, on the same failures, inside its run: after a
+  backoff of a few seconds it resumes the graph from its last checkpoint, so nodes that finished are not run again, and the run keeps its one row. The failed node runs
+  again whole: a writer node repeats its draft, expansion and title calls. It does not resume once the chapter's draft is final or the run is cancelled, and a failure
+  of the resumed run fails it with that failure.
 - **Job events**: every transition of a chat-started job writes a `job_events` row in the same transaction, numbered by a per-session `seq` taken under the session row's lock, so
   `seq` follows commit order and a cursor never skips a late commit; a failed event insert never undoes the transition, and a transition is published only after it commits. The
   session's job stream (`GET …/chat/sessions/:sessionId/jobs/stream`, SSE id = `seq`) resumes after `Last-Event-ID` or `?after=`; with no cursor it replays the running jobs'

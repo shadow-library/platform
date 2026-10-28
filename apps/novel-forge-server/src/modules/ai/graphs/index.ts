@@ -5,4 +5,5 @@ export * from './draft-expansion';
 export * from './mechanical-check';
 export * from './bible-builder.graph';
 export * from './novel-validation.graph';
+export * from './transient-resume';
 export * from './workflow-run.service';

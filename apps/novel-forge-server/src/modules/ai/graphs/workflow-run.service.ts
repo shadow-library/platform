@@ -24,6 +24,7 @@ import { createChapterFinalizationGraph, type FinalizationServices } from './cha
 import { createChapterGenerationGraph, type GraphServices } from './chapter-generation.graph';
 import { createNovelValidationGraph, type ValidationServices } from './novel-validation.graph';
 import { RunCancellationService, type RunCancelOutcome } from './run-cancellation.service';
+import { resumeOnceOnTransientFailure } from './transient-resume';
 
 export interface ChapterGenerationInput {
   projectId: bigint;
@@ -148,10 +149,7 @@ export class WorkflowRunService {
     };
   }
 
-  /**
-   * Reuses the run a crashed attempt of the same job and target left behind: its id is the checkpoint thread_id, so a retried job resumes from the last completed node
-   * instead of re-calling the LLM.
-   */
+  /** Reuses the run row a crashed attempt of the same job and target left running, so a retried job keeps one run; its graph restarts from the first node. */
   async createRun(projectId: bigint, graph: string, target: string, input: unknown, jobId?: string, parentRunId?: string): Promise<string> {
     if (jobId) {
       const existing = await this.db.query.workflowRuns.findFirst({
@@ -159,7 +157,7 @@ export class WorkflowRunService {
         columns: { id: true },
       });
       if (existing) {
-        this.logger.warn('Resuming existing workflow run from checkpoint after crash', { runId: existing.id, jobId, graph, target });
+        this.logger.warn('Reusing the run a crashed attempt left running; its graph restarts from the first node', { runId: existing.id, jobId, graph, target });
         return this.trackJobRun(jobId, existing.id);
       }
     }
@@ -357,23 +355,34 @@ export class WorkflowRunService {
 
     return this.runGraph(runId, 'runChapterGeneration', async signal => {
       const graph = createChapterGenerationGraph(this.graphServices);
-      const rawState = await graph.invoke(
-        {
-          projectId: String(input.projectId),
-          chapter: input.chapter,
-          volumeKey: input.volumeKey ?? '',
-          guidance: input.guidance ?? '',
-          autoFix: input.autoFix ?? false,
-          maxFixes: input.maxFixes ?? 3,
-          runId,
-        },
-        { configurable: { thread_id: runId }, signal },
-      );
+      const start = {
+        projectId: String(input.projectId),
+        chapter: input.chapter,
+        volumeKey: input.volumeKey ?? '',
+        guidance: input.guidance ?? '',
+        autoFix: input.autoFix ?? false,
+        maxFixes: input.maxFixes ?? 3,
+        runId,
+      };
+      const config = { configurable: { thread_id: runId }, signal };
+      const rawState = await resumeOnceOnTransientFailure(resume => graph.invoke(resume ? null : start, config), {
+        signal,
+        mayResume: async () => !(await this.isDraftFinal(input.projectId, input.chapter)),
+        onResume: err => this.logger.warn('chapter generation met a transient model failure; resuming from its last checkpoint', { runId, chapter: input.chapter, err }),
+      });
       const finalState = rawState as unknown as { outcome: string | null; nodeTrace?: string[] };
       const outcome = finalState.outcome ?? 'completed';
 
       return { outcome, status: outcome === 'awaiting_review' ? 'awaiting_review' : 'completed', nodeTrace: finalState.nodeTrace ?? [] };
     });
+  }
+
+  private async isDraftFinal(projectId: bigint, chapter: number): Promise<boolean> {
+    const draft = await this.db.query.drafts.findFirst({
+      where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter)),
+      columns: { status: true },
+    });
+    return draft?.status === 'final';
   }
 
   async runChapterFinalization(input: ChapterFinalizationInput): Promise<WorkflowRunResult> {

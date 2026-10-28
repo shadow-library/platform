@@ -43,7 +43,7 @@ import { expandShortDraft } from './draft-expansion';
 import { checkDraftMechanics, MECHANICAL_PREFIX } from './mechanical-check';
 import { assessReadability, READABILITY_PREFIX, readabilityNote, renderReadabilityEvidence } from './readability-check';
 import { bibleHashOf, keptBackOf } from './writer-snapshot-capture';
-import { type WriterSnapshotService } from '../writer-snapshot.service';
+import { type WriterSnapshotMeta, type WriterSnapshotService } from '../writer-snapshot.service';
 
 export interface GraphServices {
   db: PrimaryDatabase;
@@ -98,6 +98,7 @@ const ChapterGenAnnotation = Annotation.Root({
 });
 
 type ChapterGenState = typeof ChapterGenAnnotation.State;
+type WriterSnapshotRequest = Omit<WriterSnapshotMeta, 'modelRoute'>;
 export type PersistDraftInput = Pick<
   ChapterGenState,
   'projectId' | 'chapter' | 'volumeKey' | 'runId' | 'attempt' | 'repairMode' | 'writerClassRaised' | 'title' | 'prose' | 'summary' | 'continuationState'
@@ -347,6 +348,18 @@ export function parseJudgeOutput(raw: string): JudgeOutput | null {
 export function createChapterGenerationNodes(services: Omit<GraphServices, 'checkpointer'>) {
   const { db, contextAssembler, modelRouter, toolRegistry, pluginPolicy, writerSnapshots } = services;
 
+  // The router hands over the messages before it calls the model, so a node resumed after a transient failure would otherwise snapshot the same attempt twice.
+  const capturedAttempts = new Set<string>();
+  function snapshotOnce(meta: WriterSnapshotRequest): NonNullable<TelemetryContext['onMessages']> {
+    const key = `${meta.role}:${meta.draftRevision}:${meta.attempt}`;
+    const capture = writerSnapshots.onMessages(meta);
+    return (messages, modelRoute) => {
+      if (capturedAttempts.has(key)) return;
+      capturedAttempts.add(key);
+      capture(messages, modelRoute);
+    };
+  }
+
   // The revision a chapter's next persisted draft will carry, so every attempt in one run's repair ladder is
   // recorded against the same target revision `persistGeneratedDraft` will actually write.
   const targetRevisions = new Map<number, Promise<number>>();
@@ -473,7 +486,7 @@ export function createChapterGenerationNodes(services: Omit<GraphServices, 'chec
 
     const targetRevision = await targetRevisionFor(projectId, state.chapter);
     const pack = state.contextPackId ? await db.query.contextPacks.findFirst({ where: eq(schema.contextPacks.id, BigInt(state.contextPackId)) }) : undefined;
-    ctx.onMessages = writerSnapshots.onMessages({
+    ctx.onMessages = snapshotOnce({
       projectId,
       chapter: state.chapter,
       draftRevision: targetRevision,
@@ -741,7 +754,7 @@ export function createChapterGenerationNodes(services: Omit<GraphServices, 'chec
     const { project } = route;
     const policy = disclosure.scrubPolicy(route.policy);
     const [targetRevision, planRevision] = await Promise.all([targetRevisionFor(projectId, state.chapter), briefRevisionFor(projectId, state.chapter)]);
-    ctx.onMessages = writerSnapshots.onMessages({
+    ctx.onMessages = snapshotOnce({
       projectId,
       chapter: state.chapter,
       draftRevision: targetRevision,
@@ -829,7 +842,7 @@ export function createChapterGenerationNodes(services: Omit<GraphServices, 'chec
 
     const targetRevision = await targetRevisionFor(projectId, state.chapter);
     const pack = state.contextPackId ? await db.query.contextPacks.findFirst({ where: eq(schema.contextPacks.id, BigInt(state.contextPackId)) }) : undefined;
-    ctx.onMessages = writerSnapshots.onMessages({
+    ctx.onMessages = snapshotOnce({
       projectId,
       chapter: state.chapter,
       draftRevision: targetRevision,
