@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, exists, isNull, lt, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, lt, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger, OffsetPaginationResult, utils } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
@@ -76,9 +76,10 @@ export class ChatSessionService {
     const conditions = [eq(schema.chatSessions.projectId, projectId)];
     if (filter.scopeType) conditions.push(eq(schema.chatSessions.scopeType, filter.scopeType));
     if (filter.status) conditions.push(eq(schema.chatSessions.status, filter.status));
+    // Not a correlated EXISTS: the relational query aliases chat_sessions, so a subquery naming it by table fails (42P01).
     if (filter.started) {
-      const posted = and(eq(schema.chatMessages.sessionId, schema.chatSessions.id), eq(schema.chatMessages.role, 'user'));
-      conditions.push(exists(this.db.select({ id: schema.chatMessages.id }).from(schema.chatMessages).where(posted)));
+      const posted = and(eq(schema.chatMessages.projectId, projectId), eq(schema.chatMessages.role, 'user'));
+      conditions.push(inArray(schema.chatSessions.id, this.db.selectDistinct({ id: schema.chatMessages.sessionId }).from(schema.chatMessages).where(posted)));
     }
     const where = and(...conditions);
 
