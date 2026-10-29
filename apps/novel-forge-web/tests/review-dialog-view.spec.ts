@@ -60,6 +60,29 @@ describe('mixedPagePairs', () => {
 });
 
 describe('reviewItems', () => {
+  it('should order items as the list groups them, not as the card lists them', () => {
+    const items = reviewItems({
+      proposal: card('organise', [
+        { op: 'organise.rule', rule: 'No magic', optionId: 'r1' },
+        { op: 'bible_document.upsert', section: 'cast', slug: 'cast', body: 'Cast' },
+        { op: 'premise.update', premise: 'A tide town.' },
+      ]),
+    });
+    expect(items.map(item => item.group)).toEqual(['premise', 'pages', 'other']);
+  });
+
+  it('should title a rule by its own words, shortened when long', () => {
+    const long = 'Magic always costs the caster a memory they would rather keep, and the cost is never paid by anyone else';
+    const items = reviewItems({
+      proposal: card('organise', [
+        { op: 'organise.rule', rule: 'No magic at sea', optionId: 'r1' },
+        { op: 'organise.rule', rule: long, optionId: 'r2' },
+      ]),
+    });
+    expect(items[0]?.title).toBe('No magic at sea');
+    expect(items[1]?.title).toBe(`${long.slice(0, 60).trimEnd()}…`);
+  });
+
   it('should return nothing for an empty card or one with only actions', () => {
     expect(reviewItems({ proposal: card('chat', []) })).toEqual([]);
     expect(reviewItems({ proposal: card('chat', [{ op: 'action.plan_chapter', chapter: 2 }]) })).toEqual([]);
@@ -103,7 +126,10 @@ describe('reviewItems', () => {
       { op: 'volume.upsert', volumeKey: 'v', title: 'One' },
       { op: 'milestone.upsert', milestoneKey: 'm', label: 'Dock' },
     ];
-    const labels = (current: ReviewItemsInput['current']) => reviewItems({ proposal: card('chat', changeSet), current }).map(item => item.kindLabel);
+    const labels = (current: ReviewItemsInput['current']) =>
+      reviewItems({ proposal: card('chat', changeSet), current })
+        .sort((a, b) => (a.opIndexes[0] ?? 0) - (b.opIndexes[0] ?? 0))
+        .map(item => item.kindLabel);
     expect(labels([])).toEqual([
       'New faction',
       'New place',

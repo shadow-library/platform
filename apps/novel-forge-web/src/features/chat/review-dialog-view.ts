@@ -7,7 +7,7 @@ import { isRecord } from '@/lib/is-record';
 import { type ChangeOp } from '@/lib/proposals';
 
 import { isActionOp, mixedPagePairs, notesParagraphs, opSubject, opWrittenText, PREMISE_FIELDS, STORY_FIELD_LABELS } from './chat-view';
-import { CHANGE_GROUP_LABEL, citation, ENTRY_TAG, entryNote, opChangeGroup } from './progress-panel-view';
+import { CHANGE_GROUP_LABEL, citation, ENTRY_TAG, entryNote, groupChanges, opChangeGroup } from './progress-panel-view';
 
 export interface OpCurrent {
   index: number;
@@ -152,6 +152,14 @@ const CURRENT_OPS: ReadonlySet<string> = new Set(['premise.update', ...Object.ke
 
 function text(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
+const RULE_TITLE_LENGTH = 60;
+
+function reviewTitle(op: ChangeOp): string {
+  const rule = String(op.op) === 'organise.rule' ? text(op.rule) : undefined;
+  if (!rule) return opSubject(op);
+  return rule.length > RULE_TITLE_LENGTH ? `${rule.slice(0, RULE_TITLE_LENGTH).trimEnd()}…` : rule;
 }
 
 function fieldText(value: unknown): string | undefined {
@@ -369,7 +377,7 @@ export function reviewItems(input: ReviewItemsInput): ReviewItem[] {
   const current = new Map((input.current ?? []).map(entry => [entry.index, entry]));
   const pairs = mixedPagePairs(proposal);
   const wholePages = new Set(pairs.values());
-  return proposal.changeSet.flatMap((op, index): ReviewItem[] => {
+  const items = proposal.changeSet.flatMap((op, index): ReviewItem[] => {
     if (isActionOp(op) || wholePages.has(index)) return [];
     const entry = entries.get(index);
     const group = opChangeGroup(op);
@@ -378,7 +386,7 @@ export function reviewItems(input: ReviewItemsInput): ReviewItem[] {
       group,
       groupLabel: CHANGE_GROUP_LABEL[group],
       kindLabel: kindLabel(op, current.get(index), loaded),
-      title: opSubject(op),
+      title: reviewTitle(op),
       cite: citation(proposal.kind, op, entry),
       yourWords: yourWords(proposal.kind, op, entry, input),
       awaitsCurrent: !loaded && CURRENT_OPS.has(String(op.op)),
@@ -409,6 +417,7 @@ export function reviewItems(input: ReviewItemsInput): ReviewItem[] {
       },
     ];
   });
+  return groupChanges(items).flatMap(group => group.items);
 }
 
 export type ReviewFilter = 'all' | 'waiting' | 'ideas';
