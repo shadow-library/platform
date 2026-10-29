@@ -1120,7 +1120,9 @@ button.turnRow:hover {
 
 .modeDescription {
   display: block;
-  font-size: 11px;
+  font-size: var(--sh-text-caption);
+  line-height: var(--sh-text-caption--line-height);
+  white-space: normal;
   color: var(--sh-text-tertiary);
 }
 

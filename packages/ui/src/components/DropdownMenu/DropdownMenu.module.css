@@ -25,8 +25,8 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  height: var(--sh-control-height-md);
-  padding: 0 10px;
+  min-height: var(--sh-control-height-md);
+  padding: 4px 10px;
   border-radius: var(--sh-radius-sm);
   font-size: var(--sh-text-body-sm);
   color: var(--sh-text-secondary);
