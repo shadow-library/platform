@@ -14,11 +14,14 @@ import {
 import { auditApplyIndexes, auditSkippedOps, findAuditReportByProposal } from '@/lib/bible-audit';
 
 import { answeredInPanel, organisePage, type RejectionScope, rejectionWhy, type SuggestionCommit, suggestionCommit, type SuggestionDecision, withAuditSkips } from './chat-view';
+import { withDecisions } from './review-answers';
 import { answersSettled, currentAnswers, type SuggestionAnswers, updateAnswers, useSuggestionAnswers, writeAnswers } from './suggestion-store';
 
 export interface SuggestionAnswering {
   answers: SuggestionAnswers;
   decide: (index: number, decision: SuggestionDecision | undefined) => void;
+  /** Answers several suggestions in one commit, so a page offered twice never commits with one half stale. */
+  decideEach: (answers: readonly (readonly [number, SuggestionDecision | undefined])[], force?: boolean) => void;
   /** Answers every unanswered suggestion with add, then commits the card. */
   addAll: () => void;
   commit: (force?: boolean) => void;
@@ -91,7 +94,7 @@ export function useSuggestionAnswering(novelId: string, proposal: ProposalRespon
   const skipped = useAuditSkippedOps(novelId, proposal);
   const answers = useMemo(() => ({ ...stored, decisions: withAuditSkips(stored.decisions, skipped) }), [stored, skipped]);
   const total = proposal.changeSet.length;
-  const finished = answersSettled(proposal.status, proposal.changeSet, stored.decisions, stored.scopes);
+  const finished = answersSettled(proposal, stored.decisions, stored.scopes);
 
   useEffect(() => {
     writeAnswers(proposal.id, finished ? { decisions: [], scopes: [] } : { decisions: [...stored.decisions.entries()], scopes: [...stored.scopes.entries()] });
@@ -121,12 +124,10 @@ export function useSuggestionAnswering(novelId: string, proposal: ProposalRespon
     }
   };
 
-  const decide = (index: number, decision: SuggestionDecision | undefined): void => {
-    const next = new Map(currentAnswers(proposal.id).decisions);
-    if (decision) next.set(index, decision);
-    else next.delete(index);
+  const decideEach = (answers: readonly (readonly [number, SuggestionDecision | undefined])[], force = false): void => {
+    const next = withDecisions(currentAnswers(proposal.id).decisions, answers);
     updateAnswers(proposal.id, current => ({ ...current, decisions: next }));
-    if (decision) void commitWith(next, false);
+    if (answers.some(([, decision]) => decision)) void commitWith(next, force);
   };
 
   const addAll = (): void => {
@@ -148,7 +149,8 @@ export function useSuggestionAnswering(novelId: string, proposal: ProposalRespon
 
   return {
     answers,
-    decide,
+    decide: (index, decision) => decideEach([[index, decision]]),
+    decideEach,
     addAll,
     commit: (force = false) => void commitWith(currentAnswers(proposal.id).decisions, force),
     remember: (index, scope) => void remember(index, scope),

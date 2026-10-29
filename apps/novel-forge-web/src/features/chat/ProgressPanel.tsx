@@ -3,7 +3,7 @@ import { AlertTriangleIcon, Button, CheckIcon, Drawer, IconButton } from '@shado
 
 import { CloseIcon } from '@/components/icons';
 import { Markdown } from '@/components/nf/Markdown';
-import { type ApplyProposalResponse, isApiError, type ProposalResponse, useProposalOpMutation, useProposalQuery } from '@/lib/apis';
+import { type ApplyProposalResponse, isApiError, type OrganiseReceipt, type ProposalResponse, useProposalOpMutation, useProposalQuery } from '@/lib/apis';
 
 import { type AppliedOpState, currentOpState, type OpRun, updateOpState, useOpState } from './applied-op-store';
 import {
@@ -33,8 +33,10 @@ import {
   sourcesView,
   type StreamedPanelChange,
   turnRefs,
+  waitingChanges,
 } from './progress-panel-view';
 import styles from './ProgressPanel.module.css';
+import { reviewableCard } from './review-answers';
 import { useSuggestionAnswers } from './suggestion-store';
 import { useSuggestionAnswering } from './use-suggestion-answering';
 
@@ -298,16 +300,43 @@ function AppliedChanges({ novelId, proposal, groups }: AppliedChangesProps): Rea
   );
 }
 
+export interface CardsSummaryProps {
+  waiting: number;
+  onReview: () => void;
+}
+
+export function CardsSummary({ waiting, onReview }: CardsSummaryProps): React.JSX.Element {
+  return (
+    <div className={styles.change}>
+      <span className={styles.changeLabel}>{waiting > 0 ? `${waiting} ${waiting === 1 ? 'change' : 'changes'} waiting for you` : 'All changes answered'}</span>
+      <Button size="sm" variant="secondary" onClick={onReview}>
+        Review changes
+      </Button>
+    </div>
+  );
+}
+
 interface CardChangesProps {
   novelId: string;
   proposal: ProposalResponse;
   groups: ChangeGroupView<CardPanelChange>[];
   title?: string;
   onApplied: (result: ApplyProposalResponse) => void;
+  onReview: () => void;
 }
 
-function CardChanges({ novelId, proposal, groups, title, onApplied }: CardChangesProps): React.JSX.Element {
+function CardChanges({ novelId, proposal, groups, title, onApplied, onReview }: CardChangesProps): React.JSX.Element {
   const { answers, decide, remember, remembering } = useSuggestionAnswering(novelId, proposal, { onApplied });
+  if (reviewableCard(proposal)) {
+    const summary = <CardsSummary waiting={waitingChanges(proposal, answers.decisions)} onReview={onReview} />;
+    if (!title) return summary;
+    return (
+      <div>
+        <div className={styles.groupLabel}>{title}</div>
+        {summary}
+      </div>
+    );
+  }
   const row = (change: CardPanelChange): React.JSX.Element => (
     <CardChangeRow
       key={change.key}
@@ -428,9 +457,10 @@ export interface ProgressPanelProps {
   /** A chat turn is running or the chat is locked, so a paragraph can't be sent to it yet. */
   busy: boolean;
   onAddParagraph: (paragraph: UnusedParagraph) => void;
+  onReviewCards: (proposalId: string, receipt?: OrganiseReceipt) => void;
 }
 
-export function ProgressPanel({ novelId, turn, mode, onApplied, reveal, onBackToCurrent, notes, busy, onAddParagraph }: ProgressPanelProps): React.JSX.Element {
+export function ProgressPanel({ novelId, turn, mode, onApplied, reveal, onBackToCurrent, notes, busy, onAddParagraph, onReviewCards }: ProgressPanelProps): React.JSX.Element {
   const refs = turnRefs(turn);
   const appliedQuery = useProposalQuery(novelId, refs.appliedProposalId);
   const cardsQuery = useProposalQuery(novelId, refs.proposalId);
@@ -478,7 +508,16 @@ export function ProgressPanel({ novelId, turn, mode, onApplied, reveal, onBackTo
         cards={
           changes.kind === 'settled' &&
           cards &&
-          changes.cards.length > 0 && <CardChanges novelId={novelId} proposal={cards} groups={changes.cards} title={changes.cardsTitle} onApplied={onApplied} />
+          changes.cards.length > 0 && (
+            <CardChanges
+              novelId={novelId}
+              proposal={cards}
+              groups={changes.cards}
+              title={changes.cardsTitle}
+              onApplied={onApplied}
+              onReview={() => onReviewCards(cards.id, refs.organised)}
+            />
+          )
         }
       />
       {notUsed && (

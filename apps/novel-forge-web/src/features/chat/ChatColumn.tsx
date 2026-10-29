@@ -23,6 +23,7 @@ import {
   isTurnFailureRecorded,
   type JobEnqueueResponse,
   jobSettled,
+  type OrganiseReceipt,
   type ProgressItemKey,
   type ProgressOverrideStatus,
   type ProposalResponse,
@@ -105,6 +106,8 @@ import { QuestionCard } from './QuestionCard';
 import { ReadyChecklist } from './ReadyChecklist';
 import { RenameInput } from './RenameInput';
 import { ReplyOptionsMenu } from './ReplyOptionsMenu';
+import { reviewableCard } from './review-answers';
+import { ReviewDialog, type ReviewTarget } from './ReviewDialog';
 import { StoryBibleReceiptCard } from './StoryBibleReceiptCard';
 import { LiveStreamedTurn } from './StreamedTurn';
 import { useUnansweredCount } from './suggestion-store';
@@ -164,6 +167,7 @@ interface TranscriptActions {
   focusComposer: () => void;
   /** A reply's id, or the key of a job's changes. */
   reviewInPanel: (key: string) => void;
+  reviewCards: (proposalId: string, receipt?: OrganiseReceipt) => void;
 }
 
 function lastAssistantOrdinal(messages: ChatMessageResponse[]): number {
@@ -226,6 +230,9 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetReveals, setSheetReveals] = useState(false);
   const [dock, setDock] = useState<DockState>({ kind: 'closed' });
+  const [review, setReview] = useState<ReviewTarget>();
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const reviewOpener = useRef<HTMLElement | null>(null);
   const [chipReveal, setChipReveal] = useState<ChipReveal>();
   const revealCount = useRef(0);
   const passages = usePassageChips(novelId, session?.id);
@@ -299,6 +306,10 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
   const waiting = (proposalsQuery.data?.items ?? []).filter(proposal => session && proposal.sessionId === session.id && !shownProposals.has(proposal.id));
   const waitingPlans = waiting.filter(proposal => proposal.kind === PLAN_KIND);
   const waitingCards = waiting.filter(proposal => proposal.kind !== PLAN_KIND);
+  const reviewProposalIds = useMemo(
+    () => new Map((proposalsQuery.data?.items ?? NO_PROPOSALS).filter(reviewableCard).map(proposal => [pendingKey('proposal', proposal.id), proposal.id])),
+    [proposalsQuery.data],
+  );
   const threadCards = waiting.length + draftsForYou.length + continuityForYou.length + bibleReceipts.length + bibleDecisions.length + (writing ? 1 : 0);
   const view = chatColumnView({ messageCount: messages.length, loading: messagesQuery.isLoading, active: pending || showStream || planStartOpen || threadCards > 0 });
   const ordinals = new Map(messages.map(message => [message.id, message.ordinal]));
@@ -654,6 +665,19 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
     openChangesSheet();
   };
 
+  const reviewCards = (proposalId: string, receipt?: OrganiseReceipt): void => {
+    reviewOpener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setReview({ proposalId, receipt: receipt ?? jobStream.jobs.find(job => job.progress.proposalId === proposalId)?.progress.organised });
+    setReviewOpen(true);
+  };
+
+  // The opener may be gone by now: the panel's summary row goes once the card settles.
+  const restoreReviewFocus = (): void => {
+    const opener = reviewOpener.current;
+    reviewOpener.current = null;
+    (opener?.isConnected ? opener : inputRef.current)?.focus({ preventScroll: true });
+  };
+
   // Closing the panel hands focus back to the card it was opened from, or to the composer, rather than leaving it on the page.
   useEffect(() => {
     if (chapter === undefined) return;
@@ -742,6 +766,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
       leaveUndecided,
       focusComposer: () => inputRef.current?.focus(),
       reviewInPanel,
+      reviewCards,
     };
   });
   const actions = useMemo<TranscriptActions>(
@@ -754,6 +779,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
       leaveUndecided: key => latest.current?.leaveUndecided(key),
       focusComposer: () => latest.current?.focusComposer(),
       reviewInPanel: key => latest.current?.reviewInPanel(key),
+      reviewCards: (proposalId, receipt) => latest.current?.reviewCards(proposalId, receipt),
     }),
     [],
   );
@@ -885,6 +911,7 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
                         cards={stream.turn.proposal}
                         held={stream.turn.held}
                         onReview={() => reviewInPanel(stream.turn.assistantMessage.id)}
+                        onReviewCards={reviewCards}
                         onApplied={onApplied}
                       />
                     )
@@ -908,7 +935,14 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
                   {waitingCards.map(proposal => (
                     <PendingAnchor key={proposal.id} id={pendingKey('proposal', proposal.id)}>
                       {answeredInPanel(proposal) ? (
-                        <TurnReceipt novelId={novelId} proposalId={proposal.id} cards={proposal} onReview={() => reviewInPanel(proposal.id)} onApplied={onApplied} />
+                        <TurnReceipt
+                          novelId={novelId}
+                          proposalId={proposal.id}
+                          cards={proposal}
+                          onReview={() => reviewInPanel(proposal.id)}
+                          onReviewCards={reviewCards}
+                          onApplied={onApplied}
+                        />
                       ) : (
                         <TurnProposalCard novelId={novelId} proposal={proposal} onApplied={onApplied} />
                       )}
@@ -1026,6 +1060,8 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
                 adopting={adoptProposal.isPending ? adoptProposal.variables?.proposalId : undefined}
                 onShow={showPending}
                 onAdopt={adoptPending}
+                reviewProposalIds={reviewProposalIds}
+                onReview={reviewCards}
               />
             }
             announcement={announcement}
@@ -1061,8 +1097,10 @@ export function ChatColumn(props: ChatColumnProps): React.JSX.Element {
           notes={notes}
           busy={busy}
           onAddParagraph={paragraph => sendTurn(unusedParagraphPrompt(paragraph))}
+          onReviewCards={reviewCards}
         />
       )}
+      <ReviewDialog novelId={novelId} target={review} open={reviewOpen} onOpenChange={setReviewOpen} notes={notes} onApplied={onApplied} onCloseFocus={restoreReviewFocus} />
     </div>
   );
 }
@@ -1124,6 +1162,7 @@ function JobOutcome({ novelId, job, actions }: JobOutcomeProps): React.JSX.Eleme
         ideas={organiseIdeas(progress.organised)}
         note={progress.applyNote}
         onReview={() => actions.reviewInPanel(job.id)}
+        onReviewCards={proposalId => actions.reviewCards(proposalId, progress.organised)}
         onApplied={actions.onApplied}
       />
     </PendingAnchor>
@@ -1202,6 +1241,7 @@ const AssistantMessage = memo(function AssistantMessage({
               proposalId={isPlan ? undefined : (message.proposalId ?? undefined)}
               held={held}
               onReview={() => actions.reviewInPanel(message.id)}
+              onReviewCards={actions.reviewCards}
               onApplied={actions.onApplied}
             />
           </PendingAnchor>

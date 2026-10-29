@@ -130,6 +130,12 @@ export const ArrowUpIcon = (p: IconProps): React.JSX.Element => (
   </SvgIcon>
 );
 
+export const ArrowDownIcon = (p: IconProps): React.JSX.Element => (
+  <SvgIcon {...p}>
+    <path d="M12 5v14M19 12l-7 7-7-7" />
+  </SvgIcon>
+);
+
 export const StopIcon = (p: IconProps): React.JSX.Element => (
   <SvgIcon {...p}>
     <rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" stroke="none" />

@@ -15,13 +15,15 @@ export interface WaitingTrayProps {
   adopting?: string;
   onShow: (key: string) => void;
   onAdopt: (item: PendingItem & { proposalId: string }) => void;
+  reviewProposalIds: ReadonlyMap<string, string>;
+  onReview: (proposalId: string) => void;
 }
 
 /**
  * Everything waiting on the author, above the composer. Open while something is not in the thread yet, so it can be brought in; otherwise one
  * line, since every card is already in the thread below.
  */
-export function WaitingTray({ items, tray, canAdopt, adopting, onShow, onAdopt }: WaitingTrayProps): React.JSX.Element | null {
+export function WaitingTray({ items, tray, canAdopt, adopting, onShow, onAdopt, reviewProposalIds, onReview }: WaitingTrayProps): React.JSX.Element | null {
   const [open, setOpen] = useState<boolean>();
   const [elsewhere, setElsewhere] = useState(tray.elsewhere);
   if (elsewhere !== tray.elsewhere) {
@@ -48,6 +50,14 @@ export function WaitingTray({ items, tray, canAdopt, adopting, onShow, onAdopt }
 
   const action = (item: PendingItem): ReactNode => {
     const { proposalId } = item;
+    const review = item.inThread ? reviewProposalIds.get(item.key) : undefined;
+    if (review) {
+      return (
+        <Button size="sm" variant="ghost" aria-label={`Review ${item.title}`} onClick={() => onReview(review)}>
+          Review
+        </Button>
+      );
+    }
     if (item.inThread || !proposalId) {
       return (
         <Button size="sm" variant="ghost" aria-label={`Show ${item.title}`} onClick={() => onShow(item.key)}>

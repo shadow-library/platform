@@ -304,6 +304,17 @@ export function rejectionScopesFor(op: ChangeOp): readonly RejectionScope[] {
   return opTouchesRecord(op) ? ['never', 'not_now', 'not_this_version'] : ['never', 'not_now'];
 }
 
+/** A page offered twice asks once, on its later half, and not at all while its other version is kept. */
+export function declineAsksScope(proposal: { kind: string; changeSet: readonly ChangeOp[] }, index: number, decisions: ReadonlyMap<number, SuggestionDecision>): boolean {
+  const op = proposal.changeSet[index];
+  if (!op || decisions.get(index) !== 'decline' || rejectionScopesFor(op).length === 0) return false;
+  const pairs = mixedPagePairs(proposal);
+  const whole = pairs.get(index);
+  if (whole !== undefined) return !decisions.has(whole);
+  const notes = [...pairs].find(([, later]) => later === index)?.[0];
+  return notes === undefined || decisions.get(notes) !== 'add';
+}
+
 export function rejectionScopeNote(scope: RejectionScope): string {
   if (scope === 'never') return 'for this story';
   if (scope === 'not_now') return 'for now';

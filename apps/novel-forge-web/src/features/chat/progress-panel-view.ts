@@ -7,7 +7,9 @@ import { type ChangeOp } from '@/lib/proposals';
 import {
   answeredInPanel,
   commitBarView,
+  declineAsksScope,
   isActionOp,
+  mixedPagePairs,
   opSubject,
   opWrittenText,
   proposalPresentation,
@@ -117,7 +119,7 @@ export function turnRefs(turn: PanelTurn): TurnRefs {
   };
 }
 
-function plural(count: number, one: string, many: string): string {
+export function plural(count: number, one: string, many: string): string {
   return `${count} ${count === 1 ? one : many}`;
 }
 
@@ -319,7 +321,7 @@ export function cardChanges(
     if (isActionOp(op)) return [];
     const state = settled(index);
     const scope = scopes.get(index);
-    const asked = inPanel && !scope && REMEMBERED_STATES.has(state) && decisions.get(index) === 'decline';
+    const asked = inPanel && !scope && REMEMBERED_STATES.has(state) && declineAsksScope(proposal, index, decisions);
     const entry = labelled.get(index);
     return [
       {
@@ -419,7 +421,7 @@ export function appliedReceipt(sides: readonly ProposalResponse[], waitingCards:
   if (rows.length === 0) return { kind: 'none' };
   if (live.length === 0) return { kind: 'reverted', title: undone > 0 ? 'Every change from this turn was undone.' : 'Nothing from this turn could be saved.' };
   const ideas = live.filter(row => row.idea).length;
-  const passed = sides.filter(side => !side.autoApplied).reduce((sum, side) => sum + side.changeSet.length - appliedChanges(side).length, 0);
+  const passed = sides.filter(side => !side.autoApplied).reduce((sum, side) => sum + side.changeSet.length - appliedChanges(side).length - mixedPagePairs(side).size, 0);
   const standing = sides.filter(side => side.status === 'applied');
   const detail = [
     changeBreakdown(live),
@@ -447,10 +449,10 @@ export interface CardsReceiptInput {
   error?: string;
 }
 
-/** Owed after a failed add, or by answers kept across a reload. */
+/** Owed after a failed add, or by answers kept across a reload; a page offered twice may have one half unanswered, which the commit leaves out. */
 function owedCommit(cards: ProposalResponse, { decisions, committing, error }: CardsReceiptInput): { commit?: string } {
   const bar = commitBarView({ total: cards.changeSet.length, decisions, committing, error });
-  return bar.kind === 'ready' ? { commit: bar.action } : {};
+  return bar.kind === 'ready' || bar.kind === 'partial' ? { commit: bar.action } : {};
 }
 
 function answeredDetail({ committing, error }: CardsReceiptInput): string {
@@ -467,6 +469,22 @@ function undecided(indexes: Iterable<number>, decisions: ReadonlyMap<number, Sug
   return [...indexes].filter(index => !decisions.has(index)).length;
 }
 
+/** A page offered twice is answered once either half is added or both have an answer: a lone declined half leaves the other version open. */
+export function changeAnswered(opIndexes: readonly number[], decisions: ReadonlyMap<number, SuggestionDecision>): boolean {
+  if (opIndexes.length === 1) return decisions.has(opIndexes[0] ?? -1);
+  return opIndexes.some(index => decisions.get(index) === 'add') || opIndexes.every(index => decisions.has(index));
+}
+
+export function waitingChanges(proposal: Pick<ProposalResponse, 'kind' | 'changeSet'>, decisions: ReadonlyMap<number, SuggestionDecision>): number {
+  const pairs = mixedPagePairs(proposal);
+  const halves = new Set(pairs.values());
+  return proposal.changeSet.filter((op, index) => {
+    if (isActionOp(op) || halves.has(index)) return false;
+    const whole = pairs.get(index);
+    return !changeAnswered(whole === undefined ? [index] : [index, whole], decisions);
+  }).length;
+}
+
 export function cardsReceipt(cards: ProposalResponse, answers: CardsReceiptInput, ideas: ReadonlySet<number> = new Set()): ReceiptView {
   const presentation = proposalPresentation(cards);
   if (presentation === 'plan' || (cards.status === 'pending' && !answeredInPanel(cards))) return { kind: 'none' };
@@ -474,7 +492,7 @@ export function cardsReceipt(cards: ProposalResponse, answers: CardsReceiptInput
   const total = story.length;
   if (total === 0) return { kind: 'none' };
   if (cards.status === 'pending') {
-    const waiting = undecided(story, answers.decisions);
+    const waiting = waitingChanges(cards, answers.decisions);
     const waitingIdeas = undecided(ideas, answers.decisions);
     if (waiting > 0)
       return {
@@ -490,7 +508,7 @@ export function cardsReceipt(cards: ProposalResponse, answers: CardsReceiptInput
   const kept = new Set(story);
   const added = (cards.opResults ?? []).filter(result => result.status === 'applied' && kept.has(result.index)).length;
   if (cards.status === 'applied' || cards.status === 'reverted') {
-    const passed = total - added;
+    const passed = total - added - mixedPagePairs(cards).size;
     return {
       kind: 'cards',
       tone: 'settled',
@@ -536,7 +554,7 @@ export function turnReceipt(input: TurnReceiptInput): ReceiptView {
 
 function receiptOf({ applied, cards, answers, held, ideas = new Set() }: TurnReceiptInput): ReceiptView {
   const pending = cards?.status === 'pending' && cards.kind !== 'chapter_plan' ? cards : undefined;
-  const waiting = pending ? undecided(storyIndexes(pending), answers.decisions) : 0;
+  const waiting = pending ? waitingChanges(pending, answers.decisions) : 0;
   const panelCards = pending && answeredInPanel(pending) ? pending : undefined;
   const hold = panelCards && waiting > 0 ? holdLine(panelCards, held) : undefined;
   const saved = appliedReceipt(savedSides(applied, cards), waiting, panelCards ? undecided(ideas, answers.decisions) : 0);

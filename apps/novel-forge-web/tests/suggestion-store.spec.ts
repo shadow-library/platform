@@ -74,29 +74,51 @@ describe('answersSettled', () => {
     { op: 'entity.upsert', entityKey: 'council' },
     { op: 'entity.upsert', entityKey: 'maren' },
   ];
+  const card = (status: string): { kind: string; status: string; changeSet: typeof changeSet } => ({ kind: 'chat', status, changeSet });
   const declined = new Map<number, 'add' | 'decline'>([
     [0, 'add'],
     [1, 'decline'],
   ]);
 
   it('should keep a pending card’s answers', () => {
-    expect(answersSettled('pending', changeSet, declined, new Map())).toBe(false);
+    expect(answersSettled(card('pending'), declined, new Map())).toBe(false);
   });
 
   it('should keep a committed card’s answers until every decline has its scope', () => {
-    expect(answersSettled('applied', changeSet, declined, new Map())).toBe(false);
-    expect(answersSettled('applied', changeSet, declined, new Map([[1, 'never']]))).toBe(true);
-    expect(answersSettled('discarded', changeSet, new Map([[0, 'add']]), new Map())).toBe(true);
+    expect(answersSettled(card('applied'), declined, new Map())).toBe(false);
+    expect(answersSettled(card('applied'), declined, new Map([[1, 'never']]))).toBe(true);
+    expect(answersSettled(card('discarded'), new Map([[0, 'add']]), new Map())).toBe(true);
   });
 
   it('should drop a replaced card’s answers at once', () => {
-    expect(answersSettled('superseded', changeSet, declined, new Map())).toBe(true);
-    expect(answersSettled('conflicted', changeSet, declined, new Map())).toBe(true);
+    expect(answersSettled(card('superseded'), declined, new Map())).toBe(true);
+    expect(answersSettled(card('conflicted'), declined, new Map())).toBe(true);
   });
 
   it('should settle a declined action without a scope, since it is run or not rather than remembered', () => {
-    const actionChangeSet = [{ op: 'action.organise_notes' }];
-    expect(answersSettled('applied', actionChangeSet, new Map([[0, 'decline']]), new Map())).toBe(true);
+    const actions = { kind: 'chat', status: 'applied', changeSet: [{ op: 'action.organise_notes' }] };
+    expect(answersSettled(actions, new Map([[0, 'decline']]), new Map())).toBe(true);
+  });
+
+  it('should wait only on the scope a page offered twice asks for its later half', () => {
+    const page = { op: 'bible_document.upsert', section: 'world', slug: 'pier' };
+    const organise = { kind: 'organise', status: 'applied', changeSet: [page, page] };
+    const both = new Map<number, 'add' | 'decline'>([
+      [0, 'decline'],
+      [1, 'decline'],
+    ]);
+    expect(
+      answersSettled(
+        organise,
+        new Map([
+          [0, 'decline'],
+          [1, 'add'],
+        ]),
+        new Map(),
+      ),
+    ).toBe(true);
+    expect(answersSettled(organise, both, new Map())).toBe(false);
+    expect(answersSettled(organise, both, new Map([[1, 'never']]))).toBe(true);
   });
 });
 

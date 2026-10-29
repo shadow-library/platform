@@ -863,3 +863,49 @@ describe('an action in a turn’s card', () => {
     expect(changesView({ turn: quiet, mode: 'auto', cards: ORGANISE_ACTION, decisions: new Map() })).toEqual({ kind: 'empty', note: 'No Story Bible changes this turn.' });
   });
 });
+
+describe('receipt counts for a page offered twice', () => {
+  const page = { op: 'bible_document.upsert', section: 'world', slug: 'pier', body: 'The pier.' };
+  const PAIRED = proposal({
+    id: 'pair',
+    kind: 'organise',
+    status: 'pending',
+    autoApplied: false,
+    changeSet: [page, { op: 'entity.upsert', type: 'character', entityKey: 'tamsin', name: 'Tamsin' }, { ...page, body: 'The pier.\n\nGulls.' }],
+  });
+  const none = { decisions: new Map(), committing: false };
+
+  it('should count the page once while waiting, as the panel and the dialog do', () => {
+    expect(cardsReceipt(PAIRED, none)).toMatchObject({ count: 2, title: '2 changes waiting for you' });
+    expect(cardsReceipt(PAIRED, { ...none, decisions: new Map([[2, 'add']]) })).toMatchObject({ count: 1, title: '1 change waiting for you' });
+    expect(cardsReceipt(PAIRED, { ...none, decisions: new Map([[0, 'decline']]) })).toMatchObject({ count: 2 });
+    expect(turnReceipt({ cards: PAIRED, answers: none })).toMatchObject({ title: '2 changes waiting for you' });
+  });
+
+  it('should offer the owed commit once every change has an answer, though one half is unanswered', () => {
+    const answered = cardsReceipt(PAIRED, {
+      ...none,
+      decisions: new Map([
+        [1, 'add'],
+        [2, 'add'],
+      ]),
+      error: 'Offline.',
+    });
+    expect(answered).toMatchObject({ title: 'All changes answered', commit: 'Add the 2 picked now' });
+  });
+
+  it('should not count the version left out of a kept page as passed on', () => {
+    const kept = {
+      ...PAIRED,
+      status: 'applied',
+      opResults: [
+        { index: 1, status: 'applied' },
+        { index: 2, status: 'applied' },
+      ],
+    } as ProposalResponse;
+    expect(cardsReceipt(kept, none)).toMatchObject({ title: 'Added 2 changes to your Story Bible', detail: '' });
+    expect(turnReceipt({ cards: kept, answers: none })).toMatchObject({ detail: '1 page, 1 record' });
+    const left = { ...PAIRED, status: 'applied', opResults: [{ index: 1, status: 'applied' }] } as ProposalResponse;
+    expect(cardsReceipt(left, none)).toMatchObject({ detail: 'Passed on 1' });
+  });
+});

@@ -2,7 +2,7 @@ import { useCallback, useSyncExternalStore } from 'react';
 
 import { type ChangeOp } from '@/lib/proposals';
 
-import { isActionOp, type RejectionScope, type SuggestionDecision } from './chat-view';
+import { declineAsksScope, type RejectionScope, type SuggestionDecision } from './chat-view';
 
 export interface StoredAnswers {
   decisions: [number, SuggestionDecision][];
@@ -48,20 +48,16 @@ export function writeAnswers(proposalId: string, answers: StoredAnswers): void {
   }
 }
 
-/** Whether a card's saved answers have done their job: the card is no longer pending, and nothing it shows still needs a scope — an action's decline never does, since it is run or not rather than remembered. */
+/** Whether a card's saved answers have done their job: the card is no longer pending, and no decline still owes its scope (see `declineAsksScope`). */
 export function answersSettled(
-  status: string,
-  changeSet: readonly ChangeOp[],
+  proposal: { kind: string; status: string; changeSet: readonly ChangeOp[] },
   decisions: ReadonlyMap<number, SuggestionDecision>,
   scopes: ReadonlyMap<number, RejectionScope>,
 ): boolean {
+  const { status } = proposal;
   if (status === 'pending') return false;
   if (status !== 'applied' && status !== 'discarded' && status !== 'reverted') return true;
-  return [...decisions.entries()].every(([index, decision]) => {
-    if (decision !== 'decline') return true;
-    const op = changeSet[index];
-    return !op || isActionOp(op) || scopes.has(index);
-  });
+  return [...decisions.keys()].every(index => scopes.has(index) || !declineAsksScope(proposal, index, decisions));
 }
 
 const halfAnswered = new Map<string, number>();
