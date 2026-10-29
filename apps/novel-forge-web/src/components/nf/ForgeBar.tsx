@@ -29,7 +29,6 @@ export function ForgeBar({ novelId, scope, placeholder }: { novelId: string; sco
   const [proseEdits, setProseEdits] = useState(false);
   const [createdSession, setCreatedSession] = useState<ChatSessionResponse | undefined>();
   const [last, setLast] = useState<ChatTurnResponse | undefined>();
-  const creatingRef = useRef<string | null>(null);
   const inputWrapRef = useRef<HTMLDivElement>(null);
   const contextSentFor = useRef<string | null>(null);
 
@@ -51,37 +50,37 @@ export function ForgeBar({ novelId, scope, placeholder }: { novelId: string; sco
   }, [scopeKey]);
 
   useEffect(() => {
-    if (!open || sessionId || creatingRef.current === scopeKey) return;
-    creatingRef.current = scopeKey;
-    createSession.mutate(
-      {},
-      {
-        onSuccess: s => setCreatedSession(s),
-        onError: e => {
-          creatingRef.current = null;
-          toast.danger(e.message);
-        },
-      },
-    );
-  }, [open, sessionId, scopeKey, createSession]);
-
-  useEffect(() => {
     if (open) inputWrapRef.current?.querySelector('textarea')?.focus();
-  }, [open, sessionId]);
+  }, [open]);
 
-  const propose = (): void => {
-    const message = text.trim();
-    if (!message || !sessionId || turn.isPending) return;
-    const isFirstTurn = contextSentFor.current !== sessionId;
+  const send = (session: string, message: string): void => {
+    const isFirstTurn = contextSentFor.current !== session;
     const content = isFirstTurn ? `${contextLine(scope)}\n${message}` : message;
     turn.mutate(
-      { sessionId, content, proseEdits },
+      { sessionId: session, content, proseEdits },
       {
         onSuccess: result => {
-          if (isFirstTurn) contextSentFor.current = sessionId;
+          if (isFirstTurn) contextSentFor.current = session;
           setText('');
           setLast(result);
           if (result.proposal) toast.success('Forge staged a proposal — it is waiting on you in the chat');
+        },
+        onError: e => toast.danger(e.message),
+      },
+    );
+  };
+
+  // The chat is created with its first message, so opening the bar and leaving never adds an empty chat to the history.
+  const propose = (): void => {
+    const message = text.trim();
+    if (!message || turn.isPending || createSession.isPending) return;
+    if (sessionId) return send(sessionId, message);
+    createSession.mutate(
+      {},
+      {
+        onSuccess: session => {
+          setCreatedSession(session);
+          send(session.id, message);
         },
         onError: e => toast.danger(e.message),
       },
@@ -107,7 +106,7 @@ export function ForgeBar({ novelId, scope, placeholder }: { novelId: string; sco
           placeholder={placeholder ?? `Ask Forge to update ${scope.title} — add a detail, change a trait, note a new relationship…`}
           minRows={1}
           autoGrow
-          disabled={!sessionId}
+          disabled={createSession.isPending}
           className={styles.input}
           onKeyDown={e => {
             if (e.key === 'Enter' && !e.shiftKey) {
@@ -120,9 +119,9 @@ export function ForgeBar({ novelId, scope, placeholder }: { novelId: string; sco
         <IconButton variant="ghost" size="sm" aria-label="Close" icon={<span className={styles.closeGlyph}>×</span>} onClick={() => setOpen(false)} />
       </div>
 
-      {(last || turn.isPending) && (
+      {(last || turn.isPending || createSession.isPending) && (
         <div className={styles.reply}>
-          {turn.isPending ? (
+          {turn.isPending || createSession.isPending ? (
             <span className={styles.thinking}>Forge is thinking…</span>
           ) : (
             last && (

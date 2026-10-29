@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, isNull, lt, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, exists, isNull, lt, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger, OffsetPaginationResult, utils } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
@@ -24,6 +24,7 @@ export type ChatMessageView = Omit<Refinement.ChatMessage, 'exchange'> & Partial
 interface SessionListFilter {
   scopeType?: Refinement.ChatScope;
   status?: Refinement.ChatSessionStatus;
+  started?: boolean;
   limit?: number;
   offset?: number;
   sortBy?: string;
@@ -75,6 +76,10 @@ export class ChatSessionService {
     const conditions = [eq(schema.chatSessions.projectId, projectId)];
     if (filter.scopeType) conditions.push(eq(schema.chatSessions.scopeType, filter.scopeType));
     if (filter.status) conditions.push(eq(schema.chatSessions.status, filter.status));
+    if (filter.started) {
+      const posted = and(eq(schema.chatMessages.sessionId, schema.chatSessions.id), eq(schema.chatMessages.role, 'user'));
+      conditions.push(exists(this.db.select({ id: schema.chatMessages.id }).from(schema.chatMessages).where(posted)));
+    }
     const where = and(...conditions);
 
     const column = query.sortBy === 'createdAt' ? schema.chatSessions.createdAt : schema.chatSessions.updatedAt;

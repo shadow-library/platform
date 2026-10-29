@@ -59,6 +59,9 @@ export class ListChatSessionsQuery extends PaginationQuery(SortByTime, { sortBy:
 
   @Field(() => ChatSessionStatus, { optional: true })
   status?: Refinement.ChatSessionStatus;
+
+  @Field({ optional: true, description: 'Only chats the author has posted in. A chat that was opened, or only had a card brought into it, stays out.' })
+  started?: boolean;
 }
 
 @Schema()

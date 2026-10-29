@@ -180,8 +180,8 @@ function ChatHistoryDialog({ novelId, open, onOpenChange, openSessionId, onDelet
   const [renamingId, setRenamingId] = useState<string>();
   const [deleteTarget, setDeleteTarget] = useState<ChatSessionResponse | undefined>();
 
-  const pages = useInfiniteChatSessionsQuery(novelId, { status, limit: HISTORY_PAGE_SIZE }, open);
-  const otherQuery = useListChatSessionsQuery(novelId, { status: status === 'active' ? 'archived' : 'active', limit: 1 }, open);
+  const pages = useInfiniteChatSessionsQuery(novelId, { status, started: true, limit: HISTORY_PAGE_SIZE }, open);
+  const otherQuery = useListChatSessionsQuery(novelId, { status: status === 'active' ? 'archived' : 'active', started: true, limit: 1 }, open);
   const rename = useUpdateChatSessionMutation(novelId);
   const setSessionStatus = useSetSessionStatusMutation(novelId);
   const remove = useDeleteChatSessionMutation(novelId);

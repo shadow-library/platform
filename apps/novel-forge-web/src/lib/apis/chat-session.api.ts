@@ -38,11 +38,13 @@ import { beginChatTurn, type ChatTurnContext, rollbackChatTurn } from './chat-tu
 interface ListSessionsParams {
   scopeType?: ChatSessionResponse['scopeType'];
   status?: ChatSessionResponse['status'];
+  started?: boolean;
   limit?: number;
 }
 
 interface InfiniteSessionsParams {
   status: ChatSessionResponse['status'];
+  started?: boolean;
   limit: number;
 }
 
@@ -99,7 +101,10 @@ export function invalidateChat(queryClient: QueryClient, projectId: string, sess
 export function useListChatSessionsQuery(projectId: string, params?: ListSessionsParams, enabled = true): UseQueryResult<ListChatSessionResponse, ApiError> {
   return useQuery<ListChatSessionResponse, ApiError>({
     queryKey: [...refinementKeys.sessions(projectId), params],
-    queryFn: () => APIRequest.get(`/projects/${projectId}/chat/sessions`).query({ scopeType: params?.scopeType, status: params?.status, limit: params?.limit }).execute(),
+    queryFn: () =>
+      APIRequest.get(`/projects/${projectId}/chat/sessions`)
+        .query({ scopeType: params?.scopeType, status: params?.status, started: params?.started, limit: params?.limit })
+        .execute(),
     enabled: enabled && Boolean(projectId),
   });
 }
@@ -116,7 +121,8 @@ export function useInfiniteChatSessionsQuery(
 ): UseInfiniteQueryResult<InfiniteData<ListChatSessionResponse, number>, ApiError> {
   return useInfiniteQuery<ListChatSessionResponse, ApiError, InfiniteData<ListChatSessionResponse, number>, readonly unknown[], number>({
     queryKey: [...refinementKeys.sessions(projectId), { ...params, paged: true }],
-    queryFn: ({ pageParam }) => APIRequest.get(`/projects/${projectId}/chat/sessions`).query({ status: params.status, limit: params.limit, offset: pageParam }).execute(),
+    queryFn: ({ pageParam }) =>
+      APIRequest.get(`/projects/${projectId}/chat/sessions`).query({ status: params.status, started: params.started, limit: params.limit, offset: pageParam }).execute(),
     initialPageParam: 0,
     getNextPageParam: last => {
       const loaded = last.offset + last.items.length;
