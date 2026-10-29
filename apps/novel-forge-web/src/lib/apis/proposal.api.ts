@@ -8,6 +8,7 @@ import {
   type ListChangesResponse,
   type ListProposalResponse,
   type ListProposalsQueryParams,
+  type ProposalCurrentResponse,
   type ProposalOpDependencyErrorResponse,
   type ProposalResponse,
   type RedoProposalOpResponse,
@@ -44,6 +45,15 @@ export function useProposalQuery(projectId: string, proposalId: string | undefin
   return useQuery<ProposalResponse, ApiError>({
     queryKey: refinementKeys.proposal(projectId, proposalId ?? ''),
     queryFn: () => APIRequest.get(`/projects/${projectId}/proposals/${proposalId}`).execute(),
+    enabled: enabled && Boolean(projectId) && Boolean(proposalId),
+  });
+}
+
+export function useProposalCurrentQuery(projectId: string, proposalId: string | undefined, enabled = true): UseQueryResult<ProposalCurrentResponse, ApiError> {
+  return useQuery<ProposalCurrentResponse, ApiError>({
+    queryKey: refinementKeys.proposalCurrent(projectId, proposalId ?? ''),
+    staleTime: 0,
+    queryFn: () => APIRequest.get(`/projects/${projectId}/proposals/${proposalId}/current`).execute(),
     enabled: enabled && Boolean(projectId) && Boolean(proposalId),
   });
 }
@@ -161,7 +171,10 @@ export function useUpdateProposalMutation(projectId: string): UseMutationResult<
   const queryClient = useQueryClient();
   return useMutation<ProposalResponse, ApiError, UpdateProposalVariables>({
     mutationFn: ({ proposalId, changeSet }) => APIRequest.patch(`/projects/${projectId}/proposals/${proposalId}`).body({ changeSet }).execute(),
-    onSuccess: proposal => queryClient.setQueryData(refinementKeys.proposal(projectId, proposal.id), proposal),
+    onSuccess: proposal => {
+      queryClient.setQueryData(refinementKeys.proposal(projectId, proposal.id), proposal);
+      queryClient.invalidateQueries({ queryKey: refinementKeys.proposalCurrent(projectId, proposal.id) });
+    },
   });
 }
 

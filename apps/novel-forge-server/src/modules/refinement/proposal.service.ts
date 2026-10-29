@@ -9,7 +9,7 @@ import { APP_NAME } from '@server/constants';
 import { type DbExecutor, type PrimaryDatabase, type Refinement, schema } from '@server/database';
 
 import { ISOLATED_SOURCE_WARNING } from '../ai/isolation-read-policy';
-import { type ArtifactState, loadArtifactStates, MISSING_ARTIFACT } from './artifact-state';
+import { type ArtifactState, loadArtifactStates, loadCurrentRecords, MISSING_ARTIFACT } from './artifact-state';
 import {
   actionDecisionKeys,
   type ChangeOp,
@@ -20,6 +20,7 @@ import {
   validateChangeSet,
   validatePluginChangeSet,
 } from './change-set';
+import { currentRefs, proposalCurrent, type ProposalOpCurrent } from './proposal-current';
 import { planCardDiagnostics, proposalDiagnostics } from './plan-diagnostics';
 import { stampIdeaIds } from './idea-id';
 import { type OpUndoRecord } from './op-undo';
@@ -333,6 +334,12 @@ export class ProposalService {
     if (proposal.status !== 'applied' || !inverseOps?.length) throw AppErrorCode.RFN_007.create();
     const refs = Object.keys((proposal.postState ?? {}) as Record<string, unknown>);
     return undoImpact(undoneChange(refs, inverseOps), await loadImpactRows(this.db, projectId, proposalId, refs));
+  }
+
+  async currentValues(projectId: bigint, proposalId: bigint): Promise<ProposalOpCurrent[]> {
+    const proposal = await this.get(projectId, proposalId);
+    const changeSet = proposal.changeSet as ChangeOp[];
+    return proposalCurrent(changeSet, await loadCurrentRecords(this.db, projectId, currentRefs(changeSet)));
   }
 
   private async opUndoImpact(proposal: Refinement.Proposal, opIndex: number): Promise<UndoImpact> {

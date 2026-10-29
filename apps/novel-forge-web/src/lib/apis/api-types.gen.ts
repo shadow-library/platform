@@ -1332,6 +1332,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/projects/{projectId}/proposals/{proposalId}/current': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Current Values */
+    get: operations['get_api_v1_projects_projectId_proposals_proposalId_current'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/projects/{projectId}/proposals/{proposalId}/undo-impact': {
     parameters: {
       query?: never;
@@ -4494,6 +4511,22 @@ export interface components {
       jobId: string;
       /** @description The workflow run it opened, when the job opens one as it is queued. */
       runId?: string;
+    };
+    /** @description What each updating change of a proposal would replace, read live because the proposal only stores content hashes. */
+    ProposalCurrentResponse: {
+      /** @description One item per change that updates a premise, document, entity, secret, volume, milestone or promise; other changes have none. */
+      ops: components['schemas']['ProposalOpCurrentItem'][];
+    };
+    /** @description One suggested change that updates something that already exists, with what it holds today. */
+    ProposalOpCurrentItem: {
+      /** @description The change's index in the proposal's change-set. */
+      index: number;
+      /** @description Whether the thing this change updates exists yet; false when applying it would create it. */
+      exists: boolean;
+      /** @description The current stored value of each field the change itself carries, keyed by the change-set field name. A document also carries its frontmatter and body. Empty when it does not exist. */
+      values: {
+        [key: string]: unknown;
+      };
     };
     /** @description What undoing an applied change would affect, listed before the author confirms the revert. */
     UndoImpactResponse: {
@@ -10360,6 +10393,47 @@ export interface operations {
       };
     };
   };
+  get_api_v1_projects_projectId_proposals_proposalId_current: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        proposalId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProposalCurrentResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   get_api_v1_projects_projectId_proposals_proposalId_undo_impact: {
     parameters: {
       query?: {
@@ -15882,6 +15956,8 @@ export type ApplyProposalBody = components['schemas']['ApplyProposalBody'];
 export type ApplyProposalResponse = components['schemas']['ApplyProposalResponse'];
 export type AppliedArtifactItem = components['schemas']['AppliedArtifactItem'];
 export type AppliedActionJobItem = components['schemas']['AppliedActionJobItem'];
+export type ProposalCurrentResponse = components['schemas']['ProposalCurrentResponse'];
+export type ProposalOpCurrentItem = components['schemas']['ProposalOpCurrentItem'];
 export type UndoImpactResponse = components['schemas']['UndoImpactResponse'];
 export type UndoDependentItem = components['schemas']['UndoDependentItem'];
 export type UndoDependentKind = components['schemas']['UndoDependentKind'];
@@ -16198,6 +16274,7 @@ export type GetJobPathParams = Exclude<paths['/api/v1/jobs/{jobId}']['get']['par
 export type ListProposalsQueryParams = Exclude<paths['/api/v1/projects/{projectId}/proposals']['get']['parameters']['query'], undefined>;
 export type ListProposalsPathParams = Exclude<paths['/api/v1/projects/{projectId}/proposals']['get']['parameters']['path'], undefined>;
 export type GetProposalPathParams = Exclude<paths['/api/v1/projects/{projectId}/proposals/{proposalId}']['get']['parameters']['path'], undefined>;
+export type CurrentValuesPathParams = Exclude<paths['/api/v1/projects/{projectId}/proposals/{proposalId}/current']['get']['parameters']['path'], undefined>;
 export type UndoImpactQueryParams = Exclude<paths['/api/v1/projects/{projectId}/proposals/{proposalId}/undo-impact']['get']['parameters']['query'], undefined>;
 export type UndoImpactPathParams = Exclude<paths['/api/v1/projects/{projectId}/proposals/{proposalId}/undo-impact']['get']['parameters']['path'], undefined>;
 export type WriterPreviewPathParams = Exclude<paths['/api/v1/projects/{projectId}/proposals/{proposalId}/writer-preview']['get']['parameters']['path'], undefined>;

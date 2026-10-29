@@ -435,6 +435,30 @@ export class UndoImpactResponse {
   finalUnaffected: number;
 }
 
+@Schema({ description: 'One suggested change that updates something that already exists, with what it holds today.' })
+export class ProposalOpCurrentItem {
+  @Field(() => Integer, { description: "The change's index in the proposal's change-set." })
+  index: number;
+
+  @Field({ description: 'Whether the thing this change updates exists yet; false when applying it would create it.' })
+  exists: boolean;
+
+  @Field(() => Object, {
+    additionalProperties: true,
+    description:
+      'The current stored value of each field the change itself carries, keyed by the change-set field name. A document also carries its frontmatter and body. Empty when it does not exist.',
+  })
+  values: Record<string, unknown>;
+}
+
+@Schema({ description: 'What each updating change of a proposal would replace, read live because the proposal only stores content hashes.' })
+export class ProposalCurrentResponse {
+  @Field(() => [ProposalOpCurrentItem], {
+    description: 'One item per change that updates a premise, document, entity, secret, volume, milestone or promise; other changes have none.',
+  })
+  ops: ProposalOpCurrentItem[];
+}
+
 @Schema()
 class ChangeItemResponse {
   @Field(() => String)

@@ -9,5 +9,6 @@ export const refinementKeys = {
   proposals: (projectId: string) => ['projects', projectId, 'refinement-proposals'] as const,
   proposalList: (projectId: string, params?: ListProposalsQueryParams) => [...refinementKeys.proposals(projectId), 'list', params] as const,
   proposal: (projectId: string, proposalId: string) => [...refinementKeys.proposals(projectId), proposalId] as const,
+  proposalCurrent: (projectId: string, proposalId: string) => [...refinementKeys.proposal(projectId, proposalId), 'current'] as const,
   changes: (projectId: string) => ['projects', projectId, 'changes'] as const,
 };

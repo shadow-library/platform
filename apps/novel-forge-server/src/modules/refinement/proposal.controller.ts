@@ -17,6 +17,7 @@ import {
   ApplyProposalResponse,
   ListProposalResponse,
   ListProposalsQuery,
+  ProposalCurrentResponse,
   ProposalIdParams,
   ProposalOpDependencyErrorResponse,
   ProposalOpParams,
@@ -75,6 +76,12 @@ export class ProposalController {
     return this.proposalApplyService
       .apply(params.projectId, params.proposalId, { opIndexes: body.opIndexes })
       .then(r => ({ ...r, proposal: serialiseProposal(r.proposal), jobs: startedJobs(r.opResults) }));
+  }
+
+  @Get('/:proposalId/current')
+  @RespondFor(200, ProposalCurrentResponse)
+  async currentValues(@Params() params: ProposalIdParams): Promise<ProposalCurrentResponse> {
+    return { ops: await this.proposalService.currentValues(params.projectId, params.proposalId) };
   }
 
   @Get('/:proposalId/undo-impact')
