@@ -51,6 +51,9 @@
 .panel[data-size='lg'] {
   max-width: 720px;
 }
+.panel[data-size='xl'] {
+  max-width: 1180px;
+}
 .panel[data-state='open'] {
   animation: sh-dialog-in var(--sh-duration-slow) var(--sh-ease-standard);
 }

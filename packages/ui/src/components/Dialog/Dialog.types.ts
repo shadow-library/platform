@@ -1,12 +1,12 @@
 import type * as DialogPrimitive from '@radix-ui/react-dialog';
 import { type ComponentPropsWithoutRef, type ReactNode } from 'react';
 
-export type DialogSize = 'sm' | 'md' | 'lg';
+export type DialogSize = 'sm' | 'md' | 'lg' | 'xl';
 
 export type DialogProps = ComponentPropsWithoutRef<typeof DialogPrimitive.Root>;
 
 export interface DialogContentProps extends ComponentPropsWithoutRef<typeof DialogPrimitive.Content> {
-  /** Panel max-width: sm 400 · md 560 · lg 720. @default 'md' */
+  /** Panel max-width: sm 400 · md 560 · lg 720 · xl 1180. @default 'md' */
   size?: DialogSize;
 }
 

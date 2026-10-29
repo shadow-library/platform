@@ -21,6 +21,17 @@ describe('Dialog', () => {
     expect(screen.getByText('Environments isolate config.')).toBeInTheDocument();
   });
 
+  it('should set data-size from the size prop', () => {
+    render(
+      <Dialog defaultOpen>
+        <Dialog.Content size="xl">
+          <Dialog.Header title="Review" />
+        </Dialog.Content>
+      </Dialog>,
+    );
+    expect(screen.getByRole('dialog', { name: 'Review' })).toHaveAttribute('data-size', 'xl');
+  });
+
   it('closes through the close button', async () => {
     const user = userEvent.setup();
     const onOpenChange = vi.fn();

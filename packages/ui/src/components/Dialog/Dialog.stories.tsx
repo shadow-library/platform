@@ -34,6 +34,21 @@ export const Task: Story = {
   ),
 };
 
+export const ExtraLarge: Story = {
+  render: () => (
+    <Dialog>
+      <Dialog.Trigger asChild>
+        <Button>Review changes</Button>
+      </Dialog.Trigger>
+      <Dialog.Content size="xl">
+        <Dialog.Header title="Review changes" description="Wide panel for side-by-side content." />
+        <Dialog.Body>Content</Dialog.Body>
+        <Dialog.Footer cancel="Cancel" action="Apply" onAction={() => {}} />
+      </Dialog.Content>
+    </Dialog>
+  ),
+};
+
 export const DestructiveConfirm: Story = {
   render: () => (
     <ConfirmDialog
