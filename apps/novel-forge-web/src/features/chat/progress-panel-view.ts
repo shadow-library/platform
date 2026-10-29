@@ -238,7 +238,7 @@ function writtenValue(op: ChangeOp): Pick<AppliedPanelChange, 'value' | 'valueLo
   return { value, valueLong: value.length > LONG_VALUE || value.includes('\n') };
 }
 
-function citation(kind: string, op: ChangeOp, entry: OrganiseCardEntry | undefined): string | undefined {
+export function citation(kind: string, op: ChangeOp, entry: OrganiseCardEntry | undefined): string | undefined {
   const quote = text(op.quote);
   if (kind !== 'organise') return quote && `from your message: “${quote}”`;
   const cited = entry?.paragraphs.length ? `, ${entry.paragraphs.map(number => `¶${number}`).join(', ')}` : '';
@@ -250,12 +250,12 @@ function entriesByOp(entries: readonly OrganiseCardEntry[]): Map<number, Organis
   return new Map(entries.map(entry => [entry.opIndex, entry]));
 }
 
-const ENTRY_TAG: Partial<Record<OrganiseEntryLabel, string>> = { suggested: 'not in your notes', planner_only: 'planner-only', rule: 'rule' };
+export const ENTRY_TAG: Partial<Record<OrganiseEntryLabel, string>> = { suggested: 'not in your notes', planner_only: 'planner-only', rule: 'rule' };
 
 const RETIRED_NOTE = 'Takes out an earlier organise entry';
 const RETIRES_NOTE = 'Already in your Notebook — declining it takes it out.';
 
-function entryNote(entry: OrganiseCardEntry | undefined): string | undefined {
+export function entryNote(entry: OrganiseCardEntry | undefined): string | undefined {
   if (entry?.label === 'retired') return RETIRED_NOTE;
   return entry?.retires?.length ? RETIRES_NOTE : undefined;
 }

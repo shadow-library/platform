@@ -32,8 +32,8 @@ const PROSE_FIELDS = [
   'endingQuestion',
   'ending',
 ] as const;
-const PREMISE_FIELDS = ['premise', 'brief', 'themes', 'instructions'] as const;
-const STORY_FIELD_LABELS = {
+export const PREMISE_FIELDS = ['premise', 'brief', 'themes', 'instructions'] as const;
+export const STORY_FIELD_LABELS = {
   theme: 'Theme',
   readerPromise: 'Reader promise',
   protagonistKey: 'Protagonist',
@@ -227,6 +227,27 @@ export function proposalPresentation(proposal: { kind: string; status: string; c
 }
 
 const OWN_CARD_OPS = new Set(['draft.update', 'draft.remove', 'draft.rewrite_passage', 'brief.update']);
+
+export function organisePage(proposal: { kind: string; changeSet: readonly ChangeOp[] }, index: number): string | undefined {
+  const op = proposal.changeSet[index];
+  if (proposal.kind !== 'organise' || op?.op !== 'bible_document.upsert') return undefined;
+  return `${String(op.section)}/${String(op.slug)}`;
+}
+
+/** An organise card offers a mixed page twice, its notes-backed half before the whole page, whatever the entries are labelled; maps the earlier index to the later one. */
+export function mixedPagePairs(proposal: { kind: string; changeSet: readonly ChangeOp[] }): Map<number, number> {
+  const byPage = new Map<string, number[]>();
+  proposal.changeSet.forEach((_, index) => {
+    const page = organisePage(proposal, index);
+    if (page !== undefined) byPage.set(page, [...(byPage.get(page) ?? []), index]);
+  });
+  const pairs = new Map<number, number>();
+  for (const indexes of byPage.values()) {
+    const [notes, whole] = indexes;
+    if (indexes.length === 2 && notes !== undefined && whole !== undefined) pairs.set(notes, whole);
+  }
+  return pairs;
+}
 
 /** An action starts work or walks through a one-way door, and prose or a plan edit is read in full, so each keeps its own card in the thread. */
 export function answeredInPanel(proposal: { kind: string; changeSet: readonly ChangeOp[] }): boolean {

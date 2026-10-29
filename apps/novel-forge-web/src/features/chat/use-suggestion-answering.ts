@@ -13,7 +13,7 @@ import {
 } from '@/lib/apis';
 import { auditApplyIndexes, auditSkippedOps, findAuditReportByProposal } from '@/lib/bible-audit';
 
-import { answeredInPanel, type RejectionScope, rejectionWhy, type SuggestionCommit, suggestionCommit, type SuggestionDecision, withAuditSkips } from './chat-view';
+import { answeredInPanel, organisePage, type RejectionScope, rejectionWhy, type SuggestionCommit, suggestionCommit, type SuggestionDecision, withAuditSkips } from './chat-view';
 import { answersSettled, currentAnswers, type SuggestionAnswers, updateAnswers, useSuggestionAnswers, writeAnswers } from './suggestion-store';
 
 export interface SuggestionAnswering {
@@ -40,12 +40,6 @@ export interface CommitCheck {
 export function plannedCommit({ status, committing, total, decisions, force }: CommitCheck): SuggestionCommit {
   if (status !== 'pending' || committing) return { kind: 'wait' };
   return suggestionCommit(total, decisions, force);
-}
-
-function organisePage(proposal: Pick<ProposalResponse, 'kind' | 'changeSet'>, index: number): string | undefined {
-  const op = proposal.changeSet[index];
-  if (proposal.kind !== 'organise' || op?.op !== 'bible_document.upsert') return undefined;
-  return `${String(op.section)}/${String(op.slug)}`;
 }
 
 /**
