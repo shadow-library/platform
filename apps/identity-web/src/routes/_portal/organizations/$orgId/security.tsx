@@ -4,7 +4,7 @@ import { Badge, Button, Input, Select, Spinner, Switch, toast } from '@shadow-li
 
 import { PageHeader, SectionCard } from '@/components/si';
 import { useStepUpGate } from '@/features/portal';
-import { organisationPoliciesQueryOptions, type PolicyItem, useClearPolicyMutation, usePoliciesQuery, useSetPolicyMutation } from '@/lib/apis';
+import { isPolicyConfigured, organisationPoliciesQueryOptions, type PolicyItem, useClearPolicyMutation, usePoliciesQuery, useSetPolicyMutation } from '@/lib/apis';
 
 import styles from './security.module.css';
 
@@ -79,7 +79,7 @@ function PolicyRow({ orgId, policy, require }: { orgId: string; policy: PolicyIt
   const clear = useClearPolicyMutation();
 
   const isBoolean = policy.type === 'boolean';
-  const configured = isBoolean ? policy.configuredEnabled !== undefined : policy.configuredValue !== undefined;
+  const configured = isPolicyConfigured(policy);
   const fold = isBoolean ? 'Any organization turning this off turns it off for its members everywhere.' : 'The shortest limit set by any of a member’s organizations applies.';
 
   const applyValue = (body: { value?: number; enabled?: boolean }): void =>

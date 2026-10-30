@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Avatar, Badge, Button, ConfirmDialog, Dialog, DropdownMenu, FormField, IconButton, PlusIcon, Select, Table, toast, TokenInput, type TokenValue } from '@shadow-library/ui';
 
 import { MailIcon, MoreIcon } from '@/components/icons';
@@ -28,8 +28,13 @@ import { formatDate, relativeTime } from '@/lib/format';
 
 import styles from './members.module.css';
 
+interface MembersSearch {
+  invite?: true;
+}
+
 /** Invitations are an org-admin surface (403 for members, rejected outright for personal workspaces), so only managers prefetch them. */
 export const Route = createFileRoute('/_portal/organizations/$orgId/members')({
+  validateSearch: (search: Record<string, unknown>): MembersSearch => ({ invite: search.invite === true || search.invite === 'true' ? true : undefined }),
   loader: async ({ context, params }) => {
     const mine = await context.queryClient.ensureQueryData(myOrganisationsQueryOptions());
     const { canManage } = orgAccessOf(mine, params.orgId);
@@ -102,6 +107,8 @@ function InviteDialog({ orgId, open, onOpenChange }: { orgId: string; open: bool
 
 function MembersPage(): React.JSX.Element {
   const { orgId } = Route.useParams();
+  const { invite: inviteRequested } = Route.useSearch();
+  const navigate = Route.useNavigate();
   const me = useMeQuery();
   const { canManage } = useOrgAccess(orgId);
   const members = useMembersQuery(orgId);
@@ -114,11 +121,16 @@ function MembersPage(): React.JSX.Element {
 
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
-  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(() => inviteRequested === true && canManage);
   const [removeTarget, setRemoveTarget] = useState<MemberItem | null>(null);
   const [revokeTarget, setRevokeTarget] = useState<InvitationItem | null>(null);
   const [removeOpen, setRemoveOpen] = useState(false);
   const [revokeOpen, setRevokeOpen] = useState(false);
+
+  useEffect(() => {
+    if (!inviteRequested) return;
+    void navigate({ search: prev => ({ ...prev, invite: undefined }), replace: true });
+  }, [inviteRequested, navigate]);
 
   const rows = (members.data?.members ?? []).filter(member => {
     if (roleFilter !== 'all' && member.role !== roleFilter) return false;

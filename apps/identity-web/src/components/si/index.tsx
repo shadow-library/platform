@@ -45,17 +45,21 @@ interface PageHeaderProps {
   subtitle?: ReactNode;
   actions?: ReactNode;
   tags?: ReactNode;
+  leading?: ReactNode;
 }
 
-export function PageHeader({ title, subtitle, actions, tags }: PageHeaderProps): ReactElement {
+export function PageHeader({ title, subtitle, actions, tags, leading }: PageHeaderProps): ReactElement {
   return (
     <div className={styles.pageHeader}>
-      <div className={styles.pageHeaderMain}>
-        <div className={styles.pageHeaderTitleRow}>
-          <h1 className={styles.pageTitle}>{title}</h1>
-          {tags}
+      <div className={styles.pageHeaderIdentity}>
+        {leading}
+        <div className={styles.pageHeaderMain}>
+          <div className={styles.pageHeaderTitleRow}>
+            <h1 className={styles.pageTitle}>{title}</h1>
+            {tags}
+          </div>
+          {subtitle && <p className={styles.pageSubtitle}>{subtitle}</p>}
         </div>
-        {subtitle && <p className={styles.pageSubtitle}>{subtitle}</p>}
       </div>
       {actions && <div className={styles.pageHeaderActions}>{actions}</div>}
     </div>

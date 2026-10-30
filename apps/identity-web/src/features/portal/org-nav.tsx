@@ -3,6 +3,8 @@ import { type NavConfig } from '@shadow-library/ui/router';
 import { ArrowLeftIcon, BotIcon, BuildingIcon, GlobeIcon, GridIcon, KeyRoundIcon, LayersIcon, ShieldCheckIcon, SlidersIcon, UsersIcon } from '@/components/icons';
 import { type MemberRole, type MyOrganisation } from '@/lib/apis';
 
+import { orgGates } from './org-gates';
+
 export const ORG_OVERVIEW_PATH = '/organizations/$orgId';
 
 export interface OrgNavOptions {
@@ -28,7 +30,7 @@ function switcherOption(org: MyOrganisation): { id: string; label: string; capti
 
 export function orgNavConfig({ orgId, org, canManage, organisations, loading, onSelect, onShowAll }: OrgNavOptions): NavConfig {
   const params = { orgId };
-  const isTeam = org?.type === 'TEAM';
+  const gates = orgGates(org, canManage);
   return {
     variant: 'project',
     project: {
@@ -46,17 +48,17 @@ export function orgNavConfig({ orgId, org, canManage, organisations, loading, on
         items: [
           { to: ORG_OVERVIEW_PATH, params, label: 'Overview', icon: <GridIcon size={18} />, exact: true },
           { to: '/organizations/$orgId/members', params, label: 'Members', icon: <UsersIcon size={18} /> },
-          { to: '/organizations/$orgId/applications', params, label: 'Applications', icon: <LayersIcon size={18} />, hidden: !canManage },
-          { to: '/organizations/$orgId/bots', params, label: 'Bots', icon: <BotIcon size={18} />, hidden: !isTeam || !canManage },
+          { to: '/organizations/$orgId/applications', params, label: 'Applications', icon: <LayersIcon size={18} />, hidden: !gates.applications },
+          { to: '/organizations/$orgId/bots', params, label: 'Bots', icon: <BotIcon size={18} />, hidden: !gates.bots },
           { to: '/organizations/$orgId/settings', params, label: 'Settings', icon: <SlidersIcon size={18} /> },
         ],
       },
       {
         label: 'Access & security',
         items: [
-          { to: '/organizations/$orgId/domains', params, label: 'Domains', icon: <GlobeIcon size={18} />, hidden: !isTeam },
-          { to: '/organizations/$orgId/providers', params, label: 'Single sign-on', icon: <KeyRoundIcon size={18} />, hidden: !canManage },
-          { to: '/organizations/$orgId/security', params, label: 'Security policies', icon: <ShieldCheckIcon size={18} />, hidden: !canManage },
+          { to: '/organizations/$orgId/domains', params, label: 'Domains', icon: <GlobeIcon size={18} />, hidden: !gates.domains },
+          { to: '/organizations/$orgId/providers', params, label: 'Single sign-on', icon: <KeyRoundIcon size={18} />, hidden: !gates.providers },
+          { to: '/organizations/$orgId/security', params, label: 'Security policies', icon: <ShieldCheckIcon size={18} />, hidden: !gates.security },
         ],
       },
       { items: [{ to: '/account', label: 'Back to my account', icon: <ArrowLeftIcon size={18} /> }] },

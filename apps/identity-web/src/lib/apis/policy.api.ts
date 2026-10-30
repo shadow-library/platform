@@ -5,6 +5,10 @@ import { type ApiError, APIRequest } from './transport';
 
 export type { PolicyItem, PolicyListResponse, SetPolicyBody };
 
+export function isPolicyConfigured(policy: PolicyItem): boolean {
+  return policy.type === 'boolean' ? policy.configuredEnabled !== undefined : policy.configuredValue !== undefined;
+}
+
 const policyKeys = {
   all: ['organisations'] as const,
   list: (orgId: string) => [...policyKeys.all, orgId, 'policies'] as const,

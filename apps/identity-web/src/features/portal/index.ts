@@ -1,4 +1,5 @@
 export * from './crumb-leaf';
+export * from './org-gates';
 export * from './org-nav';
 export * from './portal-crumbs';
 export * from './portal-shell';

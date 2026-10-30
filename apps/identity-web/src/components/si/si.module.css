@@ -7,6 +7,13 @@
   margin-bottom: 22px;
 }
 
+.pageHeaderIdentity {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
 .pageHeaderMain {
   min-width: 0;
 }

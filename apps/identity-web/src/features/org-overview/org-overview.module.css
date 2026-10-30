@@ -1,0 +1,147 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 14px;
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 18px;
+  background: var(--sh-surface-card);
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: var(--sh-radius-xl);
+  color: inherit;
+  text-decoration: none;
+  transition: background-color var(--sh-duration-fast) var(--sh-ease-standard);
+}
+
+.tile:hover {
+  background: var(--sh-bg-hover);
+}
+
+.tile:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: var(--sh-focus-ring-offset);
+}
+
+.tileLabel {
+  font-size: var(--sh-text-caption);
+  line-height: var(--sh-text-caption--line-height);
+  font-weight: 500;
+  color: var(--sh-text-secondary);
+}
+
+.tileValue {
+  font-size: var(--sh-text-h1);
+  line-height: var(--sh-text-h1--line-height);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--sh-text-primary);
+}
+
+.tileDetail {
+  min-height: var(--sh-text-body-sm--line-height);
+  font-size: var(--sh-text-body-sm);
+  line-height: var(--sh-text-body-sm--line-height);
+  color: var(--sh-text-secondary);
+}
+
+.valueSkeleton {
+  display: block;
+  width: 3rem;
+  height: var(--sh-text-h1--line-height);
+}
+
+.detailSkeleton {
+  display: block;
+  width: 8rem;
+  height: var(--sh-text-body-sm--line-height);
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.checklist {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--sh-border-subtle);
+}
+
+.step:first-child {
+  padding-top: 0;
+  border-top: none;
+}
+
+.step:last-child {
+  padding-bottom: 0;
+}
+
+.indicator {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: var(--sh-radius-full);
+  border: 2px solid var(--sh-border-default);
+  color: var(--sh-text-tertiary);
+}
+
+.indicator[data-status='done'] {
+  border-color: var(--sh-success-solid);
+  background: var(--sh-success-solid);
+  color: var(--sh-neutral-white);
+}
+
+.indicator[data-status='loading'] {
+  border: none;
+}
+
+.stepMain {
+  flex: 1;
+  min-width: 0;
+}
+
+.stepTitle {
+  font-size: var(--sh-text-body);
+  line-height: var(--sh-text-body--line-height);
+  font-weight: 600;
+}
+
+.stepDetail {
+  font-size: var(--sh-text-body-sm);
+  line-height: var(--sh-text-body-sm--line-height);
+  color: var(--sh-text-secondary);
+}
+
+.stepAction {
+  flex: none;
+}
