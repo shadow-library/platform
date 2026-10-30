@@ -1,3 +1,4 @@
+import { type CurrencyCode } from './finance.types';
 import { type HeroIntensityMode } from './hero.types';
 
 export interface DayPreferences {
@@ -175,7 +176,7 @@ export interface OnboardingStatus {
 }
 
 interface OnboardingSubmission {
-  currency: string;
+  currency: CurrencyCode;
   timezone: string;
   wakeTime: string;
   sleepTime: string;

@@ -11,6 +11,7 @@ import {
   type AccountCommandHook,
   CURRENCIES,
   type CurrencyCode,
+  currencyLabel,
   type DayPreferences,
   DELETION_TERMS,
   type ExportJob,
@@ -441,7 +442,7 @@ function DayAndMoneyFields({ day, command }: DayAndMoneyFieldsProps): ReactEleme
         label="Home currency"
         helper="Fixed when you set up, so the totals in your history stay comparable. Spend in another currency keeps its own and converts to this one."
       >
-        <Input size="md" aria-label="Home currency" readOnly value={currency ? `${day.currency} · ${CURRENCIES[currency].label}` : day.currency} />
+        <Input size="md" aria-label="Home currency" readOnly value={currency ? currencyLabel(currency) : day.currency} />
       </FormField>
       <FormField
         label="Monthly budget"

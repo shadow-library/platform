@@ -661,8 +661,8 @@ export interface components {
       photoUrl?: string | null;
       authProvider: components['schemas']['AuthProvider'];
       /** @description ISO 4217 currency code; immutable once onboarding completes */
-      defaultCurrency: string;
-      enabledCurrencies: string[];
+      defaultCurrency: components['schemas']['CurrencyCode'];
+      enabledCurrencies: components['schemas']['CurrencyCode'][];
       /** @description IANA timezone; the day-boundary authority for this account */
       timezone: string;
       /** @description Staged by PATCH, not yet live; takes effect at the next daily rollover */
@@ -719,6 +719,8 @@ export interface components {
     /** @enum {string} */
     AuthProvider: 'google' | 'apple';
     /** @enum {string} */
+    CurrencyCode: 'EUR' | 'USD' | 'GBP' | 'NOK' | 'SEK' | 'DKK' | 'CHF' | 'JPY' | 'INR' | 'AED' | 'AUD' | 'CAD' | 'NZD' | 'SGD' | 'HKD' | 'PLN' | 'CZK' | 'ZAR' | 'BRL';
+    /** @enum {string} */
     Theme: 'system' | 'light' | 'dark';
     /** @enum {string} */
     IntensityMode: 'standard' | 'low_intensity' | 'high_intensity';
@@ -758,9 +760,9 @@ export interface components {
       billingReminders?: boolean;
     };
     OnboardingDto: {
-      defaultCurrency: string;
+      defaultCurrency: components['schemas']['CurrencyCode'];
       /** @description Additional enabled currencies beyond defaultCurrency, which is always included */
-      enabledCurrencies?: string[];
+      enabledCurrencies?: components['schemas']['CurrencyCode'][];
       /** @description IANA timezone */
       timezone: string;
       scheduleStartMin: number;
@@ -2302,6 +2304,7 @@ export type DeviceUpsertDto = components['schemas']['DeviceUpsertDto'];
 export type DeviceResponseDto = components['schemas']['DeviceResponseDto'];
 export type AccountResponseDto = components['schemas']['AccountResponseDto'];
 export type AuthProvider = components['schemas']['AuthProvider'];
+export type CurrencyCode = components['schemas']['CurrencyCode'];
 export type Theme = components['schemas']['Theme'];
 export type IntensityMode = components['schemas']['IntensityMode'];
 export type NotificationPrefsDto = components['schemas']['NotificationPrefsDto'];

@@ -1,9 +1,6 @@
 import { Field, Integer, Schema } from '@shadow-library/class-schema';
 
-import { AuthProvider, DeletionState, IntensityMode, Theme, WarmthState } from '@server/classes';
-
-/** A pattern rather than `format: 'date-time'`-adjacent IANA validation — the class-schema layer has no timezone format; `AccountService` validates via `Intl.DateTimeFormat`. */
-const CURRENCY_PATTERN = '^[A-Za-z]{3}$';
+import { AuthProvider, CurrencyCode, DeletionState, IntensityMode, Theme, WarmthState } from '@server/classes';
 
 @Schema()
 export class NotificationPrefsDto {
@@ -46,10 +43,10 @@ export class AccountResponseDto {
   @Field(() => AuthProvider)
   authProvider: string;
 
-  @Field({ description: 'ISO 4217 currency code; immutable once onboarding completes' })
+  @Field(() => CurrencyCode, { description: 'ISO 4217 currency code; immutable once onboarding completes' })
   defaultCurrency: string;
 
-  @Field(() => [String])
+  @Field(() => [CurrencyCode])
   enabledCurrencies: string[];
 
   @Field({ description: 'IANA timezone; the day-boundary authority for this account' })
@@ -219,11 +216,11 @@ export class AccountPatchDto {
 
 @Schema()
 export class OnboardingDto {
-  @Field({ pattern: CURRENCY_PATTERN, errorMessage: 'defaultCurrency must be a 3-letter uppercase ISO 4217 code' })
-  defaultCurrency: string;
+  @Field(() => CurrencyCode)
+  defaultCurrency: CurrencyCode;
 
-  @Field(() => [String], { optional: true, description: 'Additional enabled currencies beyond defaultCurrency, which is always included' })
-  enabledCurrencies?: string[];
+  @Field(() => [CurrencyCode], { optional: true, description: 'Additional enabled currencies beyond defaultCurrency, which is always included' })
+  enabledCurrencies?: CurrencyCode[];
 
   @Field({ description: 'IANA timezone' })
   timezone: string;

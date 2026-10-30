@@ -1,7 +1,9 @@
+import { type CurrencyCode } from '@/lib/apis/api-types.gen';
+
 import { type CommandDelivery } from './command.types';
 import { type EntryCapAdvisory } from './entry-caps';
 
-export type CurrencyCode = 'EUR' | 'USD' | 'GBP' | 'NOK' | 'SEK' | 'DKK' | 'CHF' | 'JPY' | 'INR' | 'AUD' | 'CAD' | 'NZD' | 'SGD' | 'HKD' | 'PLN' | 'CZK' | 'ZAR' | 'BRL';
+export { type CurrencyCode };
 
 export interface CurrencyMeta {
   code: CurrencyCode;
@@ -21,6 +23,7 @@ export const CURRENCIES: Record<CurrencyCode, CurrencyMeta> = {
   CHF: { code: 'CHF', label: 'Swiss franc', symbol: 'CHF', exponent: 2 },
   JPY: { code: 'JPY', label: 'Japanese yen', symbol: '¥', exponent: 0 },
   INR: { code: 'INR', label: 'Indian rupee', symbol: '₹', exponent: 2 },
+  AED: { code: 'AED', label: 'UAE dirham', symbol: 'AED', exponent: 2 },
   AUD: { code: 'AUD', label: 'Australian dollar', symbol: '$', exponent: 2 },
   CAD: { code: 'CAD', label: 'Canadian dollar', symbol: '$', exponent: 2 },
   NZD: { code: 'NZD', label: 'New Zealand dollar', symbol: '$', exponent: 2 },
@@ -31,6 +34,8 @@ export const CURRENCIES: Record<CurrencyCode, CurrencyMeta> = {
   ZAR: { code: 'ZAR', label: 'South African rand', symbol: 'R', exponent: 2 },
   BRL: { code: 'BRL', label: 'Brazilian real', symbol: 'R$', exponent: 2 },
 };
+
+export const CURRENCY_CODES = Object.keys(CURRENCIES) as CurrencyCode[];
 
 export type ExpenseCategoryId = 'food' | 'groceries' | 'transport' | 'bills' | 'health' | 'shopping' | 'home' | 'subs' | 'uncat';
 

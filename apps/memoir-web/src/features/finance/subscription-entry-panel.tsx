@@ -4,6 +4,7 @@ import { Button, Card, DatePicker, FormField, Input, Select } from '@shadow-libr
 import {
   CURRENCIES,
   type CurrencyCode,
+  currencyShortLabel,
   type FinanceSettings,
   notifyOutcome,
   parseAmountToMinor,
@@ -137,7 +138,7 @@ export function SubscriptionEntryPanel({ today, settings, onClose }: Subscriptio
               <Select size="md" value={draft.currency} onValueChange={value => patch({ currency: value as CurrencyCode })} aria-label="Currency">
                 {settings.currencies.map(code => (
                   <Select.Item key={code} value={code}>
-                    {code} {CURRENCIES[code].symbol}
+                    {currencyShortLabel(code)}
                   </Select.Item>
                 ))}
               </Select>

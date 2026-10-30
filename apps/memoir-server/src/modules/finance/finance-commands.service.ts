@@ -5,7 +5,7 @@ import { AppError, ValidationError } from '@shadow-library/common';
 import { CommandBus, type CommandContext, type CommandResult, HeroLedger } from '@modules/commands';
 import { ProgressionService } from '@modules/progression';
 import { ReceiptService } from '@modules/receipts';
-import { AppErrorCode } from '@server/classes';
+import { AppErrorCode, CURRENCY_CODES } from '@server/classes';
 import { type DatabaseTransaction, type Expense, type ExpenseAudit, schema, type Subscription } from '@server/database';
 import { pseudoAccountId, TelemetryService } from '@server/telemetry';
 
@@ -159,7 +159,7 @@ export class FinanceCommandsService implements OnModuleInit {
   private async createExpense({ accountId, envelope, tx }: CommandContext): Promise<CommandResult> {
     const payload = envelope.payload;
     const id = requireString(payload, 'id');
-    const currency = requireString(payload, 'currency').toUpperCase();
+    const currency = requireEnum(payload, 'currency', CURRENCY_CODES);
     const occurredOn = requireString(payload, 'occurredOn');
     const categoryId = requireString(payload, 'categoryId');
     const amountText = requireString(payload, 'amountText');
@@ -258,7 +258,7 @@ export class FinanceCommandsService implements OnModuleInit {
     const name = requireString(payload, 'name');
     const amountMinor = requireAmountMinor(payload);
     const amountText = requireString(payload, 'amountText');
-    const currency = requireString(payload, 'currency').toUpperCase();
+    const currency = requireEnum(payload, 'currency', CURRENCY_CODES);
     const frequency: Subscription.Frequency = requireEnum(payload, 'frequency', SUBSCRIPTION_FREQUENCIES);
     const billingDay = Number(payload['billingDay']);
     const nextDueDate = requireString(payload, 'nextDueDate');

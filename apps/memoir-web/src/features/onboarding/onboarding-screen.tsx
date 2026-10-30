@@ -3,6 +3,10 @@ import { type FormEvent, type ReactElement, useEffect, useMemo, useRef, useState
 import { Alert, Badge, Button, Card, DescriptionList, FormField, Input, RadioGroup, SegmentedControl, Select, Slider, Tag, TimePicker } from '@shadow-library/ui';
 
 import {
+  CURRENCY_CODES,
+  type CurrencyCode,
+  currencyLabel,
+  isCurrencyCode,
   notifyOutcome,
   type QuestDraft,
   STAT_LABELS,
@@ -43,13 +47,6 @@ const HEADINGS: { title: string; subtitle: string }[] = [
 ];
 
 const LAST_STEP = HEADINGS.length - 1;
-
-const CURRENCIES = [
-  { value: 'EUR', label: 'EUR €' },
-  { value: 'NOK', label: 'NOK kr' },
-  { value: 'USD', label: 'USD $' },
-  { value: 'GBP', label: 'GBP £' },
-];
 
 const EXAMPLES = ['Read 10 pages', 'Walk 20 minutes', 'No takeaway today', 'Write one line', 'Bed by 22:30'];
 
@@ -118,7 +115,7 @@ export function OnboardingScreen(): ReactElement {
   const command = useAccountCommand();
   const questCommand = useCommand();
   const [step, setStep] = useState(0);
-  const [currency, setCurrency] = useState('EUR');
+  const [currency, setCurrency] = useState<CurrencyCode>('EUR');
   const [wakeTime, setWakeTime] = useState('06:30');
   const [sleepTime, setSleepTime] = useState('22:30');
   const [browserZone] = useState(browserTimeZone);
@@ -339,10 +336,11 @@ export function OnboardingScreen(): ReactElement {
                   }
                   disabled={currencyLocked}
                 >
-                  <Select value={shownCurrency} aria-label="Home currency" disabled={currencyLocked} onValueChange={setCurrency}>
-                    {CURRENCIES.map(option => (
-                      <Select.Item key={option.value} value={option.value}>
-                        {option.label}
+                  <Select value={shownCurrency} aria-label="Home currency" disabled={currencyLocked} onValueChange={value => setCurrency(value as CurrencyCode)}>
+                    {isCurrencyCode(shownCurrency) ? null : <Select.Item value={shownCurrency}>{shownCurrency}</Select.Item>}
+                    {CURRENCY_CODES.map(code => (
+                      <Select.Item key={code} value={code}>
+                        {currencyLabel(code)}
                       </Select.Item>
                     ))}
                   </Select>

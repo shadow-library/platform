@@ -158,8 +158,8 @@ export class AccountService implements OnModuleInit {
     assertValidTimezone('body.timezone', body.timezone);
     assertScheduleWindow('body.scheduleEndMin', body.scheduleStartMin, body.scheduleEndMin);
 
-    const defaultCurrency = body.defaultCurrency.toUpperCase();
-    const enabledCurrencies = Array.from(new Set([defaultCurrency, ...(body.enabledCurrencies ?? []).map(currency => currency.toUpperCase())]));
+    const defaultCurrency = body.defaultCurrency;
+    const enabledCurrencies = Array.from(new Set([defaultCurrency, ...(body.enabledCurrencies ?? [])]));
 
     const updated = await this.accountRepository.completeOnboarding(account.id, {
       defaultCurrency,

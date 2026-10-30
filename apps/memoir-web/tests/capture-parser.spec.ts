@@ -153,6 +153,12 @@ describe('parseCapture', () => {
     expect(draftOf(parseCapture('$5 lunch', canadian)).action.command).toMatchObject({ draft: { currency: 'CAD' } });
   });
 
+  it('should read a rupee sign as INR and a bare amount as an AED home currency', () => {
+    const dirhamHome = { ...context, money: { homeCurrency: 'AED' as const, currencies: ['AED' as const, 'INR' as const], categories: BUILT_IN_CATEGORIES } };
+    expect(draftOf(parseCapture('₹250 chai', dirhamHome)).action.command).toMatchObject({ draft: { amountText: '250', currency: 'INR', note: 'chai' } });
+    expect(draftOf(parseCapture('lunch 42.50', dirhamHome)).action.command).toMatchObject({ draft: { amountText: '42.50', currency: 'AED' } });
+  });
+
   it('should refuse a currency symbol the account does not use rather than guess one', () => {
     expect(parseCapture('$5 lunch', context)).toEqual({ status: 'unrecognised', problem: { kind: 'currency-not-enabled', symbol: '$', homeCurrency: 'EUR' } });
   });

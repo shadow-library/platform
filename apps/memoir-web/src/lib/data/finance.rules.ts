@@ -40,6 +40,15 @@ export function isCurrencyCode(value: string): value is CurrencyCode {
   return value in CURRENCIES;
 }
 
+export function currencyShortLabel(currency: CurrencyCode): string {
+  const { symbol } = CURRENCIES[currency];
+  return symbol === currency ? currency : `${currency} ${symbol}`;
+}
+
+export function currencyLabel(currency: CurrencyCode): string {
+  return `${currencyShortLabel(currency)} · ${CURRENCIES[currency].label}`;
+}
+
 function currencyExponent(currency: CurrencyCode): number {
   return CURRENCIES[currency].exponent;
 }

@@ -8,6 +8,7 @@ import {
   convertToHomeMinor,
   CURRENCIES,
   type CurrencyCode,
+  currencyShortLabel,
   type EntryCapAdvisory,
   type ExpenseCategory,
   type ExpenseCategoryId,
@@ -262,7 +263,7 @@ export function ExpenseEntryPanel({ today, settings, rates, categories = BUILT_I
               <Select size="md" value={draft.currency} onValueChange={value => patch({ currency: value as CurrencyCode })} aria-label="Currency" disabled={existing !== undefined}>
                 {currencies.map(code => (
                   <Select.Item key={code} value={code}>
-                    {code} {CURRENCIES[code].symbol}
+                    {currencyShortLabel(code)}
                   </Select.Item>
                 ))}
               </Select>

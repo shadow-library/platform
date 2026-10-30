@@ -3,6 +3,10 @@ import { describe, expect, it } from 'bun:test';
 import {
   BUILT_IN_CATEGORIES,
   convertToHomeMinor,
+  CURRENCIES,
+  CURRENCY_CODES,
+  currencyLabel,
+  currencyShortLabel,
   deriveDueState,
   describeAuditEntry,
   type ExpenseAuditEntry,
@@ -68,6 +72,11 @@ describe('parseAmountToMinor', () => {
     expect(parseAmountToMinor('1200', 'JPY')).toBe(1200);
   });
 
+  it('should read rupee and dirham amounts in hundredths', () => {
+    expect(parseAmountToMinor('1,250.50', 'INR')).toBe(125050);
+    expect(parseAmountToMinor('AED 42.75', 'AED')).toBe(4275);
+  });
+
   it('should reject text with no digits and negative amounts', () => {
     expect(parseAmountToMinor('', 'EUR')).toBeNull();
     expect(parseAmountToMinor('abc', 'EUR')).toBeNull();
@@ -79,6 +88,33 @@ describe('formatMinor', () => {
   it('should render minor units in the currency of the entry', () => {
     expect(formatMinor(1840, 'EUR')).toBe('€18.40');
     expect(formatMinor(1200, 'JPY')).toBe('¥1,200');
+  });
+
+  it('should render rupees and dirhams with two decimals', () => {
+    expect(formatMinor(125050, 'INR')).toBe('₹1,250.50');
+    expect(formatMinor(4275, 'AED')).toBe('AED\u00a042.75');
+  });
+});
+
+describe('currency options', () => {
+  it('should offer every supported currency, including INR and AED, from the shared list', () => {
+    expect(CURRENCY_CODES).toContain('INR');
+    expect(CURRENCY_CODES).toContain('AED');
+  });
+
+  it('should keep each code paired with its own meta', () => {
+    for (const code of CURRENCY_CODES) expect(CURRENCIES[code].code).toBe(code);
+  });
+
+  it('should label a currency with its code, symbol and name', () => {
+    expect(currencyLabel('INR')).toBe('INR ₹ · Indian rupee');
+    expect(currencyLabel('EUR')).toBe('EUR € · Euro');
+  });
+
+  it('should not repeat a symbol that is the code itself', () => {
+    expect(currencyShortLabel('AED')).toBe('AED');
+    expect(currencyLabel('AED')).toBe('AED · UAE dirham');
+    expect(currencyShortLabel('CHF')).toBe('CHF');
   });
 });
 
