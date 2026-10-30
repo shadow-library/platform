@@ -108,7 +108,7 @@ function OrganizationsPage(): React.JSX.Element {
                       Leave
                     </Button>
                   )}
-                  <Button variant="secondary" size="sm" onClick={() => navigate({ to: '/organizations/$orgId/settings', params: { orgId: org.id } })}>
+                  <Button variant="secondary" size="sm" onClick={() => navigate({ to: '/organizations/$orgId', params: { orgId: org.id } })}>
                     Open
                   </Button>
                 </div>

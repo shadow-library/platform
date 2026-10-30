@@ -22,3 +22,19 @@
   background: var(--sh-success-bg-subtle);
   border-color: var(--sh-success-border);
 }
+
+.crumbs li {
+  min-width: 0;
+}
+
+.crumbs li:last-child {
+  flex-shrink: 0;
+}
+
+/* Below the sm breakpoint (--sh-breakpoint-sm 640) only the current page fits beside the bar's controls; the sidebar drawer still reaches every ancestor. */
+@media (max-width: 639px) {
+  .crumbs li:not(:last-child),
+  .crumbs li:last-child > svg {
+    display: none;
+  }
+}

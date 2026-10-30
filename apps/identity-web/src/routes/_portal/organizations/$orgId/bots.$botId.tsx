@@ -17,7 +17,7 @@ import {
   RECENT_ACTIVITY_LIMIT,
   SettingsTab,
 } from '@/features/bots';
-import { useStepUpGate } from '@/features/portal';
+import { useCrumbLeaf, useStepUpGate } from '@/features/portal';
 import {
   botActivityQueryOptions,
   type BotCatalogApplicationItem,
@@ -107,6 +107,7 @@ function BotDetailPage(): React.JSX.Element {
   const { require, dialog } = useStepUpGate();
   const [generateOpen, setGenerateOpen] = useState(() => generate === true && bot.data?.status === 'ACTIVE' && bot.data.activeKeyCount < MAX_ACTIVE_KEYS);
   const [revealed, setRevealed] = useState<{ key: string; name: string; expiresAt: string } | null>(null);
+  useCrumbLeaf(bot.data?.displayName);
 
   useEffect(() => {
     if (!generate) return;

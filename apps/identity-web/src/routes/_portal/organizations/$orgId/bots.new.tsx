@@ -5,7 +5,7 @@ import { Avatar, Button, DescriptionList, FormField, Input, NumberStepper, Texta
 import { ArrowLeftIcon, BotIcon } from '@/components/icons';
 import { QueryState, SectionCard } from '@/components/si';
 import { PermissionsMatrix } from '@/features/bots';
-import { useStepUpGate } from '@/features/portal';
+import { useCrumbLeaf, useStepUpGate } from '@/features/portal';
 import { botPermissionCatalogQueryOptions, myOrganisationsQueryOptions, orgAccessOf, useBotPermissionCatalogQuery, useCreateBotMutation, useOrgAccess } from '@/lib/apis';
 import { botErrorMessage, botFieldError } from '@/lib/bot-errors';
 import { type DesiredGrantMap, desiredGrantsList, summarizePermissions } from '@/lib/bot-permissions';
@@ -32,6 +32,7 @@ function NewBotPage(): React.JSX.Element {
   const create = useCreateBotMutation(orgId);
   const catalog = useBotPermissionCatalogQuery(orgId, canManage);
   const { require, dialog } = useStepUpGate();
+  useCrumbLeaf('New bot');
 
   const [displayName, setDisplayName] = useState('');
   const [handle, setHandle] = useState('');

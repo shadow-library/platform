@@ -1,17 +1,21 @@
-import { useLocation, useNavigate } from '@tanstack/react-router';
-import { type ReactNode, useEffect } from 'react';
-import { BellIcon, cn, IconButton, Spinner } from '@shadow-library/ui';
+import { useQuery } from '@tanstack/react-query';
+import { Link, useLocation, useMatchRoute, useNavigate } from '@tanstack/react-router';
+import { type ReactNode, useEffect, useState } from 'react';
+import { BellIcon, Breadcrumbs, cn, IconButton, Spinner } from '@shadow-library/ui';
 import { AppShell, type NavConfig } from '@shadow-library/ui/router';
 
 import { BrandGlyph, BuildingIcon, GridIcon, MailIcon, MonitorIcon, PlugIcon, ShieldCheckIcon, TerminalIcon, UserIcon } from '@/components/icons';
-import { CrumbTrail, ThemeToggle } from '@/components/si';
-import { useAdminContextQuery, useMeQuery, useSignoutMutation } from '@/lib/apis';
+import { ThemeToggle } from '@/components/si';
+import { myOrganisationsQueryOptions, orgAccessOf, useAdminContextQuery, useMeQuery, useSignoutMutation } from '@/lib/apis';
 import { displayName } from '@/lib/format';
 
+import { CrumbLeafContext } from './crumb-leaf';
+import { ORG_OVERVIEW_PATH, orgNavConfig } from './org-nav';
+import { accountCrumbs, type Crumb, type CrumbLeaf, orgCrumbs } from './portal-crumbs';
 import styles from './portal-shell.module.css';
 
 /** `isStaff` gates the platform section — an admin whose /admin/context grants any permission. */
-function navConfig(isStaff: boolean): NavConfig {
+function accountNavConfig(isStaff: boolean): NavConfig {
   return {
     variant: 'sections',
     sections: [
@@ -33,11 +37,24 @@ function navConfig(isStaff: boolean): NavConfig {
   };
 }
 
-function activeLabel(nav: NavConfig, pathname: string): string {
-  const leaves = nav.sections.filter(section => section.hidden !== true).flatMap(section => section.items);
-  // `items` is what makes a node a branch; a branch may carry a `to` of its own, so that is not the test.
-  const match = leaves.find(item => !('items' in item) && (item.exact === true ? pathname === item.to : pathname.startsWith(item.to)));
-  return match != null && 'label' in match ? match.label : 'Account';
+function CrumbBar({ crumbs }: { crumbs: Crumb[] }): React.JSX.Element {
+  return (
+    <Breadcrumbs className={styles.crumbs}>
+      {crumbs.map((crumb, index) =>
+        crumb.kind === 'current' ? (
+          <Breadcrumbs.Item key={index} current>
+            {crumb.label}
+          </Breadcrumbs.Item>
+        ) : (
+          <Breadcrumbs.Item key={index} asChild>
+            <Link to={crumb.to} params={crumb.params}>
+              {crumb.label}
+            </Link>
+          </Breadcrumbs.Item>
+        ),
+      )}
+    </Breadcrumbs>
+  );
 }
 
 export function PortalShell({ children }: { children: ReactNode }): React.JSX.Element {
@@ -46,6 +63,11 @@ export function PortalShell({ children }: { children: ReactNode }): React.JSX.El
   const navigate = useNavigate();
   const signout = useSignoutMutation();
   const { pathname } = useLocation();
+  const matchRoute = useMatchRoute();
+  const orgMatch = matchRoute({ to: ORG_OVERVIEW_PATH, fuzzy: true });
+  const orgId = orgMatch === false ? undefined : orgMatch.orgId;
+  const organisations = useQuery({ ...myOrganisationsQueryOptions(), enabled: orgId != null });
+  const [crumbLeaf, setCrumbLeaf] = useState<CrumbLeaf>();
 
   useEffect(() => {
     if (me.isError) navigate({ to: '/login' });
@@ -59,29 +81,45 @@ export function PortalShell({ children }: { children: ReactNode }): React.JSX.El
     );
 
   const user = me.data;
-  const nav = navConfig((adminContext.data?.permissions.length ?? 0) > 0);
   const elevated = user.aal === 'AAL2' || user.elevated;
+  let nav = accountNavConfig((adminContext.data?.permissions.length ?? 0) > 0);
+  let crumbs = accountCrumbs(nav, pathname);
+  if (orgId != null) {
+    const { org, canManage } = orgAccessOf(organisations.data, orgId);
+    nav = orgNavConfig({
+      orgId,
+      org,
+      canManage,
+      organisations: organisations.data?.organisations ?? [],
+      loading: organisations.isLoading,
+      onSelect: id => navigate({ to: ORG_OVERVIEW_PATH, params: { orgId: id } }),
+      onShowAll: () => navigate({ to: '/organizations' }),
+    });
+    crumbs = orgCrumbs({ nav, orgId, orgName: org?.name ?? 'Organization', pathname, leaf: crumbLeaf });
+  }
 
   return (
-    <AppShell
-      brand={{ icon: <BrandGlyph />, name: 'Shadow Identity', to: '/account' }}
-      nav={nav}
-      account={{
-        name: displayName(user),
-        email: user.email ?? undefined,
-        onSignOut: () => signout.mutate(undefined, { onSuccess: () => navigate({ to: '/login' }) }),
-      }}
-      breadcrumb={<CrumbTrail root="Account" leaf={activeLabel(nav, pathname)} />}
-      status={
-        <span className={styles.aalBadge} data-elevated={elevated || undefined}>
-          <ShieldCheckIcon size={12} />
-          {elevated ? 'AAL2 · MFA' : 'AAL1'}
-        </span>
-      }
-      actions={<IconButton variant="ghost" size="sm" aria-label="Notifications" icon={<BellIcon size={18} />} />}
-      utility={<ThemeToggle />}
-    >
-      {children}
-    </AppShell>
+    <CrumbLeafContext.Provider value={setCrumbLeaf}>
+      <AppShell
+        brand={{ icon: <BrandGlyph />, name: 'Shadow Identity', to: '/account' }}
+        nav={nav}
+        account={{
+          name: displayName(user),
+          email: user.email ?? undefined,
+          onSignOut: () => signout.mutate(undefined, { onSuccess: () => navigate({ to: '/login' }) }),
+        }}
+        breadcrumb={<CrumbBar crumbs={crumbs} />}
+        status={
+          <span className={styles.aalBadge} data-elevated={elevated || undefined}>
+            <ShieldCheckIcon size={12} />
+            {elevated ? 'AAL2 · MFA' : 'AAL1'}
+          </span>
+        }
+        actions={<IconButton variant="ghost" size="sm" aria-label="Notifications" icon={<BellIcon size={18} />} />}
+        utility={<ThemeToggle />}
+      >
+        {children}
+      </AppShell>
+    </CrumbLeafContext.Provider>
   );
 }
