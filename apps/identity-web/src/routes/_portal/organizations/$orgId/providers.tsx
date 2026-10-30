@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { useState } from 'react';
 import { Button, ConfirmDialog, Dialog, FormField, Input, PlusIcon, Switch, toast } from '@shadow-library/ui';
 
-import { QueryState, StatusChip } from '@/components/si';
+import { GatedNotice, PageHeader, QueryState, StatusChip } from '@/components/si';
 import { useStepUpGate } from '@/features/portal';
 import {
   type IdentityProvider,
@@ -185,16 +185,10 @@ function ProvidersPage(): React.JSX.Element {
   const [editing, setEditing] = useState<IdentityProvider | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<IdentityProvider | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   const list = providers.data?.items ?? [];
-
-  if (!canManage) {
-    return (
-      <p className={styles.intro}>
-        {org?.type === 'PERSONAL' ? 'Identity providers aren’t available for personal workspaces.' : 'Identity providers are managed by the organization’s owners and admins.'}
-      </p>
-    );
-  }
+  const canAdd = !providers.isLoading && !providers.error && list.length === 0;
 
   const openCreate = (): void =>
     require(() => {
@@ -207,73 +201,89 @@ function ProvidersPage(): React.JSX.Element {
       setFormOpen(true);
     });
 
-  return (
-    <div className={styles.page}>
-      <div className={styles.toolbar}>
-        <p className={styles.intro}>Let members sign in through your own OIDC identity provider. One provider per organization.</p>
-        {list.length > 0 && (
-          <Button variant="primary" size="sm" prefix={<PlusIcon size={15} />} onClick={openCreate}>
+  const header = (
+    <PageHeader
+      title="Single sign-on"
+      subtitle="Let members sign in through your own OIDC identity provider. One provider per organization."
+      actions={
+        canManage &&
+        canAdd && (
+          <Button variant="primary" prefix={<PlusIcon size={15} />} onClick={openCreate}>
             Add provider
           </Button>
-        )}
-      </div>
+        )
+      }
+    />
+  );
 
-      <QueryState
-        isLoading={providers.isLoading}
-        error={providers.error}
-        isEmpty={list.length === 0}
-        emptyTitle="No identity provider"
-        emptyDescription="Connect an OIDC provider so your members can use enterprise SSO."
-        emptyAction={{ label: 'Add provider', onClick: openCreate }}
-      >
-        <div className={styles.list}>
-          {list.map(idp => (
-            <div key={idp.id} className={styles.card}>
-              <div className={styles.cardMain}>
-                <div className={styles.nameRow}>
-                  <span className={styles.name}>{idp.name}</span>
-                  {idp.enforced && <StatusChip intent="warning">Enforced</StatusChip>}
-                  <StatusChip intent={idp.isActive ? 'success' : 'neutral'} dot>
-                    {idp.isActive ? 'Active' : 'Inactive'}
-                  </StatusChip>
+  if (!canManage)
+    return (
+      <>
+        {header}
+        <GatedNotice subject="Single sign-on settings" personal={org?.type === 'PERSONAL'} />
+      </>
+    );
+
+  return (
+    <>
+      {header}
+      <div className={styles.page}>
+        <QueryState
+          isLoading={providers.isLoading}
+          error={providers.error}
+          isEmpty={list.length === 0}
+          emptyTitle="No identity provider"
+          emptyDescription="Connect an OIDC provider so your members can use enterprise SSO."
+        >
+          <div className={styles.list}>
+            {list.map(idp => (
+              <div key={idp.id} className={styles.card}>
+                <div className={styles.cardMain}>
+                  <div className={styles.nameRow}>
+                    <span className={styles.name}>{idp.name}</span>
+                    {idp.enforced && <StatusChip intent="warning">Enforced</StatusChip>}
+                    <StatusChip intent={idp.isActive ? 'success' : 'neutral'} dot>
+                      {idp.isActive ? 'Active' : 'Inactive'}
+                    </StatusChip>
+                  </div>
+                  <div className={styles.issuer}>{idp.issuer}</div>
                 </div>
-                <div className={styles.issuer}>{idp.issuer}</div>
+                <div className={styles.cardActions}>
+                  <Button variant="ghost" size="sm" onClick={() => openEdit(idp)}>
+                    Edit
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setDeleteTarget(idp);
+                      setDeleteOpen(true);
+                    }}
+                  >
+                    Delete
+                  </Button>
+                </div>
               </div>
-              <div className={styles.cardActions}>
-                <Button variant="ghost" size="sm" onClick={() => openEdit(idp)}>
-                  Edit
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => require(() => setDeleteTarget(idp))}>
-                  Delete
-                </Button>
-              </div>
-            </div>
-          ))}
-        </div>
-      </QueryState>
+            ))}
+          </div>
+        </QueryState>
 
-      <IdpDialog orgId={orgId} editing={editing} open={formOpen} onOpenChange={setFormOpen} />
+        <IdpDialog orgId={orgId} editing={editing} open={formOpen} onOpenChange={setFormOpen} />
 
-      <ConfirmDialog
-        open={deleteTarget !== null}
-        onOpenChange={open => !open && setDeleteTarget(null)}
-        intent="danger"
-        title={deleteTarget ? `Delete ${deleteTarget.name}?` : 'Delete provider?'}
-        description="Members will no longer be able to sign in through this provider."
-        confirmLabel="Delete provider"
-        loading={del.isPending}
-        onConfirm={() =>
-          deleteTarget &&
-          del.mutate(deleteTarget.id, {
-            onSuccess: () => {
-              toast.success('Provider deleted');
-              setDeleteTarget(null);
-            },
-            onError: error => toast.danger(error.message),
-          })
-        }
-      />
-      {dialog}
-    </div>
+        <ConfirmDialog
+          open={deleteOpen}
+          onOpenChange={setDeleteOpen}
+          intent="danger"
+          title={deleteTarget ? `Delete ${deleteTarget.name}?` : 'Delete provider?'}
+          description="Members will no longer be able to sign in through this provider."
+          confirmLabel="Delete provider"
+          loading={del.isPending}
+          onConfirm={() =>
+            deleteTarget && require(() => del.mutate(deleteTarget.id, { onSuccess: () => toast.success('Provider deleted'), onError: error => toast.danger(error.message) }))
+          }
+        />
+        {dialog}
+      </div>
+    </>
   );
 }

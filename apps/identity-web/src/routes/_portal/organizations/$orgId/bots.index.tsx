@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import { AlertTriangleIcon, Avatar, Badge, Button, ClientOnly, DropdownMenu, EmptyState, IconButton, Input, PlusIcon, SearchIcon, Select, Table, toast } from '@shadow-library/ui';
 
 import { BotIcon, ClockIcon, LayersIcon, MoreIcon, ShieldCheckIcon } from '@/components/icons';
-import { QueryState, StatusChip } from '@/components/si';
+import { GatedNotice, QueryState, StatusChip } from '@/components/si';
 import { useStepUpGate } from '@/features/portal';
 import {
   type BotItem,
@@ -95,10 +95,7 @@ function BotsListPage(): React.JSX.Element {
   const atLimit = usage !== undefined && usage.count >= usage.limit;
   const filtered = useMemo(() => list.filter(bot => matchesQuery(bot, search) && (status === 'all' || bot.status === status)), [list, search, status]);
 
-  if (!canManage)
-    return (
-      <p className={styles.introText}>{org?.type === 'PERSONAL' ? 'Bots aren’t available to personal workspaces.' : 'Bots are managed by the organization’s owners and admins.'}</p>
-    );
+  if (!canManage) return <GatedNotice subject="Bots" personal={org?.type === 'PERSONAL'} />;
 
   const toggleSuspend = (bot: BotItem): void => {
     const mutation = bot.status === 'ACTIVE' ? suspend : resume;

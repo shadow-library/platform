@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { useState } from 'react';
 import { Badge, Button, Input, Select, Spinner, Switch, toast } from '@shadow-library/ui';
 
-import { SectionCard } from '@/components/si';
+import { PageHeader, SectionCard } from '@/components/si';
 import { useStepUpGate } from '@/features/portal';
 import { organisationPoliciesQueryOptions, type PolicyItem, useClearPolicyMutation, usePoliciesQuery, useSetPolicyMutation } from '@/lib/apis';
 
@@ -43,33 +43,36 @@ function SecurityPage(): React.JSX.Element {
   const list = policies.data?.policies ?? [];
 
   return (
-    <div className={styles.page}>
-      <SectionCard
-        title="Security policies"
-        description="Tighten how long tokens and sessions live for this organisation’s members. The strictest setting across a member’s organisations always wins — you can make a policy stricter than the platform default, never looser."
-      >
-        {policies.isLoading ? (
-          <div className={styles.center}>
-            <Spinner size="md" label="Loading policies" />
-          </div>
-        ) : list.length === 0 ? (
-          <div className={styles.empty}>No configurable policies.</div>
-        ) : (
-          <div className={styles.list}>
-            {list.map(policy => (
-              <PolicyRow key={policy.key} orgId={orgId} policy={policy} require={require} />
-            ))}
-          </div>
-        )}
-      </SectionCard>
-      {dialog}
-    </div>
+    <>
+      <PageHeader title="Security policies" subtitle="Tighten how long tokens and sessions live for this organization’s members." />
+      <div className={styles.page}>
+        <SectionCard
+          title="Session and token limits"
+          description="The strictest setting across a member’s organizations always wins — you can make a policy stricter than the platform default, never looser."
+        >
+          {policies.isLoading ? (
+            <div className={styles.center}>
+              <Spinner size="md" label="Loading policies" />
+            </div>
+          ) : list.length === 0 ? (
+            <div className={styles.empty}>No configurable policies.</div>
+          ) : (
+            <div className={styles.list}>
+              {list.map(policy => (
+                <PolicyRow key={policy.key} orgId={orgId} policy={policy} require={require} />
+              ))}
+            </div>
+          )}
+        </SectionCard>
+        {dialog}
+      </div>
+    </>
   );
 }
 
 /**
  * Rendered from registry metadata alone: a boolean key is a switch, an integer key a duration editor.
- * The fold-strategy hint says how the setting combines across a member's organisations.
+ * The fold-strategy hint says how the setting combines across a member's organizations.
  */
 function PolicyRow({ orgId, policy, require }: { orgId: string; policy: PolicyItem; require: RequireGate }): React.JSX.Element {
   const set = useSetPolicyMutation();
@@ -77,7 +80,7 @@ function PolicyRow({ orgId, policy, require }: { orgId: string; policy: PolicyIt
 
   const isBoolean = policy.type === 'boolean';
   const configured = isBoolean ? policy.configuredEnabled !== undefined : policy.configuredValue !== undefined;
-  const fold = isBoolean ? 'Any organisation turning this off turns it off for its members everywhere.' : 'The shortest limit set by any of a member’s organisations applies.';
+  const fold = isBoolean ? 'Any organization turning this off turns it off for its members everywhere.' : 'The shortest limit set by any of a member’s organizations applies.';
 
   const applyValue = (body: { value?: number; enabled?: boolean }): void =>
     require(() => set.mutate({ orgId, policyKey: policy.key, body }, { onSuccess: () => toast.success('Policy updated'), onError: error => toast.danger(error.message) }));

@@ -4,13 +4,6 @@
   gap: 20px;
 }
 
-.intro {
-  margin: 0;
-  font-size: 13px;
-  color: var(--sh-text-secondary);
-  max-width: 560px;
-}
-
 .modeRow {
   display: flex;
   align-items: flex-start;

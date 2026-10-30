@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Avatar, Button, DescriptionList, FormField, Input, NumberStepper, Textarea, toast, TokenInput, type TokenValue } from '@shadow-library/ui';
 
 import { ArrowLeftIcon, BotIcon } from '@/components/icons';
-import { QueryState, SectionCard } from '@/components/si';
+import { GatedNotice, QueryState, SectionCard } from '@/components/si';
 import { PermissionsMatrix } from '@/features/bots';
 import { useCrumbLeaf, useStepUpGate } from '@/features/portal';
 import { botPermissionCatalogQueryOptions, myOrganisationsQueryOptions, orgAccessOf, useBotPermissionCatalogQuery, useCreateBotMutation, useOrgAccess } from '@/lib/apis';
@@ -43,10 +43,7 @@ function NewBotPage(): React.JSX.Element {
   const [nameError, setNameError] = useState<string | undefined>();
   const [handleError, setHandleError] = useState<string | undefined>();
 
-  if (!canManage)
-    return (
-      <p className={styles.introText}>{org?.type === 'PERSONAL' ? 'Bots aren’t available to personal workspaces.' : 'Bots are managed by the organization’s owners and admins.'}</p>
-    );
+  if (!canManage) return <GatedNotice subject="Bots" personal={org?.type === 'PERSONAL'} />;
 
   const backToList = (): void => void navigate({ to: '/organizations/$orgId/bots', params: { orgId } });
 

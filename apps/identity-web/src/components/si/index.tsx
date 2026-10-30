@@ -1,7 +1,23 @@
 import { type ApiError } from '@/lib/apis';
-import { type ReactElement, type ReactNode } from 'react';
+import { type ReactElement, type ReactNode, useId } from 'react';
 
-import { Alert, Badge, type BadgeIntent, CopyIcon, copyText, EmptyState, IconButton, MoonIcon, Spinner, SunIcon, toast, useTheme } from '@shadow-library/ui';
+import {
+  Alert,
+  Badge,
+  type BadgeIntent,
+  Button,
+  CopyIcon,
+  copyText,
+  EmptyState,
+  IconButton,
+  Input,
+  MoonIcon,
+  SearchIcon,
+  Spinner,
+  SunIcon,
+  toast,
+  useTheme,
+} from '@shadow-library/ui';
 
 import styles from './si.module.css';
 
@@ -154,5 +170,62 @@ export function CopyButton({ value, label = 'Copy' }: CopyButtonProps): ReactEle
         else toast.danger('Couldn’t copy');
       }}
     />
+  );
+}
+
+interface GatedNoticeProps {
+  subject: string;
+  personal: boolean;
+}
+
+export function GatedNotice({ subject, personal }: GatedNoticeProps): ReactElement {
+  return (
+    <p className={styles.gatedNotice}>{personal ? `${subject} aren’t available to personal workspaces.` : `${subject} are managed by the organization’s owners and admins.`}</p>
+  );
+}
+
+interface DangerZoneProps {
+  title: string;
+  description: ReactNode;
+  actionLabel: string;
+  onAction: () => void;
+  disabled?: boolean;
+}
+
+export function DangerZone({ title, description, actionLabel, onAction, disabled }: DangerZoneProps): ReactElement {
+  const titleId = useId();
+  return (
+    <section className={styles.dangerZone} aria-labelledby={titleId}>
+      <div className={styles.dangerZoneMain}>
+        <h3 id={titleId} className={styles.dangerZoneTitle}>
+          {title}
+        </h3>
+        <p className={styles.dangerZoneDesc}>{description}</p>
+      </div>
+      <Button variant="danger" disabled={disabled} onClick={onAction}>
+        {actionLabel}
+      </Button>
+    </section>
+  );
+}
+
+interface ListToolbarProps {
+  search: string;
+  onSearchChange: (value: string) => void;
+  searchLabel: string;
+  searchPlaceholder?: string;
+  filters?: ReactNode;
+  trailing?: ReactNode;
+}
+
+export function ListToolbar({ search, onSearchChange, searchLabel, searchPlaceholder, filters, trailing }: ListToolbarProps): ReactElement {
+  return (
+    <div className={styles.listToolbar} role="search">
+      <div className={styles.listToolbarSearch}>
+        <Input size="sm" placeholder={searchPlaceholder} aria-label={searchLabel} prefix={<SearchIcon size={15} />} value={search} onValueChange={onSearchChange} />
+      </div>
+      {filters}
+      {trailing && <div className={styles.listToolbarTrailing}>{trailing}</div>}
+    </div>
   );
 }

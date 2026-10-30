@@ -1,27 +1,12 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { useState } from 'react';
-import {
-  Avatar,
-  Badge,
-  Button,
-  Dialog,
-  DropdownMenu,
-  FormField,
-  IconButton,
-  Input,
-  PlusIcon,
-  SearchIcon,
-  Select,
-  Table,
-  toast,
-  TokenInput,
-  type TokenValue,
-} from '@shadow-library/ui';
+import { Avatar, Badge, Button, ConfirmDialog, Dialog, DropdownMenu, FormField, IconButton, PlusIcon, Select, Table, toast, TokenInput, type TokenValue } from '@shadow-library/ui';
 
 import { MailIcon, MoreIcon } from '@/components/icons';
-import { QueryState } from '@/components/si';
+import { ListToolbar, PageHeader, QueryState } from '@/components/si';
 import {
   type InvitableRole,
+  type InvitationItem,
   invitationsQueryOptions,
   type MemberItem,
   type MemberRole,
@@ -130,6 +115,10 @@ function MembersPage(): React.JSX.Element {
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [removeTarget, setRemoveTarget] = useState<MemberItem | null>(null);
+  const [revokeTarget, setRevokeTarget] = useState<InvitationItem | null>(null);
+  const [removeOpen, setRemoveOpen] = useState(false);
+  const [revokeOpen, setRevokeOpen] = useState(false);
 
   const rows = (members.data?.members ?? []).filter(member => {
     if (roleFilter !== 'all' && member.role !== roleFilter) return false;
@@ -141,8 +130,15 @@ function MembersPage(): React.JSX.Element {
   const changeRole = (member: MemberItem, role: MemberRole): void =>
     updateRole.mutate({ userId: member.userId, role }, { onSuccess: () => toast.success('Role updated'), onError: error => toast.danger(error.message) });
 
-  const remove = (member: MemberItem): void =>
-    removeMember.mutate(member.userId, { onSuccess: () => toast.success('Member removed'), onError: error => toast.danger(error.message) });
+  const confirmRemove = (): void => {
+    if (!removeTarget) return;
+    removeMember.mutate(removeTarget.userId, { onSuccess: () => toast.success('Member removed'), onError: error => toast.danger(error.message) });
+  };
+
+  const confirmRevoke = (): void => {
+    if (!revokeTarget) return;
+    revoke.mutate(revokeTarget.id, { onSuccess: () => toast.success('Invitation revoked'), onError: error => toast.danger(error.message) });
+  };
 
   /** Org-scoped only — this pauses the person inside this organization and leaves their Shadow account untouched. */
   const changeStatus = (member: MemberItem, status: MemberStatus): void =>
@@ -152,135 +148,183 @@ function MembersPage(): React.JSX.Element {
     );
 
   return (
-    <div className={styles.page}>
-      <div className={styles.toolbar}>
-        <div className={styles.search}>
-          <Input size="sm" placeholder="Search members…" aria-label="Search members" prefix={<SearchIcon size={15} />} value={search} onValueChange={setSearch} />
-        </div>
-        <Select size="sm" aria-label="Filter members by role" value={roleFilter} onValueChange={setRoleFilter}>
-          <Select.Item value="all">All roles</Select.Item>
-          <Select.Item value="OWNER">Owner</Select.Item>
-          <Select.Item value="ADMIN">Admin</Select.Item>
-          <Select.Item value="MEMBER">Member</Select.Item>
-        </Select>
-        <div className={styles.spacer} />
-        {canManage && (
-          <Button variant="primary" size="sm" prefix={<PlusIcon size={15} />} onClick={() => setInviteOpen(true)}>
-            Invite members
-          </Button>
-        )}
-      </div>
+    <>
+      <PageHeader
+        title="Members"
+        subtitle="People in this organization, their roles and their access."
+        actions={
+          canManage && (
+            <Button variant="primary" prefix={<PlusIcon size={15} />} onClick={() => setInviteOpen(true)}>
+              Invite members
+            </Button>
+          )
+        }
+      />
+      <div className={styles.page}>
+        <ListToolbar
+          search={search}
+          onSearchChange={setSearch}
+          searchLabel="Search members"
+          searchPlaceholder="Search members…"
+          filters={
+            <Select size="sm" aria-label="Filter members by role" value={roleFilter} onValueChange={setRoleFilter}>
+              <Select.Item value="all">All roles</Select.Item>
+              <Select.Item value="OWNER">Owner</Select.Item>
+              <Select.Item value="ADMIN">Admin</Select.Item>
+              <Select.Item value="MEMBER">Member</Select.Item>
+            </Select>
+          }
+        />
 
-      <QueryState isLoading={members.isLoading} error={members.error} isEmpty={rows.length === 0} emptyTitle="No members match">
-        <Table
-          data={rows}
-          rowKey="userId"
-          aria-label="Organization members"
-          columns={[
-            {
-              id: 'member',
-              header: 'Member',
-              cell: member => (
-                <div className={styles.memberCell}>
-                  <Avatar name={member.email ?? member.userId} size="sm" />
-                  <div className={styles.memberText}>
-                    <div className={styles.memberName}>
-                      {member.email ?? member.userId}
-                      {member.userId === me.data?.userId && <span className={styles.you}> (you)</span>}
+        <QueryState isLoading={members.isLoading} error={members.error} isEmpty={rows.length === 0} emptyTitle="No members match">
+          <Table
+            data={rows}
+            rowKey="userId"
+            aria-label="Organization members"
+            columns={[
+              {
+                id: 'member',
+                header: 'Member',
+                cell: member => (
+                  <div className={styles.memberCell}>
+                    <Avatar name={member.email ?? member.userId} size="sm" />
+                    <div className={styles.memberText}>
+                      <div className={styles.memberName}>
+                        {member.email ?? member.userId}
+                        {member.userId === me.data?.userId && <span className={styles.you}> (you)</span>}
+                      </div>
                     </div>
                   </div>
+                ),
+              },
+              { id: 'role', header: 'Role', cell: member => <Badge intent={member.role === 'OWNER' ? 'info' : 'neutral'}>{ROLE_LABEL(member.role)}</Badge> },
+              {
+                id: 'status',
+                header: 'Status',
+                cell: member =>
+                  member.status === 'ACTIVE' ? (
+                    <span className={styles.muted}>Active</span>
+                  ) : (
+                    <Badge intent={member.status === 'BLOCKED' ? 'danger' : 'warning'} title={member.statusReason}>
+                      {STATUS_LABEL(member.status)}
+                    </Badge>
+                  ),
+              },
+              { id: 'joined', header: 'Joined', cell: member => <span className={styles.muted}>{formatDate(member.joinedAt)}</span> },
+              {
+                id: 'actions',
+                header: '',
+                align: 'end',
+                width: 56,
+                cell: member =>
+                  !canManage || member.userId === me.data?.userId ? null : (
+                    <DropdownMenu>
+                      <DropdownMenu.Trigger asChild>
+                        <IconButton variant="ghost" size="sm" aria-label="Member actions" icon={<MoreIcon size={16} />} />
+                      </DropdownMenu.Trigger>
+                      <DropdownMenu.Content align="end">
+                        <DropdownMenu.Label>Change role</DropdownMenu.Label>
+                        <DropdownMenu.Item onSelect={() => changeRole(member, 'OWNER')}>Owner</DropdownMenu.Item>
+                        <DropdownMenu.Item onSelect={() => changeRole(member, 'ADMIN')}>Admin</DropdownMenu.Item>
+                        <DropdownMenu.Item onSelect={() => changeRole(member, 'MEMBER')}>Member</DropdownMenu.Item>
+                        <DropdownMenu.Separator />
+                        <DropdownMenu.Label>Access</DropdownMenu.Label>
+                        {member.status === 'ACTIVE' ? (
+                          <>
+                            <DropdownMenu.Item onSelect={() => changeStatus(member, 'SUSPENDED')}>Suspend from organization</DropdownMenu.Item>
+                            <DropdownMenu.Item destructive onSelect={() => changeStatus(member, 'BLOCKED')}>
+                              Block from organization
+                            </DropdownMenu.Item>
+                          </>
+                        ) : (
+                          <DropdownMenu.Item onSelect={() => changeStatus(member, 'ACTIVE')}>Restore access</DropdownMenu.Item>
+                        )}
+                        <DropdownMenu.Separator />
+                        <DropdownMenu.Item
+                          destructive
+                          onSelect={() => {
+                            setRemoveTarget(member);
+                            setRemoveOpen(true);
+                          }}
+                        >
+                          Remove from organization
+                        </DropdownMenu.Item>
+                      </DropdownMenu.Content>
+                    </DropdownMenu>
+                  ),
+              },
+            ]}
+          />
+        </QueryState>
+
+        {pending.length > 0 && (
+          <div className={styles.pending}>
+            <div className="si-eyebrow">Pending invitations</div>
+            {pending.map(invitation => (
+              <div key={invitation.id} className={styles.inviteRow}>
+                <span className={styles.inviteIcon}>
+                  <MailIcon size={15} />
+                </span>
+                <div className={styles.inviteMeta}>
+                  <div className={styles.inviteEmail}>{invitation.email}</div>
+                  <div className={styles.inviteSub}>
+                    Invited as {ROLE_LABEL(invitation.role)} · {relativeTime(invitation.createdAt)} · expires {relativeTime(invitation.expiresAt)}
+                  </div>
                 </div>
-              ),
-            },
-            { id: 'role', header: 'Role', cell: member => <Badge intent={member.role === 'OWNER' ? 'info' : 'neutral'}>{ROLE_LABEL(member.role)}</Badge> },
-            {
-              id: 'status',
-              header: 'Status',
-              cell: member =>
-                member.status === 'ACTIVE' ? (
-                  <span className={styles.muted}>Active</span>
-                ) : (
-                  <Badge intent={member.status === 'BLOCKED' ? 'danger' : 'warning'} title={member.statusReason}>
-                    {STATUS_LABEL(member.status)}
-                  </Badge>
-                ),
-            },
-            { id: 'joined', header: 'Joined', cell: member => <span className={styles.muted}>{formatDate(member.joinedAt)}</span> },
-            {
-              id: 'actions',
-              header: '',
-              align: 'end',
-              width: 56,
-              cell: member =>
-                !canManage || member.userId === me.data?.userId ? null : (
-                  <DropdownMenu>
-                    <DropdownMenu.Trigger asChild>
-                      <IconButton variant="ghost" size="sm" aria-label="Member actions" icon={<MoreIcon size={16} />} />
-                    </DropdownMenu.Trigger>
-                    <DropdownMenu.Content align="end">
-                      <DropdownMenu.Label>Change role</DropdownMenu.Label>
-                      <DropdownMenu.Item onSelect={() => changeRole(member, 'OWNER')}>Owner</DropdownMenu.Item>
-                      <DropdownMenu.Item onSelect={() => changeRole(member, 'ADMIN')}>Admin</DropdownMenu.Item>
-                      <DropdownMenu.Item onSelect={() => changeRole(member, 'MEMBER')}>Member</DropdownMenu.Item>
-                      <DropdownMenu.Separator />
-                      <DropdownMenu.Label>Access</DropdownMenu.Label>
-                      {member.status === 'ACTIVE' ? (
-                        <>
-                          <DropdownMenu.Item onSelect={() => changeStatus(member, 'SUSPENDED')}>Suspend from organization</DropdownMenu.Item>
-                          <DropdownMenu.Item destructive onSelect={() => changeStatus(member, 'BLOCKED')}>
-                            Block from organization
-                          </DropdownMenu.Item>
-                        </>
-                      ) : (
-                        <DropdownMenu.Item onSelect={() => changeStatus(member, 'ACTIVE')}>Restore access</DropdownMenu.Item>
-                      )}
-                      <DropdownMenu.Separator />
-                      <DropdownMenu.Item destructive onSelect={() => remove(member)}>
-                        Remove from organization
-                      </DropdownMenu.Item>
-                    </DropdownMenu.Content>
-                  </DropdownMenu>
-                ),
-            },
-          ]}
+                <div className={styles.inviteActions}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    loading={invite.isPending && invite.variables?.email === invitation.email}
+                    onClick={() =>
+                      invitation.role !== 'OWNER' &&
+                      invite.mutate(
+                        { email: invitation.email, role: invitation.role as InvitableRole },
+                        { onSuccess: () => toast.success('Invitation resent'), onError: error => toast.danger(error.message) },
+                      )
+                    }
+                  >
+                    Resend
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setRevokeTarget(invitation);
+                      setRevokeOpen(true);
+                    }}
+                  >
+                    Revoke
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <InviteDialog orgId={orgId} open={inviteOpen} onOpenChange={setInviteOpen} />
+
+        <ConfirmDialog
+          open={removeOpen}
+          onOpenChange={setRemoveOpen}
+          intent="danger"
+          title={`Remove ${removeTarget?.email ?? 'this member'}?`}
+          description="They lose access to this organization and everything shared with it immediately. They can be invited again later."
+          confirmLabel="Remove member"
+          loading={removeMember.isPending}
+          onConfirm={confirmRemove}
         />
-      </QueryState>
-
-      {pending.length > 0 && (
-        <div className={styles.pending}>
-          <div className="si-eyebrow">Pending invitations</div>
-          {pending.map(invitation => (
-            <div key={invitation.id} className={styles.inviteRow}>
-              <span className={styles.inviteIcon}>
-                <MailIcon size={15} />
-              </span>
-              <div className={styles.inviteMeta}>
-                <div className={styles.inviteEmail}>{invitation.email}</div>
-                <div className={styles.inviteSub}>
-                  Invited as {ROLE_LABEL(invitation.role)} · {relativeTime(invitation.createdAt)} · expires {relativeTime(invitation.expiresAt)}
-                </div>
-              </div>
-              <div className={styles.inviteActions}>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() =>
-                    invitation.role !== 'OWNER' &&
-                    invite.mutate({ email: invitation.email, role: invitation.role as InvitableRole }, { onSuccess: () => toast.success('Invitation resent') })
-                  }
-                >
-                  Resend
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => revoke.mutate(invitation.id, { onSuccess: () => toast.success('Invitation revoked') })}>
-                  Revoke
-                </Button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <InviteDialog orgId={orgId} open={inviteOpen} onOpenChange={setInviteOpen} />
-    </div>
+        <ConfirmDialog
+          open={revokeOpen}
+          onOpenChange={setRevokeOpen}
+          intent="danger"
+          title={`Revoke the invitation for ${revokeTarget?.email ?? 'this email'}?`}
+          description="The invitation link stops working. You can send a new invitation at any time."
+          confirmLabel="Revoke invitation"
+          loading={revoke.isPending}
+          onConfirm={confirmRevoke}
+        />
+      </div>
+    </>
   );
 }

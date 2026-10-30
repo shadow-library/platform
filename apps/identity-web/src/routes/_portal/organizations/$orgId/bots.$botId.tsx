@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { Alert, Avatar, Button, Spinner, toast } from '@shadow-library/ui';
 
 import { ArrowLeftIcon, BotIcon, KeyIcon } from '@/components/icons';
-import { StatusChip } from '@/components/si';
+import { GatedNotice, StatusChip } from '@/components/si';
 import { SecretDialog } from '@/features/console';
 import {
   ActivityTab,
@@ -114,10 +114,7 @@ function BotDetailPage(): React.JSX.Element {
     void navigate({ search: prev => ({ ...prev, generate: undefined }), replace: true });
   }, [generate, navigate]);
 
-  if (!canManage)
-    return (
-      <p className={styles.introText}>{org?.type === 'PERSONAL' ? 'Bots aren’t available to personal workspaces.' : 'Bots are managed by the organization’s owners and admins.'}</p>
-    );
+  if (!canManage) return <GatedNotice subject="Bots" personal={org?.type === 'PERSONAL'} />;
 
   if (bot.isLoading)
     return (

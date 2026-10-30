@@ -10,21 +10,6 @@
   gap: 16px;
 }
 
-.toolbar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.search {
-  flex: 1;
-  max-width: 300px;
-}
-
-.spacer {
-  flex: 1;
-}
-
 .memberCell {
   display: flex;
   align-items: center;

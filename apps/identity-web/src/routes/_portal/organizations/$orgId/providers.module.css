@@ -4,20 +4,6 @@
   gap: 16px;
 }
 
-.toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.intro {
-  margin: 0;
-  font-size: 13px;
-  color: var(--sh-text-secondary);
-  max-width: 520px;
-}
-
 .form {
   display: flex;
   flex-direction: column;
