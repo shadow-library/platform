@@ -134,9 +134,9 @@ export function useUpdateBotMutation(orgId: string): UseMutationResult<Organisat
   const queryClient = useQueryClient();
   return useMutation<OrganisationActionResponse, ApiError, { botId: string; body: UpdateBotBody }>({
     mutationFn: ({ botId, body }) => APIRequest.patch(`/organisations/${orgId}/bots/${botId}`).body(body).execute<OrganisationActionResponse>(),
-    onSuccess: (_, { botId }) => {
-      queryClient.invalidateQueries({ queryKey: botKeys.detail(orgId, botId) });
+    onSuccess: async (_, { botId }) => {
       queryClient.invalidateQueries({ queryKey: botKeys.list(orgId) });
+      await queryClient.invalidateQueries({ queryKey: botKeys.detail(orgId, botId) });
     },
   });
 }

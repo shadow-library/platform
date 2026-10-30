@@ -1,21 +1,26 @@
-import { createFileRoute, Link } from '@tanstack/react-router';
-import { useEffect, useState } from 'react';
-import { Alert, Avatar, Button, Spinner, toast } from '@shadow-library/ui';
+import { createFileRoute } from '@tanstack/react-router';
+import { useEffect, useMemo, useState } from 'react';
+import { Alert, Avatar, Button, Spinner, Tabs, toast } from '@shadow-library/ui';
 
-import { ArrowLeftIcon, BotIcon, KeyIcon } from '@/components/icons';
-import { GatedNotice, StatusChip } from '@/components/si';
+import { BotIcon } from '@/components/icons';
+import { CopyButton, GatedNotice, PageHeader, StatusChip } from '@/components/si';
 import { SecretDialog } from '@/features/console';
 import {
   ActivityTab,
+  BOT_TABS,
+  type BotTab,
+  canGenerateKey,
   DeletionNotice,
   GenerateKeyDialog,
+  isBotTab,
   isManageable,
   KeysTab,
-  MAX_ACTIVE_KEYS,
   OverviewTab,
+  parseBotTab,
   PermissionsTab,
   RECENT_ACTIVITY_LIMIT,
   SettingsTab,
+  summarizeKeys,
 } from '@/features/bots';
 import { useCrumbLeaf, useStepUpGate } from '@/features/portal';
 import {
@@ -23,6 +28,7 @@ import {
   type BotCatalogApplicationItem,
   type BotGrantItem,
   type BotItem,
+  type BotKeyItem,
   botKeysQueryOptions,
   botPermissionCatalogQueryOptions,
   botPermissionsQueryOptions,
@@ -43,20 +49,13 @@ import { formatDate } from '@/lib/format';
 
 import styles from '@/features/bots/bots.module.css';
 
-type Tab = 'overview' | 'permissions' | 'keys' | 'activity' | 'settings';
-
 interface BotSearch {
-  tab?: Tab;
+  tab?: BotTab;
   generate?: boolean;
 }
 
-const TAB_VALUES: Tab[] = ['permissions', 'keys', 'activity', 'settings'];
-
 export const Route = createFileRoute('/_portal/organizations/$orgId/bots/$botId')({
-  validateSearch: (search: Record<string, unknown>): BotSearch => {
-    const tab = search.tab;
-    return { tab: TAB_VALUES.includes(tab as Tab) ? (tab as Tab) : undefined, generate: search.generate === true ? true : undefined };
-  },
+  validateSearch: (search: Record<string, unknown>): BotSearch => ({ tab: parseBotTab(search.tab), generate: search.generate === true ? true : undefined }),
   loader: async ({ context, params }) => {
     const mine = await context.queryClient.ensureQueryData(myOrganisationsQueryOptions());
     if (!orgAccessOf(mine, params.orgId).canManage) return;
@@ -75,13 +74,13 @@ export const Route = createFileRoute('/_portal/organizations/$orgId/bots/$botId'
   component: BotDetailPage,
 });
 
-const NAV_ITEMS: { key: Tab; label: string }[] = [
-  { key: 'overview', label: 'Overview' },
-  { key: 'permissions', label: 'Permissions' },
-  { key: 'keys', label: 'API keys' },
-  { key: 'activity', label: 'Activity' },
-  { key: 'settings', label: 'Settings' },
-];
+const TAB_LABEL: Record<BotTab, string> = {
+  overview: 'Overview',
+  permissions: 'Permissions',
+  keys: 'API keys',
+  activity: 'Activity',
+  settings: 'Settings',
+};
 
 const STATUS_META: Record<BotItem['status'], { label: string; intent: 'success' | 'warning' | 'neutral' }> = {
   ACTIVE: { label: 'Active', intent: 'success' },
@@ -92,6 +91,7 @@ const STATUS_META: Record<BotItem['status'], { label: string; intent: 'success' 
 
 const EMPTY_APPLICATIONS: BotCatalogApplicationItem[] = [];
 const EMPTY_GRANTS: BotGrantItem[] = [];
+const EMPTY_KEYS: BotKeyItem[] = [];
 
 function BotDetailPage(): React.JSX.Element {
   const { orgId, botId } = Route.useParams();
@@ -105,8 +105,9 @@ function BotDetailPage(): React.JSX.Element {
   const suspend = useSuspendBotMutation(orgId);
   const resume = useResumeBotMutation(orgId);
   const { require, dialog } = useStepUpGate();
-  const [generateOpen, setGenerateOpen] = useState(() => generate === true && bot.data?.status === 'ACTIVE' && bot.data.activeKeyCount < MAX_ACTIVE_KEYS);
+  const [generateOpen, setGenerateOpen] = useState(() => generate === true && bot.data !== undefined && canGenerateKey(bot.data.status, bot.data.activeKeyCount));
   const [revealed, setRevealed] = useState<{ key: string; name: string; expiresAt: string } | null>(null);
+  const keySummary = useMemo(() => summarizeKeys(keys.data?.keys ?? EMPTY_KEYS), [keys.data]);
   useCrumbLeaf(bot.data?.displayName);
 
   useEffect(() => {
@@ -125,25 +126,19 @@ function BotDetailPage(): React.JSX.Element {
 
   if (bot.error || !bot.data)
     return (
-      <div className={styles.page}>
-        <Link to="/organizations/$orgId/bots" params={{ orgId }} className={styles.backLink}>
-          <ArrowLeftIcon size={15} />
-          All bots
-        </Link>
-        <Alert intent="danger" title="Couldn’t load this bot">
-          {bot.error ? botErrorMessage(bot.error) : 'This bot no longer exists.'}
-        </Alert>
-      </div>
+      <Alert intent="danger" title="Couldn’t load this bot">
+        {bot.error ? botErrorMessage(bot.error) : 'This bot no longer exists.'}
+      </Alert>
     );
 
   const data = bot.data;
   const status = STATUS_META[data.status];
-  const activeKeys = keys.data?.keys.filter(key => key.status === 'ACTIVE') ?? [];
-  const canGenerateKey = data.status === 'ACTIVE' && activeKeys.length < MAX_ACTIVE_KEYS;
-  const manageable = isManageable(data.status);
+  const activeKeyCount = keys.data ? keySummary.active.length : data.activeKeyCount;
+  const keySlotFree = canGenerateKey(data.status, activeKeyCount);
   const applications = catalog.data?.applications ?? EMPTY_APPLICATIONS;
   const grants = permissions.data?.grants ?? EMPTY_GRANTS;
-  const goToTab = (next: Tab): void => void navigate({ search: prev => ({ ...prev, tab: next === 'overview' ? undefined : next }), replace: true });
+  const counts: Partial<Record<BotTab, number>> = { permissions: permissions.data ? grants.length : undefined, keys: activeKeyCount };
+  const goToTab = (next: BotTab): void => void navigate({ search: prev => ({ ...prev, tab: parseBotTab(next) }), replace: true });
 
   const toggleSuspend = (): void => {
     const mutation = data.status === 'ACTIVE' ? suspend : resume;
@@ -152,75 +147,67 @@ function BotDetailPage(): React.JSX.Element {
   };
 
   return (
-    <div className={styles.page}>
-      <Link to="/organizations/$orgId/bots" params={{ orgId }} className={styles.backLink}>
-        <ArrowLeftIcon size={15} />
-        All bots
-      </Link>
-
-      <div className={styles.detailHead}>
-        <Avatar icon={<BotIcon size={28} />} shape="square" size="xl" />
-        <div className={styles.detailHeadMain}>
-          <div className={styles.detailEyebrow}>Bot</div>
-          <div className={styles.detailName}>
-            {data.displayName}
-            <StatusChip intent={status.intent} dot>
-              {status.label}
-            </StatusChip>
-          </div>
-          <div className={styles.detailMeta}>
+    <>
+      <PageHeader
+        leading={<Avatar icon={<BotIcon size={28} />} shape="square" size="xl" />}
+        title={data.displayName}
+        tags={
+          <StatusChip intent={status.intent} dot>
+            {status.label}
+          </StatusChip>
+        }
+        subtitle={
+          <span className={styles.detailMeta}>
             <span className={styles.detailMetaId}>{data.handle}[bot]</span>
-            <span>·</span>
-            <span>
+            <span aria-hidden="true">·</span>
+            <span className={styles.detailMetaItem}>
               ID <span className={styles.detailMetaId}>{data.id}</span>
+              <CopyButton value={data.id} label="Copy bot ID" />
             </span>
             {data.createdBy && (
               <>
-                <span>·</span>
+                <span aria-hidden="true">·</span>
                 <span>
                   Created by {data.createdBy.displayName ?? 'a former member'} on {formatDate(data.createdAt)}
                 </span>
               </>
             )}
-          </div>
-        </div>
-        {manageable && (
-          <div className={styles.detailActions}>
+          </span>
+        }
+        actions={
+          isManageable(data.status) && (
             <Button variant="secondary" size="sm" loading={suspend.isPending || resume.isPending} onClick={toggleSuspend}>
               {data.status === 'ACTIVE' ? 'Suspend' : 'Resume'}
             </Button>
-            <Button variant="primary" size="sm" prefix={<KeyIcon size={14} />} disabled={!canGenerateKey} onClick={() => setGenerateOpen(true)}>
-              Generate key
-            </Button>
-          </div>
+          )
+        }
+      />
+
+      <div className={styles.page}>
+        {data.deletion && <DeletionNotice orgId={orgId} bot={data} require={require} />}
+        {data.status === 'SUSPENDED' && !data.deletion && (
+          <Alert intent="warning" role="status" title="This bot is suspended.">
+            Its keys stop working within a minute. Records and grants stay; resume it to restore access.
+          </Alert>
         )}
-      </div>
 
-      {data.deletion && <DeletionNotice orgId={orgId} bot={data} require={require} />}
-
-      <div className={styles.detailLayout}>
-        <nav className={styles.sectionNav}>
-          {NAV_ITEMS.map(item => (
-            <button
-              key={item.key}
-              type="button"
-              className={styles.navItem}
-              data-active={tab === item.key || undefined}
-              aria-current={tab === item.key ? 'page' : undefined}
-              onClick={() => goToTab(item.key)}
-            >
-              <span className={styles.navLabel}>{item.label}</span>
-              {item.key === 'keys' && <span className={styles.navCount}>{data.activeKeyCount}</span>}
-              {item.key === 'permissions' && grants.length > 0 && <span className={styles.navCount}>{grants.length}</span>}
-            </button>
-          ))}
-        </nav>
-
-        <div className={styles.sectionBody}>
-          {tab === 'overview' && (
+        <Tabs
+          value={tab}
+          onValueChange={value => {
+            if (isBotTab(value)) goToTab(value);
+          }}
+        >
+          <Tabs.List aria-label="Bot sections" className={styles.tabList}>
+            {BOT_TABS.map(key => (
+              <Tabs.Tab key={key} value={key} count={counts[key]}>
+                {TAB_LABEL[key]}
+              </Tabs.Tab>
+            ))}
+          </Tabs.List>
+          <Tabs.Panel value="overview">
             <OverviewTab
               bot={data}
-              activeKeys={activeKeys}
+              keySummary={keySummary}
               orgId={orgId}
               botId={botId}
               applications={applications}
@@ -229,8 +216,8 @@ function BotDetailPage(): React.JSX.Element {
               onEditPermissions={() => goToTab('permissions')}
               onViewActivity={() => goToTab('activity')}
             />
-          )}
-          {tab === 'permissions' && (
+          </Tabs.Panel>
+          <Tabs.Panel value="permissions">
             <PermissionsTab
               botId={botId}
               orgId={orgId}
@@ -242,30 +229,25 @@ function BotDetailPage(): React.JSX.Element {
               grantsError={permissions.error}
               require={require}
             />
-          )}
-          {tab === 'activity' && <ActivityTab orgId={orgId} botId={botId} />}
-          {tab === 'keys' && (
+          </Tabs.Panel>
+          <Tabs.Panel value="keys">
             <KeysTab
               orgId={orgId}
               botId={botId}
-              keys={keys.data?.keys ?? []}
+              keys={keys.data?.keys ?? EMPTY_KEYS}
               isLoading={keys.isLoading}
-              canGenerateKey={canGenerateKey}
+              canGenerateKey={keySlotFree}
               require={require}
               onGenerate={() => setGenerateOpen(true)}
             />
-          )}
-          {tab === 'settings' && (
-            <SettingsTab
-              orgId={orgId}
-              organisationName={org?.name ?? 'this organization'}
-              bot={data}
-              require={require}
-              onSuspendToggle={toggleSuspend}
-              suspendPending={suspend.isPending || resume.isPending}
-            />
-          )}
-        </div>
+          </Tabs.Panel>
+          <Tabs.Panel value="activity">
+            <ActivityTab orgId={orgId} botId={botId} />
+          </Tabs.Panel>
+          <Tabs.Panel value="settings" forceMount hidden={tab !== 'settings'}>
+            <SettingsTab orgId={orgId} organisationName={org?.name ?? 'this organization'} bot={data} require={require} />
+          </Tabs.Panel>
+        </Tabs>
       </div>
 
       <GenerateKeyDialog
@@ -288,6 +270,6 @@ function BotDetailPage(): React.JSX.Element {
         requireConfirm
       />
       {dialog}
-    </div>
+    </>
   );
 }

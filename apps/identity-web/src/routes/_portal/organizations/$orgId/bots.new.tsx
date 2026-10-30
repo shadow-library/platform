@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { Avatar, Button, DescriptionList, FormField, Input, NumberStepper, Textarea, toast, TokenInput, type TokenValue } from '@shadow-library/ui';
 
-import { ArrowLeftIcon, BotIcon } from '@/components/icons';
+import { BotIcon } from '@/components/icons';
 import { GatedNotice, QueryState, SectionCard } from '@/components/si';
 import { PermissionsMatrix } from '@/features/bots';
 import { useCrumbLeaf, useStepUpGate } from '@/features/portal';
@@ -95,11 +95,6 @@ function NewBotPage(): React.JSX.Element {
 
   return (
     <div className={styles.page}>
-      <button type="button" className={styles.backLink} onClick={backToList}>
-        <ArrowLeftIcon size={15} />
-        All bots
-      </button>
-
       <div>
         <h2 className={styles.tabTitle}>New bot</h2>
         <p className={styles.tabDesc}>You’ll generate its first API key right after creating it.</p>

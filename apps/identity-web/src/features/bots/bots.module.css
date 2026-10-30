@@ -64,11 +64,6 @@
   overflow: hidden;
 }
 
-.tableFoot {
-  padding: 12px 18px;
-  border-top: 1px solid var(--sh-border-subtle);
-}
-
 .botLink {
   display: flex;
   align-items: center;
@@ -256,55 +251,10 @@
   border-top: 1px solid var(--sh-border-subtle);
 }
 
-.backLink {
-  font-size: 13px;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  width: fit-content;
-  color: var(--sh-accent);
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0;
-}
-
-.detailHead {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.detailHeadMain {
-  flex: 1;
-  min-width: 0;
-}
-
-.detailEyebrow {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  color: var(--sh-text-tertiary);
-  margin-bottom: 3px;
-}
-
-.detailName {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  flex-wrap: wrap;
-  font-size: 22px;
-  font-weight: 680;
-  letter-spacing: -0.02em;
-  color: var(--sh-text-primary);
-}
-
 .detailMeta {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-top: 4px;
   font-size: 12.5px;
   color: var(--sh-text-tertiary);
   flex-wrap: wrap;
@@ -312,78 +262,23 @@
 
 .detailMetaId {
   font-family: var(--sh-font-mono);
+  overflow-wrap: anywhere;
 }
 
-.detailActions {
-  display: flex;
-  flex: none;
-  gap: 8px;
-}
-
-.detailLayout {
-  display: grid;
-  grid-template-columns: 200px minmax(0, 1fr);
-  gap: 28px;
-  align-items: start;
-}
-@media (max-width: 780px) {
-  .detailLayout {
-    grid-template-columns: 1fr;
-  }
-}
-
-.sectionNav {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.navItem {
-  display: flex;
+.detailMetaItem {
+  display: inline-flex;
   align-items: center;
-  gap: 10px;
-  height: 34px;
-  padding: 0 10px;
-  border-radius: var(--sh-radius-md);
-  font-size: 13px;
-  color: var(--sh-text-secondary);
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-family: inherit;
-  text-align: left;
-  width: 100%;
-}
-.navItem[data-active='true'] {
-  background: var(--sh-accent-soft);
-  color: var(--sh-accent);
-  font-weight: 500;
-}
-.navItem[data-disabled='true'] {
-  opacity: var(--sh-disabled-opacity);
-  cursor: not-allowed;
+  gap: 4px;
 }
 
-.navLabel {
-  flex: 1;
+/* An inset shadow instead of the list's border: the tabs' -1px overlap would otherwise raise a vertical scrollbar under overflow-x. */
+.tabList[role='tablist'] {
+  border-bottom: none;
+  box-shadow: inset 0 -1px 0 var(--sh-border-default);
+  overflow-x: auto;
 }
-
-.navCount {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--sh-text-tertiary);
-  background: var(--sh-surface-well);
-  border: 1px solid var(--sh-border-subtle);
-  border-radius: 999px;
-  padding: 1px 7px;
-  line-height: 1.5;
-}
-
-.sectionBody {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
+.tabList [role='tab'] {
+  margin-bottom: 0;
 }
 
 .overviewGrid {
@@ -406,10 +301,10 @@
 }
 
 .detailCardTitle {
+  margin: 0 0 16px;
   font-size: 14px;
   font-weight: 600;
   color: var(--sh-text-primary);
-  margin-bottom: 16px;
 }
 
 .cardStack {
@@ -476,6 +371,7 @@
 }
 
 .cardTitleInline {
+  margin: 0;
   font-size: 14px;
   font-weight: 600;
   color: var(--sh-text-primary);
@@ -537,13 +433,6 @@
   font-family: var(--sh-font-mono);
 }
 
-.listActions {
-  display: flex;
-  flex: none;
-  align-items: center;
-  gap: 4px;
-}
-
 .revokedSection {
   margin-top: 4px;
 }
@@ -562,40 +451,23 @@
   max-width: 720px;
 }
 
-.dangerCard {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 16px 20px;
-  border: 1px solid var(--sh-danger-border);
-  border-radius: var(--sh-radius-xl);
-  background: var(--sh-danger-bg-subtle);
+.formSection {
+  padding-top: 16px;
+  border-top: 1px solid var(--sh-border-subtle);
 }
 
-.suspendCard {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 16px 20px;
-  border: 1px solid var(--sh-border-subtle);
-  border-radius: var(--sh-radius-xl);
-  background: var(--sh-surface-well);
-}
-
-.dangerTitle {
+.formSectionTitle {
+  margin: 0;
   font-size: 13.5px;
   font-weight: 600;
   color: var(--sh-text-primary);
 }
 
-.dangerDesc {
-  margin-top: 3px;
+.formSectionDesc {
+  margin: 3px 0 0;
   font-size: 12.5px;
   line-height: 1.5;
   color: var(--sh-text-secondary);
-  max-width: 440px;
 }
 
 .ipList {

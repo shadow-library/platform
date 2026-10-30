@@ -1,6 +1,7 @@
 export * from './activity-tab';
 export * from './bot-activity-events';
 export * from './bot-detail.shared';
+export * from './bot-settings-form';
 export * from './delete-bot-dialog';
 export * from './deletion-notice';
 export * from './generate-key-dialog';
