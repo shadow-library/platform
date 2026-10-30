@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
-import { FakeServiceFetch, jsonResponse } from '@shadow-library/internal-api/testing';
-import { WebNovelClient } from '@shadow-library/internal-api/web-novel';
+import { FakeServiceFetch, jsonResponse } from '@shadow-library/clients/testing';
+import { WebNovelClient } from '@shadow-library/clients/web-novel';
 import { WIKI_CAPABILITIES_HEADER, WIKI_HEADLINE_GATE_CAPABILITY } from '@shadow-library/sdk/publishing';
 
 import { type Publishing } from '@server/database';

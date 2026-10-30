@@ -18,7 +18,7 @@ COPY packages/ui/package.json packages/ui/package.json
 COPY packages/web/package.json packages/web/package.json
 COPY packages/sdk/package.json packages/sdk/package.json
 COPY packages/synapse/package.json packages/synapse/package.json
-COPY packages/internal-api/package.json packages/internal-api/package.json
+COPY packages/clients/package.json packages/clients/package.json
 COPY apps/identity-server/package.json apps/identity-server/package.json
 COPY apps/identity-web/package.json apps/identity-web/package.json
 COPY apps/novel-forge-server/package.json apps/novel-forge-server/package.json
@@ -41,7 +41,7 @@ COPY packages/auth/ packages/auth/
 COPY packages/class-schema/ packages/class-schema/
 COPY packages/common/ packages/common/
 COPY packages/fastify/ packages/fastify/
-COPY packages/internal-api/ packages/internal-api/
+COPY packages/clients/ packages/clients/
 COPY packages/modules/ packages/modules/
 COPY packages/sdk/ packages/sdk/
 COPY packages/synapse/ packages/synapse/

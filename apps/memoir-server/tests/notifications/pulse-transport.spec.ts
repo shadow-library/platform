@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
-import { PulseClient } from '@shadow-library/internal-api/pulse';
-import { FakeServiceFetch, jsonResponse, type ServiceReply } from '@shadow-library/internal-api/testing';
+import { PulseClient } from '@shadow-library/clients/pulse';
+import { FakeServiceFetch, jsonResponse, type ServiceReply } from '@shadow-library/clients/testing';
 
 import { HttpPulseTransport } from '@modules/notifications/pulse-transport';
 

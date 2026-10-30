@@ -36,8 +36,8 @@ identity ──svc://novel-forge-server/internal/bots/*──> novel-forge   (bo
   API shapes.
 - The contract is NOT atomic: a server DTO/route change requires regenerating the paired web app's types and fixing its callers in the same coordinated change.
 - CI's drift check (`bun scripts/gen-api-types.ts <web-app> --check`) runs on both sides of a pair — a server-affecting change and a web-only hand edit of the committed file are both caught.
-- Server-to-server calls follow the same rule through `@shadow-library/internal-api`: each callee route a caller uses is listed in that package's `shadow.internalContracts`, its types are generated
-  by `bun scripts/gen-internal-api.ts`, and CI checks them on every server and on the package. A callee changing such a route updates the package and its callers in the same change.
+- Server-to-server calls follow the same rule through `@shadow-library/clients`: each callee route a caller uses is listed in that package's `shadow.clientContracts`, its types are generated
+  by `bun scripts/gen-clients.ts`, and CI checks them on every server and on the package. A callee changing such a route updates the package and its callers in the same change.
 
 ## Data stores
 

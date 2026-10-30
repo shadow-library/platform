@@ -224,14 +224,14 @@ application and uses the app-session flow; the summary below is orientation only
 
 ## Service-to-service calls
 
-Call another first-party server through its client in `@shadow-library/internal-api` — `PulseClient`
+Call another first-party server through its client in `@shadow-library/clients` — `PulseClient`
 (`/pulse`), `WebNovelClient` (`/web-novel`), `NovelForgeClient` (`/novel-forge`, the bot-ownership
 protocol), `IdentityClient` (`/identity`). Bind each as a provider over `fromAuthClient(authClient)`
 (identity-server: `serviceFetchFrom(serviceTokenService)`). Every method answers a `ServiceResponse`
 (`{ ok, status, headers, data | error }`); only a call with no HTTP answer throws
-`INTERNAL_API_SERVICE_UNREACHABLE`, so the caller keeps its own policy for each refusal. A route the
-package lacks: add its path to `shadow.internalContracts` in `packages/internal-api/package.json`, run
-`bun scripts/gen-internal-api.ts`, add the method. Tests use `FakeServiceFetch` from `/testing`.
+`SERVICE_UNREACHABLE`, so the caller keeps its own policy for each refusal. A route the
+package lacks: add its path to `shadow.clientContracts` in `packages/clients/package.json`, run
+`bun scripts/gen-clients.ts`, add the method. Tests use `FakeServiceFetch` from `/testing`.
 
 For anything else, use `APIRequest` from `common` with a `svc://<service>/<path>` URL — MUST NOT hard-code hostnames.
 Resolution: `svc://name/…` → `http://name/…` via cluster DNS; dotted host = cross-namespace;

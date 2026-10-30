@@ -1,6 +1,6 @@
 import { Module } from '@shadow-library/app';
 import { Config } from '@shadow-library/common';
-import { PULSE_TARGET, PulseClient } from '@shadow-library/internal-api/pulse';
+import { PULSE_TARGET, PulseClient } from '@shadow-library/clients/pulse';
 
 import { DatabaseModule } from '@server/modules/infrastructure/datastore';
 import { serviceFetchFrom, ServiceTokenModule, ServiceTokenService } from '@server/modules/infrastructure/service-token';

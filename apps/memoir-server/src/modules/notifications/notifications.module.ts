@@ -1,8 +1,8 @@
 import { Module } from '@shadow-library/app';
 import { AuthClient } from '@shadow-library/auth';
 import { AuthModule } from '@shadow-library/auth/module';
-import { fromAuthClient } from '@shadow-library/internal-api';
-import { PulseClient } from '@shadow-library/internal-api/pulse';
+import { fromAuthClient } from '@shadow-library/clients';
+import { PulseClient } from '@shadow-library/clients/pulse';
 import { DatabaseModule } from '@shadow-library/modules';
 
 import { MemoirAuthModule } from '@modules/auth';

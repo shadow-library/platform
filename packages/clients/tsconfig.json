@@ -1,0 +1,13 @@
+{
+  "extends": "../tsconfig.lib.json",
+  "compilerOptions": {
+    "paths": {
+      "@shadow-library/clients": ["./src/index.ts"],
+      "@shadow-library/clients/identity": ["./src/identity/index.ts"],
+      "@shadow-library/clients/novel-forge": ["./src/novel-forge/index.ts"],
+      "@shadow-library/clients/pulse": ["./src/pulse/index.ts"],
+      "@shadow-library/clients/web-novel": ["./src/web-novel/index.ts"],
+      "@shadow-library/clients/testing": ["./src/testing/index.ts"]
+    }
+  }
+}

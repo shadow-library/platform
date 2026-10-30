@@ -1,6 +1,6 @@
 import { ServiceDiscovery } from '@shadow-library/common';
 
-import { InternalApiErrorCode } from './internal-api-error-code';
+import { ServiceCallErrorCode } from './service-call-error-code';
 import { type ServiceFetch, type ServiceTarget } from './service-fetch';
 import { type CallOptions, type ServiceErrorBody, type ServiceResponse } from './service-response';
 
@@ -45,7 +45,7 @@ export async function callService<T>(fetchFn: ServiceFetch, target: ServiceTarge
 
   const unreachable = (error: unknown): never => {
     if (request.signal?.aborted) throw error;
-    throw InternalApiErrorCode.SERVICE_UNREACHABLE.create({ service: target.service, reason: reasonOf(error) }, error);
+    throw ServiceCallErrorCode.SERVICE_UNREACHABLE.create({ service: target.service, reason: reasonOf(error) }, error);
   };
 
   const url = ServiceDiscovery.resolve(`svc://${target.service}${request.path}`);

@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'bun:test';
 
-import { IdentityClient } from '@shadow-library/internal-api/identity';
-import { NovelForgeClient } from '@shadow-library/internal-api/novel-forge';
-import { PULSE_TARGET, PulseClient } from '@shadow-library/internal-api/pulse';
-import { FakeServiceFetch } from '@shadow-library/internal-api/testing';
-import { WebNovelClient } from '@shadow-library/internal-api/web-novel';
+import { IdentityClient } from '@shadow-library/clients/identity';
+import { NovelForgeClient } from '@shadow-library/clients/novel-forge';
+import { PULSE_TARGET, PulseClient } from '@shadow-library/clients/pulse';
+import { FakeServiceFetch } from '@shadow-library/clients/testing';
+import { WebNovelClient } from '@shadow-library/clients/web-novel';
 
 describe('PulseClient', () => {
   it('should post a notification to pulse with the send scope', async () => {

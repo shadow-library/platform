@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'bun:test';
 import { AppError } from '@shadow-library/common';
 
-import { callService, fromAuthClient, type ServiceTarget } from '@shadow-library/internal-api';
-import { FakeServiceFetch, jsonResponse } from '@shadow-library/internal-api/testing';
+import { callService, fromAuthClient, type ServiceTarget } from '@shadow-library/clients';
+import { FakeServiceFetch, jsonResponse } from '@shadow-library/clients/testing';
 
 const TARGET: ServiceTarget = { service: 'reader-server', resource: 'api://reader', scopes: ['reader:write'] };
 
@@ -60,7 +60,7 @@ describe('callService', () => {
     const error = await callService(fake.fetch, TARGET, { method: 'GET', path: '/things' }).catch((err: unknown) => err);
 
     expect(error).toBeInstanceOf(AppError);
-    expect((error as AppError).code).toBe('INTERNAL_API_SERVICE_UNREACHABLE');
+    expect((error as AppError).code).toBe('SERVICE_UNREACHABLE');
     expect((error as AppError).message).toContain('reader-server');
   });
 

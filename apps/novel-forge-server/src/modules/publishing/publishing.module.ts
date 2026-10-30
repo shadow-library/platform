@@ -2,8 +2,8 @@ import { Module } from '@shadow-library/app';
 import { AuthClient } from '@shadow-library/auth';
 import { resolveAuthClientConfig } from '@shadow-library/auth/module';
 import { FastifyModule } from '@shadow-library/fastify';
-import { fromAuthClient } from '@shadow-library/internal-api';
-import { WebNovelClient } from '@shadow-library/internal-api/web-novel';
+import { fromAuthClient } from '@shadow-library/clients';
+import { WebNovelClient } from '@shadow-library/clients/web-novel';
 import { DatabaseModule } from '@shadow-library/modules';
 
 import { PublicationAccessService } from './publication-access.service';

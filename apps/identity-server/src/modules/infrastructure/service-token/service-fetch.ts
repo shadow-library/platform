@@ -1,4 +1,4 @@
-import { type ServiceFetch } from '@shadow-library/internal-api';
+import { type ServiceFetch } from '@shadow-library/clients';
 
 import { type ServiceTokenService } from './service-token.service';
 

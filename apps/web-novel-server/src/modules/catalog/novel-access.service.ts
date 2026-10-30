@@ -2,7 +2,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { type AuthPrincipal } from '@shadow-library/auth';
 import { Config, Logger, LRUCache } from '@shadow-library/common';
-import { IdentityClient } from '@shadow-library/internal-api/identity';
+import { IdentityClient } from '@shadow-library/clients/identity';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { APP_NAME } from '@server/constants';

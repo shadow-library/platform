@@ -2,8 +2,8 @@ import { Module } from '@shadow-library/app';
 import { AuthClient } from '@shadow-library/auth';
 import { AuthModule } from '@shadow-library/auth/module';
 import { FastifyModule } from '@shadow-library/fastify';
-import { fromAuthClient } from '@shadow-library/internal-api';
-import { IdentityClient } from '@shadow-library/internal-api/identity';
+import { fromAuthClient } from '@shadow-library/clients';
+import { IdentityClient } from '@shadow-library/clients/identity';
 
 import { DatabaseModule } from '@server/modules/datastore';
 

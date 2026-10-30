@@ -9,7 +9,7 @@
 
 ## Layering (dependencies point down only)
 
-- `common` -> `class-schema`, `app` -> `fastify` -> `modules`; `auth` sits beside `modules`. Web side: `ui` and `web`. `sdk` and `ui` depend on no first-party package; `synapse` depends on `common` and `auth`; `internal-api` depends on `common` only, so identity-server can use it.
+- `common` -> `class-schema`, `app` -> `fastify` -> `modules`; `auth` sits beside `modules`. Web side: `ui` and `web`. `sdk` and `ui` depend on no first-party package; `synapse` depends on `common` and `auth`; `clients` depends on `common` only, so identity-server can use it.
 - Backends use the backend chain plus `auth` (all but identity), `sdk` (novel-forge, web-novel) and `synapse` (novel-forge, memoir); web apps use `ui` + `web` (+ `common` in identity-web, + `sdk` in novel-forge-web and web-novel-web).
 - Put code in the lowest package that can own it. Product logic stays in the app; a package never imports from `apps/*`.
 
@@ -20,7 +20,7 @@
   shared frontend wiring.
 - `sdk` novel vocabulary, the Novel Forge to Web Novel content-hash contract, the one prose paragraph count Novel Forge's server and web app share, and the chapter Markdown renderer.
 - `synapse` Synapse client: wire types, typed calls, LangChain chat model (subpath `/langchain`); consumed by `novel-forge-server` and `memoir-server`.
-- `internal-api` one client per callee for the app-to-app calls (subpaths `/identity`, `/novel-forge`, `/pulse`, `/web-novel`, `/testing`). Synapse keeps its own package and the auth SDK its
+- `clients` one client per callee for the app-to-app calls (subpaths `/identity`, `/novel-forge`, `/pulse`, `/web-novel`, `/testing`). Synapse keeps its own package and the auth SDK its
   identity protocol calls. Its `*-api.gen.ts` contracts are cut from each callee's OpenAPI document and drift-checked; never hand-edit them.
 - `common`, `modules` and `auth` each also publish a `testing` subpath (`@shadow-library/<pkg>/testing`) of fakes and stand-ins for `apps/*`'s unit tests — e.g. `FakeDatabaseService`,
   `FakeStorageService`, `InMemoryRedis`, `withoutStartupHooks`, `createTestIdP`/`createOfflineAuth`. Apps reach for these instead of hand-rolling a fake or booting real infrastructure.

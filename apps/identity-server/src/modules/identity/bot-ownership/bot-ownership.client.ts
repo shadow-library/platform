@@ -1,7 +1,7 @@
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger } from '@shadow-library/common';
-import { type ServiceFetch, type ServiceResponse } from '@shadow-library/internal-api';
-import { NovelForgeClient } from '@shadow-library/internal-api/novel-forge';
+import { type ServiceFetch, type ServiceResponse } from '@shadow-library/clients';
+import { NovelForgeClient } from '@shadow-library/clients/novel-forge';
 
 import { APP_NAME } from '@server/constants';
 import { serviceFetchFrom, ServiceTokenService } from '@server/modules/infrastructure/service-token';

@@ -45,9 +45,9 @@
         "@peculiar/x509": "^2.0.0",
         "@shadow-library/app": "workspace:*",
         "@shadow-library/class-schema": "workspace:*",
+        "@shadow-library/clients": "workspace:*",
         "@shadow-library/common": "workspace:*",
         "@shadow-library/fastify": "workspace:*",
-        "@shadow-library/internal-api": "workspace:*",
         "@shadow-library/modules": "workspace:*",
         "@simplewebauthn/server": "^14.0.3",
         "drizzle-orm": "catalog:",
@@ -102,9 +102,9 @@
         "@shadow-library/app": "workspace:*",
         "@shadow-library/auth": "workspace:*",
         "@shadow-library/class-schema": "workspace:*",
+        "@shadow-library/clients": "workspace:*",
         "@shadow-library/common": "workspace:*",
         "@shadow-library/fastify": "workspace:*",
-        "@shadow-library/internal-api": "workspace:*",
         "@shadow-library/modules": "workspace:*",
         "@shadow-library/synapse": "workspace:*",
         "drizzle-orm": "catalog:",
@@ -153,9 +153,9 @@
         "@shadow-library/app": "workspace:*",
         "@shadow-library/auth": "workspace:*",
         "@shadow-library/class-schema": "workspace:*",
+        "@shadow-library/clients": "workspace:*",
         "@shadow-library/common": "workspace:*",
         "@shadow-library/fastify": "workspace:*",
-        "@shadow-library/internal-api": "workspace:*",
         "@shadow-library/modules": "workspace:*",
         "@shadow-library/sdk": "workspace:*",
         "@shadow-library/synapse": "workspace:*",
@@ -307,9 +307,9 @@
         "@shadow-library/app": "workspace:*",
         "@shadow-library/auth": "workspace:*",
         "@shadow-library/class-schema": "workspace:*",
+        "@shadow-library/clients": "workspace:*",
         "@shadow-library/common": "workspace:*",
         "@shadow-library/fastify": "workspace:*",
-        "@shadow-library/internal-api": "workspace:*",
         "@shadow-library/modules": "workspace:*",
         "@shadow-library/sdk": "workspace:*",
         "drizzle-orm": "catalog:",
@@ -423,6 +423,20 @@
         "reflect-metadata": "^0.2.2",
       },
     },
+    "packages/clients": {
+      "name": "@shadow-library/clients",
+      "version": "0.0.0",
+      "dependencies": {
+        "@shadow-library/common": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/bun": "catalog:",
+        "typescript": "catalog:",
+      },
+      "peerDependencies": {
+        "@shadow-library/common": "workspace:*",
+      },
+    },
     "packages/common": {
       "name": "@shadow-library/common",
       "version": "2.0.0-alpha.5",
@@ -478,20 +492,6 @@
       "optionalPeers": [
         "@fastify/cookie",
       ],
-    },
-    "packages/internal-api": {
-      "name": "@shadow-library/internal-api",
-      "version": "0.0.0",
-      "dependencies": {
-        "@shadow-library/common": "workspace:*",
-      },
-      "devDependencies": {
-        "@types/bun": "catalog:",
-        "typescript": "catalog:",
-      },
-      "peerDependencies": {
-        "@shadow-library/common": "workspace:*",
-      },
     },
     "packages/modules": {
       "name": "@shadow-library/modules",
@@ -1290,13 +1290,13 @@
 
     "@shadow-library/class-schema": ["@shadow-library/class-schema@workspace:packages/class-schema"],
 
+    "@shadow-library/clients": ["@shadow-library/clients@workspace:packages/clients"],
+
     "@shadow-library/common": ["@shadow-library/common@workspace:packages/common"],
 
     "@shadow-library/fastify": ["@shadow-library/fastify@workspace:packages/fastify"],
 
     "@shadow-library/identity": ["@shadow-library/identity@workspace:apps/identity-server"],
-
-    "@shadow-library/internal-api": ["@shadow-library/internal-api@workspace:packages/internal-api"],
 
     "@shadow-library/memoir-server": ["@shadow-library/memoir-server@workspace:apps/memoir-server"],
 

@@ -18,6 +18,7 @@ const PACKAGE_ENTRIES: Record<string, string[]> = {
   'packages/app': ['src/index.ts'],
   'packages/auth': ['src/index.ts', 'src/module/index.ts', 'src/rp/index.ts', 'src/testing/index.ts'],
   'packages/class-schema': ['src/index.ts'],
+  'packages/clients': ['src/index.ts', 'src/identity/index.ts', 'src/novel-forge/index.ts', 'src/pulse/index.ts', 'src/web-novel/index.ts', 'src/testing/index.ts'],
   'packages/common': [
     'src/index.ts',
     'src/errors/index.ts',
@@ -32,7 +33,6 @@ const PACKAGE_ENTRIES: Record<string, string[]> = {
     'src/testing/index.ts',
   ],
   'packages/fastify': ['src/index.ts'],
-  'packages/internal-api': ['src/index.ts', 'src/identity/index.ts', 'src/novel-forge/index.ts', 'src/pulse/index.ts', 'src/web-novel/index.ts', 'src/testing/index.ts'],
   'packages/modules': [
     'src/index.ts',
     'src/bootstrap/index.ts',

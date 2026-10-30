@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import { type OpenApiDocument } from './gen-api-types.ts';
-import { cutContract } from './gen-internal-api.ts';
+import { cutContract } from './gen-clients.ts';
 
 const ref = (name: string): { $ref: string } => ({ $ref: `#/components/schemas/${name}` });
 const json = (schema: unknown): unknown => ({ content: { 'application/json': { schema } } });

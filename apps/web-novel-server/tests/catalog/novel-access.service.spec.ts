@@ -2,8 +2,8 @@ import '@server/bootstrap';
 
 import { describe, expect, it } from 'bun:test';
 import { type AuthPrincipal } from '@shadow-library/auth';
-import { IdentityClient } from '@shadow-library/internal-api/identity';
-import { FakeServiceFetch, jsonResponse } from '@shadow-library/internal-api/testing';
+import { IdentityClient } from '@shadow-library/clients/identity';
+import { FakeServiceFetch, jsonResponse } from '@shadow-library/clients/testing';
 import { FakeDatabaseService } from '@shadow-library/modules/testing';
 
 import { NovelAccessService } from '@modules/catalog/novel-access.service';

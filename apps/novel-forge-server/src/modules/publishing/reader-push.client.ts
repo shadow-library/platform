@@ -1,6 +1,6 @@
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
-import { type ServiceErrorBody, type ServiceResponse } from '@shadow-library/internal-api';
+import { type ServiceErrorBody, type ServiceResponse } from '@shadow-library/clients';
 import {
   type ChapterManifest,
   type ChapterUpsertBody,
@@ -10,7 +10,7 @@ import {
   type WikiManifest as ReaderWikiManifest,
   WebNovelClient,
   type WikiEntryUpsertBody,
-} from '@shadow-library/internal-api/web-novel';
+} from '@shadow-library/clients/web-novel';
 import { WIKI_CAPABILITIES_HEADER, WIKI_HEADLINE_GATE_CAPABILITY } from '@shadow-library/sdk/publishing';
 
 import { APP_NAME } from '@server/constants';

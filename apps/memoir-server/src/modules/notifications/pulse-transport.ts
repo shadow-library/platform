@@ -1,6 +1,6 @@
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
-import { PulseClient } from '@shadow-library/internal-api/pulse';
+import { PulseClient } from '@shadow-library/clients/pulse';
 
 import { APP_NAME } from '@server/constants';
 
