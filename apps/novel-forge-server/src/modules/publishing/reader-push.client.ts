@@ -1,103 +1,42 @@
 import { Injectable } from '@shadow-library/app';
-import { AuthClient } from '@shadow-library/auth';
-import { type APIResponse, Logger } from '@shadow-library/common';
-import { type ContentRating, type DarkContentLevel, type Genre, type SexualContentLevel, type Tag, type ViolenceLevel } from '@shadow-library/sdk';
+import { Logger } from '@shadow-library/common';
+import { type ServiceErrorBody, type ServiceResponse } from '@shadow-library/internal-api';
+import {
+  type ChapterManifest,
+  type ChapterUpsertBody,
+  type NovelAccessBody,
+  type NovelAccessResponse,
+  type NovelUpsertBody,
+  type WikiManifest as ReaderWikiManifest,
+  WebNovelClient,
+  type WikiEntryUpsertBody,
+} from '@shadow-library/internal-api/web-novel';
 import { WIKI_CAPABILITIES_HEADER, WIKI_HEADLINE_GATE_CAPABILITY } from '@shadow-library/sdk/publishing';
 
 import { APP_NAME } from '@server/constants';
 
-export interface NovelPushBody {
-  /** Our own identity for the novel, not the reader's: it, not the slug, decides which row a push lands on, so a new slug renames rather than duplicates. */
-  sourceRef: string;
-  /** The publication's per-project token the reader binds trust-on-first-use; optional so a reader that predates it simply drops it. Hardens the guessable `sourceRef`, not a guard-gap control on its own. */
-  publishToken?: string;
-  title: string;
-  /** The work's own author when the publishing account did not write it; omitted rather than empty — the reader's schema rejects a blank one. */
-  originalAuthor?: string;
-  blurb?: string;
-  coverPath?: string;
-  genres?: Genre[];
-  tags?: Tag[];
-  /** Omission is how a rating is cleared: the reader stores an absent dimension as unrated, and rejects an explicit null. */
-  sexualContent?: SexualContentLevel;
-  violence?: ViolenceLevel;
-  darkContent?: DarkContentLevel;
-  status?: 'live' | 'retired';
-  /** Required by the reader, not optional: a default would let a dropped field publish a private novel publicly. */
-  visibility: 'PUBLIC' | 'ORGANISATION' | 'RESTRICTED';
-  revision: number;
-}
+export type NovelPushBody = NovelUpsertBody;
 
-export interface AccessPushBody {
-  visibility: 'PUBLIC' | 'ORGANISATION' | 'RESTRICTED';
-  organisationId?: string;
-  subjectIds?: string[];
-  revision: number;
-}
+export type AccessPushBody = NovelAccessBody;
 
-export interface AccessState {
-  visibility: 'PUBLIC' | 'ORGANISATION' | 'RESTRICTED';
-  organisationId?: string;
-  subjectIds: string[];
-  revision: number;
-}
+export type AccessState = NovelAccessResponse;
 
-export interface ChapterPushBody {
-  title: string;
-  content: string;
-  authorNote?: string;
-  /** Omission is how a rating is cleared, exactly as on the novel push: the reader stores an absent dimension as unrated. */
-  contentRating?: ContentRating;
-  contentHash: string;
-  revision: number;
-  wordCount?: number;
-  publishedAt?: string;
-}
+export type ChapterPushBody = ChapterUpsertBody;
+
+export type ManifestItem = ChapterManifest[number];
+
+export type WikiPushBody = WikiEntryUpsertBody;
+
+export type WikiManifestItem = ReaderWikiManifest[number];
 
 export interface PushResult {
   outcome: 'applied' | 'noop';
-}
-
-export interface ManifestItem {
-  ordinal: number;
-  contentHash: string;
-  revision: number;
-}
-
-/** The reader-clean wiki-entry push body — payload plus its concurrency keys. */
-export interface WikiPushBody {
-  type: 'character' | 'faction' | 'location' | 'item' | 'concept' | 'power_rule';
-  name: string;
-  imageRef?: string;
-  imageVisibleFromOrdinal?: number;
-  firstVisibleOrdinal: number;
-  contentHash: string;
-  revision: number;
-  facets: { facetKey: string; content: string; sortOrder: number; visibleFromOrdinal: number }[];
-  images: { imageRef: string; caption?: string; sortOrder: number; visibleFromOrdinal: number }[];
-}
-
-export interface WikiManifestItem {
-  entryKey: string;
-  revision: number;
-  contentHash: string;
-  /** The headline gate the reader stores, echoed only by a reader advertising the headline-gate capability. */
-  imageVisibleFromOrdinal?: number;
 }
 
 export interface WikiManifest {
   items: WikiManifestItem[];
   headlineGate: boolean;
 }
-
-/** Identity service name of the reader — resolves via `SERVICE_URL_WEB_NOVEL_SERVER` or in-cluster svc DNS */
-const READER_SERVICE = 'web-novel-server';
-
-/** RFC 8707 resource the M2M token is addressed to; the reader accepts exactly this `aud`, not the service name */
-const READER_RESOURCE = 'api://web-novel';
-
-/** The M2M scope the reader's `/internal/*` guard requires; end-user tokens never carry it */
-const READER_PUBLISH_SCOPE = 'web-novel:publish';
 
 /** Any reader push failure that is not a revision conflict — transport errors, 5xx, unmintable token */
 export class ReaderPushError extends Error {
@@ -155,27 +94,13 @@ const STALE_REVISION_CODE = 'WBN_003';
 const SLUG_TAKEN_CODE = 'WBN_010';
 const HASH_MISMATCH_CODE = 'WBN_011';
 
-function readCapabilities(headers: Record<string, string | string[] | undefined> | undefined): Set<string> {
-  const raw = headers?.[WIKI_CAPABILITIES_HEADER];
-  const values = Array.isArray(raw) ? raw : [raw ?? ''];
-  return new Set(values.flatMap(value => value.split(',')).map(value => value.trim()));
+function readCapabilities(headers: Headers): Set<string> {
+  const raw = headers.get(WIKI_CAPABILITIES_HEADER) ?? '';
+  return new Set(raw.split(',').map(value => value.trim()));
 }
 
-/** The reader's error handler sends the `AppError` object as the whole response body — `{ code, message }`, with no envelope around it */
-function readErrorCode(data: unknown): string | undefined {
-  if (typeof data !== 'object' || data === null) return undefined;
-  const code = (data as { code?: unknown }).code;
-  return typeof code === 'string' ? code : undefined;
-}
-
-function readErrorMessage(data: unknown): string | undefined {
-  if (typeof data !== 'object' || data === null) return undefined;
-  const message = (data as { message?: unknown }).message;
-  return typeof message === 'string' ? message : undefined;
-}
-
-function describeRejection(data: unknown): string {
-  const parts = [readErrorCode(data), readErrorMessage(data)].filter(Boolean);
+function describeRejection(error: ServiceErrorBody): string {
+  const parts = [error.code, error.message].filter(Boolean);
   return parts.length > 0 ? ` (${parts.join(': ')})` : '';
 }
 
@@ -184,92 +109,91 @@ function describeRejection(data: unknown): string {
 export class ReaderPushClient {
   private readonly logger = Logger.getLogger(APP_NAME, ReaderPushClient.name);
 
-  constructor(private readonly authClient: AuthClient) {}
+  constructor(private readonly reader: WebNovelClient) {}
 
   async upsertNovel(slug: string, body: NovelPushBody): Promise<PushResult> {
-    const response = await this.send('PUT', `/internal/novels/${slug}`, body);
+    const response = await this.send('PUT', slug, () => this.reader.upsertNovel(slug, body));
     return this.toUpsertResult(response, slug, body.revision);
   }
 
   async upsertAccess(slug: string, body: AccessPushBody): Promise<PushResult> {
-    const response = await this.send('PUT', `/internal/novels/${slug}/access`, body);
+    const response = await this.send('PUT', slug, () => this.reader.upsertAccess(slug, body));
     return this.toUpsertResult(response, slug, body.revision);
   }
 
   /** The access counterpart of `getManifest`; an unknown novel reads as nothing shared, since the next push creates it. */
   async getAccess(slug: string): Promise<AccessState | undefined> {
-    const response = await this.send<AccessState>('GET', `/internal/novels/${slug}/access`);
-    if (response.statusCode === 404) return undefined;
-    if (response.statusCode >= 400) throw new ReaderPushError(`reader access read answered http ${response.statusCode}`, response.statusCode);
+    const response = await this.send('GET', slug, () => this.reader.getAccess(slug));
+    if (response.status === 404) return undefined;
+    if (!response.ok) throw new ReaderPushError(`reader access read answered http ${response.status}`, response.status);
     return response.data ?? undefined;
   }
 
   async upsertChapter(slug: string, ordinal: number, body: ChapterPushBody): Promise<PushResult> {
-    const response = await this.send('PUT', `/internal/novels/${slug}/chapters/${ordinal}`, body);
+    const response = await this.send('PUT', slug, () => this.reader.upsertChapter(slug, ordinal, body));
     return this.toUpsertResult(response, slug, body.revision);
   }
 
   /** Idempotent on the reader — deleting an absent chapter still answers 204 */
   async deleteChapter(slug: string, ordinal: number): Promise<void> {
-    const response = await this.send('DELETE', `/internal/novels/${slug}/chapters/${ordinal}`);
-    if (response.statusCode === 204) return;
-    if (readErrorCode(response.data) === SLUG_TAKEN_CODE) throw new SlugConflictError(slug);
-    throw new ReaderPushError(`reader unpublish answered http ${response.statusCode}${describeRejection(response.data)}`, response.statusCode);
+    const response = await this.send('DELETE', slug, () => this.reader.deleteChapter(slug, ordinal));
+    if (response.status === 204) return;
+    this.throwUnpublishRejection(response, slug, 'reader unpublish');
   }
 
   /** The reconciliation primitive — an unknown novel reads as an empty shelf, since the next novel push creates it */
   async getManifest(slug: string): Promise<ManifestItem[]> {
-    const response = await this.send<ManifestItem[]>('GET', `/internal/novels/${slug}/manifest`);
-    if (response.statusCode === 404) return [];
-    if (response.statusCode >= 400) throw new ReaderPushError(`reader manifest answered http ${response.statusCode}`, response.statusCode);
+    const response = await this.send('GET', slug, () => this.reader.getManifest(slug));
+    if (response.status === 404) return [];
+    if (!response.ok) throw new ReaderPushError(`reader manifest answered http ${response.status}`, response.status);
     return response.data ?? [];
   }
 
   async upsertWiki(slug: string, entryKey: string, body: WikiPushBody): Promise<PushResult> {
-    const response = await this.send('PUT', `/internal/novels/${slug}/wiki/${entryKey}`, body);
+    const response = await this.send('PUT', slug, () => this.reader.upsertWiki(slug, entryKey, body));
     return this.toUpsertResult(response, slug, body.revision);
   }
 
   /** Idempotent on the reader — deleting an absent wiki entry still answers 204 */
   async deleteWiki(slug: string, entryKey: string): Promise<void> {
-    const response = await this.send('DELETE', `/internal/novels/${slug}/wiki/${entryKey}`);
-    if (response.statusCode === 204) return;
-    if (readErrorCode(response.data) === SLUG_TAKEN_CODE) throw new SlugConflictError(slug);
-    throw new ReaderPushError(`reader wiki unpublish answered http ${response.statusCode}${describeRejection(response.data)}`, response.statusCode);
+    const response = await this.send('DELETE', slug, () => this.reader.deleteWiki(slug, entryKey));
+    if (response.status === 204) return;
+    this.throwUnpublishRejection(response, slug, 'reader wiki unpublish');
   }
 
   /** The wiki reconciliation primitive — an unknown novel reads as an empty wiki, since the next entry push creates it */
   async getWikiManifest(slug: string): Promise<WikiManifest> {
-    const response = await this.send<WikiManifestItem[]>('GET', `/internal/novels/${slug}/wiki/manifest`);
-    if (response.statusCode === 404) return { items: [], headlineGate: false };
-    if (response.statusCode >= 400) throw new ReaderPushError(`reader wiki manifest answered http ${response.statusCode}`, response.statusCode);
+    const response = await this.send('GET', slug, () => this.reader.getWikiManifest(slug));
+    if (response.status === 404) return { items: [], headlineGate: false };
+    if (!response.ok) throw new ReaderPushError(`reader wiki manifest answered http ${response.status}`, response.status);
     return { items: response.data ?? [], headlineGate: readCapabilities(response.headers).has(WIKI_HEADLINE_GATE_CAPABILITY) };
   }
 
-  private async send<T = unknown>(method: string, path: string, body?: unknown): Promise<APIResponse<T>> {
-    const init: RequestInit = { method };
-    if (body !== undefined) {
-      init.headers = { 'content-type': 'application/json' };
-      init.body = JSON.stringify(body);
-    }
+  private async send<T>(method: string, slug: string, call: () => Promise<ServiceResponse<T>>): Promise<ServiceResponse<T>> {
     try {
-      return await this.authClient.fetchService<T>(READER_SERVICE, path, init, { resource: READER_RESOURCE, scopes: [READER_PUBLISH_SCOPE] });
+      return await call();
     } catch (err) {
-      if (err instanceof ReaderPushError) throw err;
       const message = err instanceof Error ? err.message : String(err);
-      this.logger.warn('reader push transport failure', { method, path, message });
+      this.logger.warn('reader push transport failure', { method, slug, message });
       throw new ReaderPushError(`reader service unreachable: ${message}`);
     }
   }
 
-  /** The reader's three rejections differ in kind, not in status: WBN_003 and WBN_010 share a 409, so the body's code decides, never the status */
-  private toUpsertResult(response: APIResponse<unknown>, slug: string, revision: number): PushResult {
-    if (response.statusCode === 200) return { outcome: 'applied' };
-    if (response.statusCode === 204) return { outcome: 'noop' };
+  private throwUnpublishRejection(response: ServiceResponse<unknown>, slug: string, action: string): never {
+    const error = response.ok ? {} : response.error;
+    if (error.code === SLUG_TAKEN_CODE) throw new SlugConflictError(slug);
+    throw new ReaderPushError(`${action} answered http ${response.status}${describeRejection(error)}`, response.status);
+  }
 
-    const code = readErrorCode(response.data);
-    if (code === HASH_MISMATCH_CODE && response.statusCode === 400) throw new PayloadHashMismatchError(slug);
-    if (response.statusCode !== 409) throw new ReaderPushError(`reader push answered http ${response.statusCode}${describeRejection(response.data)}`, response.statusCode);
+  /** The reader's three rejections differ in kind, not in status: WBN_003 and WBN_010 share a 409, so the body's code decides, never the status */
+  private toUpsertResult(response: ServiceResponse<unknown>, slug: string, revision: number): PushResult {
+    if (response.status === 200) return { outcome: 'applied' };
+    if (response.status === 204) return { outcome: 'noop' };
+    if (response.ok) throw new ReaderPushError(`reader push answered http ${response.status}`, response.status);
+
+    const code = response.error.code;
+    if (code === HASH_MISMATCH_CODE && response.status === 400) throw new PayloadHashMismatchError(slug);
+    if (response.status !== 409) throw new ReaderPushError(`reader push answered http ${response.status}${describeRejection(response.error)}`, response.status);
     if (code === SLUG_TAKEN_CODE) throw new SlugConflictError(slug);
     if (code === STALE_REVISION_CODE) throw new StaleRevisionError(revision);
     throw new UnknownConflictError(slug, revision);

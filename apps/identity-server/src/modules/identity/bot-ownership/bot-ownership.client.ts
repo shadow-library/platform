@@ -1,55 +1,38 @@
 import { Injectable } from '@shadow-library/app';
-import { APIRequest, type APIResponse, AppError, Logger } from '@shadow-library/common';
+import { AppError, Logger } from '@shadow-library/common';
+import { type ServiceFetch, type ServiceResponse } from '@shadow-library/internal-api';
+import { NovelForgeClient } from '@shadow-library/internal-api/novel-forge';
 
 import { APP_NAME } from '@server/constants';
-import { ServiceTokenService } from '@server/modules/infrastructure/service-token';
+import { serviceFetchFrom, ServiceTokenService } from '@server/modules/infrastructure/service-token';
 
-import { botOwnershipUrl, OWNERSHIP_LOOKUP_TIMEOUT_MS, OWNERSHIP_TRANSFER_TIMEOUT_MS } from './bot-ownership.constants';
+import { OWNERSHIP_LOOKUP_TIMEOUT_MS, OWNERSHIP_TRANSFER_TIMEOUT_MS } from './bot-ownership.constants';
 import { type BotAwareApplication, type BotOwnedRecords } from './bot-ownership.types';
 
 @Injectable()
 export class BotOwnershipClient {
   private readonly logger = Logger.getLogger(APP_NAME, BotOwnershipClient.name);
+  private readonly fetch: ServiceFetch;
 
-  constructor(private readonly serviceTokenService: ServiceTokenService) {}
+  constructor(serviceTokenService: ServiceTokenService) {
+    this.fetch = serviceFetchFrom(serviceTokenService);
+  }
 
   async countOwned(application: BotAwareApplication, botId: bigint): Promise<BotOwnedRecords[]> {
-    const send = async (): Promise<APIResponse<Record<string, unknown>>> =>
-      APIRequest.get(botOwnershipUrl(application.name, botId, 'ownership'))
-        .header('authorization', `Bearer ${await this.serviceTokenService.getToken(application.audience, application.scope)}`)
-        .timeout(OWNERSHIP_LOOKUP_TIMEOUT_MS)
-        .suppressErrors()
-        .execute<Record<string, unknown>>();
-
-    return this.toRecords((await this.sendAuthenticated(application, send)).data);
+    const response = await this.clientFor(application).getBotOwnership(botId, { timeoutMs: OWNERSHIP_LOOKUP_TIMEOUT_MS });
+    return this.toRecords(this.assertOk(application, response));
   }
 
   async transfer(application: BotAwareApplication, botId: bigint, toUserId: bigint): Promise<BotOwnedRecords[]> {
-    const send = async (): Promise<APIResponse<Record<string, unknown>>> =>
-      APIRequest.post(botOwnershipUrl(application.name, botId, 'transfer'))
-        .header('authorization', `Bearer ${await this.serviceTokenService.getToken(application.audience, application.scope)}`)
-        .body({ toUserId: toUserId.toString() })
-        .timeout(OWNERSHIP_TRANSFER_TIMEOUT_MS)
-        .suppressErrors()
-        .execute<Record<string, unknown>>();
-
-    const moved = this.toRecords((await this.sendAuthenticated(application, send)).data);
+    const response = await this.clientFor(application).transferBotOwnership(botId, { toUserId: toUserId.toString() }, { timeoutMs: OWNERSHIP_TRANSFER_TIMEOUT_MS });
+    const moved = this.toRecords(this.assertOk(application, response));
     this.logger.info('transferred bot-owned records', { application: application.name, botId: botId.toString(), toUserId: toUserId.toString(), moved });
     return moved;
   }
 
-  /** A rotated signing key only shows up as a rejection, so the cached token is dropped and the call retried once rather than spending one of the transfer's attempts. */
-  private async sendAuthenticated(application: BotAwareApplication, send: () => Promise<APIResponse<Record<string, unknown>>>): Promise<APIResponse<Record<string, unknown>>> {
-    const response = await send();
-    if (response.statusCode !== 401 && response.statusCode !== 403) {
-      this.assertOk(application, response.statusCode, response.data);
-      return response;
-    }
-
-    this.serviceTokenService.invalidate(application.audience, application.scope);
-    const retried = await send();
-    this.assertOk(application, retried.statusCode, retried.data);
-    return retried;
+  /** Every bot-aware application answers Novel Forge's `/internal/bots/*` protocol, each under its own service, audience and scope. */
+  private clientFor(application: BotAwareApplication): NovelForgeClient {
+    return new NovelForgeClient(this.fetch, { service: `${application.name}-server`, resource: application.audience, scopes: [application.scope] });
   }
 
   /**
@@ -57,16 +40,16 @@ export class BotOwnershipClient {
    * every numeric member is carried through rather than mapped onto a fixed shape identity would
    * have to widen for each new application.
    */
-  private toRecords(data: Record<string, unknown> | null): BotOwnedRecords[] {
+  private toRecords(data: object | undefined): BotOwnedRecords[] {
     if (!data) return [];
     return Object.entries(data)
       .filter((entry): entry is [string, number] => typeof entry[1] === 'number' && Number.isFinite(entry[1]))
       .map(([kind, count]) => ({ kind, count }));
   }
 
-  private assertOk(application: BotAwareApplication, statusCode: number, data: unknown): void {
-    if (statusCode < 400) return;
-    this.logger.error('bot ownership call rejected', { application: application.name, statusCode, body: data });
-    throw AppError.internal(`${application.name} answered ${statusCode}`);
+  private assertOk<T>(application: BotAwareApplication, response: ServiceResponse<T>): T {
+    if (response.ok) return response.data;
+    this.logger.error('bot ownership call rejected', { application: application.name, statusCode: response.status, body: response.error });
+    throw AppError.internal(`${application.name} answered ${response.status}`);
   }
 }

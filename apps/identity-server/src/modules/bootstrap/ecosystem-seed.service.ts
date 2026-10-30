@@ -151,7 +151,7 @@ export class EcosystemSeedService {
     await this.oauthClientService.updateClient(provisioned.clientId, { workloadSubjects: subjects });
   }
 
-  /** identity-server mints its own outbound service tokens locally (NotificationTokenService) rather than calling its own token endpoint, so this credential is never actually presented and is never worth disclosing. */
+  /** identity-server mints its own outbound service tokens locally (ServiceTokenService) rather than calling its own token endpoint, so this credential is never actually presented and is never worth disclosing. */
   private async createServiceClient(seed: SeedServiceClient): Promise<void> {
     const application = this.applicationService.getApplicationOrThrow(seed.application);
     const { clientId, secret } = await this.oauthClientService.register({

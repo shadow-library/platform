@@ -22,6 +22,13 @@ export interface DbOptions {
   schema?: string;
 }
 
+export interface InternalContract {
+  /** Repo-relative server workspace whose OpenAPI document the contract is cut from, e.g. `apps/pulse-server`. */
+  server: string;
+  /** OpenAPI path keys kept in the contract; a trailing `*` keeps every path with that prefix. */
+  paths: string[];
+}
+
 export interface ShadowOptions {
   /** Overrides the inferred {@link WorkspaceType} — for a workspace whose path breaks the naming convention. */
   type?: WorkspaceType;
@@ -37,6 +44,8 @@ export interface ShadowOptions {
   /** Run the delegated `test` step during `verify`. Defaults to false for web apps and `none`-type workspaces, true otherwise. */
   verifyTest?: boolean;
   db?: DbOptions;
+  /** Server-to-server contracts generated into `src/<name>/<name>-api.gen.ts` by `scripts/gen-internal-api.ts`, keyed by `<name>`. */
+  internalContracts?: Record<string, InternalContract>;
 }
 
 export interface Workspace {

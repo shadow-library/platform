@@ -1,0 +1,85 @@
+{
+  "name": "@shadow-library/internal-api",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./identity": {
+      "types": "./dist/identity/index.d.ts",
+      "default": "./dist/identity/index.js"
+    },
+    "./novel-forge": {
+      "types": "./dist/novel-forge/index.d.ts",
+      "default": "./dist/novel-forge/index.js"
+    },
+    "./pulse": {
+      "types": "./dist/pulse/index.d.ts",
+      "default": "./dist/pulse/index.js"
+    },
+    "./web-novel": {
+      "types": "./dist/web-novel/index.d.ts",
+      "default": "./dist/web-novel/index.js"
+    },
+    "./testing": {
+      "types": "./dist/testing/index.d.ts",
+      "default": "./dist/testing/index.js"
+    }
+  },
+  "description": "Typed clients for the platform's server-to-server calls, over contracts generated from each callee's OpenAPI document",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/shadow-library/platform.git",
+    "directory": "packages/internal-api"
+  },
+  "author": "Leander Paul <leanderpaul97@outlook.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/shadow-library/platform/issues"
+  },
+  "homepage": "https://github.com/shadow-library/platform#readme",
+  "shadow": {
+    "internalContracts": {
+      "identity": {
+        "server": "apps/identity-server",
+        "paths": [
+          "/api/v1/internal/organisations/*"
+        ]
+      },
+      "novel-forge": {
+        "server": "apps/novel-forge-server",
+        "paths": [
+          "/internal/bots/*"
+        ]
+      },
+      "pulse": {
+        "server": "apps/pulse-server",
+        "paths": [
+          "/api/v1/notifications"
+        ]
+      },
+      "web-novel": {
+        "server": "apps/web-novel-server",
+        "paths": [
+          "/internal/novels/*"
+        ]
+      }
+    }
+  },
+  "peerDependencies": {
+    "@shadow-library/common": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "catalog:",
+    "typescript": "catalog:"
+  },
+  "dependencies": {
+    "@shadow-library/common": "workspace:*"
+  }
+}

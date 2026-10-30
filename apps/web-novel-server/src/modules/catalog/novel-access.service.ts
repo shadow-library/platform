@@ -1,7 +1,8 @@
 import { and, eq, inArray } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
-import { AuthClient, type AuthPrincipal } from '@shadow-library/auth';
+import { type AuthPrincipal } from '@shadow-library/auth';
 import { Config, Logger, LRUCache } from '@shadow-library/common';
+import { IdentityClient } from '@shadow-library/internal-api/identity';
 import { DatabaseService } from '@shadow-library/modules';
 
 import { APP_NAME } from '@server/constants';
@@ -9,16 +10,6 @@ import { type Novel, type PrimaryDatabase, schema } from '@server/modules/datast
 
 /** The subset of a novel the decision needs; taking the whole row would tempt callers to pass a stale copy. */
 export type AccessSubject = Pick<Novel, 'id' | 'visibility' | 'organisationId'>;
-
-interface MembershipResponse {
-  member: boolean;
-}
-
-/** Resolves via `SERVICE_URL_IDENTITY_SERVER` or in-cluster service DNS. */
-const IDENTITY_SERVICE = 'identity-server';
-/** Identity's own API keeps its bare identifier rather than an `api://` resource. */
-const IDENTITY_RESOURCE = 'shadow-identity';
-const DIRECTORY_SCOPE = 'users:resolve';
 
 const MEMBERSHIP_CACHE_CAPACITY = 4096;
 
@@ -30,7 +21,7 @@ export class NovelAccessService {
 
   constructor(
     databaseService: DatabaseService,
-    private readonly authClient: AuthClient,
+    private readonly identity: IdentityClient,
   ) {
     this.db = databaseService.getPostgresClient();
     this.membershipCache = new LRUCache(MEMBERSHIP_CACHE_CAPACITY, { ttl: Config.get('access.membership-ttl') * 1000 });
@@ -110,16 +101,10 @@ export class NovelAccessService {
 
   /** `null` means "could not determine", distinct from a definite `false`, and is never cached. */
   private async fetchMembership(organisationId: string, sub: string): Promise<boolean | null> {
-    const path = `/api/v1/internal/organisations/${organisationId}/members/${sub}`;
     try {
-      const response = await this.authClient.fetchService<MembershipResponse>(
-        IDENTITY_SERVICE,
-        path,
-        { method: 'GET' },
-        { resource: IDENTITY_RESOURCE, scopes: [DIRECTORY_SCOPE] },
-      );
-      if (response.statusCode >= 400) {
-        this.logger.warn('membership lookup answered an error status', { organisationId, sub, statusCode: response.statusCode });
+      const response = await this.identity.isOrganisationMember(organisationId, sub);
+      if (!response.ok) {
+        this.logger.warn('membership lookup answered an error status', { organisationId, sub, statusCode: response.status });
         return null;
       }
       return response.data?.member ?? false;

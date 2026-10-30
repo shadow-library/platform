@@ -249,7 +249,7 @@ export const ECOSYSTEM_SEED: EcosystemSeed = {
   ],
   serviceClients: [
     {
-      /** The lookup in NotificationTokenService matches on this exact name, so it must stay `identity-server`. */
+      /** The lookup in ServiceTokenService matches on this exact name, so it must stay `identity-server`. */
       id: 'identity-server',
       label: 'identity outbound',
       application: PLATFORM_APPLICATION,

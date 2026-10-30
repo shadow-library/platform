@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
-import { type AuthClient } from '@shadow-library/auth';
+import { FakeServiceFetch, jsonResponse } from '@shadow-library/internal-api/testing';
+import { WebNovelClient } from '@shadow-library/internal-api/web-novel';
 import { WIKI_CAPABILITIES_HEADER, WIKI_HEADLINE_GATE_CAPABILITY } from '@shadow-library/sdk/publishing';
 
 import { type Publishing } from '@server/database';
@@ -16,8 +17,8 @@ import {
 import { type WikiEntryProjection } from '@modules/publishing/wiki-projection';
 
 function clientAnswering(statusCode: number, data: unknown, headers: Record<string, string> = {}): ReaderPushClient {
-  const authClient = { fetchService: () => Promise.resolve({ statusCode, headers, data }) } as unknown as AuthClient;
-  return new ReaderPushClient(authClient);
+  const reader = new FakeServiceFetch(() => jsonResponse(statusCode, data ?? undefined, headers));
+  return new ReaderPushClient(new WebNovelClient(reader.fetch));
 }
 
 function pushChapter(statusCode: number, data: unknown): Promise<unknown> {

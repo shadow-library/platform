@@ -41,6 +41,7 @@
     "@shadow-library/class-schema": "workspace:*",
     "@shadow-library/common": "workspace:*",
     "@shadow-library/fastify": "workspace:*",
+    "@shadow-library/internal-api": "workspace:*",
     "@shadow-library/modules": "workspace:*",
     "@shadow-library/sdk": "workspace:*",
     "drizzle-orm": "catalog:",

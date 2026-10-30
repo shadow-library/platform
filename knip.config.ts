@@ -32,6 +32,7 @@ const PACKAGE_ENTRIES: Record<string, string[]> = {
     'src/testing/index.ts',
   ],
   'packages/fastify': ['src/index.ts'],
+  'packages/internal-api': ['src/index.ts', 'src/identity/index.ts', 'src/novel-forge/index.ts', 'src/pulse/index.ts', 'src/web-novel/index.ts', 'src/testing/index.ts'],
   'packages/modules': [
     'src/index.ts',
     'src/bootstrap/index.ts',

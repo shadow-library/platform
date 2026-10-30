@@ -1,5 +1,8 @@
 import { Module } from '@shadow-library/app';
+import { AuthClient } from '@shadow-library/auth';
 import { AuthModule } from '@shadow-library/auth/module';
+import { fromAuthClient } from '@shadow-library/internal-api';
+import { PulseClient } from '@shadow-library/internal-api/pulse';
 import { DatabaseModule } from '@shadow-library/modules';
 
 import { MemoirAuthModule } from '@modules/auth';
@@ -21,6 +24,7 @@ import { WeeklyDigestRepository } from './weekly-digest.repository';
   providers: [
     NotificationOutboxRepository,
     NotificationClient,
+    { token: PulseClient, useFactory: (authClient: AuthClient) => new PulseClient(fromAuthClient(authClient)), inject: [AuthClient] },
     { token: PulseTransport, useClass: HttpPulseTransport },
     NotificationSenderService,
     BillingReminderRepository,

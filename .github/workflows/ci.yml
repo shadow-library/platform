@@ -128,7 +128,8 @@ jobs:
               | {
                   workspace: $w,
                   checkMigrations: ($m.checkMigrations // false),
-                  checkApiTypes: (($w | test("^apps/.*-(server|web)$")) and ($m.checkApiTypes != false))
+                  checkApiTypes: (($w | test("^apps/.*-(server|web)$")) and ($m.checkApiTypes != false)),
+                  checkInternalApi: ($w | test("^(apps/.*-server|packages/internal-api)$"))
                 }
             )
           ')"
@@ -196,6 +197,11 @@ jobs:
       - name: Check API types
         if: matrix.checkApiTypes
         run: bun scripts/gen-api-types.ts "$(echo '${{ matrix.workspace }}' | sed 's/-server$/-web/')" --check
+
+      # A server's leg checks the internal contracts cut from it; the package's leg checks them all, so a hand edit of a generated contract is caught too.
+      - name: Check internal API contracts
+        if: matrix.checkInternalApi
+        run: bun scripts/gen-internal-api.ts ${{ matrix.workspace }} --check
 
       - name: Build
         if: matrix.workspace != 'scripts'

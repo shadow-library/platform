@@ -1,6 +1,9 @@
 import { Module } from '@shadow-library/app';
+import { AuthClient } from '@shadow-library/auth';
 import { AuthModule } from '@shadow-library/auth/module';
 import { FastifyModule } from '@shadow-library/fastify';
+import { fromAuthClient } from '@shadow-library/internal-api';
+import { IdentityClient } from '@shadow-library/internal-api/identity';
 
 import { DatabaseModule } from '@server/modules/datastore';
 
@@ -12,7 +15,11 @@ import { NovelAccessService } from './novel-access.service';
 @Module({
   imports: [DatabaseModule, FastifyModule, AuthModule],
   controllers: [CatalogController],
-  providers: [CatalogService, NovelAccessService],
+  providers: [
+    CatalogService,
+    NovelAccessService,
+    { token: IdentityClient, useFactory: (authClient: AuthClient) => new IdentityClient(fromAuthClient(authClient)), inject: [AuthClient] },
+  ],
   exports: [CatalogService, NovelAccessService],
 })
 export class CatalogModule {}

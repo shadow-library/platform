@@ -7,9 +7,6 @@
  */
 export const BOT_MANAGE_SCOPE_SUFFIX = ':bots:manage';
 
-/** Backend workloads are deployed as `<application>-server`; `svc://` resolves that to the cluster Service. */
-export const botOwnershipUrl = (application: string, botId: bigint, path: 'ownership' | 'transfer'): string => `svc://${application}-server/internal/bots/${botId}/${path}`;
-
 /** A person is waiting on the fan-out, so a silent application is reported as unavailable rather than stalling the response. */
 export const OWNERSHIP_LOOKUP_TIMEOUT_MS = 3_000;
 

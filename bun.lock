@@ -47,6 +47,7 @@
         "@shadow-library/class-schema": "workspace:*",
         "@shadow-library/common": "workspace:*",
         "@shadow-library/fastify": "workspace:*",
+        "@shadow-library/internal-api": "workspace:*",
         "@shadow-library/modules": "workspace:*",
         "@simplewebauthn/server": "^14.0.3",
         "drizzle-orm": "catalog:",
@@ -103,6 +104,7 @@
         "@shadow-library/class-schema": "workspace:*",
         "@shadow-library/common": "workspace:*",
         "@shadow-library/fastify": "workspace:*",
+        "@shadow-library/internal-api": "workspace:*",
         "@shadow-library/modules": "workspace:*",
         "@shadow-library/synapse": "workspace:*",
         "drizzle-orm": "catalog:",
@@ -153,6 +155,7 @@
         "@shadow-library/class-schema": "workspace:*",
         "@shadow-library/common": "workspace:*",
         "@shadow-library/fastify": "workspace:*",
+        "@shadow-library/internal-api": "workspace:*",
         "@shadow-library/modules": "workspace:*",
         "@shadow-library/sdk": "workspace:*",
         "@shadow-library/synapse": "workspace:*",
@@ -306,6 +309,7 @@
         "@shadow-library/class-schema": "workspace:*",
         "@shadow-library/common": "workspace:*",
         "@shadow-library/fastify": "workspace:*",
+        "@shadow-library/internal-api": "workspace:*",
         "@shadow-library/modules": "workspace:*",
         "@shadow-library/sdk": "workspace:*",
         "drizzle-orm": "catalog:",
@@ -474,6 +478,20 @@
       "optionalPeers": [
         "@fastify/cookie",
       ],
+    },
+    "packages/internal-api": {
+      "name": "@shadow-library/internal-api",
+      "version": "0.0.0",
+      "dependencies": {
+        "@shadow-library/common": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/bun": "catalog:",
+        "typescript": "catalog:",
+      },
+      "peerDependencies": {
+        "@shadow-library/common": "workspace:*",
+      },
     },
     "packages/modules": {
       "name": "@shadow-library/modules",
@@ -1277,6 +1295,8 @@
     "@shadow-library/fastify": ["@shadow-library/fastify@workspace:packages/fastify"],
 
     "@shadow-library/identity": ["@shadow-library/identity@workspace:apps/identity-server"],
+
+    "@shadow-library/internal-api": ["@shadow-library/internal-api@workspace:packages/internal-api"],
 
     "@shadow-library/memoir-server": ["@shadow-library/memoir-server@workspace:apps/memoir-server"],
 

@@ -1,10 +1,9 @@
 import { Injectable } from '@shadow-library/app';
-import { APIRequest, AppError, Logger } from '@shadow-library/common';
+import { AppError, Logger } from '@shadow-library/common';
+import { PulseClient } from '@shadow-library/internal-api/pulse';
 
-import { APP_NAME, PULSE_NOTIFICATION_URL } from '@server/constants';
+import { APP_NAME } from '@server/constants';
 import { NotificationOutbox } from '@server/modules/infrastructure/datastore';
-
-import { NotificationTokenService } from './notification-token.service';
 
 export const NOTIFICATION_SEND_TIMEOUT_MS = 10_000;
 
@@ -18,25 +17,18 @@ export interface SendNotification {
 export class NotificationClient {
   private readonly logger = Logger.getLogger(APP_NAME, NotificationClient.name);
 
-  constructor(private readonly tokenService: NotificationTokenService) {}
+  constructor(private readonly pulse: PulseClient) {}
 
   async send(notification: SendNotification): Promise<void> {
     this.logger.debug('dispatching notification to pulse-server', { templateKey: notification.templateKey, recipients: notification.recipients });
-    const token = await this.tokenService.getToken();
-    const response = await APIRequest.post(PULSE_NOTIFICATION_URL)
-      .header('authorization', `Bearer ${token}`)
-      .body({ ...notification, service: APP_NAME })
-      .timeout(NOTIFICATION_SEND_TIMEOUT_MS)
-      .suppressErrors()
-      .execute()
-      .catch((error: unknown) => {
-        this.logger.error('notification transport error reaching pulse-server', { templateKey: notification.templateKey, error });
-        throw error;
-      });
-    if (response.statusCode >= 400) {
-      if (response.statusCode === 401 || response.statusCode === 403) this.tokenService.invalidate();
-      this.logger.error('notification dispatch rejected by pulse-server', { templateKey: notification.templateKey, status: response.statusCode, body: response.data });
-      throw AppError.internal(`Notification request failed with status ${response.statusCode}`);
+    const body = { templateKey: notification.templateKey, recipients: notification.recipients, payload: notification.payload ?? undefined, service: APP_NAME };
+    const response = await this.pulse.sendNotification(body, { timeoutMs: NOTIFICATION_SEND_TIMEOUT_MS }).catch((error: unknown) => {
+      this.logger.error('notification transport error reaching pulse-server', { templateKey: notification.templateKey, error });
+      throw error;
+    });
+    if (!response.ok) {
+      this.logger.error('notification dispatch rejected by pulse-server', { templateKey: notification.templateKey, status: response.status, body: response.error });
+      throw AppError.internal(`Notification request failed with status ${response.status}`);
     }
     this.logger.debug('notification dispatched to pulse-server', { templateKey: notification.templateKey });
   }

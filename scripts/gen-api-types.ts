@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import openapiTS, { astToString } from 'openapi-typescript';
+import openapiTS, { astToString, type OpenAPITSOptions } from 'openapi-typescript';
 import prettier from 'prettier';
 
 import { log, reportError, ShadowError, stripGitEnv } from './utils/index.ts';
@@ -159,8 +159,8 @@ export function buildTypeAliases(document: OpenApiDocument): string {
 }
 
 // Shared by the write and `--check` paths so they cannot diverge; `outputPath` only steers prettier's config resolution.
-export async function generateApiTypesContents(document: OpenApiDocument, outputPath: string): Promise<string> {
-  const ast = await openapiTS(document as any); // openapi-typescript's input type is narrower than our validated document shape
+export async function generateApiTypesContents(document: OpenApiDocument, outputPath: string, options: OpenAPITSOptions = {}): Promise<string> {
+  const ast = await openapiTS(document as any, options); // openapi-typescript's input type is narrower than our validated document shape
   const rawContents = `${astToString(ast)}${buildTypeAliases(document)}`;
 
   const prettierOptions = await prettier.resolveConfig(outputPath);

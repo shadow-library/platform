@@ -110,10 +110,10 @@ return the result. All business logic lives in the service.
    emitted, so entity secrets never leak. The handler's TS return type is decoupled from `@RespondFor`'s
    schema — return native values and let the schema shape the wire.
    In a non-discriminated `SchemaComposer.anyOf`/`oneOf` object union the first branch whose required fields are present wins and the other branches' fields are dropped; use `SchemaComposer.discriminator` when branches overlap.
-   *Native non-JSON values (bigint, Date): class-schema itself performs NO value coercion — wire
+   _Native non-JSON values (bigint, Date): class-schema itself performs NO value coercion — wire
    conversion is handled at the HTTP layer (transformers/serializer). Mirror an existing response DTO in
    the workspace for the exact pattern (e.g. `@Field(() => String)` on a bigint id, `@Transform('strip:null')`
-   to omit nulls) rather than assuming automatic coercion.*
+   to omit nulls) rather than assuming automatic coercion._
 
 3. **Request-scoped data: ambient `Context`, always.** Extend the router's `ContextService` (via
    `context.extend()`) with typed accessors and bind that instance to a module-level `Context` through a
@@ -192,7 +192,7 @@ return the result. All business logic lives in the service.
 
 ## Authentication & authorization (`@shadow-library/auth`)
 
-**Load `references/auth.md` before doing anything with auth.** Every Shadow app is a *first-party*
+**Load `references/auth.md` before doing anything with auth.** Every Shadow app is a _first-party_
 application and uses the app-session flow; the summary below is orientation only.
 
 - `AuthModule.forRoot()` (`/module` subpath) inside `FastifyModule.forRoot({ imports: [...] })` is the
@@ -200,7 +200,7 @@ application and uses the app-session flow; the summary below is orientation only
   login/callback/logout/session/step-up routes. A service writes no auth code — only `AUTH_*` env vars.
 - Protect routes with `@Authenticated()` / `@RequireScope(...)` / `@RequirePermission(...)` /
   `@RequireElevation()`. Read the caller via the ambient context: `getAuthPrincipal()` /
-  `getAuthPrincipalOrNull()`. The principal resolves from a bearer token *or* the session cookie —
+  `getAuthPrincipalOrNull()`. The principal resolves from a bearer token _or_ the session cookie —
   handlers never branch on which.
 - MUST NOT hand-write a login route, a session cookie, or a token cache, and MUST NOT use
   `RelyingParty` (`/rp`) — that is for third-party/SPA clients, and a Shadow app is neither.
@@ -224,7 +224,16 @@ application and uses the app-session flow; the summary below is orientation only
 
 ## Service-to-service calls
 
-Use `APIRequest` from `common` with a `svc://<service>/<path>` URL — MUST NOT hard-code hostnames.
+Call another first-party server through its client in `@shadow-library/internal-api` — `PulseClient`
+(`/pulse`), `WebNovelClient` (`/web-novel`), `NovelForgeClient` (`/novel-forge`, the bot-ownership
+protocol), `IdentityClient` (`/identity`). Bind each as a provider over `fromAuthClient(authClient)`
+(identity-server: `serviceFetchFrom(serviceTokenService)`). Every method answers a `ServiceResponse`
+(`{ ok, status, headers, data | error }`); only a call with no HTTP answer throws
+`INTERNAL_API_SERVICE_UNREACHABLE`, so the caller keeps its own policy for each refusal. A route the
+package lacks: add its path to `shadow.internalContracts` in `packages/internal-api/package.json`, run
+`bun scripts/gen-internal-api.ts`, add the method. Tests use `FakeServiceFetch` from `/testing`.
+
+For anything else, use `APIRequest` from `common` with a `svc://<service>/<path>` URL — MUST NOT hard-code hostnames.
 Resolution: `svc://name/…` → `http://name/…` via cluster DNS; dotted host = cross-namespace;
 `SERVICE_DISCOVERY_SCHEME` sets the scheme; `SERVICE_URL_<NAME>` overrides one service for local
 dev/out-of-cluster (verbatim if it carries `scheme://`, else the discovery scheme is applied).
