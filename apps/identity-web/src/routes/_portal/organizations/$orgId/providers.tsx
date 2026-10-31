@@ -277,9 +277,8 @@ function ProvidersPage(): React.JSX.Element {
           title={deleteTarget ? `Delete ${deleteTarget.name}?` : 'Delete provider?'}
           description="Members will no longer be able to sign in through this provider."
           confirmLabel="Delete provider"
-          loading={del.isPending}
           onConfirm={() =>
-            deleteTarget && require(() => del.mutate(deleteTarget.id, { onSuccess: () => toast.success('Provider deleted'), onError: error => toast.danger(error.message) }))
+            deleteTarget && require(() => del.mutateAsync(deleteTarget.id, { onSuccess: () => toast.success('Provider deleted'), onError: error => toast.danger(error.message) }))
           }
         />
         {dialog}

@@ -127,14 +127,10 @@ function OrganizationsPage(): React.JSX.Element {
         title={leaveTarget ? `Leave ${leaveTarget.name}?` : 'Leave organization?'}
         description="You’ll lose access to its resources immediately. An admin will need to re-invite you to rejoin."
         confirmLabel="Leave organization"
-        loading={leave.isPending}
         onConfirm={() =>
           leaveTarget &&
-          leave.mutate(leaveTarget.id, {
-            onSuccess: () => {
-              toast.success(`Left ${leaveTarget.name}`);
-              setLeaveTarget(null);
-            },
+          leave.mutateAsync(leaveTarget.id, {
+            onSuccess: () => toast.success(`Left ${leaveTarget.name}`),
             onError: error => toast.danger(error.message),
           })
         }

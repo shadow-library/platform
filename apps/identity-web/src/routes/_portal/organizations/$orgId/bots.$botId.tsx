@@ -196,7 +196,7 @@ function BotDetailPage(): React.JSX.Element {
             if (isBotTab(value)) goToTab(value);
           }}
         >
-          <Tabs.List aria-label="Bot sections" className={styles.tabList}>
+          <Tabs.List aria-label="Bot sections">
             {BOT_TABS.map(key => (
               <Tabs.Tab key={key} value={key} count={counts[key]}>
                 {TAB_LABEL[key]}
@@ -246,7 +246,7 @@ function BotDetailPage(): React.JSX.Element {
           <Tabs.Panel value="activity">
             <ActivityTab orgId={orgId} botId={botId} />
           </Tabs.Panel>
-          <Tabs.Panel value="settings" forceMount hidden={tab !== 'settings'}>
+          <Tabs.Panel value="settings" keepMounted>
             <SettingsTab orgId={orgId} organisationName={org?.name ?? 'this organization'} bot={data} require={require} />
           </Tabs.Panel>
         </Tabs>

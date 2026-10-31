@@ -74,3 +74,16 @@ export const Confirm: Story = {
     />
   ),
 };
+
+export const AsyncConfirm: Story = {
+  render: () => (
+    <ConfirmDialog
+      trigger={<Button variant="secondary">Remove member…</Button>}
+      intent="danger"
+      title="Remove ada@acme.dev?"
+      description="Returning a promise from onConfirm keeps the dialog open and loading until it settles."
+      confirmLabel="Remove member"
+      onConfirm={() => new Promise(resolve => setTimeout(resolve, 1500))}
+    />
+  ),
+};

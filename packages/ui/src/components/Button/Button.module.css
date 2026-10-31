@@ -132,6 +132,34 @@
   background-color: var(--sh-danger-solid-active);
 }
 
+/* ── Danger tone (secondary, ghost, text; primary maps to the danger variant) ── */
+.root[data-tone='danger'][data-variant='secondary'] {
+  border-color: var(--sh-danger-border);
+  color: var(--sh-danger-text);
+}
+.root[data-tone='danger'][data-variant='ghost'],
+.root[data-tone='danger'][data-variant='text'] {
+  color: var(--sh-danger-text);
+}
+.root[data-tone='danger'][data-variant='secondary']:not(:disabled):not([aria-disabled='true']):hover,
+.root[data-tone='danger'][data-variant='ghost']:not(:disabled):not([aria-disabled='true']):hover {
+  background-color: var(--sh-danger-bg-subtle);
+  border-color: var(--sh-danger-border);
+  color: var(--sh-danger-text-on-subtle);
+}
+.root[data-tone='danger'][data-variant='secondary']:not(:disabled):not([aria-disabled='true']):active,
+.root[data-tone='danger'][data-variant='ghost']:not(:disabled):not([aria-disabled='true']):active {
+  background-color: var(--sh-danger-bg-subtle);
+  border-color: var(--sh-danger-text);
+  color: var(--sh-danger-text-on-subtle);
+}
+.root[data-tone='danger'][data-variant='text']:not(:disabled):not([aria-disabled='true']):hover {
+  color: var(--sh-danger-text-on-subtle);
+}
+.root[data-tone='danger'][data-variant='text']:not(:disabled):not([aria-disabled='true']):active {
+  color: var(--sh-danger-solid-active);
+}
+
 /* ── Content & adornments ─────────────────────────────────── */
 .content {
   display: inline-flex;

@@ -48,7 +48,11 @@ export interface ConfirmDialogProps {
   cancelLabel?: string;
   /** Gate the action until the user types this exact string (irreversible operations). */
   typedConfirmation?: string;
-  /** Fires when the confirm action is pressed. */
-  onConfirm?: () => void;
+  /**
+   * Fires when the confirm action is pressed. Return nothing and the dialog closes at once. Return a promise and it stays open, loading, until the promise settles: it closes
+   * on resolve and stays open on reject. The rejection is caught here, so show the error yourself (a toast, the mutation's error state).
+   */
+  onConfirm?: (() => void) | (() => PromiseLike<unknown>);
+  /** Show the confirm button loading; an `onConfirm` promise does this on its own. */
   loading?: boolean;
 }

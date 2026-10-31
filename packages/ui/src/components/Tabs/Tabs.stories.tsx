@@ -64,3 +64,44 @@ export const Manual: Story = {
     </div>
   ),
 };
+
+export const KeepMounted: Story = {
+  render: () => (
+    <div style={{ maxWidth: 560 }}>
+      <Tabs defaultValue="overview">
+        <Tabs.List aria-label="Bot sections">
+          <Tabs.Tab value="overview">Overview</Tabs.Tab>
+          <Tabs.Tab value="settings">Settings</Tabs.Tab>
+        </Tabs.List>
+        <Tabs.Panel value="overview" style={panelStyle}>
+          Switch to Settings, type a name, come back: the draft survives.
+        </Tabs.Panel>
+        <Tabs.Panel value="settings" keepMounted style={panelStyle}>
+          <label>
+            Name <input />
+          </label>
+        </Tabs.Panel>
+      </Tabs>
+    </div>
+  ),
+};
+
+export const ScrollingRow: Story = {
+  render: () => (
+    <div style={{ maxWidth: 320 }}>
+      <Tabs defaultValue="overview">
+        <Tabs.List aria-label="Bot sections">
+          <Tabs.Tab value="overview">Overview</Tabs.Tab>
+          <Tabs.Tab value="permissions" count={4}>
+            Permissions
+          </Tabs.Tab>
+          <Tabs.Tab value="keys" count={2}>
+            API keys
+          </Tabs.Tab>
+          <Tabs.Tab value="activity">Activity</Tabs.Tab>
+          <Tabs.Tab value="settings">Settings</Tabs.Tab>
+        </Tabs.List>
+      </Tabs>
+    </div>
+  ),
+};

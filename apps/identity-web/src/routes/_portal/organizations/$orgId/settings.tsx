@@ -84,13 +84,11 @@ function SettingsPage(): React.JSX.Element {
           description="Every member loses access immediately and all org-scoped roles are revoked. This cannot be undone."
           confirmLabel="Delete organization"
           typedConfirmation={org?.name}
-          loading={del.isPending}
           onConfirm={() =>
             require(() =>
-              del.mutate(orgId, {
+              del.mutateAsync(orgId, {
                 onSuccess: () => {
                   toast.success('Organization deleted');
-                  setConfirmOpen(false);
                   navigate({ to: '/organizations' });
                 },
                 onError: error => toast.danger(error.message),

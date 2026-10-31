@@ -123,17 +123,14 @@ function AssignmentsPanel({ role }: { role: ApplicationRoleItem }): React.JSX.El
 
   const items = assignments.data?.items ?? [];
 
-  const confirmRevoke = (): void => {
-    if (!pendingRevoke) return;
+  const confirmRevoke = (): Promise<unknown> | undefined => {
+    if (!pendingRevoke) return undefined;
     const target = pendingRevoke;
-    require(() =>
-      revoke.mutate(
+    return require(() =>
+      revoke.mutateAsync(
         { principalType: target.principalType, principalId: target.principalId, roleId: target.roleId, organisationId: target.organisationId },
         {
-          onSuccess: () => {
-            toast.success('Assignment revoked');
-            setPendingRevoke(null);
-          },
+          onSuccess: () => toast.success('Assignment revoked'),
           onError: error => toast.danger(error.message),
         },
       ),
@@ -186,7 +183,6 @@ function AssignmentsPanel({ role }: { role: ApplicationRoleItem }): React.JSX.El
             : ''
         }
         confirmLabel="Revoke"
-        loading={revoke.isPending}
         onConfirm={confirmRevoke}
       />
       {dialog}

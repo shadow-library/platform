@@ -233,15 +233,11 @@ function WebhooksPage(): React.JSX.Element {
         title={deleteTarget ? `Delete ${deleteTarget.name}?` : 'Delete webhook?'}
         description="Deliveries to this endpoint will stop immediately."
         confirmLabel="Delete webhook"
-        loading={del.isPending}
         onConfirm={() =>
           deleteTarget &&
           require(() =>
-            del.mutate(deleteTarget.id, {
-              onSuccess: () => {
-                toast.success('Webhook deleted');
-                setDeleteTarget(null);
-              },
+            del.mutateAsync(deleteTarget.id, {
+              onSuccess: () => toast.success('Webhook deleted'),
               onError: error => toast.danger(error.message),
             }),
           )

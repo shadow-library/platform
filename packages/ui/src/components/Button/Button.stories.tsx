@@ -28,6 +28,7 @@ const meta = {
   argTypes: {
     variant: { control: 'select', options: variants },
     size: { control: 'inline-radio', options: ['sm', 'md', 'lg'] },
+    tone: { control: 'inline-radio', options: ['neutral', 'danger'] },
     loading: { control: 'boolean' },
     disabled: { control: 'boolean' },
     fullWidth: { control: 'boolean' },
@@ -50,6 +51,28 @@ export const Variants: Story = {
           {variant.slice(1)}
         </Button>
       ))}
+    </div>
+  ),
+};
+
+export const DangerTone: Story = {
+  render: () => (
+    <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+      <Button variant="secondary" tone="danger">
+        Remove
+      </Button>
+      <Button variant="ghost" tone="danger">
+        Revoke
+      </Button>
+      <Button variant="ghost" tone="danger" size="sm" disabled>
+        Revoke
+      </Button>
+      <Button variant="ghost" tone="danger" size="sm" loading>
+        Revoke
+      </Button>
+      <Button variant="text" tone="danger">
+        Discard draft
+      </Button>
     </div>
   ),
 };

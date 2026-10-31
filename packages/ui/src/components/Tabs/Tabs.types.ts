@@ -15,4 +15,10 @@ export interface TabsTabProps extends ComponentPropsWithoutRef<typeof TabsPrimit
   count?: ReactNode;
 }
 
-export type TabsPanelProps = ComponentPropsWithoutRef<typeof TabsPrimitive.Content>;
+export interface TabsPanelProps extends ComponentPropsWithoutRef<typeof TabsPrimitive.Content> {
+  /**
+   * Keep the panel mounted while another tab is selected, so its state (a half-edited form, a scroll position) survives the switch. It is `hidden` meanwhile: out of the
+   * tab order and the accessibility tree. @default false
+   */
+  keepMounted?: boolean;
+}

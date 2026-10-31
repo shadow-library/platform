@@ -11,6 +11,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
   {
     variant: variantProp,
     size: sizeProp,
+    tone = 'neutral',
     loading = false,
     loadingText,
     fullWidth = false,
@@ -28,8 +29,10 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
 ) {
   // Inside a ButtonGroup the group's variant/size win — the whole set stays uniform by design.
   const group = useButtonGroupContext();
-  const variant = group?.variant ?? variantProp ?? 'secondary';
+  const requestedVariant = group?.variant ?? variantProp ?? 'secondary';
+  const variant = tone === 'danger' && requestedVariant === 'primary' ? 'danger' : requestedVariant;
   const size = group?.size ?? sizeProp ?? 'md';
+  const dataTone = tone === 'danger' ? 'danger' : undefined;
 
   const nodeEnv = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.NODE_ENV;
   if (nodeEnv !== 'production' && group && ((variantProp != null && variantProp !== group.variant) || (sizeProp != null && sizeProp !== group.size)))
@@ -43,7 +46,16 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
   // spinner and adornment wrappers do not apply — the child owns its content.
   if (asChild) {
     return (
-      <Slot ref={ref} className={rootClassName} data-variant={variant} data-size={size} data-full-width={fullWidth || undefined} onClick={handleClick} {...props}>
+      <Slot
+        ref={ref}
+        className={rootClassName}
+        data-variant={variant}
+        data-tone={dataTone}
+        data-size={size}
+        data-full-width={fullWidth || undefined}
+        onClick={handleClick}
+        {...props}
+      >
         {children}
       </Slot>
     );
@@ -57,6 +69,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       type={type ?? 'button'}
       className={rootClassName}
       data-variant={variant}
+      data-tone={dataTone}
       data-size={size}
       data-loading={loading || undefined}
       data-full-width={fullWidth || undefined}

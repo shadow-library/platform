@@ -1,5 +1,5 @@
 import { Slot } from '@radix-ui/react-slot';
-import { Children, forwardRef, isValidElement, type ReactElement, useContext } from 'react';
+import { Children, type ComponentPropsWithoutRef, forwardRef, isValidElement, type ReactElement, useContext } from 'react';
 
 import { cn } from '@/lib';
 
@@ -21,8 +21,9 @@ const BreadcrumbsItem = forwardRef<HTMLAnchorElement, BreadcrumbsItemProps>(func
   // rebuilds it — asChild router links keep their href and client-side navigation.
   const overflowed = useContext(BreadcrumbsOverflowContext);
   if (current) {
+    const { href: _href, target: _target, rel: _rel, download: _download, hrefLang: _hrefLang, ping: _ping, referrerPolicy: _referrerPolicy, type: _type, ...spanProps } = props;
     return (
-      <span className={cn(styles.current, className)} aria-current="page">
+      <span className={cn(styles.current, className)} aria-current="page" {...(spanProps as ComponentPropsWithoutRef<'span'>)}>
         {children}
       </span>
     );
@@ -35,8 +36,11 @@ const BreadcrumbsItem = forwardRef<HTMLAnchorElement, BreadcrumbsItemProps>(func
   );
 });
 
-/** `<nav aria-label="Breadcrumb">` around an ordered list; past `maxVisible` the middle collapses into a "…" menu, always keeping the first crumb and the last two. */
-const BreadcrumbsRoot = forwardRef<HTMLElement, BreadcrumbsProps>(function Breadcrumbs({ maxVisible = 4, className, children, ...props }, ref) {
+/**
+ * `<nav aria-label="Breadcrumb">` around an ordered list; past `maxVisible` the middle collapses into a "…" menu, always keeping the first crumb and the last two. Long
+ * labels ellipsise, ancestors first; give a crumb a `title` when its full text matters.
+ */
+const BreadcrumbsRoot = forwardRef<HTMLElement, BreadcrumbsProps>(function Breadcrumbs({ maxVisible = 4, hideAncestorsBelow, className, children, ...props }, ref) {
   const items = Children.toArray(children).filter(isValidElement) as ReactElement<BreadcrumbsItemProps>[];
 
   const first = items[0];
@@ -45,7 +49,7 @@ const BreadcrumbsRoot = forwardRef<HTMLElement, BreadcrumbsProps>(function Bread
   const visible: (ReactElement<BreadcrumbsItemProps> | 'overflow')[] = collapsed ? [first, 'overflow', ...items.slice(-2)] : items;
 
   return (
-    <nav ref={ref} className={cn(styles.root, className)} aria-label="Breadcrumb" {...props}>
+    <nav ref={ref} className={cn(styles.root, className)} aria-label="Breadcrumb" data-hide-ancestors-below={hideAncestorsBelow} {...props}>
       <ol className={styles.list}>
         {visible.map((item, index) => (
           <li key={`crumb-${index}`} className={styles.crumb}>

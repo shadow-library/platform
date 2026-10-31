@@ -161,15 +161,22 @@ function StepUpDialog({ open, onOpenChange, title = 'Confirm it’s you', method
   );
 }
 
-/** Runs the action at once if the session is already elevated, otherwise opens the step-up dialog (render `dialog` in the page) and runs it after elevation. */
-export function useStepUpGate(): { require: (action: () => void) => void; dialog: ReactElement } {
+/**
+ * Runs the action at once and returns its result when the session is already elevated, so a `ConfirmDialog` can await the promise. Otherwise it returns undefined, opens
+ * the step-up dialog and runs the action after elevation, by which point the confirm has closed.
+ */
+export type StepUpRequire = <T>(action: () => T) => T | undefined;
+
+/** Render `dialog` in the page. */
+export function useStepUpGate(): { require: StepUpRequire; dialog: ReactElement } {
   const me = useMeQuery();
-  const [pending, setPending] = useState<(() => void) | null>(null);
+  const [pending, setPending] = useState<(() => unknown) | null>(null);
   const methods = useStepUpMethodsQuery(pending !== null);
 
-  const require = (action: () => void): void => {
-    if (isElevationLive(me.data)) action();
-    else setPending(() => action);
+  const require: StepUpRequire = action => {
+    if (isElevationLive(me.data)) return action();
+    setPending(() => action);
+    return undefined;
   };
 
   const dialog = (
@@ -183,7 +190,8 @@ export function useStepUpGate(): { require: (action: () => void) => void; dialog
       onElevated={() => {
         const action = pending;
         setPending(null);
-        action?.();
+        // Nothing awaits a deferred action any more; its own mutation callbacks report a failure.
+        Promise.resolve(action?.()).catch(() => undefined);
       }}
     />
   );

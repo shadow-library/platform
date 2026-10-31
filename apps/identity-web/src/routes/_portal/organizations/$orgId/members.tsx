@@ -142,15 +142,11 @@ function MembersPage(): React.JSX.Element {
   const changeRole = (member: MemberItem, role: MemberRole): void =>
     updateRole.mutate({ userId: member.userId, role }, { onSuccess: () => toast.success('Role updated'), onError: error => toast.danger(error.message) });
 
-  const confirmRemove = (): void => {
-    if (!removeTarget) return;
-    removeMember.mutate(removeTarget.userId, { onSuccess: () => toast.success('Member removed'), onError: error => toast.danger(error.message) });
-  };
+  const confirmRemove = (): Promise<unknown> | undefined =>
+    removeTarget ? removeMember.mutateAsync(removeTarget.userId, { onSuccess: () => toast.success('Member removed'), onError: error => toast.danger(error.message) }) : undefined;
 
-  const confirmRevoke = (): void => {
-    if (!revokeTarget) return;
-    revoke.mutate(revokeTarget.id, { onSuccess: () => toast.success('Invitation revoked'), onError: error => toast.danger(error.message) });
-  };
+  const confirmRevoke = (): Promise<unknown> | undefined =>
+    revokeTarget ? revoke.mutateAsync(revokeTarget.id, { onSuccess: () => toast.success('Invitation revoked'), onError: error => toast.danger(error.message) }) : undefined;
 
   /** Org-scoped only — this pauses the person inside this organization and leaves their Shadow account untouched. */
   const changeStatus = (member: MemberItem, status: MemberStatus): void =>
@@ -323,7 +319,6 @@ function MembersPage(): React.JSX.Element {
           title={`Remove ${removeTarget?.email ?? 'this member'}?`}
           description="They lose access to this organization and everything shared with it immediately. They can be invited again later."
           confirmLabel="Remove member"
-          loading={removeMember.isPending}
           onConfirm={confirmRemove}
         />
         <ConfirmDialog
@@ -333,7 +328,6 @@ function MembersPage(): React.JSX.Element {
           title={`Revoke the invitation for ${revokeTarget?.email ?? 'this email'}?`}
           description="The invitation link stops working. You can send a new invitation at any time."
           confirmLabel="Revoke invitation"
-          loading={revoke.isPending}
           onConfirm={confirmRevoke}
         />
       </div>

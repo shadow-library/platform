@@ -474,13 +474,11 @@ function ApplicationDetailPage(): React.JSX.Element {
         description="This removes the application together with its provisioned client and API resource. This cannot be undone."
         confirmLabel="Delete application"
         typedConfirmation={data.name}
-        loading={del.isPending}
         onConfirm={() =>
           require(() =>
-            del.mutate(appId, {
+            del.mutateAsync(appId, {
               onSuccess: () => {
                 toast.success('Application deleted');
-                setDeleteOpen(false);
                 navigate({ to: '/console/applications' });
               },
               onError: error => toast.danger(error.message),

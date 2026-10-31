@@ -1,7 +1,8 @@
 import * as AlertDialogPrimitive from '@radix-ui/react-alert-dialog';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
-import { forwardRef, type ReactElement, useState } from 'react';
+import { forwardRef, type MouseEvent, type ReactElement, useEffect, useRef, useState } from 'react';
 
+import { useControllableState } from '@/hooks';
 import { cn } from '@/lib';
 
 import { Button } from '../Button';
@@ -87,9 +88,17 @@ export const Dialog = Object.assign(DialogRoot, {
   Close: DialogPrimitive.Close,
 });
 
-/** Radix AlertDialog with no × and no scrim dismissal, so the user must choose; Cancel takes initial focus so destruction is never default-focused. */
+function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
+  return typeof (value as PromiseLike<unknown> | null | undefined)?.then === 'function';
+}
+
+/**
+ * Radix AlertDialog with no × and no scrim dismissal, so the user must choose; Cancel takes initial focus so destruction is never default-focused. An `onConfirm` that
+ * returns a promise holds the dialog open with the confirm button loading, Cancel disabled and Escape ignored; it closes when the promise resolves and stays open when it
+ * rejects, so the caller can surface the error.
+ */
 export function ConfirmDialog({
-  open,
+  open: openProp,
   defaultOpen,
   onOpenChange,
   trigger,
@@ -102,16 +111,49 @@ export function ConfirmDialog({
   onConfirm,
   loading = false,
 }: ConfirmDialogProps): ReactElement {
+  const [open, setOpen] = useControllableState({ value: openProp, defaultValue: defaultOpen ?? false, onChange: onOpenChange });
   const [typed, setTyped] = useState('');
+  const [pending, setPending] = useState(false);
+  const [settledOpen, setSettledOpen] = useState(open);
+  const attempt = useRef(0);
   const gated = typedConfirmation != null && typed !== typedConfirmation;
 
+  if (settledOpen !== open) {
+    setSettledOpen(open);
+    setPending(false);
+  }
+
+  // A parent that closes the dialog mid-flight orphans the running confirm, so its settle must not touch the next opening.
+  useEffect(() => {
+    attempt.current += 1;
+  }, [open]);
+
+  // Radix's Action closes after this handler unless it prevents default, which is how an async confirm keeps the dialog open until it settles.
+  function handleConfirm(event: MouseEvent<HTMLButtonElement>): void {
+    if (pending) return event.preventDefault();
+    const result = onConfirm?.();
+    if (!isPromiseLike(result)) return;
+    event.preventDefault();
+    const current = ++attempt.current;
+    setPending(true);
+    const settle = (resolved: boolean): void => {
+      if (attempt.current !== current) return;
+      setPending(false);
+      if (resolved) setOpen(false);
+    };
+    result.then(
+      () => settle(true),
+      () => settle(false),
+    );
+  }
+
   return (
-    <AlertDialogPrimitive.Root open={open} defaultOpen={defaultOpen} onOpenChange={onOpenChange}>
+    <AlertDialogPrimitive.Root open={open} onOpenChange={setOpen}>
       {trigger != null ? <AlertDialogPrimitive.Trigger asChild>{trigger}</AlertDialogPrimitive.Trigger> : null}
       <AlertDialogPrimitive.Portal>
         <AlertDialogPrimitive.Overlay className={styles.scrim} />
         <div className={styles.positioner}>
-          <AlertDialogPrimitive.Content className={styles.panel} data-size="sm">
+          <AlertDialogPrimitive.Content className={styles.panel} data-size="sm" onEscapeKeyDown={event => pending && event.preventDefault()}>
             <div className={styles.header}>
               <div className={styles.heading}>
                 <AlertDialogPrimitive.Title className={styles.title}>{title}</AlertDialogPrimitive.Title>
@@ -127,10 +169,12 @@ export function ConfirmDialog({
             ) : null}
             <div className={styles.footer}>
               <AlertDialogPrimitive.Cancel asChild>
-                <Button variant="ghost">{cancelLabel}</Button>
+                <Button variant="ghost" disabled={pending}>
+                  {cancelLabel}
+                </Button>
               </AlertDialogPrimitive.Cancel>
               <AlertDialogPrimitive.Action asChild>
-                <Button variant={intent === 'danger' ? 'danger' : 'primary'} loading={loading} disabled={gated} onClick={onConfirm}>
+                <Button variant={intent === 'danger' ? 'danger' : 'primary'} loading={loading || pending} disabled={gated} onClick={handleConfirm}>
                   {confirmLabel}
                 </Button>
               </AlertDialogPrimitive.Action>

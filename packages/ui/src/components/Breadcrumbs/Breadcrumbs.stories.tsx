@@ -34,3 +34,30 @@ export const Collapsed: Story = {
     </Breadcrumbs>
   ),
 };
+
+export const LongLabels: Story = {
+  render: () => (
+    <div style={{ maxWidth: 360 }}>
+      <Breadcrumbs>
+        <Breadcrumbs.Item href="#org" title="Shadow Platform Engineering Organization">
+          Shadow Platform Engineering Organization
+        </Breadcrumbs.Item>
+        <Breadcrumbs.Item href="#bots">Bots</Breadcrumbs.Item>
+        <Breadcrumbs.Item current title="webnovel-ingest-pipeline-production-worker">
+          webnovel-ingest-pipeline-production-worker
+        </Breadcrumbs.Item>
+      </Breadcrumbs>
+    </div>
+  ),
+};
+
+export const AncestorsHiddenOnNarrowScreens: Story = {
+  parameters: { viewport: { defaultViewport: 'mobile1' } },
+  render: () => (
+    <Breadcrumbs hideAncestorsBelow="sm">
+      <Breadcrumbs.Item href="#org">Shadow Platform</Breadcrumbs.Item>
+      <Breadcrumbs.Item href="#bots">Bots</Breadcrumbs.Item>
+      <Breadcrumbs.Item current>webnovel-ingest</Breadcrumbs.Item>
+    </Breadcrumbs>
+  ),
+};

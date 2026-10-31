@@ -51,7 +51,7 @@ export interface SidebarSwitcherProps extends Omit<ComponentPropsWithoutRef<'div
   emptyLabel?: string;
   /** Heading above the option list. @default 'Switch project' */
   menuLabel?: string;
-  /** Fires with the chosen option's id; the menu closes first so navigation isn't racing the overlay. */
+  /** Fires with the chosen option's id; the menu (and the shell's mobile nav drawer) closes first so navigation isn't racing the overlay. */
   onSelect: (id: string) => void;
   footerAction?: { label: string; icon?: ReactNode; onSelect: () => void };
   loading?: boolean;

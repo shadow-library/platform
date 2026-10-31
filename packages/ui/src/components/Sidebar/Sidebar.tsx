@@ -267,12 +267,16 @@ const SidebarGroup = forwardRef<HTMLDivElement, SidebarGroupProps>(function Side
   );
 });
 
-/** Not a nav item: it names the scope every destination below it resolves against. In rail mode it shrinks to its avatar and the flyout still carries the full list. */
+/**
+ * Not a nav item: it names the scope every destination below it resolves against. In rail mode it shrinks to its avatar and the flyout still carries the full list.
+ * Choosing an option or the footer action closes the shell's mobile nav drawer too, as a nav item does.
+ */
 const SidebarSwitcher = forwardRef<HTMLDivElement, SidebarSwitcherProps>(function SidebarSwitcher(
   { current, options, emptyLabel = 'All projects', menuLabel = 'Switch project', onSelect, footerAction, loading = false, className, ...props },
   ref,
 ) {
   const { collapsed } = useContext(SidebarContext);
+  const mobileNav = useContext(ShellMobileNavAreaContext);
   // Owned rather than left to the Popover, so choosing an option can close the menu before navigating —
   // otherwise the overlay outlives the route change and lands on top of the new screen.
   const [open, setOpen] = useState(false);
@@ -280,6 +284,7 @@ const SidebarSwitcher = forwardRef<HTMLDivElement, SidebarSwitcherProps>(functio
 
   function choose(run: () => void): void {
     setOpen(false);
+    mobileNav?.close();
     run();
   }
 

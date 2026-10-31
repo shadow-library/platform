@@ -77,14 +77,10 @@ function AuthenticationPage(): React.JSX.Element {
         title={removing ? `Remove ${removing.label} settings?` : 'Remove settings?'}
         description="The method turns off and its stored client secret is deleted. Members who signed in this way keep their accounts and can link the provider again once it is reconfigured."
         confirmLabel="Remove settings"
-        loading={del.isPending}
         onConfirm={() =>
           removing?.provider &&
-          del.mutate(removing.provider.id, {
-            onSuccess: () => {
-              toast.success(`${removing.label} settings removed`);
-              setRemoving(null);
-            },
+          del.mutateAsync(removing.provider.id, {
+            onSuccess: () => toast.success(`${removing.label} settings removed`),
             onError: error => toast.danger(error.message),
           })
         }

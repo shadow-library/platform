@@ -3,6 +3,7 @@ import { Alert, Button, ClientOnly, ConfirmDialog, Skeleton, toast } from '@shad
 
 import { KeyIcon } from '@/components/icons';
 import { StatusChip } from '@/components/si';
+import { type StepUpRequire } from '@/features/portal';
 import { type ApiError, type BotItem, type BotKeyItem, useRevokeBotKeyMutation } from '@/lib/apis';
 import { botErrorMessage } from '@/lib/bot-errors';
 import { formatDate, relativeTime } from '@/lib/format';
@@ -17,7 +18,7 @@ interface KeysTabProps {
   activeKeyCount: number;
   isLoading: boolean;
   error: ApiError | null;
-  require: (action: () => void) => void;
+  require: StepUpRequire;
   onGenerate: () => void;
 }
 
@@ -55,7 +56,7 @@ function FilledSlot({ slot, disabled, onRevoke }: FilledSlotProps): React.JSX.El
         <span className={styles.slotCreated}>
           Created {formatDate(key.createdAt)} by {key.createdBy?.displayName ?? 'a former member'}
         </span>
-        <Button variant="ghost" size="sm" className={styles.revokeButton} disabled={disabled} onClick={onRevoke}>
+        <Button variant="ghost" tone="danger" size="sm" disabled={disabled} onClick={onRevoke}>
           Revoke
         </Button>
       </div>
@@ -100,11 +101,11 @@ export function KeysTab({ orgId, botId, status, keys, activeKeyCount, isLoading,
   const historyTitleId = useId();
   const inactiveKeys = keys.filter(key => key.status !== 'ACTIVE');
 
-  const doRevoke = (): void => {
-    if (!revokeTarget) return;
+  const doRevoke = (): Promise<unknown> | undefined => {
+    if (!revokeTarget) return undefined;
     const target = revokeTarget;
-    require(() =>
-      revoke.mutate(
+    return require(() =>
+      revoke.mutateAsync(
         { botId, keyId: target.id },
         {
           onSuccess: () => toast.success('Key revoked'),
@@ -206,7 +207,6 @@ export function KeysTab({ orgId, botId, status, keys, activeKeyCount, isLoading,
         title={revokeTarget ? `Revoke ${revokeTarget.name}?` : 'Revoke key?'}
         description="Anything using this key stops working immediately. This cannot be undone."
         confirmLabel="Revoke key"
-        loading={revoke.isPending}
         onConfirm={doRevoke}
       />
     </div>

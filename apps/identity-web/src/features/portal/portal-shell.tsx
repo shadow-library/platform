@@ -39,7 +39,7 @@ function accountNavConfig(isStaff: boolean): NavConfig {
 
 function CrumbBar({ crumbs }: { crumbs: Crumb[] }): React.JSX.Element {
   return (
-    <Breadcrumbs className={styles.crumbs}>
+    <Breadcrumbs hideAncestorsBelow="sm">
       {crumbs.map((crumb, index) =>
         crumb.kind === 'current' ? (
           <Breadcrumbs.Item key={index} current>

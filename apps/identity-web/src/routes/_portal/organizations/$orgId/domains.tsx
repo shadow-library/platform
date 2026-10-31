@@ -52,10 +52,10 @@ function DomainsPage(): React.JSX.Element {
     );
   };
 
-  const confirmRemove = (): void => {
-    if (!removeTarget) return;
-    require(() => remove.mutate(removeTarget.id, { onSuccess: () => toast.success('Domain removed'), onError: error => toast.danger(error.message) }));
-  };
+  const confirmRemove = (): Promise<unknown> | undefined =>
+    removeTarget
+      ? require(() => remove.mutateAsync(removeTarget.id, { onSuccess: () => toast.success('Domain removed'), onError: error => toast.danger(error.message) }))
+      : undefined;
 
   return (
     <>
@@ -155,7 +155,6 @@ function DomainsPage(): React.JSX.Element {
               : 'The pending verification is discarded. You can add the domain again later.'
           }
           confirmLabel="Remove domain"
-          loading={remove.isPending}
           onConfirm={confirmRemove}
         />
         {dialog}

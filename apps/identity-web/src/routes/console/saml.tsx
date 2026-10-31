@@ -206,14 +206,10 @@ function SamlPage(): React.JSX.Element {
         title={deleteTarget ? `Delete ${deleteTarget.name}?` : 'Delete provider?'}
         description="The service provider will no longer be able to receive assertions."
         confirmLabel="Delete provider"
-        loading={del.isPending}
         onConfirm={() =>
           deleteTarget &&
-          del.mutate(deleteTarget.id, {
-            onSuccess: () => {
-              toast.success('Provider deleted');
-              setDeleteTarget(null);
-            },
+          del.mutateAsync(deleteTarget.id, {
+            onSuccess: () => toast.success('Provider deleted'),
             onError: error => toast.danger(error.message),
           })
         }

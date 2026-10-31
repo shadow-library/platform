@@ -31,6 +31,64 @@ describe('Button', () => {
     expect(button).toHaveAttribute('data-size', 'lg');
   });
 
+  it('should leave data-tone off for the default neutral tone', () => {
+    render(<Button variant="ghost">Revoke</Button>);
+    expect(screen.getByRole('button')).not.toHaveAttribute('data-tone');
+  });
+
+  it.each(['secondary', 'ghost', 'text'] as const)('should keep the %s variant and mark the danger tone', variant => {
+    render(
+      <Button variant={variant} tone="danger">
+        Revoke
+      </Button>,
+    );
+    const button = screen.getByRole('button');
+    expect(button).toHaveAttribute('data-variant', variant);
+    expect(button).toHaveAttribute('data-tone', 'danger');
+  });
+
+  it('should render primary in the danger tone as the danger variant', () => {
+    render(
+      <Button variant="primary" tone="danger">
+        Delete
+      </Button>,
+    );
+    expect(screen.getByRole('button')).toHaveAttribute('data-variant', 'danger');
+  });
+
+  it('should leave the danger variant unchanged by the danger tone', () => {
+    render(
+      <Button variant="danger" tone="danger">
+        Delete
+      </Button>,
+    );
+    expect(screen.getByRole('button')).toHaveAttribute('data-variant', 'danger');
+  });
+
+  it('should keep a danger-toned button disabled and loading like any other', async () => {
+    const user = userEvent.setup();
+    const onClick = vi.fn();
+    render(
+      <Button variant="ghost" tone="danger" loading onClick={onClick}>
+        Revoke
+      </Button>,
+    );
+    const button = screen.getByRole('button');
+    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute('aria-busy', 'true');
+    await user.click(button);
+    expect(onClick).not.toHaveBeenCalled();
+  });
+
+  it('should carry the danger tone onto an asChild element', () => {
+    render(
+      <Button asChild variant="ghost" tone="danger">
+        <a href="/revoke">Revoke</a>
+      </Button>,
+    );
+    expect(screen.getByRole('link', { name: 'Revoke' })).toHaveAttribute('data-tone', 'danger');
+  });
+
   it('merges a caller className with the component styles', () => {
     render(<Button className="custom">Go</Button>);
     expect(screen.getByRole('button')).toHaveClass('custom');

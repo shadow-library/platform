@@ -6,6 +6,7 @@ import userEvent from '@testing-library/user-event';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { ShellMobileNavAreaContext } from '../Shell/Shell.context';
 import { Sidebar, useSidebar } from './Sidebar';
 
 const css = readFileSync(path.join(import.meta.dirname, 'Sidebar.module.css'), 'utf-8');
@@ -416,6 +417,59 @@ describe('Sidebar.Switcher', () => {
     await user.click(await screen.findByRole('button', { name: 'View all projects' }));
 
     expect(onFooter).toHaveBeenCalledOnce();
+  });
+
+  it('should close the mobile nav drawer when an option is chosen', async () => {
+    const user = userEvent.setup();
+    const close = vi.fn();
+    const onSelect = vi.fn();
+    render(
+      <ShellMobileNavAreaContext.Provider value={{ close }}>
+        <Sidebar>
+          <Sidebar.Switcher current={OPTIONS[0]} options={OPTIONS} onSelect={onSelect} />
+        </Sidebar>
+      </ShellMobileNavAreaContext.Provider>,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Alpha — switch' }));
+    await user.click(await screen.findByRole('button', { name: /Beta/ }));
+
+    expect(close).toHaveBeenCalledOnce();
+    expect(onSelect).toHaveBeenCalledWith('b');
+  });
+
+  it('should close the mobile nav drawer when the footer action runs', async () => {
+    const user = userEvent.setup();
+    const close = vi.fn();
+    render(
+      <ShellMobileNavAreaContext.Provider value={{ close }}>
+        <Sidebar>
+          <Sidebar.Switcher options={OPTIONS} onSelect={vi.fn()} footerAction={{ label: 'View all projects', onSelect: vi.fn() }} />
+        </Sidebar>
+      </ShellMobileNavAreaContext.Provider>,
+    );
+
+    await user.click(screen.getByRole('button', { name: /switch/ }));
+    await user.click(await screen.findByRole('button', { name: 'View all projects' }));
+
+    expect(close).toHaveBeenCalledOnce();
+  });
+
+  it('should leave the drawer alone when only the menu is opened', async () => {
+    const user = userEvent.setup();
+    const close = vi.fn();
+    render(
+      <ShellMobileNavAreaContext.Provider value={{ close }}>
+        <Sidebar>
+          <Sidebar.Switcher current={OPTIONS[0]} options={OPTIONS} onSelect={vi.fn()} />
+        </Sidebar>
+      </ShellMobileNavAreaContext.Provider>,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Alpha — switch' }));
+    await screen.findByRole('button', { name: /Beta/ });
+
+    expect(close).not.toHaveBeenCalled();
   });
 
   it('should say so when there is nothing to switch to', async () => {

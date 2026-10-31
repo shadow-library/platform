@@ -202,15 +202,13 @@ function UserDetailPage(): React.JSX.Element {
         description="Right-to-erasure scrubs the account's PII and credentials and closes it. The audit skeleton is retained. This cannot be undone."
         confirmLabel="Delete user"
         typedConfirmation={data.emails.find(email => email.isPrimary)?.value}
-        loading={del.isPending}
         onConfirm={() =>
           require(() =>
-            del.mutate(
+            del.mutateAsync(
               { userId },
               {
                 onSuccess: () => {
                   toast.success('User deleted');
-                  setConfirmDelete(false);
                   navigate({ to: '/console/users' });
                 },
                 onError: error => toast.danger(error.message),

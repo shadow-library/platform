@@ -4,33 +4,54 @@
  * border-strong-toned chevrons. All existing tokens.
  */
 
+.root {
+  min-width: 0;
+}
+
 .list {
   display: flex;
   align-items: center;
   gap: 4px;
+  min-width: 0;
   margin: 0;
   padding: 0;
   list-style: none;
 }
+/* Ancestors give way first; the current page keeps its width until it alone overflows the row. */
 .crumb {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  min-width: 0;
+}
+.crumb:last-child {
+  flex-shrink: 0;
+  max-width: 100%;
 }
 
 .link,
 .overflow,
 .current {
-  display: inline-flex;
-  align-items: center;
   height: 24px;
   padding: 0 6px;
   max-width: 200px;
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
   border-radius: var(--sh-radius-sm);
   font-size: var(--sh-text-body-sm);
+}
+/* Block, not inline-flex: text-overflow only ellipsises the inline content of a block container. */
+.link,
+.current {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 24px;
+}
+.overflow {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
 }
 
 .link,
@@ -66,6 +87,20 @@
   width: 14px;
   height: 14px;
   color: var(--sh-border-strong);
+}
+
+/* Breakpoint tokens --sh-breakpoint-sm 640 / --sh-breakpoint-md 768. */
+@media (max-width: 767px) {
+  .root[data-hide-ancestors-below='md'] .crumb:not(:last-child),
+  .root[data-hide-ancestors-below='md'] .crumb:last-child > .separator {
+    display: none;
+  }
+}
+@media (max-width: 639px) {
+  .root[data-hide-ancestors-below='sm'] .crumb:not(:last-child),
+  .root[data-hide-ancestors-below='sm'] .crumb:last-child > .separator {
+    display: none;
+  }
 }
 
 /* ── Overflow menu (inside a Popover surface; padding/min-width set inline to beat .content) ── */
