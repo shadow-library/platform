@@ -1,9 +1,10 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { useMemo, useState } from 'react';
-import { AlertTriangleIcon, Avatar, Badge, Button, ClientOnly, DropdownMenu, EmptyState, IconButton, Input, PlusIcon, SearchIcon, Select, Table, toast } from '@shadow-library/ui';
+import { AlertTriangleIcon, Avatar, Badge, Button, ClientOnly, DropdownMenu, EmptyState, IconButton, PlusIcon, Select, Table, toast } from '@shadow-library/ui';
 
 import { BotIcon, ClockIcon, LayersIcon, MoreIcon, ShieldCheckIcon } from '@/components/icons';
-import { GatedNotice, QueryState, StatusChip } from '@/components/si';
+import { GatedNotice, ListToolbar, PageHeader, QueryState, StatusChip } from '@/components/si';
+import { canGenerateKey, keyExpiryWarning } from '@/features/bots';
 import { useStepUpGate } from '@/features/portal';
 import {
   type BotItem,
@@ -19,11 +20,9 @@ import {
 } from '@/lib/apis';
 import { botErrorMessage } from '@/lib/bot-errors';
 import { countFlaggedGrants, countGrantsByApplication } from '@/lib/bot-permissions';
-import { daysUntil, formatDate, relativeTime } from '@/lib/format';
+import { formatDate, relativeTime } from '@/lib/format';
 
 import styles from '@/features/bots/bots.module.css';
-
-const KEY_EXPIRY_WARNING_DAYS = 7;
 
 interface PermissionsCellProps {
   orgId: string;
@@ -71,12 +70,25 @@ const STATUS_META: Record<BotStatus, { label: string; intent: 'success' | 'warni
   DELETED: { label: 'Deleted', intent: 'neutral' },
 };
 
-const MAX_ACTIVE_KEYS = 2;
-
 function matchesQuery(bot: BotItem, query: string): boolean {
   if (!query) return true;
   const needle = query.toLowerCase();
   return bot.displayName.toLowerCase().includes(needle) || bot.handle.toLowerCase().includes(needle);
+}
+
+interface KeyExpiryNoteProps {
+  expiresAt: string;
+}
+
+function KeyExpiryNote({ expiresAt }: KeyExpiryNoteProps): React.JSX.Element | null {
+  const warning = keyExpiryWarning(expiresAt);
+  if (!warning) return null;
+  return (
+    <span className={styles.keyExpiryWarning}>
+      <ClockIcon size={12} />
+      {warning}
+    </span>
+  );
 }
 
 function BotsListPage(): React.JSX.Element {
@@ -106,177 +118,172 @@ function BotsListPage(): React.JSX.Element {
   const goToBot = (bot: BotItem, tab?: 'keys'): void =>
     void navigate({ to: '/organizations/$orgId/bots/$botId', params: { orgId, botId: bot.id }, search: tab ? { tab, generate: tab === 'keys' } : {} });
 
+  const subtitle = `Non-human members of ${org?.name ?? 'this organization'}. Each one calls platform APIs with its own keys and only has the permissions you grant.`;
+  const newBot = (): void => void navigate({ to: '/organizations/$orgId/bots/new', params: { orgId } });
+
   if (list.length === 0 && !bots.isLoading && !bots.error)
     return (
-      <div className={styles.page}>
-        <EmptyState
-          illustration={<BotIcon size={40} />}
-          title={`Automate ${org?.name ?? 'your organization'} with bots`}
-          description="A bot is an identity for scripts and services. Give it only the permissions it needs, then call platform APIs with its API key."
-          action={{ label: 'New bot', onClick: () => void navigate({ to: '/organizations/$orgId/bots/new', params: { orgId } }) }}
-        />
-        <div className={styles.featureGrid}>
-          <div className={styles.featureCard}>
-            <ShieldCheckIcon size={18} className={styles.featureIcon} />
-            <div>
-              <div className={styles.featureTitle}>Least privilege</div>
-              <div className={styles.featureDesc}>Grant per-app permissions, and only the ones you hold yourself.</div>
+      <>
+        <PageHeader title="Bots" subtitle={subtitle} />
+        <div className={styles.page}>
+          <EmptyState
+            illustration={<BotIcon size={40} />}
+            title={`Automate ${org?.name ?? 'your organization'} with bots`}
+            description="A bot is an identity for scripts and services. Give it only the permissions it needs, then call platform APIs with its API key."
+            action={{ label: 'New bot', onClick: newBot }}
+          />
+          <div className={styles.featureGrid}>
+            <div className={styles.featureCard}>
+              <ShieldCheckIcon size={18} className={styles.featureIcon} />
+              <div>
+                <div className={styles.featureTitle}>Least privilege</div>
+                <div className={styles.featureDesc}>Grant per-app permissions, and only the ones you hold yourself.</div>
+              </div>
+            </div>
+            <div className={styles.featureCard}>
+              <ClockIcon size={18} className={styles.featureIcon} />
+              <div>
+                <div className={styles.featureTitle}>Keys that expire</div>
+                <div className={styles.featureDesc}>Up to two active keys, each valid for a year at most.</div>
+              </div>
+            </div>
+            <div className={styles.featureCard}>
+              <LayersIcon size={18} className={styles.featureIcon} />
+              <div>
+                <div className={styles.featureTitle}>Every exchange logged</div>
+                <div className={styles.featureDesc}>See key use, refused addresses and rate limits.</div>
+              </div>
             </div>
           </div>
-          <div className={styles.featureCard}>
-            <ClockIcon size={18} className={styles.featureIcon} />
-            <div>
-              <div className={styles.featureTitle}>Keys that expire</div>
-              <div className={styles.featureDesc}>Up to two active keys, each valid for a year at most.</div>
-            </div>
-          </div>
-          <div className={styles.featureCard}>
-            <LayersIcon size={18} className={styles.featureIcon} />
-            <div>
-              <div className={styles.featureTitle}>Every exchange logged</div>
-              <div className={styles.featureDesc}>See key use, refused addresses and rate limits.</div>
-            </div>
-          </div>
+          {dialog}
         </div>
-        {dialog}
-      </div>
+      </>
     );
 
   return (
-    <div className={styles.page}>
-      <div className={styles.introRow}>
-        <p className={styles.introText}>
-          Bots are non-human members of {org?.name ?? 'this organization'}. Each one calls platform APIs with its own API keys and only has the permissions you grant. Bots can’t
-          sign in or pass step-up, and they can’t manage other bots.
-        </p>
-        {usage && (
-          <span className={styles.usage}>
-            {usage.count} of {usage.limit} bots
-          </span>
-        )}
-      </div>
+    <>
+      <PageHeader
+        title="Bots"
+        subtitle={subtitle}
+        actions={
+          <>
+            {atLimit && <span className={styles.limitNote}>You’ve reached the {usage?.limit} bot limit.</span>}
+            <Button variant="primary" prefix={<PlusIcon size={15} />} disabled={atLimit} onClick={newBot}>
+              New bot
+            </Button>
+          </>
+        }
+      />
+      <div className={styles.page}>
+        <ListToolbar
+          search={search}
+          onSearchChange={setSearch}
+          searchLabel="Search bots"
+          searchPlaceholder="Search bots…"
+          filters={
+            <Select size="sm" aria-label="Filter bots by status" value={status} onValueChange={value => setStatus(value as 'all' | BotStatus)}>
+              <Select.Item value="all">All statuses</Select.Item>
+              <Select.Item value="ACTIVE">Active</Select.Item>
+              <Select.Item value="SUSPENDED">Suspended</Select.Item>
+            </Select>
+          }
+          trailing={
+            usage && (
+              <span className={styles.usage}>
+                {usage.count} of {usage.limit} bots
+              </span>
+            )
+          }
+        />
 
-      <div className={styles.toolbar}>
-        <div className={styles.search}>
-          <Input size="sm" placeholder="Search bots…" aria-label="Search bots" prefix={<SearchIcon size={15} />} value={search} onValueChange={setSearch} />
-        </div>
-        <Select size="sm" aria-label="Filter bots by status" value={status} onValueChange={value => setStatus(value as 'all' | BotStatus)}>
-          <Select.Item value="all">All statuses</Select.Item>
-          <Select.Item value="ACTIVE">Active</Select.Item>
-          <Select.Item value="SUSPENDED">Suspended</Select.Item>
-        </Select>
-        <div className={styles.spacer} />
-        <div className={styles.newBotGroup}>
-          {atLimit && <span className={styles.limitNote}>You’ve reached the {usage?.limit} bot limit.</span>}
-          <Button
-            variant="primary"
-            size="sm"
-            prefix={<PlusIcon size={15} />}
-            disabled={atLimit}
-            onClick={() => void navigate({ to: '/organizations/$orgId/bots/new', params: { orgId } })}
-          >
-            New bot
-          </Button>
-        </div>
-      </div>
-
-      <div className={styles.tableCard}>
-        <QueryState isLoading={bots.isLoading} error={bots.error} isEmpty={false}>
-          <Table
-            data={filtered}
-            rowKey={row => String(row.id)}
-            aria-label="Bots"
-            emptyState={<div className={styles.tableEmpty}>No bots match your search.</div>}
-            columns={[
-              {
-                id: 'bot',
-                header: 'Bot',
-                cell: bot => (
-                  <Link to="/organizations/$orgId/bots/$botId" params={{ orgId, botId: bot.id }} className={styles.botLink}>
-                    <Avatar icon={<BotIcon size={16} />} shape="square" size="sm" />
-                    <div className={styles.cellMain}>
-                      <div className={styles.cellName}>{bot.displayName}</div>
-                      <div className={styles.cellSub}>{bot.handle}[bot]</div>
-                    </div>
-                  </Link>
-                ),
-              },
-              {
-                id: 'status',
-                header: 'Status',
-                cell: bot => (
-                  <StatusChip intent={STATUS_META[bot.status].intent} dot>
-                    {STATUS_META[bot.status].label}
-                  </StatusChip>
-                ),
-              },
-              { id: 'permissions', header: 'Permissions', cell: bot => <PermissionsCell orgId={orgId} botId={bot.id} /> },
-              {
-                id: 'keys',
-                header: 'API keys',
-                cell: bot => (
-                  <div className={styles.stackCell}>
-                    <span className={styles.cellName}>{bot.activeKeyCount} active</span>
-                    {bot.nextKeyExpiresAt && (
-                      <ClientOnly>
-                        {daysUntil(bot.nextKeyExpiresAt) <= KEY_EXPIRY_WARNING_DAYS && (
-                          <span className={styles.keyExpiryWarning}>
-                            <ClockIcon size={12} />
-                            Key expires{' '}
-                            {daysUntil(bot.nextKeyExpiresAt) <= 0 ? 'today' : `in ${daysUntil(bot.nextKeyExpiresAt)} day${daysUntil(bot.nextKeyExpiresAt) === 1 ? '' : 's'}`}
-                          </span>
-                        )}
-                      </ClientOnly>
-                    )}
-                  </div>
-                ),
-              },
-              {
-                id: 'lastUsed',
-                header: 'Last used',
-                cell: bot =>
-                  bot.lastUsedAt ? (
-                    <div className={styles.stackCell}>
-                      <ClientOnly fallback={<span className={styles.cellName}>{formatDate(bot.lastUsedAt)}</span>}>
-                        <span className={styles.cellName}>{relativeTime(bot.lastUsedAt)}</span>
-                      </ClientOnly>
-                      {bot.lastUsedIp && <span className={styles.cellSub}>{bot.lastUsedIp}</span>}
-                    </div>
-                  ) : (
-                    <span className={styles.muted}>Never used</span>
+        <div className={styles.tableCard}>
+          <QueryState isLoading={bots.isLoading} error={bots.error} isEmpty={false}>
+            <Table
+              data={filtered}
+              rowKey={row => String(row.id)}
+              aria-label="Bots"
+              emptyState={<div className={styles.tableEmpty}>No bots match your search.</div>}
+              columns={[
+                {
+                  id: 'bot',
+                  header: 'Bot',
+                  cell: bot => (
+                    <Link to="/organizations/$orgId/bots/$botId" params={{ orgId, botId: bot.id }} className={styles.botLink}>
+                      <Avatar icon={<BotIcon size={16} />} shape="square" size="sm" />
+                      <div className={styles.cellMain}>
+                        <div className={styles.cellName}>{bot.displayName}</div>
+                        <div className={styles.cellSub}>{bot.handle}[bot]</div>
+                      </div>
+                    </Link>
                   ),
-              },
-              {
-                id: 'actions',
-                header: '',
-                align: 'end',
-                cell: bot => (
-                  <DropdownMenu>
-                    <DropdownMenu.Trigger asChild>
-                      <IconButton variant="ghost" size="sm" aria-label={`Actions for ${bot.displayName}`} icon={<MoreIcon size={16} />} />
-                    </DropdownMenu.Trigger>
-                    <DropdownMenu.Content align="end">
-                      <DropdownMenu.Item onSelect={() => goToBot(bot)}>View details</DropdownMenu.Item>
-                      <DropdownMenu.Item disabled={bot.status !== 'ACTIVE' || bot.activeKeyCount >= MAX_ACTIVE_KEYS} onSelect={() => goToBot(bot, 'keys')}>
-                        Generate key
-                      </DropdownMenu.Item>
-                      <DropdownMenu.Separator />
-                      <DropdownMenu.Item disabled={bot.status !== 'ACTIVE' && bot.status !== 'SUSPENDED'} onSelect={() => toggleSuspend(bot)}>
-                        {bot.status === 'ACTIVE' ? 'Suspend' : 'Resume'}
-                      </DropdownMenu.Item>
-                      <DropdownMenu.Separator />
-                      <DropdownMenu.Item destructive disabled>
-                        Delete…
-                      </DropdownMenu.Item>
-                    </DropdownMenu.Content>
-                  </DropdownMenu>
-                ),
-              },
-            ]}
-          />
-        </QueryState>
+                },
+                {
+                  id: 'status',
+                  header: 'Status',
+                  cell: bot => (
+                    <StatusChip intent={STATUS_META[bot.status].intent} dot>
+                      {STATUS_META[bot.status].label}
+                    </StatusChip>
+                  ),
+                },
+                { id: 'permissions', header: 'Permissions', cell: bot => <PermissionsCell orgId={orgId} botId={bot.id} /> },
+                {
+                  id: 'keys',
+                  header: 'API keys',
+                  cell: bot => (
+                    <div className={styles.stackCell}>
+                      <span className={styles.cellName}>{bot.activeKeyCount} active</span>
+                      {bot.nextKeyExpiresAt && (
+                        <ClientOnly>
+                          <KeyExpiryNote expiresAt={bot.nextKeyExpiresAt} />
+                        </ClientOnly>
+                      )}
+                    </div>
+                  ),
+                },
+                {
+                  id: 'lastUsed',
+                  header: 'Last used',
+                  cell: bot =>
+                    bot.lastUsedAt ? (
+                      <div className={styles.stackCell}>
+                        <ClientOnly fallback={<span className={styles.cellName}>{formatDate(bot.lastUsedAt)}</span>}>
+                          <span className={styles.cellName}>{relativeTime(bot.lastUsedAt)}</span>
+                        </ClientOnly>
+                        {bot.lastUsedIp && <span className={styles.cellSub}>{bot.lastUsedIp}</span>}
+                      </div>
+                    ) : (
+                      <span className={styles.muted}>Never used</span>
+                    ),
+                },
+                {
+                  id: 'actions',
+                  header: '',
+                  align: 'end',
+                  cell: bot => (
+                    <DropdownMenu>
+                      <DropdownMenu.Trigger asChild>
+                        <IconButton variant="ghost" size="sm" aria-label={`Actions for ${bot.displayName}`} icon={<MoreIcon size={16} />} />
+                      </DropdownMenu.Trigger>
+                      <DropdownMenu.Content align="end">
+                        <DropdownMenu.Item onSelect={() => goToBot(bot)}>View details</DropdownMenu.Item>
+                        <DropdownMenu.Item disabled={!canGenerateKey(bot.status, bot.activeKeyCount)} onSelect={() => goToBot(bot, 'keys')}>
+                          Generate key
+                        </DropdownMenu.Item>
+                        <DropdownMenu.Separator />
+                        <DropdownMenu.Item disabled={bot.status !== 'ACTIVE' && bot.status !== 'SUSPENDED'} onSelect={() => toggleSuspend(bot)}>
+                          {bot.status === 'ACTIVE' ? 'Suspend' : 'Resume'}
+                        </DropdownMenu.Item>
+                      </DropdownMenu.Content>
+                    </DropdownMenu>
+                  ),
+                },
+              ]}
+            />
+          </QueryState>
+        </div>
+        {dialog}
       </div>
-      {dialog}
-    </div>
+    </>
   );
 }

@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Avatar, Button, DescriptionList, FormField, Input, NumberStepper, Textarea, toast, TokenInput, type TokenValue } from '@shadow-library/ui';
 
 import { BotIcon } from '@/components/icons';
-import { GatedNotice, QueryState, SectionCard } from '@/components/si';
+import { GatedNotice, PageHeader, QueryState, SectionCard } from '@/components/si';
 import { PermissionsMatrix } from '@/features/bots';
 import { useCrumbLeaf, useStepUpGate } from '@/features/portal';
 import { botPermissionCatalogQueryOptions, myOrganisationsQueryOptions, orgAccessOf, useBotPermissionCatalogQuery, useCreateBotMutation, useOrgAccess } from '@/lib/apis';
@@ -94,96 +94,94 @@ function NewBotPage(): React.JSX.Element {
   };
 
   return (
-    <div className={styles.page}>
-      <div>
-        <h2 className={styles.tabTitle}>New bot</h2>
-        <p className={styles.tabDesc}>You’ll generate its first API key right after creating it.</p>
-      </div>
+    <>
+      <PageHeader title="New bot" subtitle="You’ll generate its first API key right after creating it." />
+      <div className={styles.page}>
+        <div className={styles.createGrid}>
+          <div className={styles.formCol}>
+            <SectionCard title="Details" description="Members see the handle wherever the bot creates or changes something.">
+              <div className={styles.form}>
+                <FormField label="Display name" required error={nameError}>
+                  <Input value={displayName} onValueChange={setDisplayName} placeholder="Digest bot" autoFocus />
+                </FormField>
+                <FormField label="Handle" required error={handleError} helper={handleError ? undefined : 'Lowercase letters, numbers and hyphens. Can’t be changed later.'}>
+                  <Input value={handle} onValueChange={value => setHandle(value.toLowerCase())} placeholder="digest-bot" suffix="[bot]" />
+                </FormField>
+                <FormField label="Description" optional>
+                  <Textarea value={description} onValueChange={setDescription} minRows={2} maxLength={280} placeholder="What this bot does and why it exists." />
+                </FormField>
+              </div>
+            </SectionCard>
 
-      <div className={styles.createGrid}>
-        <div className={styles.formCol}>
-          <SectionCard title="Details" description="Members see the handle wherever the bot creates or changes something.">
-            <div className={styles.form}>
-              <FormField label="Display name" required error={nameError}>
-                <Input value={displayName} onValueChange={setDisplayName} placeholder="Digest bot" autoFocus />
-              </FormField>
-              <FormField label="Handle" required error={handleError} helper={handleError ? undefined : 'Lowercase letters, numbers and hyphens. Can’t be changed later.'}>
-                <Input value={handle} onValueChange={value => setHandle(value.toLowerCase())} placeholder="digest-bot" suffix="[bot]" />
-              </FormField>
-              <FormField label="Description" optional>
-                <Textarea value={description} onValueChange={setDescription} minRows={2} maxLength={280} placeholder="What this bot does and why it exists." />
-              </FormField>
-            </div>
-          </SectionCard>
+            <SectionCard title="Permissions" description="Everything starts at No access. You can only grant permissions that apps allow for bots and that you hold yourself.">
+              <QueryState isLoading={catalog.isLoading} error={catalog.error} isEmpty={false}>
+                <PermissionsMatrix applications={catalog.data?.applications ?? []} desired={desired} onDesiredChange={setDesired} />
+              </QueryState>
+            </SectionCard>
 
-          <SectionCard title="Permissions" description="Everything starts at No access. You can only grant permissions that apps allow for bots and that you hold yourself.">
-            <QueryState isLoading={catalog.isLoading} error={catalog.error} isEmpty={false}>
-              <PermissionsMatrix applications={catalog.data?.applications ?? []} desired={desired} onDesiredChange={setDesired} />
-            </QueryState>
-          </SectionCard>
+            <SectionCard title="Network & limits" description="Checked every time an app exchanges one of this bot’s keys.">
+              <div className={styles.form}>
+                <FormField
+                  label="Allowed IP ranges"
+                  error={hasInvalidIp ? 'Fix or remove the invalid IP range before continuing.' : undefined}
+                  helper={hasInvalidIp ? undefined : 'Requests from any other address are refused. Leave empty to allow all addresses.'}
+                >
+                  <TokenInput value={ipAllowlist} onValueChange={setIpAllowlist} validate={validateCidr} maxTokens={MAX_IP_ENTRIES} placeholder="Add a CIDR range" />
+                </FormField>
+                <FormField label="Rate limit" error={rateLimitMessage} helper={rateLimitMessage ? undefined : 'Requests over the limit get a 429 response.'}>
+                  <NumberStepper
+                    value={rateLimitPerMinute}
+                    onValueChange={setRateLimitPerMinute}
+                    min={MIN_RATE_LIMIT}
+                    max={MAX_RATE_LIMIT}
+                    clampOnBlur={false}
+                    unit="requests / minute per app"
+                  />
+                </FormField>
+              </div>
+            </SectionCard>
 
-          <SectionCard title="Network & limits" description="Checked every time an app exchanges one of this bot’s keys.">
-            <div className={styles.form}>
-              <FormField
-                label="Allowed IP ranges"
-                error={hasInvalidIp ? 'Fix or remove the invalid IP range before continuing.' : undefined}
-                helper={hasInvalidIp ? undefined : 'Requests from any other address are refused. Leave empty to allow all addresses.'}
-              >
-                <TokenInput value={ipAllowlist} onValueChange={setIpAllowlist} validate={validateCidr} maxTokens={MAX_IP_ENTRIES} placeholder="Add a CIDR range" />
-              </FormField>
-              <FormField label="Rate limit" error={rateLimitMessage} helper={rateLimitMessage ? undefined : 'Requests over the limit get a 429 response.'}>
-                <NumberStepper
-                  value={rateLimitPerMinute}
-                  onValueChange={setRateLimitPerMinute}
-                  min={MIN_RATE_LIMIT}
-                  max={MAX_RATE_LIMIT}
-                  clampOnBlur={false}
-                  unit="requests / minute per app"
-                />
-              </FormField>
-            </div>
-          </SectionCard>
-
-          <div className={styles.formActions}>
-            <Button variant="ghost" onClick={backToList}>
-              Cancel
-            </Button>
-            <Button variant="primary" loading={create.isPending} disabled={hasInvalidIp || !isValidRateLimit(rateLimitPerMinute)} onClick={submit}>
-              Create bot
-            </Button>
-          </div>
-        </div>
-
-        <aside className={styles.summaryCard}>
-          <div className={styles.summaryTitle}>Summary</div>
-          <div className={styles.summaryBot}>
-            <Avatar icon={<BotIcon size={16} />} shape="square" size="md" />
-            <div>
-              <div className={styles.summaryName}>{displayName || 'New bot'}</div>
-              <div className={styles.summaryHandle}>{(handle || 'handle') + '[bot]'}</div>
+            <div className={styles.formActions}>
+              <Button variant="ghost" onClick={backToList}>
+                Cancel
+              </Button>
+              <Button variant="primary" loading={create.isPending} disabled={hasInvalidIp || !isValidRateLimit(rateLimitPerMinute)} onClick={submit}>
+                Create bot
+              </Button>
             </div>
           </div>
-          <DescriptionList layout="column">
-            {summarizePermissions(catalog.data?.applications ?? [], desired).map(group => (
-              <DescriptionList.Item key={group.applicationId} term={group.applicationName}>
-                <div className={styles.stackCell}>
-                  {group.items.map(item => (
-                    <span key={item.resource}>
-                      {item.resourceLabel} · {item.levelLabel}
-                    </span>
-                  ))}
-                </div>
+
+          <aside className={styles.summaryCard}>
+            <div className={styles.summaryTitle}>Summary</div>
+            <div className={styles.summaryBot}>
+              <Avatar icon={<BotIcon size={16} />} shape="square" size="md" />
+              <div>
+                <div className={styles.summaryName}>{displayName || 'New bot'}</div>
+                <div className={styles.summaryHandle}>{(handle || 'handle') + '[bot]'}</div>
+              </div>
+            </div>
+            <DescriptionList layout="column">
+              {summarizePermissions(catalog.data?.applications ?? [], desired).map(group => (
+                <DescriptionList.Item key={group.applicationId} term={group.applicationName}>
+                  <div className={styles.stackCell}>
+                    {group.items.map(item => (
+                      <span key={item.resource}>
+                        {item.resourceLabel} · {item.levelLabel}
+                      </span>
+                    ))}
+                  </div>
+                </DescriptionList.Item>
+              ))}
+              <DescriptionList.Item term="Network">
+                {validIps.length > 0 ? `${validIps.length} IP range${validIps.length === 1 ? '' : 's'}` : 'All addresses allowed'}
               </DescriptionList.Item>
-            ))}
-            <DescriptionList.Item term="Network">
-              {validIps.length > 0 ? `${validIps.length} IP range${validIps.length === 1 ? '' : 's'}` : 'All addresses allowed'}
-            </DescriptionList.Item>
-            <DescriptionList.Item term="Rate limit">{isValidRateLimit(rateLimitPerMinute) ? rateLimitPerMinute : '—'} / min</DescriptionList.Item>
-          </DescriptionList>
-          <div className={styles.summaryNote}>Creating a bot asks you to confirm it’s you.</div>
-        </aside>
+              <DescriptionList.Item term="Rate limit">{isValidRateLimit(rateLimitPerMinute) ? rateLimitPerMinute : '—'} / min</DescriptionList.Item>
+            </DescriptionList>
+            <div className={styles.summaryNote}>Creating a bot asks you to confirm it’s you.</div>
+          </aside>
+        </div>
+        {dialog}
       </div>
-      {dialog}
-    </div>
+    </>
   );
 }

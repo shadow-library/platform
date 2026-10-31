@@ -4,28 +4,11 @@
   gap: 20px;
 }
 
-.introRow {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
-.introText {
-  margin: 0;
-  max-width: 640px;
-  font-size: 13px;
-  line-height: 1.5;
-  color: var(--sh-text-secondary);
-}
-
 .usage {
   flex: none;
   font-size: 12.5px;
   color: var(--sh-text-tertiary);
   white-space: nowrap;
-  padding-top: 2px;
 }
 
 .toolbar {
@@ -33,22 +16,6 @@
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
-}
-
-.search {
-  flex: 1;
-  max-width: 320px;
-  min-width: 200px;
-}
-
-.spacer {
-  flex: 1;
-}
-
-.newBotGroup {
-  display: flex;
-  align-items: center;
-  gap: 10px;
 }
 
 .limitNote {
@@ -353,21 +320,8 @@
   color: var(--sh-text-secondary);
 }
 
-.tabHeadNote {
-  font-size: 12.5px;
-  color: var(--sh-text-tertiary);
-  white-space: nowrap;
-}
-
 .tabHeadTight {
   margin-bottom: 12px;
-}
-
-.tabHeadActions {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 4px;
 }
 
 .cardTitleInline {
@@ -429,19 +383,176 @@
   margin-top: 3px;
 }
 
-.listSubMono {
-  font-family: var(--sh-font-mono);
+.meter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--sh-text-secondary);
+  white-space: nowrap;
 }
 
-.revokedSection {
-  margin-top: 4px;
+.pips {
+  display: flex;
+  gap: 4px;
 }
 
-.revokedTitle {
+.pip {
+  width: 18px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--sh-surface-well);
+  border: 1px solid var(--sh-border-default);
+}
+.pip[data-filled] {
+  background: var(--sh-accent);
+  border-color: var(--sh-accent);
+}
+
+.slots {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+@media (max-width: 760px) {
+  .slots {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.slot {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px;
+  background: var(--sh-surface-card);
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: var(--sh-radius-xl);
+}
+.slot[data-empty] {
+  align-items: flex-start;
+  justify-content: center;
+  background: transparent;
+  border-style: dashed;
+  border-color: var(--sh-border-default);
+}
+
+.slotHead {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.slotLabel {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sh-text-tertiary);
+}
+
+.slotName {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--sh-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.slotFacts {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 6px 16px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--sh-text-primary);
+}
+.slotFacts dt {
+  color: var(--sh-text-tertiary);
+}
+.slotFacts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.slotFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: auto;
+}
+
+.slotCreated {
+  font-size: 12px;
+  color: var(--sh-text-tertiary);
+}
+
+.slotFoot .revokeButton[data-variant='ghost'] {
+  color: var(--sh-danger-text);
+}
+.slotFoot .revokeButton[data-variant='ghost']:hover:not(:disabled):not([aria-disabled='true']):not([data-loading]) {
+  background: var(--sh-danger-bg-subtle);
+  color: var(--sh-danger-text-on-subtle);
+}
+
+.slotEmptyTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--sh-text-primary);
+}
+
+.slotEmptyText {
+  max-width: 320px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--sh-text-secondary);
+}
+
+.history {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.historyTitle {
+  margin: 0;
   font-size: 12.5px;
   font-weight: 600;
   color: var(--sh-text-tertiary);
-  margin-bottom: 10px;
+}
+
+.historyList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: var(--sh-radius-lg);
+  background: var(--sh-surface-card);
+}
+
+.historyRow {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  padding: 10px 16px;
+  font-size: 13px;
+}
+.historyRow + .historyRow {
+  border-top: 1px solid var(--sh-border-subtle);
+}
+
+.historyName {
+  font-weight: 600;
+  color: var(--sh-text-primary);
+}
+
+.historyWhen {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--sh-text-tertiary);
 }
 
 .settingsStack {

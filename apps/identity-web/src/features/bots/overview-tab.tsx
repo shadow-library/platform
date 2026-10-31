@@ -6,12 +6,15 @@ import { type BotCatalogApplicationItem, type BotGrantItem, type BotItem, useBot
 import { summarizeGrants } from '@/lib/bot-permissions';
 import { formatDate, relativeTime } from '@/lib/format';
 import { describeEvent } from './bot-activity-events';
-import { type KeySummary, RECENT_ACTIVITY_LIMIT } from './bot-detail.shared';
+import { formatKeyUsage, type KeySummary, RECENT_ACTIVITY_LIMIT } from './bot-detail.shared';
 import styles from './bots.module.css';
+
+export type KeysState = 'loading' | 'error' | 'ready';
 
 interface OverviewTabProps {
   bot: BotItem;
   keySummary: KeySummary;
+  keysState: KeysState;
   orgId: string;
   botId: string;
   applications: BotCatalogApplicationItem[];
@@ -53,7 +56,18 @@ function SummaryCard({ title, note, badge, linkLabel, onLink, children }: Summar
   );
 }
 
-export function OverviewTab({ bot, keySummary, orgId, botId, applications, grants, onManageKeys, onEditPermissions, onViewActivity }: OverviewTabProps): React.JSX.Element {
+export function OverviewTab({
+  bot,
+  keySummary,
+  keysState,
+  orgId,
+  botId,
+  applications,
+  grants,
+  onManageKeys,
+  onEditPermissions,
+  onViewActivity,
+}: OverviewTabProps): React.JSX.Element {
   const recent = useBotActivityQuery(orgId, botId, { limit: RECENT_ACTIVITY_LIMIT }, true);
   const permissionGroups = useMemo(() => summarizeGrants(applications, grants), [applications, grants]);
   const flagged = permissionGroups.some(group => group.items.some(item => item.flagged));
@@ -90,8 +104,10 @@ export function OverviewTab({ bot, keySummary, orgId, botId, applications, grant
       </div>
 
       <div className={styles.cardStack}>
-        <SummaryCard title="API keys" note={keySummary.usage} linkLabel="Manage" onLink={onManageKeys}>
-          {keySummary.active.length === 0 ? (
+        <SummaryCard title="API keys" note={keysState === 'ready' ? keySummary.usage : formatKeyUsage(bot.activeKeyCount)} linkLabel="Manage" onLink={onManageKeys}>
+          {keysState !== 'ready' ? (
+            <p className={styles.muted}>{keysState === 'loading' ? 'Loading keys…' : 'Couldn’t load keys.'}</p>
+          ) : keySummary.active.length === 0 ? (
             <p className={styles.muted}>No keys yet.</p>
           ) : (
             <div className={styles.rowList}>

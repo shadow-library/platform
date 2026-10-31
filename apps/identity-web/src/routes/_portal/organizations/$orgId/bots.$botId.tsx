@@ -134,7 +134,6 @@ function BotDetailPage(): React.JSX.Element {
   const data = bot.data;
   const status = STATUS_META[data.status];
   const activeKeyCount = keys.data ? keySummary.active.length : data.activeKeyCount;
-  const keySlotFree = canGenerateKey(data.status, activeKeyCount);
   const applications = catalog.data?.applications ?? EMPTY_APPLICATIONS;
   const grants = permissions.data?.grants ?? EMPTY_GRANTS;
   const counts: Partial<Record<BotTab, number>> = { permissions: permissions.data ? grants.length : undefined, keys: activeKeyCount };
@@ -208,6 +207,7 @@ function BotDetailPage(): React.JSX.Element {
             <OverviewTab
               bot={data}
               keySummary={keySummary}
+              keysState={keys.isLoading ? 'loading' : keys.error && !keys.data ? 'error' : 'ready'}
               orgId={orgId}
               botId={botId}
               applications={applications}
@@ -234,9 +234,11 @@ function BotDetailPage(): React.JSX.Element {
             <KeysTab
               orgId={orgId}
               botId={botId}
+              status={data.status}
               keys={keys.data?.keys ?? EMPTY_KEYS}
+              activeKeyCount={activeKeyCount}
               isLoading={keys.isLoading}
-              canGenerateKey={keySlotFree}
+              error={keys.data ? null : keys.error}
               require={require}
               onGenerate={() => setGenerateOpen(true)}
             />

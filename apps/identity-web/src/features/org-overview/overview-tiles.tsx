@@ -16,7 +16,7 @@ function TileValue({ tile }: { tile: OverviewTile }): React.JSX.Element {
     return (
       <>
         <span aria-hidden="true">—</span>
-        <span className={styles.visuallyHidden}>unavailable</span>
+        <span className="sr-only">unavailable</span>
       </>
     );
   return <>{tile.value}</>;

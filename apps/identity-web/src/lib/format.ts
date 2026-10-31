@@ -18,9 +18,9 @@ export function relativeTime(iso?: string | null): string {
 }
 
 /** Whole days from now until `iso`, rounded up — negative once it's passed. Non-deterministic (reads `Date.now()`): render behind `ClientOnly`. */
-export function daysUntil(iso: string): number {
+export function daysUntil(iso: string, now: number = Date.now()): number {
   const DAY_MS = 24 * 60 * 60 * 1000;
-  return Math.ceil((new Date(iso).getTime() - Date.now()) / DAY_MS);
+  return Math.ceil((new Date(iso).getTime() - now) / DAY_MS);
 }
 
 export function formatDate(iso?: string | null): string {
