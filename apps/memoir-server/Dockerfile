@@ -35,7 +35,8 @@ COPY e2e/package.json e2e/package.json
 RUN --mount=type=cache,target=/root/.bun/install/cache bun install --frozen-lockfile --filter ./apps/memoir-server --filter ./
 
 FROM deps AS build
-COPY scripts/ scripts/
+COPY scripts/build.ts scripts/workspaces.ts scripts/
+COPY scripts/utils/ scripts/utils/
 COPY packages/app/ packages/app/
 COPY packages/auth/ packages/auth/
 COPY packages/class-schema/ packages/class-schema/
