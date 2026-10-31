@@ -81,7 +81,7 @@ export function SectionCard({ title, description, action, children, className, b
       {(title || action) && (
         <div className={styles.sectionHead}>
           <div className={styles.sectionHeadMain}>
-            {title && <h3 className={styles.sectionTitle}>{title}</h3>}
+            {title && <h2 className={styles.sectionTitle}>{title}</h2>}
             {description && <p className={styles.sectionDesc}>{description}</p>}
           </div>
           {action && <div className={styles.sectionAction}>{action}</div>}
@@ -201,9 +201,9 @@ export function DangerZone({ title, description, actionLabel, onAction, disabled
   return (
     <section className={styles.dangerZone} aria-labelledby={titleId}>
       <div className={styles.dangerZoneMain}>
-        <h3 id={titleId} className={styles.dangerZoneTitle}>
+        <h2 id={titleId} className={styles.dangerZoneTitle}>
           {title}
-        </h3>
+        </h2>
         <p className={styles.dangerZoneDesc}>{description}</p>
       </div>
       <Button variant="danger" disabled={disabled} onClick={onAction}>

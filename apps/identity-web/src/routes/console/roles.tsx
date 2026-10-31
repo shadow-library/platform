@@ -18,6 +18,7 @@ import {
   useRoleAssignmentsQuery,
 } from '@/lib/apis';
 import { relativeTime } from '@/lib/format';
+import { useConfirmTarget } from '@/lib/hooks';
 
 import styles from '@/features/console/console.module.css';
 
@@ -32,7 +33,7 @@ export const Route = createFileRoute('/console/roles')({
   component: RolesPage,
 });
 
-const PRINCIPAL_LABEL: Record<PrincipalType, string> = { USER: 'User', SERVICE_ACCOUNT: 'Service account', ORGANISATION: 'Organisation' };
+const PRINCIPAL_LABEL: Record<PrincipalType, string> = { USER: 'User', SERVICE_ACCOUNT: 'Service account', ORGANISATION: 'Organization' };
 
 const PRINCIPAL_ICON: Record<PrincipalType, React.JSX.Element> = {
   USER: <UserIcon size={15} />,
@@ -54,7 +55,7 @@ function AssignDialog({ role, open, onOpenChange }: { role: ApplicationRoleItem;
     const principal = isOrg ? organisationId.trim() : principalId.trim();
     const orgScope = organisationId.trim();
     if (!principal || !orgScope) {
-      toast.danger(isOrg ? 'Organisation ID is required.' : 'Principal ID and organisation ID are required.');
+      toast.danger(isOrg ? 'Organization ID is required.' : 'Principal ID and organization ID are required.');
       return;
     }
     require(() =>
@@ -77,15 +78,15 @@ function AssignDialog({ role, open, onOpenChange }: { role: ApplicationRoleItem;
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <Dialog.Content size="sm">
-          <Dialog.Header title={`Assign ${role.roleName}`} description="Grant this role to a user, service account, or a whole organisation (a vendor-controlled tier)." />
+          <Dialog.Header title={`Assign ${role.roleName}`} description="Grant this role to a user, service account, or a whole organization (a vendor-controlled tier)." />
           <Dialog.Body>
             <div className={styles.form}>
               <FormField label="Principal type" required>
                 <Select value={principalType} onValueChange={value => setPrincipalType(value as PrincipalType)}>
                   <Select.Item value="USER">User</Select.Item>
                   <Select.Item value="SERVICE_ACCOUNT">Service account</Select.Item>
-                  <Select.Item value="ORGANISATION" description="Grants the role to every member of the organisation">
-                    Organisation
+                  <Select.Item value="ORGANISATION" description="Grants the role to every member of the organization">
+                    Organization
                   </Select.Item>
                 </Select>
               </FormField>
@@ -94,7 +95,7 @@ function AssignDialog({ role, open, onOpenChange }: { role: ApplicationRoleItem;
                   <Input value={principalId} onValueChange={setPrincipalId} placeholder="e.g. 481723…" autoFocus />
                 </FormField>
               )}
-              <FormField label="Organisation ID" required helper={isOrg ? 'The organisation that holds this role, org-wide.' : 'The organisation the assignment applies within.'}>
+              <FormField label="Organization ID" required helper={isOrg ? 'The organization that holds this role, org-wide.' : 'The organization the assignment applies within.'}>
                 <Input value={organisationId} onValueChange={setOrganisationId} placeholder="e.g. 90210…" autoFocus={isOrg} />
               </FormField>
             </div>
@@ -119,13 +120,13 @@ function AssignmentsPanel({ role }: { role: ApplicationRoleItem }): React.JSX.El
   const revoke = useRevokeRoleAssignmentMutation();
   const { require, dialog } = useStepUpGate();
   const [assignOpen, setAssignOpen] = useState(false);
-  const [pendingRevoke, setPendingRevoke] = useState<RoleAssignmentItem | null>(null);
+  const revocation = useConfirmTarget<RoleAssignmentItem>();
 
   const items = assignments.data?.items ?? [];
 
   const confirmRevoke = (): Promise<unknown> | undefined => {
-    if (!pendingRevoke) return undefined;
-    const target = pendingRevoke;
+    const target = revocation.target;
+    if (!target) return undefined;
     return require(() =>
       revoke.mutateAsync(
         { principalType: target.principalType, principalId: target.principalId, roleId: target.roleId, organisationId: target.organisationId },
@@ -164,7 +165,7 @@ function AssignmentsPanel({ role }: { role: ApplicationRoleItem }): React.JSX.El
                 {item.grantedBy ? ` by ${item.grantedBy}` : ''}
               </div>
             </div>
-            <Button variant="ghost" size="sm" onClick={() => setPendingRevoke(item)}>
+            <Button variant="ghost" size="sm" onClick={() => revocation.ask(item)}>
               Revoke
             </Button>
           </div>
@@ -173,13 +174,13 @@ function AssignmentsPanel({ role }: { role: ApplicationRoleItem }): React.JSX.El
 
       <AssignDialog role={role} open={assignOpen} onOpenChange={setAssignOpen} />
       <ConfirmDialog
-        open={pendingRevoke !== null}
-        onOpenChange={open => !open && setPendingRevoke(null)}
+        open={revocation.open}
+        onOpenChange={revocation.onOpenChange}
         intent="danger"
         title="Revoke assignment?"
         description={
-          pendingRevoke
-            ? `${PRINCIPAL_LABEL[pendingRevoke.principalType]} ${pendingRevoke.principalId} will lose the ${role.roleName} role in organisation ${pendingRevoke.organisationId}.`
+          revocation.target
+            ? `${PRINCIPAL_LABEL[revocation.target.principalType]} ${revocation.target.principalId} will lose the ${role.roleName} role in organization ${revocation.target.organisationId}.`
             : ''
         }
         confirmLabel="Revoke"

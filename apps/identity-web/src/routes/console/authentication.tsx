@@ -14,6 +14,7 @@ import {
   useSetAuthModeMutation,
   useUpdateGlobalIdentityProviderMutation,
 } from '@/lib/apis';
+import { useConfirmTarget } from '@/lib/hooks';
 
 import styles from '@/features/console/console.module.css';
 
@@ -53,7 +54,7 @@ function AuthenticationPage(): React.JSX.Element {
   const del = useDeleteGlobalIdentityProviderMutation();
   const { require, dialog } = useStepUpGate();
   const [configuring, setConfiguring] = useState<AuthModeItem | null>(null);
-  const [removing, setRemoving] = useState<AuthModeItem | null>(null);
+  const removal = useConfirmTarget<AuthModeItem>();
 
   const list = modes.data?.items ?? [];
 
@@ -64,23 +65,23 @@ function AuthenticationPage(): React.JSX.Element {
       <QueryState isLoading={modes.isLoading} error={modes.error} isEmpty={list.length === 0} emptyTitle="No sign-in methods">
         <div className={styles.rowList}>
           {list.map(mode => (
-            <AuthModeRow key={mode.method} mode={mode} require={require} onConfigure={() => setConfiguring(mode)} onRemove={() => setRemoving(mode)} />
+            <AuthModeRow key={mode.method} mode={mode} require={require} onConfigure={() => setConfiguring(mode)} onRemove={() => removal.ask(mode)} />
           ))}
         </div>
       </QueryState>
 
       <ProviderDialog mode={configuring} onOpenChange={open => !open && setConfiguring(null)} />
       <ConfirmDialog
-        open={removing !== null}
-        onOpenChange={open => !open && setRemoving(null)}
+        open={removal.open}
+        onOpenChange={removal.onOpenChange}
         intent="danger"
-        title={removing ? `Remove ${removing.label} settings?` : 'Remove settings?'}
+        title={removal.target ? `Remove ${removal.target.label} settings?` : 'Remove settings?'}
         description="The method turns off and its stored client secret is deleted. Members who signed in this way keep their accounts and can link the provider again once it is reconfigured."
         confirmLabel="Remove settings"
         onConfirm={() =>
-          removing?.provider &&
-          del.mutateAsync(removing.provider.id, {
-            onSuccess: () => toast.success(`${removing.label} settings removed`),
+          removal.target?.provider &&
+          del.mutateAsync(removal.target.provider.id, {
+            onSuccess: () => toast.success(`${removal.target?.label} settings removed`),
             onError: error => toast.danger(error.message),
           })
         }

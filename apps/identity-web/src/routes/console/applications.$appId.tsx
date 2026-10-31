@@ -77,13 +77,13 @@ const TABS: { key: Tab; label: string }[] = [
   { key: 'api', label: 'API & scopes' },
   { key: 'roles', label: 'Roles' },
   { key: 'members', label: 'Members' },
-  { key: 'organisations', label: 'Organisations' },
+  { key: 'organisations', label: 'Organizations' },
 ];
 
 /** PUBLIC to everyone, RESTRICTED only to organisations a platform admin releases it to, INTERNAL to platform staff alone. */
 const VISIBILITY: Record<ApplicationVisibility, VisibilityMeta> = {
-  PUBLIC: { label: 'Public', description: 'Generally available — every organisation and personal workspace can use it.', intent: 'success' },
-  RESTRICTED: { label: 'Restricted', description: 'Only organisations you release it to can use it. Manage releases in the Organisations tab.', intent: 'warning' },
+  PUBLIC: { label: 'Public', description: 'Generally available — every organization and personal workspace can use it.', intent: 'success' },
+  RESTRICTED: { label: 'Restricted', description: 'Only organizations you release it to can use it. Manage releases in the Organizations tab.', intent: 'warning' },
   INTERNAL: { label: 'Internal', description: 'Platform staff only. It is hidden from everyone else — refused as an unknown application.', intent: 'info' },
 };
 
@@ -316,7 +316,7 @@ function ApplicationDetailPage(): React.JSX.Element {
             </div>
             {data.visibility === 'RESTRICTED' && (
               <Button variant="secondary" size="sm" onClick={() => navigate({ search: prev => ({ ...prev, tab: 'organisations' }), replace: true })}>
-                Manage organisations
+                Manage organizations
               </Button>
             )}
           </div>

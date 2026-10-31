@@ -13,6 +13,7 @@ import {
   useServiceProvidersQuery,
   useUpdateServiceProviderMutation,
 } from '@/lib/apis';
+import { useConfirmTarget } from '@/lib/hooks';
 
 import styles from '@/features/console/console.module.css';
 
@@ -130,7 +131,7 @@ function SamlPage(): React.JSX.Element {
   const { require, dialog } = useStepUpGate();
   const [editing, setEditing] = useState<ServiceProviderItem | null>(null);
   const [formOpen, setFormOpen] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<ServiceProviderItem | null>(null);
+  const deletion = useConfirmTarget<ServiceProviderItem>();
 
   const list = providers.data?.items ?? [];
 
@@ -189,7 +190,7 @@ function SamlPage(): React.JSX.Element {
                 >
                   Edit
                 </Button>
-                <Button variant="ghost" size="sm" onClick={() => require(() => setDeleteTarget(sp))}>
+                <Button variant="ghost" size="sm" onClick={() => require(() => deletion.ask(sp))}>
                   Delete
                 </Button>
               </div>
@@ -200,15 +201,15 @@ function SamlPage(): React.JSX.Element {
 
       <SpDialog editing={editing} open={formOpen} onOpenChange={setFormOpen} />
       <ConfirmDialog
-        open={deleteTarget !== null}
-        onOpenChange={open => !open && setDeleteTarget(null)}
+        open={deletion.open}
+        onOpenChange={deletion.onOpenChange}
         intent="danger"
-        title={deleteTarget ? `Delete ${deleteTarget.name}?` : 'Delete provider?'}
+        title={deletion.target ? `Delete ${deletion.target.name}?` : 'Delete provider?'}
         description="The service provider will no longer be able to receive assertions."
         confirmLabel="Delete provider"
         onConfirm={() =>
-          deleteTarget &&
-          del.mutateAsync(deleteTarget.id, {
+          deletion.target &&
+          del.mutateAsync(deletion.target.id, {
             onSuccess: () => toast.success('Provider deleted'),
             onError: error => toast.danger(error.message),
           })

@@ -25,7 +25,7 @@ export function OrganisationsTab(props: { appId: string; require: Require }): Re
   const doRelease = (): void => {
     const organisationId = orgIdInput.trim();
     if (!organisationId) {
-      toast.danger('Enter an organisation ID to release to.');
+      toast.danger('Enter an organization ID to release to.');
       return;
     }
     require(() =>
@@ -33,7 +33,7 @@ export function OrganisationsTab(props: { appId: string; require: Require }): Re
         { appId, organisationId },
         {
           onSuccess: () => {
-            toast.success('Application released to organisation');
+            toast.success('Application released to organization');
             setOrgIdInput('');
           },
           onError: error => toast.danger(error.message),
@@ -49,16 +49,16 @@ export function OrganisationsTab(props: { appId: string; require: Require }): Re
     <div className={styles.page}>
       <div className={styles.tabHead}>
         <div className={styles.tabHeadMain}>
-          <h2 className={styles.tabTitle}>Organisations</h2>
+          <h2 className={styles.tabTitle}>Organizations</h2>
           <p className={styles.tabDesc}>
-            This application is restricted: only the organisations you release it to may use it. Each organisation then chooses which of its members get it.
+            This application is restricted: only the organizations you release it to may use it. Each organization then chooses which of its members get it.
           </p>
         </div>
       </div>
 
       <div className={styles.toolbar}>
         <div className={styles.search}>
-          <Input size="sm" placeholder="Organisation ID to release…" aria-label="Organisation ID to release" value={orgIdInput} onValueChange={setOrgIdInput} />
+          <Input size="sm" placeholder="Organization ID to release…" aria-label="Organization ID to release" value={orgIdInput} onValueChange={setOrgIdInput} />
         </div>
         <Button variant="primary" size="sm" loading={release.isPending} onClick={doRelease}>
           Release
@@ -70,12 +70,12 @@ export function OrganisationsTab(props: { appId: string; require: Require }): Re
           data={rows}
           rowKey="organisationId"
           loading={orgs.isLoading}
-          aria-label="Organisations"
-          emptyState={<EmptyState size="inline" title="No organisations yet" description="Release this application to an organisation to let its members use it." />}
+          aria-label="Organizations"
+          emptyState={<EmptyState size="inline" title="No organizations yet" description="Release this application to an organization to let its members use it." />}
           columns={[
             {
               id: 'org',
-              header: 'Organisation',
+              header: 'Organization',
               cell: item => (
                 <div className={styles.cellMain}>
                   <div className={styles.cellName}>{item.name}</div>

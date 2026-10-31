@@ -71,7 +71,7 @@ export function SettingsTab({ orgId, organisationName, bot, require }: SettingsT
           </FormField>
 
           <div className={styles.formSection}>
-            <h4 className={styles.formSectionTitle}>Network &amp; limits</h4>
+            <h3 className={styles.formSectionTitle}>Network &amp; limits</h3>
             <p className={styles.formSectionDesc}>Checked every time an app exchanges one of this bot’s keys.</p>
           </div>
           <FormField

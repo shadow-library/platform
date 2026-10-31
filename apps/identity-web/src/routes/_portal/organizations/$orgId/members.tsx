@@ -25,6 +25,7 @@ import {
   useUpdateMemberStatusMutation,
 } from '@/lib/apis';
 import { formatDate, relativeTime } from '@/lib/format';
+import { useConfirmTarget } from '@/lib/hooks';
 
 import styles from './members.module.css';
 
@@ -122,10 +123,8 @@ function MembersPage(): React.JSX.Element {
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [inviteOpen, setInviteOpen] = useState(() => inviteRequested === true && canManage);
-  const [removeTarget, setRemoveTarget] = useState<MemberItem | null>(null);
-  const [revokeTarget, setRevokeTarget] = useState<InvitationItem | null>(null);
-  const [removeOpen, setRemoveOpen] = useState(false);
-  const [revokeOpen, setRevokeOpen] = useState(false);
+  const remove = useConfirmTarget<MemberItem>();
+  const revokeInvite = useConfirmTarget<InvitationItem>();
 
   useEffect(() => {
     if (!inviteRequested) return;
@@ -143,10 +142,12 @@ function MembersPage(): React.JSX.Element {
     updateRole.mutate({ userId: member.userId, role }, { onSuccess: () => toast.success('Role updated'), onError: error => toast.danger(error.message) });
 
   const confirmRemove = (): Promise<unknown> | undefined =>
-    removeTarget ? removeMember.mutateAsync(removeTarget.userId, { onSuccess: () => toast.success('Member removed'), onError: error => toast.danger(error.message) }) : undefined;
+    remove.target ? removeMember.mutateAsync(remove.target.userId, { onSuccess: () => toast.success('Member removed'), onError: error => toast.danger(error.message) }) : undefined;
 
   const confirmRevoke = (): Promise<unknown> | undefined =>
-    revokeTarget ? revoke.mutateAsync(revokeTarget.id, { onSuccess: () => toast.success('Invitation revoked'), onError: error => toast.danger(error.message) }) : undefined;
+    revokeInvite.target
+      ? revoke.mutateAsync(revokeInvite.target.id, { onSuccess: () => toast.success('Invitation revoked'), onError: error => toast.danger(error.message) })
+      : undefined;
 
   /** Org-scoped only — this pauses the person inside this organization and leaves their Shadow account untouched. */
   const changeStatus = (member: MemberItem, status: MemberStatus): void =>
@@ -248,13 +249,7 @@ function MembersPage(): React.JSX.Element {
                           <DropdownMenu.Item onSelect={() => changeStatus(member, 'ACTIVE')}>Restore access</DropdownMenu.Item>
                         )}
                         <DropdownMenu.Separator />
-                        <DropdownMenu.Item
-                          destructive
-                          onSelect={() => {
-                            setRemoveTarget(member);
-                            setRemoveOpen(true);
-                          }}
-                        >
+                        <DropdownMenu.Item destructive onSelect={() => remove.ask(member)}>
                           Remove from organization
                         </DropdownMenu.Item>
                       </DropdownMenu.Content>
@@ -294,14 +289,7 @@ function MembersPage(): React.JSX.Element {
                   >
                     Resend
                   </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setRevokeTarget(invitation);
-                      setRevokeOpen(true);
-                    }}
-                  >
+                  <Button variant="ghost" size="sm" onClick={() => revokeInvite.ask(invitation)}>
                     Revoke
                   </Button>
                 </div>
@@ -313,19 +301,19 @@ function MembersPage(): React.JSX.Element {
         <InviteDialog orgId={orgId} open={inviteOpen} onOpenChange={setInviteOpen} />
 
         <ConfirmDialog
-          open={removeOpen}
-          onOpenChange={setRemoveOpen}
+          open={remove.open}
+          onOpenChange={remove.onOpenChange}
           intent="danger"
-          title={`Remove ${removeTarget?.email ?? 'this member'}?`}
+          title={`Remove ${remove.target?.email ?? 'this member'}?`}
           description="They lose access to this organization and everything shared with it immediately. They can be invited again later."
           confirmLabel="Remove member"
           onConfirm={confirmRemove}
         />
         <ConfirmDialog
-          open={revokeOpen}
-          onOpenChange={setRevokeOpen}
+          open={revokeInvite.open}
+          onOpenChange={revokeInvite.onOpenChange}
           intent="danger"
-          title={`Revoke the invitation for ${revokeTarget?.email ?? 'this email'}?`}
+          title={`Revoke the invitation for ${revokeInvite.target?.email ?? 'this email'}?`}
           description="The invitation link stops working. You can send a new invitation at any time."
           confirmLabel="Revoke invitation"
           onConfirm={confirmRevoke}

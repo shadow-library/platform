@@ -90,6 +90,15 @@ Load this when writing or changing frontend code. First determine the rendering 
   (leading/trailing row actions), `BottomSheet` (thumb-reachable overlay where desktop would use
   `Dialog`/`Popover`).
 
+## `ui` opt-ins (reach for these before overriding component CSS)
+
+- `ConfirmDialog` `onConfirm` may return a promise: the dialog stays open and loading until it settles, closes on resolve, stays open on reject (the rejection is swallowed — toast the
+  error yourself). Return nothing and it closes at once. Hold the target in state separate from `open` so the copy doesn't flip while it animates out.
+- `Tabs.Panel keepMounted` keeps an inactive panel mounted and `hidden`, so a half-edited form survives a tab switch. Horizontal tab rows scroll on their own; don't add `overflow-x`.
+- `Button tone="danger"` recolours `secondary`/`ghost`/`text` for a quiet destructive row action; `variant="danger"` stays the loud one.
+- `Breadcrumbs hideAncestorsBelow="sm" | "md"` renders only the current crumb on narrow bars; pair it with navigation that still reaches the ancestors. Long labels truncate.
+- `Sidebar.Switcher` closes the mobile nav drawer when an option is selected.
+
 ## Secrets & env isolation
 
 - A web workspace has no server business logic: MUST NOT place server logic, DB access, or secrets in

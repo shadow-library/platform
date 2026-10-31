@@ -15,6 +15,7 @@ import {
   useOrgAccess,
   useUpdateIdentityProviderMutation,
 } from '@/lib/apis';
+import { useConfirmTarget } from '@/lib/hooks';
 
 import styles from './providers.module.css';
 
@@ -184,8 +185,7 @@ function ProvidersPage(): React.JSX.Element {
 
   const [editing, setEditing] = useState<IdentityProvider | null>(null);
   const [formOpen, setFormOpen] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<IdentityProvider | null>(null);
-  const [deleteOpen, setDeleteOpen] = useState(false);
+  const deletion = useConfirmTarget<IdentityProvider>();
 
   const list = providers.data?.items ?? [];
   const canAdd = !providers.isLoading && !providers.error && list.length === 0;
@@ -252,14 +252,7 @@ function ProvidersPage(): React.JSX.Element {
                   <Button variant="ghost" size="sm" onClick={() => openEdit(idp)}>
                     Edit
                   </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setDeleteTarget(idp);
-                      setDeleteOpen(true);
-                    }}
-                  >
+                  <Button variant="ghost" size="sm" onClick={() => deletion.ask(idp)}>
                     Delete
                   </Button>
                 </div>
@@ -271,15 +264,16 @@ function ProvidersPage(): React.JSX.Element {
         <IdpDialog orgId={orgId} editing={editing} open={formOpen} onOpenChange={setFormOpen} />
 
         <ConfirmDialog
-          open={deleteOpen}
-          onOpenChange={setDeleteOpen}
+          open={deletion.open}
+          onOpenChange={deletion.onOpenChange}
           intent="danger"
-          title={deleteTarget ? `Delete ${deleteTarget.name}?` : 'Delete provider?'}
+          title={deletion.target ? `Delete ${deletion.target.name}?` : 'Delete provider?'}
           description="Members will no longer be able to sign in through this provider."
           confirmLabel="Delete provider"
-          onConfirm={() =>
-            deleteTarget && require(() => del.mutateAsync(deleteTarget.id, { onSuccess: () => toast.success('Provider deleted'), onError: error => toast.danger(error.message) }))
-          }
+          onConfirm={() => {
+            const { target } = deletion;
+            return target && require(() => del.mutateAsync(target.id, { onSuccess: () => toast.success('Provider deleted'), onError: error => toast.danger(error.message) }));
+          }}
         />
         {dialog}
       </div>

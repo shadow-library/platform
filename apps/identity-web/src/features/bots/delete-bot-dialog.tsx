@@ -93,7 +93,7 @@ export function DeleteBotDialog({ orgId, organisationName, bot, open, onOpenChan
         <Dialog.Body>
           <div className={styles.stack}>
             <section className={styles.appPanel} aria-busy={ownership.isLoading || undefined}>
-              <h4 className={styles.appPanelTitle}>Owned records</h4>
+              <h3 className={styles.appPanelTitle}>Owned records</h3>
               {ownership.isLoading && (
                 <div className={styles.appLoading}>
                   <Spinner size="sm" label="Counting owned records" />

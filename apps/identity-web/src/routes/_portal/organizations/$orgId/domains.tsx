@@ -15,6 +15,7 @@ import {
   useVerifyDomainMutation,
 } from '@/lib/apis';
 import { formatDate } from '@/lib/format';
+import { useConfirmTarget } from '@/lib/hooks';
 
 import styles from './domains.module.css';
 
@@ -35,8 +36,7 @@ function DomainsPage(): React.JSX.Element {
   const { require, dialog } = useStepUpGate();
 
   const [value, setValue] = useState('');
-  const [removeTarget, setRemoveTarget] = useState<DomainItem | null>(null);
-  const [removeOpen, setRemoveOpen] = useState(false);
+  const removal = useConfirmTarget<DomainItem>();
   const list = domains.data?.domains ?? [];
 
   const add = (): void => {
@@ -52,10 +52,10 @@ function DomainsPage(): React.JSX.Element {
     );
   };
 
-  const confirmRemove = (): Promise<unknown> | undefined =>
-    removeTarget
-      ? require(() => remove.mutateAsync(removeTarget.id, { onSuccess: () => toast.success('Domain removed'), onError: error => toast.danger(error.message) }))
-      : undefined;
+  const confirmRemove = (): Promise<unknown> | undefined => {
+    const { target } = removal;
+    return target ? require(() => remove.mutateAsync(target.id, { onSuccess: () => toast.success('Domain removed'), onError: error => toast.danger(error.message) })) : undefined;
+  };
 
   return (
     <>
@@ -107,14 +107,7 @@ function DomainsPage(): React.JSX.Element {
                       </Button>
                     )}
                     {canManage && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setRemoveTarget(domain);
-                          setRemoveOpen(true);
-                        }}
-                      >
+                      <Button variant="ghost" size="sm" onClick={() => removal.ask(domain)}>
                         Remove
                       </Button>
                     )}
@@ -145,12 +138,12 @@ function DomainsPage(): React.JSX.Element {
           </div>
         </QueryState>
         <ConfirmDialog
-          open={removeOpen}
-          onOpenChange={setRemoveOpen}
+          open={removal.open}
+          onOpenChange={removal.onOpenChange}
           intent="danger"
-          title={`Remove ${removeTarget?.domain ?? 'this domain'}?`}
+          title={`Remove ${removal.target?.domain ?? 'this domain'}?`}
           description={
-            removeTarget?.status === 'VERIFIED'
+            removal.target?.status === 'VERIFIED'
               ? 'Single sign-on and SCIM stop working for this domain, and you will need to verify it again to restore them.'
               : 'The pending verification is discarded. You can add the domain again later.'
           }

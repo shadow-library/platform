@@ -63,7 +63,7 @@ function ContactCard({ title, kind, placeholder, items, isLoading, error, addPen
   return (
     <section className={styles.card}>
       <div className={styles.cardHead}>
-        <h3 className={styles.cardTitle}>{title}</h3>
+        <h2 className={styles.cardTitle}>{title}</h2>
       </div>
 
       <QueryState isLoading={isLoading} error={error} isEmpty={items.length === 0} emptyTitle={`No ${kind === 'email' ? 'email addresses' : 'phone numbers'} yet`}>

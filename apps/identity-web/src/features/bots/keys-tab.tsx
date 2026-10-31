@@ -1,4 +1,4 @@
-import { Fragment, useId, useState } from 'react';
+import { Fragment, useId } from 'react';
 import { Alert, Button, ClientOnly, ConfirmDialog, Skeleton, toast } from '@shadow-library/ui';
 
 import { KeyIcon } from '@/components/icons';
@@ -7,6 +7,7 @@ import { type StepUpRequire } from '@/features/portal';
 import { type ApiError, type BotItem, type BotKeyItem, useRevokeBotKeyMutation } from '@/lib/apis';
 import { botErrorMessage } from '@/lib/bot-errors';
 import { formatDate, relativeTime } from '@/lib/format';
+import { useConfirmTarget } from '@/lib/hooks';
 import { type FilledKeySlot, formatKeyUsage, keyExpiryWarning, keySlots, MAX_ACTIVE_KEYS } from './bot-detail.shared';
 import styles from './bots.module.css';
 
@@ -95,15 +96,14 @@ function SlotSkeleton(): React.JSX.Element {
 
 export function KeysTab({ orgId, botId, status, keys, activeKeyCount, isLoading, error, require, onGenerate }: KeysTabProps): React.JSX.Element {
   const revoke = useRevokeBotKeyMutation(orgId);
-  const [revokeTarget, setRevokeTarget] = useState<BotKeyItem | null>(null);
-  const [revokeOpen, setRevokeOpen] = useState(false);
+  const revocation = useConfirmTarget<BotKeyItem>();
 
   const historyTitleId = useId();
   const inactiveKeys = keys.filter(key => key.status !== 'ACTIVE');
 
   const doRevoke = (): Promise<unknown> | undefined => {
-    if (!revokeTarget) return undefined;
-    const target = revokeTarget;
+    const target = revocation.target;
+    if (!target) return undefined;
     return require(() =>
       revoke.mutateAsync(
         { botId, keyId: target.id },
@@ -156,14 +156,7 @@ export function KeysTab({ orgId, botId, status, keys, activeKeyCount, isLoading,
           {slots.map(slot => (
             <section key={slot.label} className={styles.slot} data-empty={slot.kind === 'empty' || undefined} aria-label={slot.label}>
               {slot.kind === 'filled' ? (
-                <FilledSlot
-                  slot={slot}
-                  disabled={revoke.isPending}
-                  onRevoke={() => {
-                    setRevokeTarget(slot.key);
-                    setRevokeOpen(true);
-                  }}
-                />
+                <FilledSlot slot={slot} disabled={revoke.isPending} onRevoke={() => revocation.ask(slot.key)} />
               ) : (
                 <>
                   <span className={styles.slotLabel}>{slot.label}</span>
@@ -201,10 +194,10 @@ export function KeysTab({ orgId, botId, status, keys, activeKeyCount, isLoading,
       )}
 
       <ConfirmDialog
-        open={revokeOpen}
-        onOpenChange={setRevokeOpen}
+        open={revocation.open}
+        onOpenChange={revocation.onOpenChange}
         intent="danger"
-        title={revokeTarget ? `Revoke ${revokeTarget.name}?` : 'Revoke key?'}
+        title={revocation.target ? `Revoke ${revocation.target.name}?` : 'Revoke key?'}
         description="Anything using this key stops working immediately. This cannot be undone."
         confirmLabel="Revoke key"
         onConfirm={doRevoke}

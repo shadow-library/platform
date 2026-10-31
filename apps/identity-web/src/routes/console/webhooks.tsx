@@ -17,6 +17,7 @@ import {
   webhooksQueryOptions,
 } from '@/lib/apis';
 import { relativeTime } from '@/lib/format';
+import { useConfirmTarget } from '@/lib/hooks';
 
 import styles from '@/features/console/console.module.css';
 
@@ -147,7 +148,7 @@ function WebhooksPage(): React.JSX.Element {
   const [createOpen, setCreateOpen] = useState(false);
   const [secret, setSecret] = useState<string | null>(null);
   const [deliveriesFor, setDeliveriesFor] = useState<string | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const deletion = useConfirmTarget<{ id: string; name: string }>();
 
   const list = webhooks.data?.items ?? [];
 
@@ -205,7 +206,7 @@ function WebhooksPage(): React.JSX.Element {
                       Rotate secret
                     </DropdownMenu.Item>
                     <DropdownMenu.Separator />
-                    <DropdownMenu.Item destructive onSelect={() => setDeleteTarget(webhook)}>
+                    <DropdownMenu.Item destructive onSelect={() => deletion.ask(webhook)}>
                       Delete webhook
                     </DropdownMenu.Item>
                   </DropdownMenu.Content>
@@ -227,21 +228,24 @@ function WebhooksPage(): React.JSX.Element {
         downloadName="webhook-secret.txt"
       />
       <ConfirmDialog
-        open={deleteTarget !== null}
-        onOpenChange={open => !open && setDeleteTarget(null)}
+        open={deletion.open}
+        onOpenChange={deletion.onOpenChange}
         intent="danger"
-        title={deleteTarget ? `Delete ${deleteTarget.name}?` : 'Delete webhook?'}
+        title={deletion.target ? `Delete ${deletion.target.name}?` : 'Delete webhook?'}
         description="Deliveries to this endpoint will stop immediately."
         confirmLabel="Delete webhook"
-        onConfirm={() =>
-          deleteTarget &&
-          require(() =>
-            del.mutateAsync(deleteTarget.id, {
-              onSuccess: () => toast.success('Webhook deleted'),
-              onError: error => toast.danger(error.message),
-            }),
-          )
-        }
+        onConfirm={() => {
+          const { target } = deletion;
+          return (
+            target &&
+            require(() =>
+              del.mutateAsync(target.id, {
+                onSuccess: () => toast.success('Webhook deleted'),
+                onError: error => toast.danger(error.message),
+              }),
+            )
+          );
+        }}
       />
       {dialog}
     </div>

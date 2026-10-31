@@ -4,6 +4,7 @@ import { Avatar, Badge, Button, ConfirmDialog, Dialog, FormField, Input, PlusIco
 
 import { PageHeader, QueryState } from '@/components/si';
 import { type MyOrganisation, myOrganisationsQueryOptions, useCreateOrganisationMutation, useLeaveOrganisationMutation, useMyOrganisationsQuery, useRootDomain } from '@/lib/apis';
+import { useConfirmTarget } from '@/lib/hooks';
 
 import styles from './index.module.css';
 
@@ -68,7 +69,7 @@ function OrganizationsPage(): React.JSX.Element {
   const orgs = useMyOrganisationsQuery();
   const leave = useLeaveOrganisationMutation();
   const [createOpen, setCreateOpen] = useState(false);
-  const [leaveTarget, setLeaveTarget] = useState<MyOrganisation | null>(null);
+  const leaving = useConfirmTarget<MyOrganisation>();
 
   const list = orgs.data?.organisations ?? [];
 
@@ -104,7 +105,7 @@ function OrganizationsPage(): React.JSX.Element {
                 </div>
                 <div className={styles.actions}>
                   {!personal && (
-                    <Button variant="ghost" size="sm" onClick={() => setLeaveTarget(org)}>
+                    <Button variant="ghost" size="sm" onClick={() => leaving.ask(org)}>
                       Leave
                     </Button>
                   )}
@@ -121,16 +122,16 @@ function OrganizationsPage(): React.JSX.Element {
       <CreateOrgDialog open={createOpen} onOpenChange={setCreateOpen} />
 
       <ConfirmDialog
-        open={leaveTarget !== null}
-        onOpenChange={open => !open && setLeaveTarget(null)}
+        open={leaving.open}
+        onOpenChange={leaving.onOpenChange}
         intent="danger"
-        title={leaveTarget ? `Leave ${leaveTarget.name}?` : 'Leave organization?'}
+        title={leaving.target ? `Leave ${leaving.target.name}?` : 'Leave organization?'}
         description="You’ll lose access to its resources immediately. An admin will need to re-invite you to rejoin."
         confirmLabel="Leave organization"
         onConfirm={() =>
-          leaveTarget &&
-          leave.mutateAsync(leaveTarget.id, {
-            onSuccess: () => toast.success(`Left ${leaveTarget.name}`),
+          leaving.target &&
+          leave.mutateAsync(leaving.target.id, {
+            onSuccess: () => toast.success(`Left ${leaving.target?.name}`),
             onError: error => toast.danger(error.message),
           })
         }
