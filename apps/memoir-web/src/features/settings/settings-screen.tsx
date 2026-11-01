@@ -1,11 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { type FocusEvent, type KeyboardEvent, type ReactElement, type ReactNode, useMemo, useState } from 'react';
-import { Avatar, Button, Card, FormField, Input, SegmentedControl, Select, Skeleton, type ThemeMode, TimePicker, useTheme } from '@shadow-library/ui';
+import { Avatar, Button, Card, FormField, Input, SegmentedControl, Select, Skeleton, type ThemeMode, useTheme } from '@shadow-library/ui';
 import { userDisplayName } from '@shadow-library/web';
 
 import { DataState } from '@/components/DataState';
 import { Screen, ScreenColumns, screenStyles } from '@/components/ScreenLayout';
+import { SleepWindowFields } from '@/components/SleepWindowFields';
 import { meQuery } from '@/lib/apis';
 import {
   type AccountCommandHook,
@@ -20,6 +21,7 @@ import {
   minorToMajor,
   notifyOutcome,
   parseAmountToMinor,
+  sleepWindowProblem,
   SYNC_COPY,
   useAccountCommand,
   useAppSync,
@@ -39,8 +41,6 @@ const INTENSITIES: { value: HeroIntensityMode; label: string }[] = [
   { value: 'standard', label: 'Standard' },
   { value: 'demanding', label: 'Demanding' },
 ];
-
-const SLEEP_BEFORE_WAKE = 'Sleep time must be later than wake time.';
 
 const BUDGET_INVALID = 'Enter an amount of zero or more, for example 1500.';
 
@@ -329,7 +329,7 @@ function DayAndMoneyFields({ day, command }: DayAndMoneyFieldsProps): ReactEleme
 
   const [times, setTimes] = useState<TimeState>({ wakeTime: day.wakeTime, sleepTime: day.sleepTime });
   const [syncedTimes, setSyncedTimes] = useState<TimeState>(times);
-  const [timeErrors, setTimeErrors] = useState<Partial<TimeState>>({});
+  const [timeProblem, setTimeProblem] = useState<string | null>(null);
   const [resetTokens, setResetTokens] = useState({ wakeTime: 0, sleepTime: 0 });
   const [budgetText, setBudgetText] = useState(budgetSeed);
   const [syncedBudgetSeed, setSyncedBudgetSeed] = useState(budgetSeed);
@@ -347,28 +347,29 @@ function DayAndMoneyFields({ day, command }: DayAndMoneyFieldsProps): ReactEleme
     setSubmittedBudget(null);
   }
 
-  const revertTime = (field: keyof TimeState, value: string): void => {
-    setTimes(current => ({ ...current, [field]: value }));
-    setResetTokens(current => ({ ...current, [field]: current[field] + 1 }));
+  const revertTimes = (): void => {
+    setTimes({ wakeTime: day.wakeTime, sleepTime: day.sleepTime });
+    setResetTokens(current => ({ wakeTime: current.wakeTime + 1, sleepTime: current.sleepTime + 1 }));
   };
 
-  const handleTimeChange = async (field: keyof TimeState, value: string | null): Promise<void> => {
-    if (value === null) return;
-    const previous = times[field];
+  /** An invalid pair stays on screen unsaved; the next valid pair saves both times, since the field that broke it may not be the one that fixes it. */
+  const handleTimeChange = async (field: keyof TimeState, value: string): Promise<void> => {
     const next = { ...times, [field]: value };
-    if (next.sleepTime <= next.wakeTime) {
-      setTimeErrors(current => ({ ...current, [field]: SLEEP_BEFORE_WAKE }));
-      revertTime(field, previous);
-      return;
-    }
-
-    setTimeErrors(current => ({ ...current, wakeTime: undefined, sleepTime: undefined }));
     setTimes(next);
-    const outcome = await command.run({ type: 'day.set', patch: { [field]: value } });
+    const problem = sleepWindowProblem(next.wakeTime, next.sleepTime);
+    setTimeProblem(problem);
+    if (problem) return;
+
+    const patch = {
+      ...(next.wakeTime === day.wakeTime ? {} : { wakeTime: next.wakeTime }),
+      ...(next.sleepTime === day.sleepTime ? {} : { sleepTime: next.sleepTime }),
+    };
+    if (Object.keys(patch).length === 0) return;
+    const outcome = await command.run({ type: 'day.set', patch });
     if (outcome.status === 'applied') return notifyOutcome(outcome, { success: outcome.local.message, action: 'save' });
 
-    revertTime(field, previous);
-    if (outcome.status === 'rejected') return setTimeErrors(current => ({ ...current, [field]: outcome.message }));
+    revertTimes();
+    if (outcome.status === 'rejected') return setTimeProblem(outcome.message);
     notifyOutcome(outcome, { success: '', action: 'save' });
   };
 
@@ -409,12 +410,16 @@ function DayAndMoneyFields({ day, command }: DayAndMoneyFieldsProps): ReactEleme
 
   return (
     <div className={styles.fields}>
-      <FormField label="Wake time" error={timeErrors.wakeTime}>
-        <TimePicker key={resetTokens.wakeTime} value={times.wakeTime} hour12={false} onValueChange={value => void handleTimeChange('wakeTime', value)} />
-      </FormField>
-      <FormField label="Sleep time" error={timeErrors.sleepTime}>
-        <TimePicker key={resetTokens.sleepTime} value={times.sleepTime} hour12={false} onValueChange={value => void handleTimeChange('sleepTime', value)} />
-      </FormField>
+      <SleepWindowFields
+        className={styles.wideField}
+        wakeTime={times.wakeTime}
+        sleepTime={times.sleepTime}
+        onWakeTimeChange={value => void handleTimeChange('wakeTime', value)}
+        onSleepTimeChange={value => void handleTimeChange('sleepTime', value)}
+        problem={timeProblem}
+        wakeKey={resetTokens.wakeTime}
+        sleepKey={resetTokens.sleepTime}
+      />
       <FormField label="Timezone" helper={day.pendingTimezone ? pendingHelp(day.pendingTimezone, day.timezone) : 'Travel does not shift your day unless you change it here.'}>
         <Select value={day.pendingTimezone ?? day.timezone} aria-label="Timezone" onValueChange={value => void handleDaySelect({ timezone: value })}>
           {zoneOptions.map(zone => (

@@ -33,6 +33,14 @@ describe('TimePicker', () => {
     vi.restoreAllMocks();
   });
 
+  it('should mark the field full-width only when asked', () => {
+    const { rerender } = render(<TimePicker value="07:00" aria-label="Wake" />);
+    const field = screen.getByRole('combobox', { name: 'Wake' }).parentElement;
+    expect(field).not.toHaveAttribute('data-full-width');
+    rerender(<TimePicker value="07:00" aria-label="Wake" fullWidth />);
+    expect(field).toHaveAttribute('data-full-width', 'true');
+  });
+
   it('renders the committed value formatted for 12-hour display', () => {
     render(<TimePicker value="21:30" hour12 aria-label="Doors" />);
     expect(screen.getByRole('combobox', { name: 'Doors' })).toHaveValue('9:30 PM');

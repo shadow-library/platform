@@ -340,7 +340,7 @@ export function projectWorldState(rows: Partial<DomainRows>, today: string): Mem
     logs,
     hero: toHeroState(account, today),
     activity,
-    scheduleEndMinutes: account ? number(account, 'scheduleEndMin', 1380) : null,
+    scheduleWindow: account ? { wakeMinute: number(account, 'scheduleStartMin', 360), sleepMinute: number(account, 'scheduleEndMin', 1380) } : null,
     metrics: metricValuesOn(rows.metric_entries ?? [], keyOf, today),
     metricIds,
     locks,

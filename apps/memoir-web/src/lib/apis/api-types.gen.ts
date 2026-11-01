@@ -667,7 +667,9 @@ export interface components {
       timezone: string;
       /** @description Staged by PATCH, not yet live; takes effect at the next daily rollover */
       pendingTimezone?: string | null;
+      /** @description Wake time, as minutes after local midnight */
       scheduleStartMin: number;
+      /** @description Sleep time, as minutes after local midnight; earlier than scheduleStartMin means after midnight. Must leave 3 to 14 hours of sleep */
       scheduleEndMin: number;
       theme: components['schemas']['Theme'];
       weekStart: number;
@@ -743,7 +745,9 @@ export interface components {
       updatedAt?: string;
       /** @description Staged, not applied immediately — see `pendingTimezone` on the GET response */
       timezone?: string;
+      /** @description Wake time, as minutes after local midnight */
       scheduleStartMin?: number;
+      /** @description Sleep time, as minutes after local midnight; earlier than scheduleStartMin means after midnight. Must leave 3 to 14 hours of sleep */
       scheduleEndMin?: number;
       theme?: components['schemas']['Theme'];
       weekStart?: number;
@@ -765,7 +769,9 @@ export interface components {
       enabledCurrencies?: components['schemas']['CurrencyCode'][];
       /** @description IANA timezone */
       timezone: string;
+      /** @description Wake time, as minutes after local midnight */
       scheduleStartMin: number;
+      /** @description Sleep time, as minutes after local midnight; earlier than scheduleStartMin means after midnight. Must leave 3 to 14 hours of sleep */
       scheduleEndMin: number;
     };
     OcrParseDto: {

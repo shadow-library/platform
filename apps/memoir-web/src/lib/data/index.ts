@@ -32,4 +32,5 @@ export * from './reflect.fixtures';
 export * from './reflect.provider';
 export * from './reflect.queries';
 export * from './reflect.types';
+export * from './sleep-window.rules';
 export * from './view.types';

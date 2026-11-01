@@ -103,6 +103,7 @@ export function TimePicker({
   step = 30,
   hour12 = true,
   size = 'md',
+  fullWidth = false,
   disabled = false,
   readOnly = false,
   invalid = false,
@@ -239,6 +240,7 @@ export function TimePicker({
           ref={fieldRef}
           className={cn(styles.field, className)}
           data-size={size}
+          data-full-width={fullWidth || undefined}
           data-invalid={invalid || invalidTyped || undefined}
           data-disabled={disabled || undefined}
           data-readonly={readOnly || undefined}

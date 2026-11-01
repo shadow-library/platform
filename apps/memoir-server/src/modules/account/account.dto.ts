@@ -55,10 +55,14 @@ export class AccountResponseDto {
   @Field({ optional: true, nullable: true, description: 'Staged by PATCH, not yet live; takes effect at the next daily rollover' })
   pendingTimezone?: string | null;
 
-  @Field({ minimum: 0, maximum: 1439 })
+  @Field({ minimum: 0, maximum: 1439, description: 'Wake time, as minutes after local midnight' })
   scheduleStartMin: number;
 
-  @Field({ minimum: 0, maximum: 1439 })
+  @Field({
+    minimum: 0,
+    maximum: 1439,
+    description: 'Sleep time, as minutes after local midnight; earlier than scheduleStartMin means after midnight. Must leave 3 to 14 hours of sleep',
+  })
   scheduleEndMin: number;
 
   @Field(() => Theme)
@@ -182,10 +186,15 @@ export class AccountPatchDto {
   @Field({ optional: true, description: 'Staged, not applied immediately — see `pendingTimezone` on the GET response' })
   timezone?: string;
 
-  @Field({ optional: true, minimum: 0, maximum: 1439 })
+  @Field({ optional: true, minimum: 0, maximum: 1439, description: 'Wake time, as minutes after local midnight' })
   scheduleStartMin?: number;
 
-  @Field({ optional: true, minimum: 0, maximum: 1439 })
+  @Field({
+    optional: true,
+    minimum: 0,
+    maximum: 1439,
+    description: 'Sleep time, as minutes after local midnight; earlier than scheduleStartMin means after midnight. Must leave 3 to 14 hours of sleep',
+  })
   scheduleEndMin?: number;
 
   @Field(() => Theme, { optional: true })
@@ -225,9 +234,13 @@ export class OnboardingDto {
   @Field({ description: 'IANA timezone' })
   timezone: string;
 
-  @Field({ minimum: 0, maximum: 1439 })
+  @Field({ minimum: 0, maximum: 1439, description: 'Wake time, as minutes after local midnight' })
   scheduleStartMin: number;
 
-  @Field({ minimum: 0, maximum: 1439 })
+  @Field({
+    minimum: 0,
+    maximum: 1439,
+    description: 'Sleep time, as minutes after local midnight; earlier than scheduleStartMin means after midnight. Must leave 3 to 14 hours of sleep',
+  })
   scheduleEndMin: number;
 }

@@ -17,6 +17,8 @@ export interface TimePickerProps {
   hour12?: boolean;
   /** Field height — matches Input. @default 'md' */
   size?: TimePickerSize;
+  /** Stretch to the container's width, as Input and Select do, instead of sizing to the time. */
+  fullWidth?: boolean;
   disabled?: boolean;
   readOnly?: boolean;
   invalid?: boolean;

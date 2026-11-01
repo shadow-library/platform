@@ -2,6 +2,8 @@ import { useNavigate } from '@tanstack/react-router';
 import { type FormEvent, type ReactElement, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Badge, Button, Card, DescriptionList, FormField, Input, RadioGroup, SegmentedControl, Select, Slider, Tag, TimePicker } from '@shadow-library/ui';
 
+import { SleepWindowFields } from '@/components/SleepWindowFields';
+
 import {
   CURRENCY_CODES,
   type CurrencyCode,
@@ -9,6 +11,7 @@ import {
   isCurrencyCode,
   notifyOutcome,
   type QuestDraft,
+  sleepWindowProblem,
   STAT_LABELS,
   type StatAffinity,
   type Strictness,
@@ -36,6 +39,7 @@ interface SubmitError {
   title: string;
   message: string;
   hint: string;
+  retryable: boolean;
 }
 
 const HEADINGS: { title: string; subtitle: string }[] = [
@@ -167,7 +171,7 @@ export function OnboardingScreen(): ReactElement {
       : heading.subtitle;
 
   const problems: (string | null)[] = [
-    null,
+    setupSaved ? null : sleepWindowProblem(wakeTime, sleepTime),
     questName.length === 0 ? 'Name the promise to continue.' : null,
     dayCount === 0 ? 'Choose at least one day.' : null,
     anchorNeedsTime ? 'Anchor needs a start time before you can continue.' : null,
@@ -227,7 +231,8 @@ export function OnboardingScreen(): ReactElement {
           setSubmitError({
             title: 'Setup wasn’t saved',
             message: outcome.status === 'queued-offline' ? SETUP_NOT_SAVED : outcome.message,
-            hint: `Nothing was changed. ${unreachable ? CHECK_CONNECTION : 'Check the details and try again.'}`,
+            hint: `Nothing was changed. ${unreachable ? CHECK_CONNECTION : 'Go back to check the details, then create it again.'}`,
+            retryable: unreachable,
           });
           return;
         }
@@ -247,6 +252,7 @@ export function OnboardingScreen(): ReactElement {
         title: 'Your first quest could not be created',
         message: questOutcome.message,
         hint: `Your day and currency are saved. ${questOutcome.status === 'failed' ? CHECK_CONNECTION : 'Go back to change the quest, then try again.'}`,
+        retryable: questOutcome.status === 'failed',
       });
     } finally {
       submittingRef.current = false;
@@ -276,7 +282,7 @@ export function OnboardingScreen(): ReactElement {
       : step === LAST_STEP
         ? 'You can change all of this later.'
         : 'Two minutes, and no tour afterwards.';
-  const footNote = (step === 2 ? null : problem) ?? defaultFootNote;
+  const footNote = (step === 0 || step === 2 ? null : problem) ?? defaultFootNote;
 
   return (
     <section className={styles.page} aria-labelledby="onboarding-title">
@@ -308,12 +314,17 @@ export function OnboardingScreen(): ReactElement {
                 A day in Memoir runs from when you wake to when you sleep, not from midnight. Two times and a currency, and you never have to think about this again.
               </p>
               <div className={styles.fields}>
-                <FormField label="Wake time" helper="Quests scheduled before this are not counted late." disabled={setupSaved}>
-                  <TimePicker value={shownDay.wakeTime} onValueChange={value => setWakeTime(value ?? wakeTime)} hour12={false} disabled={setupSaved} />
-                </FormField>
-                <FormField label="Sleep time" helper="Your day closes here — logs after it still belong to today." disabled={setupSaved}>
-                  <TimePicker value={shownDay.sleepTime} onValueChange={value => setSleepTime(value ?? sleepTime)} hour12={false} disabled={setupSaved} />
-                </FormField>
+                <SleepWindowFields
+                  className={styles.wideField}
+                  wakeTime={shownDay.wakeTime}
+                  sleepTime={shownDay.sleepTime}
+                  onWakeTimeChange={setWakeTime}
+                  onSleepTimeChange={setSleepTime}
+                  problem={problem}
+                  sleepHelper="Your day closes here — logs after it still belong to today."
+                  wakeHelper="Quests scheduled before this are not counted late."
+                  disabled={setupSaved}
+                />
                 <FormField
                   label="Timezone"
                   helper={
@@ -564,7 +575,12 @@ export function OnboardingScreen(): ReactElement {
                 Nothing else is set up, and nothing else needs to be — expenses, meals, weight and journal all work whenever you first reach for them.
               </p>
               {submitError ? (
-                <Alert intent="danger" title={submitError.title} action={{ label: 'Try again', onClick: () => void finish() }} className={styles.submitError}>
+                <Alert
+                  intent="danger"
+                  title={submitError.title}
+                  action={submitError.retryable ? { label: 'Try again', onClick: () => void finish() } : undefined}
+                  className={styles.submitError}
+                >
                   <p className={styles.errorLine}>{submitError.message}</p>
                   <p className={styles.errorLine}>{submitError.hint}</p>
                 </Alert>

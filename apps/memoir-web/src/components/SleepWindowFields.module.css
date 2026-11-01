@@ -1,0 +1,65 @@
+.window {
+  container-type: inline-size;
+  container-name: sleep-window;
+}
+
+.row {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.bridge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-secondary);
+}
+
+.bridge[data-invalid] {
+  color: var(--sh-danger-text-on-subtle);
+}
+
+.bridgeLabel {
+  display: none;
+}
+
+.bridgeValue {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.bridgeValue::before,
+.bridgeValue::after {
+  content: '';
+  width: 16px;
+  height: 1px;
+  background: var(--sh-border-default);
+}
+
+.problem {
+  margin: 6px 0 0;
+  font-size: var(--sh-text-caption);
+  line-height: 18px;
+  color: var(--sh-danger-text-on-subtle);
+}
+
+/* The spacer mirrors FormField's 20px label line and 6px gap so the duration sits level with the inputs, not the labels. */
+@container sleep-window (min-width: 520px) {
+  .row {
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  }
+
+  .bridgeLabel {
+    display: block;
+    height: 20px;
+  }
+
+  .bridgeValue {
+    height: var(--sh-control-height-md);
+  }
+}

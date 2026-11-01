@@ -38,6 +38,7 @@ import {
   type Strictness,
   type Weekday,
 } from './quest.types';
+import { minutesUntilSleep, type ScheduleWindow } from './sleep-window.rules';
 import { type HealthMetricKey } from './quick-logs.types';
 import { nextOccurrenceAfter, occursOn } from './recurrence.rules';
 import {
@@ -97,8 +98,8 @@ export interface MemoirWorldState {
   logs: Map<string, LogRecord>;
   hero: HeroState;
   activity: ActivityEntry[];
-  /** Minute of the local day the wake window closes, from the account row; null when no account has been mirrored yet. */
-  scheduleEndMinutes: number | null;
+  /** The account's wake and sleep minutes of the local day; null when no account has been mirrored yet. */
+  scheduleWindow: ScheduleWindow | null;
   metrics: Record<string, number>;
   metricIds: Partial<Record<HealthMetricKey, string>>;
   locks: Set<string>;
@@ -205,7 +206,7 @@ function seedWorldState(options: FixtureProviderOptions = {}): MemoirWorldState 
     logs: new Map(),
     hero: seeded.hero,
     activity: seeded.activity,
-    scheduleEndMinutes: null,
+    scheduleWindow: null,
     metrics: seeded.metrics,
     metricIds: {},
     locks,
@@ -279,19 +280,22 @@ export class MemoirEngine implements DataProvider {
 
   /** Only today has a window still running down; another day's remaining time is not a fact about now. */
   private wakeWindowNote(date: string): string {
-    const closesAt = this.state.scheduleEndMinutes;
-    if (closesAt === null || date !== this.state.today) return '';
-    const now = new Date();
-    const remaining = closesAt - (now.getHours() * 60 + now.getMinutes());
+    const remaining = this.minutesUntilSleep(date);
+    if (remaining === null) return '';
     return remaining <= 0 ? 'the wake window has closed' : `about ${formatDuration(remaining)} of wake window left`;
   }
 
   private dayHasEnded(date: string): boolean {
     if (date < this.state.today) return true;
-    const closesAt = this.state.scheduleEndMinutes;
-    if (closesAt === null || date !== this.state.today) return false;
+    const remaining = this.minutesUntilSleep(date);
+    return remaining !== null && remaining <= 0;
+  }
+
+  private minutesUntilSleep(date: string): number | null {
+    const window = this.state.scheduleWindow;
+    if (window === null || date !== this.state.today) return null;
     const now = new Date();
-    return now.getHours() * 60 + now.getMinutes() >= closesAt;
+    return minutesUntilSleep(now.getHours() * 60 + now.getMinutes(), window.wakeMinute, window.sleepMinute);
   }
 
   private daySummary(date: string, occurrences: QuestOccurrence[]): DayView['summary'] {

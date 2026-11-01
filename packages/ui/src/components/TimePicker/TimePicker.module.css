@@ -15,6 +15,9 @@
     border-color var(--sh-duration-fast) var(--sh-ease-standard),
     box-shadow var(--sh-duration-fast) var(--sh-ease-standard);
 }
+.field[data-full-width] {
+  width: 100%;
+}
 .field[data-size='sm'] {
   height: var(--sh-control-height-sm);
   border-radius: var(--sh-radius-sm);

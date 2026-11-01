@@ -8,6 +8,7 @@ import { AppErrorCode } from '@server/classes';
 import { type Account, schema } from '@server/database';
 
 import { type AccountPatchDto, type NotificationPrefsDto, type OnboardingDto } from './account.dto';
+import { isSleepWindowValid, MAX_SLEEP_MINUTES, MIN_SLEEP_MINUTES } from './sleep-window';
 
 export type AccountView = Account.Row & { notificationPrefs: NotificationPrefsDto };
 
@@ -31,7 +32,9 @@ function assertValidTimezone(field: string, timezone: string): void {
 }
 
 function assertScheduleWindow(endField: string, scheduleStartMin: number, scheduleEndMin: number): void {
-  if (scheduleEndMin <= scheduleStartMin) throw new ValidationError(endField, 'scheduleEndMin must be greater than scheduleStartMin');
+  if (isSleepWindowValid(scheduleStartMin, scheduleEndMin)) return;
+  const bounds = `${MIN_SLEEP_MINUTES / 60} and ${MAX_SLEEP_MINUTES / 60} hours`;
+  throw new ValidationError(endField, `scheduleEndMin must leave between ${bounds} of sleep before scheduleStartMin`);
 }
 
 /** `authProvider`/`defaultCurrency`/`createdAt`/`updatedAt` are declared on {@link AccountPatchDto} only so AJV's `removeAdditional` does not silently drop them — a caller naming any of them gets a typed, named rejection instead of a no-op. */
