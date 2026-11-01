@@ -101,3 +101,51 @@
   line-height: 18px;
   color: var(--sh-text-tertiary);
 }
+
+.group[data-variant='card'] {
+  gap: 8px;
+}
+
+.item[data-variant='card'] {
+  position: relative;
+  display: flex;
+  gap: 10px;
+  padding: 12px;
+  border: var(--sh-border-width) solid var(--sh-border-default);
+  border-radius: var(--sh-radius-lg);
+  background: var(--sh-surface-raised);
+  transition:
+    background-color var(--sh-duration-fast) var(--sh-ease-standard),
+    border-color var(--sh-duration-fast) var(--sh-ease-standard),
+    box-shadow var(--sh-duration-fast) var(--sh-ease-standard);
+}
+.item[data-variant='card']:not([data-disabled]):hover {
+  border-color: var(--sh-border-interactive);
+}
+/* The card's own edge is decorative, so the circle carries the 3:1 non-text contrast an unselected option needs. */
+.item[data-variant='card'] .circle:not([data-state='checked']) {
+  border-color: var(--sh-text-tertiary);
+}
+.item[data-variant='card']:has(.circle[data-state='checked']) {
+  border-color: var(--sh-accent);
+  background: var(--sh-accent-soft);
+  box-shadow: inset 0 0 0 1px var(--sh-accent);
+}
+.item[data-variant='card']:has(.circle:focus-visible) {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: var(--sh-focus-ring-offset);
+}
+.item[data-variant='card'] .circle:focus-visible {
+  outline: none;
+}
+.item[data-variant='card'] .text {
+  flex: 1;
+  min-width: 0;
+}
+/* Stretches the label's click target over the whole card; the label forwards the click to the radio. */
+.item[data-variant='card'] .label::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}

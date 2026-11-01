@@ -79,4 +79,10 @@ describe('RadioGroup', () => {
     const description = screen.getByText('Up to 5 seats');
     expect(radio.getAttribute('aria-describedby')).toBe(description.id);
   });
+
+  it('marks the group and every item with the card variant', () => {
+    render(<Plans variant="card" />);
+    expect(screen.getByRole('radiogroup')).toHaveAttribute('data-variant', 'card');
+    expect(screen.getByRole('radio', { name: 'Starter' }).parentElement).toHaveAttribute('data-variant', 'card');
+  });
 });

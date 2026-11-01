@@ -12,6 +12,7 @@ const meta = {
     invalid: { control: 'boolean' },
     disabled: { control: 'boolean' },
     orientation: { control: 'inline-radio', options: ['vertical', 'horizontal'] },
+    variant: { control: 'inline-radio', options: ['default', 'card'] },
   },
 } satisfies Meta<typeof RadioGroup>;
 
@@ -37,6 +38,20 @@ export const WithLabel: Story = {
         <RadioGroup.Item value="public" label="Public" description="Anyone with the link" />
         <RadioGroup.Item value="team" label="Team-only" description="Members of your workspace" />
         <RadioGroup.Item value="private" label="Private" description="Only you" />
+      </RadioGroup>
+    );
+  },
+};
+
+export const Cards: Story = {
+  render: () => {
+    const [value, setValue] = useState('mind');
+    return (
+      <RadioGroup variant="card" aria-label="Stat" value={value} onValueChange={setValue} style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', width: 560 }}>
+        <RadioGroup.Item value="body" label="Body" description="Movement, sleep, food, strength" />
+        <RadioGroup.Item value="mind" label="Mind" description="Reading, writing, study, focus" />
+        <RadioGroup.Item value="wealth" label="Wealth" description="Spending, saving, admin" />
+        <RadioGroup.Item value="discipline" label="Discipline" description="Anchors, tidiness, follow-through" disabled />
       </RadioGroup>
     );
   },

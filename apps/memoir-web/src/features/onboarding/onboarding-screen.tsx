@@ -92,6 +92,10 @@ function isOnboardingStrictness(value: string): value is OnboardingStrictness {
   return STRICTNESS_ORDER.some(option => option === value);
 }
 
+function isStatAffinity(value: string): value is StatAffinity {
+  return STATS.some(option => option.stat === value);
+}
+
 function browserTimeZone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone;
 }
@@ -386,15 +390,22 @@ export function OnboardingScreen(): ReactElement {
                   </Button>
                 ))}
               </div>
-              <p className={styles.groupLabel}>Which part of you does it grow?</p>
-              <div className={styles.choices} role="group" aria-label="Stat">
+              <p id="onboarding-stat-label" className={styles.groupLabel}>
+                Which part of you does it grow?
+              </p>
+              <RadioGroup
+                variant="card"
+                className={styles.choices}
+                aria-labelledby="onboarding-stat-label"
+                value={stat}
+                onValueChange={value => {
+                  if (isStatAffinity(value)) setStat(value);
+                }}
+              >
                 {STATS.map(option => (
-                  <button key={option.stat} type="button" className={styles.choice} aria-pressed={stat === option.stat} onClick={() => setStat(option.stat)}>
-                    <span className={styles.choiceName}>{STAT_LABELS[option.stat]}</span>
-                    <span className={styles.choiceDesc}>{option.description}</span>
-                  </button>
+                  <RadioGroup.Item key={option.stat} value={option.stat} label={STAT_LABELS[option.stat]} description={option.description} />
                 ))}
-              </div>
+              </RadioGroup>
             </Card.Body>
           </Card>
         ) : null}
@@ -474,6 +485,7 @@ export function OnboardingScreen(): ReactElement {
               </p>
               <p className={styles.note}>Whatever you choose, a miss never removes experience or a level.</p>
               <RadioGroup
+                variant="card"
                 className={styles.strictness}
                 aria-label="Strictness"
                 value={strictness}
@@ -485,7 +497,6 @@ export function OnboardingScreen(): ReactElement {
                   <RadioGroup.Item
                     key={option}
                     value={option}
-                    className={styles.strictRow}
                     label={
                       <span className={styles.strictHead}>
                         <span className={styles.strictName}>{STRICTNESS_LABELS[option]}</span>

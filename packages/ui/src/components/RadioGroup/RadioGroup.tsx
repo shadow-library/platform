@@ -8,13 +8,14 @@ import styles from './RadioGroup.module.css';
 import { type RadioGroupProps, type RadioItemProps } from './RadioGroup.types';
 
 /** One tab stop; arrows move and select in a single gesture (native roving tabindex). */
-const RadioGroupRoot = forwardRef<HTMLDivElement, RadioGroupProps>(function RadioGroup({ label, invalid = false, className, children, ...props }, ref) {
+const RadioGroupRoot = forwardRef<HTMLDivElement, RadioGroupProps>(function RadioGroup({ label, invalid = false, variant = 'default', className, children, ...props }, ref) {
   const labelId = useId();
   return (
-    <RadioGroupContext.Provider value={{ invalid }}>
+    <RadioGroupContext.Provider value={{ invalid, variant }}>
       <RadioGroupPrimitive.Root
         ref={ref}
         className={cn(styles.group, className)}
+        data-variant={variant}
         aria-labelledby={label != null ? labelId : undefined}
         aria-invalid={invalid || undefined}
         {...props}
@@ -31,13 +32,13 @@ const RadioGroupRoot = forwardRef<HTMLDivElement, RadioGroupProps>(function Radi
 });
 
 const RadioItem = forwardRef<HTMLButtonElement, RadioItemProps>(function RadioItem({ label, description, id, className, disabled, ...props }, ref) {
-  const { invalid } = useRadioGroupContext();
+  const { invalid, variant } = useRadioGroupContext();
   const generatedId = useId();
   const itemId = id ?? generatedId;
   const descriptionId = description != null ? `${itemId}-description` : undefined;
 
   return (
-    <div className={cn(styles.item, className)} data-disabled={disabled || undefined}>
+    <div className={cn(styles.item, className)} data-variant={variant} data-disabled={disabled || undefined}>
       <RadioGroupPrimitive.Item ref={ref} id={itemId} className={styles.circle} disabled={disabled} data-invalid={invalid || undefined} aria-describedby={descriptionId} {...props}>
         <RadioGroupPrimitive.Indicator className={styles.dot} />
       </RadioGroupPrimitive.Item>
