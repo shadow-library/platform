@@ -1,5 +1,5 @@
 import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu';
-import { forwardRef } from 'react';
+import { forwardRef, type ReactNode, useId } from 'react';
 
 import { CompactCheckIcon, CompactChevronRightIcon } from '@/icons';
 import { cn } from '@/lib';
@@ -24,6 +24,29 @@ function DotIcon() {
   );
 }
 
+interface ItemText {
+  body: ReactNode;
+  aria: { 'aria-labelledby'?: string; 'aria-describedby'?: string };
+}
+
+function useItemText(children: ReactNode, description: ReactNode): ItemText {
+  const id = useId();
+  if (description == null) return { body: <span className={styles.itemLabel}>{children}</span>, aria: {} };
+  return {
+    body: (
+      <span className={styles.itemBody}>
+        <span id={`${id}-label`} className={styles.itemLabel}>
+          {children}
+        </span>
+        <span id={`${id}-description`} className={styles.itemDescription}>
+          {description}
+        </span>
+      </span>
+    ),
+    aria: { 'aria-labelledby': `${id}-label`, 'aria-describedby': `${id}-description` },
+  };
+}
+
 const DropdownMenuContent = forwardRef<HTMLDivElement, DropdownMenuContentProps>(function DropdownMenuContent({ className, sideOffset = 6, align = 'start', ...props }, ref) {
   return (
     <DropdownMenuPrimitive.Portal>
@@ -32,11 +55,15 @@ const DropdownMenuContent = forwardRef<HTMLDivElement, DropdownMenuContentProps>
   );
 });
 
-const DropdownMenuItem = forwardRef<HTMLDivElement, DropdownMenuItemProps>(function DropdownMenuItem({ icon, shortcut, destructive = false, className, children, ...props }, ref) {
+const DropdownMenuItem = forwardRef<HTMLDivElement, DropdownMenuItemProps>(function DropdownMenuItem(
+  { icon, shortcut, destructive = false, className, children, description, ...props },
+  ref,
+) {
+  const text = useItemText(children, description);
   return (
-    <DropdownMenuPrimitive.Item ref={ref} className={cn(styles.item, className)} data-destructive={destructive || undefined} {...props}>
+    <DropdownMenuPrimitive.Item ref={ref} {...text.aria} className={cn(styles.item, className)} data-destructive={destructive || undefined} {...props}>
       {icon != null ? <span className={styles.itemIcon}>{icon}</span> : null}
-      <span className={styles.itemLabel}>{children}</span>
+      {text.body}
       {shortcut != null ? (
         <span className={styles.shortcut} aria-hidden="true">
           {shortcut}
@@ -47,12 +74,14 @@ const DropdownMenuItem = forwardRef<HTMLDivElement, DropdownMenuItemProps>(funct
 });
 
 const DropdownMenuCheckboxItem = forwardRef<HTMLDivElement, DropdownMenuCheckboxItemProps>(function DropdownMenuCheckboxItem(
-  { icon, shortcut, className, children, onSelect, ...props },
+  { icon, shortcut, className, children, description, onSelect, ...props },
   ref,
 ) {
+  const text = useItemText(children, description);
   return (
     <DropdownMenuPrimitive.CheckboxItem
       ref={ref}
+      {...text.aria}
       className={cn(styles.item, className)}
       onSelect={event => {
         event.preventDefault();
@@ -60,10 +89,10 @@ const DropdownMenuCheckboxItem = forwardRef<HTMLDivElement, DropdownMenuCheckbox
       }}
       {...props}
     >
-      <span className={styles.indicator}>
+      <span className={cn(styles.indicator, styles.checkbox)}>
         <DropdownMenuPrimitive.ItemIndicator>{icon ?? <CompactCheckIcon />}</DropdownMenuPrimitive.ItemIndicator>
       </span>
-      <span className={styles.itemLabel}>{children}</span>
+      {text.body}
       {shortcut != null ? (
         <span className={styles.shortcut} aria-hidden="true">
           {shortcut}
@@ -73,10 +102,15 @@ const DropdownMenuCheckboxItem = forwardRef<HTMLDivElement, DropdownMenuCheckbox
   );
 });
 
-const DropdownMenuRadioItem = forwardRef<HTMLDivElement, DropdownMenuRadioItemProps>(function DropdownMenuRadioItem({ shortcut, className, children, onSelect, ...props }, ref) {
+const DropdownMenuRadioItem = forwardRef<HTMLDivElement, DropdownMenuRadioItemProps>(function DropdownMenuRadioItem(
+  { shortcut, className, children, description, onSelect, ...props },
+  ref,
+) {
+  const text = useItemText(children, description);
   return (
     <DropdownMenuPrimitive.RadioItem
       ref={ref}
+      {...text.aria}
       className={cn(styles.item, className)}
       onSelect={event => {
         event.preventDefault();
@@ -89,7 +123,7 @@ const DropdownMenuRadioItem = forwardRef<HTMLDivElement, DropdownMenuRadioItemPr
           <DotIcon />
         </DropdownMenuPrimitive.ItemIndicator>
       </span>
-      <span className={styles.itemLabel}>{children}</span>
+      {text.body}
       {shortcut != null ? (
         <span className={styles.shortcut} aria-hidden="true">
           {shortcut}

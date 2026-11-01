@@ -26,9 +26,10 @@
   align-items: center;
   gap: 10px;
   min-height: var(--sh-control-height-md);
-  padding: 4px 10px;
+  padding: calc((var(--sh-control-height-md) - var(--sh-text-body-sm--line-height)) / 2) 10px;
   border-radius: var(--sh-radius-sm);
   font-size: var(--sh-text-body-sm);
+  line-height: var(--sh-text-body-sm--line-height);
   color: var(--sh-text-secondary);
   cursor: pointer;
   user-select: none;
@@ -54,6 +55,13 @@
   color: var(--sh-text-primary);
 }
 
+/* Leading slots sit on the first line, so a described item keeps its icon beside the label. */
+.itemIcon,
+.indicator {
+  align-self: flex-start;
+  margin-block: calc((var(--sh-text-body-sm--line-height) - 16px) / 2);
+}
+
 .itemIcon {
   display: inline-flex;
   flex-shrink: 0;
@@ -73,6 +81,19 @@
   white-space: nowrap;
 }
 
+.itemBody {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+.itemDescription {
+  font-size: var(--sh-text-caption);
+  line-height: var(--sh-text-caption--line-height);
+  color: var(--sh-text-tertiary);
+}
+
 .shortcut {
   flex-shrink: 0;
   font-family: var(--sh-font-mono);
@@ -80,7 +101,6 @@
   color: var(--sh-text-tertiary);
 }
 
-/* Checkbox/radio indicator occupies the icon column. */
 .indicator {
   display: inline-flex;
   align-items: center;
@@ -94,6 +114,28 @@
   display: block;
   width: 14px;
   height: 14px;
+}
+
+/* Mirrors Checkbox's box so a toggle reads as one while it is off. */
+.checkbox {
+  border: var(--sh-border-width) solid var(--sh-border-strong);
+  border-radius: var(--sh-radius-sm);
+  background: var(--sh-surface-raised);
+  color: var(--sh-on-accent);
+  transition:
+    background-color var(--sh-duration-fast) var(--sh-ease-standard),
+    border-color var(--sh-duration-fast) var(--sh-ease-standard);
+}
+.item[data-highlighted] > .checkbox {
+  border-color: var(--sh-border-interactive);
+}
+.item[data-state='checked'] > .checkbox {
+  background: var(--sh-accent);
+  border-color: var(--sh-accent);
+}
+.checkbox svg {
+  width: 11px;
+  height: 11px;
 }
 
 .subChevron {

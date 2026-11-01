@@ -1118,14 +1118,6 @@ button.turnRow:hover {
   color: var(--sh-text-tertiary);
 }
 
-.modeDescription {
-  display: block;
-  font-size: var(--sh-text-caption);
-  line-height: var(--sh-text-caption--line-height);
-  white-space: normal;
-  color: var(--sh-text-tertiary);
-}
-
 .round.round[data-size] {
   width: 34px;
   height: 34px;

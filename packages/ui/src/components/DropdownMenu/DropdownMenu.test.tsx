@@ -115,4 +115,22 @@ describe('DropdownMenu', () => {
     expect(await screen.findByRole('menuitemradio', { name: 'Date' })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('menu')).toBeInTheDocument();
   });
+
+  it('names a described item by its label and describes it by the description', async () => {
+    const user = userEvent.setup();
+    render(
+      <DropdownMenu>
+        <DropdownMenu.Trigger asChild>
+          <Button>Options</Button>
+        </DropdownMenu.Trigger>
+        <DropdownMenu.Content>
+          <DropdownMenu.CheckboxItem checked={false} description="Takes longer.">
+            Think deeper
+          </DropdownMenu.CheckboxItem>
+        </DropdownMenu.Content>
+      </DropdownMenu>,
+    );
+    await user.click(screen.getByRole('button', { name: 'Options' }));
+    expect(await screen.findByRole('menuitemcheckbox', { name: 'Think deeper' })).toHaveAccessibleDescription('Takes longer.');
+  });
 });

@@ -26,11 +26,8 @@ export function ComposerModeMenu({ value, onChange, disabled }: ComposerModeMenu
       <DropdownMenu.Content align="start" side="top">
         <DropdownMenu.RadioGroup value={value} onValueChange={next => onChange(COMPOSER_MODES.find(mode => mode.value === next)?.value ?? value)}>
           {COMPOSER_MODES.map(mode => (
-            <DropdownMenu.RadioItem key={mode.value} value={mode.value} onSelect={() => setOpen(false)}>
-              <span>
-                {mode.label}
-                <span className={styles.modeDescription}>{mode.description}</span>
-              </span>
+            <DropdownMenu.RadioItem key={mode.value} value={mode.value} description={mode.description} onSelect={() => setOpen(false)}>
+              {mode.label}
             </DropdownMenu.RadioItem>
           ))}
         </DropdownMenu.RadioGroup>

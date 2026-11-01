@@ -70,7 +70,7 @@ export const Playground: Story = {
           </DropdownMenu.Item>
           <DropdownMenu.Separator />
           <DropdownMenu.Label>View</DropdownMenu.Label>
-          <DropdownMenu.CheckboxItem checked={compact} onCheckedChange={setCompact}>
+          <DropdownMenu.CheckboxItem checked={compact} onCheckedChange={setCompact} description="Tighter padding so more rows fit on screen.">
             Compact rows
           </DropdownMenu.CheckboxItem>
           <DropdownMenu.Separator />

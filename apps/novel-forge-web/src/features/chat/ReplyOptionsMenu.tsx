@@ -3,8 +3,6 @@ import { ChevronDownIcon, DropdownMenu } from '@shadow-library/ui';
 import modelStyles from '@/components/nf/ChatModel.module.css';
 import { type ReplyOptionOffer, type ReplyOptions, replyOptionsLabel } from '@/lib/chat-model';
 
-import styles from './Chat.module.css';
-
 export interface ReplyOptionsMenuProps {
   options: ReplyOptions;
   offer: ReplyOptionOffer;
@@ -26,19 +24,21 @@ export function ReplyOptionsMenu({ options, offer, onChange, disabled }: ReplyOp
       </DropdownMenu.Trigger>
       <DropdownMenu.Content align="start" side="top">
         {offer.thinkDeeper && (
-          <DropdownMenu.CheckboxItem checked={options.thinkDeeper} onCheckedChange={checked => onChange({ ...options, thinkDeeper: checked === true })}>
-            <span>
-              Think deeper
-              <span className={styles.modeDescription}>Takes longer and uses more of your allowance.</span>
-            </span>
+          <DropdownMenu.CheckboxItem
+            checked={options.thinkDeeper}
+            onCheckedChange={checked => onChange({ ...options, thinkDeeper: checked === true })}
+            description="Takes longer and uses more of your allowance."
+          >
+            Think deeper
           </DropdownMenu.CheckboxItem>
         )}
         {offer.unrestricted && (
-          <DropdownMenu.CheckboxItem checked={options.unrestricted} onCheckedChange={checked => onChange({ ...options, unrestricted: checked === true })}>
-            <span>
-              Unrestricted
-              <span className={styles.modeDescription}>For dark or explicit material in this reply.</span>
-            </span>
+          <DropdownMenu.CheckboxItem
+            checked={options.unrestricted}
+            onCheckedChange={checked => onChange({ ...options, unrestricted: checked === true })}
+            description="For dark or explicit material in this reply."
+          >
+            Unrestricted
           </DropdownMenu.CheckboxItem>
         )}
       </DropdownMenu.Content>

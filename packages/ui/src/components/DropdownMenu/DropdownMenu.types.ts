@@ -8,15 +8,21 @@ export interface DropdownMenuItemProps extends ComponentPropsWithoutRef<typeof D
   /** Right-aligned shortcut hint; visual only (`aria-hidden`), bindings live globally. */
   shortcut?: ReactNode;
   destructive?: boolean;
+  /** Secondary line under the label; wraps, and becomes the item's accessible description. */
+  description?: ReactNode;
 }
 
 export interface DropdownMenuCheckboxItemProps extends ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.CheckboxItem> {
   icon?: ReactNode;
   shortcut?: ReactNode;
+  /** Secondary line under the label; wraps, and becomes the item's accessible description. */
+  description?: ReactNode;
 }
 
 export interface DropdownMenuRadioItemProps extends ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.RadioItem> {
   shortcut?: ReactNode;
+  /** Secondary line under the label; wraps, and becomes the item's accessible description. */
+  description?: ReactNode;
 }
 
 export interface DropdownMenuSubTriggerProps extends ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.SubTrigger> {

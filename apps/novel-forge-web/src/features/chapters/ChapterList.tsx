@@ -437,10 +437,13 @@ export function ChapterList({ novelId, view, onOpen, onView }: ChapterListProps)
                   )}
                   <DropdownMenu.Separator />
                   <DropdownMenu.Label>Advanced</DropdownMenu.Label>
-                  <DropdownMenu.CheckboxItem checked={autoFix} onCheckedChange={checked => setAutoFix(checked === true)}>
+                  <DropdownMenu.CheckboxItem
+                    checked={autoFix}
+                    onCheckedChange={checked => setAutoFix(checked === true)}
+                    description="Judge + repair reviews every draft and rewrites it when flagged — costs more per chapter."
+                  >
                     Auto-fix contradictions
                   </DropdownMenu.CheckboxItem>
-                  <div className={styles.menuNote}>Judge + repair reviews every draft and rewrites it when flagged — costs more per chapter.</div>
                   <DropdownMenu.Item disabled={!canGenerate} onSelect={startBatch}>
                     Draft the next 5 chapters
                   </DropdownMenu.Item>
