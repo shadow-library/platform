@@ -109,8 +109,7 @@ export function buildOAuthService(options: HarnessOptions = {}): OAuthHarness {
 
   const applicationAccessService = {
     resolveActiveOrganisationId: () => Promise.resolve(3n),
-    assertUserAccess: () => Promise.resolve(),
-    listGrantingOrganisations: () => Promise.resolve([{ id: 3n }]),
+    assertUserAccess: () => Promise.resolve({ organisations: [{ id: 3n }], activeOrganisationId: 3n }),
   } as unknown as ApplicationAccessService;
 
   const rateLimiterService = new RateLimiterService(databaseService);

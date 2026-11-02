@@ -10,7 +10,7 @@ import { AccessTokenService, AuthorizationCodeService, DEFAULT_AUDIENCE, isRelea
 import { SessionService } from '@server/modules/auth/session';
 import { UserService } from '@server/modules/identity/user';
 import { AppSession, AppSessionElevation, DatabaseService, OAuthClient, Organisation, PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
-import { ApplicationAccessService } from '@server/modules/system/application';
+import { ApplicationAccessService, type UserApplicationAccess } from '@server/modules/system/application';
 import { PolicyService } from '@server/modules/system/policy';
 
 export interface CreateAppSession {
@@ -99,10 +99,7 @@ export class AppSessionService {
     const identitySessionId = BigInt(payload.sessionId);
     if (!(await this.sessionService.validateById(identitySessionId))) throw AppErrorCode.OAU_003.create();
 
-    await this.applicationAccessService.assertUserAccess(user.id, input.client.applicationId);
-    const organisationId =
-      (await this.applicationAccessService.resolveActiveOrganisationId(user.id, input.client.applicationId)) ??
-      throwError(AppError.internal('Application access granted a user no organisation to act in'));
+    const { activeOrganisationId: organisationId } = await this.applicationAccessService.assertUserAccess(user.id, input.client.applicationId);
 
     const handle = randomBytes(32).toString('base64url');
     const organisationIds = [organisationId, input.client.organisationId];
@@ -138,8 +135,8 @@ export class AppSessionService {
   async mintToken(input: MintTokenInput): Promise<MintedToken> {
     const live = await this.requireLiveSession(input.client, input.handle);
 
-    await this.assertApplicationAccess(live, input.client);
-    const session = await this.realignOrganisation(live, input.client);
+    const access = await this.assertApplicationAccess(live, input.client);
+    const session = await this.realignOrganisation(live, input.client, access);
 
     const audience = input.resource ?? DEFAULT_AUDIENCE;
     const availableHere = await this.clientService.getAvailableScopes(input.client, audience);
@@ -246,10 +243,8 @@ export class AppSessionService {
 
   async switchOrganisation(client: OAuthClient, handle: string, organisationId: bigint): Promise<SwitchedOrganisation> {
     const session = await this.requireLiveSession(client, handle);
-    await this.assertApplicationAccess(session, client);
-
-    const granting = await this.applicationAccessService.listGrantingOrganisations(session.userId, client.applicationId);
-    if (!granting.some(organisation => organisation.id === organisationId)) {
+    const access = await this.assertApplicationAccess(session, client);
+    if (!access.organisations.some(organisation => organisation.id === organisationId)) {
       this.logger.warn('organisation switch refused: the user does not reach this application through the requested organisation', {
         securityEvent: 'app_session.organisation_denied',
         clientId: client.id,
@@ -314,9 +309,9 @@ export class AppSessionService {
     return session;
   }
 
-  private async assertApplicationAccess(session: AppSession, client: OAuthClient): Promise<void> {
+  private async assertApplicationAccess(session: AppSession, client: OAuthClient): Promise<UserApplicationAccess> {
     try {
-      await this.applicationAccessService.assertUserAccess(session.userId, client.applicationId);
+      return await this.applicationAccessService.assertUserAccess(session.userId, client.applicationId);
     } catch (error) {
       if (!AppError.is(error, AppErrorCode.APP_006) && !AppError.is(error, AppErrorCode.APP_007)) throw error;
       await this.db.update(schema.appSessions).set({ status: 'REVOKED', terminatedAt: new Date() }).where(eq(schema.appSessions.id, session.id));
@@ -330,14 +325,10 @@ export class AppSessionService {
     }
   }
 
-  private async realignOrganisation(session: AppSession, client: OAuthClient): Promise<AppSession> {
-    const granting = await this.applicationAccessService.listGrantingOrganisations(session.userId, client.applicationId);
-    if (session.organisationId !== null && granting.some(organisation => organisation.id === session.organisationId)) return session;
+  private async realignOrganisation(session: AppSession, client: OAuthClient, access: UserApplicationAccess): Promise<AppSession> {
+    if (session.organisationId !== null && access.organisations.some(organisation => organisation.id === session.organisationId)) return session;
 
-    const organisationId =
-      (await this.applicationAccessService.resolveActiveOrganisationId(session.userId, client.applicationId)) ??
-      throwError(AppError.internal('Application access granted a session no organisation to act in'));
-
+    const organisationId = access.activeOrganisationId;
     await this.db.update(schema.appSessions).set({ organisationId }).where(eq(schema.appSessions.id, session.id));
     this.logger.info('app session realigned onto a granting organisation', {
       securityEvent: 'app_session.organisation_realigned',
