@@ -51,6 +51,19 @@ const STORY_FIELDS = ['theme', 'readerPromise', 'protagonistKey', 'opposition', 
 
 type PremiseRow = Pick<typeof schema.projects.$inferSelect, 'premise' | 'brief' | 'themes' | 'instructions' | (typeof STORY_FIELDS)[number]>;
 
+const PREMISE_COLUMNS = {
+  premise: true,
+  brief: true,
+  themes: true,
+  instructions: true,
+  theme: true,
+  readerPromise: true,
+  protagonistKey: true,
+  opposition: true,
+  endingQuestion: true,
+  ending: true,
+} as const satisfies Record<keyof PremiseRow, true>;
+
 function premiseFields(project: PremiseRow): Record<string, unknown> {
   return { premise: project.premise, brief: project.brief, themes: project.themes, instructions: project.instructions };
 }
@@ -67,7 +80,7 @@ export async function loadArtifactStates(db: DbExecutor, projectId: bigint, refs
   for (const ref of refs) states[ref] = MISSING_ARTIFACT;
 
   if (parsed.premise) {
-    const project = await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
+    const project = await db.query.projects.findFirst({ columns: PREMISE_COLUMNS, where: eq(schema.projects.id, projectId) });
     if (project) {
       const contentHash = computeContentHash(premiseHashInput(project));
       states['premise'] = { exists: true, revision: null, contentHash };
@@ -76,6 +89,7 @@ export async function loadArtifactStates(db: DbExecutor, projectId: bigint, refs
 
   if (parsed.docs.length > 0) {
     const rows = await db.query.bibleDocuments.findMany({
+      columns: { section: true, slug: true, revision: true, contentHash: true },
       where: and(
         eq(schema.bibleDocuments.projectId, projectId),
         inArray(
@@ -91,18 +105,27 @@ export async function loadArtifactStates(db: DbExecutor, projectId: bigint, refs
   }
 
   if (parsed.volumeKeys.length > 0) {
-    const rows = await db.query.volumes.findMany({ where: and(eq(schema.volumes.projectId, projectId), inArray(schema.volumes.volumeKey, parsed.volumeKeys)) });
+    const rows = await db.query.volumes.findMany({
+      columns: { volumeKey: true, revision: true, contentHash: true },
+      where: and(eq(schema.volumes.projectId, projectId), inArray(schema.volumes.volumeKey, parsed.volumeKeys)),
+    });
     for (const row of rows) states[`volume:${row.volumeKey}`] = { exists: true, revision: row.revision, contentHash: row.contentHash };
   }
 
   if (parsed.chapters.length > 0) {
-    const rows = await db.query.briefs.findMany({ where: and(eq(schema.briefs.projectId, projectId), inArray(schema.briefs.chapter, parsed.chapters)) });
+    const rows = await db.query.briefs.findMany({
+      columns: { chapter: true, revision: true, contentHash: true },
+      where: and(eq(schema.briefs.projectId, projectId), inArray(schema.briefs.chapter, parsed.chapters)),
+    });
     for (const row of rows) states[`chapter:${row.chapter}`] = { exists: true, revision: row.revision, contentHash: row.contentHash };
   }
 
   // Drafts store no contentHash — hash the refinable prose fields at read time (like entities below).
   if (parsed.drafts.length > 0) {
-    const rows = await db.query.drafts.findMany({ where: and(eq(schema.drafts.projectId, projectId), inArray(schema.drafts.chapter, parsed.drafts)) });
+    const rows = await db.query.drafts.findMany({
+      columns: { chapter: true, revision: true, title: true, body: true, summary: true },
+      where: and(eq(schema.drafts.projectId, projectId), inArray(schema.drafts.chapter, parsed.drafts)),
+    });
     for (const row of rows) {
       const contentHash = computeContentHash({ title: row.title, body: row.body, summary: row.summary });
       states[`draft:${row.chapter}`] = { exists: true, revision: row.revision, contentHash };
@@ -210,7 +233,7 @@ export async function loadCurrentRecords(db: DbExecutor, projectId: bigint, refs
 
   const threadKeys = parsed.promiseKeys.filter(p => p.kind === 'thread').map(p => p.key);
   const mysteryKeys = parsed.promiseKeys.filter(p => p.kind === 'mystery').map(p => p.key);
-  const project = parsed.premise ? await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }) : undefined;
+  const project = parsed.premise ? await db.query.projects.findFirst({ columns: PREMISE_COLUMNS, where: eq(schema.projects.id, projectId) }) : undefined;
   const docs =
     parsed.docs.length > 0
       ? await db.query.bibleDocuments.findMany({

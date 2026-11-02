@@ -100,11 +100,17 @@ function harness(outputs: Record<string, unknown[]>, { webMode = 'off', served, 
   const rows: Record<string, unknown>[] = [];
   const sessionSets: Record<string, unknown>[] = [];
   const stable = { story: 'Mara keeps the lighthouse.', inventory: 'mara (character)' };
+  const reads = { window: 0 };
   const db = {
     query: {
       chatSessions: { findFirst: async () => session },
       projects: { findFirst: async () => ({ id: 1n, contentMode: 'standard', costTier: 'balanced' }) },
-      chatMessages: { findMany: async () => rows.filter(row => (row['ordinal'] as number) > session.summaryThroughOrdinal) },
+      chatMessages: {
+        findMany: async () => {
+          reads.window++;
+          return rows.filter(row => (row['ordinal'] as number) > session.summaryThroughOrdinal);
+        },
+      },
     },
     insert: (table: unknown) => ({
       values: (values: Record<string, unknown>) => {
@@ -184,7 +190,7 @@ function harness(outputs: Record<string, unknown[]>, { webMode = 'off', served, 
     { unrestrictedAvailable: async () => unrestrictedAvailable } as never,
   );
   const chatCalls = () => calls.filter(call => call.role === 'chat');
-  return { service, session, stable, calls, chatCalls, rows, sessionSets };
+  return { service, session, stable, calls, chatCalls, rows, sessionSets, reads };
 }
 
 // The negation check reads canon off the database; here the first reply is flagged and every later one passes.
@@ -247,6 +253,15 @@ describe('ChatService.turn — gateway session', () => {
     const [first, fix, next] = run.chatCalls();
     expect(resumes(wire((fix as Call).messages), wire((next as Call).messages))).toBe(false);
     expect(resumes(wire((first as Call).messages), wire((next as Call).messages))).toBe(true);
+  });
+
+  it('should read the chat’s window once a turn, sharing it between the compaction check and the history', async () => {
+    const run = harness({ chat: [{ reply: 'One.' }, { reply: 'Two.' }], title: [{ title: 'Counting' }] });
+
+    await run.service.turn(1n, 'session-1', 'Count with me, one.');
+    await run.service.turn(1n, 'session-1', 'Two.');
+
+    expect(run.reads.window).toBe(2);
   });
 
   it('should keep the JSON schema in the system prompt of a keyed call, so nothing trails the turn', async () => {

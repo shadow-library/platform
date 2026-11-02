@@ -58,6 +58,7 @@ export class ChatLookupService {
     const rawTools = this.toolRegistry.getRaw(CHAT_HUB_NODE, webMode);
     const ctx: ToolContext = { chapter: null, db: this.db, node: CHAT_HUB_NODE, projectId, retrieval: this.retrievalService, runId, web };
     const blocks: string[] = [];
+    const audits: (typeof schema.toolCalls.$inferInsert)[] = [];
 
     for (const lookup of lookups) {
       const args = lookup.args ?? {};
@@ -105,12 +106,14 @@ export class ChatLookupService {
       trace.lookupSettled(lookup.tool, args, status);
 
       const digest = createHash('sha256').update(resultStr).digest('hex').slice(0, 16);
-      await this.db
-        .insert(schema.toolCalls)
-        .values({ args, latencyMs: Date.now() - startedAt, node: CHAT_HUB_NODE, resultDigest: digest, runId, status: auditStatus, tool: lookup.tool })
-        .catch(err => this.logger.error('failed to write lookup audit row', { err }));
+      audits.push({ args, latencyMs: Date.now() - startedAt, node: CHAT_HUB_NODE, resultDigest: digest, runId, status: auditStatus, tool: lookup.tool });
       blocks.push(`### ${lookup.tool}\n${resultStr}`);
     }
+    if (audits.length > 0)
+      await this.db
+        .insert(schema.toolCalls)
+        .values(audits)
+        .catch(err => this.logger.error('failed to write lookup audit rows', { err }));
     return blocks.join('\n\n');
   }
 }
