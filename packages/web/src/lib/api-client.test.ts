@@ -168,6 +168,43 @@ describe('createApiClient (server)', () => {
     expect(seen?.query).toEqual({ draft: 'true' });
   });
 
+  it('should load the SSR transport once and share it across surfaces and requests', async () => {
+    let loads = 0;
+    const api = createApiClient({
+      surfaces: { v1: '/api/v1', auth: '/api/auth' },
+      ssr: () => {
+        loads++;
+        return Promise.resolve({ serverFetch: (async () => ({ ok: true, data: null })) as never });
+      },
+    });
+
+    await Promise.all([api.v1.get('/a').execute(), api.v1.get('/b').execute(), api.auth.get('/session').execute()]);
+    await api.v1.post('/c').execute();
+
+    expect(loads).toBe(1);
+  });
+
+  it('should retry loading the SSR transport after a failed load', async () => {
+    let loads = 0;
+    const api = createApiClient({
+      surfaces: { v1: '/api/v1' },
+      ssr: () => {
+        loads++;
+        if (loads === 1) return Promise.reject(new Error('chunk failed'));
+        return Promise.resolve({ serverFetch: (async () => ({ ok: true, data: 'ok' })) as never });
+      },
+    });
+
+    const first = await api.v1
+      .get('/a')
+      .execute()
+      .catch((caught: unknown) => caught);
+
+    expect((first as Error).message).toBe('chunk failed');
+    expect(await api.v1.get('/a').execute()).toBe('ok');
+    expect(loads).toBe(2);
+  });
+
   it('should fail loudly when no SSR transport was configured, rather than silently mis-routing', async () => {
     const api = createApiClient({ surfaces: { v1: '/api/v1' } });
 

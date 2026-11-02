@@ -6,7 +6,7 @@ import { type ServerFetch } from './transport';
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
-/** Loads the server-only transport. Invoked lazily and only on the server, so the module never enters the client graph. */
+/** Loads the server-only transport. Invoked lazily, once per client, and only on the server, so the module never enters the client graph. */
 export type SsrTransportLoader = () => Promise<{ serverFetch: ServerFetch }>;
 
 export interface ApiClientConfig<TSurfaces extends Record<string, string>> {
@@ -252,13 +252,24 @@ async function parseBody(response: Response): Promise<unknown> {
   }
 }
 
+// A failed load is not kept, so the next request retries the import instead of failing for the life of the process.
+function memoiseSsrTransport(load: SsrTransportLoader): SsrTransportLoader {
+  let transport: ReturnType<SsrTransportLoader> | null = null;
+  return () =>
+    (transport ??= load().catch((error: unknown) => {
+      transport = null;
+      throw error;
+    }));
+}
+
 /** Builds an app's single API client: one cookie/CSRF policy and SSR transport, one surface per base path. */
 export function createApiClient<TSurfaces extends Record<string, string>>(config: ApiClientConfig<TSurfaces>): ApiClient<TSurfaces> {
   const csrf = resolveCsrfConfig(config.csrf);
   const client = {} as ApiClient<TSurfaces>;
+  const ssr = config.ssr && memoiseSsrTransport(config.ssr);
 
   for (const [name, basePath] of Object.entries(config.surfaces)) {
-    const context: SurfaceContext = { basePath, ssr: config.ssr, csrf };
+    const context: SurfaceContext = { basePath, ssr, csrf };
     client[name as keyof TSurfaces] = {
       basePath,
       get: path => new ApiRequest(context, 'GET', path),

@@ -27,19 +27,38 @@ const STORE_NAME = 'query-cache';
 export function createIDBPersister(options: IDBPersisterOptions = {}): Persister {
   const config: IdbConfig = { dbName: options.dbName ?? 'shadow-query-cache', storeNames: [STORE_NAME], version: 1 };
   const key = options.key ?? 'query-client';
+  let database: Promise<IDBDatabase> | null = null;
+
+  // `persistQueryClient` saves on every cache event without throttling, so one connection is reused; it yields to a `deleteDatabase` (a purge) and reopens on next use.
+  const db = (): Promise<IDBDatabase> =>
+    (database ??= openDatabase(config).then(
+      connection => {
+        const release = (): void => {
+          connection.close();
+          database = null;
+        };
+        connection.onversionchange = release;
+        connection.onclose = release;
+        return connection;
+      },
+      (error: unknown) => {
+        database = null;
+        throw error;
+      },
+    ));
 
   return {
     async persistClient(client) {
       if (!isIndexedDbAvailable()) return;
-      await idbSet(await openDatabase(config), STORE_NAME, key, client);
+      await idbSet(await db(), STORE_NAME, key, client);
     },
     async restoreClient() {
       if (!isIndexedDbAvailable()) return undefined;
-      return idbGet<PersistedClient>(await openDatabase(config), STORE_NAME, key);
+      return idbGet<PersistedClient>(await db(), STORE_NAME, key);
     },
     async removeClient() {
       if (!isIndexedDbAvailable()) return;
-      await idbDelete(await openDatabase(config), STORE_NAME, key);
+      await idbDelete(await db(), STORE_NAME, key);
     },
   };
 }
