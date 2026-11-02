@@ -57,3 +57,67 @@ export function closeSettledTransactions(client: TransactionalClient): void {
   const begin = client.begin.bind(client);
   client.begin = (...args: unknown[]) => begin(...scoped(args, () => true));
 }
+
+export type QueryObserver = (query: string, durationMs: number) => void;
+
+type Settle = (value: unknown) => unknown;
+
+interface PendingQuery {
+  then: (onFulfilled?: Settle | null, onRejected?: Settle | null) => unknown;
+}
+
+const isPendingQuery = (value: unknown): value is PendingQuery => typeof value === 'object' && value !== null && typeof (value as PendingQuery).then === 'function';
+
+/** Bun SQL and postgres.js queries are lazy thenables that start on their first `then`, so the clock starts there and `.values()` set before it still applies. */
+function timeQuery(pending: unknown, query: string, observer: QueryObserver): unknown {
+  if (!isPendingQuery(pending)) return pending;
+  const then = pending.then;
+  let isTimed = false;
+  pending.then = function (this: PendingQuery, onFulfilled, onRejected) {
+    if (isTimed) return then.call(this, onFulfilled, onRejected);
+    isTimed = true;
+    const startedAt = performance.now();
+    const fulfilled = (value: unknown): unknown => {
+      observer(query, performance.now() - startedAt);
+      return onFulfilled ? onFulfilled(value) : value;
+    };
+    const rejected = (error: unknown): unknown => {
+      observer(query, performance.now() - startedAt);
+      if (onRejected) return onRejected(error);
+      throw error;
+    };
+    return then.call(this, fulfilled, rejected);
+  };
+  return pending;
+}
+
+const SCOPE_OPENERS = ['begin', 'savepoint'] as const;
+
+/**
+ * Times every query Drizzle runs through the driver's `unsafe`, on the client and on each transaction and savepoint handle it opens; Drizzle's own
+ * logger fires before execution, so it cannot. The observer receives the parameterised SQL text only. Apply before `closeSettledTransactions`.
+ */
+export function observeQueries(sql: object, observer: QueryObserver, isEnabled: () => boolean): void {
+  const target = sql as Record<string, unknown>;
+  const unsafe = target.unsafe;
+  if (typeof unsafe === 'function') {
+    target.unsafe = (query: string, ...args: unknown[]) => {
+      const pending: unknown = unsafe.call(sql, query, ...args);
+      return isEnabled() ? timeQuery(pending, query, observer) : pending;
+    };
+  }
+
+  for (const opener of SCOPE_OPENERS) {
+    const open = target[opener];
+    if (typeof open !== 'function') continue;
+    target[opener] = (...args: unknown[]) => {
+      const callback = args.at(-1);
+      if (typeof callback !== 'function') return open.apply(sql, args);
+      const observed = (scoped: object): unknown => {
+        observeQueries(scoped, observer, isEnabled);
+        return (callback as ScopeCallback)(scoped);
+      };
+      return open.apply(sql, [...args.slice(0, -1), observed]);
+    };
+  }
+}

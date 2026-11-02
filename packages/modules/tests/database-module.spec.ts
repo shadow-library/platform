@@ -150,6 +150,68 @@ describe('Database Module', () => {
     });
   });
 
+  describe('slow query logging', () => {
+    class DriverQuery extends Promise<unknown> {}
+    const SECRET = 'reset-token-4f9a';
+
+    const bootWithThreshold = async (threshold: number | undefined, queryMs: number) => {
+      const unsafe = mock<(query: string, params?: unknown[]) => DriverQuery>(() => new DriverQuery(resolve => setTimeout(() => resolve([]), queryMs)));
+      const client = { execute: mock(), $client: { unsafe } } as unknown as PostgresClient;
+      const warn = mock();
+      const getLogger = Logger.getLogger.bind(Logger);
+      const withWarn = (logger: Logger) => new Proxy(logger, { get: (target, key) => (key === 'warn' ? warn : Reflect.get(target, key)) });
+      const spy = spyOn(Logger, 'getLogger').mockImplementation(((namespace: string, label: string) =>
+        label === 'DatabaseService' ? withWarn(getLogger(namespace, label)) : getLogger(namespace, label)) as typeof Logger.getLogger);
+      const restoreConfig = setConfig(threshold === undefined ? {} : { 'database.postgres.slow-query-threshold': threshold });
+      try {
+        @Module({ imports: [DatabaseModule.forRoot({ postgres: { factory: () => client } })] })
+        class SlowQueryAppModule {}
+        await ShadowFactory.create(SlowQueryAppModule);
+      } finally {
+        restoreConfig();
+        spy.mockRestore();
+      }
+      const driver = (client as unknown as { $client: { unsafe: typeof unsafe } }).$client;
+      return { warn, query: () => driver.unsafe('select * from sessions where token = $1', [SECRET]) };
+    };
+
+    it('should warn with the duration and the parameterised SQL of a query over the threshold', async () => {
+      const { warn, query } = await bootWithThreshold(1, 3);
+
+      await query();
+
+      expect(warn).toHaveBeenCalledTimes(1);
+      const [message, metadata] = warn.mock.calls[0] as [string, { durationMs: number; query: string }];
+      expect(message).toStartWith('Slow query took');
+      expect(metadata.query).toBe('select * from sessions where token = $1');
+      expect(metadata.durationMs).toBeGreaterThan(1);
+    });
+
+    it('should never log the bound parameter values', async () => {
+      const { warn, query } = await bootWithThreshold(1, 3);
+
+      await query();
+
+      expect(JSON.stringify(warn.mock.calls)).not.toContain(SECRET);
+    });
+
+    it('should stay silent for a query within the default threshold', async () => {
+      const { warn, query } = await bootWithThreshold(undefined, 0);
+
+      await query();
+
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    it.each([0, -1])('should not log slow queries when the threshold is %d', async threshold => {
+      const { warn, query } = await bootWithThreshold(threshold, 3);
+
+      await query();
+
+      expect(warn).not.toHaveBeenCalled();
+    });
+  });
+
   describe('translateError', () => {
     let databaseService: DatabaseService;
 

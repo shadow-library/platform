@@ -12,6 +12,7 @@ declare module '@shadow-library/common' {
     'database.postgres.max-connections'?: number;
     'database.postgres.lazy-connection': boolean;
     'database.postgres.prepare': boolean;
+    'database.postgres.slow-query-threshold': number;
     'database.redis.url'?: string;
     'database.memcache.hosts'?: string;
   }

@@ -1,12 +1,15 @@
+import { channel } from 'node:diagnostics_channel';
+
 import { type DrizzleConfig } from 'drizzle-orm';
 import type Redis from 'ioredis';
 import type Memcached from 'memcached';
 import { Inject, Injectable, OnModuleDestroy, OnModuleInit } from '@shadow-library/app';
 import { AppError, Config, Logger } from '@shadow-library/common';
 
-import { DATABASE_MODULE_OPTIONS, DEFAULT_CONFIGS, LOGGER_NAMESPACE } from './database.constants';
+import { QUERY_CHANNEL } from '../internal.utils';
+import { DATABASE_MODULE_OPTIONS, DEFAULT_CONFIGS, LOGGER_NAMESPACE, MAX_LOGGED_QUERY_LENGTH } from './database.constants';
 import { type DatabaseModuleOptions, MemcacheConfig, PostgresClient, PostgresConnectionConfig, PostgresError, RedisConfig } from './database.types';
-import { closeSettledTransactions, renderPostgresQuery, type TransactionalClient } from './database.utils';
+import { closeSettledTransactions, observeQueries, renderPostgresQuery, type TransactionalClient } from './database.utils';
 
 type ConfigKey = 'database.postgres.url' | 'database.redis.url' | 'database.memcache.hosts';
 
@@ -15,6 +18,8 @@ export type LinkedWithParent<T, U> = T & { getParent: () => U };
 @Injectable()
 export class DatabaseService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = Logger.getLogger(LOGGER_NAMESPACE, 'DatabaseService');
+  private readonly queryChannel = channel(QUERY_CHANNEL);
+  private slowQueryThreshold = 0;
 
   private postgresClient?: PostgresClient;
   private redisClient?: Redis;
@@ -63,6 +68,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       this.postgresClient = await postgres.factory(drizzleConfig, connectionConfig);
       if (!this.postgresClient) throw AppError.internal('Postgres client is in an impossible state: undefined after initialization');
       await this.assertPrepareHonoured(this.postgresClient, connectionConfig.prepare);
+      this.instrumentQueries(this.postgresClient);
       this.guardSettledTransactions(this.postgresClient);
 
       const isLazyConnection = postgres.lazyConnection ?? Config.register('database.postgres.lazy-connection', DEFAULT_CONFIGS['database.postgres.lazy-connection']);
@@ -71,6 +77,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         await this.postgresClient.execute('SELECT 1');
         this.logger.info('Postgres client connected');
       }
+      this.slowQueryThreshold = Config.register('database.postgres.slow-query-threshold', DEFAULT_CONFIGS['database.postgres.slow-query-threshold']);
     }
 
     if (this.options.redis) {
@@ -137,6 +144,22 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     const message = 'Bun SQL 1.3.14 stalls pipelined queries on named prepared statements, leaving connections idle in transaction; set database.postgres.prepare to false';
     if (Config.isProductionDeployment()) throw AppError.internal(message);
     this.logger.warn(message);
+  }
+
+  private instrumentQueries(postgresClient: PostgresClient): void {
+    const client = (postgresClient as unknown as { $client?: object | null }).$client;
+    if (!client) return;
+    const isEnabled = (): boolean => this.slowQueryThreshold > 0 || this.queryChannel.hasSubscribers;
+    observeQueries(client, (query, durationMs) => this.recordQuery(query, durationMs), isEnabled);
+  }
+
+  /** Logs the parameterised SQL text only: bound values carry user data and credentials. */
+  private recordQuery(query: string, durationMs: number): void {
+    if (this.queryChannel.hasSubscribers) this.queryChannel.publish(durationMs);
+    if (this.slowQueryThreshold <= 0 || durationMs <= this.slowQueryThreshold) return;
+    const sql = query.length > MAX_LOGGED_QUERY_LENGTH ? `${query.slice(0, MAX_LOGGED_QUERY_LENGTH)}…` : query;
+    const roundedMs = Math.round(durationMs * 10) / 10;
+    this.logger.warn(`Slow query took ${roundedMs}ms (threshold ${this.slowQueryThreshold}ms)`, { durationMs: roundedMs, query: sql });
   }
 
   private guardSettledTransactions(postgresClient: PostgresClient): void {
