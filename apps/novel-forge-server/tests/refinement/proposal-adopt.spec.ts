@@ -157,6 +157,7 @@ describe('ProposalService.create — superseding the chat’s pending cards', ()
   /** Pending cards of the chat, as a query that honours the kinds it asks for would find them. */
   function stagingExecutor(pending: Record<string, unknown>[]) {
     const superseded: unknown[] = [];
+    const writes = { count: 0 };
     const executor = {
       query: {
         canonFacts: { findMany: async () => [] },
@@ -169,10 +170,28 @@ describe('ProposalService.create — superseding the chat’s pending cards', ()
         },
       },
       insert: () => ({ values: (values: Record<string, unknown>) => ({ returning: async () => [{ id: 300n, ...values }] }) }),
-      update: () => ({ set: () => ({ where: async (where: SQL) => superseded.push(dialect.sqlToQuery(where).params[0]) }) }),
+      update: () => ({
+        set: () => ({
+          where: async (where: SQL) => {
+            writes.count++;
+            superseded.push(...dialect.sqlToQuery(where).params);
+          },
+        }),
+      }),
     };
-    return { executor: executor as never, superseded };
+    return { executor: executor as never, superseded, writes };
   }
+
+  it('should supersede every overlapping card of the chat in one write', async () => {
+    const service = new ProposalService(new FakeDatabaseService());
+    const cards = [40n, 41n, 42n].map(id => ({ id, kind: 'chat', sessionId: SESSION, status: 'pending', changeSet: factOp }));
+    const { executor, superseded, writes } = stagingExecutor(cards);
+
+    await service.create(7n, { sessionId: SESSION, scopeType: 'project', kind: 'hub', changeSet: factOp, warnings: [], baseline: {} }, executor);
+
+    expect(superseded).toEqual([40n, 41n, 42n]);
+    expect(writes.count).toBe(1);
+  });
 
   it('should leave an adopted audit card standing when the chat stages a later card on the same record', async () => {
     const service = new ProposalService(new FakeDatabaseService());

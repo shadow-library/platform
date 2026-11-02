@@ -53,7 +53,7 @@ function chat() {
     { forNovelChat: async () => ({ id: null, sections: [], omitted: [], renderedStable: '', renderedVolatile: '' }) } as never,
     modelRouter as never,
     workflowRunService as never,
-    { compactIfNeeded: async () => undefined, buildHistory: async () => [], continueConversation: async () => ({ plain: [], history: [], segment: null }) } as never,
+    { compactIfNeeded: async () => ({ rows: [] }), buildHistory: async () => [], continueConversation: async () => ({ plain: [], history: [], segment: null }) } as never,
     { resolve: async () => ({ writerClass: 'permissive', raised: false, systemMessages: [] }) } as never,
     { publish: () => undefined } as never,
     { read: async () => ({ text: '' }) } as never,
@@ -143,7 +143,7 @@ describe('ChatCompactionService.compactIfNeeded under the hard line', () => {
   it('should fold without the message the hard line refuses', async () => {
     const run = compaction(async () => ({ summary: `The ${MINOR} ${SEXUAL_ONLY} came up once.` }));
 
-    const runId = await run.service.compactIfNeeded(1n, run.session, 0, { contentMode: 'unrestricted' }, turn);
+    const { runId } = await run.service.compactIfNeeded(1n, run.session, 0, { contentMode: 'unrestricted' }, turn);
 
     expect(runId).toBe('run-c');
     expect(run.transcripts[0]).not.toContain(PROBE);
@@ -157,9 +157,10 @@ describe('ChatCompactionService.compactIfNeeded under the hard line', () => {
       throw AppErrorCode.AI_015.create({ source: 'The generated text', rule: 'standalone-term', sourceRefs: [] });
     });
 
-    const runId = await run.service.compactIfNeeded(1n, run.session, 0, { contentMode: 'unrestricted' }, turn);
+    const { runId, rows } = await run.service.compactIfNeeded(1n, run.session, 0, { contentMode: 'unrestricted' }, turn);
 
     expect(runId).toBeUndefined();
+    expect(rows).toHaveLength(8);
     expect(run.updates).toEqual([]);
   });
 });

@@ -214,6 +214,7 @@ export class ProposalService {
   /** Pending cards touching the same artifacts or action decision; a card rewriting other passages of a chapter is kept unless the new card touches them. */
   private async supersedeOverlapping(projectId: bigint, owner: SQL, newProposalId: bigint, changeSet: ChangeOp[], executor: DbExecutor): Promise<void> {
     const pending = await executor.query.refinementProposals.findMany({
+      columns: { id: true, changeSet: true },
       where: and(eq(schema.refinementProposals.projectId, projectId), owner, eq(schema.refinementProposals.status, 'pending'), ne(schema.refinementProposals.id, newProposalId)),
     });
 
@@ -226,10 +227,10 @@ export class ProposalService {
       const shared = changeSetRefs(older).filter(ref => refs.includes(ref));
       return shared.length > 0 && !rewritesApart(older, changeSet, shared, drafts);
     });
-    for (const proposal of overlapping) {
-      await executor.update(schema.refinementProposals).set({ status: 'superseded', updatedAt: new Date() }).where(eq(schema.refinementProposals.id, proposal.id));
-      this.logger.debug(`proposal ${proposal.id} superseded by ${newProposalId}`);
-    }
+    if (overlapping.length === 0) return;
+    const ids = overlapping.map(proposal => proposal.id);
+    await executor.update(schema.refinementProposals).set({ status: 'superseded', updatedAt: new Date() }).where(inArray(schema.refinementProposals.id, ids));
+    for (const id of ids) this.logger.debug(`proposal ${id} superseded by ${newProposalId}`);
   }
 
   async list(projectId: bigint, filter: ListProposalsQuery): Promise<OffsetPaginationResult<Refinement.Proposal>> {
@@ -259,16 +260,32 @@ export class ProposalService {
     // The feed's order is fixed — newest apply first — so the query DTO offers no sort fields and the
     // sortBy/sortOrder defaults only satisfy the normaliser's shape; limit and offset are read below.
     const query = utils.pagination.normalise(filter, { mode: 'offset', defaults: { limit: 30, offset: 0, sortBy: 'updatedAt', sortOrder: 'desc' } });
-    const where = and(eq(schema.refinementProposals.projectId, projectId), inArray(schema.refinementProposals.status, ['applied', 'reverted']));
+    const table = schema.refinementProposals;
+    const where = and(eq(table.projectId, projectId), inArray(table.status, ['applied', 'reverted']));
 
+    // Inverse ops hold the prose and records each change replaced, so the feed counts them in SQL rather than reading them.
     const [total, items] = await Promise.all([
-      this.db.$count(schema.refinementProposals, where),
-      this.db.query.refinementProposals.findMany({
-        where,
-        limit: query.limit,
-        offset: query.offset,
-        orderBy: [desc(schema.refinementProposals.appliedAt), desc(schema.refinementProposals.id)],
-      }),
+      this.db.$count(table, where),
+      this.db
+        .select({
+          id: table.id,
+          sessionId: table.sessionId,
+          kind: table.kind,
+          scopeType: table.scopeType,
+          status: table.status,
+          summary: table.summary,
+          autoApplied: table.autoApplied,
+          changeSet: table.changeSet,
+          opResults: table.opResults,
+          appliedAt: table.appliedAt,
+          revertedAt: table.revertedAt,
+          inverseCount: sql<number>`case when jsonb_typeof(${table.inverseOps}) = 'array' then jsonb_array_length(${table.inverseOps}) else 0 end`.mapWith(Number),
+        })
+        .from(table)
+        .where(where)
+        .orderBy(desc(table.appliedAt), desc(table.id))
+        .limit(query.limit)
+        .offset(query.offset),
     ]);
 
     const changes = items.map((proposal): ChangeItem => ({
@@ -280,7 +297,7 @@ export class ProposalService {
       summary: proposal.summary,
       autoApplied: proposal.autoApplied,
       refs: changeSetRefs(proposal.changeSet as ChangeOp[]),
-      revertible: proposal.status === 'applied' && ((proposal.inverseOps as ChangeOp[] | null)?.length ?? 0) > 0,
+      revertible: proposal.status === 'applied' && proposal.inverseCount > 0,
       opResults: proposal.opResults as Record<string, unknown>[] | null,
       appliedAt: proposal.appliedAt,
       revertedAt: proposal.revertedAt,

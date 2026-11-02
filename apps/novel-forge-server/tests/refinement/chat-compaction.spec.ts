@@ -26,8 +26,16 @@ function fakeCompaction(scenario: Scenario = {}) {
   const runs: unknown[] = [];
   const calls: { project: ProjectConfig; policy: unknown }[] = [];
   const updates: { table: unknown; values: Record<string, unknown> }[] = [];
+  const reads = { window: 0 };
   const db = {
-    query: { chatMessages: { findMany: async () => messages } },
+    query: {
+      chatMessages: {
+        findMany: async () => {
+          reads.window++;
+          return messages;
+        },
+      },
+    },
     select: (columns: Record<string, unknown>) => ({
       from: () => ({
         where: () => {
@@ -55,7 +63,7 @@ function fakeCompaction(scenario: Scenario = {}) {
   const pluginPolicy = { resolve: async () => ({ writerClass: 'permissive' }) };
   const service = new ChatCompactionService({ getPostgresClient: () => db } as never, modelRouter as never, workflowRunService as never, pluginPolicy as never);
   const session = { id: 'session-1', summary: scenario.summary ?? null, summaryThroughOrdinal: 0, contentMode: scenario.sessionMode ?? null, costTier: null } as never;
-  return { service, session, runs, calls, updates };
+  return { service, session, runs, calls, updates, reads };
 }
 
 const standardTurn: ChatSelection = { contentMode: 'standard', costTier: 'economy' };
@@ -93,6 +101,29 @@ describe('ChatCompactionService.compactIfNeeded', () => {
     await service.compactIfNeeded(1n, session, 1_000_000, standardNovel, standardTurn);
 
     expect(updates).toEqual([]);
+  });
+
+  it('should hand the turn the window it read when nothing folds, so the history is built without reading it again', async () => {
+    const { service, session, reads } = fakeCompaction({ turnModes: { t1: 'standard' } });
+
+    const { runId, rows } = await service.compactIfNeeded(1n, session, 1_000_000, standardNovel, standardTurn);
+    const history = await service.buildHistory(session, standardNovel, 'standard', rows);
+
+    expect(runId).toBeUndefined();
+    expect(history.map(entry => entry.content)).toEqual(['user t1', 'assistant t1', 'user t2', 'assistant t2', 'user t3', 'assistant t3', 'user t4', 'assistant t4']);
+    expect(reads.window).toBe(1);
+  });
+
+  it('should hand the turn only the turns left after a fold, their exchanges cleared as the fold cleared them', async () => {
+    const { service, session, reads } = fakeCompaction({ turnModes: { t1: 'standard' } });
+
+    const { runId, rows } = await service.compactIfNeeded(1n, session, 0, standardNovel, standardTurn);
+    const conversation = await service.continueConversation(session, standardNovel, 'playbook', rows);
+
+    expect(runId).toBe('run-c');
+    expect(rows.map(row => [row.ordinal, row.exchange])).toEqual([3, 4, 5, 6, 7, 8].map(ordinal => [ordinal, null]));
+    expect(conversation.history[0]?.content).toBe('Conversation so far (compacted summary):\nfolded');
+    expect(reads.window).toBe(1);
   });
 
   it.each([

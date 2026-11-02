@@ -279,7 +279,7 @@ export class ChatService {
     const project = (await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) })) as ProjectConfig | undefined;
     const turnSelection = chatSelection(options, project);
     const message = renderTurnContent(content, contexts);
-    const compactionRunId = await this.compaction.compactIfNeeded(projectId, session, CHAT_HISTORY_BUDGET, project, turnSelection);
+    const compacted = await this.compaction.compactIfNeeded(projectId, session, CHAT_HISTORY_BUDGET, project, turnSelection);
 
     const { policy, project: routed, route } = await this.routeChatReply(projectId, project, turnSelection);
     // Refused before it is saved: a stored message would ride every later turn's history and refuse the session with it.
@@ -300,8 +300,8 @@ export class ChatService {
     const playbook = playbookDigest(scopeInstructions);
     const keyed = route.contentMode === 'standard';
     const conversation = keyed
-      ? await this.compaction.continueConversation(session, project, playbook)
-      : plainConversation(await this.compaction.buildHistory(session, project, route.contentMode));
+      ? await this.compaction.continueConversation(session, project, playbook, compacted.rows)
+      : plainConversation(await this.compaction.buildHistory(session, project, route.contentMode, compacted.rows));
     const promptTokens = chatPromptTokens(scopeInstructions);
     const historyTexts = conversation.plain.map(message => (typeof message.content === 'string' ? message.content : JSON.stringify(message.content)));
     const requestTokens = [turnRules, message, ...historyTexts].reduce((sum, part) => sum + countTokens(part), 0);
@@ -322,7 +322,7 @@ export class ChatService {
       await this.workflowRunService.linkContextPack(runId, pack.id);
       // Compaction, when it ran, always precedes this run's creation — it cannot name this run as its
       // parent at its own creation time, so the link is completed here instead, as soon as the id exists.
-      if (compactionRunId) await this.workflowRunService.setParentRun(compactionRunId, runId);
+      if (compacted.runId) await this.workflowRunService.setParentRun(compacted.runId, runId);
       // Persist the user's message before the model call: the running run plus this unanswered message lets a refresh or second tab recover the in-flight turn.
       const userMessage = await this.persistUserMessage(projectId, session, { content, contexts, rendered: message }, runId);
       relay?.userMessage(userMessage);

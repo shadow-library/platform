@@ -39,6 +39,12 @@ export interface ChatConversation {
   segment: ChatSegment | null;
 }
 
+/** The compaction run that folded before the turn, when one did, and the verbatim window left after it: the rows the turn's history is built from. */
+export interface CompactedWindow {
+  runId?: string;
+  rows: Refinement.ChatMessage[];
+}
+
 interface ChatWindow {
   rows: Refinement.ChatMessage[];
   opening: BaseMessage[];
@@ -65,14 +71,14 @@ export class ChatCompactionService {
   }
 
   /** Summary plus post-watermark turns as prompt messages; a standard turn never sees what the unrestricted model wrote (replies and its summary become placeholders). */
-  async buildHistory(session: Refinement.ChatSession, project: ProjectConfig | undefined, turnMode: Project.ContentMode): Promise<BaseMessage[]> {
-    const window = await this.window(session, project, turnMode);
+  async buildHistory(session: Refinement.ChatSession, project: ProjectConfig | undefined, turnMode: Project.ContentMode, rows?: Refinement.ChatMessage[]): Promise<BaseMessage[]> {
+    const window = await this.window(session, project, turnMode, rows);
     return [...window.opening, ...window.rows.flatMap(window.render)];
   }
 
   /** A standard turn's history when the gateway keeps a session: the open segment's turns as sent, so requests only append; otherwise the plain window, opening a new segment. */
-  async continueConversation(session: Refinement.ChatSession, project: ProjectConfig | undefined, playbook: string): Promise<ChatConversation> {
-    const window = await this.window(session, project, 'standard');
+  async continueConversation(session: Refinement.ChatSession, project: ProjectConfig | undefined, playbook: string, rows?: Refinement.ChatMessage[]): Promise<ChatConversation> {
+    const window = await this.window(session, project, 'standard', rows);
     const plain = [...window.opening, ...window.rows.flatMap(window.render)];
     const segment = heldSegment(window.rows, session.summaryThroughOrdinal, playbook);
     if (!segment) return { plain, history: plain, segment: null };
@@ -81,8 +87,8 @@ export class ChatCompactionService {
     return { plain, history, segment };
   }
 
-  private async window(session: Refinement.ChatSession, project: ProjectConfig | undefined, turnMode: Project.ContentMode): Promise<ChatWindow> {
-    const rows = await this.verbatimWindow(session);
+  private async window(session: Refinement.ChatSession, project: ProjectConfig | undefined, turnMode: Project.ContentMode, read?: Refinement.ChatMessage[]): Promise<ChatWindow> {
+    const rows = read ?? (await this.verbatimWindow(session));
     const fallback = modeOf(project?.contentMode);
     const standard = turnMode === 'standard';
     const unrestricted = standard ? await this.unrestrictedReplies(rows, fallback) : new Set<bigint>();
@@ -106,7 +112,8 @@ export class ChatCompactionService {
    * Folds older messages into the rolling summary once the window exceeds `historyBudget` or MAX_VERBATIM_TURNS;
    * messages are never deleted, the watermark is a read-time window over the intact transcript. Advances the passed session in place.
    * The fold runs unrestricted if the novel, turn, prior summary or any folded reply is, and the summary is then recorded unrestricted so standard turns never read it.
-   * Returns the compaction run's id (undefined if nothing needed folding) so the caller can link it to the turn run once that run exists — compaction always runs before it.
+   * Returns the compaction run's id (absent if nothing folded) so the caller can link it to the turn run once that run exists — compaction always runs before it — and the
+   * window left after any fold, which `buildHistory` and `continueConversation` take instead of reading it again.
    */
   async compactIfNeeded(
     projectId: bigint,
@@ -114,12 +121,12 @@ export class ChatCompactionService {
     historyBudget: number,
     project: ProjectConfig | undefined,
     turn: ChatSelection,
-  ): Promise<string | undefined> {
+  ): Promise<CompactedWindow> {
     const verbatim = await this.verbatimWindow(session);
-    if (verbatim.length <= KEEP_VERBATIM_TURNS) return undefined;
+    if (verbatim.length <= KEEP_VERBATIM_TURNS) return { rows: verbatim };
 
     const totalTokens = verbatim.reduce((sum, m) => sum + (m.tokens ?? countTokens(m.content)), 0);
-    if (totalTokens <= historyBudget && verbatim.length <= MAX_VERBATIM_TURNS) return undefined;
+    if (totalTokens <= historyBudget && verbatim.length <= MAX_VERBATIM_TURNS) return { rows: verbatim };
 
     const toFold = verbatim.slice(0, verbatim.length - KEEP_VERBATIM_TURNS);
     const watermark = toFold[toFold.length - 1]?.ordinal ?? session.summaryThroughOrdinal;
@@ -155,7 +162,7 @@ export class ChatCompactionService {
       });
       return null;
     });
-    if (!compacted) return undefined;
+    if (!compacted) return { rows: verbatim };
     const { runId: compactionRunId, result: summary } = compacted;
 
     await this.db.update(schema.chatSessions).set({ summary, summaryThroughOrdinal: watermark, updatedAt: new Date() }).where(eq(schema.chatSessions.id, session.id));
@@ -167,7 +174,7 @@ export class ChatCompactionService {
     session.summary = summary;
     session.summaryThroughOrdinal = watermark;
     this.logger.debug(`compacted session ${session.id} through ordinal ${watermark}`, { contentMode });
-    return compactionRunId;
+    return { runId: compactionRunId, rows: verbatim.slice(toFold.length).map(row => ({ ...row, exchange: null })) };
   }
 
   // A reply whose turn recorded no selection predates selections and ran in the novel's mode, which is the best evidence left.
