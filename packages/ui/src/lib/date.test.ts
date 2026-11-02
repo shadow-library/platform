@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { addDays, addMonths, buildMonthMatrix, isSameDay, pad2, parseISODate, startOfMonth, toISODate } from './date';
+import { addDays, addMonths, buildMonthMatrix, formatLongDate, isSameDay, pad2, parseISODate, startOfMonth, toISODate } from './date';
 
 describe('pad2', () => {
   it('zero-pads single digits', () => {
@@ -100,5 +100,26 @@ describe('buildMonthMatrix', () => {
   it('honours a Monday week start', () => {
     const weeks = buildMonthMatrix(2026, 5, 1);
     expect(toISODate(weeks[0]?.[0] as Date)).toBe('2026-06-01');
+  });
+});
+
+describe('formatLongDate', () => {
+  it('should match toLocaleDateString in each locale', () => {
+    const options: Intl.DateTimeFormatOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+    for (const locale of ['en-US', 'de-DE', 'ja-JP']) {
+      for (let month = 0; month < 12; month++) {
+        const day = new Date(2026, month, 1 + month * 2);
+        expect(formatLongDate(day, locale)).toBe(day.toLocaleDateString(locale, options));
+      }
+    }
+  });
+
+  it('should label a local date by its own calendar day whatever its time of day', () => {
+    expect(formatLongDate(new Date(2026, 5, 30, 23, 59))).toBe('Tuesday, June 30, 2026');
+    expect(formatLongDate(new Date(2026, 5, 30, 0, 0))).toBe('Tuesday, June 30, 2026');
+  });
+
+  it('should keep the Invalid Date label for an invalid date', () => {
+    expect(formatLongDate(new Date(Number.NaN))).toBe('Invalid Date');
   });
 });

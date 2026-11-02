@@ -173,7 +173,7 @@ export function Calendar({
     return undefined;
   }
 
-  const weekdays = weekdayLabels(weekStartsOn, locale);
+  const weekdays = useMemo(() => weekdayLabels(weekStartsOn, locale), [weekStartsOn, locale]);
 
   return (
     <div className={cn(styles.root, className)} onKeyDown={handleKeyDown}>

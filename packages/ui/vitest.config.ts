@@ -1,24 +1,12 @@
-import path from 'node:path';
-
 import { storybookTest } from '@storybook/addon-vitest/vitest-plugin';
 import { playwright } from '@vitest/browser-playwright';
 import { defineConfig } from 'vitest/config';
 
-const alias = { '@': path.resolve(import.meta.dirname, 'src') };
-
 export default defineConfig({
   test: {
     projects: [
-      {
-        resolve: { alias },
-        test: {
-          name: 'unit',
-          environment: 'happy-dom',
-          globals: true,
-          include: ['src/**/*.test.{ts,tsx}'],
-          setupFiles: ['./vitest.setup.ts'],
-        },
-      },
+      // Vitest initialises every project before applying `--project`, and the storybook plugin indexes every story on init, so `test` runs this file directly.
+      './vitest.unit.config.ts',
       {
         plugins: [storybookTest()],
         test: {

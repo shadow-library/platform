@@ -157,7 +157,7 @@ export function DatePicker({
   }
 
   const weeks = buildMonthMatrix(viewDate.getFullYear(), viewDate.getMonth(), weekStartsOn);
-  const weekdays = weekdayLabels(weekStartsOn, locale);
+  const weekdays = useMemo(() => weekdayLabels(weekStartsOn, locale), [weekStartsOn, locale]);
   const today = new Date();
   const monthLabel = viewDate.toLocaleDateString(locale, { month: 'long', year: 'numeric' });
 
