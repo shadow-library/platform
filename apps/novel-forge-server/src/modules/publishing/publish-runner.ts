@@ -1,4 +1,4 @@
-import { and, eq, type SQL, sql } from 'drizzle-orm';
+import { and, eq, inArray, type SQL, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
@@ -6,7 +6,7 @@ import { type Genre, isGenre, isTag, type Tag } from '@shadow-library/sdk';
 
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
-import { type PrimaryDatabase, type Publishing, schema } from '@server/database';
+import { type Chapter, type PrimaryDatabase, type Publishing, schema } from '@server/database';
 
 import { PublicationAccessService } from './publication-access.service';
 import { renderChapterPayload } from './publish-payload';
@@ -98,6 +98,11 @@ function isUnsweepable(error: string | null | undefined): boolean {
   return UNSWEEPABLE_ERROR_PREFIXES.some(prefix => error?.startsWith(prefix) === true);
 }
 
+/** Bounds the chapter prose one converge holds at once while it still reads it a window at a time rather than a row at a time. */
+const CHAPTER_READ_WINDOW = 50;
+
+type PublishedChapter = Pick<Chapter.Row, 'number' | 'title' | 'content' | 'note' | 'wordCount' | 'contentRating'>;
+
 /** A matching hash is not enough on a gate-capable reader: a rollback's old code rewrites entries without touching the gate column, leaving the right hash and a stale gate. */
 export function isWikiDrifted(row: Publishing.WikiPublication, served: WikiManifestItem | undefined, projection: WikiEntryProjection | undefined, headlineGate: boolean): boolean {
   if (row.state !== 'pushed') return false;
@@ -163,18 +168,18 @@ export class PublishRunner {
     const ledgerOrdinals = new Set(ledger.map(row => row.publishedOrdinal));
     result.unknownOrdinals = [...manifest.keys()].filter(ordinal => !ledgerOrdinals.has(ordinal)).sort((a, b) => a - b);
 
-    for (const row of ledger) {
-      const served = manifest.get(row.publishedOrdinal);
-      if (row.status === 'unpublished') {
-        if (served) await this.deleteChapter(publication.novelSlug, row, result);
+    for (let start = 0; start < ledger.length; start += CHAPTER_READ_WINDOW) {
+      const window = ledger.slice(start, start + CHAPTER_READ_WINDOW);
+      const chapters = await this.loadChapters(
+        projectId,
+        window.filter(row => this.chapterAction(row, manifest, options) === 'push'),
+      );
+      for (const row of window) {
+        const action = this.chapterAction(row, manifest, options);
+        if (action === 'delete') await this.deleteChapter(publication.novelSlug, row, result);
+        else if (action === 'push') await this.pushChapter(projectId, publication.novelSlug, row, chapters.get(row.chapter), result);
         else result.skipped.push(row.publishedOrdinal);
-        continue;
       }
-
-      const due = this.isDue(row, options);
-      const drifted = row.status === 'published' && (!served || served.contentHash !== row.contentHash);
-      if (due || drifted) await this.pushChapter(projectId, publication.novelSlug, row, result);
-      else result.skipped.push(row.publishedOrdinal);
     }
 
     // Wiki converges after the chapters so it reads their fresh `published` ordinals; it never throws — a reader hiccup is ledgered soft and swept.
@@ -265,8 +270,24 @@ export class PublishRunner {
     throw new SlugExhaustedError(entrySlug);
   }
 
-  private async pushChapter(projectId: bigint, slug: string, row: Publishing.ChapterPublication, result: ConvergeResult): Promise<void> {
-    const payload = await this.renderLedgeredPayload(projectId, row);
+  private chapterAction(row: Publishing.ChapterPublication, manifest: Map<number, ManifestItem>, options: ConvergeOptions): 'push' | 'delete' | 'skip' {
+    const served = manifest.get(row.publishedOrdinal);
+    if (row.status === 'unpublished') return served ? 'delete' : 'skip';
+    const drifted = row.status === 'published' && (!served || served.contentHash !== row.contentHash);
+    return this.isDue(row, options) || drifted ? 'push' : 'skip';
+  }
+
+  private async loadChapters(projectId: bigint, rows: Publishing.ChapterPublication[]): Promise<Map<number, PublishedChapter>> {
+    if (rows.length === 0) return new Map();
+    const chapters = await this.db.query.chapters.findMany({
+      columns: { number: true, title: true, content: true, note: true, wordCount: true, contentRating: true },
+      where: and(eq(schema.chapters.projectId, projectId), inArray(schema.chapters.number, [...new Set(rows.map(row => row.chapter))])),
+    });
+    return new Map(chapters.map(chapter => [chapter.number, chapter]));
+  }
+
+  private async pushChapter(projectId: bigint, slug: string, row: Publishing.ChapterPublication, chapter: PublishedChapter | undefined, result: ConvergeResult): Promise<void> {
+    const payload = this.renderLedgeredPayload(row, chapter);
     if (typeof payload === 'string') {
       await this.markFailed(row, payload);
       result.failed.push({ ordinal: row.publishedOrdinal, error: payload });
@@ -312,7 +333,16 @@ export class PublishRunner {
       const message = err instanceof Error ? err.message : String(err);
       const ledger = await this.wikiService.loadLedger(projectId);
       const due = ledger.filter(row => row.state !== 'deleted' && this.isWikiDue(row, options));
-      for (const row of due) await this.markWikiFailed(row, message);
+      if (due.length > 0)
+        await this.db
+          .update(schema.wikiPublications)
+          .set({ state: 'failed', error: message.slice(0, 2000), attempts: sql`${schema.wikiPublications.attempts} + 1`, updatedAt: new Date() })
+          .where(
+            inArray(
+              schema.wikiPublications.id,
+              due.map(row => row.id),
+            ),
+          );
       result.wiki.failed.push(...due.map(row => ({ entryKey: row.entryKey, error: message })));
       this.logger.warn('wiki converge could not read the reader manifest', { projectId, slug, message });
       return;
@@ -383,8 +413,7 @@ export class PublishRunner {
   }
 
   /** Drifted prose fails the row with a "republish" hint instead of pushing silently. */
-  private async renderLedgeredPayload(projectId: bigint, row: Publishing.ChapterPublication): Promise<Omit<ChapterPushBody, 'revision' | 'publishedAt'> | string> {
-    const chapter = await this.db.query.chapters.findFirst({ where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, row.chapter)) });
+  private renderLedgeredPayload(row: Publishing.ChapterPublication, chapter: PublishedChapter | undefined): Omit<ChapterPushBody, 'revision' | 'publishedAt'> | string {
     if (!chapter || !chapter.content?.trim()) return `canonical chapter ${row.chapter} not found — republish from the current chapter numbering`;
     const payload = renderChapterPayload(chapter);
     if (payload.contentHash !== row.contentHash) return `${CANONICAL_PROSE_CHANGED_PREFIX} since this publish was decided — republish chapter ${row.chapter}`;
@@ -467,6 +496,15 @@ export class PublishRunner {
   }
 
   private async recordFailure(rows: Publishing.ChapterPublication[], error: string): Promise<void> {
-    for (const row of rows) await this.markFailed(row, error);
+    if (rows.length === 0) return;
+    await this.db
+      .update(schema.chapterPublications)
+      .set({ status: 'failed', error: error.slice(0, 2000), updatedAt: new Date() })
+      .where(
+        inArray(
+          schema.chapterPublications.id,
+          rows.map(row => row.id),
+        ),
+      );
   }
 }

@@ -429,10 +429,11 @@ export function computeWithinChapterRepeatedNgrams(body: string, sizes: readonly
 /** Share of this chapter's n-grams that also appear anywhere in the prior-chapters window (~10 chapters). */
 export function computeCrossChapterRepeatedNgrams(body: string, priorBodies: string[], sizes: readonly number[] = NGRAM_SIZES): NgramReport {
   const tokens = tokenizeWords(body);
+  const priorTokens = priorBodies.map(tokenizeWords);
   const priorTokensBySize = new Map<number, Set<string>>();
   for (const n of sizes) {
     const set = new Set<string>();
-    for (const prior of priorBodies) for (const g of ngrams(tokenizeWords(prior), n)) set.add(g);
+    for (const prior of priorTokens) for (const g of ngrams(prior, n)) set.add(g);
     priorTokensBySize.set(n, set);
   }
 

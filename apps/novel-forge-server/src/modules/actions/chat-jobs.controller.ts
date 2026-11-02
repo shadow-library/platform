@@ -62,10 +62,9 @@ export class ChatJobsController {
   @RespondFor(200, ListChatJobEventsResponse)
   async listEvents(@Params() params: ChatJobsParams, @Query() query: ChatJobEventsQuery): Promise<ListChatJobEventsResponse> {
     const after = cursorOf(query.after, undefined);
+    if (after === null) return { items: (await this.reader.replay(params.projectId, params.sessionId)).events.map(serialiseEvent) };
     await this.reader.sessionCursor(params.projectId, params.sessionId);
-    const events =
-      after === null ? (await this.reader.replay(params.projectId, params.sessionId)).events : await this.reader.eventsAfter(params.projectId, params.sessionId, after);
-    return { items: events.map(serialiseEvent) };
+    return { items: (await this.reader.eventsAfter(params.projectId, params.sessionId, after)).map(serialiseEvent) };
   }
 
   /**

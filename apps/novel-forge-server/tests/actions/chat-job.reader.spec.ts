@@ -4,6 +4,8 @@ import { schema } from '@server/database';
 
 import { ChatJobReader } from '@modules/actions/chat-job.reader';
 
+import { recordingDb } from '../recording-db';
+
 const SESSION = '11111111-1111-4111-8111-111111111111';
 const HOUR_MS = 60 * 60_000;
 
@@ -107,5 +109,17 @@ describe('ChatJobReader', () => {
 
     expect(listed.items).toEqual([running] as never);
     expect(datesIn(jobWheres[1])).toContainEqual(new Date(now - HOUR_MS));
+  });
+
+  it('should read only the ids of the jobs it follows, never their payloads', async () => {
+    const { db, queries } = recordingDb(query => (query.sql.includes('from "chat_sessions"') ? [{ seq: 12 }] : [{ id: 'job-1' }]));
+    const reader = new ChatJobReader({ getPostgresClient: () => db } as never);
+
+    await reader.activeJobIds(1n, SESSION);
+    await reader.replay(1n, SESSION);
+
+    const jobReads = queries.filter(query => query.sql.startsWith('select') && query.sql.includes(' from "jobs" '));
+    expect(jobReads).toHaveLength(3);
+    for (const read of jobReads) expect(read.sql).toStartWith('select "id" from "jobs"');
   });
 });

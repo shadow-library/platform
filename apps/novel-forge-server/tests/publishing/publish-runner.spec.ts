@@ -5,10 +5,13 @@ import { PgDialect } from 'drizzle-orm/pg-core';
 import { type Publishing } from '@server/database';
 
 import { type PublicationAccessService } from '@modules/publishing/publication-access.service';
+import { renderChapterPayload } from '@modules/publishing/publish-payload';
 import { PublishRunner } from '@modules/publishing/publish-runner';
 import { type PublishingService } from '@modules/publishing/publishing.service';
 import { type AccessPushBody, type ReaderPushClient, ReaderPushError, SlugConflictError, StaleRevisionError, UnknownConflictError } from '@modules/publishing/reader-push.client';
 import { type WikiPublishingService } from '@modules/publishing/wiki-publishing.service';
+
+import { queryRows } from '../sql-filter';
 
 type Row = Record<string, unknown>;
 
@@ -56,18 +59,31 @@ interface ReaderFake {
   /** The publication row as it stands once the pass has read the share list — a narrowing that committed meanwhile. */
   latest?: Publishing.Publication;
   shareLists?: string[][];
+  ledger?: Publishing.ChapterPublication[];
+  chapters?: Row[];
 }
 
 function runner(publication: Publishing.Publication, reader: ReaderFake = {}) {
   const updates: Row[] = [];
+  const chapterReads: number[] = [];
   const shareLists = [...(reader.shareLists ?? [['reader-1']])];
   const db = {
-    query: { publications: { findFirst: async () => reader.latest ?? publication } },
+    query: {
+      publications: { findFirst: async () => reader.latest ?? publication },
+      chapters: {
+        findMany: async (query: { where: SQL }) => {
+          const rows = queryRows(reader.chapters ?? [], query);
+          chapterReads.push(rows.length);
+          return rows;
+        },
+      },
+    },
     update: () => ({ set: (patch: Row) => ({ where: async () => void updates.push(rendered(patch)) }) }),
   };
   const pushed: AccessPushBody[] = [];
   const pushClient = {
     upsertNovel: async () => (reader.upsertNovel ? reader.upsertNovel() : { outcome: 'noop' }),
+    upsertChapter: async () => ({ outcome: 'applied' }),
     getAccess: async () => ({ visibility: 'RESTRICTED', subjectIds: ['someone-else'], revision: 1 }),
     upsertAccess: async (_slug: string, body: AccessPushBody) => {
       pushed.push(body);
@@ -78,7 +94,7 @@ function runner(publication: Publishing.Publication, reader: ReaderFake = {}) {
   };
   const publishingService = {
     getPublication: async () => publication,
-    loadLedger: async () => [],
+    loadLedger: async () => reader.ledger ?? [],
     ensurePublishToken: async () => 'token',
     reassignSlug: async () => undefined,
     restoreSlug: async () => undefined,
@@ -92,7 +108,7 @@ function runner(publication: Publishing.Publication, reader: ReaderFake = {}) {
     accessService as unknown as PublicationAccessService,
     wikiService as unknown as WikiPublishingService,
   );
-  return { runner: instance, pushed, updates };
+  return { runner: instance, pushed, updates, chapterReads };
 }
 
 describe('PublishRunner.converge', () => {
@@ -171,5 +187,53 @@ describe('PublishRunner.converge', () => {
     await publish.converge(1n).catch(() => undefined);
 
     expect(updates).toContainEqual({ accessError: new StaleRevisionError(2).message });
+  });
+
+  it('should read the canonical chapters a window at a time, never once per ledger row', async () => {
+    const chapters = Array.from({ length: 101 }, (_, index) => ({
+      projectId: 1n,
+      number: index + 1,
+      title: `Chapter ${index + 1}`,
+      content: `Prose ${index + 1}.`,
+      note: null,
+      wordCount: 2,
+      contentRating: null,
+    }));
+    const ledger = chapters.map(
+      chapter =>
+        ({
+          id: BigInt(chapter.number),
+          projectId: 1n,
+          chapter: chapter.number,
+          publishedOrdinal: chapter.number,
+          status: 'scheduled',
+          scheduledAt: null,
+          contentHash: renderChapterPayload(chapter as never).contentHash,
+          revision: 1,
+          error: null,
+        }) as unknown as Publishing.ChapterPublication,
+    );
+    const { runner: publish, chapterReads } = runner(publicationRow(), { ledger, chapters });
+
+    const result = await publish.converge(1n);
+
+    expect(result.pushed).toHaveLength(101);
+    expect(result.failed).toEqual([]);
+    expect(chapterReads).toEqual([50, 50, 1]);
+  });
+
+  it('should ledger a header failure on every due chapter in one write', async () => {
+    const ledger = [1, 2, 3].map(
+      number =>
+        ({ id: BigInt(number), chapter: number, publishedOrdinal: number, status: 'scheduled', scheduledAt: null, error: null }) as unknown as Publishing.ChapterPublication,
+    );
+    const { runner: publish, updates } = runner(publicationRow(), {
+      ledger,
+      upsertNovel: () => Promise.reject(new ReaderPushError('reader service unreachable: connect ECONNREFUSED')),
+    });
+
+    await expect(publish.converge(1n)).rejects.toMatchObject({ code: 'PUB_004' });
+
+    expect(updates.filter(patch => patch['status'] === 'failed')).toHaveLength(1);
   });
 });

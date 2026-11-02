@@ -28,6 +28,7 @@ const ACTIVE_STATUSES: Job.Status[] = ['pending', 'in_progress'];
 const SETTLED_STATUSES: Job.Status[] = ['done', 'failed', 'cancelled'];
 const RECENTLY_SETTLED_MS = 60 * 60_000;
 const SNAPSHOT = { isolationLevel: 'repeatable read', accessMode: 'read only' } as const;
+const JOB_ID = { id: schema.jobs.id };
 
 function startedFrom(sessionId: string): SQL {
   return sql`${schema.jobs.payload}->'origin'->>'sessionId' = ${sessionId}`;
@@ -68,7 +69,7 @@ export class ChatJobReader {
   }
 
   async activeJobIds(projectId: bigint, sessionId: string): Promise<string[]> {
-    return (await this.activeJobs(this.db, projectId, sessionId)).map(job => job.id);
+    return (await this.activeJobs(this.db, projectId, sessionId, JOB_ID)).map(job => job.id);
   }
 
   async isStartedFrom(projectId: bigint, sessionId: string, jobId: string): Promise<boolean> {
@@ -91,8 +92,8 @@ export class ChatJobReader {
   replay(projectId: bigint, sessionId: string, now = Date.now()): Promise<ChatJobReplay> {
     return this.db.transaction(async tx => {
       const cursor = await this.sessionCursor(projectId, sessionId, tx);
-      const active = (await this.activeJobs(tx, projectId, sessionId)).map(job => job.id);
-      const settled = (await this.settledJobs(tx, projectId, sessionId, now)).map(job => job.id);
+      const active = (await this.activeJobs(tx, projectId, sessionId, JOB_ID)).map(job => job.id);
+      const settled = (await this.settledJobs(tx, projectId, sessionId, now, JOB_ID)).map(job => job.id);
       const inSession = and(eq(schema.jobEvents.projectId, projectId), eq(schema.jobEvents.sessionId, sessionId), lte(schema.jobEvents.seq, cursor));
       const running = active.length === 0 ? [] : await this.events(tx, and(inSession, inArray(schema.jobEvents.jobId, active)));
       const endings =
@@ -103,17 +104,19 @@ export class ChatJobReader {
     }, SNAPSHOT);
   }
 
-  private activeJobs(db: DbExecutor, projectId: bigint, sessionId: string): Promise<Job.Row[]> {
-    return db
-      .select()
+  private activeJobs(db: DbExecutor, projectId: bigint, sessionId: string): Promise<Job.Row[]>;
+  private activeJobs(db: DbExecutor, projectId: bigint, sessionId: string, columns: typeof JOB_ID): Promise<{ id: string }[]>;
+  private activeJobs(db: DbExecutor, projectId: bigint, sessionId: string, columns?: typeof JOB_ID): Promise<{ id: string }[]> {
+    return (columns ? db.select(columns) : db.select())
       .from(schema.jobs)
       .where(and(eq(schema.jobs.projectId, projectId), inArray(schema.jobs.status, ACTIVE_STATUSES), startedFrom(sessionId)))
       .orderBy(asc(schema.jobs.createdAt));
   }
 
-  private settledJobs(db: DbExecutor, projectId: bigint, sessionId: string, now: number): Promise<Job.Row[]> {
-    return db
-      .select()
+  private settledJobs(db: DbExecutor, projectId: bigint, sessionId: string, now: number): Promise<Job.Row[]>;
+  private settledJobs(db: DbExecutor, projectId: bigint, sessionId: string, now: number, columns: typeof JOB_ID): Promise<{ id: string }[]>;
+  private settledJobs(db: DbExecutor, projectId: bigint, sessionId: string, now: number, columns?: typeof JOB_ID): Promise<{ id: string }[]> {
+    return (columns ? db.select(columns) : db.select())
       .from(schema.jobs)
       .where(
         and(

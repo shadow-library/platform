@@ -45,6 +45,10 @@ export class PluginHost {
     return [...this.plugins.values()].sort((a, b) => a.id.localeCompare(b.id));
   }
 
+  hasAny(): boolean {
+    return this.plugins.size > 0;
+  }
+
   get(id: string): LoadedPlugin | undefined {
     return this.plugins.get(id);
   }
