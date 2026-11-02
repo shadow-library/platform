@@ -62,11 +62,18 @@ const requiredSessionQueryOptions = () =>
     },
   });
 
-export function requireSession(queryClient: QueryClient, returnTo: string): Promise<SessionUser> {
+/** Seeds the nullable read the chrome renders from, so a gated SSR document never shows "Sign in" and the screens do not read the session again. */
+function seedSession(queryClient: QueryClient, session: SessionUser): void {
+  if (queryClient.getQueryData(sessionKeys.session) == null) queryClient.setQueryData(sessionKeys.session, session);
+}
+
+export async function requireSession(queryClient: QueryClient, returnTo: string): Promise<SessionUser> {
   // `requireAuth`'s generic param is invariant over the branded `staleTime` in `queryOptions<T>()`, so the
   // options are widened to the parameter's own type and the (runtime-correct) result narrowed back.
   const query = requiredSessionQueryOptions() as Parameters<typeof requireAuth>[1];
-  return requireAuth(queryClient, query, { loginTo: '/login', returnTo }) as Promise<SessionUser>;
+  const session = (await requireAuth(queryClient, query, { loginTo: '/login', returnTo })) as SessionUser;
+  seedSession(queryClient, session);
+  return session;
 }
 
 /** The deployment's access mode, failing closed to `private` and never rejecting — for routes outside the gate. */
@@ -78,8 +85,7 @@ export async function requireReaderAccess(queryClient: QueryClient, returnTo: st
   const session = requiredSessionQueryOptions() as Parameters<typeof requireAuth>[1];
   const gate = await requireAccess(queryClient, { access: authApi.accessQueryOptions(), session, loginTo: '/login', returnTo });
   if (gate.mode === 'public') return gate.mode;
-  // Seeds the nullable read the chrome renders from, so a signed-in reader's SSR document never shows "Sign in".
-  if (queryClient.getQueryData(sessionKeys.session) == null) queryClient.setQueryData(sessionKeys.session, gate.session as SessionUser);
+  seedSession(queryClient, gate.session as SessionUser);
   return gate.mode;
 }
 
