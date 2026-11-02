@@ -52,14 +52,10 @@ export class CatalogService {
     /** Written raw and fully qualified: drizzle renders embedded columns unqualified inside sql`` fragments, silently mis-correlating the subquery. */
     const chapterCount = sql<number>`(SELECT COUNT(*)::int FROM published_chapters WHERE published_chapters.novel_id = novels.id)`;
 
-    const [total] = await this.db.select({ value: count() }).from(schema.novels).where(filters);
-    const rows = await this.db
-      .select({ novel: schema.novels, chapterCount })
-      .from(schema.novels)
-      .where(filters)
-      .orderBy(this.buildOrder(query))
-      .limit(query.limit)
-      .offset(query.offset);
+    const [[total], rows] = await Promise.all([
+      this.db.select({ value: count() }).from(schema.novels).where(filters),
+      this.db.select({ novel: schema.novels, chapterCount }).from(schema.novels).where(filters).orderBy(this.buildOrder(query)).limit(query.limit).offset(query.offset),
+    ]);
 
     const items = rows.map(row => this.toSummary(row.novel, row.chapterCount));
     return { total: total?.value ?? 0, limit: query.limit, offset: query.offset, items };

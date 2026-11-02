@@ -94,13 +94,14 @@ export class ReaderService {
 
   /** The only listing of non-public novels; two queries because grants live in this database while organisation membership is identity's to say. */
   async listShared(principal: AuthPrincipal): Promise<LibraryItem[]> {
-    const granted = await this.db
-      .select({ novel: schema.novels })
-      .from(schema.novelGrants)
-      .innerJoin(schema.novels, eq(schema.novelGrants.novelId, schema.novels.id))
-      .where(and(eq(schema.novelGrants.subjectId, principal.sub), eq(schema.novels.visibility, 'RESTRICTED')));
-
-    const orgShared = await this.db.select({ novel: schema.novels }).from(schema.novels).where(eq(schema.novels.visibility, 'ORGANISATION'));
+    const [granted, orgShared] = await Promise.all([
+      this.db
+        .select({ novel: schema.novels })
+        .from(schema.novelGrants)
+        .innerJoin(schema.novels, eq(schema.novelGrants.novelId, schema.novels.id))
+        .where(and(eq(schema.novelGrants.subjectId, principal.sub), eq(schema.novels.visibility, 'RESTRICTED'))),
+      this.db.select({ novel: schema.novels }).from(schema.novels).where(eq(schema.novels.visibility, 'ORGANISATION')),
+    ]);
 
     const candidates = [...granted, ...orgShared].map(row => row.novel);
     const readable = await this.accessService.readableIds(candidates, principal);

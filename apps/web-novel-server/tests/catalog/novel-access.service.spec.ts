@@ -8,6 +8,8 @@ import { FakeDatabaseService } from '@shadow-library/modules/testing';
 
 import { NovelAccessService } from '@modules/catalog/novel-access.service';
 
+import { roundTrips, scriptedPostgres } from '../scripted-postgres';
+
 const MEMBER = { kind: 'user', sub: '7' } as AuthPrincipal;
 const ORGANISATION_NOVEL = { id: 1n, visibility: 'ORGANISATION' as const, organisationId: '12' };
 
@@ -39,5 +41,34 @@ describe('NovelAccessService', () => {
     const service = new NovelAccessService(new FakeDatabaseService({}), new IdentityClient(identity.fetch));
 
     expect(await service.canRead(ORGANISATION_NOVEL, MEMBER)).toBe(false);
+  });
+
+  describe('readableIds', () => {
+    it('should ask identity about every organisation at once, alongside the grant query', async () => {
+      let inFlight = 0;
+      let peak = 0;
+      const identity = new FakeServiceFetch(async call => {
+        peak = Math.max(peak, ++inFlight);
+        await new Promise(resolve => setImmediate(resolve));
+        inFlight--;
+        return jsonResponse(200, { member: call.url.includes('/organisations/12/') });
+      });
+      const postgres = scriptedPostgres([[{ novelId: 4n }]]);
+      const service = new NovelAccessService(new FakeDatabaseService({ postgres: postgres.client }), new IdentityClient(identity.fetch));
+      const subjects = [
+        ORGANISATION_NOVEL,
+        { id: 2n, visibility: 'ORGANISATION' as const, organisationId: '13' },
+        { id: 3n, visibility: 'ORGANISATION' as const, organisationId: '12' },
+        { id: 4n, visibility: 'RESTRICTED' as const, organisationId: null },
+        { id: 5n, visibility: 'PUBLIC' as const, organisationId: null },
+      ];
+
+      const readable = await service.readableIds(subjects, MEMBER);
+
+      expect([...readable].sort()).toEqual([1n, 3n, 4n, 5n]);
+      expect(identity.calls).toHaveLength(2);
+      expect(peak).toBe(2);
+      expect(roundTrips(postgres)).toBe(1);
+    });
   });
 });
