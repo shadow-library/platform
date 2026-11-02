@@ -1,4 +1,4 @@
-import { and, between, eq, isNotNull, or } from 'drizzle-orm';
+import { and, between, count, eq, isNotNull, or } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError } from '@shadow-library/common';
 
@@ -190,8 +190,8 @@ export class ProgressionService {
     const today = parseLocalDate(date);
     if (!today) throw AppError.internal(`ProgressionService received a malformed calendar date '${date}'`);
     const since = formatLocalDate(addDays(today, -(RESCHEDULE_REASON_WINDOW_DAYS - 1)));
-    const rows = await tx
-      .select({ id: schema.rescheduleEvents.id })
+    const [row] = await tx
+      .select({ total: count() })
       .from(schema.rescheduleEvents)
       .where(
         and(
@@ -200,6 +200,6 @@ export class ProgressionService {
           or(isNotNull(schema.rescheduleEvents.reasonTag), isNotNull(schema.rescheduleEvents.reasonNote)),
         ),
       );
-    return rows.length;
+    return row?.total ?? 0;
   }
 }

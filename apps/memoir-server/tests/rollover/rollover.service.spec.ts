@@ -21,6 +21,7 @@ class FakeRolloverStore {
   readonly streaks = new Map<bigint, StreakState>();
   readonly quests: Quest.Row[] = [];
   serializedRuns = 0;
+  readonly calls = new Map<string, number>();
   private nextId = 100n;
 
   constructor(account: Partial<Account.Row>) {
@@ -37,10 +38,10 @@ class FakeRolloverStore {
     } as Account.Row;
   }
 
-  addDailyQuest(): void {
+  addDailyQuest(id = QUEST_ID): void {
     const recurrence = { frequency: 'daily', interval: 1, startDate: { year: 2026, month: 1, day: 1 }, end: { kind: 'never' } };
     this.quests.push({
-      id: QUEST_ID,
+      id,
       accountId: ACCOUNT_ID,
       name: 'Walk',
       strictness: 'routine',
@@ -88,13 +89,23 @@ class FakeRolloverStore {
       },
       listActiveQuests: async () => this.quests.filter(quest => quest.active),
       listQuestLogs: async (_tx: unknown, _accountId: bigint, from: string, to: string) => this.questLogs.filter(log => log.date >= from && log.date <= to),
-      insertMiss: async (_tx: unknown, values: Partial<QuestLog.Row> & { questId: bigint; date: string }) => {
-        if (this.questLogs.some(log => log.questId === values.questId && log.date === values.date)) return null;
-        const log = { id: this.id(), ...values } as QuestLog.Row;
-        this.questLogs.push(log);
-        return log;
+      insertMisses: async (_tx: unknown, rows: (Partial<QuestLog.Row> & { questId: bigint; date: string })[]) => {
+        this.count('insertMisses');
+        return rows.flatMap(values => {
+          if (this.questLogs.some(log => log.questId === values.questId && log.date === values.date)) return [];
+          const log = { id: this.id(), ...values } as QuestLog.Row;
+          this.questLogs.push(log);
+          return [log];
+        });
       },
-      lockStreak: async (_tx: unknown, _accountId: bigint, questId: bigint) => this.streaks.get(questId) ?? EMPTY_STREAK_STATE,
+      lockStreak: async (_tx: unknown, _accountId: bigint, questId: bigint) => {
+        this.count('lockStreak');
+        return this.streaks.get(questId) ?? EMPTY_STREAK_STATE;
+      },
+      lockStreaks: async (_tx: unknown, _accountId: bigint, questIds: bigint[]) => {
+        this.count('lockStreaks');
+        return new Map(questIds.flatMap(questId => (this.streaks.has(questId) ? [[questId, this.streaks.get(questId)] as const] : [])));
+      },
       writeStreak: async (_tx: unknown, _accountId: bigint, questId: bigint, _date: string, state: StreakState) => {
         this.streaks.set(questId, state);
       },
@@ -127,6 +138,10 @@ class FakeRolloverStore {
       rolloverAt: null,
       ...values,
     } as DailyState.Row;
+  }
+
+  private count(method: string): void {
+    this.calls.set(method, (this.calls.get(method) ?? 0) + 1);
   }
 
   private id(): bigint {
@@ -180,6 +195,34 @@ describe('RolloverService day walk', () => {
     await service.catchUp(ACCOUNT_ID);
 
     expect(closedDays).toEqual(['2026-03-10', '2026-03-11', '2026-03-12']);
+  });
+
+  it('should record a closed day’s misses and lock their streaks in one statement each, however many quests went unlogged', async () => {
+    const store = new FakeRolloverStore({});
+    for (let offset = 0n; offset < 6n; offset++) store.addDailyQuest(QUEST_ID + offset);
+    store.streaks.set(QUEST_ID + 1n, { ...EMPTY_STREAK_STATE, currentDays: 4, longestDays: 4 });
+    const { service } = harness(store);
+
+    at('2026-03-10');
+    await service.catchUp(ACCOUNT_ID);
+    store.questLogs.push({
+      id: 1n,
+      accountId: ACCOUNT_ID,
+      questId: QUEST_ID + 5n,
+      date: '2026-03-10',
+      state: 'completed',
+      strictness: 'routine',
+      crownSliceWeight: '1.00',
+    } as QuestLog.Row);
+    at('2026-03-11');
+    await service.catchUp(ACCOUNT_ID);
+
+    expect(store.dailyStates.get('2026-03-10')?.missedCount).toBe(5);
+    expect(store.questLogs.filter(log => log.state === 'missed').map(log => log.questId)).toEqual([10n, 11n, 12n, 13n, 14n]);
+    expect(store.streaks.get(QUEST_ID + 1n)?.currentDays).toBe(0);
+    expect(store.calls.get('insertMisses')).toBe(1);
+    expect(store.calls.get('lockStreaks')).toBe(1);
+    expect(store.calls.get('lockStreak')).toBeUndefined();
   });
 
   it('should date the last activity to the prepared day a quest was completed on when that day closes', async () => {

@@ -14,6 +14,7 @@ import {
   crownWeightFor,
   currentRuleset,
   daysBetween,
+  EMPTY_STREAK_STATE,
   evaluateComebackArming,
   formatLocalDate,
   grantStreakShield,
@@ -255,25 +256,34 @@ export class RolloverService implements OnModuleInit {
 
   private async recordMisses(tx: DatabaseTransaction, context: DayContext, scheduled: Quest.Row[], resolved: Map<bigint, QuestLog.Row>): Promise<QuestLog.Row[]> {
     const { ruleset, account, date } = context;
-    const inserted: QuestLog.Row[] = [];
-
-    for (const quest of scheduled) {
-      if (resolved.has(quest.id)) continue;
-      const log = await this.repository.insertMiss(tx, {
+    const unresolved = scheduled.filter(quest => !resolved.has(quest.id));
+    const landed = await this.repository.insertMisses(
+      tx,
+      unresolved.map(quest => ({
         accountId: account.id,
         questId: quest.id,
         date,
-        state: 'missed',
+        state: 'missed' as const,
         statAffinity: quest.statAffinity,
         strictness: quest.strictness,
         intensityModeAtLog: context.intensityMode,
         crownSliceWeight: crownWeightFor(ruleset, quest.strictness).toFixed(2),
         rulesetVersion: ruleset.version,
-      });
-      if (!log) continue;
-      inserted.push(log);
+      })),
+    );
+    const landedByQuest = new Map(landed.map(log => [log.questId, log]));
+    const missed = unresolved.flatMap(quest => {
+      const log = landedByQuest.get(quest.id);
+      return log ? [{ quest, log }] : [];
+    });
+    const priors = await this.repository.lockStreaks(
+      tx,
+      account.id,
+      missed.map(({ quest }) => quest.id),
+    );
 
-      const prior = await this.repository.lockStreak(tx, account.id, quest.id);
+    for (const { quest } of missed) {
+      const prior = priors.get(quest.id) ?? EMPTY_STREAK_STATE;
       const transition = applyStreakEvent(ruleset, prior, {
         state: 'missed',
         strictness: quest.strictness,
@@ -288,7 +298,7 @@ export class RolloverService implements OnModuleInit {
       );
     }
 
-    return inserted;
+    return missed.map(({ log }) => log);
   }
 
   /** Every break of the day is charged through one `occurrenceKey` per (quest, date), so an engine-written miss and the break it represents collapse into a single deduction. */
@@ -512,17 +522,26 @@ export class RolloverService implements OnModuleInit {
       byQuest.set(log.questId, dates);
     }
 
-    const candidates: { questId: string; preAbsenceStreakDays: number; createdOrder: number; shields: number }[] = [];
+    const runs: { quest: Quest.Row; run: number }[] = [];
     for (const quest of quests) {
       const dates = byQuest.get(quest.id);
       if (!dates) continue;
       let run = 0;
       while (dates.has(formatLocalDate(addDays(lastActive, -run)))) run += 1;
-      if (run === 0) continue;
-      const streak = await this.repository.lockStreak(tx, account.id, quest.id);
-      candidates.push({ questId: String(quest.id), preAbsenceStreakDays: run, createdOrder: Number(quest.id), shields: streak.shields });
+      if (run > 0) runs.push({ quest, run });
     }
-    return candidates;
+
+    const streaks = await this.repository.lockStreaks(
+      tx,
+      account.id,
+      runs.map(({ quest }) => quest.id),
+    );
+    return runs.map(({ quest, run }) => ({
+      questId: String(quest.id),
+      preAbsenceStreakDays: run,
+      createdOrder: Number(quest.id),
+      shields: (streaks.get(quest.id) ?? EMPTY_STREAK_STATE).shields,
+    }));
   }
 
   private async armComeback(tx: DatabaseTransaction, context: DayContext, history: QuestLog.Row[], momentum: MomentumBucket, returnerFired: boolean): Promise<boolean> {

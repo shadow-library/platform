@@ -1,3 +1,5 @@
+import '@server/bootstrap';
+
 import { describe, expect, it } from 'bun:test';
 
 import { AppError, Config } from '@shadow-library/common';
