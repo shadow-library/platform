@@ -31,6 +31,7 @@ const LINE_BREAK = /\r\n|\r|\n/;
 export class EventStream {
   /** A connected stream never ends on its own, and Fastify's `close()` waits for it: the router ends these first. */
   private static readonly openStreams = new WeakMap<HttpServer, Set<EventStream>>();
+  private static readonly streamResponses = new WeakSet<HttpResponse>();
 
   private readonly closeListeners = new Set<() => void>();
   private readonly heartbeat?: ReturnType<typeof setInterval>;
@@ -44,6 +45,7 @@ export class EventStream {
   ) {
     const { heartbeatMs = DEFAULT_HEARTBEAT_MS, maxLifetimeMs = DEFAULT_MAX_LIFETIME_MS, retryMs = DEFAULT_RETRY_MS } = options;
     response.hijack();
+    EventStream.streamResponses.add(response);
     const headers = { ...response.getHeaders(), 'content-type': 'text/event-stream; charset=utf-8', 'cache-control': 'no-cache, no-transform', 'x-accel-buffering': 'no' };
     delete headers['content-length'];
     response.raw.writeHead(200, headers as Record<string, string | string[]>);
@@ -61,6 +63,11 @@ export class EventStream {
 
   static open(response: HttpResponse, options: EventStreamOptions = {}): EventStream {
     return new EventStream(response, options);
+  }
+
+  /** Whether a stream was opened on this reply: its request then lasts as long as the stream, so request timings do not describe it. */
+  static isStream(response: HttpResponse): boolean {
+    return EventStream.streamResponses.has(response);
   }
 
   static closeAll(server: HttpServer): void {

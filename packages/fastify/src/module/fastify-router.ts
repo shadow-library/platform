@@ -103,6 +103,8 @@ interface RouteArtifacts {
   transformers: Transformers;
 }
 
+/** The levels at which `logger.http` writes: below them the request log is a no-op, so its metadata (body clone, masking, redaction) is not built. */
+const REQUEST_LOG_LEVELS = new Set(['http', 'debug', 'silly']);
 const httpMethods = Object.values(HttpMethod).filter(m => m !== HttpMethod.ALL) as Exclude<HttpMethod, HttpMethod.ALL>[];
 const DEFAULT_ARTIFACTS: RouteArtifacts = { masks: {}, transformers: {} };
 const isClassSchema = (schema: object): schema is SchemaClass => typeof schema === 'function' || (Array.isArray(schema) && typeof schema[0] === 'function');
@@ -271,6 +273,7 @@ export class FastifyRouter extends Dispatcher {
       const startTime = process.hrtime();
 
       res.raw.on('finish', () => {
+        if (!REQUEST_LOG_LEVELS.has(Config.get('log.level'))) return;
         const isLoggingDisabled = this.context.get('DISABLE_REQUEST_LOGGING') ?? false;
         if (isLoggingDisabled) return;
 

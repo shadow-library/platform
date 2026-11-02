@@ -96,13 +96,13 @@ describe('EventStream', () => {
   });
 
   it('should write a heartbeat comment while the stream is idle', async () => {
-    const { read } = await openStream({ heartbeatMs: 50 });
+    const { read } = await openStream({ heartbeatMs: 5 });
 
     expect(await read(text => text.includes(': heartbeat'))).toContain(': heartbeat\n\n');
   });
 
   it('should end the stream once its maximum lifetime passes', async () => {
-    const { read, stream } = await openStream({ maxLifetimeMs: 100, heartbeatMs: 0 });
+    const { read, stream } = await openStream({ maxLifetimeMs: 5, heartbeatMs: 0 });
 
     await read(() => false, 400).catch(() => undefined);
 
@@ -116,7 +116,8 @@ describe('EventStream', () => {
     let closes = 0;
     stream().onClose(() => closes++);
 
-    await Bun.sleep(150);
+    expect(stream().send({ data: 'still-open' })).toBe(true);
+    await read(text => text.includes('still-open'));
     expect(closes).toBe(0);
 
     disconnect();
@@ -124,6 +125,15 @@ describe('EventStream', () => {
 
     expect(closes).toBe(1);
     expect(stream().closed).toBe(true);
+  });
+
+  it('should report the replies it was opened on as streams', async () => {
+    let streamReply: HttpResponse | undefined;
+    const { read } = await openStream({ heartbeatMs: 0 }, reply => void (streamReply = reply));
+    await read(text => text.includes('retry:'));
+
+    expect(EventStream.isStream(streamReply as HttpResponse)).toBe(true);
+    expect(EventStream.isStream({} as HttpResponse)).toBe(false);
   });
 
   it('should call a close listener registered after the stream has already closed', async () => {
