@@ -1,8 +1,13 @@
-import { describe, expect, it, jest } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, jest, spyOn } from 'bun:test';
 
 import { AppError, Task } from '@shadow-library/common';
 
 describe('Task', () => {
+  let setTimeoutSpy: ReturnType<typeof spyOn>;
+
+  beforeEach(() => (setTimeoutSpy = spyOn(global, 'setTimeout').mockImplementation(((callback: () => void) => callback()) as any)));
+  afterEach(() => setTimeoutSpy.mockRestore());
+
   it('should execute successfully without retry', async () => {
     const fn = jest.fn().mockResolvedValue('done');
     const result = await Task.create(fn).name('Mock').delay(10).execute();
@@ -19,6 +24,7 @@ describe('Task', () => {
     expect(fn).toHaveBeenCalledTimes(2);
     expect(onRetry).toHaveBeenCalledTimes(1);
     expect(onRetry).toHaveBeenCalledWith(error, 1);
+    expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 10);
   });
 
   it('should fail after all retries', async () => {

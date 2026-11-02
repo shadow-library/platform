@@ -44,7 +44,7 @@ describe('APIRequest redirects', () => {
           case 'cross-origin':
             return redirect(`${peerURL}/echo`, 302);
           case 'slow':
-            await Bun.sleep(80);
+            await Bun.sleep(5);
             return redirect(`/slow/${hop + 1}`, 302);
           default:
             return echo(request);
@@ -116,7 +116,7 @@ describe('APIRequest redirects', () => {
 
   it('should apply the total timeout across the whole redirect chain rather than per hop', async () => {
     const failure = await APIRequest.get(`${originURL}/slow/1`)
-      .timeout(150)
+      .timeout(12)
       .execute()
       .catch((error: unknown) => error);
     expect(AppError.is(failure, ErrorCode.API_REQUEST_TIMEOUT)).toBe(true);

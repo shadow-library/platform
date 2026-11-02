@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
 import { performance } from 'node:perf_hooks';
 
 import { AppError, LRUCache } from '@shadow-library/common';
@@ -235,6 +235,16 @@ describe('LRUCache', () => {
   });
 
   describe('TTL (Time To Live)', () => {
+    let now = 0;
+    const advance = (ms: number): void => void (now += ms);
+
+    beforeEach(() => {
+      now = 1000;
+      spyOn(performance, 'now').mockImplementation(() => now);
+    });
+
+    afterEach(() => mock.restore());
+
     describe('constructor with ttl option', () => {
       it('should initialize cache with TTL option', () => {
         const ttlCache = new LRUCache(3, { ttl: 1000 });
@@ -266,7 +276,7 @@ describe('LRUCache', () => {
         ttlCache.set('key1', 'value1');
         const firstTtl = ttlCache['ttls'][0] as number;
 
-        Bun.sleepSync(2);
+        advance(2);
 
         ttlCache.set('key1', 'updated');
         const secondTtl = ttlCache['ttls'][0];
@@ -284,25 +294,25 @@ describe('LRUCache', () => {
         expect(value).toBe('value1');
       });
 
-      it('should return undefined and remove item if TTL has expired', async () => {
+      it('should return undefined and remove item if TTL has expired', () => {
         const ttlCache = new LRUCache(3, { ttl: 2 });
         ttlCache.set('key1', 'value1');
 
-        await Bun.sleep(3);
+        advance(3);
 
         const value = ttlCache.get('key1');
         expect(value).toBeUndefined();
         expect(ttlCache.has('key1')).toBe(false);
       });
 
-      it('should handle mixed expired and non-expired items', async () => {
+      it('should handle mixed expired and non-expired items', () => {
         const ttlCache = new LRUCache(3, { ttl: 3 });
         ttlCache.set('key1', 'value1');
 
-        await Bun.sleep(2);
+        advance(2);
         ttlCache.set('key2', 'value2');
 
-        await Bun.sleep(1);
+        advance(2);
 
         expect(ttlCache.get('key1')).toBeUndefined();
         expect(ttlCache.get('key2')).toBe('value2');
@@ -318,11 +328,11 @@ describe('LRUCache', () => {
         expect(value).toBe('value1');
       });
 
-      it('should return undefined and remove item if TTL has expired', async () => {
+      it('should return undefined and remove item if TTL has expired', () => {
         const ttlCache = new LRUCache(3, { ttl: 2 });
         ttlCache.set('key1', 'value1');
 
-        await Bun.sleep(3);
+        advance(3);
 
         const value = ttlCache.peek('key1');
         expect(value).toBeUndefined();
@@ -338,11 +348,11 @@ describe('LRUCache', () => {
         expect(ttlCache.has('key1')).toBe(true);
       });
 
-      it('should return false and remove item if TTL has expired', async () => {
+      it('should return false and remove item if TTL has expired', () => {
         const ttlCache = new LRUCache(3, { ttl: 2 });
         ttlCache.set('key1', 'value1');
 
-        await Bun.sleep(3);
+        advance(3);
 
         expect(ttlCache.has('key1')).toBe(false);
       });
@@ -353,16 +363,16 @@ describe('LRUCache', () => {
         const ttlCache = new LRUCache(3, { ttl: 0 });
         ttlCache.set('key1', 'value1');
 
-        Bun.sleepSync(2);
+        advance(2);
         const value = ttlCache.get('key1');
         expect(value).toBe('value1');
       });
 
-      it('should handle very short TTL', async () => {
+      it('should handle very short TTL', () => {
         const ttlCache = new LRUCache(3, { ttl: 1 });
         ttlCache.set('key1', 'value1');
 
-        await Bun.sleep(5);
+        advance(5);
 
         expect(ttlCache.get('key1')).toBeUndefined();
       });
@@ -387,11 +397,10 @@ describe('LRUCache', () => {
         const ttlCache = new LRUCache(3, { ttl: 100 });
         ttlCache.set('key1', 'value1');
 
-        Bun.sleepSync(90);
+        advance(90);
         ttlCache.set('key1', 'updated');
 
-        // Past the original 100ms expiry yet inside the refreshed window; small sleeps drift the least under load
-        Bun.sleepSync(20);
+        advance(20);
 
         expect(ttlCache.get('key1')).toBe('updated');
       });
@@ -402,12 +411,12 @@ describe('LRUCache', () => {
         ttlCache.set('key2', 'value2');
         ttlCache.set('key3', 'value3');
 
-        Bun.sleepSync(30);
+        advance(30);
 
         // get() moves key1 to the top but does not reset its TTL
         ttlCache.get('key1');
 
-        Bun.sleepSync(30);
+        advance(30);
 
         expect(ttlCache.get('key1')).toBeUndefined();
       });

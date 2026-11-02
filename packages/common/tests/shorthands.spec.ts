@@ -17,7 +17,7 @@ describe('Shorthands', () => {
     });
 
     it('should return the result of the promise', async () => {
-      const result = await tryCatch(() => new Promise(resolve => setTimeout(() => resolve('success'), 10)));
+      const result = await tryCatch(() => new Promise(resolve => setTimeout(() => resolve('success'), 0)));
       expect(result).toStrictEqual({ success: true, data: 'success' });
     });
 
@@ -29,7 +29,7 @@ describe('Shorthands', () => {
 
     it('should return the error if the promise rejects', async () => {
       const error = new Error('Test error');
-      const result = await tryCatch(() => new Promise((_, reject) => setTimeout(() => reject(error), 10)));
+      const result = await tryCatch(() => new Promise((_, reject) => setTimeout(() => reject(error), 0)));
       expect(result).toStrictEqual({ success: false, error });
     });
   });
