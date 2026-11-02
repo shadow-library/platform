@@ -39,7 +39,18 @@ export interface GrantOutcome {
   leveledUp: boolean;
 }
 
+interface HeroTotals {
+  level: number;
+  totalXp: bigint;
+  coins: number;
+  statDiscipline: number;
+  statBody: number;
+  statWealth: number;
+  statMind: number;
+}
+
 interface AppliedGrant {
+  account: HeroTotals;
   outcome: GrantOutcome;
   levelUps: GrantIntent[];
 }
@@ -53,19 +64,22 @@ interface AppliedGrant {
 export class HeroLedger {
   constructor(private readonly telemetry: TelemetryService) {}
 
+  /** Reads the account `FOR UPDATE` once and carries it forward: under that lock only this loop writes it, so a per-intent re-read returns what the last intent wrote. */
   async grant(tx: DatabaseTransaction, accountId: bigint, intents: GrantIntent[]): Promise<GrantOutcome[]> {
     const outcomes: GrantOutcome[] = [];
+    if (intents.length === 0) return outcomes;
+
+    let account = await this.lockTotals(tx, accountId);
     for (const intent of intents) {
-      const applied = await this.apply(tx, accountId, intent, true);
+      const applied = await this.apply(tx, accountId, account, intent, true);
+      account = applied.account;
       outcomes.push(applied.outcome);
-      for (const levelUp of applied.levelUps) await this.apply(tx, accountId, levelUp, false);
+      for (const levelUp of applied.levelUps) account = (await this.apply(tx, accountId, account, levelUp, false)).account;
     }
     return outcomes;
   }
 
-  /** `deriveLevelUps` is false for the level-up events this method itself produces, so recursion is one level deep. */
-  private async apply(tx: DatabaseTransaction, accountId: bigint, intent: GrantIntent, deriveLevelUps: boolean): Promise<AppliedGrant> {
-    const ruleset = currentRuleset();
+  private async lockTotals(tx: DatabaseTransaction, accountId: bigint): Promise<HeroTotals> {
     const [account] = await tx
       .select({
         level: schema.accounts.level,
@@ -80,7 +94,12 @@ export class HeroLedger {
       .where(eq(schema.accounts.id, accountId))
       .for('update');
     if (!account) throw AppError.internal(`HeroLedger.grant addressed account '${accountId}' which does not exist`);
+    return account;
+  }
 
+  /** `deriveLevelUps` is false for the level-up events this method itself produces, so recursion is one level deep. */
+  private async apply(tx: DatabaseTransaction, accountId: bigint, account: HeroTotals, intent: GrantIntent, deriveLevelUps: boolean): Promise<AppliedGrant> {
+    const ruleset = currentRuleset();
     const xpDelta = intent.xpDelta ?? 0;
     const coinsDelta = intent.coinsDelta ?? 0;
     const statDelta = intent.statDelta ?? 0;
@@ -111,20 +130,20 @@ export class HeroLedger {
       .onConflictDoNothing({ target: [schema.heroEvents.accountId, schema.heroEvents.dedupeKey] })
       .returning({ id: schema.heroEvents.id });
 
-    if (!event) return { outcome: await this.converge(tx, accountId, intent.dedupeKey), levelUps: [] };
+    if (!event) return { account, outcome: await this.converge(tx, accountId, intent.dedupeKey), levelUps: [] };
 
+    const next: HeroTotals = {
+      level,
+      totalXp,
+      coins,
+      statDiscipline: account.statDiscipline + (intent.statAffinity === 'discipline' ? statDelta : 0),
+      statBody: account.statBody + (intent.statAffinity === 'body' ? statDelta : 0),
+      statWealth: account.statWealth + (intent.statAffinity === 'wealth' ? statDelta : 0),
+      statMind: account.statMind + (intent.statAffinity === 'mind' ? statDelta : 0),
+    };
     await tx
       .update(schema.accounts)
-      .set({
-        totalXp,
-        coins,
-        level,
-        statDiscipline: account.statDiscipline + (intent.statAffinity === 'discipline' ? statDelta : 0),
-        statBody: account.statBody + (intent.statAffinity === 'body' ? statDelta : 0),
-        statWealth: account.statWealth + (intent.statAffinity === 'wealth' ? statDelta : 0),
-        statMind: account.statMind + (intent.statAffinity === 'mind' ? statDelta : 0),
-        updatedAt: new Date(),
-      })
+      .set({ ...next, updatedAt: new Date() })
       .where(eq(schema.accounts.id, accountId));
 
     const levelUps: GrantIntent[] = [];
@@ -160,7 +179,7 @@ export class HeroLedger {
       leveledUp,
     });
 
-    return { outcome, levelUps };
+    return { account: next, outcome, levelUps };
   }
 
   private async converge(tx: DatabaseTransaction, accountId: bigint, dedupeKey: string): Promise<GrantOutcome> {

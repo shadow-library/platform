@@ -1,4 +1,4 @@
-import { and, asc, between, eq, isNull, lte, min, sql } from 'drizzle-orm';
+import { and, asc, between, eq, inArray, isNull, lte, min, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { DatabaseService } from '@shadow-library/modules';
 
@@ -11,6 +11,7 @@ import {
   type PrimaryDatabase,
   type Quest,
   type QuestLog,
+  type QuestStreak,
   type RecoveryQuest,
   type ReturnerEvent,
   schema,
@@ -54,6 +55,16 @@ export interface ReturnerEventDraft {
   shieldTargetQuestId: bigint | null;
   shieldPending: boolean;
   intensityMode: Account.IntensityMode;
+}
+
+function toStreakState(row: QuestStreak.Row): StreakState {
+  return {
+    currentDays: row.currentRunDays,
+    longestDays: row.bestRunDays,
+    shields: row.shieldsAvailable,
+    completionsTowardShield: row.completionsTowardShield,
+    pendingShieldGrant: row.pendingShieldGrant,
+  };
 }
 
 /**
@@ -171,14 +182,14 @@ export class RolloverRepository {
     return { firstLogDate: log?.date ?? null, firstQuestAt: quest?.createdAt ?? null };
   }
 
-  /** A system miss never displaces a user's own outcome: the occurrence unique constraint absorbs the collision. */
-  async insertMiss(tx: DatabaseTransaction, values: typeof schema.questLogs.$inferInsert): Promise<QuestLog.Row | null> {
-    const [log] = await tx
+  /** A system miss never displaces a user's own outcome: the occurrence unique constraint absorbs the collision, so only the misses that landed come back. */
+  async insertMisses(tx: DatabaseTransaction, values: (typeof schema.questLogs.$inferInsert)[]): Promise<QuestLog.Row[]> {
+    if (values.length === 0) return [];
+    return tx
       .insert(schema.questLogs)
       .values(values)
       .onConflictDoNothing({ target: [schema.questLogs.accountId, schema.questLogs.questId, schema.questLogs.date] })
       .returning();
-    return log ?? null;
   }
 
   async lockStreak(tx: DatabaseTransaction, accountId: bigint, questId: bigint): Promise<StreakState> {
@@ -187,14 +198,18 @@ export class RolloverRepository {
       .from(schema.questStreaks)
       .where(and(eq(schema.questStreaks.accountId, accountId), eq(schema.questStreaks.questId, questId)))
       .for('update');
-    if (!row) return EMPTY_STREAK_STATE;
-    return {
-      currentDays: row.currentRunDays,
-      longestDays: row.bestRunDays,
-      shields: row.shieldsAvailable,
-      completionsTowardShield: row.completionsTowardShield,
-      pendingShieldGrant: row.pendingShieldGrant,
-    };
+    return row ? toStreakState(row) : EMPTY_STREAK_STATE;
+  }
+
+  /** A quest with no `quest_streaks` row yet is absent from the map; callers read it as `EMPTY_STREAK_STATE`. */
+  async lockStreaks(tx: DatabaseTransaction, accountId: bigint, questIds: bigint[]): Promise<Map<bigint, StreakState>> {
+    if (questIds.length === 0) return new Map();
+    const rows = await tx
+      .select()
+      .from(schema.questStreaks)
+      .where(and(eq(schema.questStreaks.accountId, accountId), inArray(schema.questStreaks.questId, questIds)))
+      .for('update');
+    return new Map(rows.map(row => [row.questId, toStreakState(row)]));
   }
 
   async writeStreak(tx: DatabaseTransaction, accountId: bigint, questId: bigint, date: string, state: StreakState): Promise<void> {
