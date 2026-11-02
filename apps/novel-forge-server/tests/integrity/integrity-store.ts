@@ -327,7 +327,7 @@ export function integrityStore() {
         ...resolved(() => read()),
         innerJoin: () => ({
           where: async (where: SQL) =>
-            bridgeCandidates({ drafts: rows(schema.drafts), reviews: find(schema.finalizeReviews, { with: { items: true } }), entities: rows(schema.entities) }, where),
+            bridgeCandidates({ drafts: rows(schema.drafts), reviews: find(schema.finalizeReviews, { where, with: { items: true } }), entities: rows(schema.entities) }),
         }),
         where: (where: SQL) => ({
           ...resolved(() => read(where)),

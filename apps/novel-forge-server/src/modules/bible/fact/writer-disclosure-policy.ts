@@ -346,6 +346,15 @@ export function writerDisclosurePolicy(sources: WriterDisclosureSources): Writer
  * (and any epilogue after it), whose plan may state the ending's beats. An `overlay` stands in for the chapter's stored plan.
  */
 export async function loadWriterDisclosureSources(db: DisclosureDb, projectId: bigint, chapter: number, overlay?: PlanOverlay): Promise<WriterDisclosureSources> {
+  return (await loadDisclosureRecords(db, projectId, chapter, overlay)).sources;
+}
+
+interface DisclosureRecords {
+  sources: WriterDisclosureSources;
+  project: { ending: string | null; endingQuestion: string | null } | undefined;
+}
+
+async function loadDisclosureRecords(db: DisclosureDb, projectId: bigint, chapter: number, overlay?: PlanOverlay): Promise<DisclosureRecords> {
   const briefs = schema.briefs;
   const lockedFacts = await loadWriterForbiddenFacts(db, projectId, chapter, overlay);
   const project = await db.query.projects.findFirst({ columns: { ending: true, endingQuestion: true }, where: eq(schema.projects.id, projectId) });
@@ -375,7 +384,7 @@ export async function loadWriterDisclosureSources(db: DisclosureDb, projectId: b
     .sort((left, right) => left.ordinal - right.ordinal)
     .map(volume => ({ volumeKey: volume.volumeKey, title: volume.title, objective: volume.objective, body: volume.body }));
 
-  return {
+  const sources: WriterDisclosureSources = {
     chapter,
     lockedFacts,
     ending: !atEnding && present(project?.ending) ? project.ending : null,
@@ -385,6 +394,7 @@ export async function loadWriterDisclosureSources(db: DisclosureDb, projectId: b
     volumeOrdinals,
     currentVolumeOrdinal,
   };
+  return { sources, project };
 }
 
 /**
@@ -392,8 +402,7 @@ export async function loadWriterDisclosureSources(db: DisclosureDb, projectId: b
  * since an image prompt never needs them.
  */
 export async function loadArtDisclosurePolicy(db: DisclosureDb, projectId: bigint, chapter: number): Promise<WriterDisclosurePolicy> {
-  const sources = await loadWriterDisclosureSources(db, projectId, chapter);
-  const project = await db.query.projects.findFirst({ columns: { ending: true, endingQuestion: true }, where: eq(schema.projects.id, projectId) });
+  const { sources, project } = await loadDisclosureRecords(db, projectId, chapter);
   return writerDisclosurePolicy({
     ...sources,
     ending: present(project?.ending) ? project.ending : null,

@@ -1,4 +1,4 @@
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, inArray } from 'drizzle-orm';
 import { zipSync } from 'fflate';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
@@ -159,19 +159,17 @@ export class NovelPackageService {
   private async packCharacters(projectId: bigint, files: Record<string, Uint8Array>): Promise<ManifestCharacter[]> {
     const entities = await this.db.query.entities.findMany({
       where: and(eq(schema.entities.projectId, projectId), eq(schema.entities.type, 'character')),
+      columns: { id: true, entityKey: true, name: true, imagePath: true, notes: true, motivation: true },
       orderBy: [asc(schema.entities.id)],
     });
+    const galleries = await this.loadGalleries(entities.map(entity => entity.id));
 
     const characters: ManifestCharacter[] = [];
     for (const entity of entities) {
       const slug = slugify(entity.entityKey) || `character-${entity.id}`;
       const image = await this.packImage(files, entity.imagePath, `images/characters/${slug}`);
 
-      const gallery = await this.db
-        .select({ imagePath: schema.entityImages.imagePath, caption: schema.entityImages.caption })
-        .from(schema.entityImages)
-        .where(eq(schema.entityImages.entityId, entity.id))
-        .orderBy(asc(schema.entityImages.sortOrder), asc(schema.entityImages.id));
+      const gallery = galleries.get(entity.id) ?? [];
       const variants: ManifestCharacterVariant[] = [];
       for (const [index, row] of gallery.entries()) {
         const variantImage = await this.packImage(files, row.imagePath, `images/characters/${slug}-v${index + 1}`);
@@ -189,6 +187,22 @@ export class NovelPackageService {
       });
     }
     return characters;
+  }
+
+  private async loadGalleries(entityIds: bigint[]): Promise<Map<bigint, { imagePath: string; caption: string | null }[]>> {
+    const galleries = new Map<bigint, { imagePath: string; caption: string | null }[]>();
+    if (entityIds.length === 0) return galleries;
+    const rows = await this.db
+      .select({ entityId: schema.entityImages.entityId, imagePath: schema.entityImages.imagePath, caption: schema.entityImages.caption })
+      .from(schema.entityImages)
+      .where(inArray(schema.entityImages.entityId, entityIds))
+      .orderBy(asc(schema.entityImages.entityId), asc(schema.entityImages.sortOrder), asc(schema.entityImages.id));
+    for (const { entityId, ...row } of rows) {
+      const gallery = galleries.get(entityId) ?? [];
+      gallery.push(row);
+      galleries.set(entityId, gallery);
+    }
+    return galleries;
   }
 
   private async packScenes(projectId: bigint, files: Record<string, Uint8Array>, fileByChapter: Map<number, string>): Promise<ManifestScene[]> {

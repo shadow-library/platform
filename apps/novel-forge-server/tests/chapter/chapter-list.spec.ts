@@ -37,11 +37,13 @@ function fakeDatabase(chapters: ReturnType<typeof chapter>[], briefs: ReturnType
   return {
     query: {
       chapters: {
-        findMany: async (query: FindManyQuery & { limit?: number; offset?: number }) => {
+        findMany: async (query: FindManyQuery & { limit?: number; offset?: number; columns?: Record<string, boolean> }) => {
           const rows = queryRows(chapters, query);
           const offset = query.offset ?? 0;
           const limit = query.limit ?? rows.length;
-          return rows.slice(offset, offset + limit);
+          const columns = query.columns;
+          const selected = (row: ReturnType<typeof chapter>) => (columns ? Object.fromEntries(Object.entries(row).filter(([key]) => columns[key])) : row);
+          return rows.slice(offset, offset + limit).map(selected);
         },
         findFirst: async (query: FindManyQuery) => queryRows(chapters, query)[0],
       },
@@ -142,5 +144,12 @@ describe('ChapterService.list', () => {
     const chapters = Array.from({ length: 60 }, (_, i) => chapter(i + 1));
     const result = await service(fakeDatabase(chapters)).list(1n, query({ limit: 25 }));
     expect(result.totalPages).toBe(3);
+  });
+
+  it('should list chapter metadata without reading any chapter prose', async () => {
+    const chapters = [chapter(1, { content: 'x'.repeat(50_000) }), chapter(2)];
+    const result = await service(fakeDatabase(chapters)).list(1n, query());
+    expect(result.items.map(item => item.number)).toEqual([2, 1]);
+    expect(result.items.every(item => !('content' in item))).toBe(true);
   });
 });
