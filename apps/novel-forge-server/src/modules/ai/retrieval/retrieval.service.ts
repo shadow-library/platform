@@ -42,10 +42,35 @@ export class RetrievalService {
 
   // Excludes isolated chapters, whatever their provenance. Returns [] on embed failure.
   async searchProse(projectId: bigint, query: string, k = DEFAULT_PROSE_K): Promise<RetrievalHit[]> {
-    try {
-      const embedding = await this.embeddingService.embed(projectId, query);
-      if (!embedding) return [];
+    const embedding = await this.embedQuery(projectId, query, 'searchProse');
+    return embedding ? this.proseNear(projectId, query, embedding, k) : [];
+  }
 
+  // Returns [] on embed failure.
+  async searchLore(projectId: bigint, query: string, k = DEFAULT_LORE_K, opts?: { kinds?: string[] }): Promise<RetrievalHit[]> {
+    const embedding = await this.embedQuery(projectId, query, 'searchLore');
+    return embedding ? this.loreNear(projectId, query, embedding, k, opts?.kinds) : [];
+  }
+
+  /** Both indexes for one query, embedded once: the same answers as `searchProse` and `searchLore` for one embedding call instead of two. */
+  async searchProseAndLore(projectId: bigint, query: string, proseK = DEFAULT_PROSE_K, loreK = DEFAULT_LORE_K): Promise<{ prose: RetrievalHit[]; lore: RetrievalHit[] }> {
+    const embedding = await this.embedQuery(projectId, query, 'searchProseAndLore');
+    if (!embedding) return { prose: [], lore: [] };
+    const [prose, lore] = await Promise.all([this.proseNear(projectId, query, embedding, proseK), this.loreNear(projectId, query, embedding, loreK)]);
+    return { prose, lore };
+  }
+
+  private async embedQuery(projectId: bigint, query: string, caller: string): Promise<number[] | null> {
+    try {
+      return await this.embeddingService.embed(projectId, query);
+    } catch (err) {
+      this.logger.warn(`${caller} failed`, { projectId, err });
+      return null;
+    }
+  }
+
+  private async proseNear(projectId: bigint, query: string, embedding: number[], k: number): Promise<RetrievalHit[]> {
+    try {
       // Raw-interpolated, not bound: numeric and non-attacker-controlled; pgvector needs a text '[...]'::vector literal and a bound $n needs a text-to-vector cast it lacks.
       const vecLiteral = `[${embedding.join(',')}]`;
 
@@ -73,15 +98,11 @@ export class RetrievalService {
     }
   }
 
-  // Returns [] on embed failure.
-  async searchLore(projectId: bigint, query: string, k = DEFAULT_LORE_K, opts?: { kinds?: string[] }): Promise<RetrievalHit[]> {
+  private async loreNear(projectId: bigint, query: string, embedding: number[], k: number, kinds?: string[]): Promise<RetrievalHit[]> {
     try {
-      const embedding = await this.embeddingService.embed(projectId, query);
-      if (!embedding) return [];
-
       // Raw-interpolated, not bound: numeric and non-attacker-controlled; pgvector needs a text '[...]'::vector literal and a bound $n needs a text-to-vector cast it lacks.
       const vecLiteral = `[${embedding.join(',')}]`;
-      const kindFilter = buildKindFilter(opts?.kinds);
+      const kindFilter = buildKindFilter(kinds);
 
       const loreRows = await this.db.execute<{ kind: string; refKey: string; text: string; score: number }>(sql`
         SELECT lc.kind, lc.ref_key AS "refKey", lc.text,
@@ -95,7 +116,7 @@ export class RetrievalService {
         LIMIT ${k}
       `);
 
-      this.logger.debug('searchLore', { projectId, query, k, kinds: opts?.kinds, hits: loreRows.length, topScore: loreRows[0]?.score });
+      this.logger.debug('searchLore', { projectId, query, k, kinds, hits: loreRows.length, topScore: loreRows[0]?.score });
       return loreRows.map(row => ({
         text: row.text,
         score: row.score,

@@ -21,7 +21,7 @@ export const getChapterSummariesTool: RegisteredTool = {
   handler: async (input: unknown, ctx): Promise<unknown> => {
     const parsed = inputSchema.parse(input);
     const rows = await ctx.db
-      .select()
+      .select({ number: schema.chapters.number, summary: schema.chapters.summary, isolated: schema.chapters.isolated })
       .from(schema.chapters)
       .where(and(eq(schema.chapters.projectId, ctx.projectId), between(schema.chapters.number, parsed.from, parsed.to)));
     if (rows.length === 0) return 'No chapters in range.';

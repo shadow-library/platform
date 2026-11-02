@@ -161,7 +161,11 @@ export class CatalogService {
   // Every section is sorted in memory with a key as the last tiebreak: the catalog sits in cached prefixes, so row order must never move it.
   async render(projectId: bigint, options: CatalogOptions = {}): Promise<string> {
     const [chapters, volumes, entities, worldFacts, plotThreads, mysteries, storedFacts, revealedRows, documents] = await Promise.all([
-      this.db.query.chapters.findMany({ where: eq(schema.chapters.projectId, projectId), orderBy: asc(schema.chapters.number) }),
+      this.db.query.chapters.findMany({
+        columns: { number: true, title: true, summary: true, status: true, isolated: true },
+        where: eq(schema.chapters.projectId, projectId),
+        orderBy: asc(schema.chapters.number),
+      }),
       this.db.query.volumes.findMany({ where: eq(schema.volumes.projectId, projectId), orderBy: asc(schema.volumes.ordinal) }),
       // Entity deletion is a hard delete and 'deleted' is not an entity_origin value, so no origin filter belongs here.
       this.db.query.entities.findMany({ where: eq(schema.entities.projectId, projectId), orderBy: asc(schema.entities.entityKey) }),

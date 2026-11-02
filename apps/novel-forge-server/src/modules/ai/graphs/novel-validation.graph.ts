@@ -1,6 +1,6 @@
 import { AIMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { Annotation, type BaseCheckpointSaver, END, START, StateGraph } from '@langchain/langgraph';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { Logger } from '@shadow-library/common';
 
 import { APP_NAME } from '@server/constants';
@@ -81,6 +81,26 @@ function tryParseValidation(raw: string): ValidationOutput | null {
     if (parsed.success) return parsed.data;
   }
   return null;
+}
+
+/** Sets `needsRevalidation` on every finalized chapter a validated window covered: raised where an error names it, cleared elsewhere. */
+export async function flagRevalidation(
+  db: Pick<PrimaryDatabase, 'query' | 'update'>,
+  projectId: bigint,
+  coveredChapters: ReadonlySet<number>,
+  errorChapters: ReadonlySet<unknown>,
+): Promise<void> {
+  const finalized = await db.query.chapters.findMany({ where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.status, 'done')), columns: { number: true } });
+  const covered = finalized.map(ch => ch.number).filter(number => coveredChapters.has(number));
+  const updatedAt = new Date();
+  for (const needsRevalidation of [true, false]) {
+    const numbers = covered.filter(number => errorChapters.has(number) === needsRevalidation);
+    if (numbers.length === 0) continue;
+    await db
+      .update(schema.chapters)
+      .set({ needsRevalidation, updatedAt })
+      .where(and(eq(schema.chapters.projectId, projectId), inArray(schema.chapters.number, numbers)));
+  }
 }
 
 // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
@@ -226,14 +246,7 @@ export function createNovelValidationGraph(services: ValidationServices) {
 
     if (coveredChapters.size > 0) {
       const errorChapters = new Set(issues.filter(i => i.severity === 'error' && typeof i.chapter === 'number').map(i => i.chapter));
-      const finalized = await db.query.chapters.findMany({ where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.status, 'done')), columns: { number: true } });
-      for (const ch of finalized) {
-        if (!coveredChapters.has(ch.number)) continue;
-        await db
-          .update(schema.chapters)
-          .set({ needsRevalidation: errorChapters.has(ch.number), updatedAt: new Date() })
-          .where(and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, ch.number)));
-      }
+      await flagRevalidation(db, projectId, coveredChapters, errorChapters);
     }
 
     return { outcome: JSON.stringify(state.report), nodeTrace: ['persistReport'] };

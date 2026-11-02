@@ -303,6 +303,8 @@ export function writerSafeLeakFindings(prescan: KnowledgeLeakIssue[], judgeIssue
   return writerSafeLeakLines(prescan, judgeIssues, forbidden).map(text => ({ severity: 'soft' as const, text }));
 }
 
+type ContextPackRow = typeof schema.contextPacks.$inferSelect;
+
 const EXISTING_TITLES_MAX = 10;
 
 /** The title prompt's inputs: the recent finalized titles as its style reference, an isolated chapter's left out, and the draft's summary, both scrubbed. */
@@ -416,6 +418,18 @@ export function createChapterGenerationNodes(services: Omit<GraphServices, 'chec
     return disclosure;
   }
 
+  // A context pack row is insert-only (keyed by its content hash), so one read serves every node and attempt of the run; a failed read is retried.
+  const packs = new Map<string, Promise<ContextPackRow | undefined>>();
+  function packFor(contextPackId: string): Promise<ContextPackRow | undefined> {
+    let pack = packs.get(contextPackId);
+    if (!pack) {
+      pack = db.query.contextPacks.findFirst({ where: eq(schema.contextPacks.id, BigInt(contextPackId)) });
+      packs.set(contextPackId, pack);
+      pack.catch(() => packs.delete(contextPackId));
+    }
+    return pack;
+  }
+
   const settledModes = new Map<number, Promise<Project.ContentMode>>();
   function chapterModeFor(projectId: bigint, chapter: number): Promise<Project.ContentMode> {
     let mode = settledModes.get(chapter);
@@ -459,12 +473,8 @@ export function createChapterGenerationNodes(services: Omit<GraphServices, 'chec
     const brief = await db.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, state.chapter)) });
     const projectRow = await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
 
-    let stableContext = '';
-    let volatileContext = '';
-    if (state.contextPackId) {
-      const pack = await db.query.contextPacks.findFirst({ where: eq(schema.contextPacks.id, BigInt(state.contextPackId)) });
-      ({ renderedStable: stableContext, renderedVolatile: volatileContext } = splitSegments((pack?.sections as ContextSection[] | null) ?? []));
-    }
+    const pack = state.contextPackId ? await packFor(state.contextPackId) : undefined;
+    const { renderedStable: stableContext, renderedVolatile: volatileContext } = splitSegments((pack?.sections as ContextSection[] | null) ?? []);
 
     const ctx: TelemetryContext = {
       projectId,
@@ -485,7 +495,6 @@ export function createChapterGenerationNodes(services: Omit<GraphServices, 'chec
     const wordTarget = resolveWordTarget(projectRow);
 
     const targetRevision = await targetRevisionFor(projectId, state.chapter);
-    const pack = state.contextPackId ? await db.query.contextPacks.findFirst({ where: eq(schema.contextPacks.id, BigInt(state.contextPackId)) }) : undefined;
     ctx.onMessages = snapshotOnce({
       projectId,
       chapter: state.chapter,
@@ -592,11 +601,7 @@ export function createChapterGenerationNodes(services: Omit<GraphServices, 'chec
     const projectRow = await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
     const brief = await db.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, state.chapter)) });
 
-    let renderedPack = '';
-    if (state.contextPackId) {
-      const pack = await db.query.contextPacks.findFirst({ where: eq(schema.contextPacks.id, BigInt(state.contextPackId)) });
-      renderedPack = pack?.rendered ?? '';
-    }
+    const renderedPack = state.contextPackId ? ((await packFor(state.contextPackId))?.rendered ?? '') : '';
 
     const toolCtx: ToolContext = {
       chapter: state.chapter,
@@ -732,11 +737,7 @@ export function createChapterGenerationNodes(services: Omit<GraphServices, 'chec
     const projectId = BigInt(state.projectId);
     const projectRow = await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
 
-    let renderedPack = '';
-    if (state.contextPackId) {
-      const pack = await db.query.contextPacks.findFirst({ where: eq(schema.contextPacks.id, BigInt(state.contextPackId)) });
-      renderedPack = pack?.rendered ?? '';
-    }
+    const renderedPack = state.contextPackId ? ((await packFor(state.contextPackId))?.rendered ?? '') : '';
 
     const disclosure = await disclosureFor(projectId, state.chapter);
     const findingsStr = writerFacingFindings(state, disclosure);
@@ -812,12 +813,8 @@ export function createChapterGenerationNodes(services: Omit<GraphServices, 'chec
     const brief = await db.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, state.chapter)) });
     const projectRow = await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
 
-    let stableContext = '';
-    let volatileContext = '';
-    if (state.contextPackId) {
-      const pack = await db.query.contextPacks.findFirst({ where: eq(schema.contextPacks.id, BigInt(state.contextPackId)) });
-      ({ renderedStable: stableContext, renderedVolatile: volatileContext } = splitSegments((pack?.sections as ContextSection[] | null) ?? []));
-    }
+    const pack = state.contextPackId ? await packFor(state.contextPackId) : undefined;
+    const { renderedStable: stableContext, renderedVolatile: volatileContext } = splitSegments((pack?.sections as ContextSection[] | null) ?? []);
 
     const disclosure = await disclosureFor(projectId, state.chapter);
     const findingsStr = writerFacingFindings(state, disclosure);
@@ -841,7 +838,6 @@ export function createChapterGenerationNodes(services: Omit<GraphServices, 'chec
     const wordTarget = resolveWordTarget(projectRow);
 
     const targetRevision = await targetRevisionFor(projectId, state.chapter);
-    const pack = state.contextPackId ? await db.query.contextPacks.findFirst({ where: eq(schema.contextPacks.id, BigInt(state.contextPackId)) }) : undefined;
     ctx.onMessages = snapshotOnce({
       projectId,
       chapter: state.chapter,

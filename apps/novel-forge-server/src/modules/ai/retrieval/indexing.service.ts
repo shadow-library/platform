@@ -1,4 +1,4 @@
-import { and, eq, isNotNull, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
@@ -73,34 +73,72 @@ export class IndexingService {
       });
   }
 
+  /** `addLore` for many items in one embedding call and one upsert; a repeated `refKey` keeps its last item. Best-effort alike: a failed embed stores the text unembedded. */
+  async addLoreBatch(projectId: bigint, kind: string, items: { refKey: string; text: string; sourceUpdatedAt: Date }[]): Promise<void> {
+    const unique = [...new Map(items.map(item => [item.refKey, item])).values()];
+    if (unique.length === 0) return;
+    const embeddings = await this.embeddingService.embedBatch(
+      projectId,
+      unique.map(item => item.text),
+    );
+    const task = this.embeddingService.task;
+
+    await this.db
+      .insert(schema.loreChunks)
+      .values(unique.map((item, i) => ({ projectId, kind, ...item, embedding: embeddings[i] ?? null, embeddingTask: embeddings[i] ? task : null })))
+      .onConflictDoUpdate({
+        target: [schema.loreChunks.projectId, schema.loreChunks.kind, schema.loreChunks.refKey],
+        set: {
+          text: sql`excluded.text`,
+          sourceUpdatedAt: sql`excluded.source_updated_at`,
+          embedding: sql`excluded.embedding`,
+          embeddingTask: sql`excluded.embedding_task`,
+        },
+      });
+  }
+
   // Re-indexes non-isolated 'done' chapters with no chunks, a chunk without an embedding, or one embedded by another task than the current one.
   async backfill(projectId: bigint): Promise<{ indexed: number; skipped: number }> {
-    const doneChapters = await this.db.query.chapters.findMany({
-      where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.status, 'done'), isNotNull(schema.chapters.content)),
-    });
+    const doneWhere = and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.status, 'done'), isNotNull(schema.chapters.content));
+    const [doneChapters, indexedCounts] = await Promise.all([
+      this.db.query.chapters.findMany({ columns: { number: true, isolated: true }, where: doneWhere }),
+      this.db.execute<{ chapter: number; cnt: number; unembedded: number }>(sql`
+        SELECT chapter, COUNT(*)::int AS cnt,
+               COUNT(*) FILTER (WHERE embedding IS NULL OR NOT ${sameTask(sql`embedding_task`, this.embeddingService.task)})::int AS unembedded
+        FROM chapter_chunks
+        WHERE project_id = ${projectId}
+        GROUP BY chapter
+      `),
+    ]);
 
     const indexableChapters = doneChapters.filter(c => !c.isolated);
     this.logger.info('backfill: reindexing prose', { projectId, doneChapters: doneChapters.length, indexableChapters: indexableChapters.length });
 
-    const indexedCounts = await this.db.execute<{ chapter: number; cnt: number; unembedded: number }>(sql`
-      SELECT chapter, COUNT(*)::int AS cnt,
-             COUNT(*) FILTER (WHERE embedding IS NULL OR NOT ${sameTask(sql`embedding_task`, this.embeddingService.task)})::int AS unembedded
-      FROM chapter_chunks
-      WHERE project_id = ${projectId}
-      GROUP BY chapter
-    `);
-
     const indexedChapters = new Set<number>(indexedCounts.filter(r => r.cnt > 0 && r.unembedded === 0).map(r => r.chapter));
+    const pending = indexableChapters.filter(chapter => !indexedChapters.has(chapter.number));
+    const contents =
+      pending.length > 0
+        ? await this.db.query.chapters.findMany({
+            columns: { number: true, content: true },
+            where: and(
+              doneWhere,
+              inArray(
+                schema.chapters.number,
+                pending.map(chapter => chapter.number),
+              ),
+            ),
+          })
+        : [];
+    const contentOf = new Map(contents.map(row => [row.number, row.content]));
 
     let indexed = 0;
     let skipped = 0;
 
-    for (const chapter of indexableChapters) {
-      if (indexedChapters.has(chapter.number)) continue;
-      // Narrowing only — the query already excludes null content.
-      if (!chapter.content) continue;
+    for (const chapter of pending) {
+      const content = contentOf.get(chapter.number);
+      if (!content) continue;
       try {
-        if (await this.addProse(projectId, chapter.number, chapter.content, chapter.isolated)) indexed++;
+        if (await this.addProse(projectId, chapter.number, content, chapter.isolated)) indexed++;
         else skipped++;
       } catch (err) {
         this.logger.warn('Backfill failed for chapter', { projectId, chapter: chapter.number, err });

@@ -57,7 +57,10 @@ export async function finalizePack(
     if (inserted) {
       id = inserted.id;
     } else {
-      const existing = await db.query.contextPacks.findFirst({ where: and(eq(schema.contextPacks.projectId, projectId), eq(schema.contextPacks.hash, hash)) });
+      const existing = await db.query.contextPacks.findFirst({
+        columns: { id: true },
+        where: and(eq(schema.contextPacks.projectId, projectId), eq(schema.contextPacks.hash, hash)),
+      });
       id = existing?.id ?? null;
     }
   }

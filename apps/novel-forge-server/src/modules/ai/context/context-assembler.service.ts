@@ -593,6 +593,7 @@ export class ContextAssembler {
         this.volumeByKey(projectId, volumeKey),
       ),
       this.db.query.chapters.findMany({
+        columns: { number: true, summary: true, isolated: true },
         where: and(eq(schema.chapters.projectId, projectId), sql`${schema.chapters.number} < ${chapter}`, eq(schema.chapters.status, 'done')),
         orderBy: sql`${schema.chapters.number} DESC`,
         limit: 3,
@@ -658,10 +659,9 @@ export class ContextAssembler {
     if (this.retrievalService) {
       const query = currentVolume?.objective?.split('\n')[0] ?? '';
       if (query) {
-        const [proseHits, loreHits] = await Promise.all([
-          this.retrievalService.searchProse(projectId, query).catch(() => [] as RetrievalHit[]),
-          this.retrievalService.searchLore(projectId, query).catch(() => [] as RetrievalHit[]),
-        ]);
+        const { prose: proseHits, lore: loreHits } = await this.retrievalService
+          .searchProseAndLore(projectId, query)
+          .catch(() => ({ prose: [] as RetrievalHit[], lore: [] as RetrievalHit[] }));
         if (proseHits.length > 0) {
           const content = proseHits.map((h, i) => `${i + 1}. [Ch ${h.metadata.chapter}] ${h.text}`).join('\n\n');
           sections.push(makeSection('prose_retrieved', content, 'canonical', []));
@@ -680,7 +680,10 @@ export class ContextAssembler {
     const budgetTokens = opts?.budgetTokens ?? DEFAULT_BUDGET;
 
     const [chapterRows, threadRows, mysteryRows, worldFactRows] = await Promise.all([
-      this.db.query.chapters.findMany({ where: and(eq(schema.chapters.projectId, projectId), between(schema.chapters.number, from, to)) }),
+      this.db.query.chapters.findMany({
+        columns: { number: true, summary: true, isolated: true },
+        where: and(eq(schema.chapters.projectId, projectId), between(schema.chapters.number, from, to)),
+      }),
       this.db.query.plotThreads.findMany({
         where: and(
           eq(schema.plotThreads.projectId, projectId),
@@ -865,8 +868,12 @@ export class ContextAssembler {
   /** The live production picture the hub reasons over: cursor, draft states, stale plans, open work, and the Story Bible work waiting on the author. */
   private async renderPipelineStatus(projectId: bigint, storyCurrentChapter: number): Promise<string> {
     const [drafts, staleBriefs, pendingProposals, openJobs, continuity, reviews] = await Promise.all([
-      this.db.query.drafts.findMany({ where: eq(schema.drafts.projectId, projectId), orderBy: schema.drafts.chapter }),
-      this.db.query.briefs.findMany({ where: and(eq(schema.briefs.projectId, projectId), isNotNull(schema.briefs.staleReason)) }),
+      this.db.query.drafts.findMany({
+        columns: { chapter: true, reviewStatus: true, status: true, revision: true },
+        where: eq(schema.drafts.projectId, projectId),
+        orderBy: schema.drafts.chapter,
+      }),
+      this.db.query.briefs.findMany({ columns: { chapter: true }, where: and(eq(schema.briefs.projectId, projectId), isNotNull(schema.briefs.staleReason)) }),
       this.db.$count(schema.refinementProposals, and(eq(schema.refinementProposals.projectId, projectId), eq(schema.refinementProposals.status, 'pending'))),
       this.db.$count(schema.jobs, and(eq(schema.jobs.projectId, projectId), inArray(schema.jobs.status, ['pending', 'in_progress']))),
       this.db.query.continuityProposals.findMany({
@@ -893,9 +900,21 @@ export class ContextAssembler {
     if (pendingProposals > 0) lines.push(`Pending proposals awaiting review: ${pendingProposals}`);
     if (openJobs > 0) lines.push(`Jobs running or queued: ${openJobs}`);
     const draftOf = new Map(drafts.map(draft => [draft.chapter, draft]));
-    const current = reviews.filter(review => {
+    const candidates = reviews.filter(review => {
       const draft = draftOf.get(review.chapter);
-      return draft !== undefined && draft.status !== 'final' && isReviewCurrent(review, draft);
+      return draft !== undefined && draft.status !== 'final' && review.draftRevision === draft.revision;
+    });
+    const reviewedBodies =
+      candidates.length > 0
+        ? await this.db.query.drafts.findMany({
+            columns: { chapter: true, revision: true, body: true },
+            where: and(eq(schema.drafts.projectId, projectId), inArray(schema.drafts.chapter, [...new Set(candidates.map(review => review.chapter))])),
+          })
+        : [];
+    const bodyOf = new Map(reviewedBodies.map(draft => [draft.chapter, draft]));
+    const current = candidates.filter(review => {
+      const draft = bodyOf.get(review.chapter);
+      return draft !== undefined && isReviewCurrent(review, draft);
     });
     const openOf = (review: (typeof current)[number]): number => review.items.filter(item => item.decision === null).length;
     const awaiting = renderAwaitingAuthor({
@@ -926,9 +945,12 @@ export class ContextAssembler {
 
   private async changedSince(projectId: bigint, since: Date): Promise<string[]> {
     const [volumes, briefs, docs] = await Promise.all([
-      this.db.query.volumes.findMany({ where: and(eq(schema.volumes.projectId, projectId), gt(schema.volumes.updatedAt, since)) }),
-      this.db.query.briefs.findMany({ where: and(eq(schema.briefs.projectId, projectId), gt(schema.briefs.updatedAt, since)) }),
-      this.db.query.bibleDocuments.findMany({ where: and(eq(schema.bibleDocuments.projectId, projectId), gt(schema.bibleDocuments.updatedAt, since)) }),
+      this.db.query.volumes.findMany({ columns: { volumeKey: true, revision: true }, where: and(eq(schema.volumes.projectId, projectId), gt(schema.volumes.updatedAt, since)) }),
+      this.db.query.briefs.findMany({ columns: { chapter: true, revision: true }, where: and(eq(schema.briefs.projectId, projectId), gt(schema.briefs.updatedAt, since)) }),
+      this.db.query.bibleDocuments.findMany({
+        columns: { section: true, slug: true, revision: true },
+        where: and(eq(schema.bibleDocuments.projectId, projectId), gt(schema.bibleDocuments.updatedAt, since)),
+      }),
     ]);
     return [
       ...volumes.map(v => `volume:${v.volumeKey} is now at revision ${v.revision}`),

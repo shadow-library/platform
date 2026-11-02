@@ -55,15 +55,23 @@ function byteBoundedPieces(run: string, maxBytes: number): SizedText[] {
   return pieces;
 }
 
-function sizedRuns(text: string, maxTokens: number): SizedText[] {
-  return (text.match(/\s*\S+/g) ?? [text]).flatMap(run => (run.length <= TOKENISED_RUN_CHARS ? [{ text: run, tokens: countTokens(run) }] : byteBoundedPieces(run, maxTokens)));
+function runTokens(run: string, counted: Map<string, number>): number {
+  let tokens = counted.get(run);
+  if (tokens === undefined) counted.set(run, (tokens = countTokens(run)));
+  return tokens;
+}
+
+function sizedRuns(text: string, maxTokens: number, counted: Map<string, number>): SizedText[] {
+  return (text.match(/\s*\S+/g) ?? [text]).flatMap(run =>
+    run.length <= TOKENISED_RUN_CHARS ? [{ text: run, tokens: runTokens(run, counted) }] : byteBoundedPieces(run, maxTokens),
+  );
 }
 
 /** Whole words while they fit, then a long run cut by its length; the parts rejoin to the paragraph exactly. */
-function sizedParts(text: string, maxTokens: number): SizedText[] {
+function sizedParts(text: string, maxTokens: number, counted = new Map<string, number>()): SizedText[] {
   const parts: SizedText[] = [];
   let current: SizedText = { text: '', tokens: 0 };
-  for (const run of sizedRuns(text, maxTokens)) {
+  for (const run of sizedRuns(text, maxTokens, counted)) {
     if (current.text && current.tokens + run.tokens > maxTokens) {
       parts.push(current);
       current = { text: '', tokens: 0 };
@@ -78,9 +86,11 @@ export function splitNotesParagraph(text: string, maxTokens: number = NOTES_PART
   return sizedParts(text, maxTokens).map(part => part.text);
 }
 
-function notesParts(paragraphs: readonly string[]): NotesPart[] {
+function notesParts(paragraphs: readonly string[], wanted: ReadonlySet<number>): NotesPart[] {
+  const counted = new Map<string, number>();
   return paragraphs.flatMap((paragraph, index) => {
-    const parts = sizedParts(paragraph, NOTES_PART_TOKENS);
+    if (!wanted.has(index + 1)) return [];
+    const parts = sizedParts(paragraph, NOTES_PART_TOKENS, counted);
     return parts.map((part, at) => ({ paragraph: index + 1, part: at + 1, parts: parts.length, ...part }));
   });
 }
@@ -111,7 +121,7 @@ export const getNotesTool: RegisteredTool = {
     const query = parsed.query?.toLowerCase();
     const wanted = new Set(paragraphs.flatMap((paragraph, index) => (index + 1 >= from && (!query || paragraph.toLowerCase().includes(query)) ? [index + 1] : [])));
     const startPart = parsed.part ?? 1;
-    const matching = notesParts(paragraphs).filter(part => wanted.has(part.paragraph) && (part.paragraph > from || part.part >= startPart));
+    const matching = notesParts(paragraphs, wanted).filter(part => part.paragraph > from || part.part >= startPart);
     if (matching.length === 0) return `Nothing in the author's ${paragraphs.length} paragraphs matches from there on.`;
 
     const lines: string[] = [];

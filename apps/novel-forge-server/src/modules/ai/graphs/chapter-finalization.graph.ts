@@ -1,5 +1,5 @@
 import { Annotation, type BaseCheckpointSaver, END, START, StateGraph } from '@langchain/langgraph';
-import { and, eq, isNull, lt, ne, or, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNull, lt, ne, or, sql } from 'drizzle-orm';
 import { AppError, Logger } from '@shadow-library/common';
 
 import { AppErrorCode } from '@server/classes';
@@ -223,13 +223,35 @@ export async function continuityRoster(db: Pick<PrimaryDatabase, 'query'>, proje
   return [`## ENTITY ROSTER\n${entityRoster || 'none'}`, `## EXISTING THREADS\n${threadRoster || 'none'}`, `## EXISTING MYSTERIES\n${mysteryRoster || 'none'}`].join('\n\n');
 }
 
+/** Re-indexes the lore of the entities a chapter touched: one entity read and one embedding call for all of them. */
+export async function indexEntityLore(
+  db: Pick<PrimaryDatabase, 'query'>,
+  indexingService: Pick<IndexingService, 'addLoreBatch'>,
+  projectId: bigint,
+  entityKeys: readonly string[],
+): Promise<void> {
+  const keys = [...new Set(entityKeys)];
+  if (keys.length === 0) return;
+  const entities = await db.query.entities.findMany({
+    columns: { entityKey: true, name: true, notes: true, body: true },
+    where: and(eq(schema.entities.projectId, projectId), inArray(schema.entities.entityKey, keys)),
+  });
+  const indexedAt = new Date();
+  const lore = entities
+    .map(entity => ({ refKey: entity.entityKey, text: [entity.name, entity.notes, entity.body].filter(Boolean).join('\n'), sourceUpdatedAt: indexedAt }))
+    .filter(item => item.text);
+  await indexingService.addLoreBatch(projectId, 'character', lore);
+}
+
 // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
 export function createChapterFinalizationGraph(services: FinalizationServices) {
   const { db, modelRouter, indexingService, checkpointer } = services;
 
   async function guard(state: FinalizationState) {
     const projectId = BigInt(state.projectId);
-    const draftRow = state.draftId ? await db.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, state.chapter)) }) : null;
+    const draftRow = state.draftId
+      ? await db.query.drafts.findFirst({ columns: { reviewStatus: true }, where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, state.chapter)) })
+      : null;
     const projectRow = await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
 
     // `final` is accepted alongside `approved` so a run resumed after a mid-pipeline failure gets past
@@ -414,16 +436,10 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
           logger.warn('updateIndexes: reviewed entities not read (non-fatal)', { err });
           return [];
         });
-    for (const key of touchedKeys) {
-      try {
-        const entity = await db.query.entities.findFirst({ where: and(eq(schema.entities.projectId, projectId), eq(schema.entities.entityKey, key)) });
-        if (entity) {
-          const text = [entity.name, entity.notes, entity.body].filter(Boolean).join('\n');
-          if (text) await indexingService.addLore(projectId, 'character', key, text, new Date());
-        }
-      } catch (err) {
-        logger.warn('updateIndexes: addLore failed (non-fatal)', { err, key });
-      }
+    try {
+      await indexEntityLore(db, indexingService, projectId, touchedKeys);
+    } catch (err) {
+      logger.warn('updateIndexes: addLore failed (non-fatal)', { err, touchedKeys });
     }
 
     return { nodeTrace: ['updateIndexes'] };
