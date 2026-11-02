@@ -126,14 +126,17 @@ export class PluginPolicyService {
 
   /** Resolving this once is what holds a run to a single `project_plugins` read across the dozens of model calls a graph makes. */
   async scoped(projectId: bigint, project?: ProjectBaseline): Promise<ScopedPolicyResolver> {
-    const row = project ?? (await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId), columns: { contentMode: true } }));
+    const [row, active] = await Promise.all([
+      project ?? this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId), columns: { contentMode: true } }),
+      this.active(projectId),
+    ]);
     const baseline = baselineClass(row);
-    const active = await this.active(projectId);
     return { for: call => this.build(active, baseline, call, [call.role]), forPack: (call, consumers) => this.build(active, baseline, call, consumers) };
   }
 
   /** The plugins that actually contribute on this novel: enabled, still on disk, and validating against the manifest on disk. */
   async active(projectId: bigint): Promise<ActivePlugin[]> {
+    if (!this.pluginHost.hasAny()) return [];
     const rows = await this.db.query.projectPlugins.findMany({
       where: eq(schema.projectPlugins.projectId, projectId),
       orderBy: [asc(schema.projectPlugins.ordinal), asc(schema.projectPlugins.pluginId)],

@@ -6,6 +6,7 @@ import { schema } from '@server/database';
 import { PublicationJanitor } from '@modules/jobs/publication.janitor';
 import { CANONICAL_PROSE_CHANGED_PREFIX, STALE_ERROR_PREFIX } from '@modules/publishing/publish-runner';
 
+import { serialProbe } from '../serial-executor';
 import { matchesWhere } from '../sql-filter';
 
 type Row = Record<string, unknown>;
@@ -174,5 +175,13 @@ describe('PublicationJanitor.dueProjects', () => {
     const due = await janitor.dueProjects();
 
     expect(due).toEqual(Array.from({ length: 20 }, (_, index) => BigInt(index + 1)));
+  });
+
+  it('should issue its three ledger reads together, since they run on the pool rather than one transaction', async () => {
+    const probe = serialProbe();
+    const janitor = new PublicationJanitor({ getPostgresClient: () => probe.db } as never, {} as never, {} as never);
+
+    expect(await janitor.dueProjects()).toEqual([]);
+    expect(probe.peak()).toBe(3);
   });
 });

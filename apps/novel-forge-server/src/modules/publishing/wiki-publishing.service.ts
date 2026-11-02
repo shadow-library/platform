@@ -1,4 +1,4 @@
-import { asc, eq } from 'drizzle-orm';
+import { and, asc, eq, inArray } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
@@ -20,21 +20,26 @@ export class WikiPublishingService {
 
   /** Recomputes every entity's spoiler-gated wiki payload from the current bible, ledger, and published ordinals, shaped for what the reader can gate. */
   async computeProjections(projectId: bigint, headlineGate: boolean): Promise<WikiEntryProjection[]> {
-    const entities = await this.db.query.entities.findMany({
-      where: eq(schema.entities.projectId, projectId),
-      with: {
-        aliases: true,
-        images: { orderBy: (image, { asc: ascOrder }) => [ascOrder(image.sortOrder), ascOrder(image.id)] },
-        relationships: true,
-      },
-    });
-    const facts = await this.db.query.canonFacts.findMany({ where: eq(schema.canonFacts.projectId, projectId), with: { knowledge: true } });
-    const chapterLedger = await this.db.query.chapterPublications.findMany({ where: eq(schema.chapterPublications.projectId, projectId) });
+    const [entities, facts, chapterLedger] = await Promise.all([
+      this.db.query.entities.findMany({
+        where: eq(schema.entities.projectId, projectId),
+        with: {
+          aliases: true,
+          images: { orderBy: (image, { asc: ascOrder }) => [ascOrder(image.sortOrder), ascOrder(image.id)] },
+          relationships: true,
+        },
+      }),
+      this.db.query.canonFacts.findMany({ where: eq(schema.canonFacts.projectId, projectId), with: { knowledge: true } }),
+      this.db.query.chapterPublications.findMany({
+        columns: { chapter: true, publishedOrdinal: true },
+        where: and(eq(schema.chapterPublications.projectId, projectId), eq(schema.chapterPublications.status, 'published')),
+      }),
+    ]);
 
     // Only chapters live on the reader carry a usable ordinal: a fragment gated on a not-yet-published chapter
     // must stay withheld and reappear on the converge that follows that chapter going live.
     const ordinalByChapter = new Map<number, number>();
-    for (const row of chapterLedger) if (row.status === 'published') ordinalByChapter.set(row.chapter, row.publishedOrdinal);
+    for (const row of chapterLedger) ordinalByChapter.set(row.chapter, row.publishedOrdinal);
 
     return buildWikiProjections({
       entities: entities.map(entity => ({
@@ -90,10 +95,18 @@ export class WikiPublishingService {
     }
     if (added.length > 0) await this.db.insert(schema.wikiPublications).values(added);
 
-    for (const row of existing) {
-      if (projectedKeys.has(row.entryKey) || row.state === 'deleted') continue;
-      await this.db.update(schema.wikiPublications).set({ state: 'deleted', error: null, updatedAt: now }).where(eq(schema.wikiPublications.id, row.id));
-      this.logger.info('wiki entry withdrawn from projection', { projectId, entryKey: row.entryKey });
+    const withdrawn = existing.filter(row => !projectedKeys.has(row.entryKey) && row.state !== 'deleted');
+    if (withdrawn.length > 0) {
+      await this.db
+        .update(schema.wikiPublications)
+        .set({ state: 'deleted', error: null, updatedAt: now })
+        .where(
+          inArray(
+            schema.wikiPublications.id,
+            withdrawn.map(row => row.id),
+          ),
+        );
+      for (const row of withdrawn) this.logger.info('wiki entry withdrawn from projection', { projectId, entryKey: row.entryKey });
     }
 
     return this.loadLedger(projectId);

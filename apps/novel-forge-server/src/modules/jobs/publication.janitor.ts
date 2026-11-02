@@ -93,7 +93,7 @@ export class PublicationJanitor {
 
   /** The sweep's selection, without its side effects: every project whose ledger holds work a retry can still clear */
   async dueProjects(): Promise<bigint[]> {
-    const chapterDue = await this.db
+    const chapterDue = this.db
       .selectDistinct({ projectId: schema.chapterPublications.projectId })
       .from(schema.chapterPublications)
       .where(
@@ -106,20 +106,21 @@ export class PublicationJanitor {
     // Wiki entries share the `publish` job and converge: a project with a pending or retryably-failed wiki row
     // has a push owed, exactly as a scheduled/failed chapter does. Tombstoned (`deleted`) rows are not swept —
     // like a chapter's `unpublished`, their DELETE rides the next converge some other due work triggers.
-    const wikiDue = await this.db
+    const wikiDue = this.db
       .selectDistinct({ projectId: schema.wikiPublications.projectId })
       .from(schema.wikiPublications)
       .where(or(eq(schema.wikiPublications.state, 'pending'), and(eq(schema.wikiPublications.state, 'failed'), retryableFailure(schema.wikiPublications.error))));
 
     // Access rides the same converge. A share-list change deduped onto a publish job that had already read the list is still owed, and a narrowing must reach the reader,
     // so a publication whose recorded access revision trails is due until one lands. Batched, because every publication can trail at once on a boot sweep.
-    const accessDue = await this.db
+    const accessDue = this.db
       .select({ projectId: schema.publications.projectId })
       .from(schema.publications)
       .where(and(accessBehind(), retryableFailure(schema.publications.accessError)))
       .orderBy(schema.publications.id)
       .limit(ACCESS_SWEEP_BATCH);
 
-    return [...new Set([...chapterDue, ...wikiDue, ...accessDue].map(row => row.projectId))];
+    const due = await Promise.all([chapterDue, wikiDue, accessDue]);
+    return [...new Set(due.flat().map(row => row.projectId))];
   }
 }
