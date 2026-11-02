@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterAll, afterEach, beforeAll, describe, expect, it, jest } from 'bun:test';
 
 import { AppError } from '@shadow-library/common';
 
@@ -45,11 +45,20 @@ describe('AuthClient request timeout', () => {
 describe('AuthClient.fetchService timeout', () => {
   let idp: TestIdP | undefined;
   let slow: ReturnType<typeof Bun.serve>;
+  let onRequest = (): void => {};
 
   beforeAll(() => {
-    slow = Bun.serve({ port: 0, fetch: () => new Promise<Response>(() => {}) });
+    slow = Bun.serve({
+      port: 0,
+      fetch: () => {
+        onRequest();
+        return new Promise<Response>(() => {});
+      },
+    });
     process.env.SERVICE_URL_SLOW_SVC = `http://127.0.0.1:${slow.port}`;
   });
+
+  afterEach(() => jest.useRealTimers());
 
   afterAll(() => {
     slow.stop(true);
@@ -59,8 +68,14 @@ describe('AuthClient.fetchService timeout', () => {
 
   it('should surface a retryable API_REQUEST_TIMEOUT when the service call outlives the timeout', async () => {
     idp = await createTestIdP({ clientId: 'svc-pulse', clientSecret: 's3cret' });
+    const reached = new Promise<void>(resolve => (onRequest = resolve));
+    jest.useFakeTimers();
     const auth = new AuthClient({ issuer: idp.issuer, audience: AUDIENCE, client: { id: 'svc-pulse', secret: 's3cret' }, timeout: 300 });
-    const failure = await auth.fetchService('slow-svc', '/api/v1/ping').catch((error: unknown) => error);
+    const pending = auth.fetchService('slow-svc', '/api/v1/ping').catch((error: unknown) => error);
+
+    await reached;
+    jest.advanceTimersByTime(300);
+    const failure = await pending;
     expect(failure).toBeInstanceOf(AppError);
     expect(failure as AppError).toMatchObject({ code: 'API_REQUEST_TIMEOUT', status: 504 });
   });

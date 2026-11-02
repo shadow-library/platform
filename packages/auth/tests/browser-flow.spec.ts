@@ -86,12 +86,13 @@ describe('first-party browser flow', () => {
 
   const post = (url: string, cookie?: string) => router.mockRequest({ method: 'POST', url, headers: cookie ? { cookie } : {} });
 
-  const readCookie = (response: MockResponse, name: string): string | undefined => {
+  const findSetCookie = (response: MockResponse, name: string): string | undefined => {
     const headers = response.headers['set-cookie'];
     const all = Array.isArray(headers) ? headers : [headers];
-    const match = all.find(entry => typeof entry === 'string' && entry.startsWith(`${name}=`));
-    return typeof match === 'string' ? (match.split(';')[0] as string) : undefined;
+    return all.find((entry): entry is string => typeof entry === 'string' && entry.startsWith(`${name}=`));
   };
+
+  const readCookie = (response: MockResponse, name: string): string | undefined => findSetCookie(response, name)?.split(';')[0];
 
   const login = async (sub = USER): Promise<string> => {
     const started = await get('/auth/login?return_to=/reports');
@@ -128,7 +129,8 @@ describe('first-party browser flow', () => {
 
   it('should set a __Host- session cookie whose attributes cannot be downgraded', async () => {
     const started = await get('/auth/login');
-    const raw = (started.headers['set-cookie'] as string[]).find(entry => entry.startsWith(STATE_COOKIE)) as string;
+    const raw = findSetCookie(started, STATE_COOKIE);
+    expect(raw).toBeString();
     expect(raw).toContain('HttpOnly');
     expect(raw).toContain('Secure');
     expect(raw).toContain('SameSite=Lax');
@@ -500,12 +502,13 @@ describe('RP-initiated logout', () => {
     idp.stop();
   });
 
-  const readCookie = (response: MockResponse, name: string): string | undefined => {
+  const findSetCookie = (response: MockResponse, name: string): string | undefined => {
     const headers = response.headers['set-cookie'];
     const all = Array.isArray(headers) ? headers : [headers];
-    const match = all.find(entry => typeof entry === 'string' && entry.startsWith(`${name}=`));
-    return typeof match === 'string' ? (match.split(';')[0] as string) : undefined;
+    return all.find((entry): entry is string => typeof entry === 'string' && entry.startsWith(`${name}=`));
   };
+
+  const readCookie = (response: MockResponse, name: string): string | undefined => findSetCookie(response, name)?.split(';')[0];
 
   const login = async (): Promise<string> => {
     const started = await router.mockRequest({ method: 'GET', url: '/auth/login?return_to=/reports' });

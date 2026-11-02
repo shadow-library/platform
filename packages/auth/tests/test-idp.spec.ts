@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, it, jest } from 'bun:test';
 
 import { AuthClient } from '@shadow-library/auth';
 import { createTestIdP, TestIdP } from '@shadow-library/auth/testing';
@@ -74,13 +74,20 @@ describe('createTestIdP parity', () => {
   });
 
   it('should let a test wait for a scheduled refresh rather than sleep past it', async () => {
-    const refreshing = new AuthClient({ issuer: idp.issuer, appId: APP_ID, client: CLIENT, serviceAccess: { refreshSeconds: 0.05 } });
-    await refreshing.loadServiceAccess();
+    jest.useFakeTimers();
+    try {
+      const refreshing = new AuthClient({ issuer: idp.issuer, appId: APP_ID, client: CLIENT, serviceAccess: { refreshSeconds: 0.05 } });
+      await refreshing.loadServiceAccess();
 
-    const target = idp.getRequestCount('/api/v1/authz/service-access') + 1;
-    await idp.waitForRequest('/api/v1/authz/service-access', target);
-    expect(idp.getRequestCount('/api/v1/authz/service-access')).toBeGreaterThanOrEqual(target);
-    refreshing.stop();
+      const target = idp.getRequestCount('/api/v1/authz/service-access') + 1;
+      const waiting = idp.waitForRequest('/api/v1/authz/service-access', target);
+      jest.advanceTimersByTime(50);
+      await waiting;
+      expect(idp.getRequestCount('/api/v1/authz/service-access')).toBeGreaterThanOrEqual(target);
+      refreshing.stop();
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('should refuse every app-session route to a caller holding only the handle', async () => {

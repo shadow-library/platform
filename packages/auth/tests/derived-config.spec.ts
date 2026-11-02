@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterAll, afterEach, beforeAll, describe, expect, it, setSystemTime } from 'bun:test';
 
 import { AuthClient } from '@shadow-library/auth';
 import { AppSessionService, parseCookies, resolveAuthRoutes, resolveBrowserAuthConfig } from '@shadow-library/auth/module';
@@ -12,7 +12,9 @@ const REDIRECT_URI = 'https://reports.test/auth/callback';
 
 const REFRESH_SECONDS = 0.05;
 
-const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
+const REGISTRATION_PATH = '/api/v1/apps/me';
+
+const elapseRefreshIntervals = (count: number): void => void setSystemTime(Date.now() + REFRESH_SECONDS * 1000 * count);
 
 describe('derived configuration', () => {
   let idp: TestIdP;
@@ -25,6 +27,7 @@ describe('derived configuration', () => {
     });
   });
   afterAll(() => idp.stop());
+  afterEach(() => setSystemTime());
 
   const client = (refreshSeconds = 300): AuthClient => new AuthClient({ issuer: idp.issuer, appId: APP_ID, client: CLIENT, app: { refreshSeconds } });
 
@@ -117,7 +120,7 @@ describe('derived configuration', () => {
     expect((await service.warmUp()).scopes).toEqual(['openid', 'profile', 'reports:read']);
 
     idp.setAppRegistration({ scopes: ['openid', 'reports:read', 'reports:write'] });
-    await sleep(REFRESH_SECONDS * 1000 * 2);
+    elapseRefreshIntervals(2);
 
     const started = await service.beginLogin('/reports');
     expect(new URL(started.url).searchParams.get('scope')).toBe('openid profile reports:read reports:write');
@@ -130,12 +133,14 @@ describe('derived configuration', () => {
     const auth = client(REFRESH_SECONDS);
     await expect(auth.getAudience()).resolves.toBe(AUDIENCE);
 
-    idp.setEndpointFailure('/api/v1/apps/me', true);
-    await sleep(REFRESH_SECONDS * 1000 * 2);
+    idp.setEndpointFailure(REGISTRATION_PATH, true);
+    const before = idp.getRequestCount(REGISTRATION_PATH);
+    elapseRefreshIntervals(2);
 
     // An outage must not change which tokens this service accepts
     await expect(auth.getAudience()).resolves.toBe(AUDIENCE);
-    idp.setEndpointFailure('/api/v1/apps/me', false);
+    expect(idp.getRequestCount(REGISTRATION_PATH)).toBe(before + 1);
+    idp.setEndpointFailure(REGISTRATION_PATH, false);
     auth.stop();
   });
 
