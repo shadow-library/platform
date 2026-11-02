@@ -9,7 +9,7 @@ import { schema } from '@modules/datastore';
 import { WikiService } from '@modules/wiki';
 import { listThumbnailRef, visibleHeadlineRef } from '@modules/wiki/wiki-headline';
 
-import { scriptedPostgres, type ScriptedPostgres } from '../scripted-postgres';
+import { roundTrips, scriptedPostgres, type ScriptedPostgres } from '../scripted-postgres';
 
 const READER = { kind: 'user', sub: 'reader-1' } as AuthPrincipal;
 const NOVEL = { id: 7n, visibility: 'public', accessRevision: 1 };
@@ -69,7 +69,7 @@ describe('WikiService', () => {
     }
 
     it('should expose the gated headline column only through a mask that opens at the gate, on both pages', async () => {
-      const list = scriptedPostgres([[{ furthest: 1 }], [maskedRow], [], STATS]);
+      const list = scriptedPostgres([[{ furthest: 1 }], [maskedRow], STATS, []]);
       const entry = scriptedPostgres([[{ furthest: 1 }], [{ ...maskedRow, revision: 1 }], [], [{ value: 0 }], []]);
       await service(list).listEntries('novel', READER);
       await service(entry).getEntry('novel', 'amara', READER);
@@ -83,7 +83,7 @@ describe('WikiService', () => {
     });
 
     it('should serve no headline on either page when the masked query returns none', async () => {
-      const list = await service(scriptedPostgres([[{ furthest: 1 }], [maskedRow], [], STATS])).listEntries('novel', READER);
+      const list = await service(scriptedPostgres([[{ furthest: 1 }], [maskedRow], STATS, []])).listEntries('novel', READER);
       const entry = await service(scriptedPostgres([[{ furthest: 1 }], [{ ...maskedRow, revision: 1 }], [], [{ value: 0 }], []])).getEntry('novel', 'amara', READER);
 
       expect(list.body.items[0]?.imageUrl).toBeUndefined();
@@ -95,7 +95,7 @@ describe('WikiService', () => {
   describe('the JavaScript headline gate', () => {
     describe('listEntries', () => {
       it('should give a chapter-1 reader the latest visible gallery image instead of a chapter-50 headline', async () => {
-        const read = await service(scriptedPostgres([[{ furthest: 1 }], [entryRow], [{ entryId: 1n, ...young }], STATS])).listEntries('novel', READER);
+        const read = await service(scriptedPostgres([[{ furthest: 1 }], [entryRow], STATS, [{ entryId: 1n, ...young }]])).listEntries('novel', READER);
 
         expect(read.body.items).toEqual([{ entryKey: 'amara', type: 'character', name: 'Amara', imageUrl: 'https://cdn.test/young.png' }]);
       });
@@ -117,7 +117,7 @@ describe('WikiService', () => {
       });
 
       it('should leave a chapter-1 reader without a thumbnail when no gallery image is visible yet', async () => {
-        const postgres = scriptedPostgres([[{ furthest: 1 }], [entryRow], [], STATS]);
+        const postgres = scriptedPostgres([[{ furthest: 1 }], [entryRow], STATS, []]);
         const read = await service(postgres).listEntries('novel', READER);
 
         expect(read.body.items[0]?.imageUrl).toBeUndefined();
@@ -136,6 +136,33 @@ describe('WikiService', () => {
         expect(early.body.images.map(image => image.imageUrl)).toEqual(['https://cdn.test/young.png']);
         expect(caughtUp.body.imageUrl).toBe('https://cdn.test/scarred.png');
       });
+    });
+  });
+
+  describe('round trips', () => {
+    it('should read an entry page in three round trips: the gate, the entry, then its facets, hidden count and images together', async () => {
+      const postgres = scriptedPostgres([[{ furthest: 1 }], [{ ...entryRow, revision: 1 }], [], [{ value: 2 }], []]);
+      const read = await service(postgres).getEntry('novel', 'amara', READER);
+
+      expect(read.body.hiddenFacetCount).toBe(2);
+      expect(selectCount(postgres)).toBe(5);
+      expect(roundTrips(postgres)).toBe(3);
+    });
+
+    it('should read the list in three round trips when a fallback is needed, its stats alongside the entries', async () => {
+      const postgres = scriptedPostgres([[{ furthest: 1 }], [entryRow], [{ locked: 3, maxRevision: 1 }], [{ entryId: 1n, ...young }]]);
+      const read = await service(postgres).listEntries('novel', READER);
+
+      expect(read.body.lockedCount).toBe(3);
+      expect(selectCount(postgres)).toBe(4);
+      expect(roundTrips(postgres)).toBe(3);
+    });
+
+    it('should read the list in two round trips when no fallback is needed', async () => {
+      const postgres = scriptedPostgres([[{ furthest: 50 }], [entryRow], STATS]);
+      await service(postgres).listEntries('novel', READER);
+
+      expect(roundTrips(postgres)).toBe(2);
     });
   });
 });

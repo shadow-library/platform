@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'bun:test';
+import { beforeAll, describe, expect, it } from 'bun:test';
 import { type SQL } from 'drizzle-orm';
 import { PgDialect } from 'drizzle-orm/pg-core';
 
@@ -238,6 +238,9 @@ describe('baseline seed', () => {
   });
 
   describe('the fixture catalogue', () => {
+    // The process's first email render pays juice's and LiquidJS's one-time warm-up, which would otherwise land on whichever test runs first.
+    beforeAll(() => renderLayout(engine, DEFAULT_LAYOUT?.body ?? '', FIXTURE_DESIGN));
+
     for (const layout of BASELINE_LAYOUTS) {
       it(`should render layout '${layout.layoutKey}' around probe content against sample data`, async () => {
         expect(await renderLayout(engine, layout.body, FIXTURE_DESIGN)).toBeUndefined();

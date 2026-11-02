@@ -4,10 +4,12 @@ import { PgDialect } from 'drizzle-orm/pg-core';
 import { AppError } from '@shadow-library/common';
 import { type ContextService } from '@shadow-library/fastify';
 import { FakeDatabaseService } from '@shadow-library/modules/testing';
+import { chapterContentHash } from '@shadow-library/sdk/publishing';
 
 import { AppErrorCode } from '@server/classes';
+import { schema } from '@modules/datastore';
 import { type PublishAuditService } from '@modules/publish/publish-audit.service';
-import { type NovelUpsertBody } from '@modules/publish/publish.dto';
+import { type ChapterUpsertBody, type NovelUpsertBody } from '@modules/publish/publish.dto';
 import { PublishService } from '@modules/publish/publish.service';
 
 import { type ChainCall, scriptedPostgres, type ScriptedPostgres, stepArgs } from '../scripted-postgres';
@@ -120,6 +122,36 @@ describe('PublishService', () => {
 
       expect(result.outcome).toBe('applied');
       expect(postgres.calls.some(call => call.root === 'update')).toBe(true);
+    });
+  });
+
+  describe('upsertChapter', () => {
+    const chapter = { title: 'One', content: 'A long chapter body. '.repeat(500) };
+    const CHAPTER: ChapterUpsertBody = { ...chapter, contentHash: chapterContentHash(chapter), revision: 2 };
+
+    function chapterReads(postgres: ScriptedPostgres): ChainCall[] {
+      return postgres.calls.filter(call => call.root === 'select' && stepArgs(call, 'from') === schema.publishedChapters);
+    }
+
+    it('should lock the stored chapter without loading its body, and answer an identical push as a no-op', async () => {
+      const stored = { id: 3n, revision: 2, contentHash: CHAPTER.contentHash, publishedAt: new Date(0) };
+      const postgres = scriptedPostgres([[novelRow()], [stored]]);
+      const result = await service(postgres).upsertChapter(SLUG, 1, CHAPTER);
+
+      expect(result).toEqual({ outcome: 'noop', novelId: 7n, revision: 2 });
+      const [read] = chapterReads(postgres);
+      expect(Object.keys(read?.args[0] as object).sort()).toEqual(['contentHash', 'id', 'publishedAt', 'revision']);
+      expect(stepArgs(read, 'for')).toBe('update');
+    });
+
+    it('should keep the stored publish time when a newer revision replaces the chapter', async () => {
+      const publishedAt = new Date('2026-01-01T00:00:00Z');
+      const postgres = scriptedPostgres([[novelRow()], [{ id: 3n, revision: 1, contentHash: 'older', publishedAt }]]);
+      const result = await service(postgres).upsertChapter(SLUG, 1, CHAPTER);
+
+      const update = postgres.calls.find(call => call.root === 'update');
+      expect(result.outcome).toBe('applied');
+      expect(stepArgs(update, 'set')).toMatchObject({ content: chapter.content, revision: 2, publishedAt });
     });
   });
 });

@@ -53,17 +53,18 @@ export class NovelAccessService {
     }
     if (!principal || principal.kind !== 'user') return readable;
 
-    if (restricted.length > 0) {
+    const grants = async (): Promise<void> => {
+      if (restricted.length === 0) return;
       const granted = await this.db
         .select({ novelId: schema.novelGrants.novelId })
         .from(schema.novelGrants)
         .where(and(inArray(schema.novelGrants.novelId, restricted), eq(schema.novelGrants.subjectId, principal.sub)));
       for (const grant of granted) readable.add(grant.novelId);
-    }
-
-    for (const [organisationId, novelIds] of organisations) {
+    };
+    const memberships = [...organisations].map(async ([organisationId, novelIds]) => {
       if (await this.isOrganisationMember(organisationId, principal)) for (const novelId of novelIds) readable.add(novelId);
-    }
+    });
+    await Promise.all([grants(), ...memberships]);
 
     return readable;
   }

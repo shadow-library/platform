@@ -33,6 +33,14 @@ interface StaleMarker {
   stored: number;
 }
 
+/** The revision ladder reads only these; the chapter body is the bulk of the row and is never compared. */
+const STORED_CHAPTER_COLUMNS = {
+  id: schema.publishedChapters.id,
+  revision: schema.publishedChapters.revision,
+  contentHash: schema.publishedChapters.contentHash,
+  publishedAt: schema.publishedChapters.publishedAt,
+};
+
 /** Rolls the insert transaction back so the committed row can be re-read; a second race escapes as a retryable 500, never as an ownership verdict. */
 class NovelInsertRace extends Error {
   constructor() {
@@ -118,7 +126,7 @@ export class PublishService {
     const expectedHash = chapterContentHash({ title: body.title, content: body.content, authorNote: body.authorNote, contentRating });
     if (expectedHash !== body.contentHash) throw AppErrorCode.WBN_011.create();
     const result = await this.db.transaction(async tx => {
-      const [stored] = await tx.select().from(schema.publishedChapters).where(this.chapterFilter(novel.id, ordinal)).for('update');
+      const [stored] = await tx.select(STORED_CHAPTER_COLUMNS).from(schema.publishedChapters).where(this.chapterFilter(novel.id, ordinal)).for('update');
       const base: Omit<PublishAuditEntry, 'outcome'> = {
         action: 'chapter.upsert',
         novelSlug: slug,
@@ -174,7 +182,10 @@ export class PublishService {
     assertNovelOwnership(novel, caller);
 
     const result = await this.db.transaction(async tx => {
-      const deleted = await tx.delete(schema.publishedChapters).where(this.chapterFilter(novel.id, ordinal)).returning();
+      const deleted = await tx
+        .delete(schema.publishedChapters)
+        .where(this.chapterFilter(novel.id, ordinal))
+        .returning({ contentHash: schema.publishedChapters.contentHash, revision: schema.publishedChapters.revision });
       const removed = deleted[0];
       const outcome = removed ? 'applied' : 'noop';
       await this.auditService.record({ ...base, outcome, contentHash: removed?.contentHash, storedRevision: removed?.revision }, tx);

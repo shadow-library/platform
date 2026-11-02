@@ -39,30 +39,31 @@ export class WikiService {
     const novel = await this.catalogService.getReadableNovel(slug, principal);
     const gate = await this.resolveGate(novel.id, principal);
 
-    const entries = await this.db
-      .select({
-        id: schema.wikiEntries.id,
-        entryKey: schema.wikiEntries.entryKey,
-        type: schema.wikiEntries.type,
-        name: schema.wikiEntries.name,
-        imageRef: this.headlineRef(gate),
-        imageVisibleFromOrdinal: schema.wikiEntries.imageVisibleFromOrdinal,
-      })
-      .from(schema.wikiEntries)
-      .where(and(eq(schema.wikiEntries.novelId, novel.id), lte(schema.wikiEntries.firstVisibleOrdinal, gate)))
-      .orderBy(asc(schema.wikiEntries.name));
+    const [entries, [stats]] = await Promise.all([
+      this.db
+        .select({
+          id: schema.wikiEntries.id,
+          entryKey: schema.wikiEntries.entryKey,
+          type: schema.wikiEntries.type,
+          name: schema.wikiEntries.name,
+          imageRef: this.headlineRef(gate),
+          imageVisibleFromOrdinal: schema.wikiEntries.imageVisibleFromOrdinal,
+        })
+        .from(schema.wikiEntries)
+        .where(and(eq(schema.wikiEntries.novelId, novel.id), lte(schema.wikiEntries.firstVisibleOrdinal, gate)))
+        .orderBy(asc(schema.wikiEntries.name)),
+      this.db
+        .select({
+          locked: sql<number>`count(*) filter (where ${schema.wikiEntries.firstVisibleOrdinal} > ${gate})::int`,
+          maxRevision: sql<number>`coalesce(max(${schema.wikiEntries.revision}), 0)::int`,
+        })
+        .from(schema.wikiEntries)
+        .where(eq(schema.wikiEntries.novelId, novel.id)),
+    ]);
     const galleries = await this.fallbackGalleries(
       entries.filter(entry => entry.imageVisibleFromOrdinal !== null && entry.imageVisibleFromOrdinal > gate).map(entry => entry.id),
       gate,
     );
-
-    const [stats] = await this.db
-      .select({
-        locked: sql<number>`count(*) filter (where ${schema.wikiEntries.firstVisibleOrdinal} > ${gate})::int`,
-        maxRevision: sql<number>`coalesce(max(${schema.wikiEntries.revision}), 0)::int`,
-      })
-      .from(schema.wikiEntries)
-      .where(eq(schema.wikiEntries.novelId, novel.id));
 
     const items = entries.map(entry => ({
       entryKey: entry.entryKey,
@@ -92,22 +93,22 @@ export class WikiService {
       .where(and(eq(schema.wikiEntries.novelId, novel.id), eq(schema.wikiEntries.entryKey, entryKey), lte(schema.wikiEntries.firstVisibleOrdinal, gate)));
     if (!entry) throw AppErrorCode.WBN_009.create();
 
-    const facets = await this.db
-      .select({ facetKey: schema.wikiEntryFacets.facetKey, content: schema.wikiEntryFacets.content, sortOrder: schema.wikiEntryFacets.sortOrder })
-      .from(schema.wikiEntryFacets)
-      .where(and(eq(schema.wikiEntryFacets.entryId, entry.id), lte(schema.wikiEntryFacets.visibleFromOrdinal, gate)))
-      .orderBy(asc(schema.wikiEntryFacets.sortOrder));
-
-    const [hidden] = await this.db
-      .select({ value: count() })
-      .from(schema.wikiEntryFacets)
-      .where(and(eq(schema.wikiEntryFacets.entryId, entry.id), gt(schema.wikiEntryFacets.visibleFromOrdinal, gate)));
-
-    const images = await this.db
-      .select({ imageRef: schema.wikiEntryImages.imageRef, caption: schema.wikiEntryImages.caption, sortOrder: schema.wikiEntryImages.sortOrder })
-      .from(schema.wikiEntryImages)
-      .where(and(eq(schema.wikiEntryImages.entryId, entry.id), lte(schema.wikiEntryImages.visibleFromOrdinal, gate)))
-      .orderBy(asc(schema.wikiEntryImages.sortOrder));
+    const [facets, [hidden], images] = await Promise.all([
+      this.db
+        .select({ facetKey: schema.wikiEntryFacets.facetKey, content: schema.wikiEntryFacets.content, sortOrder: schema.wikiEntryFacets.sortOrder })
+        .from(schema.wikiEntryFacets)
+        .where(and(eq(schema.wikiEntryFacets.entryId, entry.id), lte(schema.wikiEntryFacets.visibleFromOrdinal, gate)))
+        .orderBy(asc(schema.wikiEntryFacets.sortOrder)),
+      this.db
+        .select({ value: count() })
+        .from(schema.wikiEntryFacets)
+        .where(and(eq(schema.wikiEntryFacets.entryId, entry.id), gt(schema.wikiEntryFacets.visibleFromOrdinal, gate))),
+      this.db
+        .select({ imageRef: schema.wikiEntryImages.imageRef, caption: schema.wikiEntryImages.caption, sortOrder: schema.wikiEntryImages.sortOrder })
+        .from(schema.wikiEntryImages)
+        .where(and(eq(schema.wikiEntryImages.entryId, entry.id), lte(schema.wikiEntryImages.visibleFromOrdinal, gate)))
+        .orderBy(asc(schema.wikiEntryImages.sortOrder)),
+    ]);
 
     const body: WikiEntryDetailResponse = {
       entryKey: entry.entryKey,
