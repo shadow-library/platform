@@ -141,15 +141,39 @@ describe('Cache Module', () => {
 
       it('should share a single factory invocation between concurrent calls', async () => {
         redisMock.get.mockResolvedValue(null);
-        const factory = mock(async () => {
-          await new Promise(resolve => setTimeout(resolve, 10));
-          return 'computed';
-        });
+        const { promise: computed, resolve } = Promise.withResolvers<string>();
+        const factory = mock(() => computed);
 
-        const [first, second] = await Promise.all([cacheService.getOrSet('flight-key', factory), cacheService.getOrSet('flight-key', factory)]);
+        const calls = Promise.all([cacheService.getOrSet('flight-key', factory), cacheService.getOrSet('flight-key', factory)]);
+        resolve('computed');
+        const [first, second] = await calls;
         expect(first).toBe('computed');
         expect(second).toBe('computed');
         expect(factory).toHaveBeenCalledTimes(1);
+      });
+
+      it('should share a single L2 read between concurrent misses', async () => {
+        redisMock.get.mockResolvedValue(JSON.stringify({ test: 'data' }));
+        const factory = mock(() => ({ test: 'fresh' }));
+
+        const results = await Promise.all([
+          cacheService.getOrSet('shared-read', factory),
+          cacheService.getOrSet('shared-read', factory),
+          cacheService.getOrSet('shared-read', factory),
+        ]);
+        expect(results).toEqual([{ test: 'data' }, { test: 'data' }, { test: 'data' }]);
+        expect(redisMock.get).toHaveBeenCalledTimes(1);
+        expect(factory).not.toHaveBeenCalled();
+      });
+
+      it('should serve an L1 hit without reading L2', async () => {
+        redisMock.get.mockResolvedValue(JSON.stringify({ test: 'data' }));
+        await cacheService.getOrSet('local-key', () => ({ test: 'fresh' }));
+        redisMock.get.mockClear();
+
+        const result = await cacheService.getOrSet('local-key', () => ({ test: 'fresh' }));
+        expect(result).toEqual({ test: 'data' });
+        expect(redisMock.get).not.toHaveBeenCalled();
       });
 
       it('should not cache nullish factory results', async () => {

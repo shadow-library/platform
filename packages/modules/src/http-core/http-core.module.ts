@@ -1,9 +1,12 @@
+import { subscribe, unsubscribe } from 'node:diagnostics_channel';
+
 import { fastifyCookie } from '@fastify/cookie';
 import { PartialDeep } from 'type-fest';
-import { DynamicModule, Inject, Module, OnModuleInit } from '@shadow-library/app';
+import { DynamicModule, Inject, Module, OnModuleDestroy, OnModuleInit } from '@shadow-library/app';
 import { Config, LogData, Logger } from '@shadow-library/common';
-import { ContextService, FASTIFY_INSTANCE, FastifyModule, type ServerInstance } from '@shadow-library/fastify';
+import { ContextService, EventStream, FASTIFY_INSTANCE, FastifyModule, type ServerInstance } from '@shadow-library/fastify';
 
+import { QUERY_CHANNEL } from '../internal.utils';
 import { DEFAULT_CONFIGS, HTTP_CORE_CONFIGS, LOGGER_NAMESPACE } from './http-core.constants';
 import { type HttpCoreModuleOptions } from './http-core.types';
 import { CsrfProtectionMiddleware, RequestInitializerMiddleware } from './middlewares';
@@ -51,9 +54,19 @@ const DEFAULT_HTTP_CORE_CONFIGS = {
   },
 } satisfies HttpCoreModuleOptions;
 
+const REQUEST_QUERY_STATS = Symbol('request-query-stats');
+
+interface RequestQueryStats {
+  count: number;
+  durationMs: number;
+}
+
+const roundMs = (value: number): number => Math.round(value * 10) / 10;
+
 @Module()
-export class HttpCoreModule implements OnModuleInit {
+export class HttpCoreModule implements OnModuleInit, OnModuleDestroy {
   private readonly logger = Logger.getLogger(LOGGER_NAMESPACE, 'HttpCoreModule');
+  private readonly countQuery = (durationMs: unknown): void => this.addRequestQuery(durationMs as number);
 
   constructor(
     @Inject(HTTP_CORE_CONFIGS) private readonly options: HttpCoreModuleOptions,
@@ -72,8 +85,45 @@ export class HttpCoreModule implements OnModuleInit {
     this.logger.info(`${feature} registered with options`, { options: this.options[feature] });
   }
 
+  private addRequestQuery(durationMs: number): void {
+    if (!this.contextService.isInitialized()) return;
+    const stats = this.contextService.get<RequestQueryStats>(REQUEST_QUERY_STATS);
+    if (!stats) this.contextService.set<RequestQueryStats>(REQUEST_QUERY_STATS, { count: 1, durationMs });
+    else {
+      stats.count++;
+      stats.durationMs += durationMs;
+    }
+  }
+
+  /** Logs one line per request that is slow or issues too many queries, and nothing for any other request */
+  private setupRequestMetrics(): void {
+    const durationThreshold = Config.register('http-core.slow-request-threshold', DEFAULT_CONFIGS['http-core.slow-request-threshold']);
+    const queryThreshold = Config.register('http-core.request-query-threshold', DEFAULT_CONFIGS['http-core.request-query-threshold']);
+    if (durationThreshold <= 0 && queryThreshold <= 0) return;
+
+    subscribe(QUERY_CHANNEL, this.countQuery);
+    this.fastify.addHook('onResponse', (request, reply, done) => {
+      const stats = this.contextService.isInitialized() ? this.contextService.get<RequestQueryStats>(REQUEST_QUERY_STATS) : null;
+      const queryCount = stats?.count ?? 0;
+      const isSlow = durationThreshold > 0 && reply.elapsedTime > durationThreshold;
+      const isQueryHeavy = queryThreshold > 0 && queryCount > queryThreshold;
+      if ((isSlow || isQueryHeavy) && !EventStream.isStream(reply)) {
+        const route = request.routeOptions.url ?? '<unmatched>';
+        const durationMs = roundMs(reply.elapsedTime);
+        const queryDurationMs = roundMs(stats?.durationMs ?? 0);
+        const metrics = { method: request.method, route, status: reply.statusCode, durationMs, queryCount, queryDurationMs };
+        this.logger.warn(
+          `${isSlow ? 'Slow request' : 'Query-heavy request'} ${request.method} ${route} -> ${reply.statusCode} took ${durationMs}ms with ${queryCount} queries (${queryDurationMs}ms in db)`,
+          metrics,
+        );
+      }
+      done();
+    });
+  }
+
   async onModuleInit(): Promise<void> {
     await this.fastify.register(fastifyCookie);
+    this.setupRequestMetrics();
 
     Logger.addContextProvider('http', () => {
       if (!this.contextService.isInitialized()) return;
@@ -101,6 +151,10 @@ export class HttpCoreModule implements OnModuleInit {
       const compress = await import('@fastify/compress');
       await this.fastify.register(compress, this.options.compress);
     });
+  }
+
+  onModuleDestroy(): void {
+    unsubscribe(QUERY_CHANNEL, this.countQuery);
   }
 
   static forRoot(options: PartialDeep<HttpCoreModuleOptions> = {}): DynamicModule {

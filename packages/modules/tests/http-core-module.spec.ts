@@ -62,7 +62,7 @@ describe('HttpCore Module', () => {
   class AppModule {}
 
   describe('Request Initializer Middleware', () => {
-    beforeEach(async () => {
+    beforeAll(async () => {
       app = await ShadowFactory.create(AppModule);
       router = app.get(Dispatcher) as FastifyRouter;
     });
@@ -436,7 +436,7 @@ describe('HttpCore Module', () => {
       @Module({ imports: [FastifyModule.forRoot({ imports: [HttpCoreOpenAPI] })] })
       class OpenAPIAppModule {}
 
-      beforeEach(async () => {
+      beforeAll(async () => {
         openapiApp = await ShadowFactory.create(OpenAPIAppModule);
         openapiRouter = openapiApp.get(Dispatcher) as FastifyRouter;
       });
@@ -667,7 +667,6 @@ describe('HttpCore Module', () => {
   });
 
   describe('Compress Configuration', () => {
-    let compressApp: ShadowApplication;
     let compressRouter: FastifyRouter;
 
     @HttpController('/api')
@@ -690,7 +689,7 @@ describe('HttpCore Module', () => {
       }
     }
 
-    async function setupCompression(enabled: boolean) {
+    async function setupCompression(enabled: boolean): Promise<FastifyRouter> {
       const HttpCoreCompress = HttpCoreModule.forRoot({
         csrf: { expiresIn: { seconds: 10 }, refreshLeeway: { second: 1 } },
         compress: { enabled, threshold: 0 },
@@ -699,19 +698,21 @@ describe('HttpCore Module', () => {
       @Module({ imports: [FastifyModule.forRoot({ imports: [HttpCoreCompress], controllers: [CompressController] })] })
       class CompressAppModule {}
 
-      compressApp = await ShadowFactory.create(CompressAppModule);
-      compressRouter = compressApp.get(Dispatcher) as FastifyRouter;
+      const compressApp = await ShadowFactory.create(CompressAppModule);
+      return compressApp.get(Dispatcher) as FastifyRouter;
     }
 
+    beforeAll(async () => {
+      compressRouter = await setupCompression(true);
+    });
+
     it('should support compression when enabled', async () => {
-      await setupCompression(true);
       const response = await compressRouter.mockRequest().get('/api/test').headers({ 'accept-encoding': 'gzip' });
       expect(response.statusCode).toBe(200);
       expect(response.headers['content-encoding']).toBe('gzip');
     });
 
     it('should keep the body a handler sends itself and returns nothing for', async () => {
-      await setupCompression(true);
       const response = await compressRouter.mockRequest().get('/api/document').headers({ 'accept-encoding': 'gzip' });
       expect(response.statusCode).toBe(200);
       expect(response.headers['content-encoding']).toBe('gzip');
@@ -719,15 +720,14 @@ describe('HttpCore Module', () => {
     });
 
     it('should keep the body an async handler sends itself after awaiting', async () => {
-      await setupCompression(true);
       const response = await compressRouter.mockRequest().get('/api/async-document').headers({ 'accept-encoding': 'gzip' });
       expect(response.statusCode).toBe(200);
       expect(gunzipSync(response.rawPayload).toString()).toBe('<p>signing you in</p>');
     });
 
     it('should not compress response when disabled', async () => {
-      await setupCompression(false);
-      const response = await compressRouter.mockRequest().get('/api/test').headers({ 'accept-encoding': 'gzip' });
+      const disabledRouter = await setupCompression(false);
+      const response = await disabledRouter.mockRequest().get('/api/test').headers({ 'accept-encoding': 'gzip' });
       expect(response.statusCode).toBe(200);
       expect(response.headers['content-encoding']).toBeUndefined();
     });

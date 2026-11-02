@@ -12,6 +12,8 @@ declare module '@shadow-library/common' {
     'http-core.helmet.enabled'?: boolean;
     'http-core.compress.enabled'?: boolean;
     'http-core.openapi.enabled'?: boolean;
+    'http-core.slow-request-threshold': number;
+    'http-core.request-query-threshold': number;
 
     'health.host': string;
     'health.port': number;

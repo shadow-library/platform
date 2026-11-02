@@ -68,20 +68,20 @@ export class CacheService {
     this.logger.debug(`L2 cache deleted for key: ${key}`);
   }
 
-  /** Concurrent misses for a key share one factory call; nullish results are returned but not cached */
+  /** Concurrent L1 misses for a key share one L2 read and at most one factory call; nullish results are returned but not cached */
   async getOrSet<T = any>(key: string, factory: () => Promisable<T>, ttlSeconds?: number): Promise<T> {
     const pending = this.inflight.get(key) as Promise<T> | undefined;
     if (pending) return pending;
 
-    const cached = await this.get<T>(key);
-    if (cached !== null) return cached;
+    const local = this.lruCache.get<T>(key);
+    if (local !== undefined && local !== null) return local;
 
-    // A factory for this key may have started while the cache read was awaited
-    const started = this.inflight.get(key) as Promise<T> | undefined;
-    if (started) return started;
-
-    const compute = (async () => {
+    const load = (async () => {
       try {
+        const cached = await this.get<T>(key);
+        if (cached !== null) return cached;
+
+        this.logger.debug(`computing value for key: ${key}`);
         const value = await factory();
         if (value !== null && value !== undefined) await this.set(key, value, ttlSeconds);
         return value;
@@ -90,9 +90,8 @@ export class CacheService {
       }
     })();
 
-    this.inflight.set(key, compute);
-    this.logger.debug(`computing value for key: ${key}`);
-    return compute;
+    this.inflight.set(key, load);
+    return load;
   }
 
   /** Atomically increments a counter in the L2 store, dropping the L1 copy so subsequent reads stay consistent */

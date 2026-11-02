@@ -10,6 +10,8 @@ export const DEFAULT_CONFIGS = {
   'http-core.helmet.enabled': { validateType: 'boolean' },
   'http-core.compress.enabled': { validateType: 'boolean' },
   'http-core.openapi.enabled': { validateType: 'boolean' },
+  'http-core.slow-request-threshold': { validateType: 'number', defaultValue: '1000' },
+  'http-core.request-query-threshold': { validateType: 'number', defaultValue: '50' },
 
   'health.host': { defaultValue: 'localhost' },
   'health.port': { validateType: 'number', defaultValue: '8081' },
