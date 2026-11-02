@@ -2,8 +2,11 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, mock 
 import fs from 'node:fs';
 import path from 'node:path';
 
+import * as chokidar from 'chokidar';
+
 import { Utils } from '@lib/internal.utils';
 import { throwError } from '@lib/shorthands';
+
 import { AppError, Config, type ConfigRecords, ConfigService } from '@shadow-library/common';
 
 interface CustomConfigRecords extends ConfigRecords {
@@ -21,6 +24,10 @@ interface CustomConfigRecords extends ConfigRecords {
   'test.sample.four': string[];
   'reloadable.key': string;
 }
+
+const actualChokidar = { ...chokidar };
+const { exit } = Utils;
+const { log } = ConfigService.prototype as unknown as { log: unknown };
 
 mock.module('chokidar', () => {
   return {
@@ -49,6 +56,12 @@ describe('Config Service', () => {
   }
 
   let config: CustomConfig;
+
+  afterAll(() => {
+    Utils.exit = exit;
+    ConfigService.prototype['log'] = log as ConfigService['log'];
+    void mock.module('chokidar', () => actualChokidar);
+  });
 
   beforeEach(() => {
     Utils.exit = (err: string | Error) => throwError(err instanceof Error ? err : new Error(err));

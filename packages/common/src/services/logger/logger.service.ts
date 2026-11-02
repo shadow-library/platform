@@ -1,5 +1,5 @@
 import fastRedact from 'fast-redact';
-import { createLogger, format as customFormat, Logform } from 'winston';
+import { createLogger, format as customFormat, Logform, type Logger as WinstonLogger } from 'winston';
 import Transport from 'winston-transport';
 
 import { AppError } from '@lib/errors';
@@ -26,7 +26,8 @@ interface ContextProviderConfig {
 /** `LoggerInstance` lives in `logger.types` so `ConfigService` can name it without importing this module, which needs `Config` at construction */
 export type Logger = LoggerInstance;
 
-const noop = new Transport({ log: () => {} }); // eslint-disable-line @typescript-eslint/no-empty-function
+/** `next` must be called: a transport that never acknowledges an entry stalls the logger stream, which then buffers every later entry in memory. */
+const noop = new Transport({ log: (_info: unknown, next: () => void) => next() });
 
 class LoggerStatic {
   private readonly logger = createLogger({ level: Config.get('log.level') });
@@ -34,7 +35,20 @@ class LoggerStatic {
   private readonly contextProviders: ContextProviderConfig[] = [];
 
   constructor() {
+    this.skipDisabledLevels();
     Config.setLogger(this.getLogger(Config.get('app.name'), 'ConfigService'));
+  }
+
+  /** winston runs the logger-level json format on every entry before its transports drop the disabled levels, so a disabled call would still serialise its metadata. */
+  private skipDisabledLevels(): void {
+    const logger = this.logger as unknown as Record<string, unknown> & WinstonLogger;
+    for (const level of Object.keys(logger.levels)) {
+      const log = logger[level] as (...args: unknown[]) => WinstonLogger;
+      logger[level] = function (this: WinstonLogger | undefined, ...args: unknown[]): WinstonLogger {
+        const self = this ?? logger;
+        return self.isLevelEnabled(level) ? log.apply(self, args) : self;
+      };
+    }
   }
 
   private getLogContext(): LogData {

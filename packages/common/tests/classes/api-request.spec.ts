@@ -1,9 +1,13 @@
-import { beforeEach, describe, expect, it, Mock, mock, spyOn } from 'bun:test';
+import { afterAll, beforeEach, describe, expect, it, Mock, mock, spyOn } from 'bun:test';
+import * as undici from 'undici';
 import { request } from 'undici';
 
 import { APIRequest, AppError, ErrorCode, Logger } from '@shadow-library/common';
 
+const actualUndici = { ...undici };
 mock.module('undici', () => ({ request: mock(() => Promise.resolve({ statusCode: 200, headers: {} })) }));
+/** `mock.module` is process-global and survives `mock.restore()`, so the real module is reinstated for later spec files. */
+afterAll(() => void mock.module('undici', () => actualUndici));
 
 describe('APIRequest', () => {
   const mockRequest = request as Mock<any>;
@@ -149,12 +153,12 @@ describe('APIRequest', () => {
     it('should throw API_REQUEST_TIMEOUT when the request exceeds the timeout', async () => {
       mockRequest.mockImplementation((_url: string, options: { signal: AbortSignal }) => abortable(options.signal));
       const failure = await APIRequest.get('/slow')
-        .timeout(10)
+        .timeout(1)
         .execute()
         .catch((error: unknown) => error);
       expect(AppError.is(failure, ErrorCode.API_REQUEST_TIMEOUT)).toBe(true);
       expect((failure as AppError).status).toBe(504);
-      expect((failure as AppError).message).toBe('API request timed out after 10ms');
+      expect((failure as AppError).message).toBe('API request timed out after 1ms');
       expect(((failure as AppError).cause as Error).name).toBe('TimeoutError');
     });
 
@@ -163,7 +167,7 @@ describe('APIRequest', () => {
         Promise.resolve({ statusCode: 200, headers: { 'content-type': 'application/json' }, body: { json: () => abortable(options.signal) } }),
       );
       const failure = await APIRequest.get('/slow-body')
-        .timeout(10)
+        .timeout(1)
         .execute()
         .catch((error: unknown) => error);
       expect(AppError.is(failure, ErrorCode.API_REQUEST_TIMEOUT)).toBe(true);

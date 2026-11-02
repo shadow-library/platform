@@ -10,7 +10,7 @@ describe('silenceLogger', () => {
 
   beforeEach(() => {
     messages.length = 0;
-    Logger.addTransport(capture);
+    Logger['logger'].add(capture);
   });
 
   afterEach(() => void Logger['logger'].remove(capture));
