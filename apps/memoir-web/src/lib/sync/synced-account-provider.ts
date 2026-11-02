@@ -101,6 +101,7 @@ export class SyncedAccountProvider implements AccountProvider {
   private readonly deletion: SyncedDeletion;
   /** In-memory so a background refetch can't lose it by re-reading an already-cleared jobId; reset on prepare/dismiss. */
   private expiredExportNotice: string | null = null;
+  private accountRead: Promise<AccountResponseDto> | null = null;
 
   constructor(
     private readonly sync: SyncEngine,
@@ -109,8 +110,14 @@ export class SyncedAccountProvider implements AccountProvider {
     this.deletion = new SyncedDeletion(sync, principal);
   }
 
-  private async account(): Promise<AccountResponseDto> {
-    return accountApi.get();
+  /** Day, notification and onboarding reads all answer from `GET /v1/account`, so reads that overlap share one request. */
+  private account(): Promise<AccountResponseDto> {
+    if (this.accountRead) return this.accountRead;
+    const read = accountApi.get().finally(() => {
+      if (this.accountRead === read) this.accountRead = null;
+    });
+    this.accountRead = read;
+    return read;
   }
 
   async getDay(): Promise<DayPreferences> {
@@ -235,6 +242,8 @@ export class SyncedAccountProvider implements AccountProvider {
   }
 
   async dispatchCommand(command: AccountCommand): Promise<SettledCommandResult> {
+    // A read the command's invalidation triggers must not join one that left before the write.
+    this.accountRead = null;
     switch (command.type) {
       case 'day.set':
         return this.patchDay(command.patch);

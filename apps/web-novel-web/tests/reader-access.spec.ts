@@ -3,7 +3,7 @@ import { isRedirect } from '@tanstack/react-router';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { createAuthApi } from '@shadow-library/web/auth';
 
-import { apiClient, readAccessMode, requireReaderAccess, sessionKeys } from '@/lib/apis';
+import { apiClient, readAccessMode, requireReaderAccess, requireSession, sessionKeys, sessionQueryOptions } from '@/lib/apis';
 
 /** The transport's browser path calls global `fetch`, so a stub answering per path stands in for webnovel-server. */
 type Answer = { status: number; body?: unknown } | 'offline';
@@ -95,6 +95,35 @@ describe('requireReaderAccess', () => {
     await requireReaderAccess(queryClient, '/');
 
     expect(queryClient.getQueryState(sessionKeys.session)?.dataUpdatedAt).toBe(1);
+  });
+});
+
+describe('requireSession', () => {
+  it('should seed the session the chrome renders so the gated screen does not read it again', async () => {
+    answers = { '/api/auth/session': SIGNED_IN };
+    const queryClient = new QueryClient();
+
+    expect(await requireSession(queryClient, '/library')).toEqual({ userId: 'reader-1' });
+    expect(await queryClient.ensureQueryData(sessionQueryOptions())).toEqual({ userId: 'reader-1' });
+    expect(requested).toEqual(['/api/auth/session']);
+  });
+
+  it('should replace a guest read the chrome cached before the reader signed in', async () => {
+    answers = { '/api/auth/session': SIGNED_IN };
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(sessionKeys.session, null);
+
+    await requireSession(queryClient, '/library');
+
+    expect(queryClient.getQueryData(sessionKeys.session)).toEqual({ userId: 'reader-1' });
+  });
+
+  it('should redirect a guest to login without seeding a session', async () => {
+    answers = { '/api/auth/session': SIGNED_OUT };
+    const queryClient = new QueryClient();
+
+    expect(isRedirect(await requireSession(queryClient, '/history').catch((error: unknown) => error))).toBe(true);
+    expect(queryClient.getQueryData(sessionKeys.session)).toBeUndefined();
   });
 });
 

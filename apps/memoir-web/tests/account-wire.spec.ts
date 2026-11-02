@@ -155,6 +155,36 @@ describe('Account settings over the wire', () => {
     expect(projectFinanceRows(live.engine.domains()).settings.monthlyBudgetMinor).toBe(160000);
   });
 
+  it('should answer overlapping day, notification and onboarding reads with one account request', async () => {
+    const fake = httpFake({ 'GET /api/v1/account': () => ({ body: account() }) });
+    const accounts = await provider();
+
+    await Promise.all([accounts.getDay(), accounts.getNotifications(), accounts.getOnboarding()]);
+    expect(fake.count('GET', '/api/v1/account')).toBe(1);
+
+    await accounts.getDay();
+    expect(fake.count('GET', '/api/v1/account')).toBe(2);
+  });
+
+  it('should not answer a read issued after a save from a request that left before it', async () => {
+    let release = (): void => undefined;
+    const fake = httpFake({
+      'GET /api/v1/account': (_, attempt) =>
+        attempt === 0 ? new Promise(resolve => (release = () => resolve({ body: account() }))) : { body: account({ scheduleStartMin: 420 }) },
+      'PATCH /api/v1/account': () => ({ body: account({ scheduleStartMin: 420 }) }),
+    });
+    const accounts = await provider();
+
+    const before = accounts.getDay();
+    await accounts.dispatchCommand({ type: 'day.set', patch: { wakeTime: '07:00' } });
+    const after = await accounts.getDay();
+    release();
+
+    expect((await before).wakeTime).toBe('06:30');
+    expect(after.wakeTime).toBe('07:00');
+    expect(fake.count('GET', '/api/v1/account')).toBe(2);
+  });
+
   it('should patch one notification category without touching the others', async () => {
     const fake = httpFake({ 'PATCH /api/v1/account': () => ({ body: account() }) });
 
