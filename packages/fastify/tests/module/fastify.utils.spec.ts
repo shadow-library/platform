@@ -357,6 +357,49 @@ describe('Create Fastify Instance', () => {
     expect(result.error.getErrors()).toStrictEqual([{ field: 'params.id', msg: 'Invalid user id' }]);
   });
 
+  describe('response serializers', () => {
+    type BuildSerializer = (externalSchemas: unknown, options: unknown) => (route: object) => unknown;
+    const errorSchema = { $id: 'ErrorResponse', type: 'object', properties: { code: { type: 'string' }, message: { type: 'string' } } };
+    const userSchema = { $id: 'User', type: 'object', properties: { id: { type: 'string' } }, additionalProperties: false };
+    const route = (url: string, schema: object) => ({ schema, url, method: 'GET', httpStatus: '200' });
+    const getBuildSerializer = (): BuildSerializer =>
+      (fastify.mock.calls.at(-1) as unknown as [{ schemaController: { compilersFactory: { buildSerializer: BuildSerializer } } }])[0].schemaController.compilersFactory
+        .buildSerializer;
+
+    it('should compile one serializer for every route that shares a response schema', async () => {
+      await createFastifyInstance({ host: '', port: 3000, errorHandler });
+      const compile = getBuildSerializer()({}, {});
+
+      const first = compile(route('/a', errorSchema));
+      const second = compile(route('/b', structuredClone(errorSchema)));
+
+      expect(second).toBe(first);
+      expect(compile(route('/c', userSchema))).not.toBe(first);
+    });
+
+    it('should serialize through a shared serializer as its own schema declares', async () => {
+      await createFastifyInstance({ host: '', port: 3000, errorHandler });
+      const compile = getBuildSerializer()({}, {});
+      compile(route('/a', userSchema));
+
+      const serialize = compile(route('/b', userSchema)) as (data: unknown) => string;
+
+      expect(serialize({ id: 'u1', extra: true })).toBe('{"id":"u1"}');
+    });
+
+    it('should compile per route through a custom serializer factory, which may key its output on the route', async () => {
+      const compile = jest.fn(() => () => '');
+      const customFactory = jest.fn(() => compile);
+      await createFastifyInstance({ host: '', port: 3000, errorHandler, schemaController: { compilersFactory: { buildSerializer: customFactory } } } as never);
+      const routeCompile = getBuildSerializer()({}, {});
+
+      routeCompile(route('/a', errorSchema));
+      routeCompile(route('/b', errorSchema));
+
+      expect(compile).toHaveBeenCalledTimes(2);
+    });
+  });
+
   it('should apply custom ajv options when config.ajv.customOptions is provided', async () => {
     const customOptions = { verbose: true };
     instance = (await createFastifyInstance({ host: '', port: 3000, errorHandler, ajv: { customOptions } })) as unknown as FastifyInstance;

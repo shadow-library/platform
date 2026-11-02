@@ -1,8 +1,9 @@
-import { beforeEach, describe, expect, it, jest, type Mock } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, jest, type Mock } from 'bun:test';
 import { fastify, FastifyInstance } from 'fastify';
 import { DispatchMetadata } from '@shadow-library/app';
 import { ClassSchema, Field, Schema } from '@shadow-library/class-schema';
 import { AppError, Config, Fn, Logger, utils, withThis } from '@shadow-library/common';
+import { setConfig } from '@shadow-library/common/testing';
 
 import { HTTP_CONTROLLER_TYPE } from '@lib/constants';
 import { ContextService, FastifyModule, FastifyRouter, HttpMethod, Sensitive, ServerMetadata, Transform } from '@shadow-library/fastify';
@@ -888,8 +889,10 @@ describe('FastifyRouter', () => {
   describe('getRequestLogger', () => {
     let httpLogger: jest.Spied<Logger['http']>;
     let contextSpy: jest.Spied<ContextService['get']>;
+    let restoreConfig: () => void;
 
     beforeEach(() => {
+      restoreConfig = setConfig({ 'log.level': 'http' });
       httpLogger = jest.spyOn(router['logger'], 'http').mockReturnValue();
       contextSpy = jest.spyOn(context, 'get').mockImplementation((key: string | symbol) => (key.toString() === 'Symbol(rid)' ? 'test-rid' : null));
     });
@@ -1016,6 +1019,23 @@ describe('FastifyRouter', () => {
       expect(res.raw.on).toHaveBeenCalledWith('finish', expect.any(Function));
       expect(httpLogger).not.toHaveBeenCalled();
     });
+
+    it('should build no request log metadata while the http log level is disabled', () => {
+      restoreConfig();
+      restoreConfig = setConfig({ 'log.level': 'info' });
+      const body = { password: 'hunter2' };
+      const req = { body, routeOptions: { config: {} } } as any;
+      const res = { raw: { on: jest.fn((_, callback: () => void) => callback()) } } as any;
+      const clone = jest.spyOn(globalThis, 'structuredClone');
+
+      router['getRequestLogger']().call({} as any, req, res, jest.fn());
+
+      expect(contextSpy).not.toHaveBeenCalled();
+      expect(clone).not.toHaveBeenCalled();
+      expect(httpLogger).not.toHaveBeenCalled();
+    });
+
+    afterEach(() => restoreConfig());
   });
 
   describe('data transformers', () => {

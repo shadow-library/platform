@@ -132,10 +132,19 @@ function openClosedObjects(schema: unknown): unknown {
   return copy;
 }
 
-function buildOpenObjectSerializer(buildSerializer: SerializerFactory): SerializerFactory {
+/** A custom factory may key its output on the route (the standalone serializer stores code per route), so only the default one shares serializers. */
+function buildOpenObjectSerializer(buildSerializer: SerializerFactory, isShared: boolean): SerializerFactory {
   return (externalSchemas, options) => {
     const compile = buildSerializer(openClosedObjects(externalSchemas), options);
-    return route => compile({ ...route, schema: openClosedObjects(route.schema) });
+    const serializers = new Map<string, ReturnType<typeof compile>>();
+    return route => {
+      const schema = openClosedObjects(route.schema);
+      if (!isShared) return compile({ ...route, schema });
+      const key = JSON.stringify(schema);
+      let serializer = serializers.get(key);
+      if (!serializer) serializers.set(key, (serializer = compile({ ...route, schema })));
+      return serializer;
+    };
   };
 }
 
@@ -153,7 +162,8 @@ export async function createFastifyInstance(config: FastifyConfig, fastifyFactor
   }
 
   const { schemaController } = config;
-  const buildSerializer = buildOpenObjectSerializer(schemaController?.compilersFactory?.buildSerializer ?? SerializerSelector());
+  const customSerializer = schemaController?.compilersFactory?.buildSerializer;
+  const buildSerializer = buildOpenObjectSerializer(customSerializer ?? SerializerSelector(), !customSerializer);
   const instance = fastify({ ...options, schemaController: { ...schemaController, compilersFactory: { ...schemaController?.compilersFactory, buildSerializer } } });
   instance.setSchemaErrorFormatter(formatSchemaErrors);
   instance.setNotFoundHandler(notFoundHandler);

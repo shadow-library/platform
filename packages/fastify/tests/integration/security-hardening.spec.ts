@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, jest } from 'bun:test';
 import { Dispatcher, Module, ShadowApplication, ShadowFactory } from '@shadow-library/app';
+import { setConfig } from '@shadow-library/common/testing';
 
 import { Body, FastifyModule, FastifyRouter, Get, HttpController, type HttpRequest, Post, Req } from '@shadow-library/fastify';
 
@@ -81,6 +82,7 @@ describe('request body log redaction', () => {
   afterAll(() => app.stop());
 
   it('should mask sensitive fields in the logged metadata while the handler receives the real values', async () => {
+    const restoreConfig = setConfig({ 'log.level': 'http' });
     const httpLogger = jest.spyOn(router['logger'], 'http').mockReturnValue();
     const body = {
       username: 'alice',
@@ -93,6 +95,7 @@ describe('request body log redaction', () => {
     };
 
     const response = await router.mockRequest().post('/security/echo').body(body);
+    restoreConfig();
 
     expect(response.statusCode).toBe(201);
     expect(response.json()).toStrictEqual(body);
