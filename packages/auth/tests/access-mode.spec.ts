@@ -3,7 +3,7 @@ import 'reflect-metadata';
 import { Dispatcher, Module, type ShadowApplication, ShadowFactory } from '@shadow-library/app';
 import { AppError } from '@shadow-library/common';
 import { type RestoreConfig, setConfig } from '@shadow-library/common/testing';
-import { type ContextService, FastifyModule } from '@shadow-library/fastify';
+import { type ContextService, FASTIFY_INSTANCE, FastifyModule } from '@shadow-library/fastify';
 
 import { AuthClient, AuthErrorCode } from '@shadow-library/auth';
 import {
@@ -133,6 +133,7 @@ describe('access route', () => {
       class TestAppModule {}
 
       app = await ShadowFactory.create(TestAppModule);
+      await (app.get(FASTIFY_INSTANCE) as { ready(): PromiseLike<unknown> }).ready();
     });
 
     afterAll(async () => {

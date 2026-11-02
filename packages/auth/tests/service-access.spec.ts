@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterAll, afterEach, beforeAll, describe, expect, it, jest } from 'bun:test';
 
 import { AuthClient } from '@shadow-library/auth';
 import { createTestIdP, TestIdP } from '@shadow-library/auth/testing';
@@ -10,10 +10,11 @@ const RULE = { callerClientId: 'svc-indexer', method: 'POST', path: '/api/v1/ind
 
 const SERVICE_ACCESS_PATH = '/api/v1/authz/service-access';
 
-// Only for proving a timer does not fire; every other wait is driven by the mock's request counter
-const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
-
 const REFRESH_SECONDS = 0.05;
+const REFRESH_MS = REFRESH_SECONDS * 1000;
+
+// `setImmediate` is not faked, and runs only once every microtask a fired refresh queued has drained
+const settle = (): Promise<void> => new Promise(resolve => setImmediate(resolve));
 
 describe('service access rules', () => {
   let idp: TestIdP;
@@ -22,8 +23,13 @@ describe('service access rules', () => {
     idp = await createTestIdP({ clientId: CLIENT.id, clientSecret: CLIENT.secret });
   });
   afterAll(() => idp.stop());
+  afterEach(() => jest.useRealTimers());
 
   const client = (refreshSeconds = REFRESH_SECONDS): AuthClient => new AuthClient({ issuer: idp.issuer, audience: AUDIENCE, client: CLIENT, serviceAccess: { refreshSeconds } });
+
+  // No socket in the path, so a refresh fired by a faked interval completes before `settle` resolves and the next tick cannot coalesce into it
+  const inProcessClient = (): AuthClient =>
+    new AuthClient({ issuer: idp.issuer, audience: AUDIENCE, client: CLIENT, serviceAccess: { refreshSeconds: REFRESH_SECONDS }, fetch: idp.transport });
 
   it('should deny every caller until the rules have been loaded', async () => {
     const auth = client();
@@ -59,12 +65,16 @@ describe('service access rules', () => {
   });
 
   it('should keep re-fetching on the interval so nothing has to drive the refresh', async () => {
-    const auth = client();
+    jest.useFakeTimers();
+    const auth = inProcessClient();
     await auth.loadServiceAccess();
 
-    const target = idp.getRequestCount(SERVICE_ACCESS_PATH) + 2;
-    await idp.waitForRequest(SERVICE_ACCESS_PATH, target);
-    expect(idp.getRequestCount(SERVICE_ACCESS_PATH)).toBeGreaterThanOrEqual(target);
+    const before = idp.getRequestCount(SERVICE_ACCESS_PATH);
+    for (const tick of [1, 2, 3]) {
+      jest.advanceTimersByTime(REFRESH_MS);
+      await settle();
+      expect(idp.getRequestCount(SERVICE_ACCESS_PATH)).toBe(before + tick);
+    }
     auth.stop();
   });
 
@@ -94,14 +104,19 @@ describe('service access rules', () => {
   });
 
   it('should stop refreshing once the client is stopped', async () => {
-    const auth = client();
+    jest.useFakeTimers();
+    const auth = inProcessClient();
     await auth.loadServiceAccess();
-    auth.stop();
 
     const before = idp.getRequestCount(SERVICE_ACCESS_PATH);
-    const fired = await Promise.race([idp.waitForRequest(SERVICE_ACCESS_PATH, before + 1).then(() => true), sleep(REFRESH_SECONDS * 1000 * 4).then(() => false)]);
-    expect(fired).toBe(false);
-    expect(idp.getRequestCount(SERVICE_ACCESS_PATH)).toBe(before);
+    jest.advanceTimersByTime(REFRESH_MS);
+    await settle();
+    expect(idp.getRequestCount(SERVICE_ACCESS_PATH)).toBe(before + 1);
+
+    auth.stop();
+    jest.advanceTimersByTime(REFRESH_MS * 4);
+    await settle();
+    expect(idp.getRequestCount(SERVICE_ACCESS_PATH)).toBe(before + 1);
   });
 
   it('should refuse a non-positive refresh interval rather than spinning', () => {
