@@ -102,7 +102,10 @@ export class IllustrationPackBuilder {
   private async chapterSubjectSections(projectId: bigint, chapter: number, disclosure?: WriterDisclosurePolicy): Promise<ContextSection[]> {
     const scrub = (text: string, field: WriterField): string => (disclosure ? disclosure.scrub(text, field) : text);
     const [chapterRow, appearances] = await Promise.all([
-      this.db.query.chapters.findFirst({ where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, chapter)) }),
+      this.db.query.chapters.findFirst({
+        columns: { title: true, summary: true, isolated: true },
+        where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, chapter)),
+      }),
       this.db.query.entityAppearances.findMany({ where: and(eq(schema.entityAppearances.projectId, projectId), eq(schema.entityAppearances.chapter, chapter)) }),
     ]);
     if (!chapterRow) return [];

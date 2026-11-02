@@ -11,6 +11,7 @@ export type SchemaParseResult<T> = { success: true; data: T } | { success: false
 
 const ajv = new Ajv({ allErrors: true, strict: true });
 const compiledCache = new Map<string, ValidateFunction>();
+const compiledByClass = new WeakMap<SchemaClass, ValidateFunction>();
 
 // class-schema names primitive-item definitions with bare ids ('String', 'Integer', ...) while every
 // class-backed definition is id'd as `class-schema:Name-N`. AJV treats the latter as a URI with scheme
@@ -39,10 +40,15 @@ function inlinePrimitiveRefs(node: unknown): unknown {
 // Mirrors @shadow-library/fastify's own compileSchema: register every nested `definitions` entry
 // under its own $id, then the root schema under its own $id, so $ref resolution works across calls.
 function compile(Class: SchemaClass): ValidateFunction {
+  const byClass = compiledByClass.get(Class);
+  if (byClass) return byClass;
   const rawSchema = ClassSchema.generate(Class);
   const schema = inlinePrimitiveRefs(rawSchema) as typeof rawSchema;
   const cached = compiledCache.get(schema.$id);
-  if (cached) return cached;
+  if (cached) {
+    compiledByClass.set(Class, cached);
+    return cached;
+  }
 
   const { definitions, ...root } = schema;
   for (const def of Object.values(definitions ?? {})) {
@@ -53,6 +59,7 @@ function compile(Class: SchemaClass): ValidateFunction {
   const validateFn = ajv.getSchema(schema.$id);
   if (!validateFn) throw AppError.internal(`[validateSchema] failed to compile schema '${schema.$id}'`);
   compiledCache.set(schema.$id, validateFn);
+  compiledByClass.set(Class, validateFn);
   return validateFn;
 }
 

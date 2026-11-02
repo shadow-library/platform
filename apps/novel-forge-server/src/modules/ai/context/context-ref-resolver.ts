@@ -38,7 +38,7 @@ interface ResolvedRefRows {
   worldFactRows: WorldFactRow[];
   threadMap: Map<string, typeof schema.plotThreads.$inferSelect>;
   mysteryMap: Map<string, typeof schema.mysteries.$inferSelect>;
-  chapterMap: Map<number, typeof schema.chapters.$inferSelect>;
+  chapterMap: Map<number, Pick<typeof schema.chapters.$inferSelect, 'number' | 'title' | 'summary' | 'status' | 'isolated'>>;
   volumeMap: Map<string, schema.Plan.Volume>;
   bibleDocMap: Map<string, typeof schema.bibleDocuments.$inferSelect>;
   factMap: Map<string, CanonFactRow>;
@@ -132,7 +132,12 @@ export class ContextRefResolver {
         ? this.db.query.plotThreads.findMany({ where: and(eq(schema.plotThreads.projectId, projectId), inArray(schema.plotThreads.threadKey, threadKeys)) })
         : [],
       mysteryKeys.length > 0 ? this.db.query.mysteries.findMany({ where: and(eq(schema.mysteries.projectId, projectId), inArray(schema.mysteries.mysteryKey, mysteryKeys)) }) : [],
-      chapterNumbers.length > 0 ? this.db.query.chapters.findMany({ where: and(eq(schema.chapters.projectId, projectId), inArray(schema.chapters.number, chapterNumbers)) }) : [],
+      chapterNumbers.length > 0
+        ? this.db.query.chapters.findMany({
+            columns: { number: true, title: true, summary: true, status: true, isolated: true },
+            where: and(eq(schema.chapters.projectId, projectId), inArray(schema.chapters.number, chapterNumbers)),
+          })
+        : [],
       volumeKeys.length > 0 ? this.db.query.volumes.findMany({ where: and(eq(schema.volumes.projectId, projectId), inArray(schema.volumes.volumeKey, volumeKeys)) }) : [],
       bibleDocRefs.length > 0
         ? this.db.query.bibleDocuments.findMany({

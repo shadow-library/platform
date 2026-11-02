@@ -1,11 +1,12 @@
-import { describe, expect, it, mock } from 'bun:test';
+import { beforeAll, describe, expect, it, mock, spyOn } from 'bun:test';
 
 import { type BaseMessage } from '@langchain/core/messages';
+import { ClassSchema, Field, Schema } from '@shadow-library/class-schema';
 
 import { ModelRouterService } from '@modules/ai/model-router.service';
 import { notesOrganisePrompt } from '@modules/ai/prompts/notes-organise.prompt';
 import { NotesOrganiseSchema } from '@modules/ai/schemas/notes-organise.schema';
-import { toHostedPromptSchema } from '@modules/ai/schemas/validate';
+import { parseSchema, toHostedPromptSchema } from '@modules/ai/schemas/validate';
 
 import { FakeSynapse } from './synapse-fakes';
 
@@ -48,6 +49,8 @@ describe('toHostedPromptSchema', () => {
 });
 
 describe('ModelRouterService.buildMessages', () => {
+  beforeAll(() => parseSchema(NotesOrganiseSchema, {}));
+
   it('should show a hosted provider the descriptions and constraints it will be judged against', async () => {
     const invoke = mock<(messages: BaseMessage[]) => Promise<{ content: string }>>(async () => ({
       content: JSON.stringify({
@@ -71,5 +74,25 @@ describe('ModelRouterService.buildMessages', () => {
     expect(schemaMessage).toContain('JSON schema');
     expect(schemaMessage).toContain('the story as the notes place it in time, in story order');
     expect(schemaMessage).toContain('"minItems":1');
+  });
+});
+
+@Schema()
+class ParsedOnce {
+  @Field({ minLength: 1 })
+  name: string;
+}
+
+describe('parseSchema', () => {
+  it('should generate a class’s schema once however many replies it validates', () => {
+    const generate = spyOn(ClassSchema, 'generate');
+    try {
+      const results = [parseSchema(ParsedOnce, { name: 'Mira' }), parseSchema(ParsedOnce, { name: '' }), parseSchema(ParsedOnce, { name: 'Oren' })];
+
+      expect(results.map(result => result.success)).toEqual([true, false, true]);
+      expect(generate.mock.calls.filter(([Class]) => Class === ParsedOnce)).toHaveLength(1);
+    } finally {
+      generate.mockRestore();
+    }
   });
 });
