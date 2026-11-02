@@ -12,7 +12,7 @@ import { UserEmailService, UserService } from '@server/modules/identity/user';
 import { AuditService } from '@server/modules/infrastructure/audit';
 import { OAuthClient } from '@server/modules/infrastructure/datastore';
 import { GENERAL_LIMIT, GENERAL_WINDOW_SECONDS, IP_GENERAL_BUCKET, RateLimiterService } from '@server/modules/infrastructure/security';
-import { ApplicationAccessService } from '@server/modules/system/application';
+import { ApplicationAccessService, type UserApplicationAccess } from '@server/modules/system/application';
 import { PolicyService } from '@server/modules/system/policy';
 
 import { AccessTokenService } from './access-token.service';
@@ -619,8 +619,9 @@ export class OAuthService {
       throw AppErrorCode.OAU_003.create();
     }
 
+    let access: UserApplicationAccess;
     try {
-      await this.applicationAccessService.assertUserAccess(rotated.context.userId, client.applicationId);
+      access = await this.applicationAccessService.assertUserAccess(rotated.context.userId, client.applicationId);
     } catch (error) {
       if (!AppError.is(error, AppErrorCode.APP_006) && !AppError.is(error, AppErrorCode.APP_007)) throw error;
       await this.refreshTokenService.revokeFamily(rotated.familyId, 'ADMIN');
@@ -633,8 +634,7 @@ export class OAuthService {
       throw AppErrorCode.OAU_003.create();
     }
 
-    const granting = await this.applicationAccessService.listGrantingOrganisations(rotated.context.userId, client.applicationId);
-    if (rotated.context.organisationId !== null && !granting.some(organisation => organisation.id === rotated.context.organisationId)) {
+    if (rotated.context.organisationId !== null && !access.organisations.some(organisation => organisation.id === rotated.context.organisationId)) {
       await this.refreshTokenService.revokeFamily(rotated.familyId, 'ADMIN');
       this.logger.warn('refresh rejected: the organisation this family was opened in no longer grants the application', {
         securityEvent: 'oauth.refresh_access_revoked',

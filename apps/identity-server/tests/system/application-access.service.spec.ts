@@ -38,6 +38,54 @@ function serviceFor(organisation: Organisation): ApplicationAccessService {
   return new ApplicationAccessService(new FakeDatabaseService({ postgres }));
 }
 
+class CountingRedis extends InMemoryRedis {
+  roundTrips = 0;
+
+  override multi(): ReturnType<InMemoryRedis['multi']> {
+    const transaction = super.multi();
+    const exec = transaction.exec.bind(transaction);
+    transaction.exec = () => (this.roundTrips++, exec());
+    return transaction;
+  }
+
+  override get(key: string): Promise<string | null> {
+    this.roundTrips++;
+    return super.get(key);
+  }
+
+  override mget(...keys: string[]): Promise<(string | null)[]> {
+    this.roundTrips++;
+    return super.mget(...keys);
+  }
+
+  override set(...args: Parameters<InMemoryRedis['set']>): ReturnType<InMemoryRedis['set']> {
+    this.roundTrips++;
+    return super.set(...args);
+  }
+}
+
+function userAccessHarness(memberships: { organisation: Organisation; isDefault: boolean }[], application: Application) {
+  const queries: string[] = [];
+  const recorded =
+    <T>(name: string, value: T) =>
+    (): Promise<T> => (queries.push(name), Promise.resolve(value));
+  const postgres = {
+    query: {
+      applications: { findFirst: recorded('applications.findFirst', application), findMany: recorded('applications.findMany', [PUBLIC_APP, INTERNAL_APP]) },
+      organisationMembers: {
+        findMany: recorded(
+          'organisationMembers.findMany',
+          memberships.map(membership => ({ ...membership, status: 'ACTIVE', statusUntil: null })),
+        ),
+      },
+      scimDirectory: { findMany: recorded('scimDirectory.findMany', []) },
+      organisationApplications: { findMany: recorded('organisationApplications.findMany', []) },
+    },
+  };
+  const redis = new CountingRedis();
+  return { service: new ApplicationAccessService(new FakeDatabaseService({ postgres, redis })), queries, redis };
+}
+
 describe('ApplicationAccessService', () => {
   it('should withhold INTERNAL applications from a team that only borrows the platform organisation name', async () => {
     const namesake = organisationRow({ name: PLATFORM_ORG_NAME, isPlatform: false });
@@ -97,6 +145,38 @@ describe('ApplicationAccessService', () => {
       await new ApplicationAccessService(new FakeDatabaseService({ redis })).invalidateGlobal();
 
       expect(await redis.ttl('app_access_version:global')).toBe(-1);
+    });
+  });
+  describe('assertUserAccess', () => {
+    const personal = organisationRow({ id: 1n, slug: 'me', type: 'PERSONAL' });
+    const teams = [organisationRow({ id: 9n, slug: 'team-b' }), organisationRow({ id: 7n, slug: 'team-a' })];
+
+    it('should return every granting organisation and the active one from a single read of the memberships and one cache round trip for all of them', async () => {
+      const { service, queries, redis } = userAccessHarness(
+        [personal, ...teams].map(organisation => ({ organisation, isDefault: organisation.id === 9n })),
+        PUBLIC_APP,
+      );
+      await service.assertUserAccess(42n, PUBLIC_APP.id);
+      queries.length = 0;
+      redis.roundTrips = 0;
+
+      const access = await service.assertUserAccess(42n, PUBLIC_APP.id);
+
+      expect(access.organisations.map(organisation => organisation.id)).toEqual([1n, 7n, 9n]);
+      expect(access.activeOrganisationId).toBe(9n);
+      expect(queries.sort()).toEqual(['applications.findFirst', 'organisationMembers.findMany', 'scimDirectory.findMany']);
+      expect(redis.roundTrips).toBe(2);
+    });
+
+    it('should refuse an application no membership grants, hiding an INTERNAL one as unknown', async () => {
+      const team = organisationRow({ appAccessMode: 'ASSIGNED_ONLY' });
+
+      await expect(userAccessHarness([{ organisation: team, isDefault: true }], PUBLIC_APP).service.assertUserAccess(42n, PUBLIC_APP.id)).rejects.toMatchObject({
+        code: 'APP_007',
+      });
+      await expect(userAccessHarness([{ organisation: team, isDefault: true }], INTERNAL_APP).service.assertUserAccess(42n, INTERNAL_APP.id)).rejects.toMatchObject({
+        code: 'APP_006',
+      });
     });
   });
 });

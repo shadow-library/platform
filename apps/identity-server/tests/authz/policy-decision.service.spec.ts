@@ -3,8 +3,36 @@ import { describe, expect, it } from 'bun:test';
 import { FakeDatabaseService, InMemoryRedis } from '@shadow-library/modules/testing';
 
 import { PolicyDecisionService } from '@server/modules/authz/policy-decision.service';
+import { schema } from '@server/modules/infrastructure/datastore';
 
 const THIRTY_DAYS = 30 * 24 * 60 * 60;
+
+function recordingReader() {
+  const queries: string[] = [];
+  const state = { inflight: 0, maxInflight: 0 };
+  const issue = <T>(name: string, value: T): Promise<T> => {
+    queries.push(name);
+    state.maxInflight = Math.max(state.maxInflight, ++state.inflight);
+    return Promise.resolve().then(() => (state.inflight--, value));
+  };
+  const rowsFor = (table: unknown): [string, unknown[]] => {
+    if (table === schema.applicationRoles) return ['defaultRoles', [{ id: 3 }]];
+    if (table === schema.rolePermissions) return ['permissions', [{ name: 'docs.read' }]];
+    return queries.includes('explicitRoles') ? ['orgWideRoles', [{ roleId: 2 }]] : ['explicitRoles', [{ roleId: 1 }]];
+  };
+  const reader = {
+    select: () => ({
+      from: (table: unknown) => {
+        const chain = { innerJoin: () => chain, where: () => issue(...rowsFor(table)) };
+        return chain;
+      },
+    }),
+    query: {
+      organisationMembers: { findFirst: () => issue('membership', { status: 'ACTIVE', statusUntil: null, organisation: { status: 'ACTIVE' } }) },
+    },
+  };
+  return { reader, queries, state };
+}
 
 describe('PolicyDecisionService', () => {
   describe('invalidatePrincipal', () => {
@@ -40,6 +68,32 @@ describe('PolicyDecisionService', () => {
 
       expect(await service.getAuthzVersion(principal)).toBe(1);
       expect(await redis.ttl('authz_version:USER:11')).toBeGreaterThan(THIRTY_DAYS - 120);
+    });
+  });
+
+  describe('check', () => {
+    it('should read the explicit roles, membership and default roles of a user together, before the organisation-wide roles that hinge on membership', async () => {
+      const { reader, queries, state } = recordingReader();
+      const service = new PolicyDecisionService(new FakeDatabaseService({ postgres: reader }));
+
+      const decision = await service.check({ principal: { type: 'USER', id: '42' }, organisationId: '7', action: 'docs.read' });
+
+      expect(decision.decision).toBe('PERMIT');
+      expect(queries).toEqual(['explicitRoles', 'membership', 'defaultRoles', 'orgWideRoles', 'permissions']);
+      expect(state.maxInflight).toBe(3);
+    });
+
+    it('should keep the reads one at a time when they go through the transaction of a caller', async () => {
+      const pool = recordingReader();
+      const transaction = recordingReader();
+      const service = new PolicyDecisionService(new FakeDatabaseService({ postgres: pool.reader }));
+
+      const permissions = await service.listPermissions({ type: 'USER', id: '42' }, '7', { applicationId: 5, executor: transaction.reader as never });
+
+      expect([...permissions]).toEqual(['docs.read']);
+      expect(transaction.queries).toEqual(['explicitRoles', 'membership', 'defaultRoles', 'orgWideRoles', 'permissions']);
+      expect(transaction.state.maxInflight).toBe(1);
+      expect(pool.queries).toEqual([]);
     });
   });
 });

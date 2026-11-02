@@ -144,8 +144,7 @@ export class OAuthController {
 
     const userId = BigInt(claims.sub);
     const scopes = new Set(typeof claims.scope === 'string' ? claims.scope.split(' ').filter(Boolean) : []);
-    const email = await this.userEmailService.getPrimaryEmail(userId);
-    const profile = scopes.has(OIDC_PROFILE_SCOPE) ? await this.userService.getProfileClaims(userId) : {};
+    const [email, profile] = await Promise.all([this.userEmailService.getPrimaryEmail(userId), scopes.has(OIDC_PROFILE_SCOPE) ? this.userService.getProfileClaims(userId) : {}]);
     return { sub: claims.sub, email: email ?? undefined, email_verified: email ? true : undefined, ...profile };
   }
 

@@ -199,24 +199,31 @@ export class PolicyDecisionService {
   private async resolveRoleIds(principal: Principal, organisationId: string, applicationId: number | undefined, db: AuthzReader): Promise<Set<number>> {
     const orgId = BigInt(organisationId);
     const notExpired = or(isNull(schema.roleAssignments.expiresAt), gt(schema.roleAssignments.expiresAt, new Date()));
-    const roleIds = new Set<number>();
+    const explicitRoleIds = async (): Promise<number[]> => {
+      const rows = await db
+        .select({ roleId: schema.roleAssignments.roleId })
+        .from(schema.roleAssignments)
+        .where(
+          and(
+            eq(schema.roleAssignments.principalType, principal.type),
+            eq(schema.roleAssignments.principalId, principal.id),
+            eq(schema.roleAssignments.organisationId, orgId),
+            notExpired,
+          ),
+        );
+      return rows.map(row => row.roleId);
+    };
 
-    const explicit = await db
-      .select({ roleId: schema.roleAssignments.roleId })
-      .from(schema.roleAssignments)
-      .where(
-        and(
-          eq(schema.roleAssignments.principalType, principal.type),
-          eq(schema.roleAssignments.principalId, principal.id),
-          eq(schema.roleAssignments.organisationId, orgId),
-          notExpired,
-        ),
-      );
-    for (const row of explicit) roleIds.add(row.roleId);
+    if (principal.type !== 'USER') return new Set(await explicitRoleIds());
 
-    if (principal.type !== 'USER') return roleIds;
-
-    if (await this.isActiveMember(principal.id, orgId, db)) {
+    const [explicit, isMember, defaults] = await this.gather(
+      db,
+      explicitRoleIds,
+      () => this.isActiveMember(principal.id, orgId, db),
+      () => this.defaultRoleIds(applicationId, db),
+    );
+    const roleIds = new Set([...explicit, ...defaults]);
+    if (isMember) {
       const orgWide = await db
         .select({ roleId: schema.roleAssignments.roleId })
         .from(schema.roleAssignments)
@@ -230,9 +237,13 @@ export class PolicyDecisionService {
         );
       for (const row of orgWide) roleIds.add(row.roleId);
     }
-
-    for (const id of await this.defaultRoleIds(applicationId, db)) roleIds.add(id);
     return roleIds;
+  }
+
+  /** A transaction holds a single connection, so reads issued through one gain nothing from being sent together and stay sequential. */
+  private async gather<A, B, C>(db: AuthzReader, first: () => Promise<A>, second: () => Promise<B>, third: () => Promise<C>): Promise<[A, B, C]> {
+    if (db !== this.db) return [await first(), await second(), await third()];
+    return Promise.all([first(), second(), third()]);
   }
 
   private async isActiveMember(userId: string, organisationId: bigint, db: AuthzReader): Promise<boolean> {
