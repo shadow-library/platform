@@ -169,24 +169,27 @@ export class GenerationService {
     // An active generation job is returned unchanged instead of starting a competing one.
     const activeJob = await this.db.query.jobs.findFirst({
       where: and(eq(schema.jobs.projectId, projectId), eq(schema.jobs.kind, 'generate'), inArray(schema.jobs.status, ['pending', 'in_progress'])),
+      columns: { id: true, status: true, target: true },
     });
     if (activeJob) {
       this.logger.debug('generate: a generation job is already active — returning it', { projectId, jobId: activeJob.id, status: activeJob.status });
       return { jobId: activeJob.id, kind: 'generate', status: activeJob.status, target: activeJob.target ?? '' };
     }
 
-    const contradiction = await this.db.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.reviewStatus, 'contradiction')) });
-    if (contradiction) throw AppErrorCode.DRF_003.create();
-
     // Strictly ascending: the next chapters with a brief but no draft, truncated at the first unfilled external-write slot or chapter with no prose (see
     // `selectGenerationBatch`).
     // Each chapter is drafted before the next begins, so there are no gaps and no skipping ahead.
-    const allBriefs = await this.db.query.briefs.findMany({ where: eq(schema.briefs.projectId, projectId), orderBy: asc(schema.briefs.chapter) });
-    const existingDrafts = await this.db.query.drafts.findMany({ where: eq(schema.drafts.projectId, projectId), columns: { chapter: true } });
-    const finalizedChapters = await this.db.query.chapters.findMany({
-      where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.status, 'done')),
-      columns: { number: true },
-    });
+    const [contradiction, allBriefs, existingDrafts, finalizedChapters] = await Promise.all([
+      this.db.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.reviewStatus, 'contradiction')), columns: { chapter: true } }),
+      this.db.query.briefs.findMany({
+        where: eq(schema.briefs.projectId, projectId),
+        columns: { chapter: true, writeMode: true, staleReason: true, knowledgeContract: true },
+        orderBy: asc(schema.briefs.chapter),
+      }),
+      this.db.query.drafts.findMany({ where: eq(schema.drafts.projectId, projectId), columns: { chapter: true } }),
+      this.db.query.chapters.findMany({ where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.status, 'done')), columns: { number: true } }),
+    ]);
+    if (contradiction) throw AppErrorCode.DRF_003.create();
     const started = new Set(existingDrafts.map(d => d.chapter));
     const finalized = new Set(finalizedChapters.map(c => c.number));
 

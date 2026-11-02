@@ -23,16 +23,21 @@ const teachingPlan = (chapter: number) => ({ ...plan(chapter), knowledgeContract
 function makeService(fixture: GateFixture = {}) {
   const briefs = fixture.briefs ?? [plan(1)];
   const enqueued: unknown[][] = [];
+  const briefColumnsRead: string[][] = [];
   const db = {
     query: {
       projects: { findFirst: async () => ({ id: 1n }) },
       briefs: {
         findFirst: async () => briefs[0],
-        findMany: async (query?: Parameters<typeof queryRows>[1]) =>
-          queryRows(
-            briefs.map(brief => ({ projectId: 1n, ...brief })),
+        findMany: async (query?: Parameters<typeof queryRows>[1] & { columns?: Record<string, boolean> }) => {
+          const columns = query?.columns;
+          briefColumnsRead.push(columns ? Object.keys(columns) : ['*']);
+          const rows = queryRows(
+            briefs.map(brief => ({ projectId: 1n, body: `Plan for chapter ${brief.chapter}`, ...brief })),
             query,
-          ),
+          );
+          return columns ? rows.map(row => Object.fromEntries(Object.entries(row).filter(([key]) => columns[key]))) : rows;
+        },
       },
       drafts: {
         findFirst: async (query: { columns?: Record<string, boolean> }) => {
@@ -65,7 +70,7 @@ function makeService(fixture: GateFixture = {}) {
     claims.asService(),
     noop,
   );
-  return { service, enqueued };
+  return { service, enqueued, briefColumnsRead };
 }
 
 describe('GenerationService.generate', () => {
@@ -152,6 +157,16 @@ describe('GenerationService.generate', () => {
 
     expect(result).toMatchObject({ target: '1,2', stoppedAtTeachingChapter: 2 });
     expect(enqueued).toEqual([[1n, 'generate', '1,2', expect.objectContaining({ chapters: [1, 2] })]]);
+  });
+
+  it('should choose the batch from the plans without reading their prose', async () => {
+    const { service, enqueued, briefColumnsRead } = makeService({ briefs: [plan(1), plan(2)] });
+
+    await service.generate(1n, { limit: 2 });
+
+    expect(enqueued).toEqual([[1n, 'generate', '1,2', expect.objectContaining({ chapters: [1, 2] })]]);
+    expect(briefColumnsRead.flat()).not.toContain('*');
+    expect(briefColumnsRead.flat()).not.toContain('body');
   });
 
   it('should continue an imported novel whose finalized chapters have no plans', async () => {

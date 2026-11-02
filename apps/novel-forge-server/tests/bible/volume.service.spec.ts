@@ -32,11 +32,16 @@ function fakeDb(seed: { volumes?: Row[]; chapters?: Row[]; drafts?: Row[]; brief
     [schema.briefs, (seed.briefs ?? []).map((row, index) => ({ id: BigInt(index + 1), projectId: 1n, ...row }))],
   ]);
   const rows = (table: unknown): Row[] => tables.get(table) ?? [];
+  const reads = new Map<unknown, number>();
   const finder = (table: unknown) => ({
     findFirst: async (query: Parameters<typeof queryRows>[1]) => queryRows(rows(table), query)[0],
-    findMany: async (query: Parameters<typeof queryRows>[1] = {}) => queryRows(rows(table), query),
+    findMany: async (query: Parameters<typeof queryRows>[1] = {}) => {
+      reads.set(table, (reads.get(table) ?? 0) + 1);
+      return queryRows(rows(table), query);
+    },
   });
   const db = {
+    reads,
     query: { volumes: finder(schema.volumes), chapters: finder(schema.chapters), drafts: finder(schema.drafts), briefs: finder(schema.briefs) },
     $count: async (table: unknown, where?: SQL) => queryRows(rows(table), { where }).length,
     update: (table: unknown) => ({
@@ -53,8 +58,8 @@ function fakeDb(seed: { volumes?: Row[]; chapters?: Row[]; drafts?: Row[]; brief
   return db;
 }
 
-function service(seed: Parameters<typeof fakeDb>[0] = {}): VolumeService {
-  return new VolumeService({ getPostgresClient: () => fakeDb(seed) } as never);
+function service(seed: Parameters<typeof fakeDb>[0] = {}, db = fakeDb(seed)): VolumeService {
+  return new VolumeService({ getPostgresClient: () => db } as never);
 }
 
 describe('VolumeService.advanceGoalMet', () => {
@@ -148,5 +153,28 @@ describe('VolumeService derived display data', () => {
   it('should report a null plan range for a volume with no chapters anywhere in the plan', async () => {
     const volume = await service({ volumes: [{ volumeKey: 'v1', ordinal: 1, state: 'not_started' }] }).get(1n, 'v1');
     expect(volume).toMatchObject({ planChapterCount: 0, planFirstChapter: null, planLastChapter: null });
+  });
+
+  it('should read each source table once for a whole page of volumes', async () => {
+    const seed = {
+      volumes: [
+        { volumeKey: 'v1', ordinal: 1, state: 'active' },
+        { volumeKey: 'v2', ordinal: 2, state: 'not_started' },
+      ],
+      chapters: [
+        { number: 1, wordCount: 1000, volumeKey: 'v1' },
+        { number: 2, wordCount: 500, volumeKey: 'v2' },
+      ],
+      briefs: [{ chapter: 3, volumeKey: 'v2' }],
+    };
+    const db = fakeDb(seed);
+
+    const result = await service(seed, db).list(1n, { limit: 20, offset: 0, sortBy: 'createdAt', sortOrder: 'asc' });
+
+    expect(result.items.map(item => [item.volumeKey, item.wordCount, item.planLastChapter])).toEqual([
+      ['v1', 1000, 1],
+      ['v2', 500, 3],
+    ]);
+    expect([db.reads.get(schema.chapters), db.reads.get(schema.drafts), db.reads.get(schema.briefs)]).toEqual([1, 1, 1]);
   });
 });

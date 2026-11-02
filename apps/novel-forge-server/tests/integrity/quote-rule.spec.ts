@@ -262,13 +262,14 @@ function quoteRulePermits(op: ChangeOp, input: WritePolicyInput): boolean {
 function expectQuoteRuleHolds({ input, describe: turn }: Turn): void {
   const split = splitChangeSet(input);
   const context = { turn, direct: split.direct.map(op => op.op), dispositions: split.dispositions };
+  const why = JSON.stringify(context);
 
   expect(
     split.dispositions.map(disposition => disposition.index).sort((left, right) => left - right),
-    JSON.stringify(context),
+    why,
   ).toEqual(input.ops.map((_, index) => index));
-  expect(split.direct.length + split.cards.length, JSON.stringify(context)).toBe(input.ops.length);
-  expect(split.sources, JSON.stringify(context)).toEqual(split.dispositions.flatMap(d => (d.side === 'direct' ? [d.source] : [])));
+  expect(split.direct.length + split.cards.length, why).toBe(input.ops.length);
+  expect(split.sources, why).toEqual(split.dispositions.flatMap(d => (d.side === 'direct' ? [d.source] : [])));
 
   for (const disposition of split.dispositions) {
     if (disposition.side !== 'direct') continue;
@@ -276,30 +277,28 @@ function expectQuoteRuleHolds({ input, describe: turn }: Turn): void {
     const [ref] = changeSetRefs([op]);
     const current = ref === undefined ? undefined : input.state.current.get(ref);
     const override = input.mode !== 'auto' || input.hold === 'turn' || input.justDiscussing;
-    expect(override, `${op.op} applied in a turn that applies nothing — ${JSON.stringify(context)}`).toBe(false);
-    if (input.hold === 'writer_read')
-      expect(plannerSide(op), `${op.op} applied what the chapter writer or a reader can see in a held turn — ${JSON.stringify(context)}`).toBe(true);
-    expect(forbiddenDirect(op, current, disposition.source), `${op.op} applied as ${disposition.source} — ${JSON.stringify(context)}`).toBeUndefined();
-    expect(exceedsRemovalBudget(op, current), `${op.op} truncated a field without review — ${JSON.stringify(context)}`).toBe(false);
-    expect(disposition.source, `${op.op} carries the wrong source — ${JSON.stringify(context)}`).toBe(quoteRulePermits(op, input) ? 'quoted' : 'idea');
+    expect(override, `${op.op} applied in a turn that applies nothing — ${why}`).toBe(false);
+    if (input.hold === 'writer_read') expect(plannerSide(op), `${op.op} applied what the chapter writer or a reader can see in a held turn — ${why}`).toBe(true);
+    expect(forbiddenDirect(op, current, disposition.source), `${op.op} applied as ${disposition.source} — ${why}`).toBeUndefined();
+    expect(exceedsRemovalBudget(op, current), `${op.op} truncated a field without review — ${why}`).toBe(false);
+    expect(disposition.source, `${op.op} carries the wrong source — ${why}`).toBe(quoteRulePermits(op, input) ? 'quoted' : 'idea');
   }
   for (const op of split.cards) expect(split.direct.includes(op)).toBe(false);
-  for (const op of input.ops)
-    if (op.op.startsWith('action.') || NEVER_DIRECT.has(op.op)) expect(split.cards.includes(op), `${op.op} must always be a card — ${JSON.stringify(context)}`).toBe(true);
+  for (const op of input.ops) if (op.op.startsWith('action.') || NEVER_DIRECT.has(op.op)) expect(split.cards.includes(op), `${op.op} must always be a card — ${why}`).toBe(true);
 
   const cardCreated = refsCreatedByCards(input, split.cards);
   for (const op of split.direct) {
     const leaning = [...changeSetRefs([op]), ...opReferences(op)].filter(ref => cardCreated.has(ref));
-    expect(leaning, `${op.op} applied while it relies on a record only a card creates — ${JSON.stringify(context)}`).toEqual([]);
+    expect(leaning, `${op.op} applied while it relies on a record only a card creates — ${why}`).toEqual([]);
   }
 
   const reversed = splitChangeSet({ ...input, ops: [...input.ops].reverse() });
-  expect(new Set(reversed.direct), `the split depends on op order — ${JSON.stringify(context)}`).toEqual(new Set(split.direct));
+  expect(new Set(reversed.direct), `the split depends on op order — ${why}`).toEqual(new Set(split.direct));
   expect(splitChangeSet({ ...input, authorMessage: '' }).sources.every(source => source === 'idea')).toBe(true);
   expect(splitChangeSet({ ...input, justDiscussing: true }).direct).toEqual([]);
 
   const quoteRuleOnly = splitChangeSet({ ...input, ideas: 'card' });
-  for (const op of quoteRuleOnly.direct) expect(quoteRulePermits(op, input), `${op.op} applied without its quote — ${JSON.stringify(context)}`).toBe(true);
+  for (const op of quoteRuleOnly.direct) expect(quoteRulePermits(op, input), `${op.op} applied without its quote — ${why}`).toBe(true);
   expect(splitChangeSet({ ...input, ideas: 'card', authorMessage: '' }).direct).toEqual([]);
 }
 

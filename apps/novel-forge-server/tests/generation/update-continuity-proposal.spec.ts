@@ -1,5 +1,7 @@
-import { describe, expect, it } from 'bun:test';
+import { beforeAll, describe, expect, it } from 'bun:test';
 
+import { ContinuitySchema } from '@modules/ai/schemas';
+import { parseSchema } from '@modules/ai/schemas/validate';
 import { GenerationService } from '@modules/generation/generation.service';
 
 const VALID = {
@@ -31,6 +33,9 @@ function makeService(stored: Record<string, unknown> = VALID): { service: Genera
 }
 
 describe('GenerationService.updateContinuityProposal', () => {
+  // The first validation compiles the continuity schema once per process, which is not any one test's own time.
+  beforeAll(() => parseSchema(ContinuitySchema, VALID));
+
   it('should reject a body that is not a continuity output and write nothing', async () => {
     const { service, saved } = makeService();
 

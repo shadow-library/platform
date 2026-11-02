@@ -10,7 +10,24 @@ import { type Chapter, type PrimaryDatabase, schema } from '@server/database';
 
 import { CHAPTER_LIST_DEFAULT_LIMIT, type ListChaptersQuery, type UpdateChapterBody } from './chapter.dto';
 
-export type ChapterListResult = OffsetPaginationResult<Chapter.Row> & { page: number; totalPages: number };
+const LIST_COLUMNS = {
+  id: true,
+  projectId: true,
+  number: true,
+  title: true,
+  wordCount: true,
+  status: true,
+  generator: true,
+  continuityApplied: true,
+  isolated: true,
+  volumeKey: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
+
+export type ChapterListItem = Pick<Chapter.Row, keyof typeof LIST_COLUMNS>;
+
+export type ChapterListResult = OffsetPaginationResult<ChapterListItem> & { page: number; totalPages: number };
 
 @Injectable()
 export class ChapterService {
@@ -52,7 +69,7 @@ export class ChapterService {
 
     const [total, items] = await Promise.all([
       this.db.$count(schema.chapters, where),
-      this.db.query.chapters.findMany({ where, limit: query.limit, offset: query.offset, orderBy: order }),
+      this.db.query.chapters.findMany({ where, columns: LIST_COLUMNS, limit: query.limit, offset: query.offset, orderBy: order }),
     ]);
 
     return this.toResult(query, items, total);
@@ -84,7 +101,7 @@ export class ChapterService {
     return { total: 0, limit: query.limit, offset: query.offset, items: [], page: Math.floor(query.offset / query.limit) + 1, totalPages: 0 };
   }
 
-  private toResult(query: { limit: number; offset: number }, items: Chapter.Row[], total: number): ChapterListResult {
+  private toResult(query: { limit: number; offset: number }, items: ChapterListItem[], total: number): ChapterListResult {
     return { total, limit: query.limit, offset: query.offset, items, page: Math.floor(query.offset / query.limit) + 1, totalPages: Math.ceil(total / query.limit) };
   }
 
