@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'bun:test';
 
+import { Config } from '@shadow-library/common';
+
 import { AppErrorCode } from '@server/classes';
 import { type InferenceClient, type InferenceRequest, type InferenceResult } from '@modules/inference';
 import { AiExecutorService } from '@modules/ai-worker/ai-executor.service';
+
+Config.load('ai.max-attempts', { defaultValue: '3', validateType: 'number', reloadable: true });
 
 const TASK = { id: 'task-1', accountId: 7n, queryText: 'How was my week?', kind: 'adhoc', quotaConsumed: true } as never;
 const GOOD = { answer: 'fine', patterns: [], suggestions: [], limitationNote: null };
