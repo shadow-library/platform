@@ -1,11 +1,19 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Badge, Button, Dialog, FormField, Input, SearchIcon, Select, Spinner, Textarea, toast, Tooltip } from '@shadow-library/ui';
+import { Alert, AlertTriangleIcon, Badge, Button, CheckIcon, Dialog, FormField, Input, SearchIcon, Select, Spinner, Textarea, toast, Tooltip } from '@shadow-library/ui';
 
-import { ImageIcon, SparkIcon, TrashIcon } from '@/components/icons';
+import { ImageIcon, SparkIcon, StopIcon, TrashIcon } from '@/components/icons';
 import { useCollectionJump } from '@/components/Layout';
 import { type ChipIntent, CollectionPage, DetailPage, EmptyState, ItemPager, type ItemPagerJump, PaneError, PaneLoader, RowAction, StatusChip } from '@/components/nf';
 import { CandidateReferences, IllustrationReferencesPanel, StartReferencesSection } from '@/features/illustrations/ReferenceImages';
+import {
+  type IllustrationRun,
+  type IllustrationStartEntry,
+  useDismissedRuns,
+  useIllustrationRuns,
+  useStartIllustration,
+  useStopIllustrationRun,
+} from '@/features/illustrations/use-illustration-runs';
 import {
   type AppearanceConfidenceLevel,
   type AppearanceDescriptionResponse,
@@ -17,18 +25,20 @@ import {
   listIllustrationsQueryOptions,
   type ReferenceWarningResponse,
   type RefineIllustrationBody,
+  type StartIllustrationBody,
   useChapterRowsQuery,
   useDiscardIllustrationMutation,
   useListEntitiesQuery,
   useListIllustrationsQuery,
   useReferenceOptionsQuery,
   useRefineIllustrationMutation,
+  useRunUsageQuery,
   useSaveIllustrationMutation,
   useSelectIllustrationMutation,
-  useStartIllustrationMutation,
   useUpdateEntityMutation,
 } from '@/lib/apis';
 import { relativeTime } from '@/lib/format';
+import { useElapsedSeconds } from '@/lib/use-elapsed-seconds';
 import {
   candidateSlots,
   countBySubject,
@@ -37,10 +47,21 @@ import {
   depictsChapterVisibilityNote,
   FILTER_LABEL,
   filterIllustrations,
+  formatElapsed,
   FRONTIER_ROWS,
   identityMeta,
   illustrationCaption,
+  illustrationChipLabel,
+  newestIllustrationFor,
+  parseRunTarget,
   parseSubjectType,
+  pendingPair,
+  pickHint,
+  runStageLabel,
+  runStageOf,
+  shownCandidates,
+  startBodyOf,
+  SUBJECT_LABEL,
   type SubjectFilter,
   subjectLabel,
   thumbnailOf,
@@ -61,7 +82,18 @@ interface IllustrationsSearch {
   subject?: IllustrationSubjectType;
   key?: string;
   illustration?: string;
+  /** A render that has not become an illustration yet: one still running, or one that failed. */
+  run?: string;
   start?: boolean;
+}
+
+interface StartDraft {
+  subjectType: IllustrationSubjectType;
+  subjectKey: string;
+  instruction?: string;
+  references?: DraftReference[];
+  autoReferences?: boolean;
+  depictsChapter?: number;
 }
 
 interface RoundWarnings {
@@ -89,6 +121,7 @@ export const Route = createFileRoute('/novels/$novelId/illustrations')({
     subject: parseSubjectType(search.subject),
     key: typeof search.key === 'string' && search.key ? search.key : undefined,
     illustration: typeof search.illustration === 'string' && search.illustration ? search.illustration : undefined,
+    run: typeof search.run === 'string' && search.run ? search.run : undefined,
     start: search.start === true || search.start === 'true' ? true : undefined,
   }),
   loader: ({ context, params }) => context.queryClient.prefetchQuery(listIllustrationsQueryOptions(params.novelId)),
@@ -132,12 +165,11 @@ interface StartDialogProps {
   novelId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  initial: { subjectType: IllustrationSubjectType; subjectKey: string };
-  onStarted: (illustration: IllustrationResponse) => void;
+  initial: StartDraft;
+  onGenerate: (body: StartIllustrationBody) => void;
 }
 
-function StartDialog({ novelId, open, onOpenChange, initial, onStarted }: StartDialogProps): React.JSX.Element {
-  const start = useStartIllustrationMutation(novelId);
+function StartDialog({ novelId, open, onOpenChange, initial, onGenerate }: StartDialogProps): React.JSX.Element {
   const entitiesQuery = useListEntitiesQuery(novelId, { limit: 500 });
   const entities = entitiesQuery.data?.items ?? [];
   const frontierQuery = useChapterRowsQuery(novelId, FRONTIER_ROWS, open);
@@ -155,10 +187,10 @@ function StartDialog({ novelId, open, onOpenChange, initial, onStarted }: StartD
     if (open) {
       setSubjectType(initial.subjectType);
       setSubjectKey(initial.subjectKey);
-      setInstruction('');
-      setReferences([]);
-      setAutoReferences(true);
-      setDepictsChapter(undefined);
+      setInstruction(initial.instruction ?? '');
+      setReferences(initial.references ?? []);
+      setAutoReferences(initial.autoReferences ?? true);
+      setDepictsChapter(initial.depictsChapter);
     }
   }
 
@@ -178,28 +210,18 @@ function StartDialog({ novelId, open, onOpenChange, initial, onStarted }: StartD
 
   const submit = (): void => {
     const payload = buildAttachPayload(references);
-    start.mutate(
-      {
-        subjectType,
-        subjectKey: subjectType === 'cover' ? undefined : resolvedKey.trim(),
-        instruction: instruction.trim() || undefined,
-        references: payload.length > 0 ? payload : undefined,
-        autoReferences: subjectType === 'cover' ? undefined : autoReferences,
-        depictsChapter: subjectType === 'entity' ? depictsChapter : undefined,
-      },
-      {
-        onSuccess: created => {
-          toast.success('Candidates generated');
-          onOpenChange(false);
-          onStarted(created);
-        },
-        onError: err => toast.danger(referenceErrorMessage(err)),
-      },
-    );
+    onGenerate({
+      subjectType,
+      subjectKey: subjectType === 'cover' ? undefined : resolvedKey.trim(),
+      instruction: instruction.trim() || undefined,
+      references: payload.length > 0 ? payload : undefined,
+      autoReferences: subjectType === 'cover' ? undefined : autoReferences,
+      depictsChapter: subjectType === 'entity' ? depictsChapter : undefined,
+    });
   };
 
   return (
-    <Dialog open={open} onOpenChange={next => !(start.isPending && !next) && onOpenChange(next)}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <Dialog.Content size="md">
         <Dialog.Header title="Start an illustration" description="Forge composes a prompt from the canon for this subject, then renders two candidates to choose between." />
         <Dialog.Body>
@@ -250,25 +272,19 @@ function StartDialog({ novelId, open, onOpenChange, initial, onStarted }: StartD
               onDraftsChange={setReferences}
               autoReferences={autoReferences}
               onAutoReferencesChange={setAutoReferences}
-              disabled={start.isPending}
+              disabled={false}
             />
             <FormField label="Art direction" helper="Optional — becomes the first entry in the instruction list you can keep editing afterwards.">
               <Textarea value={instruction} onValueChange={setInstruction} minRows={3} autoGrow placeholder="e.g. three-quarter view, rain-soaked alley, cold blue key light" />
             </FormField>
-            {start.isPending && (
-              <Alert intent="info" title="Rendering candidates">
-                The image model runs synchronously — this usually takes 30 to 60 seconds. Leave this dialog open.
-              </Alert>
-            )}
+            <p className={styles.dialogHint}>Takes 1 to 2 minutes. You can keep working while it renders.</p>
           </div>
         </Dialog.Body>
         <Dialog.Footer>
           <Dialog.Close asChild>
-            <Button variant="ghost" disabled={start.isPending}>
-              Cancel
-            </Button>
+            <Button variant="ghost">Cancel</Button>
           </Dialog.Close>
-          <Button variant="primary" prefix={<SparkIcon />} loading={start.isPending} disabled={invalid || overCapacity || awaitingCapacity} onClick={submit}>
+          <Button variant="primary" prefix={<SparkIcon />} disabled={invalid || overCapacity || awaitingCapacity} onClick={submit}>
             Generate
           </Button>
         </Dialog.Footer>
@@ -384,6 +400,15 @@ function InstructionList({ instructions, pending, onReplace, onRemove, onAdd }: 
   );
 }
 
+function RenderingSlot(): React.JSX.Element {
+  return (
+    <div className={styles.placeholder}>
+      <Spinner size="lg" label="Rendering" />
+      <span className={styles.placeholderNote}>Rendering — usually 1 to 2 minutes</span>
+    </div>
+  );
+}
+
 interface CandidateGridProps {
   illustration: IllustrationResponse;
   busy: boolean;
@@ -392,48 +417,57 @@ interface CandidateGridProps {
 
 function CandidateGrid({ illustration, busy, onSelect }: CandidateGridProps): React.JSX.Element {
   const active = illustration.status === 'active';
-  const slots = candidateSlots(illustration.candidates, busy);
+  const shown = shownCandidates(illustration);
+  const slots = candidateSlots(shown, busy);
+  const hint = pickHint(illustration);
 
   return (
-    <div className={styles.candidates} aria-busy={busy || undefined}>
-      {slots.map((slot, index) => {
-        if (slot.kind === 'rendering')
-          return (
-            <div key={`rendering-${index}`} className={styles.placeholder}>
-              <Spinner size="lg" label="Rendering" />
-              <span className={styles.placeholderNote}>Rendering — 30 to 60 seconds</span>
-            </div>
-          );
-        if (slot.kind === 'empty')
-          return (
-            <div key={`empty-${index}`} className={styles.placeholder}>
-              <ImageIcon size={20} />
-              <span className={styles.placeholderNote}>Every edit re-renders a pair</span>
-            </div>
-          );
+    <>
+      <div className={styles.candidates} aria-busy={busy || undefined}>
+        {slots.map((slot, index) => {
+          if (slot.kind === 'rendering') return <RenderingSlot key={`rendering-${index}`} />;
+          if (slot.kind === 'empty')
+            return (
+              <div key={`empty-${index}`} className={styles.placeholder}>
+                <ImageIcon size={20} />
+                <span className={styles.placeholderNote}>Every edit re-renders a pair</span>
+              </div>
+            );
 
-        const { candidate } = slot;
-        const selected = candidate.ref === illustration.selectedRef;
-        return (
-          <div key={candidate.ref} className={styles.candidateCell}>
-            <button
-              type="button"
-              className={styles.candidate}
-              data-selected={selected || undefined}
-              aria-pressed={selected}
-              disabled={!active || busy}
-              onClick={() => onSelect(candidate)}
-            >
-              <span className={styles.frame}>
-                <IllustrationImage src={candidate.imageUrl} />
-              </span>
-              <span className={styles.candidateMeta}>{relativeTime(candidate.createdAt)}</span>
-            </button>
-            <CandidateReferences references={candidate.references} />
-          </div>
-        );
-      })}
-    </div>
+          const { candidate } = slot;
+          const selected = candidate.ref === illustration.selectedRef;
+          return (
+            <div key={candidate.ref} className={styles.candidateCell}>
+              <div className={styles.candidateBox}>
+                <button
+                  type="button"
+                  className={styles.candidate}
+                  data-selected={selected || undefined}
+                  aria-pressed={selected}
+                  disabled={!active || busy}
+                  onClick={() => onSelect(candidate)}
+                >
+                  <span className={styles.frame}>
+                    <IllustrationImage src={candidate.imageUrl} />
+                  </span>
+                  <span className={styles.candidateMeta}>
+                    {selected ? (illustration.status === 'saved' ? 'Kept · ' : 'Selected · ') : ''}
+                    {relativeTime(candidate.createdAt)}
+                  </span>
+                </button>
+                {selected && (
+                  <span className={styles.selectedBadge} aria-hidden="true">
+                    <CheckIcon size={14} />
+                  </span>
+                )}
+              </div>
+              <CandidateReferences references={candidate.references} />
+            </div>
+          );
+        })}
+      </div>
+      {hint && !busy && <p className={styles.pickHint}>{hint}</p>}
+    </>
   );
 }
 
@@ -500,6 +534,7 @@ function IllustrationControls({ novelId, illustration, busy, roundWarnings, onRe
 interface IllustrationDetailProps {
   novelId: string;
   illustration: IllustrationResponse;
+  entityNames: ReadonlyMap<string, string>;
   filter: { subject?: IllustrationSubjectType; key?: string };
   ids: readonly string[] | undefined;
   jump?: ItemPagerJump;
@@ -509,7 +544,18 @@ interface IllustrationDetailProps {
   onDismissWarnings: () => void;
 }
 
-function IllustrationDetail({ novelId, illustration, filter, ids, jump, roundWarnings, onSelect, onRound, onDismissWarnings }: IllustrationDetailProps): React.JSX.Element {
+function IllustrationDetail({
+  novelId,
+  illustration,
+  entityNames,
+  filter,
+  ids,
+  jump,
+  roundWarnings,
+  onSelect,
+  onRound,
+  onDismissWarnings,
+}: IllustrationDetailProps): React.JSX.Element {
   const illustrationId = illustration.id;
   const refine = useRefineIllustrationMutation(novelId, illustrationId);
   const select = useSelectIllustrationMutation(novelId, illustrationId);
@@ -519,7 +565,7 @@ function IllustrationDetail({ novelId, illustration, filter, ids, jump, roundWar
   const frontierQuery = useChapterRowsQuery(novelId, FRONTIER_ROWS, illustration.subjectType === 'entity');
   const frontier = frontierQuery.data?.frontier ?? 0;
 
-  const name = subjectLabel(illustration);
+  const name = subjectLabel(illustration, entityNames);
   const active = illustration.status === 'active';
   const busy = refine.isPending || select.isPending || save.isPending || discard.isPending;
 
@@ -544,7 +590,7 @@ function IllustrationDetail({ novelId, illustration, filter, ids, jump, roundWar
         identity={
           <DetailPage.Identity title={name}>
             <StatusChip intent={STATUS_INTENT[illustration.status]} dot>
-              {illustration.status}
+              {illustrationChipLabel(illustration)}
             </StatusChip>
             <span className={styles.identityMeta}>{identityMeta(illustration, relativeTime(illustration.updatedAt))}</span>
             {illustration.subjectType === 'entity' && (
@@ -602,7 +648,7 @@ function IllustrationDetail({ novelId, illustration, filter, ids, jump, roundWar
         )}
 
         <section className={styles.block}>
-          <h2 className={styles.blockTitle}>Candidates · pick the one to keep</h2>
+          <h2 className={styles.blockTitle}>{illustration.status === 'saved' ? 'Saved image' : 'Candidates · pick the one to keep'}</h2>
           <CandidateGrid illustration={illustration} busy={busy} onSelect={candidate => select.mutate({ ref: candidate.ref }, { onError: err => toast.danger(err.message) })} />
         </section>
       </DetailPage>
@@ -639,19 +685,28 @@ function IllustrationDetail({ novelId, illustration, filter, ids, jump, roundWar
 interface IllustrationTileProps {
   novelId: string;
   illustration: IllustrationResponse;
+  entityNames: ReadonlyMap<string, string>;
   filter: { subject?: IllustrationSubjectType; key?: string };
 }
 
-function IllustrationTile({ novelId, illustration, filter }: IllustrationTileProps): React.JSX.Element {
+function IllustrationTile({ novelId, illustration, entityNames, filter }: IllustrationTileProps): React.JSX.Element {
+  const pair = pendingPair(illustration);
   return (
     <Link to="/novels/$novelId/illustrations" params={{ novelId }} search={{ ...filter, illustration: illustration.id }} className={styles.tile}>
       <span className={styles.tileFrame}>
-        <IllustrationImage src={thumbnailOf(illustration)} />
+        {pair ? (
+          <span className={styles.tilePair}>
+            <IllustrationImage src={pair[0].imageUrl} />
+            <IllustrationImage src={pair[1].imageUrl} />
+          </span>
+        ) : (
+          <IllustrationImage src={thumbnailOf(illustration)} />
+        )}
         <StatusChip intent={STATUS_INTENT[illustration.status]} dot>
-          {illustration.status}
+          {illustrationChipLabel(illustration)}
         </StatusChip>
       </span>
-      <span className={styles.tileName}>{subjectLabel(illustration)}</span>
+      <span className={styles.tileName}>{subjectLabel(illustration, entityNames)}</span>
       <span className={styles.tileMeta}>
         {illustrationCaption(illustration)} · {relativeTime(illustration.updatedAt)}
       </span>
@@ -659,20 +714,278 @@ function IllustrationTile({ novelId, illustration, filter }: IllustrationTilePro
   );
 }
 
+function runSubjectLabel(target: string, entityNames: ReadonlyMap<string, string>): string {
+  const subject = parseRunTarget(target);
+  return subject ? subjectLabel(subject, entityNames) : 'Illustration';
+}
+
+interface RunningTileProps {
+  novelId: string;
+  run: IllustrationRun;
+  entityNames: ReadonlyMap<string, string>;
+}
+
+function RunningTile({ novelId, run, entityNames }: RunningTileProps): React.JSX.Element {
+  const usage = useRunUsageQuery(novelId, run.id, true);
+  const elapsed = useElapsedSeconds(Date.parse(run.startedAt));
+  const subject = parseRunTarget(run.target);
+
+  return (
+    <Link to="/novels/$novelId/illustrations" params={{ novelId }} search={{ run: run.id }} className={styles.tile}>
+      <span className={styles.tileFrame}>
+        <span className={styles.tileStatus}>
+          <Spinner size="md" label="Rendering" />
+          <span className={styles.tileStage}>{runStageLabel(runStageOf(usage.data?.calls))}</span>
+        </span>
+        <StatusChip intent="accent" dot>
+          rendering
+        </StatusChip>
+      </span>
+      <span className={styles.tileName}>{runSubjectLabel(run.target, entityNames)}</span>
+      <span className={styles.tileMeta}>
+        {subject && SUBJECT_LABEL[subject.subjectType]} · {formatElapsed(elapsed)} · usually 1–2 min
+      </span>
+    </Link>
+  );
+}
+
+interface StartingTileProps {
+  start: IllustrationStartEntry;
+  entityNames: ReadonlyMap<string, string>;
+}
+
+/** The moment between sending the request and the server recording its run: nothing to open or stop yet, so it is not a link. */
+function StartingTile({ start, entityNames }: StartingTileProps): React.JSX.Element {
+  const elapsed = useElapsedSeconds(start.submittedAt);
+  const subject = parseRunTarget(start.target);
+
+  return (
+    <div className={styles.tile}>
+      <span className={styles.tileFrame}>
+        <span className={styles.tileStatus}>
+          <Spinner size="md" label="Rendering" />
+          <span className={styles.tileStage}>{runStageLabel('composing')}</span>
+        </span>
+        <StatusChip intent="accent" dot>
+          rendering
+        </StatusChip>
+      </span>
+      <span className={styles.tileName}>{runSubjectLabel(start.target, entityNames)}</span>
+      <span className={styles.tileMeta}>
+        {subject && SUBJECT_LABEL[subject.subjectType]} · {formatElapsed(elapsed)} · usually 1–2 min
+      </span>
+    </div>
+  );
+}
+
+interface FailedTileProps {
+  novelId: string;
+  run: IllustrationRun;
+  entityNames: ReadonlyMap<string, string>;
+  onRetry: (run: IllustrationRun) => void;
+  onDismiss: (runId: string) => void;
+}
+
+function FailedTile({ novelId, run, entityNames, onRetry, onDismiss }: FailedTileProps): React.JSX.Element {
+  const subject = parseRunTarget(run.target);
+
+  return (
+    <div className={styles.failedTile}>
+      <Link to="/novels/$novelId/illustrations" params={{ novelId }} search={{ run: run.id }} className={styles.tile}>
+        <span className={styles.tileFrame}>
+          <span className={styles.tileStatus}>
+            <span className={styles.tileFailedIcon}>
+              <AlertTriangleIcon size={22} />
+            </span>
+            <span className={styles.tileStage}>Couldn&apos;t render</span>
+          </span>
+          <StatusChip intent="danger" dot>
+            failed
+          </StatusChip>
+        </span>
+        <span className={styles.tileName}>{runSubjectLabel(run.target, entityNames)}</span>
+        <span className={styles.tileMeta}>
+          {subject && SUBJECT_LABEL[subject.subjectType]} · failed {relativeTime(run.endedAt ?? run.startedAt)}
+        </span>
+      </Link>
+      <div className={styles.failedActions}>
+        {run.illustrationRequest && (
+          <Button variant="secondary" size="sm" onClick={() => onRetry(run)}>
+            Try again
+          </Button>
+        )}
+        <Button variant="ghost" size="sm" onClick={() => onDismiss(run.id)}>
+          Dismiss
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+interface RunDetailProps {
+  novelId: string;
+  run: IllustrationRun;
+  entityNames: ReadonlyMap<string, string>;
+  onRetry: (run: IllustrationRun) => void;
+  onEdit: (run: IllustrationRun) => void;
+}
+
+function RunDetail({ novelId, run, entityNames, onRetry, onEdit }: RunDetailProps): React.JSX.Element {
+  const running = run.status === 'running';
+  const usage = useRunUsageQuery(novelId, run.id, running);
+  const elapsed = useElapsedSeconds(Date.parse(run.startedAt), running);
+  const { stop, stopping } = useStopIllustrationRun(novelId);
+  const stage = runStageOf(usage.data?.calls);
+  const subject = parseRunTarget(run.target);
+  const request = run.illustrationRequest;
+  const instructions = request?.instructions ?? [];
+
+  return (
+    <DetailPage
+      back={
+        <Link to="/novels/$novelId/illustrations" params={{ novelId }} search={{}}>
+          All illustrations
+        </Link>
+      }
+      identity={
+        <DetailPage.Identity title={runSubjectLabel(run.target, entityNames)}>
+          <StatusChip intent={running ? 'accent' : 'danger'} dot>
+            {running ? 'rendering' : 'failed'}
+          </StatusChip>
+          <span className={styles.identityMeta}>
+            {subject && SUBJECT_LABEL[subject.subjectType]} · {running ? `started ${formatElapsed(elapsed)} ago` : `failed ${relativeTime(run.endedAt ?? run.startedAt)}`}
+          </span>
+        </DetailPage.Identity>
+      }
+      actions={
+        running ? (
+          <Button variant="secondary" size="sm" prefix={<StopIcon size={13} />} loading={stopping} onClick={() => stop(run.id)}>
+            Stop
+          </Button>
+        ) : (
+          request && (
+            <>
+              <Button variant="ghost" size="sm" onClick={() => onEdit(run)}>
+                Edit request
+              </Button>
+              <Button variant="primary" size="sm" onClick={() => onRetry(run)}>
+                Try again
+              </Button>
+            </>
+          )
+        )
+      }
+      aside={
+        <>
+          {running && (
+            <section className={styles.block}>
+              <h2 className={styles.blockTitle}>Progress · usually 1 to 2 minutes</h2>
+              <div className={styles.stage}>
+                <span className={styles.stageDot} data-state={stage === 'composing' ? 'now' : 'done'} />
+                <span>{stage === 'composing' ? 'Composing the prompt from your canon' : 'Composed the prompt from your canon'}</span>
+                <span className={styles.stageNote}>{stage === 'composing' ? 'now' : 'done'}</span>
+              </div>
+              <div className={styles.stage} data-pending={stage === 'composing' || undefined}>
+                <span className={styles.stageDot} data-state={stage === 'composing' ? 'next' : 'now'} />
+                <span>{runStageLabel('rendering')}</span>
+                <span className={styles.stageNote}>{stage === 'composing' ? 'next' : formatElapsed(elapsed)}</span>
+              </div>
+              <p className={styles.dialogHint}>You can leave this page. You&apos;ll be told when they&apos;re ready.</p>
+            </section>
+          )}
+          <section className={styles.block}>
+            <h2 className={styles.blockTitle}>Art direction</h2>
+            {instructions.length === 0 ? (
+              <p className={styles.emptyNote}>No art direction was given.</p>
+            ) : (
+              <ol className={styles.frozenInstructions}>
+                {instructions.map((text, index) => (
+                  <li key={index}>{text}</li>
+                ))}
+              </ol>
+            )}
+          </section>
+          <section className={styles.block}>
+            <h2 className={styles.blockTitle}>Reference images</h2>
+            <p className={styles.emptyNote}>{request?.references.length ? `${request.references.length} attached` : 'None attached.'}</p>
+          </section>
+        </>
+      }
+      asideLabel={`${runSubjectLabel(run.target, entityNames)} progress`}
+      asideWidth="prose"
+    >
+      {!running && (
+        <Alert intent="danger" title="The image model could not render this">
+          Your request is kept, so you can try again or change it. Nothing was added to the story.
+        </Alert>
+      )}
+      <section className={styles.block}>
+        <h2 className={styles.blockTitle}>{running ? 'Candidates · rendering a pair' : 'Candidates'}</h2>
+        <div className={styles.candidates} aria-busy={running || undefined}>
+          {running ? (
+            <>
+              <RenderingSlot />
+              <RenderingSlot />
+            </>
+          ) : (
+            <>
+              <div className={styles.placeholder}>
+                <ImageIcon size={20} />
+                <span className={styles.placeholderNote}>Not rendered</span>
+              </div>
+              <div className={styles.placeholder}>
+                <ImageIcon size={20} />
+                <span className={styles.placeholderNote}>Not rendered</span>
+              </div>
+            </>
+          )}
+        </div>
+      </section>
+    </DetailPage>
+  );
+}
+
+function draftFromBody(body: StartIllustrationBody): StartDraft {
+  return {
+    subjectType: body.subjectType,
+    subjectKey: body.subjectKey ?? '',
+    instruction: body.instruction,
+    references: body.references?.map(reference => ({ source: reference.source, sourceId: reference.sourceId, role: reference.role, note: reference.note ?? '' })),
+    autoReferences: body.autoReferences,
+    depictsChapter: body.depictsChapter,
+  };
+}
+
 function IllustrationsScreen(): React.JSX.Element {
   const { novelId } = Route.useParams();
-  const { subject, key, illustration: illustrationParam, start } = Route.useSearch();
+  const { subject, key, illustration: illustrationParam, run: runParam, start } = Route.useSearch();
   const goSearch = Route.useNavigate();
   const illustrationsQuery = useListIllustrationsQuery(novelId);
   const items = useMemo(() => illustrationsQuery.data?.items ?? [], [illustrationsQuery.data]);
   const [roundWarnings, setRoundWarnings] = useState<RoundWarnings>();
+  const [draft, setDraft] = useState<StartDraft>();
+  const entitiesQuery = useListEntitiesQuery(novelId, { limit: 500 });
+  const entityNames = useMemo(() => new Map((entitiesQuery.data?.items ?? []).map(entity => [entity.entityKey, entity.name])), [entitiesQuery.data]);
+  const { dismissed, dismiss } = useDismissedRuns(novelId);
+  const { runs, running, failed, starting } = useIllustrationRuns(novelId, dismissed);
+  const startIllustration = useStartIllustration(novelId, (err, body) => {
+    toast.danger(referenceErrorMessage(err));
+    setDraft(draftFromBody(body));
+    void goSearch({ search: prev => ({ ...prev, illustration: undefined, run: undefined, start: true }) });
+  });
 
   const activeFilter: SubjectFilter = subject ?? 'all';
   const resolved = !illustrationsQuery.isLoading && !illustrationsQuery.error;
-  const total = resolved ? items.length : undefined;
+  const subjectOfTile = (target: string): { subjectType: IllustrationSubjectType; subjectKey?: string | null } => parseRunTarget(target) ?? { subjectType: 'entity' };
+  const visibleStarting = starting.filter(entry => filterIllustrations([subjectOfTile(entry.target)], activeFilter, key).length > 0);
+  const visibleRunning = running.filter(run => filterIllustrations([subjectOfTile(run.target)], activeFilter, key).length > 0);
+  const visibleFailed = failed.filter(run => filterIllustrations([subjectOfTile(run.target)], activeFilter, key).length > 0);
+  const liveTiles = [...starting.map(entry => entry.target), ...running.map(run => run.target), ...failed.map(run => run.target)].map(subjectOfTile);
+  const hasVisibleLive = visibleStarting.length + visibleRunning.length + visibleFailed.length > 0;
+  const total = resolved ? items.length + liveTiles.length : undefined;
   const filtering = subject !== undefined || key !== undefined;
 
-  const counts = useMemo(() => countBySubject(items), [items]);
+  const counts = countBySubject([...items, ...liveTiles]);
   const visible = useMemo(() => filterIllustrations(items, activeFilter, key), [items, activeFilter, key]);
   const byId = useMemo(() => new Map(items.map(item => [item.id, item])), [items]);
   const visibleIds = useMemo(() => (resolved ? visible.map(item => item.id) : undefined), [resolved, visible]);
@@ -683,7 +996,24 @@ function IllustrationsScreen(): React.JSX.Element {
   const clearFilters = (): Promise<void> => goSearch({ search: {} });
   const clearKey = (): Promise<void> => goSearch({ search: prev => ({ ...prev, key: undefined }) });
   const openStart = (): Promise<void> => goSearch({ search: prev => ({ ...prev, start: true }) });
-  const closeStart = (): Promise<void> => goSearch({ search: prev => ({ ...prev, start: undefined }) });
+  const closeStart = (): void => {
+    setDraft(undefined);
+    void goSearch({ search: prev => ({ ...prev, start: undefined }) });
+  };
+  const generate = (body: StartIllustrationBody): void => {
+    closeStart();
+    startIllustration(body, created => recordRound('start', created));
+  };
+  const retry = (run: IllustrationRun): void => {
+    if (!run.illustrationRequest) return;
+    void goSearch({ search: prev => ({ ...prev, run: undefined }) });
+    startIllustration(startBodyOf(run.illustrationRequest), created => recordRound('start', created));
+  };
+  const editRequest = (run: IllustrationRun): void => {
+    if (!run.illustrationRequest) return;
+    setDraft(draftFromBody(startBodyOf(run.illustrationRequest)));
+    void goSearch({ search: prev => ({ ...prev, run: undefined, start: true }) });
+  };
   const recordRound = (kind: ReferenceRoundKind, result: IllustrationResponse): void =>
     setRoundWarnings({ illustrationId: result.id, kind, warnings: result.referenceWarnings ?? [] });
 
@@ -704,6 +1034,13 @@ function IllustrationsScreen(): React.JSX.Element {
         }
       : null,
   );
+
+  const focusedRun = runParam ? [...running, ...failed].find(run => run.id === runParam) : undefined;
+  const finishedRun = runParam ? runs.find(run => run.id === runParam && run.status === 'completed') : undefined;
+  const finishedIllustration = finishedRun ? newestIllustrationFor(items, finishedRun) : undefined;
+  useEffect(() => {
+    if (finishedIllustration) void goSearch({ search: prev => ({ ...prev, run: undefined, illustration: finishedIllustration.id }), replace: true });
+  }, [finishedIllustration, goSearch]);
 
   const staleLink = resolved && Boolean(illustrationParam);
   const notice =
@@ -727,13 +1064,18 @@ function IllustrationsScreen(): React.JSX.Element {
       novelId={novelId}
       open={Boolean(start)}
       onOpenChange={next => !next && closeStart()}
-      initial={{ subjectType: subject ?? 'entity', subjectKey: key ?? '' }}
-      onStarted={created => {
-        recordRound('start', created);
-        return openIllustration(created.id);
-      }}
+      initial={draft ?? { subjectType: subject ?? 'entity', subjectKey: key ?? '' }}
+      onGenerate={generate}
     />
   );
+
+  if (focusedRun)
+    return (
+      <>
+        <RunDetail key={focusedRun.id} novelId={novelId} run={focusedRun} entityNames={entityNames} onRetry={retry} onEdit={editRequest} />
+        {startDialog}
+      </>
+    );
 
   if (selected)
     return (
@@ -741,6 +1083,7 @@ function IllustrationsScreen(): React.JSX.Element {
         <IllustrationDetail
           novelId={novelId}
           illustration={selected}
+          entityNames={entityNames}
           filter={{ subject, key }}
           ids={visibleIds}
           jump={jump}
@@ -769,7 +1112,7 @@ function IllustrationsScreen(): React.JSX.Element {
           value: activeFilter,
           onValueChange: pickFilter,
           items: [
-            { value: 'all', label: FILTER_LABEL.all, count: items.length },
+            { value: 'all', label: FILTER_LABEL.all, count: items.length + liveTiles.length },
             { value: 'entity', label: FILTER_LABEL.entity, count: counts.entity },
             { value: 'chapter', label: FILTER_LABEL.chapter, count: counts.chapter },
             { value: 'cover', label: FILTER_LABEL.cover, count: counts.cover },
@@ -793,7 +1136,7 @@ function IllustrationsScreen(): React.JSX.Element {
           <PaneLoader />
         ) : illustrationsQuery.error ? (
           <PaneError error={illustrationsQuery.error} />
-        ) : visible.length === 0 ? (
+        ) : visible.length === 0 && !hasVisibleLive ? (
           <EmptyState
             icon={<SearchIcon size={24} />}
             title="Nothing matches"
@@ -806,8 +1149,17 @@ function IllustrationsScreen(): React.JSX.Element {
           />
         ) : (
           <div className={styles.gallery}>
+            {visibleStarting.map(entry => (
+              <StartingTile key={entry.key} start={entry} entityNames={entityNames} />
+            ))}
+            {visibleRunning.map(run => (
+              <RunningTile key={run.id} novelId={novelId} run={run} entityNames={entityNames} />
+            ))}
+            {visibleFailed.map(run => (
+              <FailedTile key={run.id} novelId={novelId} run={run} entityNames={entityNames} onRetry={retry} onDismiss={dismiss} />
+            ))}
             {visible.map(item => (
-              <IllustrationTile key={item.id} novelId={novelId} illustration={item} filter={{ subject, key }} />
+              <IllustrationTile key={item.id} novelId={novelId} illustration={item} entityNames={entityNames} filter={{ subject, key }} />
             ))}
           </div>
         )}

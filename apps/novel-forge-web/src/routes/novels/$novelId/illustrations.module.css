@@ -249,3 +249,116 @@
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   }
 }
+
+.dialogHint {
+  margin: 8px 0 0;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+}
+
+.tilePair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px;
+  width: 100%;
+  height: 100%;
+  background: var(--sh-surface-card);
+}
+
+.tileStatus {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 12px;
+  text-align: center;
+}
+
+.tileStage {
+  font-size: var(--sh-text-body-sm);
+  font-weight: 500;
+  color: var(--sh-text-primary);
+}
+
+.tileFailedIcon {
+  display: flex;
+  color: var(--sh-danger-text);
+}
+
+.failedTile {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.failedActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.candidateBox {
+  position: relative;
+}
+
+.selectedBadge {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  color: var(--sh-neutral-white);
+  background: var(--sh-accent);
+  box-shadow: 0 0 0 2px var(--sh-surface-card);
+  pointer-events: none;
+}
+
+.pickHint {
+  margin: 12px 0 0;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+}
+
+.stage {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-primary);
+}
+
+.stage[data-pending] {
+  color: var(--sh-text-tertiary);
+}
+
+.stageDot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--sh-border-strong);
+}
+
+.stageDot[data-state='now'] {
+  background: var(--sh-accent);
+}
+
+.stageDot[data-state='done'] {
+  background: var(--sh-success-solid);
+}
+
+.stageNote {
+  margin-left: auto;
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}

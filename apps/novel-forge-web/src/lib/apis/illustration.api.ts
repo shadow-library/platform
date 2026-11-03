@@ -1,4 +1,14 @@
-import { keepPreviousData, queryOptions, useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryOptions, type UseQueryResult } from '@tanstack/react-query';
+import {
+  keepPreviousData,
+  queryOptions,
+  useMutation,
+  type UseMutationResult,
+  useMutationState,
+  useQuery,
+  useQueryClient,
+  type UseQueryOptions,
+  type UseQueryResult,
+} from '@tanstack/react-query';
 
 import {
   type IllustrationResponse,
@@ -12,10 +22,12 @@ import {
   type StartIllustrationBody,
   type UpdateIllustrationReferencesBody,
 } from './api-types.gen';
+import { invalidateRuns } from './run.api';
 import { ApiError, APIRequest } from './transport';
 
 export const illustrationKeys = {
   all: (projectId: string) => ['projects', projectId, 'illustrations'] as const,
+  start: (projectId: string) => [...illustrationKeys.all(projectId), 'start'] as const,
   list: (projectId: string, params?: ListIllustrationsQueryParams) => [...illustrationKeys.all(projectId), 'list', params] as const,
   referenceOptions: (projectId: string, params?: ListReferenceOptionsQueryParams) => [...illustrationKeys.all(projectId), 'reference-options', params] as const,
 };
@@ -42,11 +54,32 @@ export function useReferenceOptionsQuery(projectId: string, params: ListReferenc
   });
 }
 
-export function useStartIllustrationMutation(projectId: string): UseMutationResult<IllustrationResponse, ApiError, StartIllustrationBody> {
+export interface PendingIllustrationStart {
+  key: string;
+  body: StartIllustrationBody;
+  submittedAt: number;
+}
+
+/** Hook-level `onError`, because the request outlives the dialog and even the screen that sent it, and a `mutate()` callback dies with its component. */
+export function useStartIllustrationMutation(
+  projectId: string,
+  onError?: (error: ApiError, body: StartIllustrationBody) => void,
+): UseMutationResult<IllustrationResponse, ApiError, StartIllustrationBody> {
   const queryClient = useQueryClient();
   return useMutation<IllustrationResponse, ApiError, StartIllustrationBody>({
+    mutationKey: illustrationKeys.start(projectId),
     mutationFn: data => APIRequest.post(`/projects/${projectId}/illustrations`).body(data).execute(),
+    onMutate: () => invalidateRuns(queryClient, projectId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: illustrationKeys.all(projectId) }),
+    onError,
+    onSettled: () => invalidateRuns(queryClient, projectId),
+  });
+}
+
+export function usePendingIllustrationStarts(projectId: string): PendingIllustrationStart[] {
+  return useMutationState({
+    filters: { mutationKey: illustrationKeys.start(projectId), status: 'pending' },
+    select: mutation => ({ key: String(mutation.mutationId), body: mutation.state.variables as StartIllustrationBody, submittedAt: mutation.state.submittedAt }),
   });
 }
 

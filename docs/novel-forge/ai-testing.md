@@ -1654,7 +1654,7 @@ Common: `POST /projects/:p/illustrations` returns 201; every other route here re
 - Image call: role `image` (grok-imagine-image-2.0), node `generate`, 2 candidates, `raw_output` NULL, tokens NULL, `cost_usd` recorded when the provider reports it. It reuses the compose spec's `promptKey@promptVersion`, so it also reads `illustration-compose@1.1.0`.
 - Optionally `appearance-describe@1.0.0` (role `vision`, `node` NULL) when a likeness reference with a loaded image exists and the entity has no appearance. It is best-effort; a failure is swallowed.
 
-Graph is `illustration` (in `GET /runs`). UI: "Illustrations" → "Start an illustration" dialog: Subject = "An entity" / "A chapter scene" / "The project cover"; "Art direction" textarea.
+Graph is `illustration` (in `GET /runs`, which also returns each started illustration's `illustrationRequest`). UI: "Illustrations" → "Start an illustration" dialog: Subject = "An entity" / "A chapter scene" / "The project cover"; "Art direction" textarea. Generate closes the dialog and the render continues as a tile on the board and a row under the bell, each with its own progress and Stop; a failed render keeps its tile with Try again and Dismiss.
 
 #### 2.1 Entity portrait (compose + render + derived appearance)
 

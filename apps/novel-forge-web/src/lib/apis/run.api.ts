@@ -26,6 +26,17 @@ const runKeys = {
 };
 
 const RUNNING_REFRESH_MS = 4000;
+const ILLUSTRATION_RUN_WINDOW_MS = 7 * 24 * 60 * 60_000;
+
+// Under `runKeys.all`, so a project's `run` events refresh it as soon as a run starts or settles.
+export const illustrationRunsQueryOptions = (projectId: string): UseQueryOptions<ListWorkflowRunResponse, ApiError> =>
+  queryOptions<ListWorkflowRunResponse, ApiError>({
+    queryKey: [...runKeys.all(projectId), 'illustrations'],
+    queryFn: () =>
+      APIRequest.get(`/projects/${projectId}/runs`)
+        .query({ graph: 'illustration', limit: 20, from: new Date(Date.now() - ILLUSTRATION_RUN_WINDOW_MS).toISOString() })
+        .execute(),
+  });
 
 export const listRunsQueryOptions = (projectId: string): UseQueryOptions<ListWorkflowRunResponse, ApiError> =>
   queryOptions<ListWorkflowRunResponse, ApiError>({
@@ -37,6 +48,14 @@ export const hasRunningRun = (data?: ListWorkflowRunResponse): boolean => data?.
 
 export function useListRunsQuery(projectId: string, enabled = true, opts?: PollingOptions<ListWorkflowRunResponse>): UseQueryResult<ListWorkflowRunResponse, ApiError> {
   return useQuery({ ...listRunsQueryOptions(projectId), enabled: enabled && Boolean(projectId), refetchInterval: livePolling(projectId, opts?.refetchInterval) });
+}
+
+export function useIllustrationRunsQuery(projectId: string, starting: boolean): UseQueryResult<ListWorkflowRunResponse, ApiError> {
+  return useQuery({
+    ...illustrationRunsQueryOptions(projectId),
+    enabled: Boolean(projectId),
+    refetchInterval: livePolling<ListWorkflowRunResponse>(projectId, query => (starting || hasRunningRun(query.state.data) ? RUNNING_REFRESH_MS : false)),
+  });
 }
 
 export function invalidateRuns(queryClient: QueryClient, projectId: string): void {
