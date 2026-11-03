@@ -379,7 +379,7 @@ describe('translateEmbeddingRequest', () => {
 });
 
 describe('translateImageRequest', () => {
-  it("should send OpenRouter's images shape with the references as input references", () => {
+  it("should send OpenRouter's images shape for one image, whatever `n` asked for, with the references as input references", () => {
     const translated = translateImageRequest({
       body: { model: 'novel-forge.image', prompt: 'A lighthouse', n: 2, reference_images: ['data:image/png;base64,AAA', 'https://img.test/a.png'], synapse: ENVELOPE },
       provider: OPENROUTER,
@@ -391,7 +391,7 @@ describe('translateImageRequest', () => {
     expect(translated.body).toEqual({
       model: 'vendor/image',
       prompt: 'A lighthouse',
-      n: 2,
+      n: 1,
       input_references: [
         { type: 'image_url', image_url: { url: 'data:image/png;base64,AAA' } },
         { type: 'image_url', image_url: { url: 'https://img.test/a.png' } },
@@ -399,7 +399,7 @@ describe('translateImageRequest', () => {
     });
   });
 
-  it('should default to one image and send no references when none are given', () => {
+  it('should send no references when none are given', () => {
     const translated = translateImageRequest({
       body: { model: 'novel-forge.image', prompt: 'A lighthouse' },
       provider: OPENROUTER,

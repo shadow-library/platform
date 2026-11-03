@@ -431,7 +431,7 @@ describe('ProviderClient', () => {
     it('should return the image data with the upstream cost, defaulting the media type', async () => {
       const { fetch } = recordingFetch(() => json({ data: [{ b64_json: 'AAA', media_type: 'image/webp' }, { b64_json: 'BBB' }, { url: 'ignored' }], usage: { cost: 0.04 } }));
 
-      expect(await new ProviderClient(fetch).sendImages(openrouter, TRANSLATED)).toEqual({
+      expect(await new ProviderClient(fetch).sendImages(openrouter, TRANSLATED, 1)).toEqual({
         data: [
           { b64_json: 'AAA', media_type: 'image/webp' },
           { b64_json: 'BBB', media_type: 'image/png' },
@@ -443,7 +443,23 @@ describe('ProviderClient', () => {
     it('should fail fatally when the provider returns no image data', async () => {
       const { fetch } = recordingFetch(() => json({ data: [] }));
 
-      expect(await failureOf(new ProviderClient(fetch).sendImages(openrouter, TRANSLATED))).toMatchObject({ retryable: false, code: 'invalid_response' });
+      expect(await failureOf(new ProviderClient(fetch).sendImages(openrouter, TRANSLATED, 1))).toMatchObject({ retryable: false, code: 'invalid_response' });
+    });
+
+    it('should make one call per image and sum what they cost', async () => {
+      const { fetch, calls } = recordingFetch(() => json({ data: [{ b64_json: 'AAA' }], usage: { cost: 0.04 } }));
+
+      const result = await new ProviderClient(fetch).sendImages(openrouter, TRANSLATED, 2);
+
+      expect(calls).toHaveLength(2);
+      expect(result.data).toHaveLength(2);
+      expect(result.upstreamCostUsd).toBe(0.08);
+    });
+
+    it('should throw the first failure when every call fails, keeping it retryable for failover', async () => {
+      const { fetch } = recordingFetch(() => json({ error: { message: 'overloaded' } }, 503));
+
+      expect(await failureOf(new ProviderClient(fetch).sendImages(openrouter, TRANSLATED, 2))).toMatchObject({ retryable: true });
     });
   });
 

@@ -196,7 +196,8 @@ export function translateImageRequest({ body, provider, providerKey, deploymentI
   const generates = dialect === 'openrouter' || dialect === 'mock';
   if (!generates) throw new ProviderCallError({ retryable: false, code: 'unsupported', message: `Provider '${providerKey}' cannot generate images` });
   const references = body.reference_images ?? [];
-  const translated: JsonObject = { model: deploymentId, prompt: body.prompt, n: body.n ?? 1 };
+  // xAI refuses any other `n` through OpenRouter, so `ProviderClient.sendImages` makes one call per image instead.
+  const translated: JsonObject = { model: deploymentId, prompt: body.prompt, n: 1 };
   if (references.length > 0) translated['input_references'] = references.map(url => ({ type: 'image_url', image_url: { url } }));
   return { url: `${baseUrl(provider)}/images`, headers: authHeaders(provider, providerKey, apiKey), body: translated };
 }

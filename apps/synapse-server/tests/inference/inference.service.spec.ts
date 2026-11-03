@@ -543,24 +543,61 @@ describe('InferenceService.embed failures', () => {
 });
 
 describe('InferenceService.generateImages', () => {
-  it("should price every generated image at the model's per-image price and bill the upstream's cost", async () => {
+  const IMAGES_URL = 'https://openrouter.ai/api/v1/images';
+  const image = { b64_json: 'aGk=', media_type: 'image/webp' };
+  const refused = json(400, { error: { message: 'n: must be exactly 1' } });
+  const singleImage = (cost?: number): Responder => {
+    const answer = json(200, { data: [image], ...(cost === undefined ? {} : { usage: { cost } }) });
+    return (url, init) => ((JSON.parse(String(init.body)) as { n?: number }).n === 1 ? answer(url, init) : refused(url, init));
+  };
+
+  it('should ask a provider that accepts only n=1 for each image in its own call', async () => {
+    const { service, fetcher, begin } = harness();
+    fetcher.on(IMAGES_URL, singleImage(), singleImage());
+
+    const response = await service.generateImages(APP, { model: 'novel-forge.image', prompt: 'a cat', n: 2, synapse: envelope() }, begin());
+
+    expect(response.data).toEqual([image, image]);
+    expect(fetcher.calls.map(call => call.body['n'])).toEqual([1, 1]);
+  });
+
+  it("should price every generated image at the model's per-image price and bill the summed upstream cost", async () => {
     const { service, fetcher, repository, begin } = harness();
-    const image = { b64_json: 'aGk=', media_type: 'image/webp' };
-    fetcher.on('https://openrouter.ai/api/v1/images', json(200, { data: [image, image, image], usage: { cost: 0.09 } }));
+    fetcher.on(IMAGES_URL, singleImage(0.03), singleImage(0.03), singleImage(0.03));
 
     const response = await service.generateImages(APP, { model: 'novel-forge.image', prompt: 'a cat', n: 3, synapse: envelope() }, begin());
 
-    expect(response.data).toEqual([image, image, image]);
     expect(response.usage).toEqual({ cost: 0.09 });
-    expect(response.synapse).toMatchObject({ provider: 'openrouter', cost: { list_usd: 0.12, billed_usd: 0.09 } });
+    expect(response.synapse).toMatchObject({ provider: 'openrouter', attempts: 1, cost: { list_usd: 0.12, billed_usd: 0.09 } });
     expect(repository.settlements[0]?.listCostUsd).toBe(0.12);
   });
 
-  it('should bill the list price when the upstream reported no cost, counting the images it actually returned', async () => {
+  it('should bill the list price when the upstream reported no cost', async () => {
     const { service, fetcher, begin } = harness();
-    fetcher.on('https://openrouter.ai/api/v1/images', json(200, { data: [{ b64_json: 'aGk=' }] }));
+    fetcher.on(IMAGES_URL, singleImage(), singleImage());
     const response = await service.generateImages(APP, { model: 'novel-forge.image', prompt: 'a cat', n: 2, synapse: envelope() }, begin());
-    expect(response.synapse.cost).toEqual({ list_usd: 0.04, billed_usd: 0.04 });
+    expect(response.synapse.cost).toEqual({ list_usd: 0.08, billed_usd: 0.08 });
+  });
+
+  it('should bill the list price when only some calls reported a cost, rather than under-billing', async () => {
+    const { service, fetcher, begin } = harness();
+    fetcher.on(IMAGES_URL, singleImage(0.01), singleImage());
+    const response = await service.generateImages(APP, { model: 'novel-forge.image', prompt: 'a cat', n: 2, synapse: envelope() }, begin());
+    expect(response.synapse.cost).toEqual({ list_usd: 0.08, billed_usd: 0.08 });
+  });
+
+  it('should return and bill the images it got when one call of several fails, without failing over', async () => {
+    const document = catalogDocument(draft => {
+      draft.models['painter']!.deployments.push({ provider: 'mock', id: 'mock-image' });
+    });
+    const { service, fetcher, repository, begin } = harness(document);
+    fetcher.on(IMAGES_URL, singleImage(0.04), json(502, { error: { message: 'bad gateway' } }));
+
+    const response = await service.generateImages(APP, { model: 'novel-forge.image', prompt: 'a cat', n: 2, synapse: envelope() }, begin());
+
+    expect(response.data).toEqual([image]);
+    expect(response.synapse).toMatchObject({ provider: 'openrouter', attempts: 1, cost: { list_usd: 0.04, billed_usd: 0.04 } });
+    expect(repository.settlements[0]?.values).toMatchObject({ status: 'ok', provider: 'openrouter', listCostUsd: 0.04 });
   });
 
   it('should fail over from a failing image provider and bill the zero-cost one nothing', async () => {
@@ -568,7 +605,8 @@ describe('InferenceService.generateImages', () => {
       draft.models['painter']!.deployments.push({ provider: 'mock', id: 'mock-image' });
     });
     const { service, fetcher, repository, begin } = harness(document);
-    fetcher.on('https://openrouter.ai/api/v1/images', json(502, { error: { message: 'bad gateway' } }));
+    const badGateway = json(502, { error: { message: 'bad gateway' } });
+    fetcher.on(IMAGES_URL, badGateway, badGateway);
 
     const response = await service.generateImages(APP, { model: 'novel-forge.image', prompt: 'a cat', n: 2, synapse: envelope() }, begin());
 
@@ -578,7 +616,7 @@ describe('InferenceService.generateImages', () => {
 
   it('should settle a refused image generation as an upstream error', async () => {
     const { service, fetcher, repository, begin } = harness();
-    fetcher.on('https://openrouter.ai/api/v1/images', json(400, { error: { message: 'prompt refused' } }));
+    fetcher.on(IMAGES_URL, json(400, { error: { message: 'prompt refused' } }));
 
     const error = await failureOf(service.generateImages(APP, { model: 'novel-forge.image', prompt: 'a cat', synapse: envelope() }, begin()));
 

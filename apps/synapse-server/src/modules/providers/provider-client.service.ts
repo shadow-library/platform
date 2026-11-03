@@ -131,7 +131,18 @@ export class ProviderClient {
     return { response: callerPayload(payload, options.responseModel), ...(usage ? { usage } : {}) };
   }
 
-  async sendImages(target: ProviderTarget, translated: TranslatedRequest, options: ProviderCallOptions = {}): Promise<ImageResult> {
+  async sendImages(target: ProviderTarget, translated: TranslatedRequest, count: number, options: ProviderCallOptions = {}): Promise<ImageResult> {
+    const calls = await Promise.allSettled(Array.from({ length: count }, () => this.sendImage(target, translated, options)));
+    const served = calls.flatMap(call => (call.status === 'fulfilled' ? [call.value] : []));
+    const failure = calls.find((call): call is PromiseRejectedResult => call.status === 'rejected');
+    if (served.length === 0 && failure) throw failure.reason;
+    const upstreamCosts = served.flatMap(result => result.upstreamCostUsd ?? []);
+    // Summing only the reported costs would under-bill; with none, `callCost` falls back to the list price.
+    const upstreamCost = upstreamCosts.length === served.length ? { upstreamCostUsd: upstreamCosts.reduce((total, cost) => total + cost, 0) } : {};
+    return { data: served.flatMap(result => result.data), ...upstreamCost };
+  }
+
+  private async sendImage(target: ProviderTarget, translated: TranslatedRequest, options: ProviderCallOptions): Promise<ImageResult> {
     const usageOptions = this.usageOptions(target);
     const payload = await this.call(target, translated, options, ['data']);
     const items = Array.isArray(payload['data']) ? payload['data'].map(asRecord) : [];

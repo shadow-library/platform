@@ -245,7 +245,7 @@ export class InferenceService {
       const { value: result, deployment } = await this.serve(admission, abort, async (target, deployment) => {
         const apiKey = await this.apiKey(deployment);
         const translated = translateImageRequest({ body, provider: deployment.provider, providerKey: deployment.providerKey, deploymentId: deployment.id, apiKey });
-        return this.providers.sendImages(target, translated, { signal: abort.signal, responseModel: admission.resolution.taskKey });
+        return this.providers.sendImages(target, translated, body.n ?? 1, { signal: abort.signal, responseModel: admission.resolution.taskKey });
       });
       const listUsd = imageListCost(result.data.length, admission.resolution.model.pricePerMTok);
       const cost = callCost(listUsd, deployment.provider.cost, result.upstreamCostUsd);
