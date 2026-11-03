@@ -11,13 +11,13 @@ export interface RecordedRequest {
 
 type Reply = (url: string) => Response;
 
-/** Shaped like Bun's own fetch failure on a refused connection: a plain `Error` carrying `code`, `path` and `errno` */
-export class ConnectionRefusedError extends Error {
-  readonly code = 'ConnectionRefused';
+/** Shaped like Bun's own fetch failure on a refused connection: a `TypeError` carrying `code`, `path` and `errno` */
+export class ConnectionRefusedError extends TypeError {
+  readonly code = 'ECONNREFUSED';
   readonly errno = 0;
 
   constructor(readonly path: string) {
-    super('Unable to connect. Is the computer able to access the url?');
+    super('ECONNREFUSED: Unable to connect. Is the computer able to access the url?');
   }
 }
 
