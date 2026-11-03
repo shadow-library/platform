@@ -5,7 +5,7 @@ import path from 'node:path';
 
 import { ESLint } from 'eslint';
 
-import { findScript, log, reportError, reportTestBudget, resolveBin, run, ShadowError } from './utils/index.ts';
+import { findScript, log, reportError, reportTestBudget, run, ShadowError } from './utils/index.ts';
 import { findWorkspace, findWorkspaces, REPO_ROOT, type Workspace } from './workspaces.ts';
 
 interface VerifyOptions {
@@ -14,6 +14,8 @@ interface VerifyOptions {
   fast: boolean;
   /** Runs the test step only. */
   unit: boolean;
+  /** Runs the type-check step only. */
+  types: boolean;
   /** Fails an `apps/*` test over the 50ms hard cap instead of only warning. */
   ci: boolean;
 }
@@ -32,7 +34,7 @@ interface VerifyTarget {
   ciScoped: boolean;
 }
 
-const USAGE = `Usage: bun scripts/verify.ts [workspace | scripts | --all] [--fix] [--fast] [--unit] [--ci]
+const USAGE = `Usage: bun scripts/verify.ts [workspace | scripts | --all] [--fix] [--fast] [--unit] [--types] [--ci]
 
   workspace   repo-relative directory (packages/common) or package name (@shadow-library/common)
   scripts     the root tooling itself — scripts/ and the root-level configs
@@ -43,6 +45,7 @@ const USAGE = `Usage: bun scripts/verify.ts [workspace | scripts | --all] [--fix
               script), the workspace's own "test" script elsewhere when it defines one (packages that
               need "bun test --isolate" or vitest) — skips format/lint/type-check; combine with --all to
               run every opted-in workspace; incompatible with --fix and --fast
+  --types     run only the type-check step; incompatible with --fix, --fast and --unit
   --ci        for an apps/* workspace, fail the test step when a test exceeds the 50ms hard cap, listing
               offenders — without it, a test over budget only warns; applies to --unit and to the normal
               test step alike. packages/* and other non-app workspaces stay warn-only regardless`;
@@ -105,7 +108,7 @@ async function runLint(target: VerifyTarget, fix: boolean): Promise<boolean> {
 }
 
 function runTypeCheck(target: VerifyTarget): boolean {
-  const result = run(resolveBin('tsc', [target.path, REPO_ROOT]), ['-p', target.tsconfigPath, '--noEmit'], { cwd: target.path });
+  const result = run('bun', ['check', '--no-script', '-p', target.tsconfigPath], { cwd: target.path });
   if (result.status !== 0) {
     log.error('failed type-check');
     return false;
@@ -197,6 +200,22 @@ async function verifyAll(options: VerifyOptions): Promise<number> {
   return 0;
 }
 
+function verifyTypesAll(): number {
+  const failures: string[] = [];
+  for (const target of [TOOLING_TARGET, ...findWorkspaces().map(toTarget)]) {
+    log.info(`\nverifying ${target.dir} (types)`);
+    if (!runTypeCheck(target)) failures.push(target.dir);
+  }
+
+  if (failures.length > 0) {
+    log.error(`\ntype-check failed for ${failures.length} target(s):\n${failures.map(dir => `  ${dir}`).join('\n')}`);
+    return 1;
+  }
+
+  log.success('\nAll targets type-checked successfully');
+  return 0;
+}
+
 function verifyUnitAll(ci: boolean): number {
   const failures: string[] = [];
   for (const target of [TOOLING_TARGET, ...findWorkspaces().map(toTarget)]) {
@@ -225,9 +244,22 @@ async function main(): Promise<number> {
     return 0;
   }
 
-  const options: VerifyOptions = { fix: args.includes('--fix'), fast: args.includes('--fast'), unit: args.includes('--unit'), ci: args.includes('--ci') };
+  const options: VerifyOptions = {
+    fix: args.includes('--fix'),
+    fast: args.includes('--fast'),
+    unit: args.includes('--unit'),
+    types: args.includes('--types'),
+    ci: args.includes('--ci'),
+  };
   if (options.unit && options.fix) throw new ShadowError(`--unit cannot be combined with --fix — a tests-only run has nothing to fix.\n\n${USAGE}`);
   if (options.unit && options.fast) throw new ShadowError(`--unit cannot be combined with --fast — --unit already skips format/lint/type-check.\n\n${USAGE}`);
+
+  if (options.types && (options.fix || options.fast || options.unit)) throw new ShadowError(`--types cannot be combined with --fix, --fast or --unit.\n\n${USAGE}`);
+
+  if (options.types) {
+    if (args.includes('--all')) return verifyTypesAll();
+    return runTypeCheck(resolveTarget(args)) ? 0 : 1;
+  }
 
   if (options.unit) {
     if (args.includes('--all')) return verifyUnitAll(options.ci);

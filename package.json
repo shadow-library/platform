@@ -39,6 +39,7 @@
     "format": "bun fmt",
     "format:check": "bun fmt --check",
     "format:changed": "bun fmt --changed",
+    "typecheck": "bun scripts/verify.ts --all --types",
     "db": "bun scripts/db.ts",
     "knip": "bun scripts/code-health.ts knip",
     "duplicates": "bun scripts/code-health.ts duplicates",
