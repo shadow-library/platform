@@ -12,6 +12,8 @@ export class ModelCallTimeoutError extends Error {
 const NETWORK_ERROR_CODES: ReadonlySet<string> = new Set([
   'ECONNRESET',
   'ECONNREFUSED',
+  'ENOTFOUND',
+  'EPROTO',
   'ECONNABORTED',
   'ETIMEDOUT',
   'EPIPE',

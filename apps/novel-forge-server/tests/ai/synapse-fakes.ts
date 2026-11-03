@@ -62,7 +62,7 @@ export const hang: Reply = ({ signal }) =>
   });
 
 export const refuseConnection: Reply = () => {
-  throw Object.assign(new Error('Unable to connect. Is the computer able to access the url?'), { code: 'ConnectionRefused' });
+  throw Object.assign(new TypeError('ECONNREFUSED: Unable to connect. Is the computer able to access the url?'), { code: 'ECONNREFUSED' });
 };
 
 export class FakeSynapse {

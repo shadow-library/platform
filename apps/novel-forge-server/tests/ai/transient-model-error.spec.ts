@@ -16,6 +16,17 @@ describe('isTransientModelError', () => {
     expect(isTransientModelError(new TypeError('fetch failed', { cause: Object.assign(new Error('socket hang up'), { code: 'ECONNRESET' }) }))).toBe(true);
   });
 
+  it.each(['ECONNREFUSED', 'ECONNRESET', 'ENOTFOUND', 'EPROTO'])('should call the TypeError Bun fetch raises for %s transient, directly or as a cause', code => {
+    const failure = Object.assign(new TypeError(`${code}: Unable to connect.`), { code });
+
+    expect(isTransientModelError(failure)).toBe(true);
+    expect(isTransientModelError(new Error('network request failed', { cause: failure }))).toBe(true);
+  });
+
+  it('should never call a request fetch could not build transient', () => {
+    expect(isTransientModelError(Object.assign(new TypeError('fetch() URL is invalid'), { code: 'ERR_INVALID_URL' }))).toBe(false);
+  });
+
   it('should never call a refusal the request itself caused transient', () => {
     expect(isTransientModelError(httpError(401))).toBe(false);
     expect(isTransientModelError(httpError(403))).toBe(false);
