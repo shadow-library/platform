@@ -136,7 +136,7 @@ export class ImageGenerationBody implements ImageRequestBody {
   @Sensitive()
   prompt: string;
 
-  @Field(() => Integer, { optional: true, minimum: 1, maximum: 10 })
+  @Field(() => Integer, { optional: true, minimum: 1, maximum: 10, description: 'How many images to generate; fewer come back when only some of them could be generated' })
   n?: number;
 
   @Field(() => [String], { optional: true, maxItems: 16, description: 'Data URLs or https URLs of images to work from' })

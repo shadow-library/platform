@@ -632,6 +632,7 @@ export interface components {
       /** @description The task id, `<app>.<name>` */
       model: string;
       prompt: string;
+      /** @description How many images to generate; fewer come back when only some of them could be generated */
       n?: number;
       /** @description Data URLs or https URLs of images to work from */
       reference_images?: string[];

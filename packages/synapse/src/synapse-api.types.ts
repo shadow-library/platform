@@ -142,6 +142,7 @@ export interface SynapseEmbeddingResponse {
 export interface SynapseImageRequest {
   model: string;
   prompt: string;
+  /** How many images to generate; fewer come back when only some of them could be generated. */
   n?: number;
   reference_images?: string[];
   synapse: SynapseEnvelopeInput;
