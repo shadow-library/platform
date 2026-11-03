@@ -188,7 +188,7 @@ jobs:
         run: bun scripts/check-migrations.ts ${{ matrix.workspace }}
 
       # The test step runs only where the workspace opts in via `"shadow": { "verifyTest": true }`; e2e needs a live deployment and does not.
-      # `--ci` fails an apps/* test over the 50ms hard cap instead of only warning.
+      # `--ci` fails an apps/* test over the 50ms hard cap instead of only warning, and isolates each test file so a test relying on another's leaked state fails.
       - name: Verify
         run: bun scripts/verify.ts ${{ matrix.workspace }} --ci
 

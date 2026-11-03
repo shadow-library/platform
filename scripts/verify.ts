@@ -16,8 +16,12 @@ interface VerifyOptions {
   unit: boolean;
   /** Runs the type-check step only. */
   types: boolean;
-  /** Fails an `apps/*` test over the 50ms hard cap instead of only warning. */
+  /** Fails an `apps/*` test over the 50ms hard cap instead of only warning, and implies {@link isolate}. */
   ci: boolean;
+  /** Gives each test file a fresh global, so one passing only because another leaked state fails. */
+  isolate: boolean;
+  /** `--watch`, `--coverage`, `--changed`: forwarded to `bun test`, so a workspace with its own `test` script is skipped. */
+  testModes: string[];
 }
 
 interface VerifyTarget {
@@ -34,7 +38,8 @@ interface VerifyTarget {
   ciScoped: boolean;
 }
 
-const USAGE = `Usage: bun scripts/verify.ts [workspace | scripts | --all] [--fix] [--fast] [--unit] [--types] [--ci]
+const USAGE = `Usage: bun scripts/verify.ts [workspace | scripts | --all] [--fix] [--fast] [--unit] [--types] [--ci] [--isolate]
+                            [--watch] [--coverage] [--changed[=ref]]
 
   workspace   repo-relative directory (packages/common) or package name (@shadow-library/common)
   scripts     the root tooling itself — scripts/ and the root-level configs
@@ -48,7 +53,16 @@ const USAGE = `Usage: bun scripts/verify.ts [workspace | scripts | --all] [--fix
   --types     run only the type-check step; incompatible with --fix, --fast and --unit
   --ci        for an apps/* workspace, fail the test step when a test exceeds the 50ms hard cap, listing
               offenders — without it, a test over budget only warns; applies to --unit and to the normal
-              test step alike. packages/* and other non-app workspaces stay warn-only regardless`;
+              test step alike. packages/* and other non-app workspaces stay warn-only regardless.
+              Implies --isolate
+  --isolate   run "bun test" with a fresh global per test file — catches a test that passes only because
+              another file leaked state into it; several times slower on a large suite
+  --watch     with --unit: rerun on change; a single workspace only
+  --coverage  with --unit: report coverage
+  --changed   with --unit: run only the tests whose import graph reaches a change, optionally against a ref.
+              Blind across workspaces — apps import packages through dist/, so never a substitute for a full run`;
+
+const TEST_MODE_PATTERN = /^--(watch|coverage|changed(=.+)?)$/;
 
 const TOOLING_TARGET: VerifyTarget = {
   dir: 'scripts',
@@ -120,10 +134,12 @@ function runTypeCheck(target: VerifyTarget): boolean {
 
 // `--timeout 1000` is only a hang guard, kept well above the 50ms `--ci` cap so the budget split is enforced by reportTestBudget, not bun's timeout.
 // A workspace with no test files exits non-zero without writing the junit report.
-function runBunTestWithBudget(target: VerifyTarget, ci: boolean): boolean {
-  const ciGate = ci && target.ciScoped;
+// Not `--parallel`: contention pushes tests over the 50ms cap and the fastify integration specs share a fixed port; sequential is also faster here, the per-file isolation cost dominating.
+function runBunTestWithBudget(target: VerifyTarget, options: VerifyOptions): boolean {
+  const ciGate = options.ci && target.ciScoped;
   const outfile = path.join(os.tmpdir(), `shadow-verify-junit-${randomUUID()}.xml`);
-  const result = run('bun', ['test', '--timeout', '1000', '--reporter=junit', `--reporter-outfile=${outfile}`], { cwd: target.path });
+  const isolation = options.ci || options.isolate ? ['--isolate'] : [];
+  const result = run('bun', ['test', '--timeout', '1000', '--reporter=junit', `--reporter-outfile=${outfile}`, ...isolation, ...options.testModes], { cwd: target.path });
   const withinBudget = fs.existsSync(outfile) ? reportTestBudget(outfile, { ci: ciGate }) : true;
   fs.rmSync(outfile, { force: true });
 
@@ -141,9 +157,9 @@ function runBunTestWithBudget(target: VerifyTarget, ci: boolean): boolean {
 }
 
 // Only the `bun test` fallback gets the junit budget reporter and the `--ci` gate.
-function runTest(target: VerifyTarget, ci: boolean): boolean {
+function runTest(target: VerifyTarget, options: VerifyOptions): boolean {
   const script = findScript(target.scripts, ['test']);
-  if (!script) return runBunTestWithBudget(target, ci);
+  if (!script) return runBunTestWithBudget(target, options);
 
   const result = run('bun', ['run', script.name], { cwd: target.path });
   if (result.status !== 0) {
@@ -156,7 +172,7 @@ function runTest(target: VerifyTarget, ci: boolean): boolean {
 }
 
 // Non-app workspaces keep their own `test` script: packages/fastify needs `--isolate` against leaking `mock.module`, and packages/ui is vitest.
-function runUnitTarget(target: VerifyTarget, ci: boolean): boolean {
+function runUnitTarget(target: VerifyTarget, options: VerifyOptions): boolean {
   log.info(`\nverifying ${target.dir} (unit)`);
 
   if (!target.verifyTest) {
@@ -164,7 +180,13 @@ function runUnitTarget(target: VerifyTarget, ci: boolean): boolean {
     return true;
   }
 
-  return target.dir.startsWith('apps/') ? runBunTestWithBudget(target, ci) : runTest(target, ci);
+  const isApp = target.dir.startsWith('apps/');
+  if (options.testModes.length > 0 && !isApp && findScript(target.scripts, ['test'])) {
+    log.info(`tests skipped — ${options.testModes.join(' ')} applies to "bun test", and this workspace has its own "test" script`);
+    return true;
+  }
+
+  return isApp ? runBunTestWithBudget(target, options) : runTest(target, options);
 }
 
 export async function verifyTarget(target: VerifyTarget, options: VerifyOptions): Promise<boolean> {
@@ -179,7 +201,7 @@ export async function verifyTarget(target: VerifyTarget, options: VerifyOptions)
   }
 
   if (!runTypeCheck(target)) return false;
-  if (target.verifyTest && !runTest(target, options.ci)) return false;
+  if (target.verifyTest && !runTest(target, options)) return false;
 
   log.success('verify passed');
   return true;
@@ -216,10 +238,10 @@ function verifyTypesAll(): number {
   return 0;
 }
 
-function verifyUnitAll(ci: boolean): number {
+function verifyUnitAll(options: VerifyOptions): number {
   const failures: string[] = [];
   for (const target of [TOOLING_TARGET, ...findWorkspaces().map(toTarget)]) {
-    if (!runUnitTarget(target, ci)) failures.push(target.dir);
+    if (!runUnitTarget(target, options)) failures.push(target.dir);
   }
 
   if (failures.length > 0) {
@@ -250,11 +272,14 @@ async function main(): Promise<number> {
     unit: args.includes('--unit'),
     types: args.includes('--types'),
     ci: args.includes('--ci'),
+    isolate: args.includes('--isolate'),
+    testModes: args.filter(arg => TEST_MODE_PATTERN.test(arg)),
   };
   if (options.unit && options.fix) throw new ShadowError(`--unit cannot be combined with --fix — a tests-only run has nothing to fix.\n\n${USAGE}`);
   if (options.unit && options.fast) throw new ShadowError(`--unit cannot be combined with --fast — --unit already skips format/lint/type-check.\n\n${USAGE}`);
-
   if (options.types && (options.fix || options.fast || options.unit)) throw new ShadowError(`--types cannot be combined with --fix, --fast or --unit.\n\n${USAGE}`);
+  if (options.testModes.length > 0 && !options.unit) throw new ShadowError(`${options.testModes.join(' ')} requires --unit.\n\n${USAGE}`);
+  if (options.testModes.includes('--watch') && args.includes('--all')) throw new ShadowError(`--watch needs a single workspace, not --all.\n\n${USAGE}`);
 
   if (options.types) {
     if (args.includes('--all')) return verifyTypesAll();
@@ -262,8 +287,8 @@ async function main(): Promise<number> {
   }
 
   if (options.unit) {
-    if (args.includes('--all')) return verifyUnitAll(options.ci);
-    return runUnitTarget(resolveTarget(args), options.ci) ? 0 : 1;
+    if (args.includes('--all')) return verifyUnitAll(options);
+    return runUnitTarget(resolveTarget(args), options) ? 0 : 1;
   }
 
   if (args.includes('--all')) return verifyAll(options);
