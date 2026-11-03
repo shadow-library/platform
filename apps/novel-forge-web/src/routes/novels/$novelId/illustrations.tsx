@@ -435,7 +435,7 @@ interface CandidateGridProps {
 function CandidateGrid({ illustration, busy, onSelect }: CandidateGridProps): React.JSX.Element {
   const active = illustration.status === 'active';
   const shown = shownCandidates(illustration);
-  const slots = candidateSlots(shown, busy);
+  const slots = candidateSlots(shown, busy, illustration.status !== 'saved');
   const [viewing, setViewing] = useState<number>();
   const hint = pickHint(illustration);
 
@@ -524,7 +524,7 @@ function IllustrationControls({ novelId, illustration, busy, roundWarnings, onRe
   return (
     <>
       <section className={styles.block}>
-        <h2 className={styles.blockTitle}>Art direction · every edit re-renders a new pair of candidates</h2>
+        <h2 className={styles.blockTitle}>{active ? 'Art direction · every edit re-renders a new pair of candidates' : 'Art direction'}</h2>
         {active ? (
           <InstructionList
             instructions={illustration.instructions}

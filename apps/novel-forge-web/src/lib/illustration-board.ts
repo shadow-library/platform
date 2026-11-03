@@ -67,9 +67,9 @@ export function countBySubject(items: readonly Pick<BoardIllustration, 'subjectT
 }
 
 /** A round always returns a pair, so a lone candidate keeps its partner's slot drawn rather than reflowing the grid when the next round lands. */
-export function candidateSlots<T>(candidates: readonly T[], rendering: boolean): CandidateSlot<T>[] {
+export function candidateSlots<T>(candidates: readonly T[], rendering: boolean, holdPartner = true): CandidateSlot<T>[] {
   const slots: CandidateSlot<T>[] = candidates.map(candidate => ({ kind: 'candidate', candidate }));
-  while (slots.length < CANDIDATE_PAIR) slots.push(rendering ? { kind: 'rendering' } : { kind: 'empty' });
+  while (holdPartner && slots.length < CANDIDATE_PAIR) slots.push(rendering ? { kind: 'rendering' } : { kind: 'empty' });
   if (rendering && !slots.some(slot => slot.kind === 'rendering')) slots.push({ kind: 'rendering' });
   return slots;
 }

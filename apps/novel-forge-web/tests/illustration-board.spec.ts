@@ -405,3 +405,9 @@ describe('pickHint', () => {
     expect(pickHint({ status: 'saved', selectedRef: 'a' })).toBeUndefined();
   });
 });
+
+describe('candidateSlots without a held partner', () => {
+  it('should leave a kept image alone, since a saved illustration renders no more', () => {
+    expect(candidateSlots(['a'], false, false)).toEqual([{ kind: 'candidate', candidate: 'a' }]);
+  });
+});
