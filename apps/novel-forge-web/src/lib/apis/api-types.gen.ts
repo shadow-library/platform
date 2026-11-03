@@ -3986,6 +3986,8 @@ export interface components {
       /** Format: date-time */
       endedAt?: string | null;
       totals: components['schemas']['RunUsageResponse'];
+      /** @description Only on a run that started an illustration, so it can be retried. No other run exposes its input. */
+      illustrationRequest?: components['schemas']['IllustrationRunRequestResponse'];
     };
     /** @enum {string} */
     WorkflowRunStatus: 'running' | 'completed' | 'awaiting_review' | 'failed' | 'cancelled';
@@ -4009,6 +4011,31 @@ export interface components {
       calls: number;
       costUsd: number;
     };
+    /** @description What an author asked an illustration run to render. */
+    IllustrationRunRequestResponse: {
+      subjectType: components['schemas']['IllustrationSubjectType'];
+      subjectKey?: string | null;
+      instructions: string[];
+      references: components['schemas']['AttachReferenceBody'][];
+      autoReferences: boolean;
+      depictsChapter?: number | null;
+    };
+    /** @enum {string} */
+    IllustrationSubjectType: 'entity' | 'chapter' | 'cover';
+    AttachReferenceBody: {
+      /** @description Which kind of project image to attach. */
+      source: components['schemas']['IllustrationReferenceSource'];
+      /** @description Entity key for 'portrait'; the numeric id for 'gallery', 'chapter-image' and 'candidate' (an illustration id, resolving to its selected image); omitted for 'cover'. */
+      sourceId?: string;
+      /** @description 'likeness' pins the face, hair, build and attire of the figure it shows; 'style' lends palette, medium and rendering only. */
+      role: components['schemas']['IllustrationAttachableReferenceRole'];
+      /** @description Free text scoping the reference, e.g. "the armored man in the center" or "the scar only". Trimmed; blank is dropped. */
+      note?: string;
+    };
+    /** @enum {string} */
+    IllustrationReferenceSource: 'cover' | 'portrait' | 'gallery' | 'chapter-image' | 'candidate';
+    /** @enum {string} */
+    IllustrationAttachableReferenceRole: 'likeness' | 'style';
     WorkflowRunDetailResponse: {
       id: string;
       projectId: string;
@@ -5601,22 +5628,6 @@ export interface components {
       /** @description Entity subjects only (else ILL_017): draw the entity as of this chapter (0 = before the story), from canon up to it with the chapter writer's secrets withheld. Defaults to the latest final chapter; a later one is refused with ILL_016. The saved image reaches readers from this chapter on. */
       depictsChapter?: number;
     };
-    /** @enum {string} */
-    IllustrationSubjectType: 'entity' | 'chapter' | 'cover';
-    AttachReferenceBody: {
-      /** @description Which kind of project image to attach. */
-      source: components['schemas']['IllustrationReferenceSource'];
-      /** @description Entity key for 'portrait'; the numeric id for 'gallery', 'chapter-image' and 'candidate' (an illustration id, resolving to its selected image); omitted for 'cover'. */
-      sourceId?: string;
-      /** @description 'likeness' pins the face, hair, build and attire of the figure it shows; 'style' lends palette, medium and rendering only. */
-      role: components['schemas']['IllustrationAttachableReferenceRole'];
-      /** @description Free text scoping the reference, e.g. "the armored man in the center" or "the scar only". Trimmed; blank is dropped. */
-      note?: string;
-    };
-    /** @enum {string} */
-    IllustrationReferenceSource: 'cover' | 'portrait' | 'gallery' | 'chapter-image' | 'candidate';
-    /** @enum {string} */
-    IllustrationAttachableReferenceRole: 'likeness' | 'style';
     IllustrationResponse: {
       id: string;
       projectId: string;
@@ -15909,6 +15920,11 @@ export type WorkflowRunListItemResponse = components['schemas']['WorkflowRunList
 export type WorkflowRunStatus = components['schemas']['WorkflowRunStatus'];
 export type RunUsageResponse = components['schemas']['RunUsageResponse'];
 export type RunCostSourceItem = components['schemas']['RunCostSourceItem'];
+export type IllustrationRunRequestResponse = components['schemas']['IllustrationRunRequestResponse'];
+export type IllustrationSubjectType = components['schemas']['IllustrationSubjectType'];
+export type AttachReferenceBody = components['schemas']['AttachReferenceBody'];
+export type IllustrationReferenceSource = components['schemas']['IllustrationReferenceSource'];
+export type IllustrationAttachableReferenceRole = components['schemas']['IllustrationAttachableReferenceRole'];
 export type WorkflowRunDetailResponse = components['schemas']['WorkflowRunDetailResponse'];
 export type RunModelCallResponse = components['schemas']['RunModelCallResponse'];
 export type CostSource = components['schemas']['CostSource'];
@@ -16096,10 +16112,6 @@ export type JudgeResponse = components['schemas']['JudgeResponse'];
 export type JudgeFindingResponse = components['schemas']['JudgeFindingResponse'];
 export type ChapterReviewResponse = components['schemas']['ChapterReviewResponse'];
 export type StartIllustrationBody = components['schemas']['StartIllustrationBody'];
-export type IllustrationSubjectType = components['schemas']['IllustrationSubjectType'];
-export type AttachReferenceBody = components['schemas']['AttachReferenceBody'];
-export type IllustrationReferenceSource = components['schemas']['IllustrationReferenceSource'];
-export type IllustrationAttachableReferenceRole = components['schemas']['IllustrationAttachableReferenceRole'];
 export type IllustrationResponse = components['schemas']['IllustrationResponse'];
 export type IllustrationStatus = components['schemas']['IllustrationStatus'];
 export type IllustrationOrigin = components['schemas']['IllustrationOrigin'];

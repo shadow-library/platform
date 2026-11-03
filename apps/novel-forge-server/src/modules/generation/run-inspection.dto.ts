@@ -2,8 +2,10 @@ import { EnumType, Field, Integer, OmitType, Schema } from '@shadow-library/clas
 import { Transform } from '@shadow-library/fastify';
 import { Paginated, PaginationQuery } from '@shadow-library/modules/http-core';
 
-import { ContentMode, CostSource, CostTier, SortByTime, WorkflowRunStatus } from '@server/common';
-import { type Ai, type Project } from '@server/database';
+import { ContentMode, CostSource, CostTier, IllustrationSubjectType, SortByTime, WorkflowRunStatus } from '@server/common';
+import { type Ai, type Illustration, type Project } from '@server/database';
+
+import { AttachReferenceBody } from '../illustration/illustration.dto';
 
 @Schema()
 export class RunParams {
@@ -297,10 +299,34 @@ class WorkflowRunSummaryResponse {
   endedAt?: Date | null;
 }
 
+@Schema({ description: 'What an author asked an illustration run to render.' })
+export class IllustrationRunRequestResponse {
+  @Field(() => IllustrationSubjectType)
+  subjectType: Illustration.SubjectType;
+
+  @Field(() => String, { optional: true, nullable: true })
+  subjectKey?: string | null;
+
+  @Field(() => [String])
+  instructions: string[];
+
+  @Field(() => [AttachReferenceBody])
+  references: AttachReferenceBody[];
+
+  @Field()
+  autoReferences: boolean;
+
+  @Field(() => Integer, { optional: true, nullable: true })
+  depictsChapter?: number | null;
+}
+
 @Schema()
 class WorkflowRunListItemResponse extends WorkflowRunSummaryResponse {
   @Field(() => RunUsageResponse)
   totals: RunUsageResponse;
+
+  @Field(() => IllustrationRunRequestResponse, { optional: true, description: 'Only on a run that started an illustration, so it can be retried. No other run exposes its input.' })
+  illustrationRequest?: IllustrationRunRequestResponse;
 }
 
 /**

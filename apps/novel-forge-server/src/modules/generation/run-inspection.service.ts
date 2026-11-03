@@ -12,6 +12,7 @@ import { type CallUsageTotals, emptyCallUsageTotals, type GroupedUsageRow, summa
 import {
   AUTHOR_FACING_GRAPHS,
   type ChapterCostResponse,
+  type IllustrationRunRequestResponse,
   type ListRunsQuery,
   type ListWorkflowRunResponse,
   type RunUsageDetailResponse,
@@ -53,6 +54,21 @@ function presentRun(run: Ai.WorkflowRun): PresentedRun {
   return { ...run, ...splitRunTrace(run.nodeTrace) };
 }
 
+/** A refine run's input is its edit, which names no subject, so only a run that started an illustration answers. */
+export function illustrationRequestOf(run: Pick<Ai.WorkflowRun, 'graph' | 'input'>): IllustrationRunRequestResponse | undefined {
+  if (run.graph !== 'illustration' || !run.input) return undefined;
+  const input = run.input as Partial<IllustrationRunRequestResponse>;
+  if (!input.subjectType) return undefined;
+  return {
+    subjectType: input.subjectType,
+    subjectKey: input.subjectKey ?? null,
+    instructions: input.instructions ?? [],
+    references: input.references ?? [],
+    autoReferences: input.autoReferences ?? true,
+    depictsChapter: input.depictsChapter ?? null,
+  };
+}
+
 @Injectable()
 export class RunInspectionService {
   private readonly db: PrimaryDatabase;
@@ -82,7 +98,10 @@ export class RunInspectionService {
     ]);
 
     const totals = await this.runUsageTotals(projectId, runs);
-    const items = runs.map(run => ({ ...presentRun(run), totals: totals.get(run.id) ?? toRunUsageResponse(emptyCallUsageTotals(), run) }));
+    const items = runs.map(run => {
+      const illustrationRequest = illustrationRequestOf(run);
+      return { ...presentRun(run), totals: totals.get(run.id) ?? toRunUsageResponse(emptyCallUsageTotals(), run), ...(illustrationRequest ? { illustrationRequest } : {}) };
+    });
     return { items, total: totalRow?.total ?? 0, limit: query.limit, offset: query.offset };
   }
 
