@@ -308,10 +308,16 @@ export class ProviderClient {
     );
   }
 
-  // Bun's fetch raises a TypeError, quoting the offending value, for a request it cannot build (a bad URL, a header it cannot carry); it is
-  // never a network failure, and its message may hold a credential, so it is neither retried nor kept.
+  // Bun's fetch raises a TypeError for a request it cannot build (a bad URL, a header it cannot carry), and its message may hold a credential, so that is neither retried nor kept.
+  // Since Bun 1.4 a network failure is a TypeError too, told apart by its system code (ECONNREFUSED, ENOTFOUND); a build failure has no code or an `ERR_` one.
+  private isBuildFailure(error: unknown): boolean {
+    if (!(error instanceof TypeError)) return false;
+    const code = (error as { code?: unknown }).code;
+    return typeof code !== 'string' || code.startsWith('ERR_');
+  }
+
   private sendFailure(error: unknown): ProviderCallError {
-    if (error instanceof TypeError) return new ProviderCallError({ retryable: false, code: 'invalid_request', message: 'The upstream request could not be built' });
+    if (this.isBuildFailure(error)) return new ProviderCallError({ retryable: false, code: 'invalid_request', message: 'The upstream request could not be built' });
     const reason = error instanceof Error ? trimUpstreamMessage(error.message) : '';
     const message = reason ? `The upstream could not be reached: ${reason}` : 'The upstream could not be reached';
     return new ProviderCallError({ retryable: true, code: 'connect', message, cause: error });

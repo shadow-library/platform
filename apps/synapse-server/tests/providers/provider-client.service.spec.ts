@@ -124,14 +124,27 @@ describe('ProviderClient', () => {
       expect(calls).toHaveLength(0);
     });
 
-    it('should classify a connect failure as retryable', async () => {
-      const refused = Object.assign(new Error('Unable to connect. Is the computer able to access the url?'), { code: 'ConnectionRefused' });
-      const fetch: ProviderFetch = () => Promise.reject(refused);
+    it.each([
+      ['ECONNREFUSED', 'ECONNREFUSED: Unable to connect. Is the computer able to access the url?'],
+      ['ENOTFOUND', 'getaddrinfo ENOTFOUND api.example.com'],
+      ['ECONNRESET', 'ECONNRESET: The socket connection was closed unexpectedly.'],
+      ['EPROTO', 'EPROTO: The TLS handshake failed. Does the server speak TLS on this port?'],
+    ])('should classify the TypeError Bun raises for %s as a retryable connect failure', async (code, message) => {
+      const fetch: ProviderFetch = () => Promise.reject(Object.assign(new TypeError(message), { code }));
 
       const error = await failureOf(new ProviderClient(fetch).sendChat(openrouter, TRANSLATED, { stream: false }));
 
       expect(error).toMatchObject({ retryable: true, code: 'connect', bytesSent: false });
-      expect(error.message).toContain('Unable to connect');
+      expect(error.message).toContain(message);
+    });
+
+    it.each(['ERR_INVALID_URL', 'ERR_INVALID_ARG_VALUE'])('should treat a TypeError coded %s as a request fetch cannot build', async code => {
+      const fetch: ProviderFetch = () => Promise.reject(Object.assign(new TypeError('fetch() URL is invalid: sk-or-SECRET'), { code }));
+
+      const error = await failureOf(new ProviderClient(fetch).sendChat(openrouter, TRANSLATED, { stream: false }));
+
+      expect(error).toMatchObject({ retryable: false, code: 'invalid_request' });
+      expect(error.message).not.toContain('SECRET');
     });
 
     it('should treat a request fetch cannot build as fatal, never quoting the TypeError that may hold the key, in the error or the log', async () => {
