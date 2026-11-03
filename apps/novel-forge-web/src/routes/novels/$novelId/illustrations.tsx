@@ -1,10 +1,27 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, AlertTriangleIcon, Badge, Button, CheckIcon, Dialog, FormField, Input, SearchIcon, Select, Spinner, Textarea, toast, Tooltip } from '@shadow-library/ui';
+import {
+  Alert,
+  AlertTriangleIcon,
+  Badge,
+  Button,
+  CheckIcon,
+  Dialog,
+  FormField,
+  IconButton,
+  Input,
+  SearchIcon,
+  Select,
+  Spinner,
+  Textarea,
+  toast,
+  Tooltip,
+} from '@shadow-library/ui';
 
-import { ImageIcon, SparkIcon, StopIcon, TrashIcon } from '@/components/icons';
+import { ExpandIcon, ImageIcon, SparkIcon, StopIcon, TrashIcon } from '@/components/icons';
 import { useCollectionJump } from '@/components/Layout';
 import { type ChipIntent, CollectionPage, DetailPage, EmptyState, ItemPager, type ItemPagerJump, PaneError, PaneLoader, RowAction, StatusChip } from '@/components/nf';
+import { CandidateLightbox } from '@/features/illustrations/CandidateLightbox';
 import { CandidateReferences, IllustrationReferencesPanel, StartReferencesSection } from '@/features/illustrations/ReferenceImages';
 import {
   type IllustrationRun,
@@ -419,6 +436,7 @@ function CandidateGrid({ illustration, busy, onSelect }: CandidateGridProps): Re
   const active = illustration.status === 'active';
   const shown = shownCandidates(illustration);
   const slots = candidateSlots(shown, busy);
+  const [viewing, setViewing] = useState<number>();
   const hint = pickHint(illustration);
 
   return (
@@ -460,6 +478,16 @@ function CandidateGrid({ illustration, busy, onSelect }: CandidateGridProps): Re
                     <CheckIcon size={14} />
                   </span>
                 )}
+                <Tooltip content="View larger">
+                  <IconButton
+                    className={styles.viewLarger}
+                    size="sm"
+                    variant="secondary"
+                    aria-label={`View candidate ${index + 1} larger`}
+                    icon={<ExpandIcon size={14} />}
+                    onClick={() => setViewing(index)}
+                  />
+                </Tooltip>
               </div>
               <CandidateReferences references={candidate.references} />
             </div>
@@ -467,6 +495,15 @@ function CandidateGrid({ illustration, busy, onSelect }: CandidateGridProps): Re
         })}
       </div>
       {hint && !busy && <p className={styles.pickHint}>{hint}</p>}
+      <CandidateLightbox
+        candidates={shown}
+        index={viewing}
+        selectedRef={illustration.selectedRef}
+        canSelect={active && !busy}
+        onIndexChange={setViewing}
+        onSelect={onSelect}
+        onClose={() => setViewing(undefined)}
+      />
     </>
   );
 }

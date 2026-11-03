@@ -1,0 +1,14 @@
+.image {
+  display: block;
+  width: 100%;
+  max-height: 70vh;
+  object-fit: contain;
+  border-radius: var(--sh-radius-md);
+  background: var(--sh-surface-well);
+}
+
+.nav {
+  display: flex;
+  gap: 8px;
+  margin-right: auto;
+}

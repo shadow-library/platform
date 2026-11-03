@@ -64,6 +64,12 @@ export const GridIcon = (p: IconProps): React.JSX.Element => (
   </SvgIcon>
 );
 
+export const ExpandIcon = (p: IconProps): React.JSX.Element => (
+  <SvgIcon {...p}>
+    <path d="M15 3h6v6M21 3l-7 7M9 21H3v-6M3 21l7-7" />
+  </SvgIcon>
+);
+
 export const ChevronLeftIcon = (p: IconProps): React.JSX.Element => (
   <SvgIcon {...p}>
     <path d="M15 18l-6-6 6-6" />
