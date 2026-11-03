@@ -7,6 +7,7 @@ import { formatElapsed, parseRunTarget, runStageLabel, runStageOf, subjectLabel 
 import { useElapsedSeconds } from '@/lib/use-elapsed-seconds';
 
 import { StopIcon } from '../icons';
+import rowStyles from './IllustrationRunRow.module.css';
 import styles from './JobsTray.module.css';
 import { type NovelParams } from './routes';
 
@@ -58,8 +59,8 @@ function IllustrationRunRow({ novelId, run, entityNames }: IllustrationRunRowPro
   return (
     <div className={styles.jobRow}>
       <Spinner size="sm" />
-      <Link to="/novels/$novelId/illustrations" params={{ novelId }} search={{ run: run.id }} className={styles.jobBody}>
-        <div className={styles.jobTitle}>Illustration · {subject ? subjectLabel(subject, entityNames) : run.target}</div>
+      <Link to="/novels/$novelId/illustrations" params={{ novelId }} search={{ run: run.id }} className={rowStyles.link}>
+        <div className={rowStyles.name}>Illustration · {subject ? subjectLabel(subject, entityNames) : run.target}</div>
         <div className={styles.jobStatus}>
           {runStageLabel(runStageOf(usage.data?.calls))} · {formatElapsed(elapsed)}
         </div>
