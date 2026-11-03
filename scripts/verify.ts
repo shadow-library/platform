@@ -37,7 +37,7 @@ const USAGE = `Usage: bun scripts/verify.ts [workspace | scripts | --all] [--fix
   workspace   repo-relative directory (packages/common) or package name (@shadow-library/common)
   scripts     the root tooling itself — scripts/ and the root-level configs
   --all       verify the root tooling and every workspace, and report a combined result
-  --fix       apply prettier and eslint fixes in place instead of only reporting
+  --fix       apply bun fmt and eslint fixes in place instead of only reporting
   --fast      stop after format + lint, skipping type-check and test
   --unit      run only the test step — "bun test" directly for apps/* (ignoring any package.json "test"
               script), the workspace's own "test" script elsewhere when it defines one (packages that
@@ -46,9 +46,6 @@ const USAGE = `Usage: bun scripts/verify.ts [workspace | scripts | --all] [--fix
   --ci        for an apps/* workspace, fail the test step when a test exceeds the 50ms hard cap, listing
               offenders — without it, a test over budget only warns; applies to --unit and to the normal
               test step alike. packages/* and other non-app workspaces stay warn-only regardless`;
-
-// Passed explicitly: prettier runs from the repo root, so a workspace-local ignore file would never be discovered.
-const IGNORE_FILES = ['.gitignore', '.prettierignore'];
 
 const TOOLING_TARGET: VerifyTarget = {
   dir: 'scripts',
@@ -74,10 +71,10 @@ function toTarget(workspace: Workspace): VerifyTarget {
   };
 }
 
+// `--no-script`: a workspace or root `fmt`/`check` script would otherwise replace the tool outright and could turn this gate into a no-op.
 function runFormat(target: VerifyTarget, fix: boolean): boolean {
-  const ignoreArgs = IGNORE_FILES.filter(file => fs.existsSync(path.join(REPO_ROOT, file))).flatMap(file => ['--ignore-path', file]);
-  const args = [fix ? '--write' : '--check', '--log-level', 'warn', ...ignoreArgs, ...target.formatPaths];
-  const result = run(resolveBin('prettier', [REPO_ROOT]), args, { cwd: REPO_ROOT });
+  const args = ['fmt', '--no-script', fix ? '--write' : '--check', '--log-level', 'warn', ...target.formatPaths];
+  const result = run('bun', args, { cwd: REPO_ROOT });
 
   if (result.status !== 0) {
     log.error(`failed format — run "bun scripts/verify.ts ${target.dir} --fix" to format them`);

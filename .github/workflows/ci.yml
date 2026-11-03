@@ -81,7 +81,7 @@ jobs:
             while IFS= read -r f; do
               [ -z "$f" ] && continue
               case "$f" in
-                packages/*|scripts/*|package.json|bun.lock|tsconfig.base.json|tsconfig.json|apps/tsconfig.server.json|apps/tsconfig.web.json|.prettierrc.json|eslint.config.ts|commitlint.config.ts|.github/workflows/ci.yml)
+                packages/*|scripts/*|package.json|bun.lock|tsconfig.base.json|tsconfig.json|apps/tsconfig.server.json|apps/tsconfig.web.json|.prettierrc.json|.prettierignore|eslint.config.ts|commitlint.config.ts|.github/workflows/ci.yml)
                   AFFECTS_ALL=true
                   ;;
                 apps/*)

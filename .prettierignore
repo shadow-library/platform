@@ -1,3 +1,8 @@
+# Outside the formatted scope: `bun fmt` walks the whole repo, so `--staged` and `--changed` would otherwise rewrite these on commit.
+.claude/
+.github/
+docs/
+
 # Generated output. The build rewrites these, so formatting them makes `verify` fail the moment anyone
 # builds — the per-workspace format globs this replaced excluded them for exactly that reason.
 **/*.gen.ts

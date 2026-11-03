@@ -6,6 +6,7 @@ export interface RunOptions {
   cwd: string;
   env?: NodeJS.ProcessEnv;
   stream?: boolean;
+  input?: string;
 }
 
 export interface RunResult {
@@ -43,6 +44,7 @@ export async function runAsync(command: string, args: string[], options: RunOpti
   const child = Bun.spawn([command, ...args], {
     cwd: options.cwd,
     env: stripGitEnv(options.env ?? process.env),
+    stdin: options.input === undefined ? 'ignore' : new Blob([options.input]),
     stdout: 'pipe',
     stderr: 'pipe',
   });

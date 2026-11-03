@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite dev --port 3000",
     "build:app": "vite build && vite build --config vite.sw.config.ts && bun run format:gen",
-    "format:gen": "prettier --log-level warn --write src/routeTree.gen.ts",
+    "format:gen": "bun fmt --log-level warn src/routeTree.gen.ts",
     "start": "bun main.ts"
   },
   "shadow": {

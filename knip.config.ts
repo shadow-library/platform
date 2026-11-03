@@ -129,6 +129,8 @@ const config: KnipConfig = {
     ),
     e2e: { entry: ['tests/**/*.ts', 'seed/**/*.ts'], project: ['**/*.ts'] },
   },
+  // knip reads the `bun fmt` subcommand as a binary named `fmt`.
+  ignoreBinaries: ['fmt'],
   ignoreExportsUsedInFile: true,
   // Spawned by path from another workspace's directory, never imported.
   ignoreUnresolved: [/^scripts\//, 'seed/seed.ts'],

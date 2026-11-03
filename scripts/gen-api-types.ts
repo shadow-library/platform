@@ -3,10 +3,9 @@ import os from 'node:os';
 import path from 'node:path';
 
 import openapiTS, { astToString, type OpenAPITSOptions } from 'openapi-typescript';
-import prettier from 'prettier';
 
-import { log, reportError, ShadowError, stripGitEnv } from './utils/index.ts';
-import { API_TYPES_PATH, findWorkspace, findWorkspaces, type Workspace } from './workspaces.ts';
+import { log, reportError, runAsync, ShadowError, stripGitEnv } from './utils/index.ts';
+import { API_TYPES_PATH, findWorkspace, findWorkspaces, REPO_ROOT, type Workspace } from './workspaces.ts';
 
 interface OpenApiParameter {
   in: string;
@@ -158,17 +157,15 @@ export function buildTypeAliases(document: OpenApiDocument): string {
   return output;
 }
 
-// Shared by the write and `--check` paths so they cannot diverge; `outputPath` only steers prettier's config resolution.
+// Shared by the write and `--check` paths so they cannot diverge.
 export async function generateApiTypesContents(document: OpenApiDocument, outputPath: string, options: OpenAPITSOptions = {}): Promise<string> {
   const ast = await openapiTS(document as any, options); // openapi-typescript's input type is narrower than our validated document shape
   const rawContents = `${astToString(ast)}${buildTypeAliases(document)}`;
 
-  const prettierOptions = await prettier.resolveConfig(outputPath);
-  try {
-    return await prettier.format(rawContents, { ...prettierOptions, parser: 'typescript' });
-  } catch (cause) {
-    throw new ShadowError(`Generated API types failed formatting — left ${outputPath} untouched`, { cause });
-  }
+  // `--parser`, not `--stdin-filepath`: a path matching `.prettierignore`, as every `*.gen.ts` does, comes back unformatted with exit 0.
+  const formatted = await runAsync('bun', ['fmt', '--no-script', '--parser=typescript'], { cwd: REPO_ROOT, input: rawContents });
+  if (formatted.status !== 0) throw new ShadowError(`Generated API types failed formatting — left ${outputPath} untouched\n${formatted.stderr.trim()}`);
+  return formatted.stdout;
 }
 
 function pairedServer(webApp: Workspace, workspaces: Workspace[]): Workspace {
